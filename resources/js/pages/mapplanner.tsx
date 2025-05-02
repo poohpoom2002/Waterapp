@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 
 type LatLng = {
   lat: number;
@@ -18,8 +18,12 @@ export default function MapPlanner() {
         spacing,
       });
       setResults(response.data.plant_locations);
-    } catch (error: any) {
-      console.error('Error generating points:', error.response?.data || error.message);
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        console.error('Error generating points:', error.response?.data || error.message);
+      } else {
+        console.error('An unexpected error occurred:', error);
+      }
     }
   };
 
