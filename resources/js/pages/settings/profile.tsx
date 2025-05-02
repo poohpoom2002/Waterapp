@@ -22,12 +22,20 @@ const breadcrumbs: BreadcrumbItem[] = [
 type ProfileForm = {
     name: string;
     email: string;
-}
+};
 
-export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: boolean; status?: string }) {
+export default function Profile({
+    mustVerifyEmail,
+    status,
+}: {
+    mustVerifyEmail: boolean;
+    status?: string;
+}) {
     const { auth } = usePage<SharedData>().props;
 
-    const { data, setData, patch, errors, processing, recentlySuccessful } = useForm<Required<ProfileForm>>({
+    const { data, setData, patch, errors, processing, recentlySuccessful } = useForm<
+        Required<ProfileForm>
+    >({
         name: auth.user.name,
         email: auth.user.email,
     });
@@ -46,7 +54,10 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
 
             <SettingsLayout>
                 <div className="space-y-6">
-                    <HeadingSmall title="Profile information" description="Update your name and email address" />
+                    <HeadingSmall
+                        title="Profile information"
+                        description="Update your name and email address"
+                    />
 
                     <form onSubmit={submit} className="space-y-6">
                         <div className="grid gap-2">
@@ -90,7 +101,7 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
                                         href={route('verification.send')}
                                         method="post"
                                         as="button"
-                                        className="text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
+                                        className="text-foreground hover:decoration-current! underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out dark:decoration-neutral-500"
                                     >
                                         Click here to resend the verification email.
                                     </Link>
