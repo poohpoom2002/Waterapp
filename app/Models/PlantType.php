@@ -4,14 +4,15 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Farm extends Model
+class PlantType extends Model
 {
     protected $fillable = [
-        'plant_name',
-        'plant_type',
+        'name',
+        'type',
         'plant_spacing',
         'row_spacing',
-        'water_needed'
+        'water_needed',
+        'description'
     ];
 
     protected $casts = [
@@ -20,8 +21,8 @@ class Farm extends Model
         'water_needed' => 'float'
     ];
 
-    public function plantType()
+    public function farms()
     {
-        return $this->belongsTo(PlantType::class);
+        return $this->hasMany(Farm::class);
     }
 }

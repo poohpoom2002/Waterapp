@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\PlantType;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
@@ -10,41 +11,53 @@ class FarmController extends Controller
     public function generatePlantingPoints(Request $request): JsonResponse
     {
         $request->validate([
-            'area' => 'required|array',
+            'area' => 'required|array|min:3',
             'area.*.lat' => 'required|numeric',
             'area.*.lng' => 'required|numeric',
-            'spacing' => 'required|numeric|min:1',
+            'plant_type_id' => 'required|exists:plant_types,id',
+            'plant_spacing' => 'required|numeric|min:0.1',
+            'row_spacing' => 'required|numeric|min:0.1',
         ]);
 
         $area = $request->input('area');
-        $spacing = $request->input('spacing');
+        $plantType = PlantType::findOrFail($request->input('plant_type_id'));
+        $plantSpacing = $request->input('plant_spacing');
+        $rowSpacing = $request->input('row_spacing');
 
-        // Calculate the bounding box of the area
+        // Calculate the bounding box of the polygon
         $minLat = min(array_column($area, 'lat'));
         $maxLat = max(array_column($area, 'lat'));
         $minLng = min(array_column($area, 'lng'));
         $maxLng = max(array_column($area, 'lng'));
 
-        // Generate grid points
-        $plantLocations = [];
-        $lat = $minLat;
-        while ($lat <= $maxLat) {
-            $lng = $minLng;
-            while ($lng <= $maxLng) {
-                // Check if point is inside the polygon (area)
-                if ($this->isPointInPolygon($lat, $lng, $area)) {
-                    $plantLocations[] = [
-                        'lat' => $lat,
-                        'lng' => $lng,
+        // Convert meters to degrees (approximate)
+        // 1 degree of latitude = 111,320 meters
+        // 1 degree of longitude = 111,320 * cos(latitude) meters
+        $latToMeters = 111320;
+        $lngToMeters = 111320 * cos(deg2rad(($minLat + $maxLat) / 2));
+
+        $plantSpacingDegrees = $plantSpacing / $lngToMeters;
+        $rowSpacingDegrees = $rowSpacing / $latToMeters;
+
+        $points = [];
+        $currentLat = $minLat;
+
+        while ($currentLat <= $maxLat) {
+            $currentLng = $minLng;
+            while ($currentLng <= $maxLng) {
+                // Check if the point is inside the polygon
+                if ($this->isPointInPolygon($currentLat, $currentLng, $area)) {
+                    $points[] = [
+                        'lat' => $currentLat,
+                        'lng' => $currentLng
                     ];
                 }
-                // Move to next point (spacing in degrees, approximately)
-                $lng += $spacing / 111320; // Convert meters to degrees (approximate)
+                $currentLng += $plantSpacingDegrees;
             }
-            $lat += $spacing / 111320; // Convert meters to degrees (approximate)
+            $currentLat += $rowSpacingDegrees;
         }
 
-        return response()->json(['plant_locations' => $plantLocations]);
+        return response()->json(['plant_locations' => $points]);
     }
 
     private function isPointInPolygon(float $lat, float $lng, array $polygon): bool
