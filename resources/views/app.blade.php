@@ -30,10 +30,14 @@
             }
         </style>
 
-        <title>WaterApp - Plant Layout Generator</title>
+        <title>WaterApp - Map Planner</title>
 
-        {{-- Favicon --}}
-        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path fill='%233B82F6' d='M16 2C16 2 24 10 24 16C24 22 20 26 16 26C12 26 8 22 8 16C8 10 16 2 16 2Z'/><path fill='none' stroke='%231D4ED8' stroke-width='1' d='M16 2C16 2 24 10 24 16C24 22 20 26 16 26C12 26 8 22 8 16C8 10 16 2 16 2Z'/></svg>">
+        <!-- Favicon -->
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+        <link rel="icon" type="image/png" href="/favicon.png">
+        
+        <!-- Meta tags -->
+        <meta name="description" content="WaterApp - Smart Water Management System">
         <meta name="theme-color" content="#3B82F6">
 
         <link rel="preconnect" href="https://fonts.bunny.net">

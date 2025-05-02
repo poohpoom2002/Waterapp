@@ -6,22 +6,5 @@ use Illuminate\Database\Eloquent\Model;
 
 class Farm extends Model
 {
-    protected $fillable = [
-        'plant_name',
-        'plant_type',
-        'plant_spacing',
-        'row_spacing',
-        'water_needed'
-    ];
-
-    protected $casts = [
-        'plant_spacing' => 'float',
-        'row_spacing' => 'float',
-        'water_needed' => 'float'
-    ];
-
-    public function plantType()
-    {
-        return $this->belongsTo(PlantType::class);
-    }
+    //
 }
