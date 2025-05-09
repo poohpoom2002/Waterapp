@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import axios, { AxiosError } from 'axios';
-import { MapContainer, TileLayer, CircleMarker, FeatureGroup, LayersControl } from 'react-leaflet';
+import axios from 'axios';
+import { MapContainer, TileLayer, FeatureGroup, LayersControl } from 'react-leaflet';
 import { EditControl } from 'react-leaflet-draw';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
 
-type LatLng = {
+// Types
+interface LatLng {
     lat: number;
     lng: number;
-};
+}
 
-type PlantType = {
+interface PlantType {
     id: number;
     name: string;
     type: string;
@@ -18,8 +19,22 @@ type PlantType = {
     row_spacing: number;
     water_needed: number;
     description: string;
+}
+
+type AreaType = 'field' | 'river' | 'powerplant' | 'building';
+
+// Constants
+const DEFAULT_MAP_CENTER: [number, number] = [13.7563, 100.5018]; // Bangkok
+const MAX_AREA = 100000; // 100,000 square meters (10 hectares)
+
+const AREA_DESCRIPTIONS: Record<AreaType, string> = {
+    field: 'Agricultural land for planting crops and vegetation.',
+    river: 'Water body for irrigation and water management.',
+    powerplant: 'Energy generation facility area.',
+    building: 'Structure or facility area.'
 };
 
+// Components
 const LoadingSpinner = () => (
     <div className="flex items-center justify-center space-x-2">
         <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
@@ -27,40 +42,54 @@ const LoadingSpinner = () => (
     </div>
 );
 
+const AreaTypeButton: React.FC<{
+    type: AreaType;
+    isSelected: boolean;
+    isDisabled: boolean;
+    onClick: () => void;
+}> = ({ type, isSelected, isDisabled, onClick }) => (
+    <button
+        onClick={onClick}
+        className={`w-32 rounded px-4 py-2 text-white transition-colors duration-200 ${
+            isSelected
+                ? 'bg-blue-600 hover:bg-blue-700'
+                : 'bg-gray-700 hover:bg-gray-600'
+        }`}
+    >
+        {type.charAt(0).toUpperCase() + type.slice(1).replace('powerplant', 'Power Plant')}
+    </button>
+);
+
+const PlantInfo: React.FC<{ plant: PlantType }> = ({ plant }) => (
+    <div className="rounded-lg bg-gray-800 p-4">
+        <h3 className="mb-2 text-lg font-medium text-white">{plant.name}</h3>
+        <div className="space-y-2 text-sm text-gray-300">
+            <p><span className="font-medium">Type:</span> {plant.type}</p>
+            <p><span className="font-medium">Plant Spacing:</span> {plant.plant_spacing}m</p>
+            <p><span className="font-medium">Row Spacing:</span> {plant.row_spacing}m</p>
+            <p><span className="font-medium">Water Needed:</span> {plant.water_needed}L/day</p>
+            <p className="mt-2 text-gray-400">{plant.description}</p>
+        </div>
+    </div>
+);
+
+// Main Component
 export default function MapPlanner() {
+    // State
     const [area, setArea] = useState<LatLng[]>([]);
     const [selectedPlant, setSelectedPlant] = useState<PlantType | null>(null);
     const [plantTypes, setPlantTypes] = useState<PlantType[]>([]);
     const [results, setResults] = useState<LatLng[]>([]);
-    const [mapCenter, setMapCenter] = useState<[number, number]>([13.7563, 100.5018]); // Default to Bangkok
+    const [mapCenter, setMapCenter] = useState<[number, number]>(DEFAULT_MAP_CENTER);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [status, setStatus] = useState<string>('Ready to draw your field');
+    const [status, setStatus] = useState<string>('Draw an area on the map first');
     const [showAllPoints, setShowAllPoints] = useState(false);
+    const [selectedAreaTypes, setSelectedAreaTypes] = useState<AreaType[]>([]);
     const featureGroupRef = useRef<any>(null);
 
-    // Calculate displayed points based on showAllPoints state
-    const displayedPoints = useMemo(() => {
-        if (showAllPoints) return results;
-        if (!selectedPlant) return results;
-        
-        // Calculate grid parameters
-        const totalPoints = results.length;
-        const pointsPerRow = Math.ceil(Math.sqrt(totalPoints * selectedPlant.row_spacing / selectedPlant.plant_spacing));
-        const totalRows = Math.ceil(totalPoints / pointsPerRow);
-
-        // Show every 3rd row, but all plants in each displayed row
-        const rowStep = 3;
-
-        // Sample points in a grid pattern
-        return results.filter((_, index) => {
-            const rowIndex = Math.floor(index / pointsPerRow);
-            return rowIndex % rowStep === 0;
-        });
-    }, [results, showAllPoints, selectedPlant]);
-
+    // Effects
     useEffect(() => {
-        // Fetch plant types when component mounts
         const fetchPlantTypes = async () => {
             try {
                 const response = await axios.get<PlantType[]>('/api/plant-types');
@@ -82,8 +111,29 @@ export default function MapPlanner() {
         }
     }, [results]);
 
+    useEffect(() => {
+        // Check for pre-selected types in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const selectedTypes = urlParams.get('selected_types');
+        
+        if (selectedTypes) {
+            const types = selectedTypes.split(',').map(type => type.trim() as AreaType);
+            setSelectedAreaTypes(types);
+            setStatus(`Selected types: ${types.join(', ')}`);
+        }
+    }, []);
+
+    // Memoized values
+    const displayedPoints = useMemo(() => {
+        if (showAllPoints || !selectedPlant) return results;
+        
+        const totalPoints = results.length;
+        const pointsPerRow = Math.ceil(Math.sqrt(totalPoints * selectedPlant.row_spacing / selectedPlant.plant_spacing));
+        return results.filter((_, index) => Math.floor(index / pointsPerRow) % 3 === 0);
+    }, [results, showAllPoints, selectedPlant]);
+
+    // Utility functions
     const calculateArea = (points: LatLng[]): number => {
-        // Calculate area using the shoelace formula
         let area = 0;
         for (let i = 0; i < points.length; i++) {
             const j = (i + 1) % points.length;
@@ -93,6 +143,7 @@ export default function MapPlanner() {
         return Math.abs(area) / 2;
     };
 
+    // Event handlers
     const handleSubmit = async () => {
         if (area.length < 3) {
             setError('Please draw a polygon on the map first');
@@ -104,18 +155,15 @@ export default function MapPlanner() {
             return;
         }
 
-        // Calculate area in square meters (approximate)
         const areaSize = calculateArea(area);
-        const maxArea = 100000; // 100,000 square meters (10 hectares)
-
-        if (areaSize > maxArea) {
-            setError(`Area is too large. Maximum allowed area is ${maxArea/10000} hectares`);
+        if (areaSize > MAX_AREA) {
+            setError(`Area is too large. Maximum allowed area is ${MAX_AREA/10000} hectares`);
             return;
         }
 
         setIsLoading(true);
         setError(null);
-        setStatus('Calculating optimal plant positions...');
+        setStatus(`Calculating optimal plant positions for ${selectedAreaTypes.join(', ')}...`);
 
         try {
             const response = await axios.post<{ plant_locations: LatLng[] }>(
@@ -125,22 +173,35 @@ export default function MapPlanner() {
                     plant_type_id: selectedPlant.id,
                     plant_spacing: selectedPlant.plant_spacing,
                     row_spacing: selectedPlant.row_spacing,
+                    area_type: selectedAreaTypes,
                 }
             );
             setResults(response.data.plant_locations);
-            setStatus(`Successfully generated ${response.data.plant_locations.length} planting points`);
-        } catch (error: unknown) {
+            setStatus(`Successfully generated ${response.data.plant_locations.length} planting points for ${selectedAreaTypes.join(', ')}`);
+        } catch (error) {
             if (axios.isAxiosError(error)) {
                 setError(error.response?.data?.message || 'Error generating points');
-                console.error('Error generating points:', error.response?.data || error.message);
             } else {
                 setError('An unexpected error occurred');
-                console.error('An unexpected error occurred:', error);
             }
             setStatus('Failed to generate planting points');
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const toggleAreaType = (type: AreaType) => {
+        setSelectedAreaTypes(prev => {
+            const newTypes = prev.includes(type)
+                ? prev.filter(t => t !== type)
+                : [...prev, type];
+            
+            setStatus(newTypes.length === 0 
+                ? 'Select area type(s) or draw an area on the map.'
+                : `Selected ${newTypes.length} type(s): ${newTypes.join(', ')}`);
+            
+            return newTypes;
+        });
     };
 
     const onCreated = (e: any) => {
@@ -151,58 +212,44 @@ export default function MapPlanner() {
         }));
         setArea(coordinates);
         setError(null);
-        setStatus('Field drawn. Select a plant type and click "Generate Points"');
+        setStatus(selectedAreaTypes.length > 0 
+            ? `Area drawn. Selected types: ${selectedAreaTypes.join(', ')}`
+            : 'Area drawn. Select area type(s) or continue.');
     };
 
     const onDeleted = () => {
         setArea([]);
         setResults([]);
         setError(null);
-        setStatus('Ready to draw your field');
+        setStatus(selectedAreaTypes.length > 0 
+            ? `Selected types: ${selectedAreaTypes.join(', ')}`
+            : 'Select area type(s) or draw an area on the map.');
     };
 
+    const handleNext = () => {
+        if (selectedAreaTypes.length === 0 || !area.length || !selectedPlant) return;
+
+        const params = new URLSearchParams();
+        params.append('areaType', selectedAreaTypes[0]);
+        params.append('area', JSON.stringify(area));
+        params.append('plantType', JSON.stringify(selectedPlant));
+
+        window.location.href = `/generate-tree?${params.toString()}`;
+    };
+
+    // Render
     return (
         <div className="min-h-screen bg-gray-900 p-6">
             <h1 className="mb-4 text-xl font-bold text-white">Plant Layout Generator</h1>
             <p className="mb-4 text-sm text-gray-400">
-                Select a plant type and draw a polygon on the map to generate planting points.
-                Maximum area: 10 hectares.
+                Draw an area on the map (recommended not over 10 hectares) and select the area type and plant type to proceed.
             </p>
 
             <div className="mb-4 flex items-center justify-between rounded-lg bg-gray-800 p-4">
                 <div className="flex items-center space-x-2">
-                    {isLoading ? (
-                        <LoadingSpinner />
-                    ) : (
-                        <div className="h-4 w-4 rounded-full bg-green-500"></div>
-                    )}
+                    <div className="h-4 w-4 rounded-full bg-green-500"></div>
                     <span className="text-sm text-gray-300">{status}</span>
                 </div>
-                {results.length > 0 && (
-                    <div className="flex items-center space-x-4">
-                        <span className="text-sm text-blue-400">
-                            {!showAllPoints ? `Showing ${displayedPoints.length} of ` : ''}{results.length} plants
-                        </span>
-                        {results.length > 1000 && (
-                            <label className="flex items-center space-x-2">
-                                <input
-                                    type="checkbox"
-                                    checked={showAllPoints}
-                                    onChange={(e) => setShowAllPoints(e.target.checked)}
-                                    className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                                />
-                                <span className="text-sm text-gray-300">
-                                    Show all points
-                                    {showAllPoints && (
-                                        <span className="ml-1 text-yellow-400">
-                                            (May affect performance)
-                                        </span>
-                                    )}
-                                </span>
-                            </label>
-                        )}
-                    </div>
-                )}
             </div>
 
             {error && (
@@ -211,184 +258,110 @@ export default function MapPlanner() {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                    <div className="space-y-4">
-                        <div>
-                            <label className="mb-1 block text-sm font-medium text-gray-300">
-                                Select Plant Type
-                            </label>
-                            <select
-                                className="w-full rounded border border-gray-700 bg-gray-800 p-2 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                                value={selectedPlant?.id || ''}
-                                onChange={(e) => {
-                                    const plant = plantTypes.find(
-                                        (p) => p.id === Number(e.target.value)
-                                    );
-                                    setSelectedPlant(plant || null);
-                                    if (plant) {
-                                        setStatus(`Selected ${plant.name}. Draw your field or click "Generate Points"`);
-                                    }
-                                }}
-                            >
-                                <option value="">Select a plant...</option>
-                                {plantTypes.map((plant) => (
-                                    <option key={plant.id} value={plant.id}>
-                                        {plant.name} ({plant.type})
-                                    </option>
-                                ))}
-                            </select>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                <div className="space-y-4 lg:col-span-1">
+                    <div>
+                        <label className="mb-1 block text-sm font-medium text-gray-300">
+                            Area Configuration
+                        </label>
+                        <div className="space-y-2">
+                            {Object.keys(AREA_DESCRIPTIONS).map((type) => (
+                                <div key={type} className="flex items-center gap-4">
+                                    <AreaTypeButton
+                                        type={type as AreaType}
+                                        isSelected={selectedAreaTypes.includes(type as AreaType)}
+                                        isDisabled={false}
+                                        onClick={() => toggleAreaType(type as AreaType)}
+                                    />
+                                    <span className="text-sm text-gray-400">
+                                        {AREA_DESCRIPTIONS[type as AreaType]}
+                                    </span>
+                                </div>
+                            ))}
                         </div>
-
-                        {selectedPlant && (
-                            <div className="rounded-lg border border-gray-700 bg-gray-800 p-4">
-                                <h3 className="mb-2 font-medium text-white">Plant Details</h3>
-                                <p className="mb-4 text-sm text-gray-400">
-                                    {selectedPlant.description}
-                                </p>
-
-                                <div className="space-y-3">
-                                    <div className="rounded border border-gray-700 bg-gray-900 p-3">
-                                        <h4 className="mb-2 font-medium text-blue-400">
-                                            Spacing Requirements
-                                        </h4>
-                                        <div className="grid grid-cols-2 gap-2 text-sm">
-                                            <div className="flex items-center text-gray-300">
-                                                <svg
-                                                    className="mr-2 h-4 w-4 text-blue-400"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    viewBox="0 0 24 24"
-                                                >
-                                                    <path
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                        strokeWidth="2"
-                                                        d="M4 6h16M4 12h16M4 18h16"
-                                                    />
-                                                </svg>
-                                                <span>Plant Spacing:</span>
-                                                <span className="ml-1 font-medium text-blue-400">
-                                                    {selectedPlant.plant_spacing}m
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center text-gray-300">
-                                                <svg
-                                                    className="mr-2 h-4 w-4 text-blue-400"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    viewBox="0 0 24 24"
-                                                >
-                                                    <path
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                        strokeWidth="2"
-                                                        d="M4 6h16M4 12h16M4 18h16"
-                                                    />
-                                                </svg>
-                                                <span>Row Spacing:</span>
-                                                <span className="ml-1 font-medium text-blue-400">
-                                                    {selectedPlant.row_spacing}m
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="rounded border border-gray-700 bg-gray-900 p-3">
-                                        <h4 className="mb-2 font-medium text-blue-400">
-                                            Water Requirements
-                                        </h4>
-                                        <div className="flex items-center text-sm text-gray-300">
-                                            <svg
-                                                className="mr-2 h-4 w-4 text-blue-400"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                            >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth="2"
-                                                    d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"
-                                                />
-                                            </svg>
-                                            <span>Water Needed per Plant:</span>
-                                            <span className="ml-1 font-medium text-blue-400">
-                                                {selectedPlant.water_needed}L
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        <button
-                            onClick={handleSubmit}
-                            className="w-full rounded bg-blue-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-700"
-                            disabled={area.length < 3 || !selectedPlant || isLoading}
-                        >
-                            {isLoading ? (
-                                <div className="flex items-center justify-center space-x-2">
-                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                                    <span>Generating Points...</span>
-                                </div>
-                            ) : (
-                                'Generate Points'
-                            )}
-                        </button>
                     </div>
+
+                    <div>
+                        <label className="mb-1 block text-sm font-medium text-gray-300">
+                            Plant Selection
+                            <span className="ml-2 text-sm font-normal text-gray-400">
+                                {selectedPlant ? `(${selectedPlant.name})` : '(Select a plant type)'}
+                            </span>
+                        </label>
+                        <select
+                            value={selectedPlant?.id || ''}
+                            onChange={(e) => {
+                                const plant = plantTypes.find(p => p.id === Number(e.target.value));
+                                setSelectedPlant(plant || null);
+                                setStatus(plant ? `${plant.name} selected` : 'Select a plant type');
+                            }}
+                            className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                        >
+                            <option value="">Select a plant type</option>
+                            {plantTypes.map((plant) => (
+                                <option key={plant.id} value={plant.id}>
+                                    {plant.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {selectedPlant && <PlantInfo plant={selectedPlant} />}
                 </div>
 
-                <div className="h-[500px] overflow-hidden rounded-lg border border-gray-700">
-                    <MapContainer
-                        center={mapCenter}
-                        zoom={13}
-                        maxZoom={25}
-                        style={{ height: '100%', width: '100%' }}
-                    >
-                        <LayersControl position="topright">
-                            <LayersControl.BaseLayer checked name="Street Map">
-                                <TileLayer
-                                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                                />
-                            </LayersControl.BaseLayer>
-                            <LayersControl.BaseLayer name="Satellite">
-                                <TileLayer
-                                    url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                                    attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
-                                />
-                            </LayersControl.BaseLayer>
-                        </LayersControl>
+                <div className="space-y-4 lg:col-span-2">
+                    <div className="h-[600px] w-full overflow-hidden rounded-lg border border-gray-700">
+                        <MapContainer
+                            center={mapCenter}
+                            zoom={13}
+                            maxZoom={19}
+                            minZoom={3}
+                            style={{ height: '100%', width: '100%' }}
+                            zoomControl={true}
+                            scrollWheelZoom={true}
+                        >
+                            <LayersControl position="topright">
+                                <LayersControl.BaseLayer checked name="Street Map">
+                                    <TileLayer
+                                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                        maxZoom={19}
+                                    />
+                                </LayersControl.BaseLayer>
+                                <LayersControl.BaseLayer name="Satellite">
+                                    <TileLayer
+                                        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                                        attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
+                                        maxZoom={19}
+                                    />
+                                </LayersControl.BaseLayer>
+                            </LayersControl>
 
-                        <FeatureGroup ref={featureGroupRef}>
-                            <EditControl
-                                position="topright"
-                                onCreated={onCreated}
-                                onDeleted={onDeleted}
-                                draw={{
-                                    rectangle: false,
-                                    circle: false,
-                                    circlemarker: false,
-                                    marker: false,
-                                    polyline: false,
-                                }}
-                            />
-                        </FeatureGroup>
-
-                        {displayedPoints.map((point, index) => (
-                            <CircleMarker
-                                key={index}
-                                center={[point.lat, point.lng]}
-                                radius={0.5}
-                                pathOptions={{
-                                    color: 'red',
-                                    fillColor: 'red',
-                                    fillOpacity: 1,
-                                }}
-                            />
-                        ))}
-                    </MapContainer>
+                            <FeatureGroup ref={featureGroupRef}>
+                                <EditControl
+                                    position="topright"
+                                    onCreated={onCreated}
+                                    onDeleted={onDeleted}
+                                    draw={{
+                                        rectangle: false,
+                                        circle: false,
+                                        circlemarker: false,
+                                        marker: false,
+                                        polyline: false,
+                                    }}
+                                />
+                            </FeatureGroup>
+                        </MapContainer>
+                    </div>
+                    <div className="flex justify-end">
+                        <button
+                            onClick={handleNext}
+                            disabled={!selectedPlant || area.length < 3 || selectedAreaTypes.length === 0}
+                            className="rounded bg-green-600 px-6 py-3 text-white transition-colors duration-200 hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-700"
+                        >
+                            Next
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

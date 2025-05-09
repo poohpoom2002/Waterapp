@@ -14,6 +14,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('dashboard');
 
     Route::get('planner', [FarmController::class, 'planner'])->name('planner');
+    Route::get('generate-tree', [FarmController::class, 'generateTree'])->name('generate.tree');
     Route::get('/api/plant-types', [FarmController::class, 'getPlantTypes']);
     Route::post('/api/generate-planting-points', [FarmController::class, 'generatePlantingPoints']);
 });

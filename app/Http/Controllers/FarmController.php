@@ -167,4 +167,43 @@ class FarmController extends Controller
 
         return $inside;
     }
+
+    public function generateTree(Request $request)
+    {
+        try {
+            // Get and decode the area data from the URL
+            $areaData = json_decode($request->input('area'), true);
+            $plantTypeData = json_decode($request->input('plantType'), true);
+            $areaType = $request->input('areaType');
+            
+            // Validate the incoming data
+            $validated = $request->validate([
+                'areaType' => 'required|string|in:field,river,powerplant,building',
+            ]);
+
+            // Validate the area data
+            if (!is_array($areaData)) {
+                throw new \Exception('Invalid area data');
+            }
+
+            foreach ($areaData as $point) {
+                if (!isset($point['lat']) || !isset($point['lng'])) {
+                    throw new \Exception('Invalid area point data');
+                }
+            }
+
+            // Validate the plant type data
+            if (!is_array($plantTypeData) || !isset($plantTypeData['id'])) {
+                throw new \Exception('Invalid plant type data');
+            }
+
+            return Inertia::render('generatetree', [
+                'areaType' => $validated['areaType'],
+                'area' => $areaData,
+                'plantType' => $plantTypeData,
+            ]);
+        } catch (\Exception $e) {
+            return redirect()->route('planner')->with('error', $e->getMessage());
+        }
+    }
 }
