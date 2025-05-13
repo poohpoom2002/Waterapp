@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { MapContainer, TileLayer, FeatureGroup, LayersControl } from 'react-leaflet';
+import { MapContainer, TileLayer, FeatureGroup, LayersControl, useMapEvents, Circle, Polygon } from 'react-leaflet';
 import { EditControl } from 'react-leaflet-draw';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
+import { router } from '@inertiajs/react';
+import { route } from 'ziggy-js';
 
 // Types
 interface LatLng {
@@ -21,20 +23,34 @@ interface PlantType {
     description: string;
 }
 
-type AreaType = 'field' | 'river' | 'powerplant' | 'building';
+type AreaType = 'field' | 'river' | 'powerplant' | 'building' | 'pump';
+
+interface LayerData {
+    type: AreaType;
+    coordinates: LatLng[];
+}
 
 // Constants
-const DEFAULT_MAP_CENTER: [number, number] = [13.7563, 100.5018]; // Bangkok
-const MAX_AREA = 100000; // 100,000 square meters (10 hectares)
+const DEFAULT_MAP_CENTER: [number, number] = [13.7563, 100.5018];
+const MAX_AREA = 100000; // 10 hectares
 
 const AREA_DESCRIPTIONS: Record<AreaType, string> = {
     field: 'Agricultural land for planting crops and vegetation.',
     river: 'Water body for irrigation and water management.',
     powerplant: 'Energy generation facility area.',
-    building: 'Structure or facility area.'
+    building: 'Structure or facility area.',
+    pump: 'Water pump station for irrigation system.'
 };
 
-// Components
+const AREA_COLORS: Record<AreaType, string> = {
+    river: '#3B82F6',    // Blue
+    field: '#22C55E',    // Green
+    powerplant: '#EF4444', // Red
+    building: '#F59E0B',  // Yellow
+    pump: '#1E40AF'      // Dark Blue
+};
+
+// Helper Components
 const LoadingSpinner = () => (
     <div className="flex items-center justify-center space-x-2">
         <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
@@ -45,15 +61,15 @@ const LoadingSpinner = () => (
 const AreaTypeButton: React.FC<{
     type: AreaType;
     isSelected: boolean;
-    isDisabled: boolean;
+    isActive: boolean;
     onClick: () => void;
-}> = ({ type, isSelected, isDisabled, onClick }) => (
+}> = ({ type, isSelected, isActive, onClick }) => (
     <button
         onClick={onClick}
         className={`w-32 rounded px-4 py-2 text-white transition-colors duration-200 ${
-            isSelected
-                ? 'bg-blue-600 hover:bg-blue-700'
-                : 'bg-gray-700 hover:bg-gray-600'
+            isActive ? 'bg-blue-600 hover:bg-blue-700' : 
+            isSelected ? 'bg-gray-600 hover:bg-gray-500' : 
+            'bg-gray-700 hover:bg-gray-600'
         }`}
     >
         {type.charAt(0).toUpperCase() + type.slice(1).replace('powerplant', 'Power Plant')}
@@ -73,10 +89,33 @@ const PlantInfo: React.FC<{ plant: PlantType }> = ({ plant }) => (
     </div>
 );
 
+// Map Event Handlers
+const MapClickHandler: React.FC<{
+    isPumpMode: boolean;
+    isBuildingMode: boolean;
+    isPowerPlantMode: boolean;
+    onPumpPlace: (lat: number, lng: number) => void;
+    onBuildingPlace: (lat: number, lng: number) => void;
+    onPowerPlantPlace: (lat: number, lng: number) => void;
+}> = ({ isPumpMode, isBuildingMode, isPowerPlantMode, onPumpPlace, onBuildingPlace, onPowerPlantPlace }) => {
+    useMapEvents({
+        click: (e) => {
+            if (isPumpMode) {
+                onPumpPlace(e.latlng.lat, e.latlng.lng);
+            } else if (isBuildingMode) {
+                onBuildingPlace(e.latlng.lat, e.latlng.lng);
+            } else if (isPowerPlantMode) {
+                onPowerPlantPlace(e.latlng.lat, e.latlng.lng);
+            }
+        }
+    });
+    return null;
+};
+
 // Main Component
 export default function MapPlanner() {
-    // State
-    const [area, setArea] = useState<LatLng[]>([]);
+    // State Management
+    const [layers, setLayers] = useState<LayerData[]>([]);
     const [selectedPlant, setSelectedPlant] = useState<PlantType | null>(null);
     const [plantTypes, setPlantTypes] = useState<PlantType[]>([]);
     const [results, setResults] = useState<LatLng[]>([]);
@@ -84,8 +123,20 @@ export default function MapPlanner() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [status, setStatus] = useState<string>('Draw an area on the map first');
-    const [showAllPoints, setShowAllPoints] = useState(false);
     const [selectedAreaTypes, setSelectedAreaTypes] = useState<AreaType[]>([]);
+    const [currentDrawingType, setCurrentDrawingType] = useState<AreaType>('field');
+    const [activeButton, setActiveButton] = useState<AreaType | null>(null);
+    const [drawingMode, setDrawingMode] = useState<'polygon' | 'rectangle'>('polygon');
+
+    // Mode States
+    const [isPumpMode, setIsPumpMode] = useState(false);
+    const [isRiverMode, setIsRiverMode] = useState(false);
+    const [isFieldMode, setIsFieldMode] = useState(false);
+    const [isBuildingMode, setIsBuildingMode] = useState(false);
+    const [isPowerPlantMode, setIsPowerPlantMode] = useState(false);
+    const [pumpLocation, setPumpLocation] = useState<LatLng | null>(null);
+
+    // Refs
     const featureGroupRef = useRef<any>(null);
 
     // Effects
@@ -111,28 +162,7 @@ export default function MapPlanner() {
         }
     }, [results]);
 
-    useEffect(() => {
-        // Check for pre-selected types in URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const selectedTypes = urlParams.get('selected_types');
-        
-        if (selectedTypes) {
-            const types = selectedTypes.split(',').map(type => type.trim() as AreaType);
-            setSelectedAreaTypes(types);
-            setStatus(`Selected types: ${types.join(', ')}`);
-        }
-    }, []);
-
-    // Memoized values
-    const displayedPoints = useMemo(() => {
-        if (showAllPoints || !selectedPlant) return results;
-        
-        const totalPoints = results.length;
-        const pointsPerRow = Math.ceil(Math.sqrt(totalPoints * selectedPlant.row_spacing / selectedPlant.plant_spacing));
-        return results.filter((_, index) => Math.floor(index / pointsPerRow) % 3 === 0);
-    }, [results, showAllPoints, selectedPlant]);
-
-    // Utility functions
+    // Helper Functions
     const calculateArea = (points: LatLng[]): number => {
         let area = 0;
         for (let i = 0; i < points.length; i++) {
@@ -143,10 +173,19 @@ export default function MapPlanner() {
         return Math.abs(area) / 2;
     };
 
-    // Event handlers
+    const resetModes = () => {
+        setIsPumpMode(false);
+        setIsRiverMode(false);
+        setIsFieldMode(false);
+        setIsBuildingMode(false);
+        setIsPowerPlantMode(false);
+        setActiveButton(null);
+    };
+
+    // Event Handlers
     const handleSubmit = async () => {
-        if (area.length < 3) {
-            setError('Please draw a polygon on the map first');
+        if (layers.length < 1) {
+            setError('Please draw an area on the map first');
             return;
         }
 
@@ -155,7 +194,7 @@ export default function MapPlanner() {
             return;
         }
 
-        const areaSize = calculateArea(area);
+        const areaSize = calculateArea(layers[0].coordinates);
         if (areaSize > MAX_AREA) {
             setError(`Area is too large. Maximum allowed area is ${MAX_AREA/10000} hectares`);
             return;
@@ -169,7 +208,7 @@ export default function MapPlanner() {
             const response = await axios.post<{ plant_locations: LatLng[] }>(
                 '/api/generate-planting-points',
                 {
-                    area,
+                    area: layers[0].coordinates,
                     plant_type_id: selectedPlant.id,
                     plant_spacing: selectedPlant.plant_spacing,
                     row_spacing: selectedPlant.row_spacing,
@@ -177,13 +216,9 @@ export default function MapPlanner() {
                 }
             );
             setResults(response.data.plant_locations);
-            setStatus(`Successfully generated ${response.data.plant_locations.length} planting points for ${selectedAreaTypes.join(', ')}`);
+            setStatus(`Successfully generated ${response.data.plant_locations.length} planting points`);
         } catch (error) {
-            if (axios.isAxiosError(error)) {
-                setError(error.response?.data?.message || 'Error generating points');
-            } else {
-                setError('An unexpected error occurred');
-            }
+            setError(axios.isAxiosError(error) ? error.response?.data?.message || 'Error generating points' : 'An unexpected error occurred');
             setStatus('Failed to generate planting points');
         } finally {
             setIsLoading(false);
@@ -191,17 +226,60 @@ export default function MapPlanner() {
     };
 
     const toggleAreaType = (type: AreaType) => {
-        setSelectedAreaTypes(prev => {
-            const newTypes = prev.includes(type)
-                ? prev.filter(t => t !== type)
-                : [...prev, type];
-            
-            setStatus(newTypes.length === 0 
-                ? 'Select area type(s) or draw an area on the map.'
-                : `Selected ${newTypes.length} type(s): ${newTypes.join(', ')}`);
-            
-            return newTypes;
-        });
+        // Toggle off if clicking the same button
+        if (activeButton === type) {
+            resetModes();
+            setStatus('Select an area type to begin');
+            return;
+        }
+
+        // Prevent multiple active buttons
+        if (activeButton !== null) {
+            setError('Please finish the current action first');
+            return;
+        }
+
+        setActiveButton(type);
+
+        // Validate initial area exists
+        if (layers.length === 0) {
+            setError(`Please draw an area first before adding a ${type}`);
+            setActiveButton(null);
+            return;
+        }
+
+        // Handle different area types
+        switch (type) {
+            case 'pump':
+                setIsPumpMode(true);
+                setSelectedAreaTypes(prev => [...prev, 'pump']);
+                setStatus('Click on the map to place a pump');
+                break;
+            case 'river':
+                setIsRiverMode(true);
+                setDrawingMode('polygon');
+                setSelectedAreaTypes(prev => [...prev, 'river']);
+                setStatus('Use the polygon tool to draw the river area');
+                break;
+            case 'field':
+                setIsFieldMode(true);
+                setDrawingMode('polygon');
+                setSelectedAreaTypes(prev => [...prev, 'field']);
+                setStatus('Use the polygon tool to draw the field area');
+                break;
+            case 'building':
+                setIsBuildingMode(true);
+                setDrawingMode('rectangle');
+                setSelectedAreaTypes(prev => [...prev, 'building']);
+                setStatus('Use the rectangle tool to draw the building area');
+                break;
+            case 'powerplant':
+                setIsPowerPlantMode(true);
+                setDrawingMode('rectangle');
+                setSelectedAreaTypes(prev => [...prev, 'powerplant']);
+                setStatus('Use the rectangle tool to draw the power plant area');
+                break;
+        }
     };
 
     const onCreated = (e: any) => {
@@ -210,16 +288,50 @@ export default function MapPlanner() {
             lat: latLng.lat,
             lng: latLng.lng,
         }));
-        setArea(coordinates);
+
+        // Apply styles for non-first layers
+        if (layers.length > 0) {
+            if (isRiverMode) {
+                layer.setStyle({
+                    color: AREA_COLORS.river,
+                    fillColor: AREA_COLORS.river,
+                    fillOpacity: 0.3,
+                    weight: 2,
+                    dashArray: '5, 10'
+                });
+            } else if (isFieldMode) {
+                layer.setStyle({
+                    color: AREA_COLORS.field,
+                    fillColor: AREA_COLORS.field,
+                    fillOpacity: 0.3,
+                    weight: 2,
+                    dashArray: '1, 0'
+                });
+            }
+        }
+
+        // Add new layer
+        setLayers(prevLayers => [...prevLayers, {
+            type: isRiverMode ? 'river' : 
+                  isFieldMode ? 'field' : 
+                  isBuildingMode ? 'building' : 
+                  isPowerPlantMode ? 'powerplant' : 
+                  currentDrawingType,
+            coordinates: coordinates
+        }]);
+
+        // Reset modes and update status
+        resetModes();
         setError(null);
-        setStatus(selectedAreaTypes.length > 0 
-            ? `Area drawn. Selected types: ${selectedAreaTypes.join(', ')}`
-            : 'Area drawn. Select area type(s) or continue.');
+        setStatus(`Added ${isRiverMode ? 'river' : 
+                          isFieldMode ? 'field' : 
+                          isBuildingMode ? 'building' : 
+                          isPowerPlantMode ? 'power plant' : 
+                          currentDrawingType} area. Select another area type to continue.`);
     };
 
-    const onDeleted = () => {
-        setArea([]);
-        setResults([]);
+    const onDeleted = (e: any) => {
+        setLayers(prevLayers => prevLayers.filter((_, index) => index !== e.layers.length - 1));
         setError(null);
         setStatus(selectedAreaTypes.length > 0 
             ? `Selected types: ${selectedAreaTypes.join(', ')}`
@@ -227,14 +339,74 @@ export default function MapPlanner() {
     };
 
     const handleNext = () => {
-        if (selectedAreaTypes.length === 0 || !area.length || !selectedPlant) return;
+        if (selectedAreaTypes.length === 0 || layers.length === 0 || !selectedPlant) {
+            setError('Please select an area type, draw an area, and select a plant type before proceeding.');
+            return;
+        }
 
         const params = new URLSearchParams();
         params.append('areaType', selectedAreaTypes[0]);
-        params.append('area', JSON.stringify(area));
+        params.append('area', JSON.stringify(layers[0].coordinates));
         params.append('plantType', JSON.stringify(selectedPlant));
 
-        window.location.href = `/generate-tree?${params.toString()}`;
+        router.visit(route('generate.tree') + '?' + params.toString(), {
+            method: 'get',
+            preserveState: true,
+            preserveScroll: true,
+            onError: (errors) => {
+                setError('Failed to navigate to the next page. Please make sure you are logged in.');
+                console.error('Navigation error:', errors);
+            }
+        });
+    };
+
+    const handlePumpPlace = (lat: number, lng: number) => {
+        if (layers.length > 0) {
+            const clickedPoint = { lat, lng };
+            setPumpLocation(clickedPoint);
+            setLayers(prevLayers => [...prevLayers, {
+                type: 'pump',
+                coordinates: [clickedPoint]
+            }]);
+            resetModes();
+            setStatus('Pump location added. Select another area type to continue.');
+        }
+    };
+
+    const handleBuildingPlace = (lat: number, lng: number) => {
+        if (layers.length > 0) {
+            const size = 0.0001;
+            const coordinates = [
+                { lat: lat - size, lng: lng - size },
+                { lat: lat - size, lng: lng + size },
+                { lat: lat + size, lng: lng + size },
+                { lat: lat + size, lng: lng - size }
+            ];
+            setLayers(prevLayers => [...prevLayers, {
+                type: 'building',
+                coordinates: coordinates
+            }]);
+            resetModes();
+            setStatus('Building added. Select another area type to continue.');
+        }
+    };
+
+    const handlePowerPlantPlace = (lat: number, lng: number) => {
+        if (layers.length > 0) {
+            const size = 0.0001;
+            const coordinates = [
+                { lat: lat - size, lng: lng - size },
+                { lat: lat - size, lng: lng + size },
+                { lat: lat + size, lng: lng + size },
+                { lat: lat + size, lng: lng - size }
+            ];
+            setLayers(prevLayers => [...prevLayers, {
+                type: 'powerplant',
+                coordinates: coordinates
+            }]);
+            resetModes();
+            setStatus('Power plant added. Select another area type to continue.');
+        }
     };
 
     // Render
@@ -270,7 +442,7 @@ export default function MapPlanner() {
                                     <AreaTypeButton
                                         type={type as AreaType}
                                         isSelected={selectedAreaTypes.includes(type as AreaType)}
-                                        isDisabled={false}
+                                        isActive={activeButton === type}
                                         onClick={() => toggleAreaType(type as AreaType)}
                                     />
                                     <span className="text-sm text-gray-400">
@@ -320,6 +492,14 @@ export default function MapPlanner() {
                             zoomControl={true}
                             scrollWheelZoom={true}
                         >
+                            <MapClickHandler 
+                                isPumpMode={isPumpMode} 
+                                isBuildingMode={isBuildingMode}
+                                isPowerPlantMode={isPowerPlantMode}
+                                onPumpPlace={handlePumpPlace}
+                                onBuildingPlace={handleBuildingPlace}
+                                onPowerPlantPlace={handlePowerPlantPlace}
+                            />
                             <LayersControl position="topright">
                                 <LayersControl.BaseLayer checked name="Street Map">
                                     <TileLayer
@@ -343,20 +523,96 @@ export default function MapPlanner() {
                                     onCreated={onCreated}
                                     onDeleted={onDeleted}
                                     draw={{
-                                        rectangle: false,
+                                        rectangle: drawingMode === 'rectangle',
                                         circle: false,
                                         circlemarker: false,
                                         marker: false,
                                         polyline: false,
+                                        polygon: drawingMode === 'polygon'
                                     }}
                                 />
                             </FeatureGroup>
+
+                            {pumpLocation && (
+                                <Circle
+                                    center={[pumpLocation.lat, pumpLocation.lng]}
+                                    radius={5}
+                                    pathOptions={{
+                                        color: AREA_COLORS.pump,
+                                        fillColor: AREA_COLORS.pump,
+                                        fillOpacity: 1,
+                                        weight: 2
+                                    }}
+                                />
+                            )}
+
+                            {layers.map((layer, index) => {
+                                if (layer.type === 'building') {
+                                    return (
+                                        <Polygon
+                                            key={`building-${index}`}
+                                            positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
+                                            pathOptions={{
+                                                color: AREA_COLORS.building,
+                                                fillColor: AREA_COLORS.building,
+                                                fillOpacity: 1,
+                                                weight: 2
+                                            }}
+                                        />
+                                    );
+                                }
+                                if (layer.type === 'powerplant') {
+                                    return (
+                                        <Polygon
+                                            key={`powerplant-${index}`}
+                                            positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
+                                            pathOptions={{
+                                                color: AREA_COLORS.powerplant,
+                                                fillColor: AREA_COLORS.powerplant,
+                                                fillOpacity: 1,
+                                                weight: 2
+                                            }}
+                                        />
+                                    );
+                                }
+                                if (layer.type === 'river') {
+                                    return (
+                                        <Polygon
+                                            key={`river-${index}`}
+                                            positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
+                                            pathOptions={{
+                                                color: AREA_COLORS.river,
+                                                fillColor: AREA_COLORS.river,
+                                                fillOpacity: 0.3,
+                                                weight: 2,
+                                                dashArray: '5, 10'
+                                            }}
+                                        />
+                                    );
+                                }
+                                if (layer.type === 'field') {
+                                    return (
+                                        <Polygon
+                                            key={`field-${index}`}
+                                            positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
+                                            pathOptions={{
+                                                color: AREA_COLORS.field,
+                                                fillColor: AREA_COLORS.field,
+                                                fillOpacity: 0.3,
+                                                weight: 2,
+                                                dashArray: '1, 0'
+                                            }}
+                                        />
+                                    );
+                                }
+                                return null;
+                            })}
                         </MapContainer>
                     </div>
                     <div className="flex justify-end">
                         <button
                             onClick={handleNext}
-                            disabled={!selectedPlant || area.length < 3 || selectedAreaTypes.length === 0}
+                            disabled={!selectedPlant || layers.length === 0 || selectedAreaTypes.length === 0}
                             className="rounded bg-green-600 px-6 py-3 text-white transition-colors duration-200 hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-700"
                         >
                             Next
