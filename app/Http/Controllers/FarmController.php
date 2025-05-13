@@ -159,7 +159,7 @@ class FarmController extends Controller
         for ($i = 0; $i < count($polygon); $i++) {
             if (($polygon[$i]['lat'] > $lat) != ($polygon[$j]['lat'] > $lat) &&
                 ($lng < ($polygon[$j]['lng'] - $polygon[$i]['lng']) * ($lat - $polygon[$i]['lat']) /
-                ($polygon[$j]['lat'] - $polygon[$i]['lat']) + $polygon[$i]['lng'])) {
+                    ($polygon[$j]['lat'] - $polygon[$i]['lat']) + $polygon[$i]['lng'])) {
                 $inside = !$inside;
             }
             $j = $i;

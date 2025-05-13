@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios, { AxiosError } from 'axios';
-import { MapContainer, TileLayer, CircleMarker, FeatureGroup, LayersControl } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, FeatureGroup, LayersControl, Polyline } from 'react-leaflet';
 import { EditControl } from 'react-leaflet-draw';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
 
 type LatLng = {
-    lat: number;
-    lng: number;
+  lat: number;
+  lng: number;
 };
 
 type PlantType = {
@@ -20,6 +20,20 @@ type PlantType = {
     description: string;
 };
 
+type SprinklerType = {
+    id: number;
+    name: string;
+    water_flow: number;  // L/min
+    min_radius: number;  // meters
+    max_radius: number;  // meters
+    description: string;
+};
+
+type PipeLayout = {
+    start: LatLng;
+    end: LatLng;
+};
+
 const LoadingSpinner = () => (
     <div className="flex items-center justify-center space-x-2">
         <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
@@ -28,20 +42,29 @@ const LoadingSpinner = () => (
 );
 
 export default function MapPlanner() {
-    const [area, setArea] = useState<LatLng[]>([]);
+  const [area, setArea] = useState<LatLng[]>([]);
     const [selectedPlant, setSelectedPlant] = useState<PlantType | null>(null);
     const [plantTypes, setPlantTypes] = useState<PlantType[]>([]);
-    const [results, setResults] = useState<LatLng[]>([]);
+  const [results, setResults] = useState<LatLng[]>([]);
     const [mapCenter, setMapCenter] = useState<[number, number]>([13.7563, 100.5018]); // Default to Bangkok
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [status, setStatus] = useState<string>('Ready to draw your field');
     const [showAllPoints, setShowAllPoints] = useState(false);
     const featureGroupRef = useRef<any>(null);
+    const [sprinklers, setSprinklers] = useState<SprinklerType[]>([]);
+    const [selectedSprinkler, setSelectedSprinkler] = useState<SprinklerType | null>(null);
+    const [pipeLayout, setPipeLayout] = useState<PipeLayout[]>([]);
+    const [sprinklerPositions, setSprinklerPositions] = useState<LatLng[]>([]);
 
     // Calculate displayed points based on showAllPoints state
     const displayedPoints = useMemo(() => {
+        // If points are less than 5000, show all of them
+        if (results.length <= 5000) return results;
+        
+        // If showAllPoints is true, show all points regardless of count
         if (showAllPoints) return results;
+        
         if (!selectedPlant) return results;
         
         // Calculate grid parameters
@@ -82,6 +105,20 @@ export default function MapPlanner() {
         }
     }, [results]);
 
+    useEffect(() => {
+        // Fetch sprinklers when component mounts
+        const fetchSprinklers = async () => {
+            try {
+                const response = await axios.get<SprinklerType[]>('/api/sprinklers');
+                console.log('Fetched sprinklers:', response.data);
+                setSprinklers(response.data);
+            } catch (error) {
+                console.error('Error fetching sprinklers:', error);
+            }
+        };
+        fetchSprinklers();
+    }, []);
+
     const calculateArea = (points: LatLng[]): number => {
         // Calculate area using the shoelace formula
         let area = 0;
@@ -93,7 +130,7 @@ export default function MapPlanner() {
         return Math.abs(area) / 2;
     };
 
-    const handleSubmit = async () => {
+  const handleSubmit = async () => {
         if (area.length < 3) {
             setError('Please draw a polygon on the map first');
             return;
@@ -121,18 +158,18 @@ export default function MapPlanner() {
             const response = await axios.post<{ plant_locations: LatLng[] }>(
                 '/api/generate-planting-points',
                 {
-                    area,
+        area,
                     plant_type_id: selectedPlant.id,
                     plant_spacing: selectedPlant.plant_spacing,
                     row_spacing: selectedPlant.row_spacing,
                 }
             );
-            setResults(response.data.plant_locations);
+      setResults(response.data.plant_locations);
             setStatus(`Successfully generated ${response.data.plant_locations.length} planting points`);
         } catch (error: unknown) {
             if (axios.isAxiosError(error)) {
                 setError(error.response?.data?.message || 'Error generating points');
-                console.error('Error generating points:', error.response?.data || error.message);
+      console.error('Error generating points:', error.response?.data || error.message);
             } else {
                 setError('An unexpected error occurred');
                 console.error('An unexpected error occurred:', error);
@@ -140,6 +177,39 @@ export default function MapPlanner() {
             setStatus('Failed to generate planting points');
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const calculatePipeLayout = async () => {
+        if (!selectedSprinkler || results.length === 0) return;
+
+        try {
+            const response = await axios.post('/api/calculate-pipe-layout', {
+                area,
+                plant_locations: results,
+                sprinkler_id: selectedSprinkler.id,
+                plant_spacing: selectedPlant?.plant_spacing,
+                row_spacing: selectedPlant?.row_spacing
+            });
+
+            console.log('Setting sprinkler positions:', response.data.sprinkler_positions);
+            console.log('Setting pipe layout:', response.data.pipe_layout);
+            
+            setSprinklerPositions(response.data.sprinkler_positions);
+            setPipeLayout(response.data.pipe_layout);
+            
+            // Verify state updates
+            console.log('Current sprinkler positions:', sprinklerPositions);
+            console.log('Current pipe layout:', pipeLayout);
+            
+            setStatus('Pipe layout calculated successfully');
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                setError(error.response?.data?.message || 'Error calculating pipe layout');
+            } else {
+                setError('An unexpected error occurred');
+            }
+            setStatus('Failed to calculate pipe layout');
         }
     };
 
@@ -155,7 +225,7 @@ export default function MapPlanner() {
     };
 
     const onDeleted = () => {
-        setArea([]);
+            setArea([]);
         setResults([]);
         setError(null);
         setStatus('Ready to draw your field');
@@ -322,8 +392,61 @@ export default function MapPlanner() {
                             </div>
                         )}
 
-                        <button
-                            onClick={handleSubmit}
+                        <div>
+                            <label className="mb-1 block text-sm font-medium text-gray-300">
+                                Select Sprinkler Type
+                            </label>
+                            <select
+                                className="w-full rounded border border-gray-700 bg-gray-800 p-2 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                                value={selectedSprinkler?.id || ''}
+                                onChange={(e) => {
+                                    const sprinkler = sprinklers.find(
+                                        (s) => s.id === Number(e.target.value)
+                                    );
+                                    setSelectedSprinkler(sprinkler || null);
+                                }}
+                            >
+                                <option value="">Select a sprinkler...</option>
+                                {sprinklers.map((sprinkler) => (
+                                    <option key={sprinkler.id} value={sprinkler.id}>
+                                        {sprinkler.name} ({sprinkler.water_flow}L/min)
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {selectedSprinkler && (
+                            <div className="rounded-lg border border-gray-700 bg-gray-800 p-4">
+                                <h3 className="mb-2 font-medium text-white">Sprinkler Details</h3>
+                                <p className="mb-4 text-sm text-gray-400">
+                                    {selectedSprinkler.description}
+                                </p>
+                                <div className="space-y-3">
+                                    <div className="rounded border border-gray-700 bg-gray-900 p-3">
+                                        <h4 className="mb-2 font-medium text-blue-400">
+                                            Coverage Details
+                                        </h4>
+                                        <div className="grid grid-cols-2 gap-2 text-sm">
+                                            <div className="flex items-center text-gray-300">
+                                                <span>Water Flow:</span>
+                                                <span className="ml-1 font-medium text-blue-400">
+                                                    {selectedSprinkler.water_flow}L/min
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center text-gray-300">
+                                                <span>Coverage Radius:</span>
+                                                <span className="ml-1 font-medium text-blue-400">
+                                                    {selectedSprinkler.min_radius}-{selectedSprinkler.max_radius}m
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+      <button
+        onClick={handleSubmit}
                             className="w-full rounded bg-blue-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-700"
                             disabled={area.length < 3 || !selectedPlant || isLoading}
                         >
@@ -335,7 +458,16 @@ export default function MapPlanner() {
                             ) : (
                                 'Generate Points'
                             )}
-                        </button>
+      </button>
+
+                        {results.length > 0 && selectedSprinkler && (
+                            <button
+                                onClick={calculatePipeLayout}
+                                className="w-full rounded bg-green-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-green-700"
+                            >
+                                Calculate Pipe Layout
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -376,6 +508,24 @@ export default function MapPlanner() {
                             />
                         </FeatureGroup>
 
+                        {/* Draw pipes */}
+                        {(() => {
+                            console.log('Rendering pipes:', pipeLayout);
+                            return null;
+                        })()}
+                        {pipeLayout.map((pipe, index) => (
+                            <Polyline
+                                key={`pipe-${index}`}
+                                positions={[
+                                    [pipe.start.lat, pipe.start.lng],
+                                    [pipe.end.lat, pipe.end.lng]
+                                ]}
+                                color="blue"
+                                weight={2}
+                            />
+                        ))}
+
+                        {/* Draw plant points */}
                         {displayedPoints.map((point, index) => (
                             <CircleMarker
                                 key={index}
@@ -391,6 +541,6 @@ export default function MapPlanner() {
                     </MapContainer>
                 </div>
             </div>
-        </div>
-    );
+    </div>
+  );
 }
