@@ -178,7 +178,7 @@ class FarmController extends Controller
             
             // Validate the incoming data
             $validated = $request->validate([
-                'areaType' => 'required|string|in:field,river,powerplant,building',
+                'areaType' => 'required|string|in:field,river,powerplant,building,pump',
             ]);
 
             // Validate the area data
@@ -197,13 +197,17 @@ class FarmController extends Controller
                 throw new \Exception('Invalid plant type data');
             }
 
+            // Get the full plant type data from the database
+            $plantType = PlantType::findOrFail($plantTypeData['id']);
+
             return Inertia::render('generatetree', [
-                'areaType' => $validated['areaType'],
+                'areaType' => $areaType,
                 'area' => $areaData,
-                'plantType' => $plantTypeData,
+                'plantType' => $plantType
             ]);
         } catch (\Exception $e) {
-            return redirect()->route('planner')->with('error', $e->getMessage());
+            return redirect()->route('planner')
+                ->with('error', 'Invalid data provided. Please try again.');
         }
     }
 }
