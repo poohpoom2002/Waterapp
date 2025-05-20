@@ -94,6 +94,8 @@ class FarmController extends Controller
             'plant_type_id' => 'required|exists:plant_types,id',
             'plant_spacing' => 'required|numeric|min:0',
             'row_spacing' => 'required|numeric|min:0',
+            'exclusion_areas' => 'array', // optional
+            'exclusion_areas.*' => 'array',
         ]);
 
         if ($validator->fails()) {
@@ -102,28 +104,50 @@ class FarmController extends Controller
 
         $plantType = PlantType::findOrFail($request->plant_type_id);
         $area = $request->area;
+        $exclusionAreas = $request->exclusion_areas ?? [];
         
-        $plantLocations = $this->calculatePlantLocations($area, $plantType);
+        $plantLocations = $this->calculatePlantLocations($area, $plantType, $exclusionAreas);
 
         return response()->json(['plant_locations' => $plantLocations]);
     }
 
-    private function calculatePlantLocations($area, $plantType)
+    private function calculatePlantLocations($area, $plantType, $exclusionAreas = [])
     {
         $points = [];
         $bounds = $this->getBounds($area);
-        
         $latStep = $plantType->plant_spacing / 111000;
         $lngStep = $plantType->row_spacing / (111000 * cos(deg2rad($bounds['center']['lat'])));
+        $buffer = $plantType->row_spacing / 2; // meters
 
         for ($lat = $bounds['min']['lat']; $lat <= $bounds['max']['lat']; $lat += $latStep) {
             for ($lng = $bounds['min']['lng']; $lng <= $bounds['max']['lng']; $lng += $lngStep) {
                 if ($this->isPointInPolygon($lat, $lng, $area)) {
+                    // Exclude if inside any exclusion area
+                    $inExclusion = false;
+                    foreach ($exclusionAreas as $exclusion) {
+                        if ($this->isPointInPolygon($lat, $lng, $exclusion)) {
+                            $inExclusion = true;
+                            break;
+                        }
+                    }
+                    if ($inExclusion) continue;
+                    // Check buffer from field edge
+                    $minDist = $this->minDistanceToPolygonEdge($lat, $lng, $area);
+                    if ($minDist < $buffer) continue;
+                    // Check buffer from all exclusion area edges
+                    $tooCloseToExclusion = false;
+                    foreach ($exclusionAreas as $exclusion) {
+                        $distToExclusion = $this->minDistanceToPolygonEdge($lat, $lng, $exclusion);
+                        if ($distToExclusion < $buffer) {
+                            $tooCloseToExclusion = true;
+                            break;
+                        }
+                    }
+                    if ($tooCloseToExclusion) continue;
                     $points[] = ['lat' => $lat, 'lng' => $lng];
                 }
             }
         }
-
         return $points;
     }
 
@@ -166,5 +190,50 @@ class FarmController extends Controller
         }
 
         return $inside;
+    }
+
+    // Helper: minimum distance from point to any edge of polygon (in meters)
+    private function minDistanceToPolygonEdge($lat, $lng, $polygon)
+    {
+        $minDist = null;
+        $n = count($polygon);
+        for ($i = 0; $i < $n; $i++) {
+            $a = $polygon[$i];
+            $b = $polygon[($i+1)%$n];
+            $dist = $this->pointToSegmentDistance($lat, $lng, $a['lat'], $a['lng'], $b['lat'], $b['lng']);
+            if ($minDist === null || $dist < $minDist) {
+                $minDist = $dist;
+            }
+        }
+        return $minDist;
+    }
+
+    // Helper: distance from point (px,py) to segment (ax,ay)-(bx,by) in meters
+    private function pointToSegmentDistance($px, $py, $ax, $ay, $bx, $by)
+    {
+        // Convert lat/lng to meters using equirectangular approximation
+        $R = 6371000; // Earth radius in meters
+        $lat1 = deg2rad($ax);
+        $lat2 = deg2rad($bx);
+        $latP = deg2rad($px);
+        $lng1 = deg2rad($ay);
+        $lng2 = deg2rad($by);
+        $lngP = deg2rad($py);
+        $x1 = $R * $lng1 * cos(($lat1+$lat2)/2);
+        $y1 = $R * $lat1;
+        $x2 = $R * $lng2 * cos(($lat1+$lat2)/2);
+        $y2 = $R * $lat2;
+        $xP = $R * $lngP * cos(($lat1+$lat2)/2);
+        $yP = $R * $latP;
+        $dx = $x2 - $x1;
+        $dy = $y2 - $y1;
+        if ($dx == 0 && $dy == 0) {
+            // a==b
+            return sqrt(pow($xP-$x1,2) + pow($yP-$y1,2));
+        }
+        $t = max(0, min(1, (($xP-$x1)*$dx + ($yP-$y1)*$dy) / ($dx*$dx + $dy*$dy)));
+        $projX = $x1 + $t*$dx;
+        $projY = $y1 + $t*$dy;
+        return sqrt(pow($xP-$projX,2) + pow($yP-$projY,2));
     }
 }
