@@ -7,6 +7,7 @@ import 'leaflet-draw/dist/leaflet.draw.css';
 import { router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 
+
 // Types
 interface LatLng {
     lat: number;
@@ -23,7 +24,15 @@ interface PlantType {
     description: string;
 }
 
-type AreaType = 'field' | 'river' | 'powerplant' | 'building' | 'pump';
+// Add new interface for custom parameters
+interface CustomPlantParams {
+    plant_spacing: number;
+    row_spacing: number;
+    water_needed: number;
+}
+
+// 1. Update AreaType to include 'solarcell'
+type AreaType = 'field' | 'river' | 'powerplant' | 'building' | 'pump' | 'custompolygon' | 'solarcell';
 
 interface LayerData {
     type: AreaType;
@@ -34,20 +43,26 @@ interface LayerData {
 const DEFAULT_MAP_CENTER: [number, number] = [13.7563, 100.5018];
 const MAX_AREA = 100000; // 10 hectares
 
+// 2. Add description for solarcell
 const AREA_DESCRIPTIONS: Record<AreaType, string> = {
     field: 'Agricultural land for planting crops and vegetation.',
     river: 'Water body for irrigation and water management.',
     powerplant: 'Energy generation facility area.',
     building: 'Structure or facility area.',
-    pump: 'Water pump station for irrigation system.'
+    pump: 'Water pump station for irrigation system.',
+    custompolygon: 'Other area for flexible drawing.',
+    solarcell: 'Solar cell installation area.' // <-- Added
 };
 
+// 3. Add color for solarcell
 const AREA_COLORS: Record<AreaType, string> = {
     river: '#3B82F6',    // Blue
     field: '#22C55E',    // Green
     powerplant: '#EF4444', // Red
     building: '#F59E0B',  // Yellow
-    pump: '#1E40AF'      // Dark Blue
+    pump: '#1E40AF',      // Dark Blue
+    custompolygon: '#A21CAF', // Purple
+    solarcell: '#FFD600' // Bright Yellow for solar cell
 };
 
 // Helper Components
@@ -68,44 +83,25 @@ const AreaTypeButton: React.FC<{
         onClick={onClick}
         className={`w-32 rounded px-4 py-2 text-white transition-colors duration-200 ${
             isActive ? 'bg-blue-600 hover:bg-blue-700' : 
-            isSelected ? 'bg-gray-600 hover:bg-gray-500' : 
+            isSelected ? 'bg-blue-500 hover:bg-blue-600' : 
             'bg-gray-700 hover:bg-gray-600'
         }`}
     >
-        {type.charAt(0).toUpperCase() + type.slice(1).replace('powerplant', 'Power Plant')}
+        {type === 'custompolygon'
+            ? 'Other'
+            : type.charAt(0).toUpperCase() + type.slice(1).replace('powerplant', 'Power Plant')}
     </button>
-);
-
-const PlantInfo: React.FC<{ plant: PlantType }> = ({ plant }) => (
-    <div className="rounded-lg bg-gray-800 p-4">
-        <h3 className="mb-2 text-lg font-medium text-white">{plant.name}</h3>
-        <div className="space-y-2 text-sm text-gray-300">
-            <p><span className="font-medium">Type:</span> {plant.type}</p>
-            <p><span className="font-medium">Plant Spacing:</span> {plant.plant_spacing}m</p>
-            <p><span className="font-medium">Row Spacing:</span> {plant.row_spacing}m</p>
-            <p><span className="font-medium">Water Needed:</span> {plant.water_needed}L/day</p>
-            <p className="mt-2 text-gray-400">{plant.description}</p>
-        </div>
-    </div>
 );
 
 // Map Event Handlers
 const MapClickHandler: React.FC<{
     isPumpMode: boolean;
-    isBuildingMode: boolean;
-    isPowerPlantMode: boolean;
     onPumpPlace: (lat: number, lng: number) => void;
-    onBuildingPlace: (lat: number, lng: number) => void;
-    onPowerPlantPlace: (lat: number, lng: number) => void;
-}> = ({ isPumpMode, isBuildingMode, isPowerPlantMode, onPumpPlace, onBuildingPlace, onPowerPlantPlace }) => {
+}> = ({ isPumpMode, onPumpPlace }) => {
     useMapEvents({
         click: (e) => {
             if (isPumpMode) {
                 onPumpPlace(e.latlng.lat, e.latlng.lng);
-            } else if (isBuildingMode) {
-                onBuildingPlace(e.latlng.lat, e.latlng.lng);
-            } else if (isPowerPlantMode) {
-                onPowerPlantPlace(e.latlng.lat, e.latlng.lng);
             }
         }
     });
@@ -127,6 +123,11 @@ export default function MapPlanner() {
     const [currentDrawingType, setCurrentDrawingType] = useState<AreaType>('field');
     const [activeButton, setActiveButton] = useState<AreaType | null>(null);
     const [drawingMode, setDrawingMode] = useState<'polygon' | 'rectangle'>('polygon');
+    const [customParams, setCustomParams] = useState<CustomPlantParams>({
+        plant_spacing: 10,
+        row_spacing: 10,
+        water_needed: 1.5
+    });
 
     // Mode States
     const [isPumpMode, setIsPumpMode] = useState(false);
@@ -139,12 +140,17 @@ export default function MapPlanner() {
     // Refs
     const featureGroupRef = useRef<any>(null);
 
+    // New state for plant type selection
+    const [selectedPlantCategory, setSelectedPlantCategory] = useState<string>('');
+    const [filteredPlants, setFilteredPlants] = useState<PlantType[]>([]);
+
     // Effects
     useEffect(() => {
         const fetchPlantTypes = async () => {
             try {
                 const response = await axios.get<PlantType[]>('/api/plant-types');
                 setPlantTypes(response.data);
+                setFilteredPlants(response.data);
             } catch (error) {
                 console.error('Error fetching plant types:', error);
             }
@@ -210,8 +216,9 @@ export default function MapPlanner() {
                 {
                     area: layers[0].coordinates,
                     plant_type_id: selectedPlant.id,
-                    plant_spacing: selectedPlant.plant_spacing,
-                    row_spacing: selectedPlant.row_spacing,
+                    plant_spacing: customParams.plant_spacing,
+                    row_spacing: customParams.row_spacing,
+                    water_needed: customParams.water_needed,
                     area_type: selectedAreaTypes,
                 }
             );
@@ -226,14 +233,13 @@ export default function MapPlanner() {
     };
 
     const toggleAreaType = (type: AreaType) => {
-        // Toggle off if clicking the same button
         if (activeButton === type) {
             resetModes();
+            setSelectedAreaTypes(prev => prev.filter(t => t !== type));
             setStatus('Select an area type to begin');
             return;
         }
 
-        // Prevent multiple active buttons
         if (activeButton !== null) {
             setError('Please finish the current action first');
             return;
@@ -241,14 +247,12 @@ export default function MapPlanner() {
 
         setActiveButton(type);
 
-        // Validate initial area exists
         if (layers.length === 0) {
             setError(`Please draw an area first before adding a ${type}`);
             setActiveButton(null);
             return;
         }
 
-        // Handle different area types
         switch (type) {
             case 'pump':
                 setIsPumpMode(true);
@@ -269,15 +273,25 @@ export default function MapPlanner() {
                 break;
             case 'building':
                 setIsBuildingMode(true);
-                setDrawingMode('rectangle');
+                setDrawingMode('polygon');
                 setSelectedAreaTypes(prev => [...prev, 'building']);
-                setStatus('Use the rectangle tool to draw the building area');
+                setStatus('Use the polygon tool to draw the building area');
                 break;
             case 'powerplant':
                 setIsPowerPlantMode(true);
-                setDrawingMode('rectangle');
+                setDrawingMode('polygon');
                 setSelectedAreaTypes(prev => [...prev, 'powerplant']);
-                setStatus('Use the rectangle tool to draw the power plant area');
+                setStatus('Use the polygon tool to draw the power plant area');
+                break;
+            case 'custompolygon':
+                setDrawingMode('polygon');
+                setSelectedAreaTypes(prev => [...prev, 'custompolygon']);
+                setStatus('Use the polygon tool to draw a custom area');
+                break;
+            case 'solarcell':
+                setDrawingMode('polygon');
+                setSelectedAreaTypes(prev => [...prev, 'solarcell']);
+                setStatus('Use the polygon tool to draw the solar cell area');
                 break;
         }
     };
@@ -289,7 +303,6 @@ export default function MapPlanner() {
             lng: latLng.lng,
         }));
 
-        // Apply styles for non-first layers
         if (layers.length > 0) {
             if (isRiverMode) {
                 layer.setStyle({
@@ -307,23 +320,49 @@ export default function MapPlanner() {
                     weight: 2,
                     dashArray: '1, 0'
                 });
+            } else if (isBuildingMode) {
+                layer.setStyle({
+                    color: AREA_COLORS.building,
+                    fillColor: AREA_COLORS.building,
+                    fillOpacity: 1,
+                    weight: 2
+                });
+            } else if (isPowerPlantMode) {
+                layer.setStyle({
+                    color: AREA_COLORS.powerplant,
+                    fillColor: AREA_COLORS.powerplant,
+                    fillOpacity: 1,
+                    weight: 2
+                });
+            } else if (activeButton === 'solarcell') {
+                layer.setStyle({
+                    color: AREA_COLORS.solarcell,
+                    fillColor: AREA_COLORS.solarcell,
+                    fillOpacity: 0.7,
+                    weight: 2
+                });
             }
         }
 
-        // Add new layer
         setLayers(prevLayers => [...prevLayers, {
             type: isRiverMode ? 'river' : 
                   isFieldMode ? 'field' : 
                   isBuildingMode ? 'building' : 
                   isPowerPlantMode ? 'powerplant' : 
+                  activeButton === 'custompolygon' ? 'custompolygon' :
+                  activeButton === 'solarcell' ? 'solarcell' :
                   currentDrawingType,
             coordinates: coordinates
         }]);
 
-        // Reset modes and update status
+        // Reset to original state after drawing
         resetModes();
+        setActiveButton(null);
+        setSelectedAreaTypes(prev => prev.filter(type => type !== activeButton));
         setError(null);
-        setStatus(`Added ${isRiverMode ? 'river' : 
+        setStatus(`Added ${activeButton === 'custompolygon' ? 'custom polygon' :
+                          activeButton === 'solarcell' ? 'solar cell' :
+                          isRiverMode ? 'river' : 
                           isFieldMode ? 'field' : 
                           isBuildingMode ? 'building' : 
                           isPowerPlantMode ? 'power plant' : 
@@ -331,11 +370,13 @@ export default function MapPlanner() {
     };
 
     const onDeleted = (e: any) => {
-        setLayers(prevLayers => prevLayers.filter((_, index) => index !== e.layers.length - 1));
+        // Clear all layers from state when the bin button is used
+        setLayers([]);
+        setSelectedAreaTypes([]);
+        setPumpLocation(null);
+        setResults([]);
         setError(null);
-        setStatus(selectedAreaTypes.length > 0 
-            ? `Selected types: ${selectedAreaTypes.join(', ')}`
-            : 'Select area type(s) or draw an area on the map.');
+        setStatus('All drawn areas have been cleared.');
     };
 
     const handleNext = () => {
@@ -368,44 +409,11 @@ export default function MapPlanner() {
                 type: 'pump',
                 coordinates: [clickedPoint]
             }]);
+            // Reset to original state after placing pump
             resetModes();
+            setActiveButton(null);
+            setSelectedAreaTypes(prev => prev.filter(type => type !== 'pump'));
             setStatus('Pump location added. Select another area type to continue.');
-        }
-    };
-
-    const handleBuildingPlace = (lat: number, lng: number) => {
-        if (layers.length > 0) {
-            const size = 0.0001;
-            const coordinates = [
-                { lat: lat - size, lng: lng - size },
-                { lat: lat - size, lng: lng + size },
-                { lat: lat + size, lng: lng + size },
-                { lat: lat + size, lng: lng - size }
-            ];
-            setLayers(prevLayers => [...prevLayers, {
-                type: 'building',
-                coordinates: coordinates
-            }]);
-            resetModes();
-            setStatus('Building added. Select another area type to continue.');
-        }
-    };
-
-    const handlePowerPlantPlace = (lat: number, lng: number) => {
-        if (layers.length > 0) {
-            const size = 0.0001;
-            const coordinates = [
-                { lat: lat - size, lng: lng - size },
-                { lat: lat - size, lng: lng + size },
-                { lat: lat + size, lng: lng + size },
-                { lat: lat + size, lng: lng - size }
-            ];
-            setLayers(prevLayers => [...prevLayers, {
-                type: 'powerplant',
-                coordinates: coordinates
-            }]);
-            resetModes();
-            setStatus('Power plant added. Select another area type to continue.');
         }
     };
 
@@ -434,6 +442,113 @@ export default function MapPlanner() {
                 <div className="space-y-4 lg:col-span-1">
                     <div>
                         <label className="mb-1 block text-sm font-medium text-gray-300">
+                            Plant Category
+                        </label>
+                        <select
+                            value={selectedPlantCategory}
+                            onChange={(e) => {
+                                setSelectedPlantCategory(e.target.value);
+                                setSelectedPlant(null);
+                                setFilteredPlants(plantTypes);
+                            }}
+                            className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                        >
+                            <option value="">Select a plant category</option>
+                            <option value="Horticultural">Horticultural</option>
+                        </select>
+                    </div>
+
+                    {selectedPlantCategory && (
+                        <div>
+                            <label className="mb-1 block text-sm font-medium text-gray-300">
+                                Plant Selection
+                                <span className="ml-2 text-sm font-normal text-gray-400">
+                                    {selectedPlant ? `(${selectedPlant.name})` : '(Select a plant)'}
+                                </span>
+                            </label>
+                            <select
+                                value={selectedPlant?.id || ''}
+                                onChange={(e) => {
+                                    const plant = filteredPlants.find(p => p.id === Number(e.target.value));
+                                    setSelectedPlant(plant || null);
+                                    if (plant) {
+                                        setCustomParams({
+                                            plant_spacing: plant.plant_spacing,
+                                            row_spacing: plant.row_spacing,
+                                            water_needed: plant.water_needed
+                                        });
+                                    }
+                                    setStatus(plant ? `${plant.name} selected` : 'Select a plant');
+                                }}
+                                className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                            >
+                                <option value="">Select a plant</option>
+                                {filteredPlants.map((plant) => (
+                                    <option key={plant.id} value={plant.id}>
+                                        {plant.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    {selectedPlant && (
+                        <>
+                            <div className="space-y-4 rounded-lg bg-gray-800 p-4">
+                                <div>
+                                    <label className="mb-1 block text-sm font-medium text-gray-300">
+                                        Plant Spacing (m)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={customParams.plant_spacing}
+                                        onChange={(e) => setCustomParams(prev => ({
+                                            ...prev,
+                                            plant_spacing: parseFloat(e.target.value) || 0
+                                        }))}
+                                        min="0"
+                                        step="0.1"
+                                        className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="mb-1 block text-sm font-medium text-gray-300">
+                                        Row Spacing (m)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={customParams.row_spacing}
+                                        onChange={(e) => setCustomParams(prev => ({
+                                            ...prev,
+                                            row_spacing: parseFloat(e.target.value) || 0
+                                        }))}
+                                        min="0"
+                                        step="0.1"
+                                        className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="mb-1 block text-sm font-medium text-gray-300">
+                                        Water Needed (L/day)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={customParams.water_needed}
+                                        onChange={(e) => setCustomParams(prev => ({
+                                            ...prev,
+                                            water_needed: parseFloat(e.target.value) || 0
+                                        }))}
+                                        min="0"
+                                        step="0.1"
+                                        className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    <div>
+                        <label className="mb-1 block text-sm font-medium text-gray-300">
                             Area Configuration
                         </label>
                         <div className="space-y-2">
@@ -452,33 +567,6 @@ export default function MapPlanner() {
                             ))}
                         </div>
                     </div>
-
-                    <div>
-                        <label className="mb-1 block text-sm font-medium text-gray-300">
-                            Plant Selection
-                            <span className="ml-2 text-sm font-normal text-gray-400">
-                                {selectedPlant ? `(${selectedPlant.name})` : '(Select a plant type)'}
-                            </span>
-                        </label>
-                        <select
-                            value={selectedPlant?.id || ''}
-                            onChange={(e) => {
-                                const plant = plantTypes.find(p => p.id === Number(e.target.value));
-                                setSelectedPlant(plant || null);
-                                setStatus(plant ? `${plant.name} selected` : 'Select a plant type');
-                            }}
-                            className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
-                        >
-                            <option value="">Select a plant type</option>
-                            {plantTypes.map((plant) => (
-                                <option key={plant.id} value={plant.id}>
-                                    {plant.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {selectedPlant && <PlantInfo plant={selectedPlant} />}
                 </div>
 
                 <div className="space-y-4 lg:col-span-2">
@@ -494,11 +582,7 @@ export default function MapPlanner() {
                         >
                             <MapClickHandler 
                                 isPumpMode={isPumpMode} 
-                                isBuildingMode={isBuildingMode}
-                                isPowerPlantMode={isPowerPlantMode}
                                 onPumpPlace={handlePumpPlace}
-                                onBuildingPlace={handleBuildingPlace}
-                                onPowerPlantPlace={handlePowerPlantPlace}
                             />
                             <LayersControl position="topright">
                                 <LayersControl.BaseLayer checked name="Street Map">
@@ -601,6 +685,21 @@ export default function MapPlanner() {
                                                 fillOpacity: 0.3,
                                                 weight: 2,
                                                 dashArray: '1, 0'
+                                            }}
+                                        />
+                                    );
+                                }
+                                if (layer.type === 'custompolygon') {
+                                    return (
+                                        <Polygon
+                                            key={`custompolygon-${index}`}
+                                            positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
+                                            pathOptions={{
+                                                color: AREA_COLORS.custompolygon,
+                                                fillColor: AREA_COLORS.custompolygon,
+                                                fillOpacity: 0.4,
+                                                weight: 2,
+                                                dashArray: '2, 6'
                                             }}
                                         />
                                     );
