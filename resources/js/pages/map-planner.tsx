@@ -5,8 +5,6 @@ import { EditControl } from 'react-leaflet-draw';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import { router } from '@inertiajs/react';
-import { route } from 'ziggy-js';
-
 
 // Types
 interface LatLng {
@@ -21,17 +19,14 @@ interface PlantType {
     plant_spacing: number;
     row_spacing: number;
     water_needed: number;
-    description: string;
 }
 
-// Add new interface for custom parameters
 interface CustomPlantParams {
     plant_spacing: number;
     row_spacing: number;
     water_needed: number;
 }
 
-// 1. Update AreaType to include 'solarcell'
 type AreaType = 'field' | 'river' | 'powerplant' | 'building' | 'pump' | 'custompolygon' | 'solarcell';
 
 interface LayerData {
@@ -43,7 +38,6 @@ interface LayerData {
 const DEFAULT_MAP_CENTER: [number, number] = [13.7563, 100.5018];
 const MAX_AREA = 100000; // 10 hectares
 
-// 2. Add description for solarcell
 const AREA_DESCRIPTIONS: Record<AreaType, string> = {
     field: 'Agricultural land for planting crops and vegetation.',
     river: 'Water body for irrigation and water management.',
@@ -51,10 +45,9 @@ const AREA_DESCRIPTIONS: Record<AreaType, string> = {
     building: 'Structure or facility area.',
     pump: 'Water pump station for irrigation system.',
     custompolygon: 'Other area for flexible drawing.',
-    solarcell: 'Solar cell installation area.' // <-- Added
+    solarcell: 'Solar cell installation area.'
 };
 
-// 3. Add color for solarcell
 const AREA_COLORS: Record<AreaType, string> = {
     river: '#3B82F6',    // Blue
     field: '#22C55E',    // Green
@@ -62,7 +55,7 @@ const AREA_COLORS: Record<AreaType, string> = {
     building: '#F59E0B',  // Yellow
     pump: '#1E40AF',      // Dark Blue
     custompolygon: '#A21CAF', // Purple
-    solarcell: '#FFD600' // Bright Yellow for solar cell
+    solarcell: '#FFD600' // Bright Yellow
 };
 
 // Helper Components
@@ -87,9 +80,8 @@ const AreaTypeButton: React.FC<{
             'bg-gray-700 hover:bg-gray-600'
         }`}
     >
-        {type === 'custompolygon'
-            ? 'Other'
-            : type.charAt(0).toUpperCase() + type.slice(1).replace('powerplant', 'Power Plant')}
+        {type === 'custompolygon' ? 'Other' : 
+         type.charAt(0).toUpperCase() + type.slice(1).replace('powerplant', 'Power Plant')}
     </button>
 );
 
@@ -114,13 +106,11 @@ export default function MapPlanner() {
     const [layers, setLayers] = useState<LayerData[]>([]);
     const [selectedPlant, setSelectedPlant] = useState<PlantType | null>(null);
     const [plantTypes, setPlantTypes] = useState<PlantType[]>([]);
-    const [results, setResults] = useState<LatLng[]>([]);
     const [mapCenter, setMapCenter] = useState<[number, number]>(DEFAULT_MAP_CENTER);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [status, setStatus] = useState<string>('Draw an area on the map first');
     const [selectedAreaTypes, setSelectedAreaTypes] = useState<AreaType[]>([]);
-    const [currentDrawingType, setCurrentDrawingType] = useState<AreaType>('field');
     const [activeButton, setActiveButton] = useState<AreaType | null>(null);
     const [drawingMode, setDrawingMode] = useState<'polygon' | 'rectangle'>('polygon');
     const [customParams, setCustomParams] = useState<CustomPlantParams>({
@@ -136,13 +126,11 @@ export default function MapPlanner() {
     const [isBuildingMode, setIsBuildingMode] = useState(false);
     const [isPowerPlantMode, setIsPowerPlantMode] = useState(false);
     const [pumpLocation, setPumpLocation] = useState<LatLng | null>(null);
+    const [selectedPlantCategory, setSelectedPlantCategory] = useState<string>('');
+    const [filteredPlants, setFilteredPlants] = useState<PlantType[]>([]);
 
     // Refs
     const featureGroupRef = useRef<any>(null);
-
-    // New state for plant type selection
-    const [selectedPlantCategory, setSelectedPlantCategory] = useState<string>('');
-    const [filteredPlants, setFilteredPlants] = useState<PlantType[]>([]);
 
     // Effects
     useEffect(() => {
@@ -158,27 +146,7 @@ export default function MapPlanner() {
         fetchPlantTypes();
     }, []);
 
-    useEffect(() => {
-        if (results.length > 0) {
-            const center = results.reduce(
-                (acc, point) => [acc[0] + point.lat, acc[1] + point.lng],
-                [0, 0]
-            );
-            setMapCenter([center[0] / results.length, center[1] / results.length]);
-        }
-    }, [results]);
-
     // Helper Functions
-    const calculateArea = (points: LatLng[]): number => {
-        let area = 0;
-        for (let i = 0; i < points.length; i++) {
-            const j = (i + 1) % points.length;
-            area += points[i].lat * points[j].lng;
-            area -= points[j].lat * points[i].lng;
-        }
-        return Math.abs(area) / 2;
-    };
-
     const resetModes = () => {
         setIsPumpMode(false);
         setIsRiverMode(false);
@@ -188,47 +156,18 @@ export default function MapPlanner() {
         setActiveButton(null);
     };
 
-    // Event Handlers
-    const handleSubmit = async () => {
-        if (layers.length < 1) {
-            setError('Please draw an area on the map first');
-            return;
-        }
-
-        if (!selectedPlant) {
-            setError('Please select a plant type');
-            return;
-        }
-
-        const areaSize = calculateArea(layers[0].coordinates);
-        if (areaSize > MAX_AREA) {
-            setError(`Area is too large. Maximum allowed area is ${MAX_AREA/10000} hectares`);
-            return;
-        }
-
-        setIsLoading(true);
-        setError(null);
-        setStatus(`Calculating optimal plant positions for ${selectedAreaTypes.join(', ')}...`);
-
-        try {
-            const response = await axios.post<{ plant_locations: LatLng[] }>(
-                '/api/generate-planting-points',
-                {
-                    area: layers[0].coordinates,
-                    plant_type_id: selectedPlant.id,
-                    plant_spacing: customParams.plant_spacing,
-                    row_spacing: customParams.row_spacing,
-                    water_needed: customParams.water_needed,
-                    area_type: selectedAreaTypes,
-                }
-            );
-            setResults(response.data.plant_locations);
-            setStatus(`Successfully generated ${response.data.plant_locations.length} planting points`);
-        } catch (error) {
-            setError(axios.isAxiosError(error) ? error.response?.data?.message || 'Error generating points' : 'An unexpected error occurred');
-            setStatus('Failed to generate planting points');
-        } finally {
-            setIsLoading(false);
+    const handlePumpPlace = (lat: number, lng: number) => {
+        if (layers.length > 0) {
+            const clickedPoint = { lat, lng };
+            setPumpLocation(clickedPoint);
+            setLayers(prevLayers => [...prevLayers, {
+                type: 'pump',
+                coordinates: [clickedPoint]
+            }]);
+            resetModes();
+            setActiveButton(null);
+            setSelectedAreaTypes(prev => prev.filter(type => type !== 'pump'));
+            setStatus('Pump location added. Select another area type to continue.');
         }
     };
 
@@ -253,47 +192,49 @@ export default function MapPlanner() {
             return;
         }
 
-        switch (type) {
-            case 'pump':
+        const modeMap = {
+            pump: () => {
                 setIsPumpMode(true);
                 setSelectedAreaTypes(prev => [...prev, 'pump']);
                 setStatus('Click on the map to place a pump');
-                break;
-            case 'river':
+            },
+            river: () => {
                 setIsRiverMode(true);
                 setDrawingMode('polygon');
                 setSelectedAreaTypes(prev => [...prev, 'river']);
                 setStatus('Use the polygon tool to draw the river area');
-                break;
-            case 'field':
+            },
+            field: () => {
                 setIsFieldMode(true);
                 setDrawingMode('polygon');
                 setSelectedAreaTypes(prev => [...prev, 'field']);
                 setStatus('Use the polygon tool to draw the field area');
-                break;
-            case 'building':
+            },
+            building: () => {
                 setIsBuildingMode(true);
                 setDrawingMode('polygon');
                 setSelectedAreaTypes(prev => [...prev, 'building']);
                 setStatus('Use the polygon tool to draw the building area');
-                break;
-            case 'powerplant':
+            },
+            powerplant: () => {
                 setIsPowerPlantMode(true);
                 setDrawingMode('polygon');
                 setSelectedAreaTypes(prev => [...prev, 'powerplant']);
                 setStatus('Use the polygon tool to draw the power plant area');
-                break;
-            case 'custompolygon':
+            },
+            custompolygon: () => {
                 setDrawingMode('polygon');
                 setSelectedAreaTypes(prev => [...prev, 'custompolygon']);
                 setStatus('Use the polygon tool to draw a custom area');
-                break;
-            case 'solarcell':
+            },
+            solarcell: () => {
                 setDrawingMode('polygon');
                 setSelectedAreaTypes(prev => [...prev, 'solarcell']);
                 setStatus('Use the polygon tool to draw the solar cell area');
-                break;
-        }
+            }
+        };
+
+        modeMap[type]();
     };
 
     const onCreated = (e: any) => {
@@ -303,42 +244,25 @@ export default function MapPlanner() {
             lng: latLng.lng,
         }));
 
+        const styleMap = {
+            river: { color: AREA_COLORS.river, fillOpacity: 0.3, dashArray: '5, 10' },
+            field: { color: AREA_COLORS.field, fillOpacity: 0.3, dashArray: '1, 0' },
+            building: { color: AREA_COLORS.building, fillOpacity: 1 },
+            powerplant: { color: AREA_COLORS.powerplant, fillOpacity: 1 },
+            solarcell: { color: AREA_COLORS.solarcell, fillOpacity: 0.7 }
+        };
+
         if (layers.length > 0) {
-            if (isRiverMode) {
+            const currentType = isRiverMode ? 'river' : 
+                              isFieldMode ? 'field' : 
+                              isBuildingMode ? 'building' : 
+                              isPowerPlantMode ? 'powerplant' : 
+                              activeButton === 'solarcell' ? 'solarcell' : null;
+
+            if (currentType && styleMap[currentType]) {
                 layer.setStyle({
-                    color: AREA_COLORS.river,
-                    fillColor: AREA_COLORS.river,
-                    fillOpacity: 0.3,
-                    weight: 2,
-                    dashArray: '5, 10'
-                });
-            } else if (isFieldMode) {
-                layer.setStyle({
-                    color: AREA_COLORS.field,
-                    fillColor: AREA_COLORS.field,
-                    fillOpacity: 0.3,
-                    weight: 2,
-                    dashArray: '1, 0'
-                });
-            } else if (isBuildingMode) {
-                layer.setStyle({
-                    color: AREA_COLORS.building,
-                    fillColor: AREA_COLORS.building,
-                    fillOpacity: 1,
-                    weight: 2
-                });
-            } else if (isPowerPlantMode) {
-                layer.setStyle({
-                    color: AREA_COLORS.powerplant,
-                    fillColor: AREA_COLORS.powerplant,
-                    fillOpacity: 1,
-                    weight: 2
-                });
-            } else if (activeButton === 'solarcell') {
-                layer.setStyle({
-                    color: AREA_COLORS.solarcell,
-                    fillColor: AREA_COLORS.solarcell,
-                    fillOpacity: 0.7,
+                    ...styleMap[currentType],
+                    fillColor: styleMap[currentType].color,
                     weight: 2
                 });
             }
@@ -351,11 +275,10 @@ export default function MapPlanner() {
                   isPowerPlantMode ? 'powerplant' : 
                   activeButton === 'custompolygon' ? 'custompolygon' :
                   activeButton === 'solarcell' ? 'solarcell' :
-                  currentDrawingType,
+                  'field',
             coordinates: coordinates
         }]);
 
-        // Reset to original state after drawing
         resetModes();
         setActiveButton(null);
         setSelectedAreaTypes(prev => prev.filter(type => type !== activeButton));
@@ -366,58 +289,50 @@ export default function MapPlanner() {
                           isFieldMode ? 'field' : 
                           isBuildingMode ? 'building' : 
                           isPowerPlantMode ? 'power plant' : 
-                          currentDrawingType} area. Select another area type to continue.`);
+                          'field'} area. Select another area type to continue.`);
     };
 
-    const onDeleted = (e: any) => {
-        // Clear all layers from state when the bin button is used
+    const onDeleted = () => {
         setLayers([]);
         setSelectedAreaTypes([]);
         setPumpLocation(null);
-        setResults([]);
         setError(null);
         setStatus('All drawn areas have been cleared.');
     };
 
     const handleNext = () => {
-        if (selectedAreaTypes.length === 0 || layers.length === 0 || !selectedPlant) {
-            setError('Please select an area type, draw an area, and select a plant type before proceeding.');
+        if (layers.length === 0) {
+            setError('Please draw an area on the map first.');
             return;
         }
 
-        const params = new URLSearchParams();
-        params.append('areaType', selectedAreaTypes[0]);
-        params.append('area', JSON.stringify(layers[0].coordinates));
-        params.append('plantType', JSON.stringify(selectedPlant));
+        if (!selectedPlantCategory) {
+            setError('Please select a plant category.');
+            return;
+        }
 
-        router.visit(route('generate.tree') + '?' + params.toString(), {
-            method: 'get',
-            preserveState: true,
-            preserveScroll: true,
-            onError: (errors) => {
-                setError('Failed to navigate to the next page. Please make sure you are logged in.');
-                console.error('Navigation error:', errors);
-            }
-        });
-    };
+        if (!selectedPlant) {
+            setError('Please select a plant.');
+            return;
+        }
 
-    const handlePumpPlace = (lat: number, lng: number) => {
-        if (layers.length > 0) {
-            const clickedPoint = { lat, lng };
-            setPumpLocation(clickedPoint);
-            setLayers(prevLayers => [...prevLayers, {
-                type: 'pump',
-                coordinates: [clickedPoint]
-            }]);
-            // Reset to original state after placing pump
-            resetModes();
-            setActiveButton(null);
-            setSelectedAreaTypes(prev => prev.filter(type => type !== 'pump'));
-            setStatus('Pump location added. Select another area type to continue.');
+        try {
+            router.visit('/generate-tree', {
+                method: 'get',
+                data: {
+                    areaType: selectedAreaTypes[0] || '',
+                    area: JSON.stringify(layers[0].coordinates),
+                    plantType: JSON.stringify(selectedPlant)
+                },
+                preserveState: false,
+                preserveScroll: false
+            });
+        } catch (error) {
+            console.error('Error in handleNext:', error);
+            setError('An error occurred while trying to proceed. Please try again.');
         }
     };
 
-    // Render
     return (
         <div className="min-h-screen bg-gray-900 p-6">
             <h1 className="mb-4 text-xl font-bold text-white">Plant Layout Generator</h1>
@@ -455,6 +370,9 @@ export default function MapPlanner() {
                         >
                             <option value="">Select a plant category</option>
                             <option value="Horticultural">Horticultural</option>
+                            <option value="Field Crop">Field Crop</option>
+                            <option value="Greenhouse">Greenhouse</option>
+                            <option value="Home Garden">Home Garden</option>
                         </select>
                     </div>
 
@@ -493,58 +411,56 @@ export default function MapPlanner() {
                     )}
 
                     {selectedPlant && (
-                        <>
-                            <div className="space-y-4 rounded-lg bg-gray-800 p-4">
-                                <div>
-                                    <label className="mb-1 block text-sm font-medium text-gray-300">
-                                        Plant Spacing (m)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        value={customParams.plant_spacing}
-                                        onChange={(e) => setCustomParams(prev => ({
-                                            ...prev,
-                                            plant_spacing: parseFloat(e.target.value) || 0
-                                        }))}
-                                        min="0"
-                                        step="0.1"
-                                        className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="mb-1 block text-sm font-medium text-gray-300">
-                                        Row Spacing (m)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        value={customParams.row_spacing}
-                                        onChange={(e) => setCustomParams(prev => ({
-                                            ...prev,
-                                            row_spacing: parseFloat(e.target.value) || 0
-                                        }))}
-                                        min="0"
-                                        step="0.1"
-                                        className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="mb-1 block text-sm font-medium text-gray-300">
-                                        Water Needed (L/day)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        value={customParams.water_needed}
-                                        onChange={(e) => setCustomParams(prev => ({
-                                            ...prev,
-                                            water_needed: parseFloat(e.target.value) || 0
-                                        }))}
-                                        min="0"
-                                        step="0.1"
-                                        className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
-                                    />
-                                </div>
+                        <div className="space-y-4 rounded-lg bg-gray-800 p-4">
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-gray-300">
+                                    Plant Spacing (m)
+                                </label>
+                                <input
+                                    type="number"
+                                    value={customParams.plant_spacing}
+                                    onChange={(e) => setCustomParams(prev => ({
+                                        ...prev,
+                                        plant_spacing: parseFloat(e.target.value) || 0
+                                    }))}
+                                    min="0"
+                                    step="0.1"
+                                    className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                                />
                             </div>
-                        </>
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-gray-300">
+                                    Row Spacing (m)
+                                </label>
+                                <input
+                                    type="number"
+                                    value={customParams.row_spacing}
+                                    onChange={(e) => setCustomParams(prev => ({
+                                        ...prev,
+                                        row_spacing: parseFloat(e.target.value) || 0
+                                    }))}
+                                    min="0"
+                                    step="0.1"
+                                    className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-gray-300">
+                                    Water Needed (L/day)
+                                </label>
+                                <input
+                                    type="number"
+                                    value={customParams.water_needed}
+                                    onChange={(e) => setCustomParams(prev => ({
+                                        ...prev,
+                                        water_needed: parseFloat(e.target.value) || 0
+                                    }))}
+                                    min="0"
+                                    step="0.1"
+                                    className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                                />
+                            </div>
+                        </div>
                     )}
 
                     <div>
@@ -570,7 +486,7 @@ export default function MapPlanner() {
                 </div>
 
                 <div className="space-y-4 lg:col-span-2">
-                    <div className="h-[600px] w-full overflow-hidden rounded-lg border border-gray-700">
+                    <div className="h-[700px] w-full overflow-hidden rounded-lg border border-gray-700">
                         <MapContainer
                             center={mapCenter}
                             zoom={13}
@@ -631,75 +547,25 @@ export default function MapPlanner() {
                             )}
 
                             {layers.map((layer, index) => {
-                                if (layer.type === 'building') {
+                                const styleMap: Record<AreaType, { color: string; fillOpacity: number; dashArray?: string }> = {
+                                    building: { color: AREA_COLORS.building, fillOpacity: 1 },
+                                    powerplant: { color: AREA_COLORS.powerplant, fillOpacity: 1 },
+                                    river: { color: AREA_COLORS.river, fillOpacity: 0.3, dashArray: '5, 10' },
+                                    field: { color: AREA_COLORS.field, fillOpacity: 0.3, dashArray: '1, 0' },
+                                    custompolygon: { color: AREA_COLORS.custompolygon, fillOpacity: 0.4, dashArray: '2, 6' },
+                                    pump: { color: AREA_COLORS.pump, fillOpacity: 1 },
+                                    solarcell: { color: AREA_COLORS.solarcell, fillOpacity: 0.7 }
+                                };
+
+                                if (styleMap[layer.type]) {
                                     return (
                                         <Polygon
-                                            key={`building-${index}`}
+                                            key={`${layer.type}-${index}`}
                                             positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
                                             pathOptions={{
-                                                color: AREA_COLORS.building,
-                                                fillColor: AREA_COLORS.building,
-                                                fillOpacity: 1,
+                                                ...styleMap[layer.type],
+                                                fillColor: styleMap[layer.type].color,
                                                 weight: 2
-                                            }}
-                                        />
-                                    );
-                                }
-                                if (layer.type === 'powerplant') {
-                                    return (
-                                        <Polygon
-                                            key={`powerplant-${index}`}
-                                            positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
-                                            pathOptions={{
-                                                color: AREA_COLORS.powerplant,
-                                                fillColor: AREA_COLORS.powerplant,
-                                                fillOpacity: 1,
-                                                weight: 2
-                                            }}
-                                        />
-                                    );
-                                }
-                                if (layer.type === 'river') {
-                                    return (
-                                        <Polygon
-                                            key={`river-${index}`}
-                                            positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
-                                            pathOptions={{
-                                                color: AREA_COLORS.river,
-                                                fillColor: AREA_COLORS.river,
-                                                fillOpacity: 0.3,
-                                                weight: 2,
-                                                dashArray: '5, 10'
-                                            }}
-                                        />
-                                    );
-                                }
-                                if (layer.type === 'field') {
-                                    return (
-                                        <Polygon
-                                            key={`field-${index}`}
-                                            positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
-                                            pathOptions={{
-                                                color: AREA_COLORS.field,
-                                                fillColor: AREA_COLORS.field,
-                                                fillOpacity: 0.3,
-                                                weight: 2,
-                                                dashArray: '1, 0'
-                                            }}
-                                        />
-                                    );
-                                }
-                                if (layer.type === 'custompolygon') {
-                                    return (
-                                        <Polygon
-                                            key={`custompolygon-${index}`}
-                                            positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
-                                            pathOptions={{
-                                                color: AREA_COLORS.custompolygon,
-                                                fillColor: AREA_COLORS.custompolygon,
-                                                fillOpacity: 0.4,
-                                                weight: 2,
-                                                dashArray: '2, 6'
                                             }}
                                         />
                                     );
@@ -711,10 +577,10 @@ export default function MapPlanner() {
                     <div className="flex justify-end">
                         <button
                             onClick={handleNext}
-                            disabled={!selectedPlant || layers.length === 0 || selectedAreaTypes.length === 0}
+                            disabled={layers.length === 0 || !selectedPlantCategory || !selectedPlant}
                             className="rounded bg-green-600 px-6 py-3 text-white transition-colors duration-200 hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-700"
                         >
-                            Next
+                            {isLoading ? 'Processing...' : 'Next'}
                         </button>
                     </div>
                 </div>

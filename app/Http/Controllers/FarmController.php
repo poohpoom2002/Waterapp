@@ -8,9 +8,11 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
+use Exception;
 
 class FarmController extends Controller
 {
+    // Basic CRUD Operations
     public function index()
     {
         return inertia('farms/index');
@@ -73,19 +75,18 @@ class FarmController extends Controller
             ->with('success', 'Farm deleted successfully.');
     }
 
-    // Map Planner Methods
+    // Map Planning Operations
     public function planner()
     {
-        return inertia('mapplanner');
+        return inertia('map-planner');
     }
 
-    public function getPlantTypes()
+    public function getPlantTypes(): JsonResponse
     {
-        $plantTypes = PlantType::all();
-        return response()->json($plantTypes);
+        return response()->json(PlantType::all());
     }
 
-    public function generatePlantingPoints(Request $request)
+    public function generatePlantingPoints(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'area' => 'required|array|min:3',
@@ -101,14 +102,37 @@ class FarmController extends Controller
         }
 
         $plantType = PlantType::findOrFail($request->plant_type_id);
-        $area = $request->area;
-        
-        $plantLocations = $this->calculatePlantLocations($area, $plantType);
+        $plantLocations = $this->calculatePlantLocations($request->area, $plantType);
 
         return response()->json(['plant_locations' => $plantLocations]);
     }
 
-    private function calculatePlantLocations($area, $plantType)
+    public function generateTree(Request $request)
+    {
+        try {
+            $areaData = json_decode($request->input('area'), true);
+            $plantTypeData = json_decode($request->input('plantType'), true);
+            $areaType = $request->input('areaType');
+
+            if (!$this->validateAreaData($areaData)) {
+                throw new Exception('Invalid area data');
+            }
+
+            $plantType = PlantType::findOrFail($plantTypeData['id']);
+
+            return Inertia::render('generate-tree', [
+                'areaType' => $areaType,
+                'area' => $areaData,
+                'plantType' => $plantType
+            ]);
+        } catch (Exception $e) {
+            return redirect()->route('planner')
+                ->with('error', 'Invalid data provided. Please try again.');
+        }
+    }
+
+    // Helper Methods
+    private function calculatePlantLocations(array $area, PlantType $plantType): array
     {
         $points = [];
         $bounds = $this->getBounds($area);
@@ -127,7 +151,7 @@ class FarmController extends Controller
         return $points;
     }
 
-    private function getBounds($area)
+    private function getBounds(array $area): array
     {
         $minLat = PHP_FLOAT_MAX;
         $maxLat = -PHP_FLOAT_MAX;
@@ -151,7 +175,7 @@ class FarmController extends Controller
         ];
     }
 
-    private function isPointInPolygon($lat, $lng, $polygon)
+    private function isPointInPolygon(float $lat, float $lng, array $polygon): bool
     {
         $inside = false;
         $j = count($polygon) - 1;
@@ -168,46 +192,18 @@ class FarmController extends Controller
         return $inside;
     }
 
-    public function generateTree(Request $request)
+    private function validateAreaData(?array $areaData): bool
     {
-        try {
-            // Get and decode the area data from the URL
-            $areaData = json_decode($request->input('area'), true);
-            $plantTypeData = json_decode($request->input('plantType'), true);
-            $areaType = $request->input('areaType');
-            
-            // Validate the incoming data
-            $validated = $request->validate([
-                'areaType' => 'required|string|in:field,river,powerplant,building,pump',
-            ]);
-
-            // Validate the area data
-            if (!is_array($areaData)) {
-                throw new \Exception('Invalid area data');
-            }
-
-            foreach ($areaData as $point) {
-                if (!isset($point['lat']) || !isset($point['lng'])) {
-                    throw new \Exception('Invalid area point data');
-                }
-            }
-
-            // Validate the plant type data
-            if (!is_array($plantTypeData) || !isset($plantTypeData['id'])) {
-                throw new \Exception('Invalid plant type data');
-            }
-
-            // Get the full plant type data from the database
-            $plantType = PlantType::findOrFail($plantTypeData['id']);
-
-            return Inertia::render('generatetree', [
-                'areaType' => $areaType,
-                'area' => $areaData,
-                'plantType' => $plantType
-            ]);
-        } catch (\Exception $e) {
-            return redirect()->route('planner')
-                ->with('error', 'Invalid data provided. Please try again.');
+        if (!is_array($areaData)) {
+            return false;
         }
+
+        foreach ($areaData as $point) {
+            if (!isset($point['lat']) || !isset($point['lng'])) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
