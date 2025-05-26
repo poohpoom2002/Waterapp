@@ -8,7 +8,8 @@ export default defineConfig({
         laravel({
             input: [
                 'resources/js/app.tsx',
-                'resources/js/pages/mapplanner.tsx'
+                'resources/js/pages/mapplanner.tsx',
+                'resources/js/pages/generatetree.tsx'
             ],
             refresh: true,
         }),
