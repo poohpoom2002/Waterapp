@@ -24,10 +24,25 @@ type Props = {
     areaType: string;
     area: LatLng[];
     plantType: PlantType;
+    layers?: Array<{
+        type: string;
+        coordinates: LatLng[];
+    }>;
 };
 
 // Constants
 const DEFAULT_CENTER: [number, number] = [13.7563, 100.5018];
+
+const AREA_COLORS: Record<string, string> = {
+    river: '#3B82F6',    // Blue
+    field: '#22C55E',    // Green
+    powerplant: '#EF4444', // Red
+    building: '#F59E0B',  // Yellow
+    pump: '#1E40AF',      // Dark Blue
+    custompolygon: '#A21CAF', // Purple
+    solarcell: '#FFD600', // Bright Yellow
+    map: '#A21CAF'       // Purple
+};
 
 // Components
 const MapBounds = ({ positions }: { positions: LatLng[] }) => {
@@ -39,7 +54,7 @@ const MapBounds = ({ positions }: { positions: LatLng[] }) => {
                 (bounds, point) => bounds.extend([point.lat, point.lng]),
                 L.latLngBounds([])
             );
-            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 19, animate: true });
+            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 22, animate: true });
         }
     }, [positions, map]);
 
@@ -62,12 +77,64 @@ const InfoItem = ({ title, children }: { title: string; children: React.ReactNod
     </div>
 );
 
+// Add area calculation function
+const calculateAreaInRai = (coordinates: LatLng[]): number => {
+    if (coordinates.length < 3) return 0;
+
+    // Convert coordinates to meters using Haversine formula
+    const toMeters = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+        const R = 6371000; // Earth's radius in meters
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                 Math.sin(dLng/2) * Math.sin(dLng/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    };
+
+    // Calculate area using shoelace formula
+    let area = 0;
+    for (let i = 0; i < coordinates.length; i++) {
+        const j = (i + 1) % coordinates.length;
+        area += coordinates[i].lat * coordinates[j].lng;
+        area -= coordinates[j].lat * coordinates[i].lng;
+    }
+    area = Math.abs(area) / 2;
+
+    // Convert to square meters (approximate)
+    const areaInSquareMeters = area * 111000 * 111000 * Math.cos(coordinates[0].lat * Math.PI / 180);
+
+    // Convert to rai (1 rai = 1600 square meters)
+    return areaInSquareMeters / 1600;
+};
+
 // Main Component
-export default function GenerateTree({ areaType, area, plantType }: Props) {
+export default function GenerateTree({ areaType, area, plantType, layers = [] }: Props) {
     const [plantLocations, setPlantLocations] = useState<LatLng[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isPlantLayoutGenerated, setIsPlantLayoutGenerated] = useState(false);
+
+    // Calculate area in rai
+    const areaInRai = React.useMemo(() => calculateAreaInRai(area), [area]);
+
+    // Process the received data to ensure we use the correct values
+    const processedPlantType = React.useMemo(() => ({
+        ...plantType,
+        plant_spacing: Number(plantType.plant_spacing),
+        row_spacing: Number(plantType.row_spacing),
+        water_needed: Number(plantType.water_needed)
+    }), [plantType]);
+
+    // Debug logging
+    console.log('Received Props:', {
+        areaType,
+        area,
+        plantType: processedPlantType,
+        layers,
+        areaInRai
+    });
 
     const mapCenter = React.useMemo(() => {
         if (area.length === 0) return DEFAULT_CENTER;
@@ -84,15 +151,17 @@ export default function GenerateTree({ areaType, area, plantType }: Props) {
 
         try {
             const areaTypes = areaType ? areaType.split(',').map(type => type.trim()) : ['default'];
+            console.log('Generating with area types:', areaTypes);
 
             const { data } = await axios.post<{ plant_locations: LatLng[] }>(
                 '/api/generate-planting-points',
                 {
                     area,
-                    plant_type_id: plantType.id,
-                    plant_spacing: plantType.plant_spacing,
-                    row_spacing: plantType.row_spacing,
-                    area_types: areaTypes
+                    plant_type_id: processedPlantType.id,
+                    plant_spacing: processedPlantType.plant_spacing,
+                    row_spacing: processedPlantType.row_spacing,
+                    area_types: areaTypes,
+                    layers: layers
                 }
             );
             
@@ -150,27 +219,27 @@ export default function GenerateTree({ areaType, area, plantType }: Props) {
                 <div className="space-y-4 lg:col-span-1">
                     <InfoSection title="Plant Information">
                         <InfoItem title="Basic Details">
-                            <p><span className="font-medium">Plant Category:</span> {plantType.name}</p>
-                            <p><span className="font-medium">Plant Selection:</span> {plantType.type}</p>
+                            <p><span className="font-medium">Plant Category:</span> {processedPlantType.name}</p>
+                            <p><span className="font-medium">Plant Selection:</span> {processedPlantType.type}</p>
                         </InfoItem>
                         <InfoItem title="Spacing Requirements">
-                            <p><span className="font-medium">Plant Spacing:</span> {plantType.plant_spacing}m</p>
-                            <p><span className="font-medium">Row Spacing:</span> {plantType.row_spacing}m</p>
+                            <p><span className="font-medium">Plant Spacing:</span> {processedPlantType.plant_spacing.toFixed(2)}m</p>
+                            <p><span className="font-medium">Row Spacing:</span> {processedPlantType.row_spacing.toFixed(2)}m</p>
                         </InfoItem>
                         <InfoItem title="Water Requirements">
-                            <p><span className="font-medium">Daily Water Need:</span> {plantType.water_needed}L/day</p>
+                            <p><span className="font-medium">Daily Water Need:</span> {processedPlantType.water_needed.toFixed(2)}L/day</p>
                         </InfoItem>
                     </InfoSection>
 
                     <InfoSection title="Area Information">
                         <InfoItem title="Area Size">
-                            <p>To be calculated.</p>
+                            <p>{areaInRai.toFixed(2)} rai</p>
                         </InfoItem>
                         <InfoItem title="Number of Plants">
-                            <p>To be calculated.</p>
+                            <p>{plantLocations.length} plants</p>
                         </InfoItem>
                         <InfoItem title="Total Water Need">
-                            <p>To be calculated.</p>
+                            <p>{(plantLocations.length * processedPlantType.water_needed).toFixed(2)} L/day</p>
                         </InfoItem>
                     </InfoSection>
                 </div>
@@ -179,9 +248,8 @@ export default function GenerateTree({ areaType, area, plantType }: Props) {
                     <div className="h-[900px] w-full overflow-hidden rounded-lg border border-gray-700">
                         <MapContainer
                             center={mapCenter}
-                            zoom={17}
-                            maxZoom={18}
-                            minZoom={3}
+                            zoom={18}
+                            maxZoom={19}
                             style={{ height: '100%', width: '100%' }}
                             zoomControl={true}
                             scrollWheelZoom={true}
@@ -189,20 +257,59 @@ export default function GenerateTree({ areaType, area, plantType }: Props) {
                             <TileLayer
                                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                maxZoom={19}
                             />
                             <MapBounds positions={area} />
-                            <Polygon
-                                positions={area}
-                                pathOptions={{
-                                    color: 'blue',
-                                    fillColor: 'blue',
-                                    fillOpacity: 0.2,
-                                    weight: 2
-                                }}
-                            />
+                            
+                            {/* Display all layers */}
+                            {layers.map((layer, index) => {
+                                const styleMap: Record<string, { color: string; fillOpacity: number; dashArray?: string }> = {
+                                    building: { color: AREA_COLORS.building, fillOpacity: 1 },
+                                    powerplant: { color: AREA_COLORS.powerplant, fillOpacity: 1 },
+                                    river: { color: AREA_COLORS.river, fillOpacity: 0.3, dashArray: '5, 10' },
+                                    field: { color: AREA_COLORS.field, fillOpacity: 0.3, dashArray: '1, 0' },
+                                    custompolygon: { color: AREA_COLORS.custompolygon, fillOpacity: 0.4, dashArray: '2, 6' },
+                                    pump: { color: AREA_COLORS.pump, fillOpacity: 1 },
+                                    solarcell: { color: AREA_COLORS.solarcell, fillOpacity: 0.7 },
+                                    map: { color: AREA_COLORS.map, fillOpacity: 0.4, dashArray: '2, 6' }
+                                };
+
+                                if (layer.type === 'pump') {
+                                    return (
+                                        <CircleMarker
+                                            key={`${layer.type}-${index}`}
+                                            center={[layer.coordinates[0].lat, layer.coordinates[0].lng]}
+                                            radius={5}
+                                            pathOptions={{
+                                                color: AREA_COLORS.pump,
+                                                fillColor: AREA_COLORS.pump,
+                                                fillOpacity: 1,
+                                                weight: 2
+                                            }}
+                                        />
+                                    );
+                                }
+
+                                if (styleMap[layer.type]) {
+                                    return (
+                                        <Polygon
+                                            key={`${layer.type}-${index}`}
+                                            positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
+                                            pathOptions={{
+                                                ...styleMap[layer.type],
+                                                fillColor: styleMap[layer.type].color,
+                                                weight: 2
+                                            }}
+                                        />
+                                    );
+                                }
+                                return null;
+                            })}
+
+                            {/* Display plant locations */}
                             {plantLocations.map((location, index) => (
                                 <CircleMarker
-                                    key={index}
+                                    key={`plant-${index}`}
                                     center={[location.lat, location.lng]}
                                     radius={3}
                                     pathOptions={{
