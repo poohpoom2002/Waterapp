@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { router } from '@inertiajs/react';
-import { MapContainer, TileLayer, CircleMarker, Polygon, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Polygon, useMap, FeatureGroup, LayersControl } from 'react-leaflet';
+import { EditControl } from 'react-leaflet-draw';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet-draw/dist/leaflet.draw.css';
 import axios from 'axios';
 import L from 'leaflet';
 
@@ -27,6 +29,7 @@ type Props = {
     layers?: Array<{
         type: string;
         coordinates: LatLng[];
+        isInitialMap?: boolean;
     }>;
 };
 
@@ -39,9 +42,8 @@ const AREA_COLORS: Record<string, string> = {
     powerplant: '#EF4444', // Red
     building: '#F59E0B',  // Yellow
     pump: '#1E40AF',      // Dark Blue
-    custompolygon: '#A21CAF', // Purple
+    custompolygon: '#4B5563', // Black Gray
     solarcell: '#FFD600', // Bright Yellow
-    map: '#A21CAF'       // Purple
 };
 
 // Components
@@ -77,13 +79,58 @@ const InfoItem = ({ title, children }: { title: string; children: React.ReactNod
     </div>
 );
 
-// Add area calculation function
+const PointManagementControls = () => {
+    const map = useMap();
+    const featureGroupRef = React.useRef<L.FeatureGroup>(null);
+
+    const handleAddPoints = () => {
+        if (featureGroupRef.current) {
+            map.fire('draw:drawstart');
+        }
+    };
+
+    const handleDeletePoints = () => {
+        if (featureGroupRef.current) {
+            map.fire('draw:deletestart');
+        }
+    };
+
+    const handleMovePoints = () => {
+        if (featureGroupRef.current) {
+            map.fire('draw:editstart');
+        }
+    };
+
+    return (
+        <div className="absolute top-4 left-[60px] z-[1000] flex gap-2 bg-white p-2 rounded-lg shadow-lg">
+            <button
+                className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                onClick={handleAddPoints}
+            >
+                Add Points
+            </button>
+            <button
+                className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                onClick={handleDeletePoints}
+            >
+                Delete Points
+            </button>
+            <button
+                className="px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                onClick={handleMovePoints}
+            >
+                Move Points
+            </button>
+        </div>
+    );
+};
+
+// Helper Functions
 const calculateAreaInRai = (coordinates: LatLng[]): number => {
     if (coordinates.length < 3) return 0;
 
-    // Convert coordinates to meters using Haversine formula
     const toMeters = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
-        const R = 6371000; // Earth's radius in meters
+        const R = 6371000;
         const dLat = (lat2 - lat1) * Math.PI / 180;
         const dLng = (lng2 - lng1) * Math.PI / 180;
         const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -93,7 +140,6 @@ const calculateAreaInRai = (coordinates: LatLng[]): number => {
         return R * c;
     };
 
-    // Calculate area using shoelace formula
     let area = 0;
     for (let i = 0; i < coordinates.length; i++) {
         const j = (i + 1) % coordinates.length;
@@ -102,10 +148,7 @@ const calculateAreaInRai = (coordinates: LatLng[]): number => {
     }
     area = Math.abs(area) / 2;
 
-    // Convert to square meters (approximate)
     const areaInSquareMeters = area * 111000 * 111000 * Math.cos(coordinates[0].lat * Math.PI / 180);
-
-    // Convert to rai (1 rai = 1600 square meters)
     return areaInSquareMeters / 1600;
 };
 
@@ -116,27 +159,15 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
     const [error, setError] = useState<string | null>(null);
     const [isPlantLayoutGenerated, setIsPlantLayoutGenerated] = useState(false);
 
-    // Calculate area in rai
-    const areaInRai = React.useMemo(() => calculateAreaInRai(area), [area]);
-
-    // Process the received data to ensure we use the correct values
-    const processedPlantType = React.useMemo(() => ({
+    const areaInRai = useMemo(() => calculateAreaInRai(area), [area]);
+    const processedPlantType = useMemo(() => ({
         ...plantType,
         plant_spacing: Number(plantType.plant_spacing),
         row_spacing: Number(plantType.row_spacing),
         water_needed: Number(plantType.water_needed)
     }), [plantType]);
 
-    // Debug logging
-    console.log('Received Props:', {
-        areaType,
-        area,
-        plantType: processedPlantType,
-        layers,
-        areaInRai
-    });
-
-    const mapCenter = React.useMemo(() => {
+    const mapCenter = useMemo(() => {
         if (area.length === 0) return DEFAULT_CENTER;
         const center = area.reduce(
             (acc, point) => [acc[0] + point.lat, acc[1] + point.lng],
@@ -151,8 +182,6 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
 
         try {
             const areaTypes = areaType ? areaType.split(',').map(type => type.trim()) : ['default'];
-            console.log('Generating with area types:', areaTypes);
-
             const { data } = await axios.post<{ plant_locations: LatLng[] }>(
                 '/api/generate-planting-points',
                 {
@@ -161,7 +190,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                     plant_spacing: processedPlantType.plant_spacing,
                     row_spacing: processedPlantType.row_spacing,
                     area_types: areaTypes,
-                    layers: layers
+                    layers
                 }
             );
             
@@ -173,18 +202,10 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
             setIsPlantLayoutGenerated(true);
         } catch (error) {
             console.error('Error details:', error);
-            
-            if (axios.isAxiosError(error)) {
-                const errorMessage = error.response?.data?.message 
-                    || error.response?.data?.error 
-                    || error.message 
-                    || 'Error generating points';
-                setError(`Error: ${errorMessage}`);
-            } else if (error instanceof Error) {
-                setError(`Error: ${error.message}`);
-            } else {
-                setError('An unexpected error occurred while generating plant layout');
-            }
+            setError(axios.isAxiosError(error) 
+                ? error.response?.data?.message || error.message || 'Error generating points'
+                : 'An unexpected error occurred'
+            );
         } finally {
             setIsLoading(false);
         }
@@ -195,7 +216,6 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
         setError(null);
 
         try {
-            // TODO: Implement pipe layout generation API call
             console.log('Generating pipe layout...');
         } catch (error) {
             setError(axios.isAxiosError(error) 
@@ -254,24 +274,65 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                             zoomControl={true}
                             scrollWheelZoom={true}
                         >
-                            <TileLayer
-                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                                maxZoom={19}
-                            />
+                            <LayersControl position="topright">
+                                <LayersControl.BaseLayer checked name="Street Map">
+                                    <TileLayer
+                                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                        maxZoom={19}
+                                    />
+                                </LayersControl.BaseLayer>
+                                <LayersControl.BaseLayer name="Satellite">
+                                    <TileLayer
+                                        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                                        attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
+                                        maxZoom={19}
+                                    />
+                                </LayersControl.BaseLayer>
+                            </LayersControl>
                             <MapBounds positions={area} />
                             
-                            {/* Display all layers */}
+                            <FeatureGroup>
+                                <EditControl
+                                    position="topright"
+                                    onCreated={(e) => {
+                                        const layer = e.layer;
+                                        if (layer instanceof L.Marker) {
+                                            const latlng = layer.getLatLng();
+                                            console.log('New point added:', { lat: latlng.lat, lng: latlng.lng });
+                                        }
+                                    }}
+                                    onDeleted={() => {
+                                        console.log('Points deleted');
+                                    }}
+                                    draw={{
+                                        rectangle: false,
+                                        circle: false,
+                                        circlemarker: false,
+                                        marker: false,
+                                        polyline: false,
+                                        polygon: false
+                                    }}
+                                    edit={{
+                                        edit: {
+                                            selectedPathOptions: {
+                                                dashArray: '10, 10'
+                                            }
+                                        },
+                                        remove: true
+                                    }}
+                                />
+                            </FeatureGroup>
+                            <PointManagementControls />
+                            
                             {layers.map((layer, index) => {
                                 const styleMap: Record<string, { color: string; fillOpacity: number; dashArray?: string }> = {
-                                    building: { color: AREA_COLORS.building, fillOpacity: 1 },
-                                    powerplant: { color: AREA_COLORS.powerplant, fillOpacity: 1 },
-                                    river: { color: AREA_COLORS.river, fillOpacity: 0.3, dashArray: '5, 10' },
-                                    field: { color: AREA_COLORS.field, fillOpacity: 0.3, dashArray: '1, 0' },
-                                    custompolygon: { color: AREA_COLORS.custompolygon, fillOpacity: 0.4, dashArray: '2, 6' },
-                                    pump: { color: AREA_COLORS.pump, fillOpacity: 1 },
-                                    solarcell: { color: AREA_COLORS.solarcell, fillOpacity: 0.7 },
-                                    map: { color: AREA_COLORS.map, fillOpacity: 0.4, dashArray: '2, 6' }
+                                    river: { color: AREA_COLORS.river, fillOpacity: 0.5 },
+                                    field: { color: AREA_COLORS.field, fillOpacity: 0.5 },
+                                    building: { color: AREA_COLORS.building, fillOpacity: 0.5 },
+                                    powerplant: { color: AREA_COLORS.powerplant, fillOpacity: 0.5 },
+                                    solarcell: { color: AREA_COLORS.solarcell, fillOpacity: 0.5 },
+                                    custompolygon: { color: AREA_COLORS.custompolygon, fillOpacity: 0.5 }
                                 };
 
                                 if (layer.type === 'pump') {
@@ -284,6 +345,21 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                                                 color: AREA_COLORS.pump,
                                                 fillColor: AREA_COLORS.pump,
                                                 fillOpacity: 1,
+                                                weight: 2
+                                            }}
+                                        />
+                                    );
+                                }
+
+                                if (layer.isInitialMap) {
+                                    return (
+                                        <Polygon
+                                            key={`initial-map-${index}`}
+                                            positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
+                                            pathOptions={{
+                                                color: '#90EE90',
+                                                fillColor: '#90EE90',
+                                                fillOpacity: 0.5,
                                                 weight: 2
                                             }}
                                         />
@@ -306,7 +382,6 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                                 return null;
                             })}
 
-                            {/* Display plant locations */}
                             {plantLocations.map((location, index) => (
                                 <CircleMarker
                                     key={`plant-${index}`}

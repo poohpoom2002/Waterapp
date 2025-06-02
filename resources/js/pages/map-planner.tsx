@@ -7,12 +7,12 @@ import 'leaflet-draw/dist/leaflet.draw.css';
 import { router } from '@inertiajs/react';
 
 // Types
-interface LatLng {
+type LatLng = {
     lat: number;
     lng: number;
-}
+};
 
-interface PlantType {
+type PlantType = {
     id: number;
     name: string;
     type: string;
@@ -20,23 +20,24 @@ interface PlantType {
     row_spacing: number;
     water_needed: number;
     description?: string;
-}
+};
 
-interface CustomPlantParams {
+type CustomPlantParams = {
     name: string;
     type: string;
     description: string;
     plant_spacing: number;
     row_spacing: number;
     water_needed: number;
-}
+};
 
 type AreaType = 'field' | 'river' | 'powerplant' | 'building' | 'pump' | 'custompolygon' | 'solarcell';
 
-interface LayerData {
+type LayerData = {
     type: AreaType;
     coordinates: LatLng[];
-}
+    isInitialMap?: boolean;
+};
 
 // Constants
 const DEFAULT_MAP_CENTER: [number, number] = [13.7563, 100.5018];
@@ -58,11 +59,11 @@ const AREA_COLORS: Record<AreaType, string> = {
     powerplant: '#EF4444', // Red
     building: '#F59E0B',  // Yellow
     pump: '#1E40AF',      // Dark Blue
-    custompolygon: '#A21CAF', // Purple
+    custompolygon: '#4B5563', // Black Gray
     solarcell: '#FFD600' // Bright Yellow
 };
 
-// Helper Components
+// Components
 const LoadingSpinner = () => (
     <div className="flex items-center justify-center space-x-2">
         <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
@@ -89,7 +90,6 @@ const AreaTypeButton: React.FC<{
     </button>
 );
 
-// Map Event Handlers
 const MapClickHandler: React.FC<{
     isPumpMode: boolean;
     onPumpPlace: (lat: number, lng: number) => void;
@@ -132,6 +132,8 @@ export default function MapPlanner() {
     const [isFieldMode, setIsFieldMode] = useState(false);
     const [isBuildingMode, setIsBuildingMode] = useState(false);
     const [isPowerPlantMode, setIsPowerPlantMode] = useState(false);
+    const [isOtherMode, setIsOtherMode] = useState(false);
+    const [isSolarcellMode, setIsSolarcellMode] = useState(false);
     const [pumpLocation, setPumpLocation] = useState<LatLng | null>(null);
     const [selectedPlantCategory, setSelectedPlantCategory] = useState<string>('');
     const [filteredPlants, setFilteredPlants] = useState<PlantType[]>([]);
@@ -160,6 +162,8 @@ export default function MapPlanner() {
         setIsFieldMode(false);
         setIsBuildingMode(false);
         setIsPowerPlantMode(false);
+        setIsOtherMode(false);
+        setIsSolarcellMode(false);
         setActiveButton(null);
     };
 
@@ -237,11 +241,13 @@ export default function MapPlanner() {
                 setStatus('Use the polygon tool to draw the power plant area');
             },
             custompolygon: () => {
+                setIsOtherMode(true);
                 setDrawingMode('polygon');
                 setSelectedAreaTypes(prev => [...prev, 'custompolygon']);
                 setStatus('Use the polygon tool to draw a custom area');
             },
             solarcell: () => {
+                setIsSolarcellMode(true);
                 setDrawingMode('polygon');
                 setSelectedAreaTypes(prev => [...prev, 'solarcell']);
                 setStatus('Use the polygon tool to draw the solar cell area');
@@ -259,27 +265,51 @@ export default function MapPlanner() {
         }));
 
         const styleMap = {
-            river: { color: AREA_COLORS.river, fillOpacity: 0.3, dashArray: '5, 10' },
-            field: { color: AREA_COLORS.field, fillOpacity: 0.3, dashArray: '1, 0' },
-            building: { color: AREA_COLORS.building, fillOpacity: 1 },
-            powerplant: { color: AREA_COLORS.powerplant, fillOpacity: 1 },
-            solarcell: { color: AREA_COLORS.solarcell, fillOpacity: 0.7 }
+            river: { color: AREA_COLORS.river, fillOpacity: 0.5 },
+            field: { color: AREA_COLORS.field, fillOpacity: 0.5 },
+            building: { color: AREA_COLORS.building, fillOpacity: 0.5 },
+            powerplant: { color: AREA_COLORS.powerplant, fillOpacity: 0.5 },
+            solarcell: { color: AREA_COLORS.solarcell, fillOpacity: 0.5 },
+            custompolygon: { color: AREA_COLORS.custompolygon, fillOpacity: 0.5 }
         };
 
-        if (layers.length > 0) {
-            const currentType = isRiverMode ? 'river' : 
-                              isFieldMode ? 'field' : 
-                              isBuildingMode ? 'building' : 
-                              isPowerPlantMode ? 'powerplant' : 
-                              activeButton === 'solarcell' ? 'solarcell' : null;
+        if (layers.length === 0) {
+            // First draw is the initial map area with light green
+            layer.setStyle({
+                color: '#90EE90', // Light Green
+                fillColor: '#90EE90',
+                fillOpacity: 0.3,
+                weight: 2
+            });
+            
+            const newLayer: LayerData = {
+                type: 'custompolygon', // Use custompolygon type for initial draw
+                coordinates: coordinates,
+                isInitialMap: true // Add flag to identify initial map draw
+            };
+            
+            setLayers(prevLayers => [...prevLayers, newLayer]);
+            console.log('Initial Map Area Created:', {
+                coordinates: newLayer.coordinates
+            });
+            
+            setStatus('Initial map area drawn. Now select an area type to continue.');
+            return;
+        }
 
-            if (currentType && styleMap[currentType]) {
-                layer.setStyle({
-                    ...styleMap[currentType],
-                    fillColor: styleMap[currentType].color,
-                    weight: 2
-                });
-            }
+        const currentType = isRiverMode ? 'river' : 
+                          isFieldMode ? 'field' : 
+                          isBuildingMode ? 'building' : 
+                          isPowerPlantMode ? 'powerplant' : 
+                          isSolarcellMode ? 'solarcell' : 
+                          isOtherMode ? 'custompolygon' : null;
+
+        if (currentType && styleMap[currentType]) {
+            layer.setStyle({
+                ...styleMap[currentType],
+                fillColor: styleMap[currentType].color,
+                weight: 2
+            });
         }
 
         const newLayer: LayerData = {
@@ -287,10 +317,11 @@ export default function MapPlanner() {
                   isFieldMode ? 'field' : 
                   isBuildingMode ? 'building' : 
                   isPowerPlantMode ? 'powerplant' : 
-                  activeButton === 'custompolygon' ? 'custompolygon' :
-                  activeButton === 'solarcell' ? 'solarcell' :
+                  isOtherMode ? 'custompolygon' :
+                  isSolarcellMode ? 'solarcell' :
                   'custompolygon') as AreaType,
-            coordinates: coordinates
+            coordinates: coordinates,
+            isInitialMap: false
         };
 
         setLayers(prevLayers => [...prevLayers, newLayer]);
@@ -643,7 +674,7 @@ export default function MapPlanner() {
                             {pumpLocation && (
                                 <Circle
                                     center={[pumpLocation.lat, pumpLocation.lng]}
-                                    radius={5}
+                                    radius={4}
                                     pathOptions={{
                                         color: AREA_COLORS.pump,
                                         fillColor: AREA_COLORS.pump,
@@ -655,14 +686,29 @@ export default function MapPlanner() {
 
                             {layers.map((layer, index) => {
                                 const styleMap: Record<AreaType, { color: string; fillOpacity: number; dashArray?: string }> = {
-                                    building: { color: AREA_COLORS.building, fillOpacity: 1 },
-                                    powerplant: { color: AREA_COLORS.powerplant, fillOpacity: 1 },
-                                    river: { color: AREA_COLORS.river, fillOpacity: 0.3, dashArray: '5, 10' },
-                                    field: { color: AREA_COLORS.field, fillOpacity: 0.3, dashArray: '1, 0' },
-                                    custompolygon: { color: AREA_COLORS.custompolygon, fillOpacity: 0.4, dashArray: '2, 6' },
-                                    pump: { color: AREA_COLORS.pump, fillOpacity: 1 },
-                                    solarcell: { color: AREA_COLORS.solarcell, fillOpacity: 0.7 }
+                                    building: { color: AREA_COLORS.building, fillOpacity: 0.5 },
+                                    powerplant: { color: AREA_COLORS.powerplant, fillOpacity: 0.5 },
+                                    river: { color: AREA_COLORS.river, fillOpacity: 0.5 },
+                                    field: { color: AREA_COLORS.field, fillOpacity: 0.5 },
+                                    custompolygon: { color: AREA_COLORS.custompolygon, fillOpacity: 0.5 },
+                                    pump: { color: AREA_COLORS.pump, fillOpacity: 0.5 },
+                                    solarcell: { color: AREA_COLORS.solarcell, fillOpacity: 0.5 }
                                 };
+
+                                if (layer.isInitialMap) {
+                                    return (
+                                        <Polygon
+                                            key={`initial-map-${index}`}
+                                            positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
+                                            pathOptions={{
+                                                color: '#90EE90',
+                                                fillColor: '#90EE90',
+                                                fillOpacity: 0.5,
+                                                weight: 2
+                                            }}
+                                        />
+                                    );
+                                }
 
                                 if (styleMap[layer.type]) {
                                     return (
