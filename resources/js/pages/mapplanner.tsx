@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios, { AxiosError } from 'axios';
-import { MapContainer, TileLayer, CircleMarker, FeatureGroup, LayersControl, Polyline, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, FeatureGroup, LayersControl, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import { EditControl } from 'react-leaflet-draw';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
+import { LeafletMouseEvent } from 'leaflet';
 
 type LatLng = {
   lat: number;
   lng: number;
+  elevation?: number;  // Add elevation field
+  id?: string;
 };
 
 type PlantType = {
@@ -239,12 +242,76 @@ function ZoomLevel() {
     );
 }
 
+function MapClickHandler({ onMapClick }: { onMapClick: (e: LeafletMouseEvent) => void }) {
+    useMapEvents({
+        click: onMapClick,
+    });
+    return null;
+}
+
+function MapDragHandler({ isDragging, editMode, selectedPoints }: { 
+    isDragging: boolean; 
+    editMode: string;
+    selectedPoints: Set<string>;
+}) {
+    const map = useMap();
+    
+    useEffect(() => {
+        if (isDragging || (editMode === 'select' && selectedPoints.size > 0)) {
+            map.dragging.disable();
+        } else {
+            map.dragging.enable();
+        }
+    }, [isDragging, editMode, selectedPoints.size, map]);
+    
+    return null;
+}
+
+// Add a component to track mouse movement for point dragging
+function MouseTracker({ onMove }: { onMove: (pos: [number, number]) => void }) {
+    const map = useMap();
+    
+    useEffect(() => {
+        const handleMouseMove = (e: LeafletMouseEvent) => {
+            onMove([e.latlng.lat, e.latlng.lng]);
+        };
+        
+        map.on('mousemove', handleMouseMove);
+        return () => {
+            map.off('mousemove', handleMouseMove);
+        };
+    }, [map, onMove]);
+    
+    return null;
+}
+
+// Add a component to handle mouse up events on the map
+function MapMouseUpHandler({ onMouseUp }: { onMouseUp: () => void }) {
+    useMapEvents({
+        mouseup: onMouseUp,
+    });
+    return null;
+}
+
+// Add a point-in-polygon function
+function isPointInPolygon(lat: number, lng: number, polygon: { lat: number; lng: number }[]): boolean {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i].lat, yi = polygon[i].lng;
+        const xj = polygon[j].lat, yj = polygon[j].lng;
+        const intersect = ((yi > lng) !== (yj > lng)) &&
+            (lat < (xj - xi) * (lng - yi) / (yj - yi + 0.0000001) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+
 export default function MapPlanner() {
-  const [area, setArea] = useState<LatLng[]>([]);
+    const [area, setArea] = useState<LatLng[]>([]);
     const [selectedPlant, setSelectedPlant] = useState<PlantType | null>(null);
     const [plantTypes, setPlantTypes] = useState<PlantType[]>([]);
-  const [results, setResults] = useState<LatLng[]>([]);
-    const [mapCenter, setMapCenter] = useState<[number, number]>([13.7563, 100.5018]); // Default to Bangkok
+    const [results, setResults] = useState<LatLng[]>([]);
+    const [mapCenter, setMapCenter] = useState<[number, number]>([13.7563, 100.5018]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [status, setStatus] = useState<string>('Ready to draw your field');
@@ -256,6 +323,19 @@ export default function MapPlanner() {
     const [sprinklerPositions, setSprinklerPositions] = useState<LatLng[]>([]);
     const [exclusionAreas, setExclusionAreas] = useState<LatLng[][]>([]);
     const [searchCenter, setSearchCenter] = useState<[number, number] | null>(null);
+    const [elevationInfo, setElevationInfo] = useState<{min: number | null, max: number | null, avg: number | null}>({
+        min: null,
+        max: null,
+        avg: null
+    });
+    const [selectedPoints, setSelectedPoints] = useState<Set<string>>(new Set());
+    const [isDragging, setIsDragging] = useState(false);
+    const [editMode, setEditMode] = useState<'select' | 'add' | 'delete'>('select');
+    const [movingPoint, setMovingPoint] = useState<{ id: string; position: [number, number] } | null>(null);
+    const [history, setHistory] = useState<LatLng[][]>([]);
+    const [historyIndex, setHistoryIndex] = useState(-1);
+    const [drawMode, setDrawMode] = useState<'polygon' | 'rectangle'>('polygon');
+    const mapRef = useRef<any>(null);
 
     // Calculate displayed points based on showAllPoints state
     const displayedPoints = useMemo(() => {
@@ -330,7 +410,26 @@ export default function MapPlanner() {
         return Math.abs(area) / 2;
     };
 
-  const handleSubmit = async () => {
+    // Add function to save state to history
+    const saveToHistory = (newResults: LatLng[]) => {
+        setHistory(prev => {
+            const newHistory = prev.slice(0, historyIndex + 1);
+            newHistory.push([...newResults]);
+            return newHistory;
+        });
+        setHistoryIndex(prev => prev + 1);
+    };
+
+    // Add undo function
+    const handleUndo = () => {
+        if (historyIndex > 0) {
+            const newIndex = historyIndex - 1;
+            setHistoryIndex(newIndex);
+            setResults([...history[newIndex]]);
+        }
+    };
+
+    const handleSubmit = async () => {
         if (area.length < 3) {
             setError('Please draw a polygon on the map first');
             return;
@@ -355,22 +454,28 @@ export default function MapPlanner() {
         setStatus('Calculating optimal plant positions...');
 
         try {
+            console.log('Sending request with area:', area);
             const response = await axios.post<{ plant_locations: LatLng[] }>(
                 '/api/generate-planting-points',
                 {
-        area,
+                    area,
                     exclusion_areas: exclusionAreas,
                     plant_type_id: selectedPlant.id,
                     plant_spacing: selectedPlant.plant_spacing,
                     row_spacing: selectedPlant.row_spacing,
                 }
             );
-      setResults(response.data.plant_locations);
+            console.log('Received response:', response.data);
+            
+            setResults(response.data.plant_locations);
+            // Initialize history with the initial state
+            setHistory([response.data.plant_locations]);
+            setHistoryIndex(0);
             setStatus(`Successfully generated ${response.data.plant_locations.length} planting points`);
         } catch (error: unknown) {
             if (axios.isAxiosError(error)) {
                 setError(error.response?.data?.message || 'Error generating points');
-      console.error('Error generating points:', error.response?.data || error.message);
+                console.error('Error generating points:', error.response?.data || error.message);
             } else {
                 setError('An unexpected error occurred');
                 console.error('An unexpected error occurred:', error);
@@ -414,15 +519,81 @@ export default function MapPlanner() {
         }
     };
 
-    const onCreated = (e: any) => {
+    const fetchElevationData = async (coordinates: LatLng[]): Promise<LatLng[]> => {
+        try {
+            console.log('Sending elevation request for coordinates:', coordinates);
+            const response = await axios.post('/api/get-elevation', {
+                coordinates: coordinates
+            });
+            
+            console.log('Elevation API Response Status:', response.status);
+            console.log('Elevation API Response Headers:', response.headers);
+            console.log('Raw Elevation API Response:', response.data);
+            
+            // Check if we got valid elevation data
+            const hasValidElevations = response.data.coordinates.some((coord: LatLng) => coord.elevation && coord.elevation !== 0);
+            
+            if (hasValidElevations) {
+                console.log('Elevation API working - data received:', response.data.coordinates);
+                console.log('Sample elevation values:', response.data.coordinates.slice(0, 3).map((coord: LatLng) => ({
+                    lat: coord.lat,
+                    lng: coord.lng,
+                    elevation: coord.elevation
+                })));
+                setStatus('Elevation data successfully retrieved');
+            } else {
+                console.warn('Elevation API returned all zeros or no data');
+                console.warn('First few coordinates with elevation:', response.data.coordinates.slice(0, 3).map((coord: LatLng) => ({
+                    lat: coord.lat,
+                    lng: coord.lng,
+                    elevation: coord.elevation
+                })));
+                setStatus('Warning: Could not retrieve elevation data. Using default values.');
+            }
+            
+            return response.data.coordinates;
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                console.error('Elevation API Error:', {
+                    status: error.response?.status,
+                    statusText: error.response?.statusText,
+                    data: error.response?.data,
+                    message: error.message
+                });
+            } else {
+                console.error('Unexpected error fetching elevation data:', error);
+            }
+            setStatus('Error: Elevation service unavailable. Using default values.');
+            return coordinates; // Return original coordinates if elevation fetch fails
+        }
+    };
+
+    const calculateElevationInfo = (coordinates: LatLng[]) => {
+        const elevations = coordinates
+            .map(coord => coord.elevation)
+            .filter((elev): elev is number => elev !== undefined);
+
+        if (elevations.length === 0) return { min: null, max: null, avg: null };
+
+        return {
+            min: Math.min(...elevations),
+            max: Math.max(...elevations),
+            avg: elevations.reduce((a, b) => a + b, 0) / elevations.length
+        };
+    };
+
+    const onCreated = async (e: any) => {
         const layer = e.layer;
         const coordinates = layer.getLatLngs()[0].map((latLng: { lat: number; lng: number }) => ({
             lat: latLng.lat,
             lng: latLng.lng,
         }));
+
+        // Skip fetching elevation data
         if (area.length === 0) {
             setArea(coordinates);
-            setStatus('Field drawn. Draw water/exclusion areas if needed.');
+            setElevationInfo({ min: null, max: null, avg: null });
+            setStatus('Field drawn.');
         } else {
             setExclusionAreas(prev => [...prev, coordinates]);
             setStatus('Exclusion area added. Draw more or generate points.');
@@ -444,6 +615,172 @@ export default function MapPlanner() {
         setSearchCenter([lat, lng]);
     };
 
+    const handlePointClick = (pointId: string, event: LeafletMouseEvent) => {
+        event.originalEvent?.stopPropagation();
+        
+        if (editMode === 'select') {
+            setSelectedPoints(prev => {
+                const newSet = new Set(prev);
+                if (newSet.has(pointId)) {
+                    newSet.delete(pointId);
+                } else {
+                    newSet.add(pointId);
+                }
+                return newSet;
+            });
+        } else if (editMode === 'delete') {
+            const pointIndex = results.findIndex(p => (p.id || `point-${results.indexOf(p)}`) === pointId);
+            if (pointIndex !== -1) {
+                const newResults = results.filter((_, index) => index !== pointIndex);
+                saveToHistory(newResults);
+                setResults(newResults);
+                setSelectedPoints(prev => {
+                    const newSet = new Set(prev);
+                    newSet.delete(pointId);
+                    return newSet;
+                });
+            }
+        }
+    };
+
+    const handleMapClick = (e: LeafletMouseEvent) => {
+        if (editMode === 'add' && selectedPlant) {
+            const newPoint: LatLng = {
+                lat: e.latlng.lat,
+                lng: e.latlng.lng,
+                id: `point-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+            };
+            const newResults = [...results, newPoint];
+            saveToHistory(newResults);
+            setResults(newResults);
+        }
+    };
+
+    const handleMouseUp = () => {
+        if (movingPoint) {
+            const newResults = results.map(p => 
+                (p.id || `point-${results.indexOf(p)}`) === movingPoint.id
+                    ? { ...p, lat: movingPoint.position[0], lng: movingPoint.position[1] }
+                    : p
+            );
+            saveToHistory(newResults);
+            setResults(newResults);
+            setMovingPoint(null);
+        }
+    };
+
+    const renderEditControls = () => {
+        if (results.length === 0) return null;
+
+        return (
+            <div className="mb-4 rounded-lg border border-gray-700 bg-gray-800 p-4">
+                <div className="mb-2 flex items-center justify-between">
+                    <h3 className="font-medium text-white">Edit Plant Points</h3>
+                    <button
+                        onClick={handleUndo}
+                        disabled={historyIndex <= 0}
+                        className={`rounded px-3 py-1 text-sm ${
+                            historyIndex > 0
+                                ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                : 'cursor-not-allowed bg-gray-800 text-gray-500'
+                        }`}
+                    >
+                        Undo
+                    </button>
+                </div>
+                <div className="flex space-x-2">
+                    <button
+                        onClick={() => setEditMode('select')}
+                        className={`rounded px-3 py-1 text-sm ${
+                            editMode === 'select'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        }`}
+                    >
+                        Select Points
+                    </button>
+                    <button
+                        onClick={() => setEditMode('add')}
+                        className={`rounded px-3 py-1 text-sm ${
+                            editMode === 'add'
+                                ? 'bg-green-600 text-white'
+                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        }`}
+                    >
+                        Add Points
+                    </button>
+                    <button
+                        onClick={() => setEditMode('delete')}
+                        className={`rounded px-3 py-1 text-sm ${
+                            editMode === 'delete'
+                                ? 'bg-red-600 text-white'
+                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        }`}
+                    >
+                        Delete Points
+                    </button>
+                </div>
+                {selectedPoints.size > 0 && (
+                    <div className="mt-2 text-sm text-gray-300">
+                        {selectedPoints.size} point{selectedPoints.size !== 1 ? 's' : ''} selected
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    // Update the handleMouseMove function to restrict movement to inside the polygon
+    const handleMouseMove = (position: [number, number]) => {
+        if (movingPoint) {
+            // Only update if inside the polygon
+            if (isPointInPolygon(position[0], position[1], area)) {
+                setMovingPoint(prev => prev ? { ...prev, position } : null);
+            }
+        }
+    };
+
+    // Update the renderPlantPoints function to only allow moving selected points, and restrict movement to inside the polygon
+    const renderPlantPoints = () => {
+        return displayedPoints.map((point: LatLng, index: number) => {
+            const pointId = point.id || `point-${index}`;
+            const isSelected = selectedPoints.has(pointId);
+            const isMoving = movingPoint?.id === pointId;
+            // Use the moving position if the point is being moved
+            const position: [number, number] = isMoving && movingPoint
+                ? movingPoint.position
+                : [point.lat, point.lng];
+            return (
+                <CircleMarker
+                    key={pointId}
+                    center={position}
+                    radius={isSelected ? 3 : 0.5}
+                    pathOptions={{
+                        color: isSelected ? 'blue' : 'red',
+                        fillColor: isSelected ? 'blue' : 'red',
+                        fillOpacity: isMoving ? 0.5 : 1,
+                    }}
+                    eventHandlers={{
+                        click: (e) => {
+                            const mouseEvent = e as unknown as LeafletMouseEvent;
+                            mouseEvent.originalEvent?.stopPropagation();
+                            handlePointClick(pointId, mouseEvent);
+                        },
+                        mousedown: (e) => {
+                            if (editMode === 'select' && isSelected) {
+                                const mouseEvent = e as unknown as LeafletMouseEvent;
+                                mouseEvent.originalEvent?.stopPropagation();
+                                setMovingPoint({
+                                    id: pointId,
+                                    position: [point.lat, point.lng]
+                                });
+                            }
+                        }
+                    }}
+                />
+            );
+        });
+    };
+
     return (
         <div className="min-h-screen bg-gray-900 p-6">
             <h1 className="mb-4 text-xl font-bold text-white">Plant Layout Generator</h1>
@@ -461,6 +798,13 @@ export default function MapPlanner() {
                     )}
                     <span className="text-sm text-gray-300">{status}</span>
                 </div>
+                {elevationInfo.min !== null && (
+                    <div className="text-sm text-blue-400">
+                        Elevation: {elevationInfo.min.toFixed(1)}m - {elevationInfo.max?.toFixed(1)}m
+                        <br />
+                        Average: {elevationInfo.avg?.toFixed(1)}m
+                    </div>
+                )}
                 {results.length > 0 && (
                     <div className="flex items-center space-x-4">
                         <span className="text-sm text-blue-400">
@@ -658,8 +1002,8 @@ export default function MapPlanner() {
                             </div>
                         )}
 
-      <button
-        onClick={handleSubmit}
+                        <button
+                            onClick={handleSubmit}
                             className="w-full rounded bg-blue-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-700"
                             disabled={area.length < 3 || !selectedPlant || isLoading}
                         >
@@ -671,7 +1015,7 @@ export default function MapPlanner() {
                             ) : (
                                 'Generate Points'
                             )}
-      </button>
+                        </button>
 
                         {results.length > 0 && selectedSprinkler && (
                             <button
@@ -681,6 +1025,7 @@ export default function MapPlanner() {
                                 Calculate Pipe Layout
                             </button>
                         )}
+                        {renderEditControls()}
                     </div>
                 </div>
 
@@ -693,7 +1038,14 @@ export default function MapPlanner() {
                         style={{ height: '100%', width: '100%' }}
                     >
                         <SearchControl onSearch={handleSearch} />
-                        {searchCenter && <MapController center={searchCenter} />}
+                        <MapClickHandler onMapClick={handleMapClick} />
+                        <MapDragHandler 
+                            isDragging={!!movingPoint} 
+                            editMode={editMode} 
+                            selectedPoints={selectedPoints}
+                        />
+                        <MouseTracker onMove={handleMouseMove} />
+                        <MapMouseUpHandler onMouseUp={handleMouseUp} />
                         <ZoomLevel />
                         
                         <LayersControl position="topright">
@@ -709,6 +1061,13 @@ export default function MapPlanner() {
                                     url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
                                     attribution='&copy; <a href="https://www.google.com/maps">Google Maps</a>'
                                     maxZoom={25}
+                                />
+                            </LayersControl.BaseLayer>
+                            <LayersControl.BaseLayer name="Terrain">
+                                <TileLayer
+                                    url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+                                    attribution='Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a>'
+                                    maxZoom={17}
                                 />
                             </LayersControl.BaseLayer>
                         </LayersControl>
@@ -739,10 +1098,6 @@ export default function MapPlanner() {
                         ))}
 
                         {/* Draw pipes */}
-                        {(() => {
-                            console.log('Rendering pipes:', pipeLayout);
-                            return null;
-                        })()}
                         {pipeLayout.map((pipe, index) => (
                             <Polyline
                                 key={`pipe-${index}`}
@@ -755,22 +1110,32 @@ export default function MapPlanner() {
                             />
                         ))}
 
-                        {/* Draw plant points */}
-                        {displayedPoints.map((point, index) => (
-                            <CircleMarker
-                                key={index}
-                                center={[point.lat, point.lng]}
-                                radius={0.5}
-                                pathOptions={{
-                                    color: 'red',
-                                    fillColor: 'red',
-                                    fillOpacity: 1,
+                        <div style={{ position: 'absolute', top: 10, right: 10 }}>
+                            <button
+                                style={{
+                                    background: drawMode === 'polygon' ? 'rgba(0, 0, 255, 0.7)' : 'rgba(255, 255, 255, 0.7)',
+                                    border: 'none',
+                                    borderRadius: '50%',
+                                    width: '30px',
+                                    height: '30px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
                                 }}
-                            />
-                        ))}
+                                onClick={() => setDrawMode('polygon')}
+                                title="Draw polygon"
+                            >
+                                <svg style={{ width: '16px', height: '16px', fill: 'white' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <polygon points="5,3 19,3 21,12 12,21 3,12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {renderPlantPoints()}
                     </MapContainer>
                 </div>
             </div>
-    </div>
-  );
+        </div>
+    );
 }
