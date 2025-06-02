@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { router } from '@inertiajs/react';
-import { MapContainer, TileLayer, CircleMarker, Polygon, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Polygon, useMap, FeatureGroup, LayersControl } from 'react-leaflet';
+import { EditControl } from 'react-leaflet-draw';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet-draw/dist/leaflet.draw.css';
 import axios from 'axios';
 import L from 'leaflet';
 
@@ -24,10 +26,25 @@ type Props = {
     areaType: string;
     area: LatLng[];
     plantType: PlantType;
+    layers?: Array<{
+        type: string;
+        coordinates: LatLng[];
+        isInitialMap?: boolean;
+    }>;
 };
 
 // Constants
 const DEFAULT_CENTER: [number, number] = [13.7563, 100.5018];
+
+const AREA_COLORS: Record<string, string> = {
+    river: '#3B82F6',    // Blue
+    field: '#22C55E',    // Green
+    powerplant: '#EF4444', // Red
+    building: '#F59E0B',  // Yellow
+    pump: '#1E40AF',      // Dark Blue
+    custompolygon: '#4B5563', // Black Gray
+    solarcell: '#FFD600', // Bright Yellow
+};
 
 // Components
 const MapBounds = ({ positions }: { positions: LatLng[] }) => {
@@ -39,7 +56,7 @@ const MapBounds = ({ positions }: { positions: LatLng[] }) => {
                 (bounds, point) => bounds.extend([point.lat, point.lng]),
                 L.latLngBounds([])
             );
-            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 19, animate: true });
+            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 22, animate: true });
         }
     }, [positions, map]);
 
@@ -62,14 +79,95 @@ const InfoItem = ({ title, children }: { title: string; children: React.ReactNod
     </div>
 );
 
+const PointManagementControls = () => {
+    const map = useMap();
+    const featureGroupRef = React.useRef<L.FeatureGroup>(null);
+
+    const handleAddPoints = () => {
+        if (featureGroupRef.current) {
+            map.fire('draw:drawstart');
+        }
+    };
+
+    const handleDeletePoints = () => {
+        if (featureGroupRef.current) {
+            map.fire('draw:deletestart');
+        }
+    };
+
+    const handleMovePoints = () => {
+        if (featureGroupRef.current) {
+            map.fire('draw:editstart');
+        }
+    };
+
+    return (
+        <div className="absolute top-4 left-[60px] z-[1000] flex gap-2 bg-white p-2 rounded-lg shadow-lg">
+            <button
+                className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                onClick={handleAddPoints}
+            >
+                Add Points
+            </button>
+            <button
+                className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                onClick={handleDeletePoints}
+            >
+                Delete Points
+            </button>
+            <button
+                className="px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                onClick={handleMovePoints}
+            >
+                Move Points
+            </button>
+        </div>
+    );
+};
+
+// Helper Functions
+const calculateAreaInRai = (coordinates: LatLng[]): number => {
+    if (coordinates.length < 3) return 0;
+
+    const toMeters = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+        const R = 6371000;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                 Math.sin(dLng/2) * Math.sin(dLng/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    };
+
+    let area = 0;
+    for (let i = 0; i < coordinates.length; i++) {
+        const j = (i + 1) % coordinates.length;
+        area += coordinates[i].lat * coordinates[j].lng;
+        area -= coordinates[j].lat * coordinates[i].lng;
+    }
+    area = Math.abs(area) / 2;
+
+    const areaInSquareMeters = area * 111000 * 111000 * Math.cos(coordinates[0].lat * Math.PI / 180);
+    return areaInSquareMeters / 1600;
+};
+
 // Main Component
-export default function GenerateTree({ areaType, area, plantType }: Props) {
+export default function GenerateTree({ areaType, area, plantType, layers = [] }: Props) {
     const [plantLocations, setPlantLocations] = useState<LatLng[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isPlantLayoutGenerated, setIsPlantLayoutGenerated] = useState(false);
 
-    const mapCenter = React.useMemo(() => {
+    const areaInRai = useMemo(() => calculateAreaInRai(area), [area]);
+    const processedPlantType = useMemo(() => ({
+        ...plantType,
+        plant_spacing: Number(plantType.plant_spacing),
+        row_spacing: Number(plantType.row_spacing),
+        water_needed: Number(plantType.water_needed)
+    }), [plantType]);
+
+    const mapCenter = useMemo(() => {
         if (area.length === 0) return DEFAULT_CENTER;
         const center = area.reduce(
             (acc, point) => [acc[0] + point.lat, acc[1] + point.lng],
@@ -84,15 +182,15 @@ export default function GenerateTree({ areaType, area, plantType }: Props) {
 
         try {
             const areaTypes = areaType ? areaType.split(',').map(type => type.trim()) : ['default'];
-
             const { data } = await axios.post<{ plant_locations: LatLng[] }>(
                 '/api/generate-planting-points',
                 {
                     area,
-                    plant_type_id: plantType.id,
-                    plant_spacing: plantType.plant_spacing,
-                    row_spacing: plantType.row_spacing,
-                    area_types: areaTypes
+                    plant_type_id: processedPlantType.id,
+                    plant_spacing: processedPlantType.plant_spacing,
+                    row_spacing: processedPlantType.row_spacing,
+                    area_types: areaTypes,
+                    layers
                 }
             );
             
@@ -104,18 +202,10 @@ export default function GenerateTree({ areaType, area, plantType }: Props) {
             setIsPlantLayoutGenerated(true);
         } catch (error) {
             console.error('Error details:', error);
-            
-            if (axios.isAxiosError(error)) {
-                const errorMessage = error.response?.data?.message 
-                    || error.response?.data?.error 
-                    || error.message 
-                    || 'Error generating points';
-                setError(`Error: ${errorMessage}`);
-            } else if (error instanceof Error) {
-                setError(`Error: ${error.message}`);
-            } else {
-                setError('An unexpected error occurred while generating plant layout');
-            }
+            setError(axios.isAxiosError(error) 
+                ? error.response?.data?.message || error.message || 'Error generating points'
+                : 'An unexpected error occurred'
+            );
         } finally {
             setIsLoading(false);
         }
@@ -126,7 +216,6 @@ export default function GenerateTree({ areaType, area, plantType }: Props) {
         setError(null);
 
         try {
-            // TODO: Implement pipe layout generation API call
             console.log('Generating pipe layout...');
         } catch (error) {
             setError(axios.isAxiosError(error) 
@@ -150,27 +239,27 @@ export default function GenerateTree({ areaType, area, plantType }: Props) {
                 <div className="space-y-4 lg:col-span-1">
                     <InfoSection title="Plant Information">
                         <InfoItem title="Basic Details">
-                            <p><span className="font-medium">Plant Category:</span> {plantType.name}</p>
-                            <p><span className="font-medium">Plant Selection:</span> {plantType.type}</p>
+                            <p><span className="font-medium">Plant Category:</span> {processedPlantType.name}</p>
+                            <p><span className="font-medium">Plant Selection:</span> {processedPlantType.type}</p>
                         </InfoItem>
                         <InfoItem title="Spacing Requirements">
-                            <p><span className="font-medium">Plant Spacing:</span> {plantType.plant_spacing}m</p>
-                            <p><span className="font-medium">Row Spacing:</span> {plantType.row_spacing}m</p>
+                            <p><span className="font-medium">Plant Spacing:</span> {processedPlantType.plant_spacing.toFixed(2)}m</p>
+                            <p><span className="font-medium">Row Spacing:</span> {processedPlantType.row_spacing.toFixed(2)}m</p>
                         </InfoItem>
                         <InfoItem title="Water Requirements">
-                            <p><span className="font-medium">Daily Water Need:</span> {plantType.water_needed}L/day</p>
+                            <p><span className="font-medium">Daily Water Need:</span> {processedPlantType.water_needed.toFixed(2)}L/day</p>
                         </InfoItem>
                     </InfoSection>
 
                     <InfoSection title="Area Information">
                         <InfoItem title="Area Size">
-                            <p>To be calculated.</p>
+                            <p>{areaInRai.toFixed(2)} rai</p>
                         </InfoItem>
                         <InfoItem title="Number of Plants">
-                            <p>To be calculated.</p>
+                            <p>{plantLocations.length} plants</p>
                         </InfoItem>
                         <InfoItem title="Total Water Need">
-                            <p>To be calculated.</p>
+                            <p>{(plantLocations.length * processedPlantType.water_needed).toFixed(2)} L/day</p>
                         </InfoItem>
                     </InfoSection>
                 </div>
@@ -179,30 +268,123 @@ export default function GenerateTree({ areaType, area, plantType }: Props) {
                     <div className="h-[900px] w-full overflow-hidden rounded-lg border border-gray-700">
                         <MapContainer
                             center={mapCenter}
-                            zoom={17}
-                            maxZoom={18}
-                            minZoom={3}
+                            zoom={18}
+                            maxZoom={19}
                             style={{ height: '100%', width: '100%' }}
                             zoomControl={true}
                             scrollWheelZoom={true}
                         >
-                            <TileLayer
-                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                            />
+                            <LayersControl position="topright">
+                                <LayersControl.BaseLayer checked name="Street Map">
+                                    <TileLayer
+                                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                        maxZoom={19}
+                                    />
+                                </LayersControl.BaseLayer>
+                                <LayersControl.BaseLayer name="Satellite">
+                                    <TileLayer
+                                        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                                        attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
+                                        maxZoom={19}
+                                    />
+                                </LayersControl.BaseLayer>
+                            </LayersControl>
                             <MapBounds positions={area} />
-                            <Polygon
-                                positions={area}
-                                pathOptions={{
-                                    color: 'blue',
-                                    fillColor: 'blue',
-                                    fillOpacity: 0.2,
-                                    weight: 2
-                                }}
-                            />
+                            
+                            <FeatureGroup>
+                                <EditControl
+                                    position="topright"
+                                    onCreated={(e) => {
+                                        const layer = e.layer;
+                                        if (layer instanceof L.Marker) {
+                                            const latlng = layer.getLatLng();
+                                            console.log('New point added:', { lat: latlng.lat, lng: latlng.lng });
+                                        }
+                                    }}
+                                    onDeleted={() => {
+                                        console.log('Points deleted');
+                                    }}
+                                    draw={{
+                                        rectangle: false,
+                                        circle: false,
+                                        circlemarker: false,
+                                        marker: false,
+                                        polyline: false,
+                                        polygon: false
+                                    }}
+                                    edit={{
+                                        edit: {
+                                            selectedPathOptions: {
+                                                dashArray: '10, 10'
+                                            }
+                                        },
+                                        remove: true
+                                    }}
+                                />
+                            </FeatureGroup>
+                            <PointManagementControls />
+                            
+                            {layers.map((layer, index) => {
+                                const styleMap: Record<string, { color: string; fillOpacity: number; dashArray?: string }> = {
+                                    river: { color: AREA_COLORS.river, fillOpacity: 0.5 },
+                                    field: { color: AREA_COLORS.field, fillOpacity: 0.5 },
+                                    building: { color: AREA_COLORS.building, fillOpacity: 0.5 },
+                                    powerplant: { color: AREA_COLORS.powerplant, fillOpacity: 0.5 },
+                                    solarcell: { color: AREA_COLORS.solarcell, fillOpacity: 0.5 },
+                                    custompolygon: { color: AREA_COLORS.custompolygon, fillOpacity: 0.5 }
+                                };
+
+                                if (layer.type === 'pump') {
+                                    return (
+                                        <CircleMarker
+                                            key={`${layer.type}-${index}`}
+                                            center={[layer.coordinates[0].lat, layer.coordinates[0].lng]}
+                                            radius={5}
+                                            pathOptions={{
+                                                color: AREA_COLORS.pump,
+                                                fillColor: AREA_COLORS.pump,
+                                                fillOpacity: 1,
+                                                weight: 2
+                                            }}
+                                        />
+                                    );
+                                }
+
+                                if (layer.isInitialMap) {
+                                    return (
+                                        <Polygon
+                                            key={`initial-map-${index}`}
+                                            positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
+                                            pathOptions={{
+                                                color: '#90EE90',
+                                                fillColor: '#90EE90',
+                                                fillOpacity: 0.5,
+                                                weight: 2
+                                            }}
+                                        />
+                                    );
+                                }
+
+                                if (styleMap[layer.type]) {
+                                    return (
+                                        <Polygon
+                                            key={`${layer.type}-${index}`}
+                                            positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
+                                            pathOptions={{
+                                                ...styleMap[layer.type],
+                                                fillColor: styleMap[layer.type].color,
+                                                weight: 2
+                                            }}
+                                        />
+                                    );
+                                }
+                                return null;
+                            })}
+
                             {plantLocations.map((location, index) => (
                                 <CircleMarker
-                                    key={index}
+                                    key={`plant-${index}`}
                                     center={[location.lat, location.lng]}
                                     radius={3}
                                     pathOptions={{

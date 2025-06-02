@@ -12,7 +12,7 @@ class PlantTypeSeeder extends Seeder
         $plants = [
             [
                 'name' => 'Mango',
-                'type' => 'Fruit',
+                'type' => 'Horticultural',
                 'plant_spacing' => 10,
                 'row_spacing' => 10,
                 'water_needed' => 1.5,
@@ -20,7 +20,7 @@ class PlantTypeSeeder extends Seeder
             ],
             [
                 'name' => 'Durian',
-                'type' => 'Fruit',
+                'type' => 'Horticultural',
                 'plant_spacing' => 12,
                 'row_spacing' => 12,
                 'water_needed' => 2.0,
@@ -28,7 +28,7 @@ class PlantTypeSeeder extends Seeder
             ],
             [
                 'name' => 'Pineapple',
-                'type' => 'Fruit',
+                'type' => 'Horticultural',
                 'plant_spacing' => 11,
                 'row_spacing' => 11,
                 'water_needed' => 0.5,
@@ -36,7 +36,7 @@ class PlantTypeSeeder extends Seeder
             ],
             [
                 'name' => 'Mangosteen',
-                'type' => 'Fruit',
+                'type' => 'Horticultural',
                 'plant_spacing' => 12,
                 'row_spacing' => 12,
                 'water_needed' => 1.0,
@@ -44,7 +44,7 @@ class PlantTypeSeeder extends Seeder
             ],
             [
                 'name' => 'Longkong',
-                'type' => 'Fruit',
+                'type' => 'Horticultural',
                 'plant_spacing' => 10,
                 'row_spacing' => 10,
                 'water_needed' => 0.3,

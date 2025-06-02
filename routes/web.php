@@ -16,7 +16,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('planner', [FarmController::class, 'planner'])->name('planner');
     Route::get('generate-tree', [FarmController::class, 'generateTree'])->name('generateTree');
     Route::get('/api/plant-types', [FarmController::class, 'getPlantTypes']);
-    Route::post('/api/generate-planting-points', [FarmController::class, 'generatePlantingPoints']);
+    Route::post('/api/generate-planting-points', [FarmController::class, 'generatePlantingPoints'])->name('generate.planting.points');
 });
 
 require __DIR__.'/settings.php';
