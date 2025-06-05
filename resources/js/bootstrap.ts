@@ -18,3 +18,4 @@ if (token) {
 if (typeof Ziggy !== 'undefined') {
     (window as any).Ziggy = Ziggy;
 }
+ 
