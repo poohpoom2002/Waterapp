@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { MapContainer, TileLayer, FeatureGroup, LayersControl, useMapEvents, Circle, Polygon } from 'react-leaflet';
+import { MapContainer, TileLayer, FeatureGroup, LayersControl, useMapEvents, Circle, Polygon, useMap } from 'react-leaflet';
 import { EditControl } from 'react-leaflet-draw';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
@@ -37,6 +37,12 @@ type LayerData = {
     type: AreaType;
     coordinates: LatLng[];
     isInitialMap?: boolean;
+};
+
+type Suggestion = {
+    display_name: string;
+    lat: string;
+    lon: string;
 };
 
 // Constants
@@ -104,6 +110,219 @@ const MapClickHandler: React.FC<{
     return null;
 };
 
+// Add SearchControl component
+const SearchControl: React.FC<{ onSearch: (lat: number, lng: number) => void }> = ({ onSearch }) => {
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isSearching, setIsSearching] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const searchTimeoutRef = useRef<NodeJS.Timeout>();
+
+    const handleClear = () => {
+        setSearchQuery('');
+        setSuggestions([]);
+        setShowSuggestions(false);
+        setError(null);
+    };
+
+    const handleSearch = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!searchQuery.trim()) return;
+
+        setIsSearching(true);
+        setError(null);
+        setShowSuggestions(false);
+
+        try {
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}`
+            );
+            const data = await response.json();
+
+            if (data && data.length > 0) {
+                const { lat, lon } = data[0];
+                onSearch(parseFloat(lat), parseFloat(lon));
+            } else {
+                setError('Location not found');
+            }
+        } catch (err) {
+            setError('Error searching for location');
+            console.error('Search error:', err);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setSearchQuery(value);
+        setShowSuggestions(true);
+
+        if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
+        }
+
+        if (value.trim()) {
+            searchTimeoutRef.current = setTimeout(async () => {
+                try {
+                    const response = await fetch(
+                        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(value)}&limit=5`
+                    );
+                    const data = await response.json();
+                    setSuggestions(data);
+                } catch (err) {
+                    console.error('Error fetching suggestions:', err);
+                }
+            }, 300);
+        } else {
+            setSuggestions([]);
+        }
+    };
+
+    const handleSuggestionClick = (suggestion: Suggestion) => {
+        const lat = parseFloat(suggestion.lat);
+        const lng = parseFloat(suggestion.lon);
+        
+        if (!isNaN(lat) && !isNaN(lng)) {
+            onSearch(lat, lng);
+            setSearchQuery(suggestion.display_name);
+            setShowSuggestions(false);
+        }
+    };
+
+    return (
+        <div className="absolute top-4 left-[60px] z-[1000] w-80">
+            <form onSubmit={handleSearch} className="flex flex-col gap-2">
+                <div className="relative">
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={handleInputChange}
+                        onFocus={() => setShowSuggestions(true)}
+                        placeholder="Search location..."
+                        className="w-full rounded bg-white p-2 pr-8 text-gray-900 shadow-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    {searchQuery && (
+                        <button
+                            type="button"
+                            onClick={handleClear}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                        >
+                            <svg
+                                className="h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M6 18L18 6M6 6l12 12"
+                                />
+                            </svg>
+                        </button>
+                    )}
+                    {isSearching && (
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
+                        </div>
+                    )}
+                </div>
+                {error && (
+                    <div className="text-sm text-red-400">{error}</div>
+                )}
+                {showSuggestions && suggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 max-h-60 overflow-y-auto rounded bg-white shadow-lg">
+                        {suggestions.map((suggestion, index) => (
+                            <button
+                                key={index}
+                                type="button"
+                                onClick={() => handleSuggestionClick(suggestion)}
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
+                            >
+                                {suggestion.display_name}
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </form>
+        </div>
+    );
+};
+
+// Add MapController component
+const MapController: React.FC<{ center: [number, number]; zoom?: number }> = ({ center, zoom }) => {
+    const map = useMap();
+    
+    useEffect(() => {
+        if (map && center) {
+            if (zoom) {
+                map.setZoom(zoom);
+            }
+            map.setView(center, zoom || map.getZoom(), {
+                animate: true,
+                duration: 1.5,
+                easeLinearity: 0.25
+            });
+        }
+    }, [center, map, zoom]);
+
+    return null;
+};
+
+// Add MapStateTracker component
+const MapStateTracker: React.FC<{
+    onZoomChange: (zoom: number) => void;
+    onMapTypeChange: (type: string) => void;
+}> = ({ onZoomChange, onMapTypeChange }) => {
+    const map = useMap();
+    
+    useEffect(() => {
+        const handleZoomEnd = () => {
+            onZoomChange(map.getZoom());
+        };
+
+        const handleBaseLayerChange = (e: any) => {
+            onMapTypeChange(e.name.toLowerCase());
+        };
+
+        map.on('zoomend', handleZoomEnd);
+        map.on('baselayerchange', handleBaseLayerChange);
+
+        return () => {
+            map.off('zoomend', handleZoomEnd);
+            map.off('baselayerchange', handleBaseLayerChange);
+        };
+    }, [map, onZoomChange, onMapTypeChange]);
+
+    return null;
+};
+
+// Update the ZoomLevelDisplay component position
+const ZoomLevelDisplay: React.FC = () => {
+    const map = useMap();
+    const [zoom, setZoom] = useState(map.getZoom());
+
+    useEffect(() => {
+        const handleZoom = () => {
+            setZoom(map.getZoom());
+        };
+
+        map.on('zoomend', handleZoom);
+        return () => {
+            map.off('zoomend', handleZoom);
+        };
+    }, [map]);
+
+    return (
+        <div className="absolute bottom-4 left-4 z-[1000] rounded bg-white px-3 py-1 text-sm font-medium text-gray-700 shadow-md">
+            Zoom: {zoom.toFixed(1)}
+        </div>
+    );
+};
+
 // Main Component
 export default function MapPlanner() {
     // State Management
@@ -140,6 +359,14 @@ export default function MapPlanner() {
 
     // Refs
     const featureGroupRef = useRef<any>(null);
+
+    // In the MapPlanner component, add searchCenter state
+    const [searchCenter, setSearchCenter] = useState<[number, number] | null>(null);
+
+    // Add these to the state declarations at the top of the MapPlanner component
+    const [currentZoom, setCurrentZoom] = useState(13);
+    const [currentMapType, setCurrentMapType] = useState('street');
+    const [initialZoom, setInitialZoom] = useState(13);
 
     // Effects
     useEffect(() => {
@@ -210,6 +437,19 @@ export default function MapPlanner() {
             return;
         }
 
+        const enablePolygonDrawing = () => {
+            const map = featureGroupRef.current?.leafletElement?._map;
+            if (map) {
+                const layers = map._layers as Record<string, any>;
+                const drawControl = Object.values(layers).find(layer => layer._drawingMode === 'polygon');
+                if (drawControl) {
+                    drawControl.enable();
+                    // Force the polygon drawing mode to be active
+                    drawControl._startShape();
+                }
+            }
+        };
+
         const modeMap = {
             pump: () => {
                 setIsPumpMode(true);
@@ -220,37 +460,43 @@ export default function MapPlanner() {
                 setIsRiverMode(true);
                 setDrawingMode('polygon');
                 setSelectedAreaTypes(prev => [...prev, 'river']);
-                setStatus('Use the polygon tool to draw the river area');
+                setStatus('Draw the river area');
+                enablePolygonDrawing();
             },
             field: () => {
                 setIsFieldMode(true);
                 setDrawingMode('polygon');
                 setSelectedAreaTypes(prev => [...prev, 'field']);
-                setStatus('Use the polygon tool to draw the field area');
+                setStatus('Draw the field area');
+                enablePolygonDrawing();
             },
             building: () => {
                 setIsBuildingMode(true);
                 setDrawingMode('polygon');
                 setSelectedAreaTypes(prev => [...prev, 'building']);
-                setStatus('Use the polygon tool to draw the building area');
+                setStatus('Draw the building area');
+                enablePolygonDrawing();
             },
             powerplant: () => {
                 setIsPowerPlantMode(true);
                 setDrawingMode('polygon');
                 setSelectedAreaTypes(prev => [...prev, 'powerplant']);
-                setStatus('Use the polygon tool to draw the power plant area');
+                setStatus('Draw the power plant area');
+                enablePolygonDrawing();
             },
             custompolygon: () => {
                 setIsOtherMode(true);
                 setDrawingMode('polygon');
                 setSelectedAreaTypes(prev => [...prev, 'custompolygon']);
-                setStatus('Use the polygon tool to draw a custom area');
+                setStatus('Draw a custom area');
+                enablePolygonDrawing();
             },
             solarcell: () => {
                 setIsSolarcellMode(true);
                 setDrawingMode('polygon');
                 setSelectedAreaTypes(prev => [...prev, 'solarcell']);
-                setStatus('Use the polygon tool to draw the solar cell area');
+                setStatus('Draw the solar cell area');
+                enablePolygonDrawing();
             }
         };
 
@@ -283,15 +529,32 @@ export default function MapPlanner() {
             });
             
             const newLayer: LayerData = {
-                type: 'custompolygon', // Use custompolygon type for initial draw
+                type: 'custompolygon',
                 coordinates: coordinates,
-                isInitialMap: true // Add flag to identify initial map draw
+                isInitialMap: true
             };
             
             setLayers(prevLayers => [...prevLayers, newLayer]);
-            console.log('Initial Map Area Created:', {
-                coordinates: newLayer.coordinates
-            });
+            
+            // Calculate and set the new center based on the drawn area
+            const center = coordinates.reduce(
+                (acc: number[], point: LatLng) => [acc[0] + point.lat, acc[1] + point.lng],
+                [0, 0]
+            );
+            const newCenter: [number, number] = [
+                center[0] / coordinates.length,
+                center[1] / coordinates.length
+            ];
+            setMapCenter(newCenter);
+            
+            // Store the current zoom level
+            const map = featureGroupRef.current?.leafletElement?._map;
+            if (map) {
+                const currentZoom = map.getZoom();
+                setInitialZoom(currentZoom);
+                setCurrentZoom(currentZoom);
+                console.log('Setting initial zoom:', currentZoom);
+            }
             
             setStatus('Initial map area drawn. Now select an area type to continue.');
             return;
@@ -467,6 +730,22 @@ export default function MapPlanner() {
         });
     };
 
+    // Add handleSearch function
+    const handleSearch = (lat: number, lng: number) => {
+        setSearchCenter([lat, lng]);
+    };
+
+    // Add this function to calculate center from layers
+    const calculateMapCenter = () => {
+        if (layers.length > 0) {
+            const allPoints = layers.flatMap(layer => layer.coordinates);
+            const totalLat = allPoints.reduce((sum: number, point: LatLng) => sum + point.lat, 0);
+            const totalLng = allPoints.reduce((sum: number, point: LatLng) => sum + point.lng, 0);
+            return [totalLat / allPoints.length, totalLng / allPoints.length] as [number, number];
+        }
+        return mapCenter;
+    };
+
     return (
         <div className="min-h-screen bg-gray-900 p-6">
             <h1 className="mb-4 text-xl font-bold text-white">Plant Layout Generator</h1>
@@ -488,255 +767,328 @@ export default function MapPlanner() {
             )}
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <div className="space-y-4 lg:col-span-1">
-                    <div>
-                        <label className="mb-1 block text-sm font-medium text-gray-300">
-                            Plant Category
-                        </label>
-                        <select
-                            value={selectedPlantCategory}
-                            onChange={(e) => {
-                                setSelectedPlantCategory(e.target.value);
-                                setSelectedPlant(null);
-                                console.log('Selected Plant Category:', e.target.value);
-                                if (e.target.value === 'Horticultural') {
-                                    const filtered = plantTypes.filter(plant => 
-                                        ['Mango', 'Durian', 'Pineapple', 'Longkong'].includes(plant.name)
-                                    );
-                                    console.log('Filtered Plants:', filtered);
-                                    setFilteredPlants(filtered);
-                                } else {
-                                    console.log('No plants available for category:', e.target.value);
-                                    setFilteredPlants([]);
-                                }
-                            }}
-                            className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
-                        >
-                            <option value="">Select a plant category</option>
-                            <option value="Horticultural">Horticultural</option>
-                            <option value="Field Crop">Field Crop</option>
-                            <option value="Greenhouse">Greenhouse</option>
-                            <option value="Home Garden">Home Garden</option>
-                        </select>
-                    </div>
-
-                    {selectedPlantCategory && (
-                        <div>
-                            <label className="mb-1 block text-sm font-medium text-gray-300">
-                                Plant Selection
-                                <span className="ml-2 text-sm font-normal text-gray-400">
-                                    {selectedPlant ? `(${selectedPlant.name})` : '(Select a plant)'}
-                                </span>
-                            </label>
-                            <select
-                                value={selectedPlant?.id || ''}
-                                onChange={(e) => {
-                                    const plant = filteredPlants.find(p => p.id === Number(e.target.value));
-                                    if (plant) {
-                                        handlePlantSelect(plant);
-                                    } else {
+                {layers.length > 0 ? (
+                    <>
+                        <div className="space-y-4 lg:col-span-1">
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-gray-300">
+                                    Plant Category
+                                </label>
+                                <select
+                                    value={selectedPlantCategory}
+                                    onChange={(e) => {
+                                        setSelectedPlantCategory(e.target.value);
                                         setSelectedPlant(null);
-                                        setStatus('Select a plant');
-                                    }
-                                }}
-                                className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
-                            >
-                                <option value="">Select a plant</option>
-                                {filteredPlants.map((plant) => (
-                                    <option key={plant.id} value={plant.id}>
-                                        {plant.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
+                                        console.log('Selected Plant Category:', e.target.value);
+                                        if (e.target.value === 'Horticultural') {
+                                            const filtered = plantTypes.filter(plant => 
+                                                ['Mango', 'Durian', 'Pineapple', 'Longkong'].includes(plant.name)
+                                            );
+                                            console.log('Filtered Plants:', filtered);
+                                            setFilteredPlants(filtered);
+                                        } else {
+                                            console.log('No plants available for category:', e.target.value);
+                                            setFilteredPlants([]);
+                                        }
+                                    }}
+                                    className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                                >
+                                    <option value="">Select a plant category</option>
+                                    <option value="Horticultural">Horticultural</option>
+                                    <option value="Field Crop">Field Crop</option>
+                                    <option value="Greenhouse">Greenhouse</option>
+                                    <option value="Home Garden">Home Garden</option>
+                                </select>
+                            </div>
 
-                    {selectedPlant && (
-                        <div className="space-y-4 rounded-lg bg-gray-800 p-4">
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-300">
-                                    Plant Spacing (m)
-                                </label>
-                                <input
-                                    type="number"
-                                    value={customParams.plant_spacing}
-                                    onChange={(e) => handleCustomParamChange('plant_spacing', e.target.value)}
-                                    min="0"
-                                    step="0.1"
-                                    className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-300">
-                                    Row Spacing (m)
-                                </label>
-                                <input
-                                    type="number"
-                                    value={customParams.row_spacing}
-                                    onChange={(e) => handleCustomParamChange('row_spacing', e.target.value)}
-                                    min="0"
-                                    step="0.1"
-                                    className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-300">
-                                    Water Needed (L/day)
-                                </label>
-                                <input
-                                    type="number"
-                                    value={customParams.water_needed}
-                                    onChange={(e) => handleCustomParamChange('water_needed', e.target.value)}
-                                    min="0"
-                                    step="0.1"
-                                    className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
-                                />
-                            </div>
-                            <button
-                                onClick={resetToDefault}
-                                className="mt-4 w-full rounded bg-blue-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-blue-700"
-                            >
-                                Reset to Default Values
-                            </button>
-                        </div>
-                    )}
-
-                    <div>
-                        <label className="mb-1 block text-sm font-medium text-gray-300">
-                            Area Configuration
-                        </label>
-                        <div className="space-y-2">
-                            {Object.keys(AREA_DESCRIPTIONS).map((type) => (
-                                <div key={type} className="flex items-center gap-4">
-                                    <AreaTypeButton
-                                        type={type as AreaType}
-                                        isSelected={selectedAreaTypes.includes(type as AreaType)}
-                                        isActive={activeButton === type}
-                                        onClick={() => toggleAreaType(type as AreaType)}
-                                    />
-                                    <span className="text-sm text-gray-400">
-                                        {AREA_DESCRIPTIONS[type as AreaType]}
-                                    </span>
+                            {selectedPlantCategory && (
+                                <div>
+                                    <label className="mb-1 block text-sm font-medium text-gray-300">
+                                        Plant Selection
+                                        <span className="ml-2 text-sm font-normal text-gray-400">
+                                            {selectedPlant ? `(${selectedPlant.name})` : '(Select a plant)'}
+                                        </span>
+                                    </label>
+                                    <select
+                                        value={selectedPlant?.id || ''}
+                                        onChange={(e) => {
+                                            const plant = filteredPlants.find(p => p.id === Number(e.target.value));
+                                            if (plant) {
+                                                handlePlantSelect(plant);
+                                            } else {
+                                                setSelectedPlant(null);
+                                                setStatus('Select a plant');
+                                            }
+                                        }}
+                                        className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                                    >
+                                        <option value="">Select a plant</option>
+                                        {filteredPlants.map((plant) => (
+                                            <option key={plant.id} value={plant.id}>
+                                                {plant.name}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="space-y-4 lg:col-span-2">
-                    <div className="h-[700px] w-full overflow-hidden rounded-lg border border-gray-700">
-                        <MapContainer
-                            center={mapCenter}
-                            zoom={13}
-                            maxZoom={19}
-                            minZoom={5}
-                            style={{ height: '100%', width: '100%' }}
-                            zoomControl={true}
-                            scrollWheelZoom={true}
-                        >
-                            <MapClickHandler 
-                                isPumpMode={isPumpMode} 
-                                onPumpPlace={handlePumpPlace}
-                            />
-                            <LayersControl position="topright">
-                                <LayersControl.BaseLayer checked name="Street Map">
-                                    <TileLayer
-                                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                                        maxZoom={19}
-                                    />
-                                </LayersControl.BaseLayer>
-                                <LayersControl.BaseLayer name="Satellite">
-                                    <TileLayer
-                                        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                                        attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
-                                        maxZoom={19}
-                                    />
-                                </LayersControl.BaseLayer>
-                            </LayersControl>
-
-                            <FeatureGroup ref={featureGroupRef}>
-                                <EditControl
-                                    position="topright"
-                                    onCreated={onCreated}
-                                    onDeleted={onDeleted}
-                                    draw={{
-                                        rectangle: drawingMode === 'rectangle',
-                                        circle: false,
-                                        circlemarker: false,
-                                        marker: false,
-                                        polyline: false,
-                                        polygon: drawingMode === 'polygon'
-                                    }}
-                                />
-                            </FeatureGroup>
-
-                            {pumpLocation && (
-                                <Circle
-                                    center={[pumpLocation.lat, pumpLocation.lng]}
-                                    radius={4}
-                                    pathOptions={{
-                                        color: AREA_COLORS.pump,
-                                        fillColor: AREA_COLORS.pump,
-                                        fillOpacity: 1,
-                                        weight: 2
-                                    }}
-                                />
                             )}
 
-                            {layers.map((layer, index) => {
-                                const styleMap: Record<AreaType, { color: string; fillOpacity: number; dashArray?: string }> = {
-                                    building: { color: AREA_COLORS.building, fillOpacity: 0.5 },
-                                    powerplant: { color: AREA_COLORS.powerplant, fillOpacity: 0.5 },
-                                    river: { color: AREA_COLORS.river, fillOpacity: 0.5 },
-                                    field: { color: AREA_COLORS.field, fillOpacity: 0.5 },
-                                    custompolygon: { color: AREA_COLORS.custompolygon, fillOpacity: 0.5 },
-                                    pump: { color: AREA_COLORS.pump, fillOpacity: 0.5 },
-                                    solarcell: { color: AREA_COLORS.solarcell, fillOpacity: 0.5 }
-                                };
+                            {selectedPlant && (
+                                <div className="space-y-4 rounded-lg bg-gray-800 p-4">
+                                    <div>
+                                        <label className="mb-1 block text-sm font-medium text-gray-300">
+                                            Plant Spacing (m)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={customParams.plant_spacing}
+                                            onChange={(e) => handleCustomParamChange('plant_spacing', e.target.value)}
+                                            min="0"
+                                            step="0.1"
+                                            className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="mb-1 block text-sm font-medium text-gray-300">
+                                            Row Spacing (m)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={customParams.row_spacing}
+                                            onChange={(e) => handleCustomParamChange('row_spacing', e.target.value)}
+                                            min="0"
+                                            step="0.1"
+                                            className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="mb-1 block text-sm font-medium text-gray-300">
+                                            Water Needed (L/day)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={customParams.water_needed}
+                                            onChange={(e) => handleCustomParamChange('water_needed', e.target.value)}
+                                            min="0"
+                                            step="0.1"
+                                            className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={resetToDefault}
+                                        className="mt-4 w-full rounded bg-blue-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-blue-700"
+                                    >
+                                        Reset to Default Values
+                                    </button>
+                                </div>
+                            )}
 
-                                if (layer.isInitialMap) {
-                                    return (
-                                        <Polygon
-                                            key={`initial-map-${index}`}
-                                            positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-gray-300">
+                                    Area Configuration
+                                </label>
+                                <div className="space-y-2">
+                                    {Object.keys(AREA_DESCRIPTIONS).map((type) => (
+                                        <div key={type} className="flex items-center gap-4">
+                                            <AreaTypeButton
+                                                type={type as AreaType}
+                                                isSelected={selectedAreaTypes.includes(type as AreaType)}
+                                                isActive={activeButton === type}
+                                                onClick={() => toggleAreaType(type as AreaType)}
+                                            />
+                                            <span className="text-sm text-gray-400">
+                                                {AREA_DESCRIPTIONS[type as AreaType]}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4 lg:col-span-2">
+                            <div className="h-[700px] w-full overflow-hidden rounded-lg border border-gray-700">
+                                <MapContainer
+                                    center={calculateMapCenter()}
+                                    zoom={currentZoom}
+                                    maxZoom={25}
+                                    minZoom={3}
+                                    style={{ height: '100%', width: '100%' }}
+                                    zoomControl={true}
+                                    scrollWheelZoom={true}
+                                    doubleClickZoom={true}
+                                    dragging={true}
+                                >
+                                    <SearchControl onSearch={handleSearch} />
+                                    <MapController center={calculateMapCenter()} zoom={currentZoom} />
+                                    <MapStateTracker 
+                                        onZoomChange={setCurrentZoom}
+                                        onMapTypeChange={setCurrentMapType}
+                                    />
+                                    <ZoomLevelDisplay />
+                                    <MapClickHandler 
+                                        isPumpMode={isPumpMode} 
+                                        onPumpPlace={handlePumpPlace}
+                                    />
+                                    <LayersControl position="topright">
+                                        <LayersControl.BaseLayer checked={currentMapType === 'street'} name="Street Map">
+                                            <TileLayer
+                                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                                maxZoom={25}
+                                                minZoom={3}
+                                            />
+                                        </LayersControl.BaseLayer>
+                                        <LayersControl.BaseLayer checked={currentMapType === 'satellite'} name="Satellite">
+                                            <TileLayer
+                                                url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+                                                attribution='&copy; <a href="https://www.google.com/maps">Google Maps</a>'
+                                                maxZoom={25}
+                                                minZoom={3}
+                                            />
+                                        </LayersControl.BaseLayer>
+                                    </LayersControl>
+
+                                    <FeatureGroup ref={featureGroupRef}>
+                                        <EditControl
+                                            position="topright"
+                                            onCreated={onCreated}
+                                            onDeleted={onDeleted}
+                                            draw={{
+                                                rectangle: drawingMode === 'rectangle',
+                                                circle: false,
+                                                circlemarker: false,
+                                                marker: false,
+                                                polyline: false,
+                                                polygon: drawingMode === 'polygon'
+                                            }}
+                                        />
+                                    </FeatureGroup>
+
+                                    {pumpLocation && (
+                                        <Circle
+                                            center={[pumpLocation.lat, pumpLocation.lng]}
+                                            radius={4}
                                             pathOptions={{
-                                                color: '#90EE90',
-                                                fillColor: '#90EE90',
-                                                fillOpacity: 0.5,
+                                                color: AREA_COLORS.pump,
+                                                fillColor: AREA_COLORS.pump,
+                                                fillOpacity: 1,
                                                 weight: 2
                                             }}
                                         />
-                                    );
-                                }
+                                    )}
 
-                                if (styleMap[layer.type]) {
-                                    return (
-                                        <Polygon
-                                            key={`${layer.type}-${index}`}
-                                            positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
-                                            pathOptions={{
-                                                ...styleMap[layer.type],
-                                                fillColor: styleMap[layer.type].color,
-                                                weight: 2
-                                            }}
+                                    {layers.map((layer, index) => {
+                                        const styleMap: Record<AreaType, { color: string; fillOpacity: number; dashArray?: string }> = {
+                                            building: { color: AREA_COLORS.building, fillOpacity: 0.5 },
+                                            powerplant: { color: AREA_COLORS.powerplant, fillOpacity: 0.5 },
+                                            river: { color: AREA_COLORS.river, fillOpacity: 0.5 },
+                                            field: { color: AREA_COLORS.field, fillOpacity: 0.5 },
+                                            custompolygon: { color: AREA_COLORS.custompolygon, fillOpacity: 0.5 },
+                                            pump: { color: AREA_COLORS.pump, fillOpacity: 0.5 },
+                                            solarcell: { color: AREA_COLORS.solarcell, fillOpacity: 0.5 }
+                                        };
+
+                                        if (layer.isInitialMap) {
+                                            return (
+                                                <Polygon
+                                                    key={`initial-map-${index}`}
+                                                    positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
+                                                    pathOptions={{
+                                                        color: '#90EE90',
+                                                        fillColor: '#90EE90',
+                                                        fillOpacity: 0.5,
+                                                        weight: 2
+                                                    }}
+                                                />
+                                            );
+                                        }
+
+                                        if (styleMap[layer.type]) {
+                                            return (
+                                                <Polygon
+                                                    key={`${layer.type}-${index}`}
+                                                    positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
+                                                    pathOptions={{
+                                                        ...styleMap[layer.type],
+                                                        fillColor: styleMap[layer.type].color,
+                                                        weight: 2
+                                                    }}
+                                                />
+                                            );
+                                        }
+                                        return null;
+                                    })}
+                                </MapContainer>
+                            </div>
+                            <div className="flex justify-end">
+                                <button
+                                    onClick={handleNext}
+                                    disabled={layers.length === 0 || !selectedPlantCategory || !selectedPlant}
+                                    className="rounded bg-green-600 px-6 py-3 text-white transition-colors duration-200 hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-700"
+                                >
+                                    {isLoading ? 'Processing...' : 'Next'}
+                                </button>
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <div className="col-span-full">
+                        <div className="h-[800px] w-full overflow-hidden rounded-lg border border-gray-700">
+                            <MapContainer
+                                center={searchCenter || mapCenter}
+                                zoom={initialZoom}
+                                maxZoom={25}
+                                minZoom={3}
+                                style={{ height: '100%', width: '100%' }}
+                                zoomControl={true}
+                                scrollWheelZoom={true}
+                                doubleClickZoom={true}
+                                dragging={true}
+                            >
+                                <SearchControl onSearch={handleSearch} />
+                                <MapController center={searchCenter || mapCenter} zoom={initialZoom} />
+                                <MapStateTracker 
+                                    onZoomChange={setCurrentZoom}
+                                    onMapTypeChange={setCurrentMapType}
+                                />
+                                <ZoomLevelDisplay />
+                                <LayersControl position="topright">
+                                    <LayersControl.BaseLayer checked={currentMapType === 'street'} name="Street Map">
+                                        <TileLayer
+                                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                            maxZoom={25}
+                                            minZoom={3}
                                         />
-                                    );
-                                }
-                                return null;
-                            })}
-                        </MapContainer>
+                                    </LayersControl.BaseLayer>
+                                    <LayersControl.BaseLayer checked={currentMapType === 'satellite'} name="Satellite">
+                                        <TileLayer
+                                            url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+                                            attribution='&copy; <a href="https://www.google.com/maps">Google Maps</a>'
+                                            maxZoom={25}
+                                            minZoom={3}
+                                        />
+                                    </LayersControl.BaseLayer>
+                                </LayersControl>
+
+                                <FeatureGroup ref={featureGroupRef}>
+                                    <EditControl
+                                        position="topright"
+                                        onCreated={onCreated}
+                                        onDeleted={onDeleted}
+                                        draw={{
+                                            rectangle: drawingMode === 'rectangle',
+                                            circle: false,
+                                            circlemarker: false,
+                                            marker: false,
+                                            polyline: false,
+                                            polygon: drawingMode === 'polygon'
+                                        }}
+                                    />
+                                </FeatureGroup>
+                            </MapContainer>
+                        </div>
                     </div>
-                    <div className="flex justify-end">
-                        <button
-                            onClick={handleNext}
-                            disabled={layers.length === 0 || !selectedPlantCategory || !selectedPlant}
-                            className="rounded bg-green-600 px-6 py-3 text-white transition-colors duration-200 hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-700"
-                        >
-                            {isLoading ? 'Processing...' : 'Next'}
-                        </button>
-                    </div>
-                </div>
+                )}
             </div>
         </div>
     );

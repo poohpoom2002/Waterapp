@@ -89,16 +89,35 @@ class FarmController extends Controller
     public function generatePlantingPoints(Request $request): JsonResponse
     {
         try {
-            $this->validatePlantingPointsRequest($request);
+            \Log::info('Starting generatePlantingPoints with request data:', [
+                'plant_type_id' => $request->plant_type_id,
+                'area_points' => count($request->area ?? []),
+                'exclusion_areas' => count($request->exclusion_areas ?? []),
+                'layers' => count($request->layers ?? [])
+            ]);
 
+            // Basic validation
+            if (empty($request->area) || count($request->area) < 3) {
+                throw new \Exception('Invalid area: Must have at least 3 points');
+            }
+
+            if (empty($request->plant_type_id)) {
+                throw new \Exception('Plant type is required');
+            }
+
+            // Get the plant type
             $plantType = PlantType::findOrFail($request->plant_type_id);
-            $configuredAreas = $this->getConfiguredAreas($request->layers);
             
+            // Calculate plant locations
             $plantLocations = $this->calculatePlantLocations(
-                $request->area, 
-                $plantType, 
-                $configuredAreas
+                $request->area,
+                $plantType,
+                $request->exclusion_areas ?? []
             );
+
+            if (empty($plantLocations)) {
+                throw new \Exception('No valid plant locations could be generated');
+            }
 
             return response()->json([
                 'plant_locations' => $plantLocations,
@@ -106,9 +125,13 @@ class FarmController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            \Log::error('Error generating plant locations: ' . $e->getMessage());
+            \Log::error('Error generating plant locations:', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return response()->json([
-                'error' => 'Error generating plant locations: ' . $e->getMessage()
+                'error' => $e->getMessage()
             ], 500);
         }
     }
@@ -126,8 +149,10 @@ class FarmController extends Controller
     }
 
     // Helper Methods
-    private function validatePlantingPointsRequest(Request $request): void
+    private function validatePlantingPointsRequest(Request $request)
     {
+        \Log::info('Validating planting points request');
+        
         $validator = Validator::make($request->all(), [
             'area' => 'required|array|min:3',
             'area.*.lat' => 'required|numeric',
@@ -145,16 +170,11 @@ class FarmController extends Controller
         ]);
 
         if ($validator->fails()) {
-            throw new Exception('Invalid request data: ' . json_encode($validator->errors()));
+            \Log::error('Validation failed:', ['errors' => $validator->errors()->toArray()]);
+            throw new \Exception('Invalid request data: ' . json_encode($validator->errors()));
         }
 
-        $plantType = PlantType::findOrFail($request->plant_type_id);
-        $area = $request->area;
-        $exclusionAreas = $request->exclusion_areas ?? [];
-        
-        $plantLocations = $this->calculatePlantLocations($area, $plantType, $exclusionAreas);
-
-        return response()->json(['plant_locations' => $plantLocations]);
+        \Log::info('Request validation passed');
     }
 
     private function getConfiguredAreas(array $layers): array
@@ -184,6 +204,22 @@ class FarmController extends Controller
         ];
     }
 
+    private function validateAreaData($areaData): bool
+    {
+        if (!is_array($areaData) || count($areaData) < 3) {
+            return false;
+        }
+
+        foreach ($areaData as $point) {
+            if (!isset($point['lat']) || !isset($point['lng']) ||
+                !is_numeric($point['lat']) || !is_numeric($point['lng'])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private function formatPlantTypeData(array $plantTypeData): array
     {
         return array_merge($plantTypeData, [
@@ -195,51 +231,51 @@ class FarmController extends Controller
 
     private function calculatePlantLocations($area, $plantType, $exclusionAreas = [])
     {
-        $points = [];
-        $bounds = $this->getBounds($area);
-        $latStep = $plantType->plant_spacing / 111000;
-        $lngStep = $plantType->row_spacing / (111000 * cos(deg2rad($bounds['center']['lat'])));
-        $buffer = $plantType->row_spacing / 2; // meters
+        try {
+            $points = [];
+            $bounds = $this->getBounds($area);
+            
+            // Convert spacing from meters to degrees (approximate)
+            $latStep = $plantType->plant_spacing / 111000; // 111000 meters per degree
+            $lngStep = $plantType->row_spacing / (111000 * cos(deg2rad($bounds['center']['lat'])));
+            
+            // Buffer from edges (half row spacing in degrees)
+            $buffer = ($plantType->row_spacing / 2) / 111000;
 
-        // No elevation fetching or usage
-
-        for ($lat = $bounds['min']['lat']; $lat <= $bounds['max']['lat']; $lat += $latStep) {
-            for ($lng = $bounds['min']['lng']; $lng <= $bounds['max']['lng']; $lng += $lngStep) {
-                if ($this->isPointInPolygon($lat, $lng, $area)) {
-                    // Exclude if inside any exclusion area
-                    $inExclusion = false;
-                    foreach ($exclusionAreas as $exclusion) {
-                        if ($this->isPointInPolygon($lat, $lng, $exclusion)) {
-                            $inExclusion = true;
-                            break;
+            for ($lat = $bounds['min']['lat'] + $buffer; $lat <= $bounds['max']['lat'] - $buffer; $lat += $latStep) {
+                for ($lng = $bounds['min']['lng'] + $buffer; $lng <= $bounds['max']['lng'] - $buffer; $lng += $lngStep) {
+                    if ($this->isPointInPolygon($lat, $lng, $area)) {
+                        // Check if point is in any exclusion area
+                        $inExclusion = false;
+                        foreach ($exclusionAreas as $exclusion) {
+                            if ($this->isPointInPolygon($lat, $lng, $exclusion)) {
+                                $inExclusion = true;
+                                break;
+                            }
+                        }
+                        
+                        if (!$inExclusion) {
+                            // Check distance from polygon edges
+                            $minDist = $this->minDistanceToPolygonEdge($lat, $lng, $area);
+                            if ($minDist >= ($plantType->row_spacing / 2)) {
+                                $points[] = [
+                                    'lat' => $lat,
+                                    'lng' => $lng
+                                ];
+                            }
                         }
                     }
-                    if ($inExclusion) continue;
-
-                    // Check buffer from field edge
-                    $minDist = $this->minDistanceToPolygonEdge($lat, $lng, $area);
-                    if ($minDist < $buffer) continue;
-
-                    // Check buffer from all exclusion area edges
-                    $tooCloseToExclusion = false;
-                    foreach ($exclusionAreas as $exclusion) {
-                        $distToExclusion = $this->minDistanceToPolygonEdge($lat, $lng, $exclusion);
-                        if ($distToExclusion < $buffer) {
-                            $tooCloseToExclusion = true;
-                            break;
-                        }
-                    }
-                    if ($tooCloseToExclusion) continue;
-
-                    // Add point (no elevation)
-                    $points[] = [
-                        'lat' => $lat,
-                        'lng' => $lng
-                    ];
                 }
             }
+
+            return $points;
+        } catch (\Exception $e) {
+            \Log::error('Error in calculatePlantLocations:', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         }
-        return $points;
     }
 
     private function getAreaElevationData($bounds)
@@ -696,5 +732,133 @@ class FarmController extends Controller
         }
 
         return response()->json(['coordinates' => $coordinatesWithElevation]);
+    }
+
+    public function addPlantPoint(Request $request): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'lat' => 'required|numeric',
+                'lng' => 'required|numeric',
+                'plant_type_id' => 'required|exists:plant_types,id',
+                'area' => 'required|array|min:3',
+                'area.*.lat' => 'required|numeric',
+                'area.*.lng' => 'required|numeric',
+            ]);
+
+            if ($validator->fails()) {
+                throw new \Exception('Invalid request data: ' . json_encode($validator->errors()));
+            }
+
+            // Check if point is within the area
+            if (!$this->isPointInPolygon($request->lat, $request->lng, $request->area)) {
+                throw new \Exception('Point must be within the field area');
+            }
+
+            // Check if point is at least half row spacing from edges
+            $plantType = PlantType::findOrFail($request->plant_type_id);
+            $minDist = $this->minDistanceToPolygonEdge($request->lat, $request->lng, $request->area);
+            if ($minDist < ($plantType->row_spacing / 2)) {
+                throw new \Exception('Point must be at least half row spacing away from field edges');
+            }
+
+            return response()->json([
+                'point' => [
+                    'lat' => $request->lat,
+                    'lng' => $request->lng
+                ],
+                'message' => 'Plant point added successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error adding plant point:', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function deletePlantPoint(Request $request): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'lat' => 'required|numeric',
+                'lng' => 'required|numeric',
+                'point_id' => 'required|string'
+            ]);
+
+            if ($validator->fails()) {
+                throw new \Exception('Invalid request data: ' . json_encode($validator->errors()));
+            }
+
+            return response()->json([
+                'point_id' => $request->point_id,
+                'message' => 'Plant point deleted successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error deleting plant point:', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function movePlantPoint(Request $request): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'point_id' => 'required|string',
+                'new_lat' => 'required|numeric',
+                'new_lng' => 'required|numeric',
+                'plant_type_id' => 'required|exists:plant_types,id',
+                'area' => 'required|array|min:3',
+                'area.*.lat' => 'required|numeric',
+                'area.*.lng' => 'required|numeric',
+            ]);
+
+            if ($validator->fails()) {
+                throw new \Exception('Invalid request data: ' . json_encode($validator->errors()));
+            }
+
+            // Check if new position is within the area
+            if (!$this->isPointInPolygon($request->new_lat, $request->new_lng, $request->area)) {
+                throw new \Exception('New position must be within the field area');
+            }
+
+            // Check if new position is at least half row spacing from edges
+            $plantType = PlantType::findOrFail($request->plant_type_id);
+            $minDist = $this->minDistanceToPolygonEdge($request->new_lat, $request->new_lng, $request->area);
+            if ($minDist < ($plantType->row_spacing / 2)) {
+                throw new \Exception('New position must be at least half row spacing away from field edges');
+            }
+
+            return response()->json([
+                'point' => [
+                    'id' => $request->point_id,
+                    'lat' => $request->new_lat,
+                    'lng' => $request->new_lng
+                ],
+                'message' => 'Plant point moved successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error moving plant point:', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }
