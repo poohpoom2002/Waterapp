@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Http;
 
 class FarmController extends Controller
 {
+    // Basic CRUD Operations
     public function index()
     {
         return inertia('farms/index');
@@ -74,19 +75,58 @@ class FarmController extends Controller
             ->with('success', 'Farm deleted successfully.');
     }
 
-    // Map Planner Methods
+    // Map Planning Operations
     public function planner()
     {
-        return inertia('mapplanner');
+        return inertia('map-planner');
     }
 
-    public function getPlantTypes()
+    public function getPlantTypes(): JsonResponse
     {
-        $plantTypes = PlantType::all();
-        return response()->json($plantTypes);
+        return response()->json(PlantType::all());
     }
 
-    public function generatePlantingPoints(Request $request)
+    public function generatePlantingPoints(Request $request): JsonResponse
+    {
+        try {
+            $this->validatePlantingPointsRequest($request);
+
+            $plantType = PlantType::findOrFail($request->plant_type_id);
+            $configuredAreas = $this->getConfiguredAreas($request->layers);
+            
+            $plantLocations = $this->calculatePlantLocations(
+                $request->area, 
+                $plantType, 
+                $configuredAreas
+            );
+
+            return response()->json([
+                'plant_locations' => $plantLocations,
+                'message' => 'Plant locations generated successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error generating plant locations: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Error generating plant locations: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function generateTree(Request $request)
+    {
+        try {
+            $data = $this->prepareGenerateTreeData($request);
+
+            return Inertia::render('generate-tree', $data);
+        } catch (Exception $e) {
+            return redirect()->route('planner')
+                ->with('error', 'Invalid data provided. Please try again.');
+        }
+    }
+
+    // Helper Methods
+    private function validatePlantingPointsRequest(Request $request): void
     {
         $validator = Validator::make($request->all(), [
             'area' => 'required|array|min:3',
@@ -97,10 +137,15 @@ class FarmController extends Controller
             'row_spacing' => 'required|numeric|min:0',
             'exclusion_areas' => 'array', // optional
             'exclusion_areas.*' => 'array',
+            'layers' => 'required|array',
+            'layers.*.type' => 'required|string',
+            'layers.*.coordinates' => 'required|array',
+            'layers.*.coordinates.*.lat' => 'required|numeric',
+            'layers.*.coordinates.*.lng' => 'required|numeric',
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            throw new Exception('Invalid request data: ' . json_encode($validator->errors()));
         }
 
         $plantType = PlantType::findOrFail($request->plant_type_id);
@@ -110,6 +155,42 @@ class FarmController extends Controller
         $plantLocations = $this->calculatePlantLocations($area, $plantType, $exclusionAreas);
 
         return response()->json(['plant_locations' => $plantLocations]);
+    }
+
+    private function getConfiguredAreas(array $layers): array
+    {
+        return array_filter($layers, fn($layer) => $layer['type'] !== 'map');
+    }
+
+    private function prepareGenerateTreeData(Request $request): array
+    {
+        $areaData = json_decode($request->input('area'), true);
+        $plantTypeData = json_decode($request->input('plantType'), true);
+        $areaType = $request->input('areaType', '');
+        $layersData = json_decode($request->input('layers'), true);
+
+        if (!$this->validateAreaData($areaData)) {
+            throw new Exception('Invalid area data');
+        }
+
+        $plantTypeData = $this->formatPlantTypeData($plantTypeData);
+        PlantType::findOrFail($plantTypeData['id']);
+
+        return [
+            'areaType' => $areaType ?: '',
+            'area' => $areaData,
+            'plantType' => $plantTypeData,
+            'layers' => $layersData
+        ];
+    }
+
+    private function formatPlantTypeData(array $plantTypeData): array
+    {
+        return array_merge($plantTypeData, [
+            'plant_spacing' => floatval($plantTypeData['plant_spacing']),
+            'row_spacing' => floatval($plantTypeData['row_spacing']),
+            'water_needed' => floatval($plantTypeData['water_needed'])
+        ]);
     }
 
     private function calculatePlantLocations($area, $plantType, $exclusionAreas = [])
@@ -386,7 +467,7 @@ class FarmController extends Controller
         return $R * $c;
     }
 
-    private function getBounds($area)
+    private function getBounds(array $area): array
     {
         $minLat = PHP_FLOAT_MAX;
         $maxLat = -PHP_FLOAT_MAX;
@@ -410,7 +491,7 @@ class FarmController extends Controller
         ];
     }
 
-    private function isPointInPolygon($lat, $lng, $polygon)
+    private function isPointInPolygon(float $lat, float $lng, array $polygon): bool
     {
         $inside = false;
         $j = count($polygon) - 1;
