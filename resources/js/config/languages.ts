@@ -26,7 +26,6 @@ export const languages = {
             failed: 'Failed to generate planting points'
         },
         areaTypes: {
-            field: 'Agricultural land for planting crops and vegetation.',
             river: 'Water body for irrigation and water management.',
             powerplant: 'Energy generation facility area.',
             building: 'Structure or facility area.',
@@ -68,7 +67,6 @@ export const languages = {
             failed: 'ไม่สามารถสร้างจุดปลูกพืชได้'
         },
         areaTypes: {
-            field: 'พื้นที่เกษตรกรรมสำหรับปลูกพืชและพืชพรรณ',
             river: 'แหล่งน้ำสำหรับการชลประทานและการจัดการน้ำ',
             powerplant: 'พื้นที่โรงไฟฟ้า',
             building: 'พื้นที่โครงสร้างหรือสิ่งอำนวยความสะดวก',
