@@ -521,6 +521,16 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
         return [center[0] / area.length, center[1] / area.length] as [number, number];
     }, [area]);
 
+    // Add useEffect to automatically generate tree points
+    useEffect(() => {
+        const generatePoints = async () => {
+            if (area.length > 0 && !isPlantLayoutGenerated) {
+                await handleGenerate();
+            }
+        };
+        generatePoints();
+    }, [area, processedPlantType, layers]); // Dependencies that should trigger regeneration
+
     const handleGenerate = async () => {
         setIsLoading(true);
         setError(null);
@@ -788,14 +798,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                             })}
                         </MapContainer>
                     </div>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <button
-                            onClick={handleGenerate}
-                            disabled={isLoading}
-                            className="w-full rounded bg-green-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-700"
-                        >
-                            {isLoading ? 'Generating...' : 'Generate Plant Layout'}
-                        </button>
+                    <div className="grid grid-cols-1 gap-4">
                         <button
                             onClick={handleGeneratePipeLayout}
                             disabled={isLoading || !isPlantLayoutGenerated}
