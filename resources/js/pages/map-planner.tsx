@@ -5,6 +5,7 @@ import { EditControl } from 'react-leaflet-draw';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import { router } from '@inertiajs/react';
+import L from 'leaflet';
 
 // Types
 type LatLng = {
@@ -31,7 +32,7 @@ type CustomPlantParams = {
     water_needed: number;
 };
 
-type AreaType = 'field' | 'river' | 'powerplant' | 'building' | 'pump' | 'custompolygon' | 'solarcell';
+type AreaType = 'river' | 'powerplant' | 'building' | 'pump' | 'custompolygon' | 'solarcell';
 
 type LayerData = {
     type: AreaType;
@@ -45,12 +46,19 @@ type Suggestion = {
     lon: string;
 };
 
+// Add these types after the existing types
+type LayerHistory = {
+    layers: LayerData[];
+    selectedAreaTypes: AreaType[];
+    activeButton: AreaType | null;
+    pumpLocation: LatLng | null;
+};
+
 // Constants
 const DEFAULT_MAP_CENTER: [number, number] = [13.7563, 100.5018];
 const MAX_AREA = 100000; // 10 hectares
 
 const AREA_DESCRIPTIONS: Record<AreaType, string> = {
-    field: 'Agricultural land for planting crops and vegetation.',
     river: 'Water body for irrigation and water management.',
     powerplant: 'Energy generation facility area.',
     building: 'Structure or facility area.',
@@ -61,7 +69,6 @@ const AREA_DESCRIPTIONS: Record<AreaType, string> = {
 
 const AREA_COLORS: Record<AreaType, string> = {
     river: '#3B82F6',    // Blue
-    field: '#22C55E',    // Green
     powerplant: '#EF4444', // Red
     building: '#F59E0B',  // Yellow
     pump: '#1E40AF',      // Dark Blue
@@ -252,22 +259,34 @@ const SearchControl: React.FC<{ onSearch: (lat: number, lng: number) => void }> 
     );
 };
 
-// Add MapController component
-const MapController: React.FC<{ center: [number, number]; zoom?: number }> = ({ center, zoom }) => {
+// Create separate components for zoom and center control
+const ZoomController: React.FC<{ zoom?: number }> = ({ zoom }) => {
+    const map = useMap();
+    
+    useEffect(() => {
+        if (map && zoom) {
+            map.setZoom(zoom);
+        }
+    }, [map, zoom]);
+
+    return null;
+};
+
+const CenterController: React.FC<{ center: [number, number] }> = ({ center }) => {
     const map = useMap();
     
     useEffect(() => {
         if (map && center) {
-            if (zoom) {
-                map.setZoom(zoom);
+            const currentCenter = map.getCenter();
+            if (currentCenter.lat !== center[0] || currentCenter.lng !== center[1]) {
+                map.setView(center, map.getZoom(), {
+                    animate: true,
+                    duration: 1.5,
+                    easeLinearity: 0.25
+                });
             }
-            map.setView(center, zoom || map.getZoom(), {
-                animate: true,
-                duration: 1.5,
-                easeLinearity: 0.25
-            });
         }
-    }, [center, map, zoom]);
+    }, [map, center]);
 
     return null;
 };
@@ -323,6 +342,53 @@ const ZoomLevelDisplay: React.FC = () => {
     );
 };
 
+// Add these helper functions before the MapPlanner component
+const isPointInPolygon = (point: LatLng, polygon: LatLng[]): boolean => {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i].lng;
+        const yi = polygon[i].lat;
+        const xj = polygon[j].lng;
+        const yj = polygon[j].lat;
+
+        const intersect = ((yi > point.lat) !== (yj > point.lat))
+            && (point.lng < (xj - xi) * (point.lat - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+};
+
+const isAreaWithinInitialMap = (newArea: LatLng[], initialMap: LatLng[]): boolean => {
+    return newArea.every(point => isPointInPolygon(point, initialMap));
+};
+
+// Update DrawHandler component
+const DrawHandler: React.FC<{
+    layers: LayerData[];
+    featureGroupRef: React.RefObject<any>;
+}> = ({ layers, featureGroupRef }) => {
+    const map = useMap();
+    const featureGroup = featureGroupRef.current?.leafletElement;
+
+    useEffect(() => {
+        if (!map || !featureGroup) return;
+
+        const handleDrawStart = (e: any) => {
+            const drawControl = e.target;
+            const drawTool = drawControl._toolbar._activeMode;
+            drawControl.enable();
+        };
+
+        map.on('draw:drawstart', handleDrawStart);
+
+        return () => {
+            map.off('draw:drawstart', handleDrawStart);
+        };
+    }, [map, layers]);
+
+    return null;
+};
+
 // Main Component
 export default function MapPlanner() {
     // State Management
@@ -348,7 +414,6 @@ export default function MapPlanner() {
     // Mode States
     const [isPumpMode, setIsPumpMode] = useState(false);
     const [isRiverMode, setIsRiverMode] = useState(false);
-    const [isFieldMode, setIsFieldMode] = useState(false);
     const [isBuildingMode, setIsBuildingMode] = useState(false);
     const [isPowerPlantMode, setIsPowerPlantMode] = useState(false);
     const [isOtherMode, setIsOtherMode] = useState(false);
@@ -366,7 +431,14 @@ export default function MapPlanner() {
     // Add these to the state declarations at the top of the MapPlanner component
     const [currentZoom, setCurrentZoom] = useState(13);
     const [currentMapType, setCurrentMapType] = useState('street');
-    const [initialZoom, setInitialZoom] = useState(13);
+    const [initialZoom, setInitialZoom] = useState<number | null>(null);
+
+    // Add new state for storing initial map position
+    const [initialMapPosition, setInitialMapPosition] = useState<[number, number] | null>(null);
+
+    // Add these state declarations in the MapPlanner component
+    const [history, setHistory] = useState<LayerHistory[]>([]);
+    const [historyIndex, setHistoryIndex] = useState(-1);
 
     // Effects
     useEffect(() => {
@@ -386,7 +458,6 @@ export default function MapPlanner() {
     const resetModes = () => {
         setIsPumpMode(false);
         setIsRiverMode(false);
-        setIsFieldMode(false);
         setIsBuildingMode(false);
         setIsPowerPlantMode(false);
         setIsOtherMode(false);
@@ -403,10 +474,16 @@ export default function MapPlanner() {
                 coordinates: clickedPoint
             });
             setPumpLocation(clickedPoint);
-            setLayers(prevLayers => [...prevLayers, {
+            
+            // Add pump to layers and save to history
+            const pumpLayer: LayerData = {
                 type: 'pump',
                 coordinates: [clickedPoint]
-            }]);
+            };
+            const newLayers = [...layers, pumpLayer];
+            setLayers(newLayers);
+            saveToHistory(newLayers, selectedAreaTypes, activeButton, clickedPoint);
+            
             resetModes();
             setActiveButton(null);
             setSelectedAreaTypes(prev => prev.filter(type => type !== 'pump'));
@@ -424,18 +501,18 @@ export default function MapPlanner() {
         }
 
         if (activeButton !== null) {
-            setError('Please finish the current action first');
-            return;
+            // If there's an active button, remove its layer first
+            setLayers(prevLayers => {
+                // Keep the initial map area and remove only the active button's layer
+                return prevLayers.filter(layer => 
+                    layer.isInitialMap || layer.type !== activeButton
+                );
+            });
+            setSelectedAreaTypes(prev => prev.filter(t => t !== activeButton));
         }
 
         setActiveButton(type);
         console.log('Area Type Selected:', type);
-
-        if (layers.length === 0) {
-            setError(`Please draw an area first before adding a ${type}`);
-            setActiveButton(null);
-            return;
-        }
 
         const enablePolygonDrawing = () => {
             const map = featureGroupRef.current?.leafletElement?._map;
@@ -444,8 +521,6 @@ export default function MapPlanner() {
                 const drawControl = Object.values(layers).find(layer => layer._drawingMode === 'polygon');
                 if (drawControl) {
                     drawControl.enable();
-                    // Force the polygon drawing mode to be active
-                    drawControl._startShape();
                 }
             }
         };
@@ -461,13 +536,6 @@ export default function MapPlanner() {
                 setDrawingMode('polygon');
                 setSelectedAreaTypes(prev => [...prev, 'river']);
                 setStatus('Draw the river area');
-                enablePolygonDrawing();
-            },
-            field: () => {
-                setIsFieldMode(true);
-                setDrawingMode('polygon');
-                setSelectedAreaTypes(prev => [...prev, 'field']);
-                setStatus('Draw the field area');
                 enablePolygonDrawing();
             },
             building: () => {
@@ -510,19 +578,19 @@ export default function MapPlanner() {
             lng: latLng.lng,
         }));
 
-        const styleMap = {
-            river: { color: AREA_COLORS.river, fillOpacity: 0.5 },
-            field: { color: AREA_COLORS.field, fillOpacity: 0.5 },
-            building: { color: AREA_COLORS.building, fillOpacity: 0.5 },
-            powerplant: { color: AREA_COLORS.powerplant, fillOpacity: 0.5 },
-            solarcell: { color: AREA_COLORS.solarcell, fillOpacity: 0.5 },
-            custompolygon: { color: AREA_COLORS.custompolygon, fillOpacity: 0.5 }
+        const styleMap: Record<AreaType, { color: string; fillOpacity: number; dashArray?: string }> = {
+            river: { color: '#3B82F6', fillOpacity: 0.3 },
+            powerplant: { color: '#EF4444', fillOpacity: 0.3 },
+            building: { color: '#F59E0B', fillOpacity: 0.3 },
+            pump: { color: '#1E40AF', fillOpacity: 0.3 },
+            custompolygon: { color: '#4B5563', fillOpacity: 0.3 },
+            solarcell: { color: '#FFD600', fillOpacity: 0.3 }
         };
 
         if (layers.length === 0) {
             // First draw is the initial map area with light green
             layer.setStyle({
-                color: '#90EE90', // Light Green
+                color: '#90EE90',
                 fillColor: '#90EE90',
                 fillOpacity: 0.3,
                 weight: 2
@@ -534,18 +602,16 @@ export default function MapPlanner() {
                 isInitialMap: true
             };
             
-            setLayers(prevLayers => [...prevLayers, newLayer]);
+            const newLayers = [...layers, newLayer];
+            setLayers(newLayers);
+            saveToHistory(newLayers, selectedAreaTypes, activeButton, pumpLocation);
             
             // Calculate and set the new center based on the drawn area
-            const center = coordinates.reduce(
-                (acc: number[], point: LatLng) => [acc[0] + point.lat, acc[1] + point.lng],
-                [0, 0]
-            );
-            const newCenter: [number, number] = [
-                center[0] / coordinates.length,
-                center[1] / coordinates.length
-            ];
+            const bounds = layer.getBounds();
+            const center = bounds.getCenter();
+            const newCenter: [number, number] = [center.lat, center.lng];
             setMapCenter(newCenter);
+            setInitialMapPosition(newCenter);
             
             // Store the current zoom level
             const map = featureGroupRef.current?.leafletElement?._map;
@@ -553,7 +619,11 @@ export default function MapPlanner() {
                 const currentZoom = map.getZoom();
                 setInitialZoom(currentZoom);
                 setCurrentZoom(currentZoom);
-                console.log('Setting initial zoom:', currentZoom);
+                // Center the map on the initial polygon
+                map.setView(newCenter, currentZoom, {
+                    animate: true,
+                    duration: 1
+                });
             }
             
             setStatus('Initial map area drawn. Now select an area type to continue.');
@@ -561,10 +631,8 @@ export default function MapPlanner() {
         }
 
         const currentType = isRiverMode ? 'river' : 
-                          isFieldMode ? 'field' : 
                           isBuildingMode ? 'building' : 
                           isPowerPlantMode ? 'powerplant' : 
-                          isSolarcellMode ? 'solarcell' : 
                           isOtherMode ? 'custompolygon' : null;
 
         if (currentType && styleMap[currentType]) {
@@ -577,30 +645,44 @@ export default function MapPlanner() {
 
         const newLayer: LayerData = {
             type: (isRiverMode ? 'river' : 
-                  isFieldMode ? 'field' : 
                   isBuildingMode ? 'building' : 
                   isPowerPlantMode ? 'powerplant' : 
                   isOtherMode ? 'custompolygon' :
-                  isSolarcellMode ? 'solarcell' :
                   'custompolygon') as AreaType,
             coordinates: coordinates,
             isInitialMap: false
         };
 
-        setLayers(prevLayers => [...prevLayers, newLayer]);
+        // Add the layer to the FeatureGroup
+        if (featureGroupRef.current?.leafletElement) {
+            featureGroupRef.current.leafletElement.addLayer(layer);
+        }
+
+        const newLayers = [...layers, newLayer];
+        setLayers(newLayers);
+        saveToHistory(newLayers, selectedAreaTypes, activeButton, pumpLocation);
         console.log('Area Created:', {
             type: newLayer.type,
             coordinates: newLayer.coordinates
         });
+
+        // Center the map on the newly drawn polygon
+        const map = featureGroupRef.current?.leafletElement?._map;
+        if (map) {
+            const bounds = layer.getBounds();
+            const center = bounds.getCenter();
+            map.setView([center.lat, center.lng], map.getZoom(), {
+                animate: true,
+                duration: 1
+            });
+        }
 
         resetModes();
         setActiveButton(null);
         setSelectedAreaTypes(prev => prev.filter(type => type !== activeButton));
         setError(null);
         setStatus(`Added ${activeButton === 'custompolygon' ? 'custom polygon' :
-                          activeButton === 'solarcell' ? 'solar cell' :
                           isRiverMode ? 'river' : 
-                          isFieldMode ? 'field' : 
                           isBuildingMode ? 'building' : 
                           isPowerPlantMode ? 'power plant' : 
                           'custom polygon'} area. Select another area type to continue.`);
@@ -690,6 +772,41 @@ export default function MapPlanner() {
         }
     };
 
+    // Update handleBack function
+    const handleBack = () => {
+        console.log('handleBack called'); // ตรวจสอบว่าฟังก์ชันนี้ถูกเรียก
+        setLayers([]);
+        setSelectedAreaTypes([]);
+        setPumpLocation(null);
+        setSelectedPlant(null);
+        setSelectedPlantCategory('');
+        setCustomParams({
+            name: '',
+            type: '',
+            description: '',
+            plant_spacing: 10,
+            row_spacing: 10,
+            water_needed: 1.5
+        });
+        setError(null);
+        setStatus('Draw an area on the map first');
+
+        // Reset map view to initial position and zoom
+        if (initialMapPosition && initialZoom !== null) {
+            setMapCenter(initialMapPosition);
+            setCurrentZoom(initialZoom);
+        }
+
+        // Clear layer that drawed out of initial map
+        if (featureGroupRef.current) {
+            const leafletElem = featureGroupRef.current.leafletElement;
+            if (leafletElem && leafletElem.clearLayers) {
+                console.log('Layers: ', layers);
+                leafletElem.clearLayers();
+            }
+        }
+    };
+
     const resetToDefault = () => {
         if (selectedPlant) {
             setCustomParams({
@@ -746,6 +863,117 @@ export default function MapPlanner() {
         return mapCenter;
     };
 
+    // Add these functions in the MapPlanner component
+    const saveToHistory = (newLayers: LayerData[], newSelectedTypes: AreaType[], newActiveButton: AreaType | null, newPumpLocation: LatLng | null) => {
+        // Clear any existing history after current index
+        const newHistory = history.slice(0, historyIndex + 1);
+        
+        // Save the complete state
+        newHistory.push({
+            layers: newLayers.map(layer => ({
+                ...layer,
+                coordinates: layer.coordinates.map(coord => ({
+                    lat: coord.lat,
+                    lng: coord.lng
+                }))
+            })),
+            selectedAreaTypes: [...newSelectedTypes],
+            activeButton: newActiveButton,
+            pumpLocation: newPumpLocation ? { ...newPumpLocation } : null
+        });
+        
+        setHistory(newHistory);
+        setHistoryIndex(newHistory.length - 1);
+    };
+
+    const handleUndo = () => {
+        if (historyIndex > 0) {
+            const newIndex = historyIndex - 1;
+            const previousState = history[newIndex];
+
+            // Clear old layers from map
+            if (featureGroupRef.current && featureGroupRef.current.leafletElement) {
+                const featureGroup = featureGroupRef.current.leafletElement;
+                featureGroup.clearLayers(); // สำคัญ!
+            }
+
+            setLayers(previousState.layers);
+            setSelectedAreaTypes(previousState.selectedAreaTypes);
+            setActiveButton(null);
+            setPumpLocation(previousState.pumpLocation);
+            setHistoryIndex(newIndex);
+
+            setStatus('Undo: Previous state restored');
+        }
+    };
+
+    const handleRedo = () => {
+        if (historyIndex < history.length - 1) {
+            const newIndex = historyIndex + 1;
+            const nextState = history[newIndex];
+
+            // Clear old layers from map
+            if (featureGroupRef.current && featureGroupRef.current.leafletElement) {
+                const featureGroup = featureGroupRef.current.leafletElement;
+                featureGroup.clearLayers(); // สำคัญ!
+            }
+
+            setLayers(nextState.layers);
+            setSelectedAreaTypes(nextState.selectedAreaTypes);
+            setActiveButton(null);
+            setPumpLocation(nextState.pumpLocation);
+            setHistoryIndex(newIndex);
+
+            setStatus('Redo: Next state restored');
+        }
+    };
+
+    // Add the arrow controls to the map
+    const MapControls: React.FC = () => {
+        return (
+            <div className="absolute bottom-4 right-4 z-[1000] flex space-x-2">
+                <button
+                    onClick={handleUndo}
+                    disabled={historyIndex <= 0}
+                    className="rounded bg-white p-2 shadow-md hover:bg-gray-100 disabled:opacity-50"
+                >
+                    <svg
+                        className="h-6 w-6 text-gray-700"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 19l-7-7 7-7"
+                        />
+                    </svg>
+                </button>
+                <button
+                    onClick={handleRedo}
+                    disabled={historyIndex >= history.length - 1}
+                    className="rounded bg-white p-2 shadow-md hover:bg-gray-100 disabled:opacity-50"
+                >
+                    <svg
+                        className="h-6 w-6 text-gray-700"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5l7 7-7 7"
+                        />
+                    </svg>
+                </button>
+            </div>
+        );
+    };
+
     return (
         <div className="min-h-screen bg-gray-900 p-6">
             <h1 className="mb-4 text-xl font-bold text-white">Plant Layout Generator</h1>
@@ -767,9 +995,9 @@ export default function MapPlanner() {
             )}
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                {layers.length > 0 ? (
-                    <>
-                        <div className="space-y-4 lg:col-span-1">
+                <div className={`space-y-4 ${layers.length > 0 ? 'lg:col-span-1' : 'hidden'}`}>
+                    {layers.length > 0 && (
+                        <>
                             <div>
                                 <label className="mb-1 block text-sm font-medium text-gray-300">
                                     Plant Category
@@ -902,193 +1130,156 @@ export default function MapPlanner() {
                                     ))}
                                 </div>
                             </div>
-                        </div>
+                        </>
+                    )}
+                </div>
 
-                        <div className="space-y-4 lg:col-span-2">
-                            <div className="h-[700px] w-full overflow-hidden rounded-lg border border-gray-700">
-                                <MapContainer
-                                    center={calculateMapCenter()}
-                                    zoom={currentZoom}
-                                    maxZoom={25}
-                                    minZoom={3}
-                                    style={{ height: '100%', width: '100%' }}
-                                    zoomControl={true}
-                                    scrollWheelZoom={true}
-                                    doubleClickZoom={true}
-                                    dragging={true}
-                                >
-                                    <SearchControl onSearch={handleSearch} />
-                                    <MapController center={calculateMapCenter()} zoom={currentZoom} />
-                                    <MapStateTracker 
-                                        onZoomChange={setCurrentZoom}
-                                        onMapTypeChange={setCurrentMapType}
+                <div className={`space-y-4 ${layers.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
+                    <div className={`${layers.length === 0 ? 'h-[900px]' : 'h-[700px]'} w-full overflow-hidden rounded-lg border border-gray-700 ${layers.length === 0 ? 'w-full' : ''}`}>
+                        <MapContainer
+                            center={searchCenter || calculateMapCenter()}
+                            zoom={initialZoom || currentZoom}
+                            maxZoom={25}
+                            minZoom={3}
+                            style={{ height: '100%', width: '100%' }}
+                            zoomControl={true}
+                            scrollWheelZoom={true}
+                            doubleClickZoom={true}
+                            dragging={true}
+                        >
+                            <SearchControl onSearch={handleSearch} />
+                            <ZoomController zoom={initialZoom || currentZoom} />
+                            <CenterController center={searchCenter || calculateMapCenter()} />
+                            <MapStateTracker 
+                                onZoomChange={setCurrentZoom}
+                                onMapTypeChange={setCurrentMapType}
+                            />
+                            <ZoomLevelDisplay />
+                            <MapControls />
+                            <DrawHandler layers={layers} featureGroupRef={featureGroupRef} />
+                            <MapClickHandler 
+                                isPumpMode={isPumpMode} 
+                                onPumpPlace={handlePumpPlace}
+                            />
+                            <LayersControl position="topright">
+                                <LayersControl.BaseLayer checked={currentMapType === 'street'} name="Street Map">
+                                    <TileLayer
+                                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                        maxZoom={25}
+                                        minZoom={3}
                                     />
-                                    <ZoomLevelDisplay />
-                                    <MapClickHandler 
-                                        isPumpMode={isPumpMode} 
-                                        onPumpPlace={handlePumpPlace}
+                                </LayersControl.BaseLayer>
+                                <LayersControl.BaseLayer checked={currentMapType === 'satellite'} name="Satellite">
+                                    <TileLayer
+                                        url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+                                        attribution='&copy; <a href="https://www.google.com/maps">Google Maps</a>'
+                                        maxZoom={25}
+                                        minZoom={3}
                                     />
-                                    <LayersControl position="topright">
-                                        <LayersControl.BaseLayer checked={currentMapType === 'street'} name="Street Map">
-                                            <TileLayer
-                                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                                                maxZoom={25}
-                                                minZoom={3}
-                                            />
-                                        </LayersControl.BaseLayer>
-                                        <LayersControl.BaseLayer checked={currentMapType === 'satellite'} name="Satellite">
-                                            <TileLayer
-                                                url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
-                                                attribution='&copy; <a href="https://www.google.com/maps">Google Maps</a>'
-                                                maxZoom={25}
-                                                minZoom={3}
-                                            />
-                                        </LayersControl.BaseLayer>
-                                    </LayersControl>
+                                </LayersControl.BaseLayer>
+                            </LayersControl>
 
-                                    <FeatureGroup ref={featureGroupRef}>
-                                        <EditControl
-                                            position="topright"
-                                            onCreated={onCreated}
-                                            onDeleted={onDeleted}
-                                            draw={{
-                                                rectangle: drawingMode === 'rectangle',
-                                                circle: false,
-                                                circlemarker: false,
-                                                marker: false,
-                                                polyline: false,
-                                                polygon: drawingMode === 'polygon'
-                                            }}
-                                        />
-                                    </FeatureGroup>
+                            <FeatureGroup ref={featureGroupRef}>
+                                <EditControl
+                                    position="topright"
+                                    onCreated={onCreated}
+                                    onDeleted={onDeleted}
+                                    draw={{
+                                        rectangle: false,
+                                        circle: false,
+                                        circlemarker: false,
+                                        marker: false,
+                                        polyline: false,
+                                        polygon: {
+                                            allowIntersection: true,
+                                            showArea: true,
+                                            drawError: {
+                                                color: '#e1e4e8',
+                                                message: '<strong>Error:</strong> Cannot draw outside the initial map area!'
+                                            },
+                                            shapeOptions: {
+                                                color: '#3B82F6',
+                                                fillOpacity: 0.3,
+                                                weight: 2
+                                            },
+                                            repeatMode: true
+                                        }
+                                    }}
+                                />
+                            </FeatureGroup>
 
-                                    {pumpLocation && (
-                                        <Circle
-                                            center={[pumpLocation.lat, pumpLocation.lng]}
-                                            radius={4}
+                            {pumpLocation && (
+                                <Circle
+                                    center={[pumpLocation.lat, pumpLocation.lng]}
+                                    radius={4}
+                                    pathOptions={{
+                                        color: AREA_COLORS.pump,
+                                        fillColor: AREA_COLORS.pump,
+                                        fillOpacity: 1,
+                                        weight: 2
+                                    }}
+                                />
+                            )}
+
+                            {layers.map((layer, index) => {
+                                const styleMap: Record<AreaType, { color: string; fillOpacity: number; dashArray?: string }> = {
+                                    building: { color: AREA_COLORS.building, fillOpacity: 0.5 },
+                                    powerplant: { color: AREA_COLORS.powerplant, fillOpacity: 0.5 },
+                                    river: { color: AREA_COLORS.river, fillOpacity: 0.5 },
+                                    custompolygon: { color: AREA_COLORS.custompolygon, fillOpacity: 0.5 },
+                                    pump: { color: AREA_COLORS.pump, fillOpacity: 0.5 },
+                                    solarcell: { color: AREA_COLORS.solarcell, fillOpacity: 0.5 }
+                                };
+
+                                if (layer.isInitialMap) {
+                                    return (
+                                        <Polygon
+                                            key={`initial-map-${index}`}
+                                            positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
                                             pathOptions={{
-                                                color: AREA_COLORS.pump,
-                                                fillColor: AREA_COLORS.pump,
-                                                fillOpacity: 1,
+                                                color: '#90EE90',
+                                                fillColor: '#90EE90',
+                                                fillOpacity: 0.5,
                                                 weight: 2
                                             }}
                                         />
-                                    )}
+                                    );
+                                }
 
-                                    {layers.map((layer, index) => {
-                                        const styleMap: Record<AreaType, { color: string; fillOpacity: number; dashArray?: string }> = {
-                                            building: { color: AREA_COLORS.building, fillOpacity: 0.5 },
-                                            powerplant: { color: AREA_COLORS.powerplant, fillOpacity: 0.5 },
-                                            river: { color: AREA_COLORS.river, fillOpacity: 0.5 },
-                                            field: { color: AREA_COLORS.field, fillOpacity: 0.5 },
-                                            custompolygon: { color: AREA_COLORS.custompolygon, fillOpacity: 0.5 },
-                                            pump: { color: AREA_COLORS.pump, fillOpacity: 0.5 },
-                                            solarcell: { color: AREA_COLORS.solarcell, fillOpacity: 0.5 }
-                                        };
-
-                                        if (layer.isInitialMap) {
-                                            return (
-                                                <Polygon
-                                                    key={`initial-map-${index}`}
-                                                    positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
-                                                    pathOptions={{
-                                                        color: '#90EE90',
-                                                        fillColor: '#90EE90',
-                                                        fillOpacity: 0.5,
-                                                        weight: 2
-                                                    }}
-                                                />
-                                            );
-                                        }
-
-                                        if (styleMap[layer.type]) {
-                                            return (
-                                                <Polygon
-                                                    key={`${layer.type}-${index}`}
-                                                    positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
-                                                    pathOptions={{
-                                                        ...styleMap[layer.type],
-                                                        fillColor: styleMap[layer.type].color,
-                                                        weight: 2
-                                                    }}
-                                                />
-                                            );
-                                        }
-                                        return null;
-                                    })}
-                                </MapContainer>
-                            </div>
-                            <div className="flex justify-end">
-                                <button
-                                    onClick={handleNext}
-                                    disabled={layers.length === 0 || !selectedPlantCategory || !selectedPlant}
-                                    className="rounded bg-green-600 px-6 py-3 text-white transition-colors duration-200 hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-700"
-                                >
-                                    {isLoading ? 'Processing...' : 'Next'}
-                                </button>
-                            </div>
-                        </div>
-                    </>
-                ) : (
-                    <div className="col-span-full">
-                        <div className="h-[800px] w-full overflow-hidden rounded-lg border border-gray-700">
-                            <MapContainer
-                                center={searchCenter || mapCenter}
-                                zoom={initialZoom}
-                                maxZoom={25}
-                                minZoom={3}
-                                style={{ height: '100%', width: '100%' }}
-                                zoomControl={true}
-                                scrollWheelZoom={true}
-                                doubleClickZoom={true}
-                                dragging={true}
-                            >
-                                <SearchControl onSearch={handleSearch} />
-                                <MapController center={searchCenter || mapCenter} zoom={initialZoom} />
-                                <MapStateTracker 
-                                    onZoomChange={setCurrentZoom}
-                                    onMapTypeChange={setCurrentMapType}
-                                />
-                                <ZoomLevelDisplay />
-                                <LayersControl position="topright">
-                                    <LayersControl.BaseLayer checked={currentMapType === 'street'} name="Street Map">
-                                        <TileLayer
-                                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                                            maxZoom={25}
-                                            minZoom={3}
+                                if (styleMap[layer.type]) {
+                                    return (
+                                        <Polygon
+                                            key={`${layer.type}-${index}`}
+                                            positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
+                                            pathOptions={{
+                                                ...styleMap[layer.type],
+                                                fillColor: styleMap[layer.type].color,
+                                                weight: 2
+                                            }}
                                         />
-                                    </LayersControl.BaseLayer>
-                                    <LayersControl.BaseLayer checked={currentMapType === 'satellite'} name="Satellite">
-                                        <TileLayer
-                                            url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
-                                            attribution='&copy; <a href="https://www.google.com/maps">Google Maps</a>'
-                                            maxZoom={25}
-                                            minZoom={3}
-                                        />
-                                    </LayersControl.BaseLayer>
-                                </LayersControl>
-
-                                <FeatureGroup ref={featureGroupRef}>
-                                    <EditControl
-                                        position="topright"
-                                        onCreated={onCreated}
-                                        onDeleted={onDeleted}
-                                        draw={{
-                                            rectangle: drawingMode === 'rectangle',
-                                            circle: false,
-                                            circlemarker: false,
-                                            marker: false,
-                                            polyline: false,
-                                            polygon: drawingMode === 'polygon'
-                                        }}
-                                    />
-                                </FeatureGroup>
-                            </MapContainer>
-                        </div>
+                                    );
+                                }
+                                return null;
+                            })}
+                        </MapContainer>
                     </div>
-                )}
+                </div>
+            </div>
+            <div className="mt-4 flex justify-between">
+                <button
+                    onClick={handleBack}
+                    className="rounded bg-gray-600 px-6 py-3 text-white transition-colors duration-200 hover:bg-gray-700"
+                >
+                    Back
+                </button>
+                <button
+                    onClick={handleNext}
+                    disabled={layers.length === 0 || !selectedPlantCategory || !selectedPlant}
+                    className="rounded bg-green-600 px-6 py-3 text-white transition-colors duration-200 hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-700"
+                >
+                    {isLoading ? 'Processing...' : 'Next'}
+                </button>
             </div>
         </div>
     );
