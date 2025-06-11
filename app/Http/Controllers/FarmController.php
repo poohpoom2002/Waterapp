@@ -229,46 +229,114 @@ class FarmController extends Controller
         ]);
     }
 
+    private function haversine($p1, $p2)
+    {
+        $R = 6371000; // Earth radius in meters
+        $lat1 = deg2rad($p1['lat']);
+        $lat2 = deg2rad($p2['lat']);
+        $dLat = $lat2 - $lat1;
+        $dLng = deg2rad($p2['lng'] - $p1['lng']);
+
+        $a = sin($dLat / 2) ** 2 +
+            cos($lat1) * cos($lat2) * sin($dLng / 2) ** 2;
+
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+        return $R * $c;
+    }
+
+
     private function calculatePlantLocations($area, $plantType, $exclusionAreas = [])
     {
         try {
             $points = [];
-            $bounds = $this->getBounds($area);
-            
-            // Convert spacing from meters to degrees (approximate)
-            $latStep = $plantType->plant_spacing / 111000; // 111000 meters per degree
-            $lngStep = $plantType->row_spacing / (111000 * cos(deg2rad($bounds['center']['lat'])));
-            
-            // Buffer from edges (half row spacing in degrees)
-            $buffer = ($plantType->row_spacing / 2) / 111000;
 
-            for ($lat = $bounds['min']['lat'] + $buffer; $lat <= $bounds['max']['lat'] - $buffer; $lat += $latStep) {
-                for ($lng = $bounds['min']['lng'] + $buffer; $lng <= $bounds['max']['lng'] - $buffer; $lng += $lngStep) {
-                    if ($this->isPointInPolygon($lat, $lng, $area)) {
-                        // Check if point is in any exclusion area
+            // 1. Find the two leftmost points (lowest longitude)
+            usort($area, fn($a, $b) => $a['lng'] <=> $b['lng']);
+            $leftmost1 = $area[0];
+            $leftmost2 = $area[1];
+            $bottomLeft = $leftmost1['lat'] < $leftmost2['lat'] ? $leftmost1 : $leftmost2;
+            $topLeft = $leftmost1['lat'] >= $leftmost2['lat'] ? $leftmost1 : $leftmost2;
+
+            // 2. Find the two bottommost points (lowest latitude)
+            usort($area, fn($a, $b) => $a['lat'] <=> $b['lat']);
+            $bottom1 = $area[0];
+            $bottom2 = $area[1];
+            $bottomRight = $bottom1['lng'] > $bottom2['lng'] ? $bottom1 : $bottom2;
+            // Keep previously defined $bottomLeft
+
+            // 3. Define plantDir (along bottom edge)
+            $plantDir = [
+                'lat' => $bottomRight['lat'] - $bottomLeft['lat'],
+                'lng' => $bottomRight['lng'] - $bottomLeft['lng'],
+            ];
+            $plantLength = sqrt($plantDir['lat'] ** 2 + $plantDir['lng'] ** 2);
+            $plantDir = [
+                'lat' => $plantDir['lat'] / $plantLength,
+                'lng' => $plantDir['lng'] / $plantLength,
+            ];
+
+            $rowDir = [
+                'lat' => $topLeft['lat'] - $bottomLeft['lat'],
+                'lng' => $topLeft['lng'] - $bottomLeft['lng'],
+            ];
+            $rowLength = sqrt($rowDir['lat'] ** 2 + $rowDir['lng'] ** 2);
+            $rowDir = [
+                'lat' => $rowDir['lat'] / $rowLength,
+                'lng' => $rowDir['lng'] / $rowLength,
+            ];
+
+            $fieldWidthMeters = $this->haversine($bottomLeft, $bottomRight);
+            $fieldHeightMeters = $this->haversine($bottomLeft, $topLeft);
+
+            $maxPlantSteps = (int) ($fieldWidthMeters / $plantType->plant_spacing);
+            $maxRowSteps = (int) ($fieldHeightMeters / $plantType->row_spacing);
+
+            // 4. Generate grid using corrected directions and real-world meters
+            for ($i = 0; $i <= $maxRowSteps; $i++) {
+                $rowStart = [
+                    'lat' => $bottomLeft['lat'] + $rowDir['lat'] * $i * ($plantType->row_spacing / 111000),
+                    'lng' => $bottomLeft['lng'] + $rowDir['lng'] * $i * ($plantType->row_spacing / (111000 * cos(deg2rad($bottomLeft['lat'])))),
+                ];
+
+                for ($j = 0; $j <= $maxPlantSteps; $j++) {
+                    $point = [
+                        'lat' => $rowStart['lat'] + $plantDir['lat'] * $j * ($plantType->plant_spacing / 111000),
+                        'lng' => $rowStart['lng'] + $plantDir['lng'] * $j * ($plantType->plant_spacing / (111000 * cos(deg2rad($rowStart['lat'])))),
+                    ];
+
+                    // $minDist = $this->minDistanceToPolygonEdge($point['lat'], $point['lng'], $area);
+                    // if ($minDist >= ($plantType->row_spacing / 2)) {
+                    //     $points[] = $point;
+                    // }
+
+                    // $points[] = $point;
+
+                    // Check if point is in the main polygon                
+                    if ($this->isPointInPolygon($point['lat'], $point['lng'], $area)) {
+                        // $points[] = $point;
+                        // Check exclusion zones
                         $inExclusion = false;
                         foreach ($exclusionAreas as $exclusion) {
-                            if ($this->isPointInPolygon($lat, $lng, $exclusion)) {
+                            if ($this->isPointInPolygon($point['lat'], $point['lng'], $exclusion)) {
                                 $inExclusion = true;
                                 break;
                             }
                         }
-                        
+
+                        // Check edge buffer
                         if (!$inExclusion) {
-                            // Check distance from polygon edges
-                            $minDist = $this->minDistanceToPolygonEdge($lat, $lng, $area);
+                            $minDist = $this->minDistanceToPolygonEdge($point['lat'], $point['lng'], $area);
                             if ($minDist >= ($plantType->row_spacing / 2)) {
-                                $points[] = [
-                                    'lat' => $lat,
-                                    'lng' => $lng
-                                ];
+                                $points[] = $point;
                             }
                         }
                     }
                 }
             }
 
+
             return $points;
+
         } catch (\Exception $e) {
             \Log::error('Error in calculatePlantLocations:', [
                 'message' => $e->getMessage(),
@@ -277,6 +345,56 @@ class FarmController extends Controller
             throw $e;
         }
     }
+
+
+    // private function calculatePlantLocations($area, $plantType, $exclusionAreas = [])
+    // {
+    //     try {
+    //         $points = [];
+    //         $bounds = $this->getBounds($area);
+            
+    //         // Convert spacing from meters to degrees (approximate)
+    //         $latStep = $plantType->plant_spacing / 111000; // 111000 meters per degree
+    //         $lngStep = $plantType->row_spacing / (111000 * cos(deg2rad($bounds['center']['lat'])));
+            
+    //         // Buffer from edges (half row spacing in degrees)
+    //         $buffer = ($plantType->row_spacing / 2) / 111000;
+
+    //         for ($lat = $bounds['min']['lat'] + $buffer; $lat <= $bounds['max']['lat'] - $buffer; $lat += $latStep) {
+    //             for ($lng = $bounds['min']['lng'] + $buffer; $lng <= $bounds['max']['lng'] - $buffer; $lng += $lngStep) {
+    //                 if ($this->isPointInPolygon($lat, $lng, $area)) {
+    //                     // Check if point is in any exclusion area
+    //                     $inExclusion = false;
+    //                     foreach ($exclusionAreas as $exclusion) {
+    //                         if ($this->isPointInPolygon($lat, $lng, $exclusion)) {
+    //                             $inExclusion = true;
+    //                             break;
+    //                         }
+    //                     }
+                        
+    //                     if (!$inExclusion) {
+    //                         // Check distance from polygon edges
+    //                         $minDist = $this->minDistanceToPolygonEdge($lat, $lng, $area);
+    //                         if ($minDist >= ($plantType->row_spacing / 2)) {
+    //                             $points[] = [
+    //                                 'lat' => $lat,
+    //                                 'lng' => $lng
+    //                             ];
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //         }
+
+    //         return $points;
+    //     } catch (\Exception $e) {
+    //         \Log::error('Error in calculatePlantLocations:', [
+    //             'message' => $e->getMessage(),
+    //             'trace' => $e->getTraceAsString()
+    //         ]);
+    //         throw $e;
+    //     }
+    // }
 
     private function getAreaElevationData($bounds)
     {
@@ -527,17 +645,25 @@ class FarmController extends Controller
         ];
     }
 
-    private function isPointInPolygon(float $lat, float $lng, array $polygon): bool
+    private function isPointInPolygon($lat, $lng, $polygon)
     {
         $inside = false;
-        $j = count($polygon) - 1;
+        $numPoints = count($polygon);
+        $j = $numPoints - 1;
 
-        for ($i = 0; $i < count($polygon); $i++) {
-            if (($polygon[$i]['lat'] > $lat) != ($polygon[$j]['lat'] > $lat) &&
-                ($lng < ($polygon[$j]['lng'] - $polygon[$i]['lng']) * ($lat - $polygon[$i]['lat']) /
-                    ($polygon[$j]['lat'] - $polygon[$i]['lat']) + $polygon[$i]['lng'])) {
+        for ($i = 0; $i < $numPoints; $i++) {
+            $xi = $polygon[$i]['lng'];
+            $yi = $polygon[$i]['lat'];
+            $xj = $polygon[$j]['lng'];
+            $yj = $polygon[$j]['lat'];
+
+            $intersect = (($yi > $lat) !== ($yj > $lat)) &&
+                        ($lng < ($xj - $xi) * ($lat - $yi) / ($yj - $yi + 1e-10) + $xi);
+
+            if ($intersect) {
                 $inside = !$inside;
             }
+
             $j = $i;
         }
 
