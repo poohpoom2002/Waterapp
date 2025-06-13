@@ -292,6 +292,14 @@ class FarmController extends Controller
             $maxRowSteps = (int) ($fieldHeightMeters / $plantType->row_spacing);
 
             // 4. Generate grid using corrected directions and real-world meters
+            usort($area, fn($a, $b) => $a['lat'] <=> $b['lat']);
+            $top = [$area[2], $area[3]];
+            $bottom = [$area[0], $area[1]];
+            usort($top, fn($a, $b) => $a['lng'] <=> $b['lng']);
+            usort($bottom, fn($a, $b) => $a['lng'] <=> $b['lng']);
+
+            $area = [$bottom[0], $bottom[1], $top[1], $top[0], $bottom[0]];
+            
             for ($i = 0; $i <= $maxRowSteps; $i++) {
                 $rowStart = [
                     'lat' => $bottomLeft['lat'] + $rowDir['lat'] * $i * ($plantType->row_spacing / 111000),
