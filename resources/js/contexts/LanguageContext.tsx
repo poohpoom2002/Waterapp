@@ -19,7 +19,7 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
     const t = (key: string, params?: Record<string, string | number>): string => {
         const keys = key.split('.');
         let value: any = languages[currentLanguage];
-        
+
         for (const k of keys) {
             value = value?.[k];
             if (value === undefined) return key;
@@ -49,4 +49,4 @@ export const useLanguage = () => {
         throw new Error('useLanguage must be used within a LanguageProvider');
     }
     return context;
-}; 
+};
