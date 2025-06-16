@@ -221,7 +221,7 @@ const PointManagementControls = ({
     plantType
 }: { 
     plantLocations: LatLng[]; 
-    setPlantLocations: React.Dispatch<React.SetStateAction<LatLng[]>>;
+    setPlantLocations: React.Dispatch<React.SetStateAction<LatLng[][]>>;
     area: LatLng[];
     plantType: PlantType;
 }) => {
@@ -235,7 +235,7 @@ const PointManagementControls = ({
     // Initialize history when plantLocations changes and there's no history
     useEffect(() => {
         if (history.length === 0 && plantLocations.length > 0) {
-            setHistory([[...plantLocations]]);
+            setHistory([plantLocations]);
             setHistoryIndex(0);
         }
     }, [plantLocations]);
@@ -255,7 +255,7 @@ const PointManagementControls = ({
         if (historyIndex > 0) {
             const newIndex = historyIndex - 1;
             setHistoryIndex(newIndex);
-            setPlantLocations([...history[newIndex]]);
+            setPlantLocations([history[newIndex]]);
         }
     };
 
@@ -295,7 +295,7 @@ const PointManagementControls = ({
                 };
                 const newResults = [...plantLocations, newPoint];
                 saveToHistory(newResults);
-                setPlantLocations(newResults);
+                setPlantLocations([newResults]);
             }
         }
     };
@@ -318,7 +318,7 @@ const PointManagementControls = ({
             if (pointIndex !== -1) {
                 const newLocations = plantLocations.filter((_, index) => index !== pointIndex);
                 saveToHistory(newLocations);
-                setPlantLocations(newLocations);
+                setPlantLocations([newLocations]);
                 setSelectedPoints(prev => {
                     const newSet = new Set(prev);
                     newSet.delete(pointId);
@@ -352,7 +352,7 @@ const PointManagementControls = ({
                     : p
             );
             saveToHistory(newLocations);
-            setPlantLocations(newLocations);
+            setPlantLocations([newLocations]);
             setMovingPoint(null);
         }
     };
@@ -495,13 +495,22 @@ const calculateAreaInRai = (coordinates: LatLng[]): number => {
     return areaInSquareMeters / 1600;
 };
 
+// Add new type for pipe layout
+type PipeLayout = {
+    type: 'horizontal' | 'vertical';
+    start: LatLng;
+    end: LatLng;
+    row_index: number;
+};
+
 // Main Component
 export default function GenerateTree({ areaType, area, plantType, layers = [] }: Props) {
-    const [plantLocations, setPlantLocations] = useState<LatLng[]>([]);
+    const [plantLocations, setPlantLocations] = useState<LatLng[][]>([]);
     const [grid, setGrid] = useState<LatLng[][] | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isPlantLayoutGenerated, setIsPlantLayoutGenerated] = useState(false);
+    const [pipeLayout, setPipeLayout] = useState<PipeLayout[]>([]);
     const featureGroupRef = React.useRef<L.FeatureGroup>(null);
 
     const areaInRai = useMemo(() => calculateAreaInRai(area), [area]);
@@ -511,6 +520,11 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
         row_spacing: Number(plantType.row_spacing),
         water_needed: Number(plantType.water_needed)
     }), [plantType]);
+
+    // Calculate total number of plants
+    const totalPlants = useMemo(() => {
+        return plantLocations.reduce((total, row) => total + row.length, 0);
+    }, [plantLocations]);
 
     const mapCenter = useMemo(() => {
         if (area.length === 0) return DEFAULT_CENTER;
@@ -527,7 +541,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
 
         try {
             const areaTypes = areaType ? areaType.split(',').map(type => type.trim()) : ['default'];
-            const { data } = await axios.post<{ plant_locations: LatLng[]; grid: LatLng[][] }>(
+            const { data } = await axios.post<{ plant_locations: LatLng[][] }>(
                 '/api/generate-planting-points',
                 {
                     area,
@@ -542,7 +556,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                 throw new Error('Invalid response format from server');
             }
             setPlantLocations(data.plant_locations);
-            setGrid(data.grid || null);
+            setGrid(data.plant_locations);
             setIsPlantLayoutGenerated(true);
         } catch (error) {
             console.error('Error details:', error);
@@ -560,8 +574,22 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
         setError(null);
 
         try {
-            console.log('Generating pipe layout...');
+            const { data } = await axios.post<{ pipe_layout: PipeLayout[] }>(
+                '/api/generate-pipe-layout',
+                {
+                    plant_type_id: plantType.id,
+                    area,
+                    exclusion_areas: layers.filter(layer => layer.type !== 'map').map(layer => layer.coordinates)
+                }
+            );
+
+            if (!data?.pipe_layout) {
+                throw new Error('Invalid response format from server');
+            }
+
+            setPipeLayout(data.pipe_layout);
         } catch (error) {
+            console.error('Error generating pipe layout:', error);
             setError(axios.isAxiosError(error) 
                 ? error.response?.data?.message || 'Error generating pipe layout'
                 : 'An unexpected error occurred'
@@ -600,10 +628,10 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                             <p>{areaInRai.toFixed(2)} rai</p>
                         </InfoItem>
                         <InfoItem title="Number of Plants">
-                            <p>{plantLocations.length} plants</p>
+                            <p>{totalPlants} plants</p>
                         </InfoItem>
                         <InfoItem title="Total Water Need">
-                            <p>{(plantLocations.length * processedPlantType.water_needed).toFixed(2)} L/day</p>
+                            <p>{(totalPlants * processedPlantType.water_needed).toFixed(2)} L/day</p>
                         </InfoItem>
                     </InfoSection>
                 </div>
@@ -650,7 +678,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                                         const layer = e.layer;
                                         if (layer instanceof L.Marker) {
                                             const latlng = layer.getLatLng();
-                                            setPlantLocations(prev => [...prev, { lat: latlng.lat, lng: latlng.lng }]);
+                                            setPlantLocations(prev => [...prev, [{ lat: latlng.lat, lng: latlng.lng }]]);
                                         }
                                     }}
                                     onDeleted={(e) => {
@@ -659,7 +687,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                                             if (layer instanceof L.Marker) {
                                                 const latlng = layer.getLatLng();
                                                 setPlantLocations(prev => 
-                                                    prev.filter(p => p.lat !== latlng.lat || p.lng !== latlng.lng)
+                                                    prev.map(row => row.filter(p => p.lat !== latlng.lat || p.lng !== latlng.lng))
                                                 );
                                             }
                                         });
@@ -670,11 +698,11 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                                             if (layer instanceof L.Marker) {
                                                 const latlng = layer.getLatLng();
                                                 setPlantLocations(prev => 
-                                                    prev.map(p => 
+                                                    prev.map(row => row.map(p => 
                                                         p.lat === latlng.lat && p.lng === latlng.lng
                                                             ? { lat: latlng.lat, lng: latlng.lng }
                                                             : p
-                                                    )
+                                                    ))
                                                 );
                                             }
                                         });
@@ -698,7 +726,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                                 />
                             </FeatureGroup>
                             <PointManagementControls 
-                                plantLocations={plantLocations}
+                                plantLocations={plantLocations.flat()}
                                 setPlantLocations={setPlantLocations}
                                 area={area}
                                 plantType={processedPlantType}
@@ -760,32 +788,18 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                                 }
                                 return null;
                             })}
-                            {grid && grid.map((row, rowIdx) => {
-                                const rowPoints = row.filter(pt => pt);
-                                if (rowPoints.length < 2) return null;
-                                return (
-                                    <Polyline
-                                        key={`grid-row-${rowIdx}`}
-                                        positions={rowPoints.map(pt => [pt.lat, pt.lng])}
-                                        color="blue"
-                                        weight={1}
-                                        opacity={0.5}
-                                    />
-                                );
-                            })}
-                            {grid && grid[0] && grid[0].map((_, colIdx) => {
-                                const colPoints = grid.map(row => row[colIdx]).filter(pt => pt);
-                                if (colPoints.length < 2) return null;
-                                return (
-                                    <Polyline
-                                        key={`grid-col-${colIdx}`}
-                                        positions={colPoints.map(pt => [pt.lat, pt.lng])}
-                                        color="orange"
-                                        weight={1}
-                                        opacity={0.5}
-                                    />
-                                );
-                            })}
+                            {pipeLayout.map((pipe, index) => (
+                                <Polyline
+                                    key={`pipe-${index}`}
+                                    positions={[
+                                        [pipe.start.lat, pipe.start.lng],
+                                        [pipe.end.lat, pipe.end.lng]
+                                    ]}
+                                    color={pipe.type === 'horizontal' ? '#3B82F6' : '#10B981'}
+                                    weight={3}
+                                    opacity={0.8}
+                                />
+                            ))}
                         </MapContainer>
                     </div>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
