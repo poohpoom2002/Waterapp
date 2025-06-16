@@ -262,7 +262,6 @@ class FarmController extends Controller
             $bottom1 = $area[0];
             $bottom2 = $area[1];
             $bottomRight = $bottom1['lng'] > $bottom2['lng'] ? $bottom1 : $bottom2;
-            // Keep previously defined $bottomLeft
 
             // 3. Define plantDir (along bottom edge)
             $plantDir = [
@@ -275,6 +274,7 @@ class FarmController extends Controller
                 'lng' => $plantDir['lng'] / $plantLength,
             ];
 
+            // 4. Define rowDir (along left edge)
             $rowDir = [
                 'lat' => $topLeft['lat'] - $bottomLeft['lat'],
                 'lng' => $topLeft['lng'] - $bottomLeft['lng'],
@@ -285,21 +285,22 @@ class FarmController extends Controller
                 'lng' => $rowDir['lng'] / $rowLength,
             ];
 
+            // 5. Get field size and calculate steps
             $fieldWidthMeters = $this->haversine($bottomLeft, $bottomRight);
             $fieldHeightMeters = $this->haversine($bottomLeft, $topLeft);
 
             $maxPlantSteps = (int) ($fieldWidthMeters / $plantType->plant_spacing);
             $maxRowSteps = (int) ($fieldHeightMeters / $plantType->row_spacing);
 
-            // 4. Generate grid using corrected directions and real-world meters
+            // 6. Reorder polygon (optional for convex ordering)
             usort($area, fn($a, $b) => $a['lat'] <=> $b['lat']);
             $top = [$area[2], $area[3]];
             $bottom = [$area[0], $area[1]];
             usort($top, fn($a, $b) => $a['lng'] <=> $b['lng']);
             usort($bottom, fn($a, $b) => $a['lng'] <=> $b['lng']);
-
             $area = [$bottom[0], $bottom[1], $top[1], $top[0], $bottom[0]];
-            
+
+            // 7. Generate grid into 2D array
             for ($i = 0; $i <= $maxRowSteps; $i++) {
                 $rowStart = [
                     'lat' => $bottomLeft['lat'] + $rowDir['lat'] * $i * ($plantType->row_spacing / 111000),
@@ -312,17 +313,7 @@ class FarmController extends Controller
                         'lng' => $rowStart['lng'] + $plantDir['lng'] * $j * ($plantType->plant_spacing / (111000 * cos(deg2rad($rowStart['lat'])))),
                     ];
 
-                    // $minDist = $this->minDistanceToPolygonEdge($point['lat'], $point['lng'], $area);
-                    // if ($minDist >= ($plantType->row_spacing / 2)) {
-                    //     $points[] = $point;
-                    // }
-
-                    // $points[] = $point;
-
-                    // Check if point is in the main polygon                
                     if ($this->isPointInPolygon($point['lat'], $point['lng'], $area)) {
-                        // $points[] = $point;
-                        // Check exclusion zones
                         $inExclusion = false;
                         foreach ($exclusionAreas as $exclusion) {
                             if ($this->isPointInPolygon($point['lat'], $point['lng'], $exclusion)) {
@@ -331,19 +322,17 @@ class FarmController extends Controller
                             }
                         }
 
-                        // Check edge buffer
                         if (!$inExclusion) {
                             $minDist = $this->minDistanceToPolygonEdge($point['lat'], $point['lng'], $area);
                             if ($minDist >= ($plantType->row_spacing / 2)) {
-                                $points[] = $point;
+                                $points[$i][] = $point; // group by row index
                             }
                         }
                     }
                 }
             }
 
-
-            return $points;
+            return array_values($points);
 
         } catch (\Exception $e) {
             \Log::error('Error in calculatePlantLocations:', [
@@ -353,56 +342,6 @@ class FarmController extends Controller
             throw $e;
         }
     }
-
-
-    // private function calculatePlantLocations($area, $plantType, $exclusionAreas = [])
-    // {
-    //     try {
-    //         $points = [];
-    //         $bounds = $this->getBounds($area);
-            
-    //         // Convert spacing from meters to degrees (approximate)
-    //         $latStep = $plantType->plant_spacing / 111000; // 111000 meters per degree
-    //         $lngStep = $plantType->row_spacing / (111000 * cos(deg2rad($bounds['center']['lat'])));
-            
-    //         // Buffer from edges (half row spacing in degrees)
-    //         $buffer = ($plantType->row_spacing / 2) / 111000;
-
-    //         for ($lat = $bounds['min']['lat'] + $buffer; $lat <= $bounds['max']['lat'] - $buffer; $lat += $latStep) {
-    //             for ($lng = $bounds['min']['lng'] + $buffer; $lng <= $bounds['max']['lng'] - $buffer; $lng += $lngStep) {
-    //                 if ($this->isPointInPolygon($lat, $lng, $area)) {
-    //                     // Check if point is in any exclusion area
-    //                     $inExclusion = false;
-    //                     foreach ($exclusionAreas as $exclusion) {
-    //                         if ($this->isPointInPolygon($lat, $lng, $exclusion)) {
-    //                             $inExclusion = true;
-    //                             break;
-    //                         }
-    //                     }
-                        
-    //                     if (!$inExclusion) {
-    //                         // Check distance from polygon edges
-    //                         $minDist = $this->minDistanceToPolygonEdge($lat, $lng, $area);
-    //                         if ($minDist >= ($plantType->row_spacing / 2)) {
-    //                             $points[] = [
-    //                                 'lat' => $lat,
-    //                                 'lng' => $lng
-    //                             ];
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-
-    //         return $points;
-    //     } catch (\Exception $e) {
-    //         \Log::error('Error in calculatePlantLocations:', [
-    //             'message' => $e->getMessage(),
-    //             'trace' => $e->getTraceAsString()
-    //         ]);
-    //         throw $e;
-    //     }
-    // }
 
     private function getAreaElevationData($bounds)
     {
@@ -986,6 +925,74 @@ class FarmController extends Controller
 
         } catch (\Exception $e) {
             \Log::error('Error moving plant point:', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function generatePipeLayout(Request $request): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'plant_type_id' => 'required|integer|exists:plant_types,id',
+                'area' => 'required|array|min:3',
+                'area.*.lat' => 'required|numeric',
+                'area.*.lng' => 'required|numeric',
+                'exclusion_areas' => 'array'
+            ]);
+
+            if ($validator->fails()) {
+                throw new \Exception('Invalid request data: ' . json_encode($validator->errors()));
+            }
+
+            $plantType = PlantType::findOrFail($request->plant_type_id);
+
+            // Use calculatePlantLocations to generate the 2D grid
+            $grid = $this->calculatePlantLocations(
+                $request->area,
+                $plantType,
+                $request->exclusion_areas ?? []
+            );
+
+            // Generate pipe layout connecting plants in the same row
+            $pipeLayout = [];
+
+            foreach ($grid as $rowIndex => $row) {
+                if (!is_array($row) || count($row) < 2) continue; // Skip invalid or too short rows
+
+                // Sort row by longitude (left to right)
+                usort($row, fn($a, $b) => $a['lng'] <=> $b['lng']);
+
+                for ($i = 0; $i < count($row) - 1; $i++) {
+                    if (isset($row[$i]['lat'], $row[$i]['lng'], $row[$i + 1]['lat'], $row[$i + 1]['lng'])) {
+                        $pipeLayout[] = [
+                            'type' => 'horizontal',
+                            'start' => $row[$i],
+                            'end' => $row[$i + 1],
+                            'row_index' => $rowIndex
+                        ];
+                    } else {
+                        \Log::warning('Invalid point skipped in pipe layout generation', [
+                            'rowIndex' => $rowIndex,
+                            'point1' => $row[$i] ?? null,
+                            'point2' => $row[$i + 1] ?? null
+                        ]);
+                    }
+                }
+            }
+
+            return response()->json([
+                'pipe_layout' => $pipeLayout,
+                'message' => 'Pipe layout generated successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error generating pipe layout:', [
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
