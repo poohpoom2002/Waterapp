@@ -262,7 +262,6 @@ class FarmController extends Controller
             $bottom1 = $area[0];
             $bottom2 = $area[1];
             $bottomRight = $bottom1['lng'] > $bottom2['lng'] ? $bottom1 : $bottom2;
-            // Keep previously defined $bottomLeft
 
             // 3. Define plantDir (along bottom edge)
             $plantDir = [
@@ -275,6 +274,7 @@ class FarmController extends Controller
                 'lng' => $plantDir['lng'] / $plantLength,
             ];
 
+            // 4. Define rowDir (along left edge)
             $rowDir = [
                 'lat' => $topLeft['lat'] - $bottomLeft['lat'],
                 'lng' => $topLeft['lng'] - $bottomLeft['lng'],
@@ -285,36 +285,58 @@ class FarmController extends Controller
                 'lng' => $rowDir['lng'] / $rowLength,
             ];
 
-            $fieldWidthMeters = $this->haversine($bottomLeft, $bottomRight);
-            $fieldHeightMeters = $this->haversine($bottomLeft, $topLeft);
+            $leftmost = $area[0];
+            $rightmost = $area[0];
+            $bottommost = $area[0];
+            $topmost = $area[0];
+            
+            foreach ($area as $point) {
+                if ($point['lng'] < $leftmost['lng']) {
+                    $leftmost = $point;
+                }
+                if ($point['lng'] > $rightmost['lng']) {
+                    $rightmost = $point;
+                }
+                if ($point['lat'] < $bottommost['lat']) {
+                    $bottommost = $point;
+                }
+                if ($point['lat'] > $topmost['lat']) {
+                    $topmost = $point;
+                }
+            }
+
+            // 5. Get field size and calculate steps
+            $fieldWidthMeters = $this->haversine($leftmost, $rightmost);
+            $fieldHeightMeters = $this->haversine($bottommost, $topmost);
 
             $maxPlantSteps = (int) ($fieldWidthMeters / $plantType->plant_spacing);
             $maxRowSteps = (int) ($fieldHeightMeters / $plantType->row_spacing);
 
-            // 4. Generate grid using corrected directions and real-world meters
+            // 6. Reorder polygon (optional for convex ordering)
+            usort($area, fn($a, $b) => $a['lat'] <=> $b['lat']);
+            $top = [$area[2], $area[3]];
+            $bottom = [$area[0], $area[1]];
+            usort($top, fn($a, $b) => $a['lng'] <=> $b['lng']);
+            usort($bottom, fn($a, $b) => $a['lng'] <=> $b['lng']);
+            $area = [$bottom[0], $bottom[1], $top[1], $top[0], $bottom[0]];
+
+            // 7. Generate grid into 2D array
             for ($i = 0; $i <= $maxRowSteps; $i++) {
                 $rowStart = [
                     'lat' => $bottomLeft['lat'] + $rowDir['lat'] * $i * ($plantType->row_spacing / 111000),
                     'lng' => $bottomLeft['lng'] + $rowDir['lng'] * $i * ($plantType->row_spacing / (111000 * cos(deg2rad($bottomLeft['lat'])))),
                 ];
 
+                $rowPoints = [];
                 for ($j = 0; $j <= $maxPlantSteps; $j++) {
                     $point = [
                         'lat' => $rowStart['lat'] + $plantDir['lat'] * $j * ($plantType->plant_spacing / 111000),
                         'lng' => $rowStart['lng'] + $plantDir['lng'] * $j * ($plantType->plant_spacing / (111000 * cos(deg2rad($rowStart['lat'])))),
                     ];
 
-                    // $minDist = $this->minDistanceToPolygonEdge($point['lat'], $point['lng'], $area);
-                    // if ($minDist >= ($plantType->row_spacing / 2)) {
-                    //     $points[] = $point;
-                    // }
-
-                    // $points[] = $point;
-
-                    // Check if point is in the main polygon                
+                    // Check if point is inside the main area
                     if ($this->isPointInPolygon($point['lat'], $point['lng'], $area)) {
-                        // $points[] = $point;
-                        // Check exclusion zones
+                        // Check if point is in any exclusion area
                         $inExclusion = false;
                         foreach ($exclusionAreas as $exclusion) {
                             if ($this->isPointInPolygon($point['lat'], $point['lng'], $exclusion)) {
@@ -323,19 +345,23 @@ class FarmController extends Controller
                             }
                         }
 
-                        // Check edge buffer
+                        // Only add point if it's not in an exclusion area and is far enough from edges
                         if (!$inExclusion) {
                             $minDist = $this->minDistanceToPolygonEdge($point['lat'], $point['lng'], $area);
                             if ($minDist >= ($plantType->row_spacing / 2)) {
-                                $points[] = $point;
+                                $rowPoints[] = $point;
                             }
                         }
                     }
                 }
+
+                // Only add the row if it has points
+                if (!empty($rowPoints)) {
+                    $points[] = $rowPoints;
+                }
             }
 
-
-            return $points;
+            return array_values($points);
 
         } catch (\Exception $e) {
             \Log::error('Error in calculatePlantLocations:', [
@@ -344,265 +370,6 @@ class FarmController extends Controller
             ]);
             throw $e;
         }
-    }
-
-
-    // private function calculatePlantLocations($area, $plantType, $exclusionAreas = [])
-    // {
-    //     try {
-    //         $points = [];
-    //         $bounds = $this->getBounds($area);
-            
-    //         // Convert spacing from meters to degrees (approximate)
-    //         $latStep = $plantType->plant_spacing / 111000; // 111000 meters per degree
-    //         $lngStep = $plantType->row_spacing / (111000 * cos(deg2rad($bounds['center']['lat'])));
-            
-    //         // Buffer from edges (half row spacing in degrees)
-    //         $buffer = ($plantType->row_spacing / 2) / 111000;
-
-    //         for ($lat = $bounds['min']['lat'] + $buffer; $lat <= $bounds['max']['lat'] - $buffer; $lat += $latStep) {
-    //             for ($lng = $bounds['min']['lng'] + $buffer; $lng <= $bounds['max']['lng'] - $buffer; $lng += $lngStep) {
-    //                 if ($this->isPointInPolygon($lat, $lng, $area)) {
-    //                     // Check if point is in any exclusion area
-    //                     $inExclusion = false;
-    //                     foreach ($exclusionAreas as $exclusion) {
-    //                         if ($this->isPointInPolygon($lat, $lng, $exclusion)) {
-    //                             $inExclusion = true;
-    //                             break;
-    //                         }
-    //                     }
-                        
-    //                     if (!$inExclusion) {
-    //                         // Check distance from polygon edges
-    //                         $minDist = $this->minDistanceToPolygonEdge($lat, $lng, $area);
-    //                         if ($minDist >= ($plantType->row_spacing / 2)) {
-    //                             $points[] = [
-    //                                 'lat' => $lat,
-    //                                 'lng' => $lng
-    //                             ];
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-
-    //         return $points;
-    //     } catch (\Exception $e) {
-    //         \Log::error('Error in calculatePlantLocations:', [
-    //             'message' => $e->getMessage(),
-    //             'trace' => $e->getTraceAsString()
-    //         ]);
-    //         throw $e;
-    //     }
-    // }
-
-    private function getAreaElevationData($bounds)
-    {
-        try {
-            \Log::info('Fetching elevation data for bounds:', $bounds);
-            
-            $response = Http::get('https://portal.opentopography.org/API/globaldem', [
-                'demtype' => 'SRTMGL1',
-                'south' => $bounds['min']['lat'],
-                'north' => $bounds['max']['lat'],
-                'east' => $bounds['max']['lng'],
-                'west' => $bounds['min']['lng'],
-                'outputFormat' => 'AAIGrid',
-                'API_Key' => '4cd21a1605439f9d3cc521cb698900b5'
-            ]);
-
-            if ($response->successful()) {
-                \Log::info('Elevation API response received');
-                $elevationData = $this->parseElevationData($response->body());
-                \Log::info('Parsed elevation data:', ['count' => count($elevationData)]);
-                return $elevationData;
-            } else {
-                \Log::error('Elevation API error:', [
-                    'status' => $response->status(),
-                    'body' => $response->body()
-                ]);
-            }
-        } catch (\Exception $e) {
-            \Log::error('Error fetching area elevation data: ' . $e->getMessage());
-        }
-        return [];
-    }
-
-    private function parseElevationData($responseBody)
-    {
-        try {
-            \Log::info('Starting elevation data parsing');
-            
-            if (empty($responseBody)) {
-                \Log::error('Empty response body received');
-                return [];
-            }
-            
-            // Split the response into lines
-            $lines = explode("\n", $responseBody);
-            \Log::info('Response split into lines:', ['count' => count($lines)]);
-            
-            if (count($lines) < 7) {
-                \Log::error('Invalid response format: too few lines', ['line_count' => count($lines)]);
-                return [];
-            }
-            
-            // Parse header information
-            $header = [];
-            $requiredHeaders = ['ncols', 'nrows', 'xllcorner', 'yllcorner', 'cellsize', 'NODATA_value'];
-            $headerFound = 0;
-            
-            for ($i = 0; $i < 6; $i++) {
-                if (isset($lines[$i])) {
-                    $parts = preg_split('/\s+/', trim($lines[$i]));
-                    if (count($parts) >= 2) {
-                        $key = strtolower($parts[0]);
-                        $value = floatval($parts[1]);
-                        $header[$key] = $value;
-                        if (in_array($key, $requiredHeaders)) {
-                            $headerFound++;
-                        }
-                    }
-                }
-            }
-            
-            if ($headerFound < count($requiredHeaders)) {
-                \Log::error('Missing required header information', [
-                    'found_headers' => array_keys($header),
-                    'required_headers' => $requiredHeaders
-                ]);
-                return [];
-            }
-            
-            // Extract grid parameters
-            $ncols = intval($header['ncols']);
-            $nrows = intval($header['nrows']);
-            $xllcorner = floatval($header['xllcorner']);
-            $yllcorner = floatval($header['yllcorner']);
-            $cellsize = floatval($header['cellsize']);
-            $NODATA_value = floatval($header['NODATA_value']);
-            
-            \Log::info('Grid parameters:', [
-                'ncols' => $ncols,
-                'nrows' => $nrows,
-                'xllcorner' => $xllcorner,
-                'yllcorner' => $yllcorner,
-                'cellsize' => $cellsize,
-                'NODATA_value' => $NODATA_value
-            ]);
-            
-            if ($ncols <= 0 || $nrows <= 0 || $cellsize <= 0) {
-                \Log::error('Invalid grid parameters', [
-                    'ncols' => $ncols,
-                    'nrows' => $nrows,
-                    'cellsize' => $cellsize
-                ]);
-                return [];
-            }
-            
-            $elevations = [];
-            $dataStart = 6; // Skip header lines
-            $validPoints = 0;
-            $invalidPoints = 0;
-            
-            for ($i = $dataStart; $i < count($lines); $i++) {
-                $line = trim($lines[$i]);
-                if (empty($line)) continue;
-                
-                $rowIndex = $i - $dataStart;
-                if ($rowIndex >= $nrows) break; // Stop if we've processed all rows
-                
-                $values = preg_split('/\s+/', $line);
-                if (count($values) !== $ncols) {
-                    \Log::warning('Invalid number of columns in row', [
-                        'row' => $rowIndex,
-                        'expected' => $ncols,
-                        'found' => count($values)
-                    ]);
-                    continue;
-                }
-                
-                foreach ($values as $colIndex => $value) {
-                    if (is_numeric($value)) {
-                        $elevation = floatval($value);
-                        if ($elevation > $NODATA_value) {
-                            // Calculate lat/lng for this grid cell
-                            // Note: AAIGrid uses bottom-left corner, so we need to adjust
-                            $lat = $yllcorner + ($nrows - $rowIndex - 0.5) * $cellsize;
-                            $lng = $xllcorner + ($colIndex + 0.5) * $cellsize;
-                            
-                            $elevations[] = [
-                                'lat' => $lat,
-                                'lng' => $lng,
-                                'elevation' => $elevation
-                            ];
-                            $validPoints++;
-                        } else {
-                            $invalidPoints++;
-                        }
-                    }
-                }
-            }
-            
-            \Log::info('Parsed elevations:', [
-                'total_points' => count($elevations),
-                'valid_points' => $validPoints,
-                'invalid_points' => $invalidPoints,
-                'min' => count($elevations) > 0 ? min(array_column($elevations, 'elevation')) : null,
-                'max' => count($elevations) > 0 ? max(array_column($elevations, 'elevation')) : null,
-                'sample' => array_slice($elevations, 0, 5)
-            ]);
-            
-            if (count($elevations) === 0) {
-                \Log::error('No valid elevation points found in the data');
-                return [];
-            }
-            
-            return $elevations;
-        } catch (\Exception $e) {
-            \Log::error('Error parsing elevation data: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString()
-            ]);
-            return [];
-        }
-    }
-
-    private function getPointElevation($lat, $lng, $elevationData)
-    {
-        if (empty($elevationData)) {
-            \Log::warning('No elevation data available for point', ['lat' => $lat, 'lng' => $lng]);
-            return 0;
-        }
-
-        \Log::info('Getting elevation for point:', [
-            'lat' => $lat,
-            'lng' => $lng,
-            'elevation_data_count' => count($elevationData)
-        ]);
-
-        // Find the closest elevation point
-        $closestElevation = null;
-        $minDistance = PHP_FLOAT_MAX;
-        $closestPoint = null;
-
-        foreach ($elevationData as $point) {
-            if (isset($point['lat']) && isset($point['lng']) && isset($point['elevation'])) {
-                $distance = $this->calculateDistance($lat, $lng, $point['lat'], $point['lng']);
-                if ($distance < $minDistance) {
-                    $minDistance = $distance;
-                    $closestElevation = $point['elevation'];
-                    $closestPoint = $point;
-                }
-            }
-        }
-
-        \Log::info('Found closest elevation point:', [
-            'closest_point' => $closestPoint,
-            'distance' => $minDistance,
-            'elevation' => $closestElevation
-        ]);
-
-        return $closestElevation ?? 0;
     }
 
     private function calculateDistance($lat1, $lng1, $lat2, $lng2)
@@ -713,151 +480,6 @@ class FarmController extends Controller
         $projX = $x1 + $t*$dx;
         $projY = $y1 + $t*$dy;
         return sqrt(pow($xP-$projX,2) + pow($yP-$projY,2));
-    }
-
-    public function getElevation(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'coordinates' => 'required|array',
-            'coordinates.*.lat' => 'required|numeric',
-            'coordinates.*.lng' => 'required|numeric',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
-        $coordinates = $request->coordinates;
-        $coordinatesWithElevation = [];
-        $retryCount = 0;
-        $maxRetries = 3;
-
-        foreach ($coordinates as $coord) {
-            try {
-                // Calculate a bounding box that's at least 250 meters on each side
-                // 0.0025 degrees is approximately 250 meters at the equator
-                $latOffset = 0.0025;
-                $lngOffset = 0.0025 / cos(deg2rad($coord['lat'])); // Adjust for latitude
-
-                $elevation = null;
-                $retryCount = 0;
-
-                while ($elevation === null && $retryCount < $maxRetries) {
-                    try {
-                        \Log::info('Attempting to fetch elevation data', [
-                            'attempt' => $retryCount + 1,
-                            'lat' => $coord['lat'],
-                            'lng' => $coord['lng']
-                        ]);
-
-                        // Call OpenTopography API to get elevation data
-                        $response = Http::timeout(30)->get('https://portal.opentopography.org/API/globaldem', [
-                            'demtype' => 'SRTMGL1',
-                            'south' => $coord['lat'] - $latOffset,
-                            'north' => $coord['lat'] + $latOffset,
-                            'east' => $coord['lng'] + $lngOffset,
-                            'west' => $coord['lng'] - $lngOffset,
-                            'outputFormat' => 'AAIGrid',
-                            'API_Key' => '4cd21a1605439f9d3cc521cb698900b5'
-                        ]);
-
-                        \Log::info('OpenTopography API response', [
-                            'status' => $response->status(),
-                            'headers' => $response->headers(),
-                            'body_length' => strlen($response->body())
-                        ]);
-
-                        \Log::info('OpenTopography raw response body', [
-                            'lat' => $coord['lat'],
-                            'lng' => $coord['lng'],
-                            'body' => $response->body()
-                        ]);
-
-                        if ($response->successful()) {
-                            $elevationData = $this->parseElevationData($response->body());
-                            
-                            if (!empty($elevationData)) {
-                                // Get the elevation at the center point
-                                $elevation = $this->getPointElevation($coord['lat'], $coord['lng'], $elevationData);
-                                
-                                if ($elevation !== null && $elevation !== 0) {
-                                    \Log::info('Successfully retrieved elevation', [
-                                        'lat' => $coord['lat'],
-                                        'lng' => $coord['lng'],
-                                        'elevation' => $elevation
-                                    ]);
-                                    break; // Exit the retry loop on success
-                                }
-                                
-                                \Log::warning('Invalid elevation value received', [
-                                    'lat' => $coord['lat'],
-                                    'lng' => $coord['lng'],
-                                    'elevation' => $elevation,
-                                    'elevation_data_count' => count($elevationData)
-                                ]);
-                            } else {
-                                \Log::warning('No elevation data parsed from response', [
-                                    'lat' => $coord['lat'],
-                                    'lng' => $coord['lng'],
-                                    'response_length' => strlen($response->body())
-                                ]);
-                            }
-                        } else {
-                            \Log::error('OpenTopography API error', [
-                                'status' => $response->status(),
-                                'body' => $response->body(),
-                                'lat' => $coord['lat'],
-                                'lng' => $coord['lng']
-                            ]);
-                        }
-                        
-                        $retryCount++;
-                        if ($retryCount < $maxRetries) {
-                            sleep(1); // Wait 1 second before retrying
-                        }
-                    } catch (\Exception $e) {
-                        \Log::error('Error during elevation fetch attempt', [
-                            'attempt' => $retryCount + 1,
-                            'error' => $e->getMessage(),
-                            'lat' => $coord['lat'],
-                            'lng' => $coord['lng']
-                        ]);
-                        $retryCount++;
-                        if ($retryCount < $maxRetries) {
-                            sleep(1); // Wait 1 second before retrying
-                        }
-                    }
-                }
-
-                // If we still don't have a valid elevation after all retries
-                if ($elevation === null || $elevation === 0) {
-                    \Log::error('Failed to get valid elevation after all retries', [
-                        'lat' => $coord['lat'],
-                        'lng' => $coord['lng']
-                    ]);
-                }
-
-                $coordinatesWithElevation[] = [
-                    'lat' => $coord['lat'],
-                    'lng' => $coord['lng'],
-                    'elevation' => $elevation ?? 0
-                ];
-
-            } catch (\Exception $e) {
-                \Log::error('Error in elevation processing', [
-                    'error' => $e->getMessage(),
-                    'lat' => $coord['lat'],
-                    'lng' => $coord['lng']
-                ]);
-                $coordinatesWithElevation[] = [
-                    'lat' => $coord['lat'],
-                    'lng' => $coord['lng'],
-                    'elevation' => 0
-                ];
-            }
-        }
-
-        return response()->json(['coordinates' => $coordinatesWithElevation]);
     }
 
     public function addPlantPoint(Request $request): JsonResponse
@@ -986,5 +608,242 @@ class FarmController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    public function generatePipeLayout(Request $request): JsonResponse
+    {
+        try {
+            \Log::info('Starting pipe layout generation with request data:', [
+                'plant_type_id' => $request->plant_type_id,
+                'zones_count' => count($request->zones ?? []),
+                'area_points' => count($request->area ?? [])
+            ]);
+
+            $validator = Validator::make($request->all(), [
+                'plant_type_id' => 'required|integer|exists:plant_types,id',
+                'zones' => 'array',
+                'zones.*.points' => 'required|array',
+                'zones.*.points.*.lat' => 'required|numeric',
+                'zones.*.points.*.lng' => 'required|numeric',
+                'zones.*.pipeDirection' => 'required|in:horizontal,vertical',
+                'area' => 'required|array|min:3',
+                'area.*.lat' => 'required|numeric',
+                'area.*.lng' => 'required|numeric'
+            ]);
+
+            if ($validator->fails()) {
+                throw new \Exception('Invalid request data: ' . json_encode($validator->errors()));
+            }
+
+            $plantType = PlantType::findOrFail($request->plant_type_id);
+            $area = $request->area;
+            $pipeLayout = [];
+
+            // Find the two leftmost points (lowest longitude)
+            usort($area, fn($a, $b) => $a['lng'] <=> $b['lng']);
+            $leftmost1 = $area[0];
+            $leftmost2 = $area[1];
+            $bottomLeft = $leftmost1['lat'] < $leftmost2['lat'] ? $leftmost1 : $leftmost2;
+            $topLeft = $leftmost1['lat'] >= $leftmost2['lat'] ? $leftmost1 : $leftmost2;
+
+            // Find the two bottommost points (lowest latitude)
+            usort($area, fn($a, $b) => $a['lat'] <=> $b['lat']);
+            $bottom1 = $area[0];
+            $bottom2 = $area[1];
+            $bottomRight = $bottom1['lng'] > $bottom2['lng'] ? $bottom1 : $bottom2;
+
+            // Define plantDir (along bottom edge)
+            $plantDir = [
+                'lat' => $bottomRight['lat'] - $bottomLeft['lat'],
+                'lng' => $bottomRight['lng'] - $bottomLeft['lng'],
+            ];
+            $plantLength = sqrt($plantDir['lat'] ** 2 + $plantDir['lng'] ** 2);
+            $plantDir = [
+                'lat' => $plantDir['lat'] / $plantLength,
+                'lng' => $plantDir['lng'] / $plantLength,
+            ];
+
+            // Define rowDir (along left edge)
+            $rowDir = [
+                'lat' => $topLeft['lat'] - $bottomLeft['lat'],
+                'lng' => $topLeft['lng'] - $bottomLeft['lng'],
+            ];
+            $rowLength = sqrt($rowDir['lat'] ** 2 + $rowDir['lng'] ** 2);
+            $rowDir = [
+                'lat' => $rowDir['lat'] / $rowLength,
+                'lng' => $rowDir['lng'] / $rowLength,
+            ];
+
+            // Calculate field size and steps
+            $leftmost = $area[0];
+            $rightmost = $area[0];
+            $bottommost = $area[0];
+            $topmost = $area[0];
+            
+            foreach ($area as $point) {
+                if ($point['lng'] < $leftmost['lng']) {
+                    $leftmost = $point;
+                }
+                if ($point['lng'] > $rightmost['lng']) {
+                    $rightmost = $point;
+                }
+                if ($point['lat'] < $bottommost['lat']) {
+                    $bottommost = $point;
+                }
+                if ($point['lat'] > $topmost['lat']) {
+                    $topmost = $point;
+                }
+            }
+
+            // 5. Get field size and calculate steps
+            $fieldWidthMeters = $this->haversine($leftmost, $rightmost);
+            $fieldHeightMeters = $this->haversine($bottommost, $topmost);
+
+            $maxPlantSteps = (int) ($fieldWidthMeters / $plantType->plant_spacing);
+            $maxRowSteps = (int) ($fieldHeightMeters / $plantType->row_spacing);
+
+            foreach ($request->zones as $zone) {
+                \Log::info('Processing zone:', [
+                    'zone_id' => $zone['id'] ?? 'unknown',
+                    'direction' => $zone['pipeDirection'],
+                    'points_count' => count($zone['points'])
+                ]);
+
+                $points = $zone['points'];
+                $pipeDirection = $zone['pipeDirection'];
+
+                if ($pipeDirection === 'horizontal') {
+                    // Generate horizontal grid lines
+                    for ($i = 0; $i <= $maxRowSteps; $i++) {
+                        $rowStart = [
+                            'lat' => $bottomLeft['lat'] + $rowDir['lat'] * $i * ($plantType->row_spacing / 111000),
+                            'lng' => $bottomLeft['lng'] + $rowDir['lng'] * $i * ($plantType->row_spacing / (111000 * cos(deg2rad($bottomLeft['lat'])))),
+                        ];
+
+                        $rowEnd = [
+                            'lat' => $rowStart['lat'] + $plantDir['lat'] * $maxPlantSteps * ($plantType->plant_spacing / 111000),
+                            'lng' => $rowStart['lng'] + $plantDir['lng'] * $maxPlantSteps * ($plantType->plant_spacing / (111000 * cos(deg2rad($rowStart['lat'])))),
+                        ];
+
+                        // Check if any points in this zone are near this grid line
+                        $pointsOnLine = array_filter($points, function($point) use ($rowStart, $rowEnd) {
+                            $distance = $this->pointToLineDistance(
+                                $point['lat'], $point['lng'],
+                                $rowStart['lat'], $rowStart['lng'],
+                                $rowEnd['lat'], $rowEnd['lng']
+                            );
+                            return $distance < 0.0001; // About 10 meters tolerance
+                        });
+
+                        if (count($pointsOnLine) >= 1) {
+                            // Sort points by longitude (left to right)
+                            usort($pointsOnLine, fn($a, $b) => $a['lng'] <=> $b['lng']);
+                            
+                            // Use first and last points as pipe endpoints
+                            $pipeLayout[] = [
+                                'type' => 'horizontal',
+                                'start' => $pointsOnLine[0],
+                                'end' => end($pointsOnLine),
+                                'zone_id' => $zone['id'] ?? null,
+                                'length' => $this->haversine($pointsOnLine[0], end($pointsOnLine))
+                            ];
+                        }
+                    }
+                } else {
+                    // Generate vertical grid lines
+                    for ($j = 0; $j <= $maxPlantSteps; $j++) {
+                        $colStart = [
+                            'lat' => $bottomLeft['lat'] + $plantDir['lat'] * $j * ($plantType->plant_spacing / 111000),
+                            'lng' => $bottomLeft['lng'] + $plantDir['lng'] * $j * ($plantType->plant_spacing / (111000 * cos(deg2rad($bottomLeft['lat'])))),
+                        ];
+
+                        $colEnd = [
+                            'lat' => $colStart['lat'] + $rowDir['lat'] * $maxRowSteps * ($plantType->row_spacing / 111000),
+                            'lng' => $colStart['lng'] + $rowDir['lng'] * $maxRowSteps * ($plantType->row_spacing / (111000 * cos(deg2rad($colStart['lat'])))),
+                        ];
+
+                        // Check if any points in this zone are near this grid line
+                        $pointsOnLine = array_filter($points, function($point) use ($colStart, $colEnd) {
+                            $distance = $this->pointToLineDistance(
+                                $point['lat'], $point['lng'],
+                                $colStart['lat'], $colStart['lng'],
+                                $colEnd['lat'], $colEnd['lng']
+                            );
+                            return $distance < 0.0001; // About 10 meters tolerance
+                        });
+
+                        if (count($pointsOnLine) >= 1) {
+                            // Sort points by latitude (bottom to top)
+                            usort($pointsOnLine, fn($a, $b) => $a['lat'] <=> $b['lat']);
+                            
+                            // Use first and last points as pipe endpoints
+                            $pipeLayout[] = [
+                                'type' => 'vertical',
+                                'start' => $pointsOnLine[0],
+                                'end' => end($pointsOnLine),
+                                'zone_id' => $zone['id'] ?? null,
+                                'length' => $this->haversine($pointsOnLine[0], end($pointsOnLine))
+                            ];
+                        }
+                    }
+                }
+            }
+
+            \Log::info('Generated pipe layout:', [
+                'total_pipes' => count($pipeLayout),
+                'horizontal_pipes' => count(array_filter($pipeLayout, fn($p) => $p['type'] === 'horizontal')),
+                'vertical_pipes' => count(array_filter($pipeLayout, fn($p) => $p['type'] === 'vertical'))
+            ]);
+
+            return response()->json([
+                'pipe_layout' => $pipeLayout,
+                'message' => 'Pipe layout generated successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error generating pipe layout:', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // Helper function to calculate distance from point to line segment
+    private function pointToLineDistance($px, $py, $x1, $y1, $x2, $y2) {
+        $A = $px - $x1;
+        $B = $py - $y1;
+        $C = $x2 - $x1;
+        $D = $y2 - $y1;
+
+        $dot = $A * $C + $B * $D;
+        $len_sq = $C * $C + $D * $D;
+        $param = -1;
+
+        if ($len_sq != 0) {
+            $param = $dot / $len_sq;
+        }
+
+        $xx = 0;
+        $yy = 0;
+
+        if ($param < 0) {
+            $xx = $x1;
+            $yy = $y1;
+        } else if ($param > 1) {
+            $xx = $x2;
+            $yy = $y2;
+        } else {
+            $xx = $x1 + $param * $C;
+            $yy = $y1 + $param * $D;
+        }
+
+        $dx = $px - $xx;
+        $dy = $py - $yy;
+
+        return sqrt($dx * $dx + $dy * $dy);
     }
 }
