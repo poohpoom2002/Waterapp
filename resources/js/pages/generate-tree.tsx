@@ -35,6 +35,12 @@ type Props = {
     }>;
 };
 
+type UserPipe = {
+    id: string;
+    type: 'main' | 'submain';
+    coordinates: [number, number][];
+};
+
 // Constants
 const DEFAULT_CENTER: [number, number] = [13.7563, 100.5018];
 
@@ -515,6 +521,33 @@ type PipeLayout = {
     length: number;
 };
 
+// Helper to flatten nested arrays from getLatLngs
+function flattenLatLngs(latlngs: any): L.LatLng[] {
+    if (Array.isArray(latlngs) && latlngs.length > 0 && Array.isArray(latlngs[0])) {
+        return latlngs.flat(Infinity) as L.LatLng[];
+    }
+    return latlngs as L.LatLng[];
+}
+
+// Helper to calculate the length of a polyline in meters
+function polylineLength(coords: [number, number][]): number {
+    let total = 0;
+    for (let i = 1; i < coords.length; i++) {
+        const [lat1, lng1] = coords[i - 1];
+        const [lat2, lng2] = coords[i];
+        // Haversine formula
+        const R = 6371000;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLng/2) * Math.sin(dLng/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        total += R * c;
+    }
+    return total;
+}
+
 // Main Component
 export default function GenerateTree({ areaType, area, plantType, layers = [] }: Props) {
     const [plantLocations, setPlantLocations] = useState<LatLng[]>([]);
@@ -526,6 +559,9 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
     const featureGroupRef = React.useRef<L.FeatureGroup>(null);
     const [zones, setZones] = useState<Zone[]>([]);
     const [currentZoneIndex, setCurrentZoneIndex] = useState<number | null>(null);
+    const [userPipes, setUserPipes] = useState<UserPipe[]>([]);
+    const [drawingPipeType, setDrawingPipeType] = useState<'main' | 'submain' | null>(null);
+    const [showPipeSummary, setShowPipeSummary] = useState(false);
 
     const areaInRai = useMemo(() => calculateAreaInRai(area), [area]);
     const processedPlantType = useMemo(() => ({
@@ -702,14 +738,58 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
         setPlantLocations(prev => [...prev, newPoint]);
     };
 
-    // Function to get pipe color based on type and zone
+    // Function to get pipe color based on the zone's pipeDirection
     const getPipeColor = (pipe: PipeLayout) => {
-        if (pipe.type === 'horizontal') {
-            return '#3B82F6'; // Blue for horizontal pipes
-        } else {
-            return '#10B981'; // Green for vertical pipes
+        const zone = zones.find(z => z.id === pipe.zone_id);
+        if (zone) {
+            return zone.pipeDirection === 'horizontal' ? '#3B82F6' : '#10B981';
+        }
+        // fallback
+        return '#888';
+    };
+
+    // Handler for when a polyline is created
+    const handleUserPipeCreated = (e: any) => {
+        if (drawingPipeType && e.layerType === 'polyline' && e.layer instanceof L.Polyline) {
+            const latlngs: L.LatLng[] = flattenLatLngs(e.layer.getLatLngs());
+            const coordinates: [number, number][] = latlngs.map(latlng => [latlng.lat, latlng.lng]);
+            setUserPipes(prev => [
+                ...prev,
+                {
+                    id: `userpipe-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    type: drawingPipeType,
+                    coordinates
+                }
+            ]);
+            setDrawingPipeType(null); // Exit drawing mode
         }
     };
+
+    // Handler for deleting user pipes
+    const handleUserPipeDeleted = (e: any) => {
+        const layers = e.layers;
+        layers.eachLayer((layer: any) => {
+            if (layer instanceof L.Polyline) {
+                const latlngs: L.LatLng[] = flattenLatLngs(layer.getLatLngs());
+                setUserPipes(prev => prev.filter(pipe => {
+                    // Remove if coordinates match
+                    if (pipe.coordinates.length !== latlngs.length) return true;
+                    for (let i = 0; i < latlngs.length; i++) {
+                        if (Math.abs(pipe.coordinates[i][0] - latlngs[i].lat) > 1e-8 || Math.abs(pipe.coordinates[i][1] - latlngs[i].lng) > 1e-8) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }));
+            }
+        });
+    };
+
+    // Calculate longest main and submain pipe lengths
+    const mainPipeLengths = userPipes.filter(p => p.type === 'main').map(p => polylineLength(p.coordinates));
+    const submainPipeLengths = userPipes.filter(p => p.type === 'submain').map(p => polylineLength(p.coordinates));
+    const longestMain = mainPipeLengths.length > 0 ? Math.max(...mainPipeLengths) : 0;
+    const longestSubmain = submainPipeLengths.length > 0 ? Math.max(...submainPipeLengths) : 0;
 
     return (
         <div className="min-h-screen bg-gray-900 p-6">
@@ -832,6 +912,22 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                             </div>
                         </InfoItem>
                     </InfoSection>
+                    <div className="flex gap-2 mt-4">
+                        <button
+                            className={`px-3 py-2 rounded ${drawingPipeType === 'main' ? 'bg-red-600 text-white' : 'bg-red-500 text-white hover:bg-red-600'}`}
+                            onClick={() => setDrawingPipeType(drawingPipeType === 'main' ? null : 'main')}
+                            disabled={drawingPipeType === 'submain'}
+                        >
+                            {drawingPipeType === 'main' ? 'Drawing Main Pipe...' : 'Draw Main Pipe'}
+                        </button>
+                        <button
+                            className={`px-3 py-2 rounded ${drawingPipeType === 'submain' ? 'bg-orange-600 text-white' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
+                            onClick={() => setDrawingPipeType(drawingPipeType === 'submain' ? null : 'submain')}
+                            disabled={drawingPipeType === 'main'}
+                        >
+                            {drawingPipeType === 'submain' ? 'Drawing Sub-Main Pipe...' : 'Draw Sub-Main Pipe'}
+                        </button>
+                    </div>
                 </div>
 
                 <div className="space-y-4 lg:col-span-3">
@@ -905,6 +1001,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                                         if (e.layer instanceof L.Marker) {
                                             handleMarkerCreated(e.layer.getLatLng());
                                         }
+                                        handleUserPipeCreated(e);
                                     }}
                                     onDeleted={(e) => {
                                         const layers = e.layers;
@@ -916,6 +1013,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                                                 );
                                             }
                                         });
+                                        handleUserPipeDeleted(e);
                                     }}
                                     onEdited={(e) => {
                                         const layers = e.layers;
@@ -938,7 +1036,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                                         circle: false,
                                         circlemarker: false,
                                         marker: true,
-                                        polyline: false
+                                        polyline: drawingPipeType !== null // Only allow polyline when drawing mode is active
                                     }}
                                     edit={{
                                         edit: {
@@ -1001,15 +1099,34 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                                     })}
                                 </FeatureGroup>
                             )}
+                            {userPipes.map(pipe => (
+                                <Polyline
+                                    key={pipe.id}
+                                    positions={pipe.coordinates}
+                                    color={pipe.type === 'main' ? 'red' : 'orange'}
+                                    weight={5}
+                                    opacity={0.8}
+                                />
+                            ))}
                         </MapContainer>
                     </div>
-                    <div className="grid grid-cols-1 gap-4">
+                    <div className="flex flex-col gap-2 mt-4">
                         <button
                             onClick={handleGeneratePipeLayout}
                             disabled={isLoading || !isPlantLayoutGenerated || zones.length === 0}
-                            className="w-full rounded bg-blue-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-700"
+                            className="rounded bg-blue-600 px-6 py-2 text-white transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-700"
                         >
                             {isLoading ? 'Generating...' : 'Generate Pipe Layout'}
+                        </button>
+                        <button
+                            onClick={() => setShowPipeSummary(true)}
+                            disabled={pipeLayout.length === 0}
+                            className={`rounded px-6 py-2 font-semibold shadow-lg transition-colors duration-200
+                                ${pipeLayout.length === 0
+                                    ? 'bg-gray-700 text-gray-300 cursor-not-allowed'
+                                    : 'bg-green-600 text-white hover:bg-green-700'}`}
+                        >
+                            Next
                         </button>
                     </div>
                 </div>
@@ -1023,6 +1140,16 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                     Back
                 </button>
             </div>
+
+            {showPipeSummary && (
+                <div className="mt-4 p-4 bg-gray-800 rounded-lg text-white">
+                    <h3 className="text-lg font-semibold mb-2">Pipe Summary</h3>
+                    <div className="flex flex-col gap-2">
+                        <span>Longest Main Pipe: <span className="font-bold">{longestMain.toFixed(2)} m</span></span>
+                        <span>Longest Sub-Main Pipe: <span className="font-bold">{longestSubmain.toFixed(2)} m</span></span>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
