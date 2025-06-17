@@ -601,6 +601,23 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
 
         try {
             const areaTypes = areaType ? areaType.split(',').map(type => type.trim()) : ['default'];
+            
+            // Get all layers that should be treated as exclusion zones
+            const exclusionLayers = layers.filter(layer => 
+                layer.type === 'exclusion' || layer.type === 'river'
+            );
+
+            // Log the request data
+            console.log('Generating planting points with data:', {
+                area,
+                plant_type_id: plantType.id,
+                plant_spacing: plantType.plant_spacing,
+                row_spacing: plantType.row_spacing,
+                area_types: areaTypes,
+                layers,
+                exclusion_areas: exclusionLayers.map(layer => layer.coordinates)
+            });
+
             const { data } = await axios.post<{ plant_locations: LatLng[][] }>(
                 '/api/generate-planting-points',
                 {
@@ -609,9 +626,14 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                     plant_spacing: plantType.plant_spacing,
                     row_spacing: plantType.row_spacing,
                     area_types: areaTypes,
-                    layers
+                    layers,
+                    exclusion_areas: exclusionLayers.map(layer => layer.coordinates)
                 }
             );
+
+            // Log the response data
+            console.log('Received plant locations:', data);
+
             if (!data?.plant_locations) {
                 throw new Error('Invalid response format from server');
             }
@@ -785,11 +807,71 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
         });
     };
 
-    // Calculate longest main and submain pipe lengths
+    // Calculate pipe lengths
     const mainPipeLengths = userPipes.filter(p => p.type === 'main').map(p => polylineLength(p.coordinates));
     const submainPipeLengths = userPipes.filter(p => p.type === 'submain').map(p => polylineLength(p.coordinates));
     const longestMain = mainPipeLengths.length > 0 ? Math.max(...mainPipeLengths) : 0;
     const longestSubmain = submainPipeLengths.length > 0 ? Math.max(...submainPipeLengths) : 0;
+    const totalMainLength = mainPipeLengths.reduce((sum, length) => sum + length, 0);
+    const totalSubmainLength = submainPipeLengths.reduce((sum, length) => sum + length, 0);
+
+    // Calculate zone pipe lengths
+    const zonePipeLengths = zones.map(zone => {
+        const zonePipes = pipeLayout.filter(pipe => pipe.zone_id === zone.id);
+        const longestPipeLength = zonePipes.length > 0 
+            ? Math.max(...zonePipes.map(pipe => pipe.length))
+            : 0;
+        const totalZoneLength = zonePipes.reduce((sum, pipe) => sum + pipe.length, 0);
+        return {
+            zoneId: zone.id,
+            zoneName: zone.name,
+            longestPipe: longestPipeLength,
+            totalLength: totalZoneLength
+        };
+    });
+
+    // Calculate area and plant data
+    const totalWaterNeed = totalPlants * processedPlantType.water_needed;
+
+    // Calculate zone-specific data
+    const zoneData = zones.map(zone => {
+        const pointsInZone = plantLocations.filter(point => 
+            zone.polygon && isPointInZonePolygon(point.lat, point.lng, zone.polygon)
+        );
+        const zoneArea = zone.polygon ? 
+            calculateAreaInRai(zone.polygon.map(([lat, lng]) => ({ lat, lng }))) : 0;
+        const plantsInZone = pointsInZone.length;
+        const waterNeedInZone = plantsInZone * processedPlantType.water_needed;
+
+        return {
+            id: zone.id,
+            name: zone.name,
+            area: zoneArea,
+            plants: plantsInZone,
+            waterNeed: waterNeedInZone
+        };
+    });
+
+    // Share area and plant data with other pages
+    useEffect(() => {
+        const farmData = {
+            total: {
+                area: areaInRai,
+                plants: totalPlants,
+                waterNeed: totalWaterNeed
+            },
+            zones: zoneData
+        };
+
+        // Store in localStorage for persistence
+        localStorage.setItem('farmData', JSON.stringify(farmData));
+        
+        // Share with Inertia
+        router.reload({
+            only: ['farmData'],
+            data: { farmData }
+        });
+    }, [areaInRai, totalPlants, totalWaterNeed, zoneData]);
 
     return (
         <div className="min-h-screen bg-gray-900 p-6">
@@ -1143,10 +1225,66 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
 
             {showPipeSummary && (
                 <div className="mt-4 p-4 bg-gray-800 rounded-lg text-white">
-                    <h3 className="text-lg font-semibold mb-2">Pipe Summary</h3>
-                    <div className="flex flex-col gap-2">
-                        <span>Longest Main Pipe: <span className="font-bold">{longestMain.toFixed(2)} m</span></span>
-                        <span>Longest Sub-Main Pipe: <span className="font-bold">{longestSubmain.toFixed(2)} m</span></span>
+                    <h3 className="text-lg font-semibold mb-4">Pipe Summary</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                            <h4 className="text-md font-medium text-gray-300">Main Pipes</h4>
+                            <div className="space-y-2">
+                                <div className="flex justify-between">
+                                    <span>Longest Main Pipe:</span>
+                                    <span className="font-bold">{longestMain.toFixed(2)} m</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>Total Main Pipe Length:</span>
+                                    <span className="font-bold">{totalMainLength.toFixed(2)} m</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <h4 className="text-md font-medium text-gray-300">Sub-Main Pipes</h4>
+                            <div className="space-y-2">
+                                <div className="flex justify-between">
+                                    <span>Longest Sub-Main Pipe:</span>
+                                    <span className="font-bold">{longestSubmain.toFixed(2)} m</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>Total Sub-Main Pipe Length:</span>
+                                    <span className="font-bold">{totalSubmainLength.toFixed(2)} m</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-6">
+                        <h4 className="text-md font-medium text-gray-300 mb-4">Zone Pipe Details</h4>
+                        <div className="space-y-4">
+                            {zonePipeLengths.map(zone => (
+                                <div key={zone.zoneId} className="bg-gray-700 p-3 rounded">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span style={{ 
+                                            background: zones.find(z => z.id === zone.zoneId)?.color, 
+                                            width: 12, 
+                                            height: 12, 
+                                            display: 'inline-block', 
+                                            borderRadius: 3 
+                                        }}></span>
+                                        <span className="font-medium">{zone.zoneName}</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4 text-sm">
+                                        <div className="flex justify-between">
+                                            <span>Longest Branch:</span>
+                                            <span className="font-bold">{zone.longestPipe.toFixed(2)} m</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Total Branch Length:</span>
+                                            <span className="font-bold">{zone.totalLength.toFixed(2)} m</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             )}
