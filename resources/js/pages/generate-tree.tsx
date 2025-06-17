@@ -33,12 +33,30 @@ type Props = {
         coordinates: LatLng[];
         isInitialMap?: boolean;
     }>;
+    pumpLocation?: LatLng;
 };
 
 type UserPipe = {
     id: string;
     type: 'main' | 'submain';
     coordinates: [number, number][];
+};
+
+type Zone = {
+    id: number;
+    name: string;
+    color: string;
+    polygon: [number, number][] | null;
+    pipeDirection: 'horizontal' | 'vertical';
+};
+
+type PipeLayout = {
+    type: 'horizontal' | 'vertical';
+    start: LatLng;
+    end: LatLng;
+    row_index: number | null;
+    zone_id: number | null;
+    length: number;
 };
 
 // Constants
@@ -56,12 +74,122 @@ const AREA_COLORS: Record<string, string> = {
 
 const ZONE_COLORS = ['#FF5733', '#33C1FF', '#8DFF33', '#FF33D4']; // 4 unique colors
 
-type Zone = {
-    id: number;
-    name: string;
-    color: string;
-    polygon: [number, number][] | null;
-    pipeDirection: 'horizontal' | 'vertical';
+// Utility Functions
+const calculateAreaInRai = (coordinates: LatLng[]): number => {
+    if (coordinates.length < 3) return 0;
+
+    const toMeters = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+        const R = 6371000;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                 Math.sin(dLng/2) * Math.sin(dLng/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    };
+
+    let area = 0;
+    for (let i = 0; i < coordinates.length; i++) {
+        const j = (i + 1) % coordinates.length;
+        area += coordinates[i].lat * coordinates[j].lng;
+        area -= coordinates[j].lat * coordinates[i].lng;
+    }
+    area = Math.abs(area) / 2;
+
+    const areaInSquareMeters = area * 111000 * 111000 * Math.cos(coordinates[0].lat * Math.PI / 180);
+    return areaInSquareMeters / 1600;
+};
+
+const isPointInPolygon = (lat: number, lng: number, polygon: { lat: number; lng: number }[]): boolean => {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i].lat, yi = polygon[i].lng;
+        const xj = polygon[j].lat, yj = polygon[j].lng;
+        const intersect = ((yi > lng) !== (yj > lng)) &&
+            (lat < (xj - xi) * (lng - yi) / (yj - yi + 0.0000001) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+};
+
+const findNearestGridPoint = (lat: number, lng: number, plantType: PlantType, area: LatLng[]): [number, number] => {
+    const plantSpacing = plantType.plant_spacing;
+    const rowSpacing = plantType.row_spacing;
+    const padding = rowSpacing / 2;
+
+    const bounds = area.reduce((acc, point) => ({
+        minLat: Math.min(acc.minLat, point.lat),
+        maxLat: Math.max(acc.maxLat, point.lat),
+        minLng: Math.min(acc.minLng, point.lng),
+        maxLng: Math.max(acc.maxLng, point.lng)
+    }), {
+        minLat: area[0].lat,
+        maxLat: area[0].lat,
+        minLng: area[0].lng,
+        maxLng: area[0].lng
+    });
+
+    const paddedBounds = {
+        minLat: bounds.minLat + (padding / 111000),
+        maxLat: bounds.maxLat - (padding / 111000),
+        minLng: bounds.minLng + (padding / (111000 * Math.cos(bounds.minLat * Math.PI / 180))),
+        maxLng: bounds.maxLng - (padding / (111000 * Math.cos(bounds.minLat * Math.PI / 180)))
+    };
+
+    const latPoints: number[] = [];
+    const lngPoints: number[] = [];
+
+    for (let lat = paddedBounds.minLat; lat <= paddedBounds.maxLat; lat += rowSpacing / 111000) {
+        latPoints.push(lat);
+    }
+    for (let lng = paddedBounds.minLng; lng <= paddedBounds.maxLng; lng += plantSpacing / (111000 * Math.cos(bounds.minLat * Math.PI / 180))) {
+        lngPoints.push(lng);
+    }
+
+    let nearestLat = latPoints[0];
+    let nearestLng = lngPoints[0];
+    let minDistance = Number.MAX_VALUE;
+
+    for (const gridLat of latPoints) {
+        for (const gridLng of lngPoints) {
+            const distance = Math.sqrt(
+                Math.pow(lat - gridLat, 2) + 
+                Math.pow(lng - gridLng, 2)
+            );
+            if (distance < minDistance) {
+                minDistance = distance;
+                nearestLat = gridLat;
+                nearestLng = gridLng;
+            }
+        }
+    }
+
+    return [nearestLat, nearestLng];
+};
+
+const polylineLength = (coords: [number, number][]): number => {
+    let total = 0;
+    for (let i = 1; i < coords.length; i++) {
+        const [lat1, lng1] = coords[i - 1];
+        const [lat2, lng2] = coords[i];
+        const R = 6371000;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLng/2) * Math.sin(dLng/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        total += R * c;
+    }
+    return total;
+};
+
+const flattenLatLngs = (latlngs: any): L.LatLng[] => {
+    if (Array.isArray(latlngs) && latlngs.length > 0 && Array.isArray(latlngs[0])) {
+        return latlngs.flat(Infinity) as L.LatLng[];
+    }
+    return latlngs as L.LatLng[];
 };
 
 // Components
@@ -154,81 +282,6 @@ const MapDragHandler = ({ isDragging, editMode, selectedPoints }: {
     
     return null;
 };
-
-// Add point-in-polygon function
-function isPointInPolygon(lat: number, lng: number, polygon: { lat: number; lng: number }[]): boolean {
-    let inside = false;
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const xi = polygon[i].lat, yi = polygon[i].lng;
-        const xj = polygon[j].lat, yj = polygon[j].lng;
-        const intersect = ((yi > lng) !== (yj > lng)) &&
-            (lat < (xj - xi) * (lng - yi) / (yj - yi + 0.0000001) + xi);
-        if (intersect) inside = !inside;
-    }
-    return inside;
-}
-
-// Add function to find nearest grid point
-function findNearestGridPoint(lat: number, lng: number, plantType: PlantType, area: LatLng[]): [number, number] {
-    // Calculate grid parameters
-    const plantSpacing = plantType.plant_spacing;
-    const rowSpacing = plantType.row_spacing;
-    const padding = rowSpacing / 2; // Half of row spacing for padding
-
-    // Find the bounds of the area
-    const bounds = area.reduce((acc, point) => ({
-        minLat: Math.min(acc.minLat, point.lat),
-        maxLat: Math.max(acc.maxLat, point.lat),
-        minLng: Math.min(acc.minLng, point.lng),
-        maxLng: Math.max(acc.maxLng, point.lng)
-    }), {
-        minLat: area[0].lat,
-        maxLat: area[0].lat,
-        minLng: area[0].lng,
-        maxLng: area[0].lng
-    });
-
-    // Add padding to bounds
-    const paddedBounds = {
-        minLat: bounds.minLat + (padding / 111000), // Convert meters to degrees
-        maxLat: bounds.maxLat - (padding / 111000),
-        minLng: bounds.minLng + (padding / (111000 * Math.cos(bounds.minLat * Math.PI / 180))),
-        maxLng: bounds.maxLng - (padding / (111000 * Math.cos(bounds.minLat * Math.PI / 180)))
-    };
-
-    // Calculate grid points
-    const latPoints: number[] = [];
-    const lngPoints: number[] = [];
-
-    // Generate grid points with padding
-    for (let lat = paddedBounds.minLat; lat <= paddedBounds.maxLat; lat += rowSpacing / 111000) {
-        latPoints.push(lat);
-    }
-    for (let lng = paddedBounds.minLng; lng <= paddedBounds.maxLng; lng += plantSpacing / (111000 * Math.cos(bounds.minLat * Math.PI / 180))) {
-        lngPoints.push(lng);
-    }
-
-    // Find nearest grid point
-    let nearestLat = latPoints[0];
-    let nearestLng = lngPoints[0];
-    let minDistance = Number.MAX_VALUE;
-
-    for (const gridLat of latPoints) {
-        for (const gridLng of lngPoints) {
-            const distance = Math.sqrt(
-                Math.pow(lat - gridLat, 2) + 
-                Math.pow(lng - gridLng, 2)
-            );
-            if (distance < minDistance) {
-                minDistance = distance;
-                nearestLat = gridLat;
-                nearestLng = gridLng;
-            }
-        }
-    }
-
-    return [nearestLat, nearestLng];
-}
 
 const PointManagementControls = ({ 
     plantLocations, 
@@ -484,72 +537,127 @@ const PointManagementControls = ({
     );
 };
 
-// Helper Functions
-const calculateAreaInRai = (coordinates: LatLng[]): number => {
-    if (coordinates.length < 3) return 0;
+// Map Components
+const MapLayers = ({ layers = [] }: { layers?: Props['layers'] }) => (
+    <>
+        {layers.map((layer, index) => {
+            const styleMap: Record<string, { color: string; fillOpacity: number }> = {
+                river: { color: '#3B82F6', fillOpacity: 0.3 },
+                powerplant: { color: '#EF4444', fillOpacity: 0.3 },
+                building: { color: '#F59E0B', fillOpacity: 0.3 },
+                pump: { color: '#1E40AF', fillOpacity: 0.3 },
+                custompolygon: { color: '#4B5563', fillOpacity: 0.3 },
+                solarcell: { color: '#FFD600', fillOpacity: 0.3 }
+            };
 
-    const toMeters = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
-        const R = 6371000;
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLng = (lng2 - lng1) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                 Math.sin(dLng/2) * Math.sin(dLng/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        return R * c;
-    };
+            const style = layer.isInitialMap 
+                ? { color: '#90EE90', fillColor: '#90EE90', fillOpacity: 0.3, weight: 2 }
+                : {
+                    ...styleMap[layer.type] || styleMap.custompolygon,
+                    fillColor: styleMap[layer.type]?.color || styleMap.custompolygon.color
+                };
 
-    let area = 0;
-    for (let i = 0; i < coordinates.length; i++) {
-        const j = (i + 1) % coordinates.length;
-        area += coordinates[i].lat * coordinates[j].lng;
-        area -= coordinates[j].lat * coordinates[i].lng;
+            return (
+                <Polygon
+                    key={`layer-${index}`}
+                    positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
+                    pathOptions={{
+                        ...style,
+                        weight: 2
+                    }}
+                />
+            );
+        })}
+    </>
+);
+
+const ZonePolygons = ({ zones }: { zones: Zone[] }) => (
+    <>
+        {zones.map((zone) => (
+            zone.polygon ? (
+                <Polygon
+                    key={zone.id}
+                    positions={zone.polygon}
+                    pathOptions={{ color: zone.color, weight: 2, fillOpacity: 0.2 }}
+                />
+            ) : null
+        ))}
+    </>
+);
+
+const PlantPoints = ({ plantLocations, getPointColor }: { 
+    plantLocations: LatLng[]; 
+    getPointColor: (point: LatLng) => string;
+}) => (
+    <>
+        {plantLocations.map((point, index) => {
+            const pointId = point.id || `point-${index}`;
+            const color = getPointColor(point);
+            return (
+                <CircleMarker
+                    key={pointId}
+                    center={[point.lat, point.lng]}
+                    radius={1.5}
+                    pathOptions={{
+                        color: color,
+                        fillColor: color,
+                        fillOpacity: 1,
+                    }}
+                />
+            );
+        })}
+    </>
+);
+
+const PipeLayouts = ({ pipeLayout, getPipeColor }: { 
+    pipeLayout: PipeLayout[]; 
+    getPipeColor: (pipe: PipeLayout) => string;
+}) => (
+    <FeatureGroup>
+        {pipeLayout.map((pipe, index) => (
+            <Polyline
+                key={`pipe-${index}`}
+                positions={[
+                    [pipe.start.lat, pipe.start.lng],
+                    [pipe.end.lat, pipe.end.lng]
+                ]}
+                color={getPipeColor(pipe)}
+                weight={3}
+                opacity={0.8}
+            />
+        ))}
+    </FeatureGroup>
+);
+
+const UserPipes = ({ userPipes }: { userPipes: UserPipe[] }) => (
+    <>
+        {userPipes.map(pipe => (
+            <Polyline
+                key={pipe.id}
+                positions={pipe.coordinates}
+                color={pipe.type === 'main' ? 'red' : 'orange'}
+                weight={5}
+                opacity={0.8}
+            />
+        ))}
+    </>
+);
+
+// Add isPointInZonePolygon function
+const isPointInZonePolygon = (lat: number, lng: number, polygon: [number, number][]): boolean => {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i][0], yi = polygon[i][1];
+        const xj = polygon[j][0], yj = polygon[j][1];
+        const intersect = ((yi > lng) !== (yj > lng)) &&
+            (lat < (xj - xi) * (lng - yi) / (yj - yi + 0.0000001) + xi);
+        if (intersect) inside = !inside;
     }
-    area = Math.abs(area) / 2;
-
-    const areaInSquareMeters = area * 111000 * 111000 * Math.cos(coordinates[0].lat * Math.PI / 180);
-    return areaInSquareMeters / 1600;
+    return inside;
 };
-
-// Update the PipeLayout type
-type PipeLayout = {
-    type: 'horizontal' | 'vertical';
-    start: LatLng;
-    end: LatLng;
-    row_index: number | null;
-    zone_id: number | null;
-    length: number;
-};
-
-// Helper to flatten nested arrays from getLatLngs
-function flattenLatLngs(latlngs: any): L.LatLng[] {
-    if (Array.isArray(latlngs) && latlngs.length > 0 && Array.isArray(latlngs[0])) {
-        return latlngs.flat(Infinity) as L.LatLng[];
-    }
-    return latlngs as L.LatLng[];
-}
-
-// Helper to calculate the length of a polyline in meters
-function polylineLength(coords: [number, number][]): number {
-    let total = 0;
-    for (let i = 1; i < coords.length; i++) {
-        const [lat1, lng1] = coords[i - 1];
-        const [lat2, lng2] = coords[i];
-        // Haversine formula
-        const R = 6371000;
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLng = (lng2 - lng1) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-            Math.sin(dLng/2) * Math.sin(dLng/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        total += R * c;
-    }
-    return total;
-}
 
 // Main Component
-export default function GenerateTree({ areaType, area, plantType, layers = [] }: Props) {
+export default function GenerateTree({ areaType, area, plantType, layers = [], pumpLocation }: Props) {
     const [plantLocations, setPlantLocations] = useState<LatLng[]>([]);
     const [grid, setGrid] = useState<LatLng[][] | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -563,6 +671,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
     const [drawingPipeType, setDrawingPipeType] = useState<'main' | 'submain' | null>(null);
     const [showPipeSummary, setShowPipeSummary] = useState(false);
 
+    // Memoized values
     const areaInRai = useMemo(() => calculateAreaInRai(area), [area]);
     const processedPlantType = useMemo(() => ({
         ...plantType,
@@ -571,10 +680,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
         water_needed: Number(plantType.water_needed)
     }), [plantType]);
 
-    // Calculate total number of plants
-    const totalPlants = useMemo(() => {
-        return plantLocations.length;
-    }, [plantLocations]);
+    const totalPlants = useMemo(() => plantLocations.length, [plantLocations]);
 
     const mapCenter = useMemo(() => {
         if (area.length === 0) return DEFAULT_CENTER;
@@ -585,16 +691,17 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
         return [center[0] / area.length, center[1] / area.length] as [number, number];
     }, [area]);
 
-    // Add useEffect to automatically generate tree points
-    useEffect(() => {
-        const generatePoints = async () => {
-            if (area.length > 0 && !isPlantLayoutGenerated) {
-                await handleGenerate();
-            }
+    // Add handleMarkerCreated inside the main component
+    const handleMarkerCreated = (latlng: L.LatLng) => {
+        const newPoint: LatLng = {
+            lat: latlng.lat,
+            lng: latlng.lng,
+            id: `point-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
         };
-        generatePoints();
-    }, [area, processedPlantType, layers]); // Dependencies that should trigger regeneration
+        setPlantLocations(prev => [...prev, newPoint]);
+    };
 
+    // Handlers
     const handleGenerate = async () => {
         setIsLoading(true);
         setError(null);
@@ -609,13 +716,20 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                     plant_spacing: plantType.plant_spacing,
                     row_spacing: plantType.row_spacing,
                     area_types: areaTypes,
-                    layers
+                    layers: layers.map(layer => ({
+                        ...layer,
+                        coordinates: layer.coordinates.map(coord => ({
+                            lat: Number(coord.lat),
+                            lng: Number(coord.lng)
+                        }))
+                    }))
                 }
             );
+
             if (!data?.plant_locations) {
                 throw new Error('Invalid response format from server');
             }
-            // Flatten the 2D array into 1D array of points
+
             const flattenedPoints = data.plant_locations.flat().map((point, index) => ({
                 ...point,
                 id: `point-${index}`
@@ -650,7 +764,6 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                             zone.polygon.map(([lat, lng]) => ({ lat, lng }))
                         )
                     );
-                    console.log(`Zone ${zone.id} points:`, zonePoints);
                     return {
                         id: zone.id,
                         pipeDirection: zone.pipeDirection,
@@ -658,10 +771,8 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                     };
                 })
             };
-            console.log('Sending request data:', requestData);
 
             const response = await axios.post('/api/generate-pipe-layout', requestData);
-            console.log('Received pipe layout:', response.data.pipe_layout);
             setPipeLayout(response.data.pipe_layout);
         } catch (error) {
             console.error('Error generating pipe layout:', error);
@@ -678,7 +789,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
             name: `Zone ${zones.length + 1}`,
             color: ZONE_COLORS[zones.length],
             polygon: null,
-            pipeDirection: 'horizontal' // default direction
+            pipeDirection: 'horizontal'
         };
         setZones([...zones, newZone]);
         setCurrentZoneIndex(zones.length);
@@ -706,18 +817,6 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
         );
     };
 
-    function isPointInZonePolygon(lat: number, lng: number, polygon: [number, number][]) {
-        let inside = false;
-        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-            const xi = polygon[i][0], yi = polygon[i][1];
-            const xj = polygon[j][0], yj = polygon[j][1];
-            const intersect = ((yi > lng) !== (yj > lng)) &&
-                (lat < (xj - xi) * (lng - yi) / (yj - yi + 0.0000001) + xi);
-            if (intersect) inside = !inside;
-        }
-        return inside;
-    }
-
     const getPointColor = (point: LatLng) => {
         for (let i = 0; i < zones.length; i++) {
             const z = zones[i];
@@ -728,27 +827,11 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
         return 'green';
     };
 
-    // Update the marker creation handler
-    const handleMarkerCreated = (latlng: L.LatLng) => {
-        const newPoint: LatLng = {
-            lat: latlng.lat,
-            lng: latlng.lng,
-            id: `point-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-        };
-        setPlantLocations(prev => [...prev, newPoint]);
-    };
-
-    // Function to get pipe color based on the zone's pipeDirection
     const getPipeColor = (pipe: PipeLayout) => {
         const zone = zones.find(z => z.id === pipe.zone_id);
-        if (zone) {
-            return zone.pipeDirection === 'horizontal' ? '#3B82F6' : '#10B981';
-        }
-        // fallback
-        return '#888';
+        return zone?.pipeDirection === 'horizontal' ? '#3B82F6' : '#10B981';
     };
 
-    // Handler for when a polyline is created
     const handleUserPipeCreated = (e: any) => {
         if (drawingPipeType && e.layerType === 'polyline' && e.layer instanceof L.Polyline) {
             const latlngs: L.LatLng[] = flattenLatLngs(e.layer.getLatLngs());
@@ -761,21 +844,20 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                     coordinates
                 }
             ]);
-            setDrawingPipeType(null); // Exit drawing mode
+            setDrawingPipeType(null);
         }
     };
 
-    // Handler for deleting user pipes
     const handleUserPipeDeleted = (e: any) => {
         const layers = e.layers;
         layers.eachLayer((layer: any) => {
             if (layer instanceof L.Polyline) {
                 const latlngs: L.LatLng[] = flattenLatLngs(layer.getLatLngs());
                 setUserPipes(prev => prev.filter(pipe => {
-                    // Remove if coordinates match
                     if (pipe.coordinates.length !== latlngs.length) return true;
                     for (let i = 0; i < latlngs.length; i++) {
-                        if (Math.abs(pipe.coordinates[i][0] - latlngs[i].lat) > 1e-8 || Math.abs(pipe.coordinates[i][1] - latlngs[i].lng) > 1e-8) {
+                        if (Math.abs(pipe.coordinates[i][0] - latlngs[i].lat) > 1e-8 || 
+                            Math.abs(pipe.coordinates[i][1] - latlngs[i].lng) > 1e-8) {
                             return true;
                         }
                     }
@@ -785,11 +867,47 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
         });
     };
 
-    // Calculate longest main and submain pipe lengths
+    // Calculate pipe lengths
     const mainPipeLengths = userPipes.filter(p => p.type === 'main').map(p => polylineLength(p.coordinates));
     const submainPipeLengths = userPipes.filter(p => p.type === 'submain').map(p => polylineLength(p.coordinates));
     const longestMain = mainPipeLengths.length > 0 ? Math.max(...mainPipeLengths) : 0;
     const longestSubmain = submainPipeLengths.length > 0 ? Math.max(...submainPipeLengths) : 0;
+
+    // Effects
+    useEffect(() => {
+        console.log('=== Data received from map-planner ===');
+        console.log('Area Type:', areaType);
+        console.log('Area:', area);
+        console.log('Plant Type:', plantType);
+        console.log('Layers:', layers);
+        console.log('Initial Map Layer:', layers.find(layer => layer.isInitialMap));
+        console.log('Other Layers:', layers.filter(layer => !layer.isInitialMap));
+        console.log('Total Layers:', layers.length);
+        console.log('=====================================');
+    }, []);
+
+    useEffect(() => {
+        const generatePoints = async () => {
+            if (area.length > 0 && !isPlantLayoutGenerated) {
+                await handleGenerate();
+            }
+        };
+        generatePoints();
+    }, [area, processedPlantType, layers]);
+
+    // Add pump location marker to the map
+    useEffect(() => {
+        if (pumpLocation) {
+            const pumpMarker = L.circle([pumpLocation.lat, pumpLocation.lng], {
+                radius: 4,
+                color: AREA_COLORS.pump,
+                fillColor: AREA_COLORS.pump,
+                fillOpacity: 1,
+                weight: 2
+            });
+            featureGroupRef.current?.addLayer(pumpMarker);
+        }
+    }, [pumpLocation]);
 
     return (
         <div className="min-h-screen bg-gray-900 p-6">
@@ -825,6 +943,12 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                         <InfoItem title="Total Water Need (W)">
                             <p>{(plantLocations.length * processedPlantType.water_needed).toFixed(2)} L/day</p>
                         </InfoItem>
+                        {pumpLocation && (
+                            <InfoItem title="Pump Location">
+                                <p>Lat: {pumpLocation.lat.toFixed(6)}</p>
+                                <p>Lng: {pumpLocation.lng.toFixed(6)}</p>
+                            </InfoItem>
+                        )}
                     </InfoSection>
                     <InfoSection title="Zoning Configuration">
                         <InfoItem title="Zones">
@@ -965,18 +1089,9 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                             </LayersControl>
                             <MapBounds positions={area} />
                             
-                            {layers.filter(layer => layer.isInitialMap).map((layer, index) => (
-                                <Polygon
-                                    key={`initial-map-${index}`}
-                                    positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
-                                    pathOptions={{
-                                        color: '#90EE90',
-                                        fillColor: '#90EE90',
-                                        fillOpacity: 0.5,
-                                        weight: 2
-                                    }}
-                                />
-                            ))}
+                            {/* Render all layers */}
+                            <MapLayers layers={layers} />
+
                             <FeatureGroup ref={featureGroupRef}>
                                 <EditControl
                                     position="topright"
@@ -1055,59 +1170,18 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                                 plantType={processedPlantType}
                             />
                             
-                            {zones.map((zone, idx) => (
-                                zone.polygon ? (
-                                    <Polygon
-                                        key={zone.id}
-                                        positions={zone.polygon}
-                                        pathOptions={{ color: zone.color, weight: 2, fillOpacity: 0.2 }}
-                                    />
-                                ) : null
-                            ))}
-                            {plantLocations.map((point, index) => {
-                                const pointId = point.id || `point-${index}`;
-                                const color = getPointColor(point);
-                                    return (
-                                        <CircleMarker
-                                        key={pointId}
-                                        center={[point.lat, point.lng]}
-                                        radius={1.5}
-                                            pathOptions={{
-                                            color: color,
-                                            fillColor: color,
-                                                fillOpacity: 1,
-                                            }}
-                                        />
-                                    );
-                            })}
+                            <ZonePolygons zones={zones} />
+                            <PlantPoints 
+                                plantLocations={plantLocations}
+                                getPointColor={getPointColor}
+                            />
                             {pipeLayout.length > 0 && (
-                                <FeatureGroup>
-                                    {pipeLayout.map((pipe, index) => {
-                                        console.log('Rendering pipe:', pipe);
-                                        return (
-                                            <Polyline
-                                                key={`pipe-${index}`}
-                                                positions={[
-                                                    [pipe.start.lat, pipe.start.lng],
-                                                    [pipe.end.lat, pipe.end.lng]
-                                                ]}
-                                                color={getPipeColor(pipe)}
-                                                weight={3}
-                                                opacity={0.8}
-                                            />
-                                        );
-                                    })}
-                                </FeatureGroup>
-                            )}
-                            {userPipes.map(pipe => (
-                                <Polyline
-                                    key={pipe.id}
-                                    positions={pipe.coordinates}
-                                    color={pipe.type === 'main' ? 'red' : 'orange'}
-                                    weight={5}
-                                    opacity={0.8}
+                                <PipeLayouts 
+                                    pipeLayout={pipeLayout}
+                                    getPipeColor={getPipeColor}
                                 />
-                            ))}
+                            )}
+                            <UserPipes userPipes={userPipes} />
                         </MapContainer>
                     </div>
                     <div className="flex flex-col gap-2 mt-4">
@@ -1118,26 +1192,26 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                         >
                             {isLoading ? 'Generating...' : 'Generate Pipe Layout'}
                         </button>
-                        <button
-                            onClick={() => setShowPipeSummary(true)}
-                            disabled={pipeLayout.length === 0}
-                            className={`rounded px-6 py-2 font-semibold shadow-lg transition-colors duration-200
-                                ${pipeLayout.length === 0
-                                    ? 'bg-gray-700 text-gray-300 cursor-not-allowed'
-                                    : 'bg-green-600 text-white hover:bg-green-700'}`}
-                        >
-                            Next
-                        </button>
                     </div>
                 </div>
             </div>
 
-            <div className="mt-6">
+            <div className="mt-6 flex justify-between items-center">
                 <button
                     onClick={() => router.get('/planner', {}, { preserveState: true })}
                     className="rounded bg-gray-700 px-6 py-2 text-white transition-colors duration-200 hover:bg-gray-600"
                 >
                     Back
+                </button>
+                <button
+                    onClick={() => setShowPipeSummary(true)}
+                    disabled={pipeLayout.length === 0}
+                    className={`rounded px-6 py-2 text-white transition-colors duration-200
+                        ${pipeLayout.length === 0
+                            ? 'bg-gray-700 cursor-not-allowed'
+                            : 'bg-green-600 hover:bg-green-700'}`}
+                >
+                    Next
                 </button>
             </div>
 
