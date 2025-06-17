@@ -62,6 +62,8 @@
         "clsx": "^2.1.1",
         "concurrently": "^9.0.1",
         "globals": "^15.14.0",
+        "html2canvas": "^1.4.1",
+        "jspdf": "^3.0.1",
         "laravel-vite-plugin": "^1.0",
         "leaflet": "^1.9.4",
         "leaflet-draw": "^1.0.4",
