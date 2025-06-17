@@ -54,7 +54,8 @@ type Zone = {
     id: number;
     name: string;
     color: string;
-    polygon: [number, number][] | null; // Polygon coordinates: array of [lat, lng]
+    polygon: [number, number][] | null;
+    pipeDirection: 'horizontal' | 'vertical';
 };
 
 // Components
@@ -244,7 +245,7 @@ const PointManagementControls = ({
     // Initialize history when plantLocations changes and there's no history
     useEffect(() => {
         if (history.length === 0 && plantLocations.length > 0) {
-            setHistory([[...plantLocations]]);
+            setHistory([plantLocations]);
             setHistoryIndex(0);
         }
     }, [plantLocations]);
@@ -253,7 +254,7 @@ const PointManagementControls = ({
     const saveToHistory = (newLocations: LatLng[]) => {
         setHistory(prev => {
             const newHistory = prev.slice(0, historyIndex + 1);
-            newHistory.push([...newLocations]);
+            newHistory.push(newLocations);
             return newHistory;
         });
         setHistoryIndex(prev => prev + 1);
@@ -264,7 +265,7 @@ const PointManagementControls = ({
         if (historyIndex > 0) {
             const newIndex = historyIndex - 1;
             setHistoryIndex(newIndex);
-            setPlantLocations([...history[newIndex]]);
+            setPlantLocations(history[newIndex]);
         }
     };
 
@@ -323,7 +324,7 @@ const PointManagementControls = ({
                 return newSet;
             });
         } else if (editMode === 'delete') {
-            const pointIndex = plantLocations.findIndex(p => (p.id || `point-${plantLocations.indexOf(p)}`) === pointId);
+            const pointIndex = plantLocations.findIndex(p => p.id === pointId);
             if (pointIndex !== -1) {
                 const newLocations = plantLocations.filter((_, index) => index !== pointIndex);
                 saveToHistory(newLocations);
@@ -356,7 +357,7 @@ const PointManagementControls = ({
     const handleMouseUp = () => {
         if (movingPoint) {
             const newLocations = plantLocations.map(p => 
-                (p.id || `point-${plantLocations.indexOf(p)}`) === movingPoint.id
+                p.id === movingPoint.id
                     ? { ...p, lat: movingPoint.position[0], lng: movingPoint.position[1] }
                     : p
             );
@@ -436,8 +437,8 @@ const PointManagementControls = ({
             />
             <MouseTracker onMove={handleMouseMove} />
             <MapMouseUpHandler onMouseUp={handleMouseUp} />
-            {plantLocations.map((point, index) => {
-                const pointId = point.id || `point-${index}`;
+            {plantLocations.map((point) => {
+                const pointId = point.id || `point-${plantLocations.indexOf(point)}`;
                 const isSelected = selectedPoints.has(pointId);
                 const isMoving = movingPoint?.id === pointId;
                 const position: [number, number] = isMoving && movingPoint
@@ -504,6 +505,16 @@ const calculateAreaInRai = (coordinates: LatLng[]): number => {
     return areaInSquareMeters / 1600;
 };
 
+// Update the PipeLayout type
+type PipeLayout = {
+    type: 'horizontal' | 'vertical';
+    start: LatLng;
+    end: LatLng;
+    row_index: number | null;
+    zone_id: number | null;
+    length: number;
+};
+
 // Main Component
 export default function GenerateTree({ areaType, area, plantType, layers = [] }: Props) {
     const [plantLocations, setPlantLocations] = useState<LatLng[]>([]);
@@ -511,6 +522,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isPlantLayoutGenerated, setIsPlantLayoutGenerated] = useState(false);
+    const [pipeLayout, setPipeLayout] = useState<PipeLayout[]>([]);
     const featureGroupRef = React.useRef<L.FeatureGroup>(null);
     const [zones, setZones] = useState<Zone[]>([]);
     const [currentZoneIndex, setCurrentZoneIndex] = useState<number | null>(null);
@@ -522,6 +534,11 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
         row_spacing: Number(plantType.row_spacing),
         water_needed: Number(plantType.water_needed)
     }), [plantType]);
+
+    // Calculate total number of plants
+    const totalPlants = useMemo(() => {
+        return plantLocations.length;
+    }, [plantLocations]);
 
     const mapCenter = useMemo(() => {
         if (area.length === 0) return DEFAULT_CENTER;
@@ -548,7 +565,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
 
         try {
             const areaTypes = areaType ? areaType.split(',').map(type => type.trim()) : ['default'];
-            const { data } = await axios.post<{ plant_locations: LatLng[]; grid: LatLng[][] }>(
+            const { data } = await axios.post<{ plant_locations: LatLng[][] }>(
                 '/api/generate-planting-points',
                 {
                     area,
@@ -562,8 +579,13 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
             if (!data?.plant_locations) {
                 throw new Error('Invalid response format from server');
             }
-            setPlantLocations(data.plant_locations);
-            setGrid(data.grid || null);
+            // Flatten the 2D array into 1D array of points
+            const flattenedPoints = data.plant_locations.flat().map((point, index) => ({
+                ...point,
+                id: `point-${index}`
+            }));
+            setPlantLocations(flattenedPoints);
+            setGrid(data.plant_locations);
             setIsPlantLayoutGenerated(true);
         } catch (error) {
             console.error('Error details:', error);
@@ -577,16 +599,37 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
     };
 
     const handleGeneratePipeLayout = async () => {
-        setIsLoading(true);
-        setError(null);
+        if (!plantLocations || !plantLocations.length) return;
 
         try {
-            console.log('Generating pipe layout...');
+            setIsLoading(true);
+            const requestData = {
+                plant_type_id: plantType.id,
+                area: area,
+                zones: zones.map(zone => {
+                    const zonePoints = plantLocations.filter(point => 
+                        zone.polygon && isPointInPolygon(
+                            point.lat, 
+                            point.lng, 
+                            zone.polygon.map(([lat, lng]) => ({ lat, lng }))
+                        )
+                    );
+                    console.log(`Zone ${zone.id} points:`, zonePoints);
+                    return {
+                        id: zone.id,
+                        pipeDirection: zone.pipeDirection,
+                        points: zonePoints
+                    };
+                })
+            };
+            console.log('Sending request data:', requestData);
+
+            const response = await axios.post('/api/generate-pipe-layout', requestData);
+            console.log('Received pipe layout:', response.data.pipe_layout);
+            setPipeLayout(response.data.pipe_layout);
         } catch (error) {
-            setError(axios.isAxiosError(error) 
-                ? error.response?.data?.message || 'Error generating pipe layout'
-                : 'An unexpected error occurred'
-            );
+            console.error('Error generating pipe layout:', error);
+            alert('Failed to generate pipe layout');
         } finally {
             setIsLoading(false);
         }
@@ -599,9 +642,32 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
             name: `Zone ${zones.length + 1}`,
             color: ZONE_COLORS[zones.length],
             polygon: null,
+            pipeDirection: 'horizontal' // default direction
         };
         setZones([...zones, newZone]);
         setCurrentZoneIndex(zones.length);
+    };
+
+    const handleDeleteZone = (zoneId: number) => {
+        setZones(prevZones => prevZones.filter(zone => zone.id !== zoneId));
+        if (currentZoneIndex !== null) {
+            const deletedZoneIndex = zones.findIndex(zone => zone.id === zoneId);
+            if (deletedZoneIndex === currentZoneIndex) {
+                setCurrentZoneIndex(null);
+            } else if (deletedZoneIndex < currentZoneIndex) {
+                setCurrentZoneIndex(currentZoneIndex - 1);
+            }
+        }
+    };
+
+    const handlePipeDirectionChange = (zoneId: number, direction: 'horizontal' | 'vertical') => {
+        setZones(prevZones => 
+            prevZones.map(zone => 
+                zone.id === zoneId 
+                    ? { ...zone, pipeDirection: direction }
+                    : zone
+            )
+        );
     };
 
     function isPointInZonePolygon(lat: number, lng: number, polygon: [number, number][]) {
@@ -624,6 +690,25 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
             }
         }
         return 'green';
+    };
+
+    // Update the marker creation handler
+    const handleMarkerCreated = (latlng: L.LatLng) => {
+        const newPoint: LatLng = {
+            lat: latlng.lat,
+            lng: latlng.lng,
+            id: `point-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        };
+        setPlantLocations(prev => [...prev, newPoint]);
+    };
+
+    // Function to get pipe color based on type and zone
+    const getPipeColor = (pipe: PipeLayout) => {
+        if (pipe.type === 'horizontal') {
+            return '#3B82F6'; // Blue for horizontal pipes
+        } else {
+            return '#10B981'; // Green for vertical pipes
+        }
     };
 
     return (
@@ -665,25 +750,85 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                         <InfoItem title="Zones">
                             <div className="flex flex-col gap-2">
                                 {zones.map((zone, idx) => {
-                                    const pointsInZone = plantLocations.filter(point => zone.polygon && isPointInZonePolygon(point.lat, point.lng, zone.polygon));
-                                    const zoneArea = zone.polygon ? calculateAreaInRai(zone.polygon.map(([lat, lng]) => ({ lat, lng }))) : 0;
+                                    const pointsInZone = plantLocations.filter(point => 
+                                        zone.polygon && isPointInZonePolygon(point.lat, point.lng, zone.polygon)
+                                    );
+                                    const zoneArea = zone.polygon ? 
+                                        calculateAreaInRai(zone.polygon.map(([lat, lng]) => ({ lat, lng }))) : 0;
                                     const totalWaterNeed = pointsInZone.length * processedPlantType.water_needed;
+                                    
+                                    // Calculate longest pipe length for this zone
+                                    const zonePipes = pipeLayout.filter(pipe => pipe.zone_id === zone.id);
+                                    const longestPipeLength = zonePipes.length > 0 
+                                        ? Math.max(...zonePipes.map(pipe => pipe.length))
+                                        : 0;
+
                                     return (
-                                        <div key={zone.id} className="flex items-center gap-2">
-                                            <span style={{ background: zone.color, width: 16, height: 16, display: 'inline-block', borderRadius: 4 }}></span>
-                                            <span className="text-white">{zone.name} A: {zoneArea.toFixed(2)} rai, N: {pointsInZone.length}, W: {totalWaterNeed.toFixed(2)} L/day</span>
+                                        <div key={zone.id} className="flex flex-col gap-2 p-2 rounded bg-gray-800">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <span style={{ 
+                                                        background: zone.color, 
+                                                        width: 16, 
+                                                        height: 16, 
+                                                        display: 'inline-block', 
+                                                        borderRadius: 4 
+                                                    }}></span>
+                                                    <span className="text-white font-medium">{zone.name}</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleDeleteZone(zone.id)}
+                                                    className="px-2 py-1 text-xs text-red-400 hover:text-red-300 transition-colors"
+                                                    disabled={currentZoneIndex !== null}
+                                                >
+                                                    Delete
+                                                </button>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-sm text-gray-300">
+                                                <span>A: {zoneArea.toFixed(2)} rai</span>
+                                                <span>•</span>
+                                                <span>N: {pointsInZone.length}</span>
+                                                <span>•</span>
+                                                <span>W: {totalWaterNeed.toFixed(2)} L/day</span>
+                                                {longestPipeLength > 0 && (
+                                                    <>
+                                                        <span>•</span>
+                                                        <span>L: {longestPipeLength.toFixed(2)}m</span>
+                                                    </>
+                                                )}
+                                            </div>
+                                            {zone.polygon && (
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm text-gray-300">Pipe Direction:</span>
+                                                    <select
+                                                        value={zone.pipeDirection}
+                                                        onChange={(e) => handlePipeDirectionChange(zone.id, e.target.value as 'horizontal' | 'vertical')}
+                                                        className="px-2 py-1 text-sm bg-gray-700 text-white rounded border border-gray-600 focus:outline-none focus:border-blue-500"
+                                                        disabled={currentZoneIndex !== null}
+                                                    >
+                                                        <option value="horizontal">Horizontal (Width)</option>
+                                                        <option value="vertical">Vertical (Height)</option>
+                                                    </select>
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}
                                 <button
-                                    className={`mt-2 px-2 py-1 rounded bg-blue-600 text-white text-xs ${zones.length >= 4 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    className={`mt-2 px-2 py-1 rounded bg-blue-600 text-white text-xs ${
+                                        zones.length >= 4 ? 'opacity-50 cursor-not-allowed' : ''
+                                    }`}
                                     onClick={handleAddZone}
                                     disabled={zones.length >= 4 || currentZoneIndex !== null}
                                 >
                                     + Add Zone
                                 </button>
                                 {zones.length >= 4 && <span className="text-xs text-gray-400">Max 4 zones</span>}
-                                {currentZoneIndex !== null && <span className="text-xs text-yellow-400">Draw polygon for {zones[currentZoneIndex]?.name}</span>}
+                                {currentZoneIndex !== null && 
+                                    <span className="text-xs text-yellow-400">
+                                        Draw polygon for {zones[currentZoneIndex]?.name}
+                                    </span>
+                                }
                             </div>
                         </InfoItem>
                     </InfoSection>
@@ -742,7 +887,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                                     onCreated={(e) => {
                                         // Polygon for zone
                                         if (currentZoneIndex !== null && e.layerType === 'polygon' && e.layer instanceof L.Polygon) {
-                                        const layer = e.layer;
+                                            const layer = e.layer;
                                             const latlngsRaw = layer.getLatLngs();
                                             let latlngs: L.LatLng[] = [];
                                             if (Array.isArray(latlngsRaw[0])) {
@@ -758,8 +903,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                                             featureGroupRef.current?.removeLayer(layer);
                                         }
                                         if (e.layer instanceof L.Marker) {
-                                            const latlng = e.layer.getLatLng();
-                                            setPlantLocations(prev => [...prev, { lat: latlng.lat, lng: latlng.lng }]);
+                                            handleMarkerCreated(e.layer.getLatLng());
                                         }
                                     }}
                                     onDeleted={(e) => {
@@ -838,38 +982,31 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                                         />
                                     );
                             })}
-                            {grid && grid.map((row, rowIdx) => {
-                                const rowPoints = row.filter(pt => pt);
-                                if (rowPoints.length < 2) return null;
-                                return (
-                                    <Polyline
-                                        key={`grid-row-${rowIdx}`}
-                                        positions={rowPoints.map(pt => [pt.lat, pt.lng])}
-                                        color="blue"
-                                        weight={1}
-                                        opacity={0.5}
-                                    />
-                                );
-                            })}
-                            {grid && grid[0] && grid[0].map((_, colIdx) => {
-                                const colPoints = grid.map(row => row[colIdx]).filter(pt => pt);
-                                if (colPoints.length < 2) return null;
-                                return (
-                                    <Polyline
-                                        key={`grid-col-${colIdx}`}
-                                        positions={colPoints.map(pt => [pt.lat, pt.lng])}
-                                        color="orange"
-                                        weight={1}
-                                        opacity={0.5}
-                                    />
-                                );
-                            })}
+                            {pipeLayout.length > 0 && (
+                                <FeatureGroup>
+                                    {pipeLayout.map((pipe, index) => {
+                                        console.log('Rendering pipe:', pipe);
+                                        return (
+                                            <Polyline
+                                                key={`pipe-${index}`}
+                                                positions={[
+                                                    [pipe.start.lat, pipe.start.lng],
+                                                    [pipe.end.lat, pipe.end.lng]
+                                                ]}
+                                                color={getPipeColor(pipe)}
+                                                weight={3}
+                                                opacity={0.8}
+                                            />
+                                        );
+                                    })}
+                                </FeatureGroup>
+                            )}
                         </MapContainer>
                     </div>
                     <div className="grid grid-cols-1 gap-4">
                         <button
                             onClick={handleGeneratePipeLayout}
-                            disabled={isLoading || !isPlantLayoutGenerated}
+                            disabled={isLoading || !isPlantLayoutGenerated || zones.length === 0}
                             className="w-full rounded bg-blue-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-700"
                         >
                             {isLoading ? 'Generating...' : 'Generate Pipe Layout'}
