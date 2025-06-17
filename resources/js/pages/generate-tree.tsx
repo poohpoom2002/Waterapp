@@ -601,6 +601,23 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
 
         try {
             const areaTypes = areaType ? areaType.split(',').map(type => type.trim()) : ['default'];
+            
+            // Get all layers that should be treated as exclusion zones
+            const exclusionLayers = layers.filter(layer => 
+                layer.type === 'exclusion' || layer.type === 'river'
+            );
+
+            // Log the request data
+            console.log('Generating planting points with data:', {
+                area,
+                plant_type_id: plantType.id,
+                plant_spacing: plantType.plant_spacing,
+                row_spacing: plantType.row_spacing,
+                area_types: areaTypes,
+                layers,
+                exclusion_areas: exclusionLayers.map(layer => layer.coordinates)
+            });
+
             const { data } = await axios.post<{ plant_locations: LatLng[][] }>(
                 '/api/generate-planting-points',
                 {
@@ -609,9 +626,14 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                     plant_spacing: plantType.plant_spacing,
                     row_spacing: plantType.row_spacing,
                     area_types: areaTypes,
-                    layers
+                    layers,
+                    exclusion_areas: exclusionLayers.map(layer => layer.coordinates)
                 }
             );
+
+            // Log the response data
+            console.log('Received plant locations:', data);
+
             if (!data?.plant_locations) {
                 throw new Error('Invalid response format from server');
             }
