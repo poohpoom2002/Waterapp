@@ -158,9 +158,9 @@ export default function Product() {
             <div className="mx-auto max-w-7xl">
                 <div className="mb-6 flex items-center justify-center gap-4">
                     <img
-                        src="https://scontent.fbkk17-1.fna.fbcdn.net/v/t39.30808-6/329365639_863669681576432_9072509434807570833_n.jpg?_nc_cat=102&ccb=1-7&_nc_sid=6ee11a&_nc_eui2=AeHzH0DSWRVrgxX-EPgYJXWZa6wVAKl2SdJrrBUAqXZJ0oxyybhLN1NBN_23fG_LnsJ6WcMd43_CHfgauuKawq9u&_nc_ohc=AYHmXGdPpb4Q7kNvwGjNIyW&_nc_oc=Adn8gkjmK5ho0NtNd0I0aDcp_32sp2juklFr_jP0eF8617DZ6crKViCr4e0-DZzT5uQ&_nc_zt=23&_nc_ht=scontent.fbkk17-1.fna&_nc_gid=Zfi-XqpAeRcnvD0MriwK7A&oh=00_AfO7sOig231Gxwr0PwWWUoNs5XOC5lL5YPLds-YxiQGHdg&oe=6856A38C"
-                        alt=""
-                        className="h-[80px] w-[80px] rounded-full"
+                        src="https://f.btwcdn.com/store-50036/store/e4c1b5ae-cf8e-5017-536b-66ecd994018d.jpg"
+                        alt="logo"
+                        className="h-[80px] w-[80px] rounded-xl"
                     />
                     <h1 className="text-center text-3xl font-bold text-blue-400">
                         ระบบคำนวณเลือกอุปกรณ์การให้น้ำพืช
