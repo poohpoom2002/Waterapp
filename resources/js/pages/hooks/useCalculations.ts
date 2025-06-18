@@ -103,6 +103,8 @@ export const useCalculations = (input: IrrigationInput): CalculationResults | nu
         const irrigationTimeHours = input.irrigationTimeMinutes / 60;
         const totalWaterRequiredLPH = totalWaterRequiredPerDay / irrigationTimeHours;
         const totalWaterRequiredLPM = totalWaterRequiredLPH / 60;
+        const branchesPerSecondary = input.branchesPerSecondary;
+        
 
         const safetyFactor = 1.25;
         const adjustedFlow = totalWaterRequiredLPM * safetyFactor;
@@ -404,6 +406,7 @@ export const useCalculations = (input: IrrigationInput): CalculationResults | nu
             recommendedSecondaryPipe: recommendedSecondaryPipe,
             recommendedMainPipe: recommendedMainPipe,
             recommendedPump,
+            branchesPerSecondary,
             // เพิ่มข้อมูลที่วิเคราะห์แล้ว
             analyzedBranchPipes,
             analyzedSecondaryPipes,
