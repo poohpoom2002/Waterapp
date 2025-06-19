@@ -34,7 +34,7 @@ type CustomPlantParams = {
     water_needed: number;
 };
 
-type AreaType = 'river' | 'powerplant' | 'building' | 'pump' | 'custompolygon' | 'solarcell';
+type AreaType = 'river' | 'powerplant' | 'building' | 'custompolygon' | 'solarcell';
 
 type LayerData = {
     type: AreaType;
@@ -48,13 +48,6 @@ type Suggestion = {
     lon: string;
 };
 
-type LayerHistory = {
-    layers: LayerData[];
-    selectedAreaTypes: AreaType[];
-    activeButton: AreaType | null;
-    pumpLocation: LatLng | null;
-};
-
 // Constants
 const DEFAULT_MAP_CENTER: [number, number] = [13.7563, 100.5018];
 const MAX_AREA = 100000; // 10 hectares
@@ -63,18 +56,16 @@ const AREA_DESCRIPTIONS: Record<AreaType, string> = {
     river: 'Water body for irrigation and water management.',
     powerplant: 'Energy generation facility area.',
     building: 'Structure or facility area.',
-    pump: 'Water pump station for irrigation system.',
-    custompolygon: 'Other area for flexible drawing.',
-    solarcell: 'Solar cell installation area.'
+    solarcell: 'Solar cell installation area.',
+    custompolygon: 'Other area for flexible drawing.'
 };
 
 const AREA_COLORS: Record<AreaType, string> = {
     river: '#3B82F6',    // Blue
     powerplant: '#EF4444', // Red
     building: '#F59E0B',  // Yellow
-    pump: '#1E40AF',      // Dark Blue
-    custompolygon: '#4B5563', // Black Gray
-    solarcell: '#FFD600' // Bright Yellow
+    solarcell: '#FFD600', // Bright Yellow
+    custompolygon: '#4B5563' // Black Gray
 };
 
 // Components
@@ -104,19 +95,7 @@ const AreaTypeButton: React.FC<{
     </button>
 );
 
-const MapClickHandler: React.FC<{
-    isPumpMode: boolean;
-    onPumpPlace: (lat: number, lng: number) => void;
-}> = ({ isPumpMode, onPumpPlace }) => {
-    useMapEvents({
-        click: (e) => {
-            if (isPumpMode) {
-                onPumpPlace(e.latlng.lat, e.latlng.lng);
-            }
-        }
-    });
-    return null;
-};
+// MapClickHandler component removed - pump functionality no longer needed
 
 const SearchControl: React.FC<{ onSearch: (lat: number, lng: number) => void }> = ({ onSearch }) => {
     const [searchQuery, setSearchQuery] = useState('');
@@ -381,13 +360,11 @@ export default function MapPlanner() {
     });
 
     // Mode States
-    const [isPumpMode, setIsPumpMode] = useState(false);
     const [isRiverMode, setIsRiverMode] = useState(false);
     const [isBuildingMode, setIsBuildingMode] = useState(false);
     const [isPowerPlantMode, setIsPowerPlantMode] = useState(false);
     const [isOtherMode, setIsOtherMode] = useState(false);
     const [isSolarcellMode, setIsSolarcellMode] = useState(false);
-    const [pumpLocation, setPumpLocation] = useState<LatLng | null>(null);
     const [selectedPlantCategory, setSelectedPlantCategory] = useState<string>('');
     const [filteredPlants, setFilteredPlants] = useState<PlantType[]>([]);
 
@@ -405,10 +382,6 @@ export default function MapPlanner() {
     // Add new state for storing initial map position
     const [initialMapPosition, setInitialMapPosition] = useState<[number, number] | null>(null);
 
-    // Add these state declarations in the MapPlanner component
-    const [history, setHistory] = useState<LayerHistory[]>([]);
-    const [historyIndex, setHistoryIndex] = useState(-1);
-
     // Effects
     useEffect(() => {
         const fetchPlantTypes = async () => {
@@ -425,7 +398,6 @@ export default function MapPlanner() {
 
     // Helper Functions
     const resetModes = () => {
-        setIsPumpMode(false);
         setIsRiverMode(false);
         setIsBuildingMode(false);
         setIsPowerPlantMode(false);
@@ -434,31 +406,7 @@ export default function MapPlanner() {
         setActiveButton(null);
     };
 
-    const handlePumpPlace = (lat: number, lng: number) => {
-        if (layers.length > 0) {
-            const clickedPoint = { lat, lng };
-            console.log('Pump Location:', {
-                latitude: lat,
-                longitude: lng,
-                coordinates: clickedPoint
-            });
-            setPumpLocation(clickedPoint);
-
-            // Add pump to layers and save to history
-            const pumpLayer: LayerData = {
-                type: 'pump',
-                coordinates: [clickedPoint]
-            };
-            const newLayers = [...layers, pumpLayer];
-            setLayers(newLayers);
-            saveToHistory(newLayers, selectedAreaTypes, activeButton, clickedPoint);
-
-            resetModes();
-            setActiveButton(null);
-            setSelectedAreaTypes(prev => prev.filter(type => type !== 'pump'));
-            setStatus('Pump location added. Select another area type to continue.');
-        }
-    };
+    // handlePumpPlace function removed - pump functionality no longer needed
 
     const toggleAreaType = (type: AreaType) => {
         if (activeButton === type) {
@@ -495,11 +443,6 @@ export default function MapPlanner() {
         };
 
         const modeMap = {
-            pump: () => {
-                setIsPumpMode(true);
-                setSelectedAreaTypes(prev => [...prev, 'pump']);
-                setStatus('Click on the map to place a pump');
-            },
             river: () => {
                 setIsRiverMode(true);
                 setDrawingMode('polygon');
@@ -565,7 +508,6 @@ export default function MapPlanner() {
             river: { color: '#3B82F6', fillOpacity: 0.3 },
             powerplant: { color: '#EF4444', fillOpacity: 0.3 },
             building: { color: '#F59E0B', fillOpacity: 0.3 },
-            pump: { color: '#1E40AF', fillOpacity: 0.3 },
             custompolygon: { color: '#4B5563', fillOpacity: 0.3 },
             solarcell: { color: '#FFD600', fillOpacity: 0.3 }
         };
@@ -585,9 +527,7 @@ export default function MapPlanner() {
                 isInitialMap: true
             };
 
-            const newLayers = [...layers, newLayer];
-            setLayers(newLayers);
-            saveToHistory(newLayers, selectedAreaTypes, activeButton, pumpLocation);
+            setLayers([newLayer]);
 
             // Set map center and zoom
             const bounds = layer.getBounds();
@@ -640,9 +580,7 @@ export default function MapPlanner() {
             isInitialMap: false
         };
 
-        const newLayers = [...layers, newLayer];
-        setLayers(newLayers);
-        saveToHistory(newLayers, selectedAreaTypes, activeButton, pumpLocation);
+        setLayers(prevLayers => [...prevLayers, newLayer]);
 
         // Reset modes
         resetModes();
@@ -651,34 +589,8 @@ export default function MapPlanner() {
         setStatus(`${currentType} area added. Select another area type to continue.`);
     };
 
-    // Add useEffect to handle map centering when layout changes
-    useEffect(() => {
-        if (layers.length > 0 && featureGroupRef.current?.leafletElement) {
-            const map = featureGroupRef.current.leafletElement._map;
-            if (map) {
-                // Add a small delay to ensure the layout has updated
-                setTimeout(() => {
-                    map.invalidateSize();
-                    const initialMap = layers.find(layer => layer.type === 'initial' as AreaType);
-                    if (initialMap) {
-                        const bounds = L.latLngBounds(initialMap.coordinates);
-                        map.fitBounds(bounds, {
-                            padding: [50, 50],
-                            maxZoom: 20
-                        });
-                    } else if (mapCenter) {
-                        map.setView(mapCenter, currentZoom, {
-                            animate: true,
-                            duration: 0.5
-                        });
-                    }
-                }, 100);
-            }
-        }
-    }, [layers, featureGroupRef, mapCenter, currentZoom]);
-
     const onDeleted = () => {
-        // When a layer is deleted, update the state and save to history
+        // When a layer is deleted, update the state
         if (featureGroupRef.current?.leafletElement) {
             const featureGroup = featureGroupRef.current.leafletElement;
             const map = featureGroup._map;
@@ -706,7 +618,7 @@ export default function MapPlanner() {
                     }
 
                     mapLayers.push({
-                        type: layer instanceof L.Circle ? 'pump' : 'custompolygon', // Default type
+                        type: 'custompolygon', // Default type for any remaining layers
                         coordinates: latLngs,
                         isInitialMap: false
                     });
@@ -715,7 +627,6 @@ export default function MapPlanner() {
 
             // Update the state with the remaining layers
             setLayers(mapLayers);
-            saveToHistory(mapLayers, selectedAreaTypes, activeButton, pumpLocation);
             setStatus('Area deleted. Select another area type to continue.');
         }
     };
@@ -773,10 +684,10 @@ export default function MapPlanner() {
                 areaType: uniqueAreaTypes.join(','),
                 area: JSON.stringify(mainAreaCoordinates),
                 plantType: JSON.stringify(plantData),
-                layers: JSON.stringify(formattedLayers),
-                pumpLocation: pumpLocation ? JSON.stringify(pumpLocation) : undefined
+                layers: JSON.stringify(formattedLayers)
             };
 
+            // Log the final data being sent
             console.log('Data being sent to generate-tree page:', formattedData);
 
             router.visit('/generate-tree', {
@@ -800,7 +711,6 @@ export default function MapPlanner() {
         // Reset all state
         setLayers([]);
         setSelectedAreaTypes([]);
-        setPumpLocation(null);
         setSelectedPlant(null);
         setSelectedPlantCategory('');
         setCustomParams({
@@ -814,8 +724,6 @@ export default function MapPlanner() {
         setError(null);
         setStatus('Draw an area on the map first');
         setActiveButton(null);
-        setHistory([]);
-        setHistoryIndex(-1);
 
         // Reset map view to previous position
         setMapCenter(currentCenter);
@@ -911,134 +819,6 @@ export default function MapPlanner() {
             return [totalLat / allPoints.length, totalLng / allPoints.length] as [number, number];
         }
         return mapCenter;
-    };
-
-    // Add these functions in the MapPlanner component
-    const saveToHistory = (newLayers: LayerData[], newSelectedTypes: AreaType[], newActiveButton: AreaType | null, newPumpLocation: LatLng | null) => {
-        // Clear any existing history after current index
-        const newHistory = history.slice(0, historyIndex + 1);
-
-        // Save the complete state
-        newHistory.push({
-            layers: newLayers.map(layer => ({
-                ...layer,
-                coordinates: layer.coordinates.map(coord => ({
-                    lat: coord.lat,
-                    lng: coord.lng
-                }))
-            })),
-            selectedAreaTypes: [...newSelectedTypes],
-            activeButton: newActiveButton,
-            pumpLocation: newPumpLocation ? { ...newPumpLocation } : null
-        });
-
-        setHistory(newHistory);
-        setHistoryIndex(newHistory.length - 1);
-    };
-
-    // --- START: CORRECTED UNDO/REDO LOGIC ---
-
-    const restoreMapState = (state: LayerHistory) => {
-        const featureGroup = featureGroupRef.current?.leafletElement;
-        
-        // 1. Clear the imperative layers from the FeatureGroup
-        if (featureGroup) {
-            featureGroup.clearLayers();
-
-            // 2. Re-populate the FeatureGroup from the restored state so EditControl works
-            state.layers.forEach(layerData => {
-                if (layerData.type !== 'pump') {
-                    const polygon = new L.Polygon(
-                        layerData.coordinates.map(c => [c.lat, c.lng]),
-                        {
-                            // Apply styling so the layers are visible
-                            color: layerData.isInitialMap ? '#90EE90' : AREA_COLORS[layerData.type],
-                            fillColor: layerData.isInitialMap ? '#90EE90' : AREA_COLORS[layerData.type],
-                            fillOpacity: 0.5,
-                            weight: 2
-                        }
-                    );
-                    featureGroup.addLayer(polygon);
-                }
-            });
-             // Note: The pump is handled by the declarative <Circle> component
-        }
-        
-        // 3. Restore the React state, which will re-render the declarative layers
-        resetModes();
-        setLayers(state.layers);
-        setSelectedAreaTypes(state.selectedAreaTypes);
-        setActiveButton(null); // Always reset active tool on undo/redo
-        setPumpLocation(state.pumpLocation);
-    };
-
-    const handleUndo = () => {
-        if (historyIndex > 0) {
-            const newIndex = historyIndex - 1;
-            const previousState = history[newIndex];
-            restoreMapState(previousState);
-            setHistoryIndex(newIndex);
-            setStatus('Undo: Previous state restored');
-        }
-    };
-
-    const handleRedo = () => {
-        if (historyIndex < history.length - 1) {
-            const newIndex = historyIndex + 1;
-            const nextState = history[newIndex];
-            restoreMapState(nextState);
-            setHistoryIndex(newIndex);
-            setStatus('Redo: Next state restored');
-        }
-    };
-    
-    // --- END: CORRECTED UNDO/REDO LOGIC ---
-
-
-    // Add the arrow controls to the map
-    const MapControls: React.FC = () => {
-        return (
-            <div className="absolute bottom-4 right-4 z-[1000] flex space-x-2">
-                <button
-                    onClick={handleUndo}
-                    disabled={historyIndex <= 0}
-                    className="rounded bg-white p-2 shadow-md hover:bg-gray-100 disabled:opacity-50"
-                >
-                    <svg
-                        className="h-6 w-6 text-gray-700"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 19l-7-7 7-7"
-                        />
-                    </svg>
-                </button>
-                <button
-                    onClick={handleRedo}
-                    disabled={historyIndex >= history.length - 1}
-                    className="rounded bg-white p-2 shadow-md hover:bg-gray-100 disabled:opacity-50"
-                >
-                    <svg
-                        className="h-6 w-6 text-gray-700"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 5l7 7-7 7"
-                        />
-                    </svg>
-                </button>
-            </div>
-        );
     };
 
     return (
@@ -1222,11 +1002,6 @@ export default function MapPlanner() {
                                 onMapTypeChange={setCurrentMapType}
                             />
                             <ZoomLevelDisplay />
-                            <MapControls />
-                            <MapClickHandler
-                                isPumpMode={isPumpMode}
-                                onPumpPlace={handlePumpPlace}
-                            />
                             <LayersControl position="topright">
                                 <LayersControl.BaseLayer checked={currentMapType === 'street'} name="Street Map">
                                     <TileLayer
@@ -1274,19 +1049,6 @@ export default function MapPlanner() {
                                     }}
                                 />
                             </FeatureGroup>
-
-                            {pumpLocation && (
-                                <Circle
-                                    center={[pumpLocation.lat, pumpLocation.lng]}
-                                    radius={4}
-                                    pathOptions={{
-                                        color: AREA_COLORS.pump,
-                                        fillColor: AREA_COLORS.pump,
-                                        fillOpacity: 1,
-                                        weight: 2
-                                    }}
-                                />
-                            )}
 
                             {layers.map((layer, index) => {
                                 if (layer.isInitialMap) {

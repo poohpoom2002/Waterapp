@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { router } from '@inertiajs/react';
-import { MapContainer, TileLayer, CircleMarker, Polygon, useMap, FeatureGroup, LayersControl, Polyline, Rectangle } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Polygon, useMap, FeatureGroup, LayersControl, Polyline, Circle } from 'react-leaflet';
 import { EditControl } from 'react-leaflet-draw';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
@@ -22,6 +22,25 @@ type PlantType = {
     plant_spacing: number;
     row_spacing: number;
     water_needed: number;
+};
+
+type ValveType = 'solenoid' | 'ball';
+
+type Valve = {
+    id: string;
+    type: ValveType;
+    position: [number, number];
+};
+
+type Pump = {
+    id: string;
+    position: [number, number];
+    radius: number;
+};
+
+type EquipmentState = {
+    valves: Valve[];
+    pumps: Pump[];
 };
 
 type Props = {
@@ -656,6 +675,76 @@ const isPointInZonePolygon = (lat: number, lng: number, polygon: [number, number
     return inside;
 };
 
+// Add this utility function after the existing utility functions
+const createTrianglePoints = (center: [number, number], size: number = 0.00003): [number, number][] => {
+    const [lat, lng] = center;
+    return [
+        [lat + size, lng], // Bottom point
+        [lat - size/2, lng - size], // Top left
+        [lat - size/2, lng + size], // Top right
+    ];
+};
+
+// Add after the existing utility functions
+const ValveUndoRedoControl = ({ onUndo, onRedo, canUndo, canRedo }: { 
+    onUndo: () => void; 
+    onRedo: () => void;
+    canUndo: boolean;
+    canRedo: boolean;
+}) => {
+    const map = useMap();
+
+    useEffect(() => {
+        const controlDiv = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+        controlDiv.style.backgroundColor = 'white';
+        controlDiv.style.padding = '6px';
+        controlDiv.style.borderRadius = '4px';
+        controlDiv.style.boxShadow = '0 1px 5px rgba(0,0,0,0.65)';
+        controlDiv.style.marginTop = '60px'; // Position below valve controls
+
+        const undoButton = L.DomUtil.create('button', '', controlDiv);
+        undoButton.innerHTML = '↶';
+        undoButton.style.marginRight = '4px';
+        undoButton.style.padding = '4px 8px';
+        undoButton.style.border = 'none';
+        undoButton.style.borderRadius = '4px';
+        undoButton.style.cursor = canUndo ? 'pointer' : 'not-allowed';
+        undoButton.style.opacity = canUndo ? '1' : '0.5';
+        undoButton.style.backgroundColor = canUndo ? '#1E40AF' : '#9CA3AF';
+        undoButton.style.color = 'white';
+
+        const redoButton = L.DomUtil.create('button', '', controlDiv);
+        redoButton.innerHTML = '↷';
+        redoButton.style.padding = '4px 8px';
+        redoButton.style.border = 'none';
+        redoButton.style.borderRadius = '4px';
+        redoButton.style.cursor = canRedo ? 'pointer' : 'not-allowed';
+        redoButton.style.opacity = canRedo ? '1' : '0.5';
+        redoButton.style.backgroundColor = canRedo ? '#1E40AF' : '#9CA3AF';
+        redoButton.style.color = 'white';
+
+        L.DomEvent.on(undoButton, 'click', (e) => {
+            L.DomEvent.stopPropagation(e);
+            if (canUndo) onUndo();
+        });
+
+        L.DomEvent.on(redoButton, 'click', (e) => {
+            L.DomEvent.stopPropagation(e);
+            if (canRedo) onRedo();
+        });
+
+        const control = new L.Control({ position: 'topright' });
+        control.onAdd = () => controlDiv;
+        control.addTo(map);
+
+        return () => {
+            control.remove();
+        };
+    }, [map, onUndo, onRedo, canUndo, canRedo]);
+
+    return null;
+};
+
 // Main Component
 export default function GenerateTree({ areaType, area, plantType, layers = [], pumpLocation }: Props) {
     const [plantLocations, setPlantLocations] = useState<LatLng[]>([]);
@@ -670,6 +759,16 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
     const [userPipes, setUserPipes] = useState<UserPipe[]>([]);
     const [drawingPipeType, setDrawingPipeType] = useState<'main' | 'submain' | null>(null);
     const [showPipeSummary, setShowPipeSummary] = useState(false);
+    const [selectedValveType, setSelectedValveType] = useState<ValveType | null>(null);
+    const [valves, setValves] = useState<Valve[]>([]);
+    const [draggingValve, setDraggingValve] = useState<Valve | null>(null);
+    // Add new pump state
+    const [pumps, setPumps] = useState<Pump[]>([]);
+    const [selectedPumpType, setSelectedPumpType] = useState<boolean>(false);
+    const [draggingPump, setDraggingPump] = useState<Pump | null>(null);
+    // Combined equipment history
+    const [equipmentHistory, setEquipmentHistory] = useState<EquipmentState[]>([{ valves: [], pumps: [] }]);
+    const [equipmentHistoryIndex, setEquipmentHistoryIndex] = useState(0);
 
     // Memoized values
     const areaInRai = useMemo(() => calculateAreaInRai(area), [area]);
@@ -873,6 +972,102 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
     const longestMain = mainPipeLengths.length > 0 ? Math.max(...mainPipeLengths) : 0;
     const longestSubmain = submainPipeLengths.length > 0 ? Math.max(...submainPipeLengths) : 0;
 
+    // Add after the existing handlers
+    const handleValveTypeSelect = (type: ValveType) => {
+        setSelectedValveType(type);
+        setSelectedPumpType(false); // Disable pump selection when valve is selected
+    };
+
+    const handlePumpTypeSelect = () => {
+        setSelectedPumpType(!selectedPumpType);
+        setSelectedValveType(null); // Disable valve selection when pump is selected
+    };
+
+    const handleValveDragStart = (valve: Valve) => {
+        setDraggingValve(valve);
+    };
+
+    const handleValveDragEnd = (position: [number, number]) => {
+        if (draggingValve) {
+            const newValves = valves.map(v => 
+                v.id === draggingValve.id 
+                    ? { ...v, position } 
+                    : v
+            );
+            saveEquipmentToHistory({ valves: newValves, pumps: pumps });
+            setValves(newValves);
+            setDraggingValve(null);
+        }
+    };
+
+    const handlePumpDragStart = (pump: Pump) => {
+        setDraggingPump(pump);
+    };
+
+    const handlePumpDragEnd = (position: [number, number]) => {
+        if (draggingPump) {
+            const newPumps = pumps.map(p => 
+                p.id === draggingPump.id 
+                    ? { ...p, position } 
+                    : p
+            );
+            saveEquipmentToHistory({ valves: valves, pumps: newPumps });
+            setPumps(newPumps);
+            setDraggingPump(null);
+        }
+    };
+
+    const handleMapClick = (e: LeafletMouseEvent) => {
+        if (selectedValveType) {
+            const newValve: Valve = {
+                id: `valve-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                type: selectedValveType,
+                position: [e.latlng.lat, e.latlng.lng]
+            };
+            const newValves = [...valves, newValve];
+            saveEquipmentToHistory({ valves: newValves, pumps: pumps });
+            setValves(newValves);
+            setSelectedValveType(null);
+        } else if (selectedPumpType) {
+            const newPump: Pump = {
+                id: `pump-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                position: [e.latlng.lat, e.latlng.lng],
+                radius: 4 // Reduced from 100 to 50 meters
+            };
+            const newPumps = [...pumps, newPump];
+            saveEquipmentToHistory({ valves: valves, pumps: newPumps });
+            setPumps(newPumps);
+            setSelectedPumpType(false);
+        }
+    };
+
+    const saveEquipmentToHistory = (newEquipment: EquipmentState) => {
+        setEquipmentHistory(prev => {
+            const newHistory = prev.slice(0, equipmentHistoryIndex + 1);
+            newHistory.push(newEquipment);
+            return newHistory;
+        });
+        setEquipmentHistoryIndex(prev => prev + 1);
+    };
+
+    const handleValveUndo = () => {
+        if (equipmentHistoryIndex > 0) {
+            const newIndex = equipmentHistoryIndex - 1;
+            setEquipmentHistoryIndex(newIndex);
+            setValves(equipmentHistory[newIndex].valves);
+            setPumps(equipmentHistory[newIndex].pumps);
+        }
+    };
+
+    const handleValveRedo = () => {
+        if (equipmentHistoryIndex < equipmentHistory.length - 1) {
+            const newIndex = equipmentHistoryIndex + 1;
+            setEquipmentHistoryIndex(newIndex);
+            setValves(equipmentHistory[newIndex].valves);
+            setPumps(equipmentHistory[newIndex].pumps);
+        }
+    };
+
     // Effects
     useEffect(() => {
         console.log('=== Data received from map-planner ===');
@@ -898,16 +1093,17 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
     // Add pump location marker to the map
     useEffect(() => {
         if (pumpLocation) {
-            const pumpMarker = L.circle([pumpLocation.lat, pumpLocation.lng], {
-                radius: 4,
-                color: AREA_COLORS.pump,
-                fillColor: AREA_COLORS.pump,
-                fillOpacity: 1,
-                weight: 2
-            });
-            featureGroupRef.current?.addLayer(pumpMarker);
+            console.log('Pump location received:', pumpLocation);
+            console.log('Pump coordinates:', [pumpLocation.lat, pumpLocation.lng]);
         }
     }, [pumpLocation]);
+
+    useEffect(() => {
+        if (equipmentHistory.length === 1 && equipmentHistory[0].valves.length === 0 && equipmentHistory[0].pumps.length === 0 && (valves.length > 0 || pumps.length > 0)) {
+            setEquipmentHistory([{ valves: [], pumps: [] }, { valves: valves, pumps: pumps }]);
+            setEquipmentHistoryIndex(1);
+        }
+    }, [valves, pumps]);
 
     return (
         <div className="min-h-screen bg-gray-900 p-6">
@@ -943,12 +1139,6 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                         <InfoItem title="Total Water Need (W)">
                             <p>{(plantLocations.length * processedPlantType.water_needed).toFixed(2)} L/day</p>
                         </InfoItem>
-                        {pumpLocation && (
-                            <InfoItem title="Pump Location">
-                                <p>Lat: {pumpLocation.lat.toFixed(6)}</p>
-                                <p>Lng: {pumpLocation.lng.toFixed(6)}</p>
-                            </InfoItem>
-                        )}
                     </InfoSection>
                     <InfoSection title="Zoning Configuration">
                         <InfoItem title="Zones">
@@ -1036,22 +1226,58 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                             </div>
                         </InfoItem>
                     </InfoSection>
-                    <div className="flex gap-2 mt-4">
-                        <button
-                            className={`px-3 py-2 rounded ${drawingPipeType === 'main' ? 'bg-red-600 text-white' : 'bg-red-500 text-white hover:bg-red-600'}`}
-                            onClick={() => setDrawingPipeType(drawingPipeType === 'main' ? null : 'main')}
-                            disabled={drawingPipeType === 'submain'}
-                        >
-                            {drawingPipeType === 'main' ? 'Drawing Main Pipe...' : 'Draw Main Pipe'}
-                        </button>
-                        <button
-                            className={`px-3 py-2 rounded ${drawingPipeType === 'submain' ? 'bg-orange-600 text-white' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
-                            onClick={() => setDrawingPipeType(drawingPipeType === 'submain' ? null : 'submain')}
-                            disabled={drawingPipeType === 'main'}
-                        >
-                            {drawingPipeType === 'submain' ? 'Drawing Sub-Main Pipe...' : 'Draw Sub-Main Pipe'}
-                        </button>
-                    </div>
+
+                    <InfoSection title="Valve Configuration">
+                        <InfoItem title="Valve Count">
+                            <div className="flex flex-col gap-2">
+                                <div className="flex items-center justify-between p-2 rounded bg-gray-800">
+                                    <div className="flex items-center gap-2">
+                                        <span style={{ 
+                                            background: '#9333EA', 
+                                            width: 16, 
+                                            height: 16, 
+                                            display: 'inline-block', 
+                                            borderRadius: 4 
+                                        }}></span>
+                                        <span className="text-white font-medium">Solenoid Valves</span>
+                                    </div>
+                                    <span className="text-white font-medium">
+                                        {valves.filter(v => v.type === 'solenoid').length}
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between p-2 rounded bg-gray-800">
+                                    <div className="flex items-center gap-2">
+                                        <span style={{ 
+                                            background: '#4F46E5', 
+                                            width: 16, 
+                                            height: 16, 
+                                            display: 'inline-block', 
+                                            borderRadius: 4 
+                                        }}></span>
+                                        <span className="text-white font-medium">Ball Valves</span>
+                                    </div>
+                                    <span className="text-white font-medium">
+                                        {valves.filter(v => v.type === 'ball').length}
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between p-2 rounded bg-gray-800">
+                                    <div className="flex items-center gap-2">
+                                        <span style={{ 
+                                            background: '#1E40AF', 
+                                            width: 16, 
+                                            height: 16, 
+                                            display: 'inline-block', 
+                                            borderRadius: 4 
+                                        }}></span>
+                                        <span className="text-white font-medium">Pumps</span>
+                                    </div>
+                                    <span className="text-white font-medium">
+                                        {pumps.length}
+                                    </span>
+                                </div>
+                            </div>
+                        </InfoItem>
+                    </InfoSection>
                 </div>
 
                 <div className="space-y-4 lg:col-span-3">
@@ -1182,9 +1408,114 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                                 />
                             )}
                             <UserPipes userPipes={userPipes} />
+                            {valves.map((valve) => (
+                                <Polygon
+                                    key={valve.id}
+                                    positions={createTrianglePoints(valve.position)}
+                                    pathOptions={{
+                                        color: valve.type === 'solenoid' ? '#9333EA' : '#4F46E5',
+                                        fillColor: valve.type === 'solenoid' ? '#9333EA' : '#4F46E5',
+                                        fillOpacity: 1,
+                                        weight: 2
+                                    }}
+                                    eventHandlers={{
+                                        mousedown: () => handleValveDragStart(valve),
+                                        mouseup: () => setDraggingValve(null)
+                                    }}
+                                />
+                            ))}
+                            {pumps.map((pump) => (
+                                <Circle
+                                    key={pump.id}
+                                    center={pump.position}
+                                    radius={pump.radius}
+                                    pathOptions={{ 
+                                        color: '#1E40AF', 
+                                        fillColor: '#1E40AF', 
+                                        fillOpacity: 1,
+                                        weight: 2
+                                    }}
+                                    eventHandlers={{
+                                        mousedown: () => handlePumpDragStart(pump),
+                                        mouseup: () => setDraggingPump(null)
+                                    }}
+                                />
+                            ))}
+                            <MapClickHandler onMapClick={handleMapClick} />
+                            <MouseTracker onMove={(position) => {
+                                if (draggingValve) {
+                                    handleValveDragEnd(position);
+                                }
+                                if (draggingPump) {
+                                    handlePumpDragEnd(position);
+                                }
+                            }} />
+                            <ValveUndoRedoControl 
+                                onUndo={handleValveUndo}
+                                onRedo={handleValveRedo}
+                                canUndo={equipmentHistoryIndex > 0}
+                                canRedo={equipmentHistoryIndex < equipmentHistory.length - 1}
+                            />
                         </MapContainer>
                     </div>
                     <div className="flex flex-col gap-2 mt-4">
+                        <div className="grid grid-cols-5 gap-2">
+                            <button
+                                className={`rounded px-6 py-2 text-white transition-colors duration-200 ${
+                                    drawingPipeType === 'main' 
+                                        ? 'bg-red-600' 
+                                        : 'bg-red-500 hover:bg-red-600'
+                                }`}
+                                onClick={() => setDrawingPipeType(drawingPipeType === 'main' ? null : 'main')}
+                                disabled={drawingPipeType === 'submain' || selectedValveType !== null || selectedPumpType}
+                            >
+                                {drawingPipeType === 'main' ? 'Drawing Main Pipe...' : 'Draw Main Pipe'}
+                            </button>
+                            <button
+                                className={`rounded px-6 py-2 text-white transition-colors duration-200 ${
+                                    drawingPipeType === 'submain' 
+                                        ? 'bg-orange-600' 
+                                        : 'bg-orange-500 hover:bg-orange-600'
+                                }`}
+                                onClick={() => setDrawingPipeType(drawingPipeType === 'submain' ? null : 'submain')}
+                                disabled={drawingPipeType === 'main' || selectedValveType !== null || selectedPumpType}
+                            >
+                                {drawingPipeType === 'submain' ? 'Drawing Sub-Main Pipe...' : 'Draw Sub-Main Pipe'}
+                            </button>
+                            <button
+                                className={`rounded px-6 py-2 text-white transition-colors duration-200 ${
+                                    selectedValveType === 'solenoid' 
+                                        ? 'bg-purple-600' 
+                                        : 'bg-purple-500 hover:bg-purple-600'
+                                }`}
+                                onClick={() => handleValveTypeSelect('solenoid')}
+                                disabled={drawingPipeType !== null || selectedPumpType}
+                            >
+                                {selectedValveType === 'solenoid' ? 'Placing Solenoid Valve...' : 'Add Solenoid Valve'}
+                            </button>
+                            <button
+                                className={`rounded px-6 py-2 text-white transition-colors duration-200 ${
+                                    selectedValveType === 'ball' 
+                                        ? 'bg-indigo-600' 
+                                        : 'bg-indigo-500 hover:bg-indigo-600'
+                                }`}
+                                onClick={() => handleValveTypeSelect('ball')}
+                                disabled={drawingPipeType !== null || selectedPumpType}
+                            >
+                                {selectedValveType === 'ball' ? 'Placing Ball Valve...' : 'Add Ball Valve'}
+                            </button>
+                            <button
+                                className={`rounded px-6 py-2 text-white transition-colors duration-200 ${
+                                    selectedPumpType 
+                                        ? 'bg-blue-600' 
+                                        : 'bg-blue-500 hover:bg-blue-600'
+                                }`}
+                                onClick={handlePumpTypeSelect}
+                                disabled={drawingPipeType !== null || selectedValveType !== null}
+                            >
+                                {selectedPumpType ? 'Placing Pump...' : 'Add Pump'}
+                            </button>
+                        </div>
                         <button
                             onClick={handleGeneratePipeLayout}
                             disabled={isLoading || !isPlantLayoutGenerated || zones.length === 0}
