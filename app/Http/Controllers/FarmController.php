@@ -285,29 +285,29 @@ class FarmController extends Controller
                 'lng' => $rowDir['lng'] / $rowLength,
             ];
 
-            $leftmost = $area[0];
-            $rightmost = $area[0];
-            $bottommost = $area[0];
-            $topmost = $area[0];
+            $left = $area[0];
+            $right = $area[0];
+            $bottom = $area[0];
+            $top = $area[0];
             
             foreach ($area as $point) {
-                if ($point['lng'] < $leftmost['lng']) {
-                    $leftmost = $point;
+                if ($point['lng'] < $left['lng']) {
+                    $left = $point;
                 }
-                if ($point['lng'] > $rightmost['lng']) {
-                    $rightmost = $point;
+                if ($point['lng'] > $right['lng']) {
+                    $right = $point;
                 }
-                if ($point['lat'] < $bottommost['lat']) {
-                    $bottommost = $point;
+                if ($point['lat'] < $bottom['lat']) {
+                    $bottom = $point;
                 }
-                if ($point['lat'] > $topmost['lat']) {
-                    $topmost = $point;
+                if ($point['lat'] > $top['lat']) {
+                    $top = $point;
                 }
             }
 
             // 5. Get field size and calculate steps
-            $fieldWidthMeters = $this->haversine($leftmost, $rightmost);
-            $fieldHeightMeters = $this->haversine($bottommost, $topmost);
+            $fieldWidthMeters = $this->haversine($left, $right);
+            $fieldHeightMeters = $this->haversine($bottom, $top);
 
             $maxPlantSteps = (int) ($fieldWidthMeters / $plantType->plant_spacing);
             $maxRowSteps = (int) ($fieldHeightMeters / $plantType->row_spacing);
