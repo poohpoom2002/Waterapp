@@ -1,4 +1,4 @@
-// utils/calculations.ts
+// C:\webchaiyo\Waterapp\resources\js\pages\utils\calculations.ts
 import { IrrigationInput } from '../types/interfaces';
 
 export const calculatePipeRolls = (totalLength: number, rollLength: number): number => {
@@ -84,52 +84,141 @@ export const calculateImprovedHeadLoss = (
 
 export const checkVelocity = (velocity: number, section: string): string => {
     if (velocity > 3.0)
-        return `🔴 ${section}: ความเร็วสูงมาก (${velocity.toFixed(2)} m/s) - อาจเกิด water hammer`;
+        return `🔴 ${section}: ความเร็วสูงมาก (${velocity.toFixed(3)} m/s) - อาจเกิด water hammer`;
     if (velocity > 2.5)
-        return `🟡 ${section}: ความเร็วค่อนข้างสูง (${velocity.toFixed(2)} m/s) - ควรพิจารณาเพิ่มขนาดท่อ`;
+        return `🟡 ${section}: ความเร็วค่อนข้างสูง (${velocity.toFixed(3)} m/s) - ควรพิจารณาเพิ่มขนาดท่อ`;
     if (velocity < 0.3)
-        return `🔵 ${section}: ความเร็วต่ำมาก (${velocity.toFixed(2)} m/s) - อาจมีการตกตะกอน`;
-    return `🟢 ${section}: ความเร็วเหมาะสม (${velocity.toFixed(2)} m/s)`;
+        return `🔵 ${section}: ความเร็วต่ำมาก (${velocity.toFixed(3)} m/s) - อาจมีการตกตะกอน`;
+    return `🟢 ${section}: ความเร็วเหมาะสม (${velocity.toFixed(3)} m/s)`;
 };
 
-// ฟังก์ชันใหม่สำหรับประเมินความเหมาะสมของความเร็ว
+// ฟังก์ชันใหม่สำหรับประเมินความเหมาะสมของความเร็ว (ปรับปรุงใหม่)
 export const getVelocityScore = (velocity: number): number => {
-    if (velocity >= 0.8 && velocity <= 2.0) {
-        return 40; // ช่วงที่ดีที่สุด
-    } else if (velocity >= 0.5 && velocity <= 2.5) {
-        return 30; // ช่วงดี
-    } else if (velocity >= 0.3 && velocity <= 3.0) {
-        return 20; // ใช้ได้
+    if (velocity >= 1.0 && velocity <= 2.0) {
+        return 50; // ช่วงที่ดีที่สุด
+    } else if (velocity >= 0.8 && velocity <= 2.5) {
+        return 45; // ช่วงดีมาก
+    } else if (velocity >= 0.6 && velocity <= 3.0) {
+        return 35; // ช่วงดี
+    } else if (velocity >= 0.4 && velocity <= 3.5) {
+        return 25; // ใช้ได้
+    } else if (velocity >= 0.3 && velocity <= 4.0) {
+        return 15; // ใช้ได้แต่ไม่เหมาะสม
     } else {
         return 0; // ไม่เหมาะสม
     }
 };
 
-// ฟังก์ชันใหม่สำหรับประเมินประสิทธิภาพการใช้เงิน
-export const getCostEfficiencyScore = (pipe: any): number => {
-    const costEfficiency = (pipe.lengthM * 1000) / (pipe.price * pipe.sizeMM);
-    if (costEfficiency > 50) {
-        return 20;
-    } else if (costEfficiency > 30) {
-        return 15;
-    } else if (costEfficiency > 20) {
-        return 10;
+// ฟังก์ชันประเมินขนาดท่อที่เหมาะสม (ปรับปรุงใหม่)
+export const getSizeScore = (
+    pipeSize: number, 
+    minSize: number, 
+    maxSize: number, 
+    optimalSize: number
+): number => {
+    if (pipeSize === optimalSize) {
+        return 35; // ขนาดที่เหมาะสมที่สุด
+    } else if (pipeSize >= optimalSize * 0.9 && pipeSize <= optimalSize * 1.1) {
+        return 32; // ใกล้เคียงขนาดที่เหมาะสม
+    } else if (pipeSize >= minSize && pipeSize <= maxSize) {
+        return 28; // อยู่ในช่วงที่ยอมรับได้
+    } else if (pipeSize >= minSize * 0.8 && pipeSize <= maxSize * 1.2) {
+        return 20; // ใกล้เคียงช่วงที่ยอมรับได้
     } else {
-        return 5;
+        return 5; // ไม่เหมาะสม
     }
 };
 
-// ฟังก์ชันใหม่สำหรับประเมิน Head Loss
-export const getHeadLossScore = (headLoss: number): number => {
-    if (headLoss < 1) {
-        return 10;
-    } else if (headLoss < 2) {
-        return 8;
-    } else if (headLoss < 5) {
-        return 5;
-    } else {
-        return 2;
+// ฟังก์ชันใหม่สำหรับประเมินประสิทธิภาพการใช้เงิน (ปรับปรุงใหม่)
+export const getCostEfficiencyScore = (pipe: any, pipeType: string): number => {
+    // คำนวณ cost per meter per mm diameter
+    const costPerMeterPerMM = pipe.price / (pipe.lengthM * pipe.sizeMM);
+    
+    // เกณฑ์การให้คะแนนตามประเภทท่อ
+    let excellentThreshold, goodThreshold, averageThreshold;
+    
+    switch (pipeType) {
+        case 'branch':
+            excellentThreshold = 0.5;
+            goodThreshold = 1.0;
+            averageThreshold = 2.0;
+            break;
+        case 'secondary':
+            excellentThreshold = 1.0;
+            goodThreshold = 2.0;
+            averageThreshold = 4.0;
+            break;
+        case 'main':
+            excellentThreshold = 2.0;
+            goodThreshold = 4.0;
+            averageThreshold = 8.0;
+            break;
+        default:
+            excellentThreshold = 1.0;
+            goodThreshold = 2.0;
+            averageThreshold = 4.0;
     }
+    
+    if (costPerMeterPerMM <= excellentThreshold) {
+        return 15; // ประสิทธิภาพสูงมาก
+    } else if (costPerMeterPerMM <= goodThreshold) {
+        return 12; // ประสิทธิภาพดี
+    } else if (costPerMeterPerMM <= averageThreshold) {
+        return 8; // ประสิทธิภาพปานกลาง
+    } else {
+        return 3; // ประสิทธิภาพต่ำ
+    }
+};
+
+// ฟังก์ชันใหม่สำหรับประเมิน Head Loss (ปรับปรุงใหม่)
+export const getHeadLossScore = (headLoss: number, pipeType: string): number => {
+    let excellentThreshold, goodThreshold, averageThreshold;
+    
+    switch (pipeType) {
+        case 'branch':
+            excellentThreshold = 0.5;
+            goodThreshold = 1.0;
+            averageThreshold = 2.0;
+            break;
+        case 'secondary':
+            excellentThreshold = 1.0;
+            goodThreshold = 2.0;
+            averageThreshold = 4.0;
+            break;
+        case 'main':
+            excellentThreshold = 2.0;
+            goodThreshold = 4.0;
+            averageThreshold = 8.0;
+            break;
+        default:
+            excellentThreshold = 1.0;
+            goodThreshold = 2.0;
+            averageThreshold = 4.0;
+    }
+    
+    if (headLoss <= excellentThreshold) {
+        return 15; // Head loss ต่ำมาก
+    } else if (headLoss <= goodThreshold) {
+        return 12; // Head loss ต่ำ
+    } else if (headLoss <= averageThreshold) {
+        return 8; // Head loss ปานกลาง
+    } else {
+        return 3; // Head loss สูง
+    }
+};
+
+// ฟังก์ชันคำนวณขนาดท่อที่เหมาะสมตาม flow
+export const calculateOptimalPipeSize = (flow_lpm: number, targetVelocity: number = 1.5): number => {
+    // Q = A × V
+    // A = π × (D/2)²
+    // D = 2 × sqrt(Q / (π × V))
+    
+    const Q = flow_lpm / 60000; // m³/s
+    const V = targetVelocity; // m/s
+    const D = 2 * Math.sqrt(Q / (Math.PI * V)); // meters
+    const D_mm = D * 1000; // millimeters
+    
+    return D_mm;
 };
 
 export const formatWaterFlow = (waterFlow: any) => {
@@ -146,41 +235,49 @@ export const formatRadius = (radius: any) => {
     return radius.toString();
 };
 
+// ฟังก์ชันจัดรูปแบบตัวเลขให้แสดง 3 ทศนิยม
+export const formatNumber = (value: number, decimals: number = 3): number => {
+    return Math.round(value * Math.pow(10, decimals)) / Math.pow(10, decimals);
+};
+
 // ปรับปรุงฟังก์ชันการเรียงลำดับ
 export const sortForDropdown = (allItems: any[], recommendedItems: any[]) => {
     // แยกท่อตามระดับคำแนะนำ
-    const highly_recommended = allItems.filter(item => 
-        recommendedItems.includes(item) && (item.score >= 60)
-    ).sort((a, b) => b.score - a.score);
-    
-    const good_choice = allItems.filter(item => 
-        !recommendedItems.includes(item) && (item.score >= 40)
-    ).sort((a, b) => b.score - a.score);
-    
-    const usable = allItems.filter(item => 
-        !recommendedItems.includes(item) && (item.score >= 20) && (item.score < 40)
-    ).sort((a, b) => b.score - a.score);
-    
-    const others = allItems.filter(item => 
-        !recommendedItems.includes(item) && (item.score < 20)
-    ).sort((a, b) => a.price - b.price);
-    
-    return [...highly_recommended, ...good_choice, ...usable, ...others];
+    const highly_recommended = allItems
+        .filter((item) => recommendedItems.includes(item) && item.score >= 70)
+        .sort((a, b) => b.score - a.score);
+
+    const recommended = allItems
+        .filter((item) => recommendedItems.includes(item) && item.score >= 50 && item.score < 70)
+        .sort((a, b) => b.score - a.score);
+
+    const good_choice = allItems
+        .filter((item) => !recommendedItems.includes(item) && item.score >= 40)
+        .sort((a, b) => b.score - a.score);
+
+    const usable = allItems
+        .filter((item) => !recommendedItems.includes(item) && item.score >= 20 && item.score < 40)
+        .sort((a, b) => b.score - a.score);
+
+    const others = allItems
+        .filter((item) => !recommendedItems.includes(item) && item.score < 20)
+        .sort((a, b) => a.price - b.price);
+
+    return [...highly_recommended, ...recommended, ...good_choice, ...usable, ...others];
 };
 
 export const isRecommended = (item: any, recommendedList: any[]) => {
     return recommendedList.includes(item);
 };
 
-// ฟังก์ชันใหม่สำหรับประเมินท่อโดยรวม
+// ฟังก์ชันใหม่สำหรับประเมินท่อโดยรวม (ปรับปรุงใหม่)
 export const evaluatePipeOverall = (
     pipe: any,
     flow_lpm: number,
     length_m: number,
     sectionType: string,
     pipeAgeYears: number,
-    minSize: number,
-    maxSize: number
+    allowedTypes: string[]
 ) => {
     const headLossData = calculateImprovedHeadLoss(
         flow_lpm,
@@ -190,35 +287,87 @@ export const evaluatePipeOverall = (
         sectionType,
         pipeAgeYears
     );
-    
+
     let score = 0;
     const velocity = headLossData.velocity;
     
-    // คะแนนความเร็ว (40%)
-    score += getVelocityScore(velocity);
+    // คำนวณขนาดท่อที่เหมาะสมสำหรับ flow นี้
+    const optimalSize = calculateOptimalPipeSize(flow_lpm);
     
-    // คะแนนขนาด (30%)
-    if (pipe.sizeMM >= minSize && pipe.sizeMM <= maxSize) {
-        score += 30;
-    } else if (pipe.sizeMM >= minSize * 0.8 && pipe.sizeMM <= maxSize * 1.2) {
-        score += 20;
-    } else {
-        score += 5;
+    // กำหนดช่วงขนาดที่เหมาะสมตาม section type
+    let minSize, maxSize;
+    switch (sectionType) {
+        case 'branch':
+            minSize = 16;
+            maxSize = 50;
+            break;
+        case 'secondary':
+            minSize = 25;
+            maxSize = 110;
+            break;
+        case 'main':
+            minSize = 40;
+            maxSize = 200;
+            break;
+        default:
+            minSize = 16;
+            maxSize = 200;
     }
-    
-    // คะแนนราคาต่อประสิทธิภาพ (20%)
-    score += getCostEfficiencyScore(pipe);
-    
-    // คะแนน Head Loss (10%)
-    score += getHeadLossScore(headLossData.total);
+
+    // 1. คะแนนความเร็ว (50%)
+    score += getVelocityScore(velocity);
+
+    // 2. คะแนนขนาดที่เหมาะสม (35%)
+    score += getSizeScore(pipe.sizeMM, minSize, maxSize, optimalSize);
+
+    // 3. คะแนนประเภทท่อ (ใหม่) (10%)
+    if (allowedTypes.includes(pipe.pipeType)) {
+        // ให้คะแนนเพิ่มตามคุณภาพของประเภทท่อ
+        switch (pipe.pipeType) {
+            case 'HDPE PE 100':
+                score += 10;
+                break;
+            case 'HDPE PE 80':
+                score += 9;
+                break;
+            case 'PE-RT':
+                score += 8;
+                break;
+            case 'PVC':
+                score += 7;
+                break;
+            case 'LDPE':
+                score += 6;
+                break;
+            case 'Flexible PE':
+                score += 5;
+                break;
+            default:
+                score += 3;
+        }
+    } else {
+        score += 1; // ประเภทไม่เหมาะสม
+    }
+
+    // 4. คะแนนราคาต่อประสิทธิภาพ (15%)
+    score += getCostEfficiencyScore(pipe, sectionType);
+
+    // 5. คะแนน Head Loss (10%)
+    score += getHeadLossScore(headLossData.total, sectionType);
+
+    // คำนวณระดับความเหมาะสม
+    const isTypeAllowed = allowedTypes.includes(pipe.pipeType);
+    const isVelocityOK = velocity >= 0.3 && velocity <= 3.5;
     
     return {
         ...pipe,
-        score,
-        velocity,
-        headLoss: headLossData.total,
-        isRecommended: score >= 60,
-        isGoodChoice: score >= 40,
-        isUsable: score >= 20 && velocity >= 0.3 && velocity <= 3.0
+        score: formatNumber(score, 1),
+        velocity: formatNumber(velocity, 3),
+        headLoss: formatNumber(headLossData.total, 3),
+        optimalSize: formatNumber(optimalSize, 1),
+        isRecommended: score >= 70 && isTypeAllowed && isVelocityOK,
+        isGoodChoice: score >= 50 && isTypeAllowed && isVelocityOK,
+        isUsable: score >= 30 && isVelocityOK,
+        isTypeAllowed,
     };
 };

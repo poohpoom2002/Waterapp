@@ -1,4 +1,4 @@
-// types/interfaces.ts
+// C:\webchaiyo\Waterapp\resources\js\pages\types\interfaces.ts
 export interface IrrigationInput {
     farmSizeRai: number;
     totalTrees: number;
@@ -32,9 +32,11 @@ export interface AnalyzedPipe {
     score: number;
     velocity: number;
     headLoss: number;
+    optimalSize?: number; // เพิ่ม field ใหม่
     isRecommended: boolean;
     isGoodChoice: boolean;
     isUsable: boolean;
+    isTypeAllowed?: boolean; // เพิ่ม field ใหม่
 }
 
 export interface AnalyzedSprinkler {
@@ -140,9 +142,12 @@ export interface CalculationResults {
         main: number;
     };
     pumpHeadRequired: number;
+    pressureFromSprinkler?: number; // เพิ่ม field ใหม่ - แรงดันจากสปริงเกอร์
     safetyFactor: number;
     adjustedFlow: number;
     velocityWarnings: string[];
+    hasValidSecondaryPipe?: boolean; // เพิ่ม field ใหม่ - สถานะท่อรอง
+    hasValidMainPipe?: boolean; // เพิ่ม field ใหม่ - สถานะท่อหลัก
 }
 
 export interface QuotationData {
@@ -153,11 +158,11 @@ export interface QuotationData {
 }
 
 export interface QuotationDataCustomer {
-    code: string;
+    // code: string;
     name: string;
-    address: string;
+    address1: string;
+    address2: string;
     phone: string;
-    email: string;
 }
 
 export type PipeType = 'branch' | 'secondary' | 'main';

@@ -8,45 +8,48 @@ const ChatBox = () => {
 
     const sendMessage = async () => {
         if (!message.trim()) return;
-      
+
         const newMessage = { role: 'user', content: message };
         const updatedHistory = [...chatHistory, newMessage];
-      
+
         setChatHistory(updatedHistory);
         setMessage('');
         setIsTyping(true);
-      
+
         try {
-          const response = await axios.post('http://127.0.0.1:8000/api/chat', {
-            messages: updatedHistory,
-          });
-          const aiReply = { role: 'assistant', content: response.data.reply };
-          setChatHistory(prev => [...prev, aiReply]);
+            const response = await axios.post('http://127.0.0.1:8000/api/chat', {
+                messages: updatedHistory,
+            });
+            const aiReply = { role: 'assistant', content: response.data.reply };
+            setChatHistory((prev) => [...prev, aiReply]);
         } catch (error) {
-          setChatHistory(prev => [...prev, {
-            role: 'assistant', content: 'เกิดข้อผิดพลาดในการเชื่อมต่อ API'
-          }]);
+            setChatHistory((prev) => [
+                ...prev,
+                {
+                    role: 'assistant',
+                    content: 'เกิดข้อผิดพลาดในการเชื่อมต่อ API',
+                },
+            ]);
         } finally {
-          setIsTyping(false);
+            setIsTyping(false);
         }
-      };
-      
+    };
 
     return (
-        <div className="p-6 max-w-xl mx-auto">
-            <h2 className="text-xl font-bold mb-4">สอบถามข้อมูลเพิ่มเติม (เป็นการตอบกลับจาก AI)</h2>
+        <div className="mx-auto max-w-xl p-6">
+            <h2 className="mb-4 text-xl font-bold">สอบถามข้อมูลเพิ่มเติม (เป็นการตอบกลับจาก AI)</h2>
 
-            <div className="h-[400px] overflow-y-auto border border-gray-300 rounded p-4 bg-white space-y-4">
+            <div className="h-[400px] space-y-4 overflow-y-auto rounded border border-gray-300 bg-white p-4">
                 {chatHistory.map((msg, index) => (
                     <div
                         key={index}
                         className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
                         <div
-                            className={`px-4 py-2 rounded-2xl max-w-[70%] text-sm ${
+                            className={`max-w-[70%] rounded-2xl px-4 py-2 text-sm ${
                                 msg.role === 'user'
-                                    ? 'bg-blue-500 text-white rounded-br-none'
-                                    : 'bg-gray-200 text-black rounded-bl-none'
+                                    ? 'rounded-br-none bg-blue-500 text-white'
+                                    : 'rounded-bl-none bg-gray-200 text-black'
                             }`}
                         >
                             {msg.content}
@@ -57,7 +60,7 @@ const ChatBox = () => {
                 {/* 🟡 กำลังพิมพ์ */}
                 {isTyping && (
                     <div className="flex justify-start">
-                        <div className="px-4 py-2 rounded-2xl max-w-[70%] bg-gray-100 text-gray-500 text-sm italic animate-pulse">
+                        <div className="max-w-[70%] animate-pulse rounded-2xl bg-gray-100 px-4 py-2 text-sm italic text-gray-500">
                             กำลังพิมพ์...
                         </div>
                     </div>
@@ -66,7 +69,7 @@ const ChatBox = () => {
 
             <div className="mt-4 flex gap-2">
                 <textarea
-                    className="w-full border p-2 rounded resize-none text-black"
+                    className="w-full resize-none rounded border p-2 text-black"
                     rows={2}
                     placeholder="พิมพ์ข้อความของคุณ..."
                     value={message}
@@ -79,7 +82,7 @@ const ChatBox = () => {
                     }}
                 />
                 <button
-                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                    className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
                     onClick={sendMessage}
                     disabled={isTyping}
                 >

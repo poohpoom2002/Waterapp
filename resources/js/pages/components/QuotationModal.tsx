@@ -31,7 +31,9 @@ const QuotationModal: React.FC<QuotationModalProps> = ({
                     <div className="w-1/2 space-y-4">
                         <h1 className="text-xl font-semibold">ผู้ให้บริการ</h1>
                         <div>
-                            <label className="mb-2 block text-sm font-medium">Your Reference:</label>
+                            <label className="mb-2 block text-sm font-medium">
+                                Your Reference:
+                            </label>
                             <input
                                 type="text"
                                 value={quotationData.yourReference}
@@ -46,7 +48,9 @@ const QuotationModal: React.FC<QuotationModalProps> = ({
                             />
                         </div>
                         <div>
-                            <label className="mb-2 block text-sm font-medium">Quotation Date:</label>
+                            <label className="mb-2 block text-sm font-medium">
+                                Quotation Date:
+                            </label>
                             <input
                                 type="text"
                                 value={quotationData.quotationDate}
@@ -92,7 +96,7 @@ const QuotationModal: React.FC<QuotationModalProps> = ({
                     </div>
                     <div className="w-1/2 space-y-4">
                         <h1 className="text-xl font-semibold">ผู้ใช้บริการ</h1>
-                        <div>
+                        {/* <div>
                             <label className="mb-2 block text-sm font-medium">Code:</label>
                             <input
                                 type="text"
@@ -106,7 +110,7 @@ const QuotationModal: React.FC<QuotationModalProps> = ({
                                 className="w-full rounded border border-gray-300 p-2 focus:border-blue-500 focus:outline-none"
                                 placeholder="รหัสคำสั่งซื้อ"
                             />
-                        </div>
+                        </div> */}
                         <div>
                             <label className="mb-2 block text-sm font-medium">Name:</label>
                             <input
@@ -123,18 +127,33 @@ const QuotationModal: React.FC<QuotationModalProps> = ({
                             />
                         </div>
                         <div>
-                            <label className="mb-2 block text-sm font-medium">Address:</label>
+                            <label className="mb-2 block text-sm font-medium">Address1:</label>
                             <input
                                 type="text"
-                                value={quotationDataCustomer.address}
+                                value={quotationDataCustomer.address1}
                                 onChange={(e) =>
                                     onQuotationDataCustomerChange({
                                         ...quotationDataCustomer,
-                                        address: e.target.value,
+                                        address1: e.target.value,
                                     })
                                 }
                                 className="w-full rounded border border-gray-300 p-2 focus:border-blue-500 focus:outline-none"
                                 placeholder="ที่อยู่"
+                            />
+                        </div>
+                        <div>
+                            <label className="mb-2 block text-sm font-medium">Address2:</label>
+                            <input
+                                type="text"
+                                value={quotationDataCustomer.address2}
+                                onChange={(e) =>
+                                    onQuotationDataCustomerChange({
+                                        ...quotationDataCustomer,
+                                        address2: e.target.value,
+                                    })
+                                }
+                                className="w-full rounded border border-gray-300 p-2 focus:border-blue-500 focus:outline-none"
+                                placeholder="จังหวัด"
                             />
                         </div>
                         <div>
