@@ -653,7 +653,13 @@ export default function MapPlanner() {
         );
     };
 
+    const clearOldData = () => {
+        localStorage.removeItem('farmData');
+        localStorage.removeItem('pipeLengthData');
+    };
+
     const onDeleted = () => {
+        clearOldData();
         console.log('All Areas Cleared');
         setLayers([]);
         setSelectedAreaTypes([]);

@@ -1,3 +1,4 @@
+// resources/js/utils/pipeData.ts
 import { router } from '@inertiajs/react';
 
 export interface PipeLengthData {
@@ -28,14 +29,14 @@ export const getPipeLengthData = (): PipeLengthData | null => {
 
 export const usePipeLengthData = () => {
     const data = getPipeLengthData();
-    
+
     // If no data is found, you might want to redirect to the generate-tree page
     if (!data) {
         console.warn('No pipe length data found. Redirecting to generate-tree page...');
         router.visit('/generate-tree');
         return null;
     }
-    
+
     return data;
 };
 
@@ -53,9 +54,9 @@ export const getSubmainPipeData = () => {
 export const getZoneData = (zoneId?: number) => {
     const data = getPipeLengthData();
     if (!data) return null;
-    
+
     if (zoneId) {
-        return data.zones.find(zone => zone.id === zoneId);
+        return data.zones.find((zone) => zone.id === zoneId);
     }
     return data.zones;
-}; 
+};

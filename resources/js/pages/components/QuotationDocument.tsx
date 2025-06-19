@@ -12,7 +12,7 @@ interface QuotationItem {
     unitPrice: number;
     discount: number;
     taxes: string;
-    originalData?: any; // เก็บข้อมูลต้นฉบับของอุปกรณ์
+    originalData?: any;
 }
 
 interface QuotationDocumentProps {
@@ -43,12 +43,12 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     const [items, setItems] = useState<QuotationItem[]>([]);
     const [currentPage, setCurrentPage] = useState(1);
     const [isEditing, setIsEditing] = useState(false);
-    const itemsPerPage = 10; // จำนวนรายการต่อหน้า
+    const itemsPerPage = 10;
 
     // Initialize items from selected equipment
     useEffect(() => {
-        if (!show) return; // ไม่ initialize ถ้าไม่ได้แสดง component
-        
+        if (!show) return;
+
         console.log('useEffect triggered with:', {
             show,
             selectedSprinkler: !!selectedSprinkler,
@@ -56,11 +56,17 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             selectedBranchPipe: !!selectedBranchPipe,
             selectedSecondaryPipe: !!selectedSecondaryPipe,
             selectedMainPipe: !!selectedMainPipe,
-            results: !!results
+            results: !!results,
         });
 
-        // ตรวจสอบว่ามีข้อมูลอุปกรณ์อย่างน้อย 1 ชิ้น และมี results
-        if ((!selectedSprinkler && !selectedBranchPipe && !selectedSecondaryPipe && !selectedMainPipe && !selectedPump) || !results) {
+        if (
+            (!selectedSprinkler &&
+                !selectedBranchPipe &&
+                !selectedSecondaryPipe &&
+                !selectedMainPipe &&
+                !selectedPump) ||
+            !results
+        ) {
             console.log('Missing equipment or results, skipping initialization');
             return;
         }
@@ -80,7 +86,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 unitPrice: selectedSprinkler.price || 0,
                 discount: 30.0,
                 taxes: 'Output\nVAT\n7%',
-                originalData: selectedSprinkler
+                originalData: selectedSprinkler,
             });
         }
 
@@ -96,7 +102,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 unitPrice: selectedBranchPipe.price || 0,
                 discount: 30.0,
                 taxes: 'Output\nVAT\n7%',
-                originalData: selectedBranchPipe
+                originalData: selectedBranchPipe,
             });
         }
 
@@ -112,7 +118,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 unitPrice: selectedSecondaryPipe.price || 0,
                 discount: 30.0,
                 taxes: 'Output\nVAT\n7%',
-                originalData: selectedSecondaryPipe
+                originalData: selectedSecondaryPipe,
             });
         }
 
@@ -128,7 +134,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 unitPrice: selectedMainPipe.price || 0,
                 discount: 30.0,
                 taxes: 'Output\nVAT\n7%',
-                originalData: selectedMainPipe
+                originalData: selectedMainPipe,
             });
         }
 
@@ -144,24 +150,30 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 unitPrice: selectedPump.price || 0,
                 discount: 30.0,
                 taxes: 'Output\nVAT\n7%',
-                originalData: selectedPump
+                originalData: selectedPump,
             });
         }
 
         console.log('Final initialItems:', initialItems);
-        
-        // เซ็ต items เฉพาะเมื่อมีรายการ
+
         if (initialItems.length > 0) {
             setItems(initialItems);
-            setCurrentPage(1); // รีเซ็ตหน้าเป็นหน้าแรก
+            setCurrentPage(1);
         }
-    }, [show, selectedSprinkler, selectedPump, selectedBranchPipe, selectedSecondaryPipe, selectedMainPipe, results]);
+    }, [
+        show,
+        selectedSprinkler,
+        selectedPump,
+        selectedBranchPipe,
+        selectedSecondaryPipe,
+        selectedMainPipe,
+        results,
+    ]);
 
     const totalPages = Math.ceil(items.length / itemsPerPage);
 
     const calculateItemAmount = (item: QuotationItem) => {
-        const discountAmount = item.unitPrice * (item.discount / 100);
-        return (item.unitPrice - discountAmount) * item.quantity;
+        return item.unitPrice * item.quantity - item.unitPrice * (item.discount / 100);
     };
 
     const calculateTotal = () => {
@@ -169,10 +181,8 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     };
 
     const updateItem = (id: string, field: keyof QuotationItem, value: any) => {
-        setItems(prevItems =>
-            prevItems.map(item =>
-                item.id === id ? { ...item, [field]: value } : item
-            )
+        setItems((prevItems) =>
+            prevItems.map((item) => (item.id === id ? { ...item, [field]: value } : item))
         );
     };
 
@@ -186,15 +196,14 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             quantity: 1,
             unitPrice: 0,
             discount: 0,
-            taxes: 'Output\nVAT\n7%'
+            taxes: 'Output\nVAT\n7%',
         };
         setItems([...items, newItem]);
     };
 
     const removeItem = (id: string) => {
-        setItems(prevItems => {
-            const filteredItems = prevItems.filter(item => item.id !== id);
-            // อัพเดท seq ใหม่
+        setItems((prevItems) => {
+            const filteredItems = prevItems.filter((item) => item.id !== id);
             return filteredItems.map((item, index) => ({ ...item, seq: index + 1 }));
         });
     };
@@ -206,21 +215,21 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     };
 
     const handlePrint = () => {
-        // รับค่าล่าสุดของ items และ totalPages
         const currentItems = items;
         const currentTotalPages = Math.ceil(currentItems.length / itemsPerPage);
-        
-        // สร้าง print container ที่มีทุกหน้า
+
+        // สร้าง print container
         const printContainer = document.createElement('div');
         printContainer.className = 'print-document-container';
-        
+        printContainer.style.display = 'none';
+
         let allPagesHTML = '';
         for (let page = 1; page <= currentTotalPages; page++) {
             const startIndex = (page - 1) * itemsPerPage;
             const endIndex = startIndex + itemsPerPage;
             const pageItems = currentItems.slice(startIndex, endIndex);
-            
-            // สร้าง HTML สำหรับแต่ละหน้า
+
+            // สร้าง HTML structure เหมือนกับหน้าจอทุกประการ
             const headerHTML = `
                 <div class="print-header mb-2 flex items-center justify-between">
                     <div class="flex items-center">
@@ -232,7 +241,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     </div>
                 </div>
                 <hr class="print-hr mb-4 border-gray-800" />
-                <div class="print-company-info self-start text-sm mb-4">
+                <div class="print-company-info mb-4 self-start text-sm">
                     <p class="font-semibold">บจก. กนกโปรดักส์ (สำนักงานใหญ่)</p>
                     <p>15 ซ. พระยามนธาตุ แยก 10</p>
                     <p>แขวงคลองบางบอน เขตบางบอน</p>
@@ -242,41 +251,62 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
             const customerInfoHTML = page === 1 ? `
                 <div class="print-customer-info mb-6 self-end text-left text-sm">
-                    <p class="font-semibold">
-                        [${quotationDataCustomer.code}] ${quotationDataCustomer.name}
-                    </p>
-                    <p>${quotationDataCustomer.address}</p>
-                    <p>${quotationDataCustomer.phone}</p>
-                    <p>${quotationDataCustomer.email}</p>
+                    <p class="font-semibold">[1234] ${quotationDataCustomer.name || '-'}</p>
+                    <p>${quotationDataCustomer.address1 || '-'}</p>
+                    <p>${quotationDataCustomer.address2 || '-'}</p>
+                    <p>${quotationDataCustomer.phone || '-'}</p>
                 </div>
             ` : '';
 
             const quotationDetailsHTML = page === 1 ? `
-                <h1 class="print-title mb-4 text-xl font-bold">
-                    Quotation # QT1234567890
-                </h1>
+                <h1 class="print-title mb-4 text-xl font-bold">Quotation # QT1234567890</h1>
                 <div class="print-details mb-4 flex flex-row gap-9 text-left text-sm">
                     <div>
                         <strong>Your Reference:</strong>
-                        <p>${quotationData.yourReference}</p>
+                        <p>${quotationData.yourReference || '-'}</p>
                     </div>
                     <div>
                         <strong>Quotation Date:</strong>
-                        <p>${quotationData.quotationDate}</p>
+                        <p>${quotationData.quotationDate || '-'}</p>
                     </div>
                     <div>
                         <strong>Salesperson:</strong>
-                        <p>${quotationData.salesperson}</p>
+                        <p>${quotationData.salesperson || '-'}</p>
                     </div>
                     <div>
                         <strong>Payment Terms:</strong>
-                        <p>${quotationData.paymentTerms}</p>
+                        <p>${quotationData.paymentTerms || '-'}</p>
                     </div>
                 </div>
             ` : '';
 
-            const tableRows = pageItems.map(item => {
-                const itemAmount = (item.unitPrice - (item.unitPrice * (item.discount / 100))) * item.quantity;
+            const tableHeaderHTML = `
+                <thead>
+                    <tr class="bg-gray-100">
+                        <th class="border border-gray-400 p-2 text-center" colspan="5">
+                            Commitment
+                        </th>
+                        <th class="border border-gray-400 p-2 text-center" colspan="5">
+                            Disc. Fixed
+                        </th>
+                    </tr>
+                    <tr class="bg-gray-100">
+                        <th class="w-[10px] border border-gray-400 p-1 text-center">Seq</th>
+                        <th class="w-[10px] border border-gray-400 p-1 text-center">Image</th>
+                        <th class="w-[10px] border border-gray-400 p-1 text-center">Date</th>
+                        <th class="w-[10px] border border-gray-400 p-1 text-center">Description</th>
+                        <th class="w-[10px] border border-gray-400 p-1 text-center">Quantity</th>
+                        <th class="w-[10px] border border-gray-400 p-1 text-center">Unit Price</th>
+                        <th class="w-[10px] border border-gray-400 p-1 text-center">Disc.(%)</th>
+                        <th class="w-[10px] border border-gray-400 p-1 text-center">Amount</th>
+                        <th class="w-[10px] border border-gray-400 p-1 text-center">Taxes</th>
+                        <th class="w-[10px] border border-gray-400 p-1 text-center">Amount</th>
+                    </tr>
+                </thead>
+            `;
+
+            const tableRows = pageItems.map((item) => {
+                const itemAmount = calculateItemAmount(item);
                 return `
                     <tr>
                         <td class="border border-gray-400 p-1 text-center align-top">${item.seq}</td>
@@ -288,55 +318,23 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         </td>
                         <td class="border border-gray-400 p-1 text-right align-top">${item.unitPrice.toFixed(4)}</td>
                         <td class="border border-gray-400 p-1 text-right align-top">${item.discount.toFixed(3)}</td>
-                        <td class="border border-gray-400 p-1 text-right align-top">
-                            ${(item.unitPrice * (item.discount / 100)).toFixed(2)}
-                        </td>
-                        <td class="border border-gray-400 p-1 text-right align-top">
-                            ${item.taxes.replace(/\n/g, '<br />')}
-                        </td>
-                        <td class="border border-gray-400 p-1 text-right align-top">
-                            ${itemAmount.toFixed(2)} ฿
-                        </td>
+                        <td class="border border-gray-400 p-1 text-right align-top">${(item.unitPrice * (item.discount / 100)).toFixed(2)}</td>
+                        <td class="border border-gray-400 p-1 text-right align-top">${item.taxes.replace(/\n/g, '<br />')}</td>
+                        <td class="border border-gray-400 p-1 text-right align-top">${itemAmount.toFixed(2)} ฿</td>
                     </tr>
                 `;
             }).join('');
 
             const tableHTML = `
                 <table class="print-table w-full border-collapse border border-gray-400 text-xs">
-                    <thead>
-                        <tr class="bg-gray-100">
-                            <th class="border border-gray-400 p-2 text-center" colspan="5">
-                                Commitment
-                            </th>
-                            <th class="border border-gray-400 p-2 text-center" colspan="5">
-                                Disc. Fixed
-                            </th>
-                        </tr>
-                        <tr class="bg-gray-100">
-                            <th class="w-[10px] border border-gray-400 p-1 text-center">Seq</th>
-                            <th class="w-[10px] border border-gray-400 p-1 text-center">Image</th>
-                            <th class="w-[10px] border border-gray-400 p-1 text-center">Date</th>
-                            <th class="w-[10px] border border-gray-400 p-1 text-center">Description</th>
-                            <th class="w-[10px] border border-gray-400 p-1 text-center">Quantity</th>
-                            <th class="w-[10px] border border-gray-400 p-1 text-center">Unit Price</th>
-                            <th class="w-[10px] border border-gray-400 p-1 text-center">Disc.(%)</th>
-                            <th class="w-[10px] border border-gray-400 p-1 text-center">Amount</th>
-                            <th class="w-[10px] border border-gray-400 p-1 text-center">Taxes</th>
-                            <th class="w-[10px] border border-gray-400 p-1 text-center">Amount</th>
-                        </tr>
-                    </thead>
+                    ${tableHeaderHTML}
                     <tbody>
                         ${tableRows}
                     </tbody>
                 </table>
             `;
 
-            // คำนวณยอดรวมจากรายการทั้งหมด
-            const grandTotal = currentItems.reduce((total, item) => {
-                const itemAmount = (item.unitPrice - (item.unitPrice * (item.discount / 100))) * item.quantity;
-                return total + itemAmount;
-            }, 0);
-
+            const grandTotal = calculateTotal();
             const totalHTML = page === currentTotalPages ? `
                 <div class="print-total text-right">
                     <p class="text-lg font-bold">
@@ -354,29 +352,38 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     </div>
                 </div>
             `;
-            
+
+            // สร้างหน้าใหม่พร้อม page break และใช้ class structure เดียวกันกับหน้าจอ
+            const pageBreak = page < currentTotalPages ? 'page-break-after: always;' : '';
             allPagesHTML += `
-                <div class="print-page">
-                    ${headerHTML}
-                    ${customerInfoHTML}
-                    ${quotationDetailsHTML}
-                    ${tableHTML}
-                    ${totalHTML}
-                    ${footerHTML}
+                <div class="mx-auto flex h-[1123px] w-[794px] flex-col bg-white p-8 text-black shadow-lg" style="${pageBreak}">
+                    <div class="print-page flex min-h-full flex-col">
+                        ${headerHTML}
+                        ${customerInfoHTML}
+                        ${quotationDetailsHTML}
+                        ${tableHTML}
+                        ${totalHTML}
+                        ${footerHTML}
+                    </div>
                 </div>
             `;
         }
-        
+
         printContainer.innerHTML = allPagesHTML;
         document.body.appendChild(printContainer);
 
-        // Print
-        window.print();
-
-        // Remove print container after printing
+        // รอให้ DOM โหลดเสร็จก่อนพิมพ์
         setTimeout(() => {
-            document.body.removeChild(printContainer);
-        }, 1000);
+            printContainer.style.display = 'block';
+            window.print();
+            
+            // ลบ container หลังพิมพ์เสร็จ
+            setTimeout(() => {
+                if (document.body.contains(printContainer)) {
+                    document.body.removeChild(printContainer);
+                }
+            }, 2000);
+        }, 100);
     };
 
     const renderHeader = () => (
@@ -391,7 +398,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 </div>
             </div>
             <hr className="print-hr mb-4 border-gray-800" />
-            <div className="print-company-info self-start text-sm mb-4">
+            <div className="print-company-info mb-4 self-start text-sm">
                 <p className="font-semibold">บจก. กนกโปรดักส์ (สำนักงานใหญ่)</p>
                 <p>15 ซ. พระยามนธาตุ แยก 10</p>
                 <p>แขวงคลองบางบอน เขตบางบอน</p>
@@ -412,36 +419,32 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
     const renderCustomerInfo = () => (
         <div className="print-customer-info mb-6 self-end text-left text-sm">
-            <p className="font-semibold">
-                [{quotationDataCustomer.code}] {quotationDataCustomer.name}
-            </p>
-            <p>{quotationDataCustomer.address}</p>
-            <p>{quotationDataCustomer.phone}</p>
-            <p>{quotationDataCustomer.email}</p>
+            <p className="font-semibold">[1234] {quotationDataCustomer.name || '-'}</p>
+            <p>{quotationDataCustomer.address1 || '-'}</p>
+            <p>{quotationDataCustomer.address2 || '-'}</p>
+            <p>{quotationDataCustomer.phone || '-'}</p>
         </div>
     );
 
     const renderQuotationDetails = () => (
         <>
-            <h1 className="print-title mb-4 text-xl font-bold">
-                Quotation # QT1234567890
-            </h1>
+            <h1 className="print-title mb-4 text-xl font-bold">Quotation # QT1234567890</h1>
             <div className="print-details mb-4 flex flex-row gap-9 text-left text-sm">
                 <div>
                     <strong>Your Reference:</strong>
-                    <p>{quotationData.yourReference}</p>
+                    <p>{quotationData.yourReference || '-'}</p>
                 </div>
                 <div>
                     <strong>Quotation Date:</strong>
-                    <p>{quotationData.quotationDate}</p>
+                    <p>{quotationData.quotationDate || '-'}</p>
                 </div>
                 <div>
                     <strong>Salesperson:</strong>
-                    <p>{quotationData.salesperson}</p>
+                    <p>{quotationData.salesperson || '-'}</p>
                 </div>
                 <div>
                     <strong>Payment Terms:</strong>
-                    <p>{quotationData.paymentTerms}</p>
+                    <p>{quotationData.paymentTerms || '-'}</p>
                 </div>
             </div>
         </>
@@ -468,7 +471,11 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 <th className="w-[10px] border border-gray-400 p-1 text-center">Amount</th>
                 <th className="w-[10px] border border-gray-400 p-1 text-center">Taxes</th>
                 <th className="w-[10px] border border-gray-400 p-1 text-center">Amount</th>
-                {isEditing && <th className="w-[10px] border border-gray-400 p-1 text-center no-print">Actions</th>}
+                {isEditing && (
+                    <th className="no-print w-[10px] border border-gray-400 p-1 text-center">
+                        Actions
+                    </th>
+                )}
             </tr>
         </thead>
     );
@@ -495,8 +502,10 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     <input
                         type="number"
                         value={item.quantity}
-                        onChange={(e) => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
-                        className="w-full border-none bg-transparent text-xs text-right"
+                        onChange={(e) =>
+                            updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)
+                        }
+                        className="w-full border-none bg-transparent text-right text-xs"
                         step="0.0001"
                     />
                 ) : (
@@ -510,8 +519,10 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     <input
                         type="number"
                         value={item.unitPrice}
-                        onChange={(e) => updateItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
-                        className="w-full border-none bg-transparent text-xs text-right"
+                        onChange={(e) =>
+                            updateItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)
+                        }
+                        className="w-full border-none bg-transparent text-right text-xs"
                         step="0.001"
                     />
                 ) : (
@@ -523,8 +534,10 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     <input
                         type="number"
                         value={item.discount}
-                        onChange={(e) => updateItem(item.id, 'discount', parseFloat(e.target.value) || 0)}
-                        className="w-full border-none bg-transparent text-xs text-right"
+                        onChange={(e) =>
+                            updateItem(item.id, 'discount', parseFloat(e.target.value) || 0)
+                        }
+                        className="w-full border-none bg-transparent text-right text-xs"
                         step="0.001"
                         max="100"
                         min="0"
@@ -548,10 +561,10 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 {calculateItemAmount(item).toFixed(2)} ฿
             </td>
             {isEditing && (
-                <td className="border border-gray-400 p-1 text-center align-top no-print">
+                <td className="no-print border border-gray-400 p-1 text-center align-top">
                     <button
                         onClick={() => removeItem(item.id)}
-                        className="text-red-500 hover:text-red-700 text-xs"
+                        className="text-xs text-red-500 hover:text-red-700"
                     >
                         ลบ
                     </button>
@@ -564,14 +577,20 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
     return (
         <div className="fixed inset-0 z-50 overflow-auto bg-gray-800">
-            {/* Print Styles */}
+            {/* Enhanced Print Styles - ปรับให้ตรงกับ Tailwind structure */}
             <style
                 dangerouslySetInnerHTML={{
                     __html: `
                     @media print {
                         @page {
                             size: A4 portrait;
-                            margin: 15mm;
+                            margin: 0;
+                        }
+                        
+                        * {
+                            -webkit-print-color-adjust: exact !important;
+                            color-adjust: exact !important;
+                            box-sizing: border-box !important;
                         }
                         
                         body > *:not(.print-document-container) {
@@ -579,170 +598,81 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         }
                         
                         .print-document-container {
-                            position: fixed !important;
-                            top: 0 !important;
-                            left: 0 !important;
-                            width: 100% !important;
-                            height: 100% !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            background: white !important;
-                            z-index: 99999 !important;
-                        }
-                        
-                        .print-page {
-                            width: 100% !important;
-                            min-height: 100vh !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            font-family: Arial, sans-serif !important;
-                            color: black !important;
-                            background: white !important;
-                            display: flex !important;
-                            flex-direction: column !important;
-                            page-break-after: always !important;
-                        }
-                        
-                        .print-page:last-child {
-                            page-break-after: avoid !important;
-                        }
-                        
-                        .print-header {
-                            display: flex !important;
-                            align-items: center !important;
-                            justify-content: space-between !important;
-                            margin-bottom: 16px !important;
-                        }
-                        
-                        .print-logo {
-                            width: 40px !important;
-                            height: 40px !important;
-                            border-radius: 50% !important;
-                        }
-                        
-                        .print-hr {
-                            border: none !important;
-                            border-top: 1px solid #1f2937 !important;
-                            margin: 0 !important;
-                        }
-                        
-                        .print-company-info {
-                            font-size: 14px !important;
-                            line-height: 1.4 !important;
-                        }
-                        
-                        .print-company-info p {
-                            margin: 2px 0 !important;
-                        }
-                        
-                        .print-customer-info {
-                            font-size: 14px !important;
-                            line-height: 1.4 !important;
-                            text-align: left !important;
-                        }
-                        
-                        .print-customer-info p {
-                            margin: 2px 0 !important;
-                        }
-                        
-                        .print-title {
-                            font-size: 20px !important;
-                            font-weight: bold !important;
-                            margin-bottom: 16px !important;
-                        }
-                        
-                        .print-details {
-                            display: flex !important;
-                            gap: 36px !important;
-                            font-size: 14px !important;
-                            margin-bottom: 16px !important;
-                            text-align: left !important;
-                        }
-                        
-                        .print-details > div {
-                            flex-shrink: 0 !important;
-                        }
-                        
-                        .print-details strong {
-                            font-weight: bold !important;
                             display: block !important;
-                            margin-bottom: 2px !important;
-                        }
-                        
-                        .print-details p {
-                            margin: 0 !important;
-                        }
-                        
-                        .print-table {
+                            position: static !important;
                             width: 100% !important;
-                            border-collapse: collapse !important;
-                            font-size: 12px !important;
-                            margin: 12px 0 !important;
-                        }
-                        
-                        .print-table th,
-                        .print-table td {
-                            border: 1px solid #9ca3af !important;
-                            padding: 8px 4px !important;
-                            vertical-align: top !important;
-                        }
-                        
-                        .print-table th {
-                            background-color: #f3f4f6 !important;
-                            font-weight: bold !important;
-                            text-align: center !important;
-                        }
-                        
-                        .print-table .text-left {
-                            text-align: left !important;
-                        }
-                        
-                        .print-table .text-right {
-                            text-align: right !important;
-                        }
-                        
-                        .print-table .text-center {
-                            text-align: center !important;
-                        }
-                        
-                        .print-total {
-                            text-align: right !important;
-                            margin: 16px 0 !important;
-                        }
-                        
-                        .print-total p {
-                            font-size: 18px !important;
-                            font-weight: bold !important;
+                            height: auto !important;
                             margin: 0 !important;
+                            padding: 0 !important;
+                            background: white !important;
+                            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif !important;
                         }
                         
-                        .print-footer-container {
-                            margin-top: auto !important;
-                            text-align: center !important;
-                            font-size: 12px !important;
-                            padding-top: 20px !important;
+                        /* ใช้ class structure เดียวกันกับหน้าจอ */
+                        .mx-auto { margin-left: auto !important; margin-right: auto !important; }
+                        .flex { display: flex !important; }
+                        .h-\\[1123px\\] { height: 1123px !important; }
+                        .w-\\[794px\\] { width: 794px !important; }
+                        .flex-col { flex-direction: column !important; }
+                        .bg-white { background-color: white !important; }
+                        .p-8 { padding: 2rem !important; }
+                        .text-black { color: black !important; }
+                        .shadow-lg { box-shadow: none !important; }
+                        
+                        .print-page { 
+                            display: flex !important; 
+                            min-height: 100% !important; 
+                            flex-direction: column !important; 
                         }
                         
-                        .print-footer-hr {
-                            border: none !important;
-                            border-top: 1px solid #1f2937 !important;
-                            margin-bottom: 8px !important;
-                        }
+                        .mb-2 { margin-bottom: 0.5rem !important; }
+                        .mb-4 { margin-bottom: 1rem !important; }
+                        .mb-6 { margin-bottom: 1.5rem !important; }
+                        .mt-auto { margin-top: auto !important; }
                         
-                        .print-footer p {
-                            margin: 2px 0 !important;
-                        }
+                        .items-center { align-items: center !important; }
+                        .justify-between { justify-content: space-between !important; }
+                        .self-start { align-self: flex-start !important; }
+                        .self-end { align-self: flex-end !important; }
                         
-                        .no-print {
-                            display: none !important;
-                        }
+                        .h-10 { height: 2.5rem !important; }
+                        .w-10 { width: 2.5rem !important; }
                         
-                        .font-semibold {
-                            font-weight: 600 !important;
-                        }
+                        .border-gray-800 { border-color: rgb(31, 41, 55) !important; }
+                        .border-gray-400 { border-color: rgb(156, 163, 175) !important; }
+                        .bg-gray-100 { background-color: rgb(243, 244, 246) !important; }
                         
-                        .font-bold {
-                            font-weight: bold !important;
+                        .text-sm { font-size: 0.875rem !important; line-height: 1.25rem !important; }
+                        .text-xs { font-size: 0.75rem !important; line-height: 1rem !important; }
+                        .text-xl { font-size: 1.25rem !important; line-height: 1.75rem !important; }
+                        .text-lg { font-size: 1.125rem !important; line-height: 1.75rem !important; }
+                        
+                        .font-semibold { font-weight: 600 !important; }
+                        .font-bold { font-weight: 700 !important; }
+                        
+                        .text-left { text-align: left !important; }
+                        .text-right { text-align: right !important; }
+                        .text-center { text-align: center !important; }
+                        
+                        .flex-row { flex-direction: row !important; }
+                        .gap-9 { gap: 2.25rem !important; }
+                        
+                        .w-full { width: 100% !important; }
+                        .border-collapse { border-collapse: collapse !important; }
+                        .border { border-width: 1px !important; }
+                        
+                        .w-\\[10px\\] { width: 10px !important; }
+                        .p-1 { padding: 0.25rem !important; }
+                        .p-2 { padding: 0.5rem !important; }
+                        .align-top { vertical-align: top !important; }
+                        
+                        .no-print { display: none !important; }
+                        
+                        strong { font-weight: bold !important; }
+                        
+                        hr { 
+                            border: none !important; 
+                            border-top: 1px solid !important; 
                         }
                     }
                 `,
@@ -750,8 +680,8 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             />
 
             <div className="mx-auto my-8 max-w-4xl p-4">
-                {/* Debug Information - จะถูกซ่อนเมื่อพิมพ์ */}
-                <div className="no-print fixed bottom-4 left-4 bg-gray-900 text-white p-2 text-xs rounded">
+                {/* Debug Information */}
+                <div className="no-print fixed bottom-4 left-4 rounded bg-gray-900 p-2 text-xs text-white">
                     <div>Items: {items.length}</div>
                     <div>Page: {currentPage}/{totalPages}</div>
                     <div>Editing: {isEditing ? 'Yes' : 'No'}</div>
@@ -769,8 +699,8 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         <button
                             onClick={() => setIsEditing(!isEditing)}
                             className={`rounded px-4 py-2 text-white ${
-                                isEditing 
-                                    ? 'bg-green-500 hover:bg-green-600' 
+                                isEditing
+                                    ? 'bg-green-500 hover:bg-green-600'
                                     : 'bg-yellow-500 hover:bg-yellow-600'
                             }`}
                         >
@@ -785,7 +715,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             </button>
                         )}
                     </div>
-                    
+
                     <div className="flex items-center space-x-4">
                         {totalPages > 1 && (
                             <div className="flex items-center space-x-2">
@@ -800,7 +730,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                     หน้า {currentPage} / {totalPages}
                                 </span>
                                 <button
-                                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                                    onClick={() =>
+                                        setCurrentPage(Math.min(totalPages, currentPage + 1))
+                                    }
                                     disabled={currentPage === totalPages}
                                     className="rounded bg-gray-600 px-3 py-1 text-white disabled:opacity-50"
                                 >
@@ -808,13 +740,13 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                 </button>
                             </div>
                         )}
-                        
-                        <button
+
+                        {isEditing ? "" : <button
                             onClick={handlePrint}
                             className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
                         >
                             พิมพ์
-                        </button>
+                        </button>}
                     </div>
                 </div>
 
@@ -822,7 +754,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 <div className="mx-auto flex h-[1123px] w-[794px] flex-col bg-white p-8 text-black shadow-lg">
                     <div className="print-page flex min-h-full flex-col">
                         {renderHeader()}
-                        
+
                         {currentPage === 1 && (
                             <>
                                 {renderCustomerInfo()}
@@ -833,9 +765,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         {/* Table */}
                         <table className="print-table w-full border-collapse border border-gray-400 text-xs">
                             {renderTableHeader()}
-                            <tbody>
-                                {getItemsForPage(currentPage).map(renderTableRow)}
-                            </tbody>
+                            <tbody>{getItemsForPage(currentPage).map(renderTableRow)}</tbody>
                         </table>
 
                         {/* Total - แสดงเฉพาะหน้าสุดท้าย */}
@@ -853,8 +783,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             </div>
         </div>
     );
-
-
 };
 
 export default QuotationDocument;

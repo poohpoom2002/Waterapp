@@ -1,4 +1,4 @@
-// components/CalculationSummary.tsx
+// C:\webchaiyo\Waterapp\resources\js\pages\components\CalculationSummary.tsx
 import React from 'react';
 import { CalculationResults, IrrigationInput } from '../types/interfaces';
 
@@ -21,13 +21,40 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
     selectedSecondaryPipe,
     selectedMainPipe,
 }) => {
-    const totalCost = (
+    const totalCost =
         (selectedSprinkler?.price || 0) * results.totalSprinklers +
         (selectedPump?.price || 0) +
         (selectedBranchPipe?.price || 0) * results.branchPipeRolls +
         (selectedSecondaryPipe?.price || 0) * results.secondaryPipeRolls +
-        (selectedMainPipe?.price || 0) * results.mainPipeRolls
-    );
+        (selectedMainPipe?.price || 0) * results.mainPipeRolls;
+
+    // คำนวณแรงดันจากสปริงเกอร์ที่เลือก
+    const getSprinklerPressureInfo = () => {
+        if (!selectedSprinkler) {
+            return {
+                pressure: input.pressureHeadM,
+                source: 'ค่าเริ่มต้น'
+            };
+        }
+
+        const minPressure = Array.isArray(selectedSprinkler.pressureBar)
+            ? selectedSprinkler.pressureBar[0]
+            : parseFloat(String(selectedSprinkler.pressureBar).split('-')[0]);
+        const maxPressure = Array.isArray(selectedSprinkler.pressureBar)
+            ? selectedSprinkler.pressureBar[1]
+            : parseFloat(String(selectedSprinkler.pressureBar).split('-')[1]);
+        
+        const avgPressureBar = (minPressure + maxPressure) / 2;
+        const pressureM = avgPressureBar * 10.2; // แปลง bar เป็น เมตร
+
+        return {
+            pressure: pressureM,
+            source: `จากสปริงเกอร์ (${avgPressureBar.toFixed(1)} bar)`,
+            pressureBar: avgPressureBar
+        };
+    };
+
+    const pressureInfo = getSprinklerPressureInfo();
 
     return (
         <>
@@ -65,9 +92,9 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
             {/* สรุปการคำนวณรายละเอียด */}
             <div className="mb-6 rounded-lg bg-gray-700 p-6">
                 <h2 className="mb-4 text-xl font-semibold text-yellow-400">
-                    สรุปการคำนวณ (เวอร์ชันปรับปรุงใหม่) ✨
+                    สรุปการคำนวณ
                 </h2>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                     {/* การไหลและอัตรา */}
                     <div className="rounded bg-gray-600 p-4">
                         <h3 className="mb-2 font-medium text-blue-300">ความต้องการน้ำรวม</h3>
@@ -108,18 +135,22 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                     {results.flows.branch.toFixed(1)} LPM
                                 </span>
                             </p>
-                            <p>
-                                ท่อรอง:{' '}
-                                <span className="font-bold text-orange-300">
-                                    {results.flows.secondary.toFixed(1)} LPM
-                                </span>
-                            </p>
-                            <p>
-                                ท่อหลัก:{' '}
-                                <span className="font-bold text-cyan-300">
-                                    {results.flows.main.toFixed(1)} LPM
-                                </span>
-                            </p>
+                            {results.hasValidSecondaryPipe && (
+                                <p>
+                                    ท่อรอง:{' '}
+                                    <span className="font-bold text-orange-300">
+                                        {results.flows.secondary.toFixed(1)} LPM
+                                    </span>
+                                </p>
+                            )}
+                            {results.hasValidMainPipe && (
+                                <p>
+                                    ท่อหลัก:{' '}
+                                    <span className="font-bold text-cyan-300">
+                                        {results.flows.main.toFixed(1)} LPM
+                                    </span>
+                                </p>
+                            )}
                         </div>
                         <p className="mt-1 text-xs text-gray-400">ตามการออกแบบระบบ</p>
                     </div>
@@ -147,8 +178,8 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                         results.headLoss.total > 20
                                             ? 'text-red-400'
                                             : results.headLoss.total > 15
-                                            ? 'text-yellow-400'
-                                            : 'text-green-400'
+                                              ? 'text-yellow-400'
+                                              : 'text-green-400'
                                     }`}
                                 >
                                     {results.headLoss.total.toFixed(1)} m
@@ -157,8 +188,12 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         </div>
                         <div className="mt-2 text-xs text-gray-300">
                             <p>ย่อย: {results.headLoss.branch.total.toFixed(1)}m</p>
-                            <p>รอง: {results.headLoss.secondary.total.toFixed(1)}m</p>
-                            <p>หลัก: {results.headLoss.main.total.toFixed(1)}m</p>
+                            {results.hasValidSecondaryPipe && (
+                                <p>รอง: {results.headLoss.secondary.total.toFixed(1)}m</p>
+                            )}
+                            {results.hasValidMainPipe && (
+                                <p>หลัก: {results.headLoss.main.total.toFixed(1)}m</p>
+                            )}
                         </div>
                     </div>
 
@@ -173,41 +208,45 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                         results.velocity.branch > 2.5
                                             ? 'text-red-400'
                                             : results.velocity.branch < 0.3
-                                            ? 'text-blue-400'
-                                            : 'text-green-400'
+                                              ? 'text-blue-400'
+                                              : 'text-green-400'
                                     }`}
                                 >
                                     {results.velocity.branch.toFixed(2)}
                                 </span>
                             </p>
-                            <p>
-                                รอง:{' '}
-                                <span
-                                    className={`font-bold ${
-                                        results.velocity.secondary > 2.5
-                                            ? 'text-red-400'
-                                            : results.velocity.secondary < 0.3
-                                            ? 'text-blue-400'
-                                            : 'text-green-400'
-                                    }`}
-                                >
-                                    {results.velocity.secondary.toFixed(2)}
-                                </span>
-                            </p>
-                            <p>
-                                หลัก:{' '}
-                                <span
-                                    className={`font-bold ${
-                                        results.velocity.main > 2.5
-                                            ? 'text-red-400'
-                                            : results.velocity.main < 0.3
-                                            ? 'text-blue-400'
-                                            : 'text-green-400'
-                                    }`}
-                                >
-                                    {results.velocity.main.toFixed(2)}
-                                </span>
-                            </p>
+                            {results.hasValidSecondaryPipe && (
+                                <p>
+                                    รอง:{' '}
+                                    <span
+                                        className={`font-bold ${
+                                            results.velocity.secondary > 2.5
+                                                ? 'text-red-400'
+                                                : results.velocity.secondary < 0.3
+                                                  ? 'text-blue-400'
+                                                  : 'text-green-400'
+                                        }`}
+                                    >
+                                        {results.velocity.secondary.toFixed(2)}
+                                    </span>
+                                </p>
+                            )}
+                            {results.hasValidMainPipe && (
+                                <p>
+                                    หลัก:{' '}
+                                    <span
+                                        className={`font-bold ${
+                                            results.velocity.main > 2.5
+                                                ? 'text-red-400'
+                                                : results.velocity.main < 0.3
+                                                  ? 'text-blue-400'
+                                                  : 'text-green-400'
+                                        }`}
+                                    >
+                                        {results.velocity.main.toFixed(2)}
+                                    </span>
+                                </p>
+                            )}
                         </div>
                         <p className="mt-1 text-xs text-gray-400">แนะนำ: 0.3-2.5 m/s</p>
                     </div>
@@ -220,8 +259,8 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                 results.pumpHeadRequired > 60
                                     ? 'text-red-400'
                                     : results.pumpHeadRequired > 40
-                                    ? 'text-yellow-400'
-                                    : 'text-green-400'
+                                      ? 'text-yellow-400'
+                                      : 'text-green-400'
                             }`}
                         >
                             {results.pumpHeadRequired.toFixed(1)} เมตร
@@ -229,7 +268,12 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         <div className="text-xs text-gray-300">
                             <p>Static: {input.staticHeadM.toFixed(1)}m</p>
                             <p>Head Loss: {results.headLoss.total.toFixed(1)}m</p>
-                            <p>Pressure: {input.pressureHeadM.toFixed(1)}m</p>
+                            <p className="text-yellow-300">
+                                Pressure: {pressureInfo.pressure.toFixed(1)}m
+                            </p>
+                            <p className="text-xs text-gray-400">
+                                ({pressureInfo.source})
+                            </p>
                         </div>
                     </div>
 
@@ -243,22 +287,47 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                     {selectedBranchPipe?.sizeMM || 'N/A'}mm
                                 </span>
                             </p>
-                            <p>
-                                รอง:{' '}
-                                <span className="font-bold text-orange-300">
-                                    {selectedSecondaryPipe?.sizeMM || 'N/A'}mm
-                                </span>
-                            </p>
-                            <p>
-                                หลัก:{' '}
-                                <span className="font-bold text-cyan-300">
-                                    {selectedMainPipe?.sizeMM || 'N/A'}mm
-                                </span>
-                            </p>
+                            {results.hasValidSecondaryPipe && (
+                                <p>
+                                    รอง:{' '}
+                                    <span className="font-bold text-orange-300">
+                                        {selectedSecondaryPipe?.sizeMM || 'N/A'}mm
+                                    </span>
+                                </p>
+                            )}
+                            {results.hasValidMainPipe && (
+                                <p>
+                                    หลัก:{' '}
+                                    <span className="font-bold text-cyan-300">
+                                        {selectedMainPipe?.sizeMM || 'N/A'}mm
+                                    </span>
+                                </p>
+                            )}
                         </div>
                         <p className="mt-1 text-xs text-gray-400">ขนาดที่ระบบแนะนำ</p>
                     </div>
                 </div>
+
+                {/* แสดงข้อมูลแรงดันจากสปริงเกอร์ */}
+                {selectedSprinkler && (
+                    <div className="mt-6 rounded bg-blue-900 p-4">
+                        <h3 className="mb-2 font-medium text-blue-300">💧 แรงดันจากสปริงเกอร์ที่เลือก</h3>
+                        <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-3">
+                            <p>
+                                <strong>สปริงเกอร์:</strong> {selectedSprinkler.productCode}
+                            </p>
+                            <p>
+                                <strong>ช่วงแรงดัน:</strong> {pressureInfo.pressureBar?.toFixed(1)} บาร์
+                            </p>
+                            <p>
+                                <strong>แรงดันที่ใช้คำนวณ:</strong> {pressureInfo.pressure.toFixed(1)} เมตร
+                            </p>
+                        </div>
+                        <p className="mt-2 text-xs text-blue-200">
+                            💡 ระบบจะใช้แรงดันกลางของช่วงที่สปริงเกอร์รองรับในการคำนวณ Pump Head
+                        </p>
+                    </div>
+                )}
 
                 {/* การเตือนความเร็ว */}
                 {results.velocityWarnings.length > 0 && (

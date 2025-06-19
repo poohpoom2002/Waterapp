@@ -1128,7 +1128,7 @@ export default function MapPlanner() {
                             />
                         </FeatureGroup>
 */
-                        /*{/* Draw exclusion areas as polygons (yellow) }
+/*{/* Draw exclusion areas as polygons (yellow) }
                         /*
                         {exclusionAreas.map((polygon, idx) => (
                             <Polyline
