@@ -141,6 +141,14 @@ const MapMouseUpHandler = ({ onMouseUp }: { onMouseUp: () => void }) => {
     return null;
 };
 
+<<<<<<< HEAD
+const MapDragHandler = ({
+    isDragging,
+    editMode,
+    selectedPoints,
+}: {
+    isDragging: boolean;
+=======
 const MapMouseDownHandler = ({ onMouseDown }: { onMouseDown: () => void }) => {
     const map = useMap();
     useEffect(() => {
@@ -154,6 +162,7 @@ const MapMouseDownHandler = ({ onMouseDown }: { onMouseDown: () => void }) => {
 
 const MapDragHandler = ({ isDragging, editMode, selectedPoints }: { 
     isDragging: boolean; 
+>>>>>>> origin/main
     editMode: 'select' | 'add' | 'delete' | null;
     selectedPoints: Set<string>;
 }) => {
@@ -193,16 +202,74 @@ function isPointInPolygon(
     return inside;
 }
 
+<<<<<<< HEAD
+// Add function to find nearest grid point
+function findNearestGridPoint(
+    lat: number,
+    lng: number,
+    plantType: PlantType,
+    area: LatLng[]
+): [number, number] {
+    // Calculate grid parameters
+    const plantSpacing = plantType.plant_spacing;
+    const rowSpacing = plantType.row_spacing;
+    const padding = rowSpacing / 2; // Half of row spacing for padding
+
+    // Find the bounds of the area
+    const bounds = area.reduce(
+        (acc, point) => ({
+            minLat: Math.min(acc.minLat, point.lat),
+            maxLat: Math.max(acc.maxLat, point.lat),
+            minLng: Math.min(acc.minLng, point.lng),
+            maxLng: Math.max(acc.maxLng, point.lng),
+        }),
+        {
+            minLat: area[0].lat,
+            maxLat: area[0].lat,
+            minLng: area[0].lng,
+            maxLng: area[0].lng,
+        }
+    );
+
+    // Add padding to bounds
+    const paddedBounds = {
+        minLat: bounds.minLat + padding / 111000, // Convert meters to degrees
+        maxLat: bounds.maxLat - padding / 111000,
+        minLng: bounds.minLng + padding / (111000 * Math.cos((bounds.minLat * Math.PI) / 180)),
+        maxLng: bounds.maxLng - padding / (111000 * Math.cos((bounds.minLat * Math.PI) / 180)),
+    };
+
+    // Calculate grid points
+    const latPoints: number[] = [];
+    const lngPoints: number[] = [];
+
+    // Generate grid points with padding
+    for (let lat = paddedBounds.minLat; lat <= paddedBounds.maxLat; lat += rowSpacing / 111000) {
+        latPoints.push(lat);
+    }
+    for (
+        let lng = paddedBounds.minLng;
+        lng <= paddedBounds.maxLng;
+        lng += plantSpacing / (111000 * Math.cos((bounds.minLat * Math.PI) / 180))
+    ) {
+        lngPoints.push(lng);
+=======
 // Add function to find nearest point based on row structure with 1-meter steps
 function findNearestRowPoint(lat: number, lng: number, grid: LatLng[][] | null): [number, number] {
     if (!grid || grid.length === 0) {
         return [lat, lng]; // Fallback to original position
+>>>>>>> origin/main
     }
 
     // Find the nearest point in the grid structure
     let nearestPoint: LatLng | null = null;
     let minDistance = Number.MAX_VALUE;
 
+<<<<<<< HEAD
+    for (const gridLat of latPoints) {
+        for (const gridLng of lngPoints) {
+            const distance = Math.sqrt(Math.pow(lat - gridLat, 2) + Math.pow(lng - gridLng, 2));
+=======
     // Search through all points in the grid structure
     for (let rowIndex = 0; rowIndex < grid.length; rowIndex++) {
         const row = grid[rowIndex];
@@ -212,6 +279,7 @@ function findNearestRowPoint(lat: number, lng: number, grid: LatLng[][] | null):
                 Math.pow(lat - point.lat, 2) + 
                 Math.pow(lng - point.lng, 2)
             );
+>>>>>>> origin/main
             if (distance < minDistance) {
                 minDistance = distance;
                 nearestPoint = point;
@@ -267,6 +335,10 @@ const PointManagementControls = ({
     setPlantLocations,
     area,
     plantType,
+<<<<<<< HEAD
+}: {
+    plantLocations: LatLng[];
+=======
     originalPlantLocations,
     selectedPoints,
     setSelectedPoints,
@@ -277,6 +349,7 @@ const PointManagementControls = ({
     grid
 }: { 
     plantLocations: LatLng[]; 
+>>>>>>> origin/main
     setPlantLocations: React.Dispatch<React.SetStateAction<LatLng[]>>;
     area: LatLng[];
     plantType: PlantType;
@@ -290,6 +363,15 @@ const PointManagementControls = ({
     grid: LatLng[][] | null;
 }) => {
     const map = useMap();
+<<<<<<< HEAD
+    const [editMode, setEditMode] = useState<'select' | 'add' | 'delete' | null>(null);
+    const [selectedPoints, setSelectedPoints] = useState<Set<string>>(new Set());
+    const [movingPoint, setMovingPoint] = useState<{
+        id: string;
+        position: [number, number];
+    } | null>(null);
+=======
+>>>>>>> origin/main
     const [history, setHistory] = useState<LatLng[][]>([]);
     const [historyIndex, setHistoryIndex] = useState(-1);
     const [isDeletingWithPolygon, setIsDeletingWithPolygon] = useState(false);
@@ -389,6 +471,37 @@ const PointManagementControls = ({
         }
     };
 
+<<<<<<< HEAD
+    const handlePointClick = (pointId: string, event: LeafletMouseEvent) => {
+        event.originalEvent?.stopPropagation();
+
+        if (editMode === 'select') {
+            setSelectedPoints((prev) => {
+                const newSet = new Set(prev);
+                if (newSet.has(pointId)) {
+                    newSet.delete(pointId);
+                } else {
+                    newSet.add(pointId);
+                }
+                return newSet;
+            });
+        } else if (editMode === 'delete') {
+            const pointIndex = plantLocations.findIndex((p) => p.id === pointId);
+            if (pointIndex !== -1) {
+                const newLocations = plantLocations.filter((_, index) => index !== pointIndex);
+                saveToHistory(newLocations);
+                setPlantLocations(newLocations);
+                setSelectedPoints((prev) => {
+                    const newSet = new Set(prev);
+                    newSet.delete(pointId);
+                    return newSet;
+                });
+            }
+        }
+    };
+
+=======
+>>>>>>> origin/main
     const handleMouseMove = (position: [number, number]) => {
         if (movingPoints.length > 0) {
             // Calculate the center of the selected points
@@ -402,6 +515,13 @@ const PointManagementControls = ({
                 grid
             );
 
+<<<<<<< HEAD
+            // Only update if the point is inside the area
+            if (isPointInPolygon(nearestLat, nearestLng, area)) {
+                setMovingPoint((prev) =>
+                    prev ? { ...prev, position: [nearestLat, nearestLng] } : null
+                );
+=======
             // Only update if the target position is inside the area
             if (isPointInPolygon(nearestCenterLat, nearestCenterLng, area)) {
                 // Calculate the offset from original center to new center
@@ -433,11 +553,23 @@ const PointManagementControls = ({
                         currentPosition: [newLat, newLng]
                     };
                 }));
+>>>>>>> origin/main
             }
         }
     };
 
     const handleMouseUp = () => {
+<<<<<<< HEAD
+        if (movingPoint) {
+            const newLocations = plantLocations.map((p) =>
+                p.id === movingPoint.id
+                    ? { ...p, lat: movingPoint.position[0], lng: movingPoint.position[1] }
+                    : p
+            );
+            saveToHistory(newLocations);
+            setPlantLocations(newLocations);
+            setMovingPoint(null);
+=======
         if (movingPoints.length > 0) {
             // Finalize the move - save to history and clear moving state
             saveToHistory(plantLocations); // Save the current state after the move
@@ -527,6 +659,7 @@ const PointManagementControls = ({
             }
 
             featureGroupRef.current?.removeLayer(layer);
+>>>>>>> origin/main
         }
     };
 
@@ -600,13 +733,57 @@ const PointManagementControls = ({
                 </div>
             </div>
             <MapClickHandler onMapClick={handleMapClick} />
+<<<<<<< HEAD
+            <MapDragHandler
+                isDragging={!!movingPoint}
+                editMode={editMode}
+=======
             <MapDragHandler 
                 isDragging={movingPoints.length > 0} 
                 editMode={editMode} 
+>>>>>>> origin/main
                 selectedPoints={selectedPoints}
             />
             <MouseTracker onMove={handleMouseMove} />
             <MapMouseUpHandler onMouseUp={handleMouseUp} />
+<<<<<<< HEAD
+            {plantLocations.map((point) => {
+                const pointId = point.id || `point-${plantLocations.indexOf(point)}`;
+                const isSelected = selectedPoints.has(pointId);
+                const isMoving = movingPoint?.id === pointId;
+                const position: [number, number] =
+                    isMoving && movingPoint ? movingPoint.position : [point.lat, point.lng];
+                return (
+                    <CircleMarker
+                        key={pointId}
+                        center={position}
+                        radius={isSelected ? 3 : 0.5}
+                        pathOptions={{
+                            color: isSelected ? 'blue' : 'red',
+                            fillColor: isSelected ? 'blue' : 'red',
+                            fillOpacity: isMoving ? 0.5 : 1,
+                        }}
+                        eventHandlers={{
+                            click: (e) => {
+                                const mouseEvent = e as unknown as LeafletMouseEvent;
+                                mouseEvent.originalEvent?.stopPropagation();
+                                handlePointClick(pointId, mouseEvent);
+                            },
+                            mousedown: (e) => {
+                                if (editMode === 'select' && isSelected) {
+                                    const mouseEvent = e as unknown as LeafletMouseEvent;
+                                    mouseEvent.originalEvent?.stopPropagation();
+                                    setMovingPoint({
+                                        id: pointId,
+                                        position: [point.lat, point.lng],
+                                    });
+                                }
+                            },
+                        }}
+                    />
+                );
+            })}
+=======
             <MapMouseDownHandler onMouseDown={handleMouseDown} />
             <FeatureGroup ref={featureGroupRef}>
                 <EditControl
@@ -626,6 +803,7 @@ const PointManagementControls = ({
                     }}
                 />
             </FeatureGroup>
+>>>>>>> origin/main
         </>
     );
 };
@@ -866,6 +1044,11 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
         setError(null);
 
         try {
+<<<<<<< HEAD
+            const areaTypes = areaType
+                ? areaType.split(',').map((type) => type.trim())
+                : ['default'];
+=======
             const areaTypes = areaType ? areaType.split(',').map(type => type.trim()) : ['default'];
             
             // Get all layers that should be treated as exclusion zones
@@ -889,6 +1072,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                 exclusion_areas: exclusionLayers.map(layer => layer.coordinates)
             });
 
+>>>>>>> origin/main
             const { data } = await axios.post<{ plant_locations: LatLng[][] }>(
                 '/api/generate-planting-points',
                 {
@@ -929,8 +1113,33 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
 
         try {
             setIsLoading(true);
+<<<<<<< HEAD
+            const requestData = {
+                plant_type_id: plantType.id,
+                area: area,
+                zones: zones.map((zone) => {
+                    const zonePoints = plantLocations.filter(
+                        (point) =>
+                            zone.polygon &&
+                            isPointInPolygon(
+                                point.lat,
+                                point.lng,
+                                zone.polygon.map(([lat, lng]) => ({ lat, lng }))
+                            )
+                    );
+                    console.log(`Zone ${zone.id} points:`, zonePoints);
+                    return {
+                        id: zone.id,
+                        pipeDirection: zone.pipeDirection,
+                        points: zonePoints,
+                    };
+                }),
+            };
+            console.log('Sending request data:', requestData);
+=======
             
             const newPipeLayout: PipeLayout[] = [];
+>>>>>>> origin/main
 
             // Process each zone
             zones.forEach(zone => {
@@ -1199,6 +1408,8 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
         .map((p) => polylineLength(p.coordinates));
     const longestMain = mainPipeLengths.length > 0 ? Math.max(...mainPipeLengths) : 0;
     const longestSubmain = submainPipeLengths.length > 0 ? Math.max(...submainPipeLengths) : 0;
+<<<<<<< HEAD
+=======
     const totalMainLength = mainPipeLengths.reduce((sum, length) => sum + length, 0);
     const totalSubmainLength = submainPipeLengths.reduce((sum, length) => sum + length, 0);
 
@@ -1392,6 +1603,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
             data: { farmData }
         });
     }, [areaInRai, totalPlants, totalWaterNeed, zoneData]);
+>>>>>>> origin/main
 
     // Store enhanced pipe data in localStorage
     useEffect(() => {
@@ -1916,13 +2128,23 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                             {plantLocations.map((point, index) => {
                                 const pointId = point.id || `point-${index}`;
                                 const color = getPointColor(point);
+<<<<<<< HEAD
+=======
                                 const isSelected = selectedPoints.has(pointId);
                                 const isMoving = movingPoints.some(mp => mp.id === pointId);
                                 
+>>>>>>> origin/main
                                 return (
                                     <CircleMarker
                                         key={pointId}
                                         center={[point.lat, point.lng]}
+<<<<<<< HEAD
+                                        radius={1.5}
+                                        pathOptions={{
+                                            color: color,
+                                            fillColor: color,
+                                            fillOpacity: 1,
+=======
                                         radius={isSelected || isMoving ? 3 : 1.5}
                                         eventHandlers={{
                                             click: (e) => {
@@ -1936,6 +2158,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                                             fillColor: isSelected || isMoving ? '#FFD700' : color,
                                             fillOpacity: 1,
                                             weight: isSelected || isMoving ? 2 : 1,
+>>>>>>> origin/main
                                         }}
                                     />
                                 );
@@ -2007,6 +2230,25 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
             </div>
 
             {showPipeSummary && (
+<<<<<<< HEAD
+                <div className="mt-4 rounded-lg bg-gray-800 p-4 text-white">
+                    <h3 className="mb-2 text-lg font-semibold">Pipe Summary</h3>
+                    <div className="flex flex-col gap-2">
+                        <span>
+                            Longest Main Pipe:{' '}
+                            <span className="font-bold">{longestMain.toFixed(2)} m</span>
+                        </span>
+                        <span>
+                            Longest Sub-Main Pipe:{' '}
+                            <span className="font-bold">{longestSubmain.toFixed(2)} m</span>
+                        </span>
+                        <button
+                            onClick={handleNextToProduct}
+                            className="rounded bg-blue-600 px-6 py-2 text-white transition-colors duration-200 hover:bg-blue-700"
+                        >
+                            Next
+                        </button>
+=======
                 <div className="mt-4 p-4 bg-gray-800 rounded-lg text-white">
                     <h3 className="text-lg font-semibold mb-4">Pipe Summary</h3>
                     
@@ -2207,6 +2449,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [] }:
                                 </div>
                             ))}
                         </div>
+>>>>>>> origin/main
                     </div>
 
                     {longestBranchPipeData && (

@@ -54,7 +54,7 @@ export const PumpData = [
         suction_depth_m: 9,
         dimensions_cm: '18 x 30 x 22',
         weight_kg: 12.5,
-        price: 1820,    
+        price: 1820,
     },
     {
         id: 5,

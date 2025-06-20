@@ -111,9 +111,9 @@ export const getVelocityScore = (velocity: number): number => {
 
 // ฟังก์ชันประเมินขนาดท่อที่เหมาะสม (ปรับปรุงใหม่)
 export const getSizeScore = (
-    pipeSize: number, 
-    minSize: number, 
-    maxSize: number, 
+    pipeSize: number,
+    minSize: number,
+    maxSize: number,
     optimalSize: number
 ): number => {
     if (pipeSize === optimalSize) {
@@ -133,10 +133,10 @@ export const getSizeScore = (
 export const getCostEfficiencyScore = (pipe: any, pipeType: string): number => {
     // คำนวณ cost per meter per mm diameter
     const costPerMeterPerMM = pipe.price / (pipe.lengthM * pipe.sizeMM);
-    
+
     // เกณฑ์การให้คะแนนตามประเภทท่อ
     let excellentThreshold, goodThreshold, averageThreshold;
-    
+
     switch (pipeType) {
         case 'branch':
             excellentThreshold = 0.5;
@@ -158,7 +158,7 @@ export const getCostEfficiencyScore = (pipe: any, pipeType: string): number => {
             goodThreshold = 2.0;
             averageThreshold = 4.0;
     }
-    
+
     if (costPerMeterPerMM <= excellentThreshold) {
         return 15; // ประสิทธิภาพสูงมาก
     } else if (costPerMeterPerMM <= goodThreshold) {
@@ -173,7 +173,7 @@ export const getCostEfficiencyScore = (pipe: any, pipeType: string): number => {
 // ฟังก์ชันใหม่สำหรับประเมิน Head Loss (ปรับปรุงใหม่)
 export const getHeadLossScore = (headLoss: number, pipeType: string): number => {
     let excellentThreshold, goodThreshold, averageThreshold;
-    
+
     switch (pipeType) {
         case 'branch':
             excellentThreshold = 0.5;
@@ -195,7 +195,7 @@ export const getHeadLossScore = (headLoss: number, pipeType: string): number => 
             goodThreshold = 2.0;
             averageThreshold = 4.0;
     }
-    
+
     if (headLoss <= excellentThreshold) {
         return 15; // Head loss ต่ำมาก
     } else if (headLoss <= goodThreshold) {
@@ -208,16 +208,19 @@ export const getHeadLossScore = (headLoss: number, pipeType: string): number => 
 };
 
 // ฟังก์ชันคำนวณขนาดท่อที่เหมาะสมตาม flow
-export const calculateOptimalPipeSize = (flow_lpm: number, targetVelocity: number = 1.5): number => {
+export const calculateOptimalPipeSize = (
+    flow_lpm: number,
+    targetVelocity: number = 1.5
+): number => {
     // Q = A × V
     // A = π × (D/2)²
     // D = 2 × sqrt(Q / (π × V))
-    
+
     const Q = flow_lpm / 60000; // m³/s
     const V = targetVelocity; // m/s
     const D = 2 * Math.sqrt(Q / (Math.PI * V)); // meters
     const D_mm = D * 1000; // millimeters
-    
+
     return D_mm;
 };
 
@@ -290,10 +293,10 @@ export const evaluatePipeOverall = (
 
     let score = 0;
     const velocity = headLossData.velocity;
-    
+
     // คำนวณขนาดท่อที่เหมาะสมสำหรับ flow นี้
     const optimalSize = calculateOptimalPipeSize(flow_lpm);
-    
+
     // กำหนดช่วงขนาดที่เหมาะสมตาม section type
     let minSize, maxSize;
     switch (sectionType) {
@@ -358,7 +361,7 @@ export const evaluatePipeOverall = (
     // คำนวณระดับความเหมาะสม
     const isTypeAllowed = allowedTypes.includes(pipe.pipeType);
     const isVelocityOK = velocity >= 0.3 && velocity <= 3.5;
-    
+
     return {
         ...pipe,
         score: formatNumber(score, 1),

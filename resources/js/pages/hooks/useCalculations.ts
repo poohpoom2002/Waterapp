@@ -34,23 +34,21 @@ export const useCalculations = (
         const waterPerSprinklerLPM = waterPerSprinklerLPH / 60;
 
         // ตรวจสอบว่ามีข้อมูลท่อหรือไม่
-        const hasValidSecondaryPipe = input.longestSecondaryPipeM > 0 && input.totalSecondaryPipeM > 0;
+        const hasValidSecondaryPipe =
+            input.longestSecondaryPipeM > 0 && input.totalSecondaryPipeM > 0;
         const hasValidMainPipe = input.longestMainPipeM > 0 && input.totalMainPipeM > 0;
 
         // คำนวณ Flow แบบแยกตามว่ามีท่อไหนบ้าง
         const flowBranch = waterPerSprinklerLPM * input.sprinklersPerBranch;
-        
+
         // ถ้าไม่มี secondary pipe ให้ branch ไปตรงเป็น main
-        const flowSecondary = hasValidSecondaryPipe 
-            ? flowBranch * input.branchesPerSecondary 
-            : 0; // ไม่คำนวณเลย
-            
+        const flowSecondary = hasValidSecondaryPipe ? flowBranch * input.branchesPerSecondary : 0; // ไม่คำนวณเลย
+
         // ถ้าไม่มี secondary pipe ให้ main รับ flow จาก branch โดยตรง
         const flowMain = hasValidMainPipe
-            ? (hasValidSecondaryPipe 
-                ? waterPerZoneLPM * input.simultaneousZones  // ปกติ
+            ? hasValidSecondaryPipe
+                ? waterPerZoneLPM * input.simultaneousZones // ปกติ
                 : flowBranch * (input.totalTrees / input.sprinklersPerBranch) // จาก branch โดยตรง
-              )
             : 0; // ไม่คำนวณเลย
 
         // วิเคราะห์สปริงเกอร์ทั้งหมด
@@ -67,7 +65,7 @@ export const useCalculations = (
             // คะแนนความเหมาะสมของอัตราการไหล (60%)
             const flowDiff = Math.abs(waterPerSprinklerLPH - (minFlow + maxFlow) / 2);
             const flowRange = maxFlow - minFlow;
-            
+
             if (waterPerSprinklerLPH >= minFlow && waterPerSprinklerLPH <= maxFlow) {
                 const positionInRange = (waterPerSprinklerLPH - minFlow) / flowRange;
                 if (positionInRange >= 0.2 && positionInRange <= 0.8) {
@@ -75,11 +73,20 @@ export const useCalculations = (
                 } else {
                     score += 55;
                 }
-            } else if (waterPerSprinklerLPH >= minFlow * 0.9 && waterPerSprinklerLPH <= maxFlow * 1.1) {
+            } else if (
+                waterPerSprinklerLPH >= minFlow * 0.9 &&
+                waterPerSprinklerLPH <= maxFlow * 1.1
+            ) {
                 score += 45;
-            } else if (waterPerSprinklerLPH >= minFlow * 0.8 && waterPerSprinklerLPH <= maxFlow * 1.2) {
+            } else if (
+                waterPerSprinklerLPH >= minFlow * 0.8 &&
+                waterPerSprinklerLPH <= maxFlow * 1.2
+            ) {
                 score += 30;
-            } else if (waterPerSprinklerLPH >= minFlow * 0.6 && waterPerSprinklerLPH <= maxFlow * 1.4) {
+            } else if (
+                waterPerSprinklerLPH >= minFlow * 0.6 &&
+                waterPerSprinklerLPH <= maxFlow * 1.4
+            ) {
                 score += 15;
             } else {
                 score += 5;
@@ -128,9 +135,18 @@ export const useCalculations = (
                 flowMatch: waterPerSprinklerLPH >= minFlow && waterPerSprinklerLPH <= maxFlow,
                 flowCloseMatch:
                     waterPerSprinklerLPH >= minFlow * 0.9 && waterPerSprinklerLPH <= maxFlow * 1.1,
-                isRecommended: score >= 70 && waterPerSprinklerLPH >= minFlow * 0.9 && waterPerSprinklerLPH <= maxFlow * 1.1,
-                isGoodChoice: score >= 50 && waterPerSprinklerLPH >= minFlow * 0.8 && waterPerSprinklerLPH <= maxFlow * 1.2,
-                isUsable: score >= 30 && waterPerSprinklerLPH >= minFlow * 0.6 && waterPerSprinklerLPH <= maxFlow * 1.4,
+                isRecommended:
+                    score >= 70 &&
+                    waterPerSprinklerLPH >= minFlow * 0.9 &&
+                    waterPerSprinklerLPH <= maxFlow * 1.1,
+                isGoodChoice:
+                    score >= 50 &&
+                    waterPerSprinklerLPH >= minFlow * 0.8 &&
+                    waterPerSprinklerLPH <= maxFlow * 1.2,
+                isUsable:
+                    score >= 30 &&
+                    waterPerSprinklerLPH >= minFlow * 0.6 &&
+                    waterPerSprinklerLPH <= maxFlow * 1.4,
                 targetFlow: formatNumber(waterPerSprinklerLPH, 3),
                 minFlow: formatNumber(minFlow, 3),
                 maxFlow: formatNumber(maxFlow, 3),
@@ -143,7 +159,7 @@ export const useCalculations = (
         const recommendedSprinklers = analyzedSprinklers.filter((s) => s.isRecommended);
 
         // วิเคราะห์ท่อแต่ละประเภท - ไม่จำกัดประเภทท่อ เอาท่อทั้งหมดมาวิเคราะห์
-        const analyzedBranchPipes = PipeData.map(pipe => 
+        const analyzedBranchPipes = PipeData.map((pipe) =>
             evaluatePipeOverall(
                 pipe,
                 flowBranch,
@@ -155,61 +171,64 @@ export const useCalculations = (
         ).sort((a, b) => b.score - a.score);
 
         // Secondary pipes - วิเคราะห์เฉพาะเมื่อมีข้อมูล
-        const analyzedSecondaryPipes = hasValidSecondaryPipe 
-            ? PipeData.map(pipe =>
-                evaluatePipeOverall(
-                    pipe,
-                    flowSecondary,
-                    input.longestSecondaryPipeM,
-                    'secondary',
-                    input.pipeAgeYears,
-                    [] // ไม่จำกัดประเภท
-                )
+        const analyzedSecondaryPipes = hasValidSecondaryPipe
+            ? PipeData.map((pipe) =>
+                  evaluatePipeOverall(
+                      pipe,
+                      flowSecondary,
+                      input.longestSecondaryPipeM,
+                      'secondary',
+                      input.pipeAgeYears,
+                      [] // ไม่จำกัดประเภท
+                  )
               ).sort((a, b) => b.score - a.score)
             : []; // ไม่มีข้อมูล = array ว่าง
 
         // Main pipes - วิเคราะห์เฉพาะเมื่อมีข้อมูล
         const analyzedMainPipes = hasValidMainPipe
-            ? PipeData.map(pipe =>
-                evaluatePipeOverall(
-                    pipe,
-                    flowMain,
-                    input.longestMainPipeM,
-                    'main',
-                    input.pipeAgeYears,
-                    [] // ไม่จำกัดประเภท
-                )
+            ? PipeData.map((pipe) =>
+                  evaluatePipeOverall(
+                      pipe,
+                      flowMain,
+                      input.longestMainPipeM,
+                      'main',
+                      input.pipeAgeYears,
+                      [] // ไม่จำกัดประเภท
+                  )
               ).sort((a, b) => b.score - a.score)
             : []; // ไม่มีข้อมูล = array ว่าง
 
         // แยกท่อที่แนะนำ (เฉพาะที่มีข้อมูล)
         const recommendedBranchPipe = analyzedBranchPipes.filter((p) => p.isRecommended);
-        const recommendedSecondaryPipe = hasValidSecondaryPipe 
+        const recommendedSecondaryPipe = hasValidSecondaryPipe
             ? analyzedSecondaryPipes.filter((p) => p.isRecommended)
             : [];
         const recommendedMainPipe = hasValidMainPipe
-            ? analyzedMainPipes.filter((p) => p.isRecommended) 
+            ? analyzedMainPipes.filter((p) => p.isRecommended)
             : [];
 
         // เลือกท่อ default (เฉพาะที่มีข้อมูล)
-        const defaultBranchPipe = analyzedBranchPipes.find((p) => p.isUsable) || analyzedBranchPipes[0];
+        const defaultBranchPipe =
+            analyzedBranchPipes.find((p) => p.isUsable) || analyzedBranchPipes[0];
         const defaultSecondaryPipe = hasValidSecondaryPipe
-            ? (analyzedSecondaryPipes.find((p) => p.isUsable) || analyzedSecondaryPipes[0])
+            ? analyzedSecondaryPipes.find((p) => p.isUsable) || analyzedSecondaryPipes[0]
             : null;
         const defaultMainPipe = hasValidMainPipe
-            ? (analyzedMainPipes.find((p) => p.isUsable) || analyzedMainPipes[0])
+            ? analyzedMainPipes.find((p) => p.isUsable) || analyzedMainPipes[0]
             : null;
 
         // คำนวณจำนวนม้วนท่อ (เฉพาะที่มีข้อมูล)
         const branchRolls = defaultBranchPipe
             ? calculatePipeRolls(input.totalBranchPipeM, defaultBranchPipe.lengthM)
             : 1;
-        const secondaryRolls = defaultSecondaryPipe && hasValidSecondaryPipe
-            ? calculatePipeRolls(input.totalSecondaryPipeM, defaultSecondaryPipe.lengthM)
-            : 0; // ไม่มีข้อมูล = 0 ม้วน
-        const mainRolls = defaultMainPipe && hasValidMainPipe
-            ? calculatePipeRolls(input.totalMainPipeM, defaultMainPipe.lengthM)
-            : 0; // ไม่มีข้อมูล = 0 ม้วน
+        const secondaryRolls =
+            defaultSecondaryPipe && hasValidSecondaryPipe
+                ? calculatePipeRolls(input.totalSecondaryPipeM, defaultSecondaryPipe.lengthM)
+                : 0; // ไม่มีข้อมูล = 0 ม้วน
+        const mainRolls =
+            defaultMainPipe && hasValidMainPipe
+                ? calculatePipeRolls(input.totalMainPipeM, defaultMainPipe.lengthM)
+                : 0; // ไม่มีข้อมูล = 0 ม้วน
 
         // คำนวณ Head Loss และ Velocity (เฉพาะท่อที่มีข้อมูล)
         const branchLoss = defaultBranchPipe
@@ -223,27 +242,29 @@ export const useCalculations = (
               )
             : { major: 0, minor: 0, total: 0, velocity: 0, C: 135 };
 
-        const secondaryLoss = (defaultSecondaryPipe && hasValidSecondaryPipe)
-            ? calculateImprovedHeadLoss(
-                  flowSecondary,
-                  defaultSecondaryPipe.sizeMM,
-                  input.longestSecondaryPipeM,
-                  defaultSecondaryPipe.pipeType,
-                  'secondary',
-                  input.pipeAgeYears
-              )
-            : { major: 0, minor: 0, total: 0, velocity: 0, C: 140 }; // ไม่มีข้อมูล = 0 loss
+        const secondaryLoss =
+            defaultSecondaryPipe && hasValidSecondaryPipe
+                ? calculateImprovedHeadLoss(
+                      flowSecondary,
+                      defaultSecondaryPipe.sizeMM,
+                      input.longestSecondaryPipeM,
+                      defaultSecondaryPipe.pipeType,
+                      'secondary',
+                      input.pipeAgeYears
+                  )
+                : { major: 0, minor: 0, total: 0, velocity: 0, C: 140 }; // ไม่มีข้อมูล = 0 loss
 
-        const mainLoss = (defaultMainPipe && hasValidMainPipe)
-            ? calculateImprovedHeadLoss(
-                  flowMain,
-                  defaultMainPipe.sizeMM,
-                  input.longestMainPipeM,
-                  defaultMainPipe.pipeType,
-                  'main',
-                  input.pipeAgeYears
-              )
-            : { major: 0, minor: 0, total: 0, velocity: 0, C: 145 }; // ไม่มีข้อมูล = 0 loss
+        const mainLoss =
+            defaultMainPipe && hasValidMainPipe
+                ? calculateImprovedHeadLoss(
+                      flowMain,
+                      defaultMainPipe.sizeMM,
+                      input.longestMainPipeM,
+                      defaultMainPipe.pipeType,
+                      'main',
+                      input.pipeAgeYears
+                  )
+                : { major: 0, minor: 0, total: 0, velocity: 0, C: 145 }; // ไม่มีข้อมูล = 0 loss
 
         const totalHeadLoss = branchLoss.total + secondaryLoss.total + mainLoss.total;
         const totalMajorLoss = branchLoss.major + secondaryLoss.major + mainLoss.major;
@@ -251,26 +272,26 @@ export const useCalculations = (
 
         // ตรวจสอบความเร็ว (เฉพาะท่อที่มีข้อมูล)
         const velocityWarnings = [];
-        
+
         // Branch pipe - ตรวจสอบเสมอ
         velocityWarnings.push(checkVelocity(branchLoss.velocity, 'ท่อย่อย'));
-        
+
         // Secondary pipe - ตรวจสอบเฉพาะเมื่อมีข้อมูล
         if (hasValidSecondaryPipe && defaultSecondaryPipe) {
             velocityWarnings.push(checkVelocity(secondaryLoss.velocity, 'ท่อรอง'));
         }
-        
+
         // Main pipe - ตรวจสอบเฉพาะเมื่อมีข้อมูล
         if (hasValidMainPipe && defaultMainPipe) {
             velocityWarnings.push(checkVelocity(mainLoss.velocity, 'ท่อหลัก'));
         }
-        
+
         // กรองเฉพาะคำเตือนที่ไม่ใช่สีเขียว
         const filteredWarnings = velocityWarnings.filter((warning) => !warning.includes('🟢'));
 
         // คำนวณแรงดันจากสปริงเกอร์ที่เลือก
         let pressureFromSprinkler = input.pressureHeadM; // ค่าเริ่มต้น
-        
+
         if (selectedSprinkler) {
             // ใช้แรงดันกลางของสปริงเกอร์ที่เลือก
             const minPressure = Array.isArray(selectedSprinkler.pressureBar)
@@ -279,7 +300,7 @@ export const useCalculations = (
             const maxPressure = Array.isArray(selectedSprinkler.pressureBar)
                 ? selectedSprinkler.pressureBar[1]
                 : parseFloat(String(selectedSprinkler.pressureBar).split('-')[1]);
-            
+
             // แปลง bar เป็น เมตร (1 bar ≈ 10.2 เมตร)
             const avgPressureBar = (minPressure + maxPressure) / 2;
             pressureFromSprinkler = avgPressureBar * 10.2;
@@ -289,13 +310,17 @@ export const useCalculations = (
         const pumpHeadRequired = input.staticHeadM + totalHeadLoss + pressureFromSprinkler;
 
         // ใช้ flow ที่เหมาะสมสำหรับปั๊ม
-        const pumpRequiredFlow = hasValidMainPipe 
-            ? flowMain 
-            : (hasValidSecondaryPipe ? flowSecondary : flowBranch);
+        const pumpRequiredFlow = hasValidMainPipe
+            ? flowMain
+            : hasValidSecondaryPipe
+              ? flowSecondary
+              : flowBranch;
 
         // วิเคราะห์ปั๊มทั้งหมด
         const analyzedPumps = PumpData.map((pump) => {
-            const maxFlow = pump.max_flow_rate_lpm || (Array.isArray(pump.flow_rate_lpm) ? pump.flow_rate_lpm[1] : 0);
+            const maxFlow =
+                pump.max_flow_rate_lpm ||
+                (Array.isArray(pump.flow_rate_lpm) ? pump.flow_rate_lpm[1] : 0);
             const maxHead = pump.max_head_m || (Array.isArray(pump.head_m) ? pump.head_m[0] : 0);
 
             let score = 0;
@@ -368,9 +393,24 @@ export const useCalculations = (
                 estimatedHP: formatNumber(estimatedHP, 3),
                 isFlowAdequate: maxFlow >= pumpRequiredFlow,
                 isHeadAdequate: maxHead >= pumpHeadRequired,
-                isRecommended: score >= 70 && maxFlow >= pumpRequiredFlow && maxHead >= pumpHeadRequired && flowRatio <= 2.0 && headRatio <= 2.0,
-                isGoodChoice: score >= 50 && maxFlow >= pumpRequiredFlow && maxHead >= pumpHeadRequired && flowRatio <= 2.5 && headRatio <= 2.5,
-                isUsable: score >= 30 && maxFlow >= pumpRequiredFlow && maxHead >= pumpHeadRequired && flowRatio <= 3.0 && headRatio <= 3.0,
+                isRecommended:
+                    score >= 70 &&
+                    maxFlow >= pumpRequiredFlow &&
+                    maxHead >= pumpHeadRequired &&
+                    flowRatio <= 2.0 &&
+                    headRatio <= 2.0,
+                isGoodChoice:
+                    score >= 50 &&
+                    maxFlow >= pumpRequiredFlow &&
+                    maxHead >= pumpHeadRequired &&
+                    flowRatio <= 2.5 &&
+                    headRatio <= 2.5,
+                isUsable:
+                    score >= 30 &&
+                    maxFlow >= pumpRequiredFlow &&
+                    maxHead >= pumpHeadRequired &&
+                    flowRatio <= 3.0 &&
+                    headRatio <= 3.0,
             };
         }).sort((a, b) => {
             if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;

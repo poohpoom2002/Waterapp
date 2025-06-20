@@ -24,13 +24,13 @@ const CostSummary: React.FC<CostSummaryProps> = ({
     const sprinklerCost = (selectedSprinkler?.price || 0) * results.totalSprinklers;
     const pumpCost = selectedPump?.price || 0;
     const branchPipeCost = (selectedBranchPipe?.price || 0) * results.branchPipeRolls;
-    const secondaryPipeCost = selectedSecondaryPipe 
-        ? (selectedSecondaryPipe.price || 0) * results.secondaryPipeRolls 
+    const secondaryPipeCost = selectedSecondaryPipe
+        ? (selectedSecondaryPipe.price || 0) * results.secondaryPipeRolls
         : 0;
-    const mainPipeCost = selectedMainPipe 
-        ? (selectedMainPipe.price || 0) * results.mainPipeRolls 
+    const mainPipeCost = selectedMainPipe
+        ? (selectedMainPipe.price || 0) * results.mainPipeRolls
         : 0;
-    
+
     const totalCost = sprinklerCost + pumpCost + branchPipeCost + secondaryPipeCost + mainPipeCost;
 
     return (
@@ -41,44 +41,40 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 <div className="rounded bg-gray-600 p-4">
                     <h4 className="font-medium text-green-300">สปริงเกอร์</h4>
                     <p className="text-sm">จำนวน: {results.totalSprinklers} หัว</p>
-                    <p className="text-xl font-bold">
-                        {sprinklerCost.toLocaleString()} บาท
-                    </p>
+                    <p className="text-xl font-bold">{sprinklerCost.toLocaleString()} บาท</p>
                 </div>
-                
+
                 {/* ปั๊มน้ำ - แสดงเสมอ */}
                 <div className="rounded bg-gray-600 p-4">
                     <h4 className="font-medium text-red-300">ปั๊มน้ำ</h4>
                     <p className="text-sm">จำนวน: 1 ตัว ({selectedPump?.powerHP || 'N/A'} HP)</p>
-                    <p className="text-xl font-bold">
-                        {pumpCost.toLocaleString()} บาท
-                    </p>
+                    <p className="text-xl font-bold">{pumpCost.toLocaleString()} บาท</p>
                 </div>
-                
+
                 {/* ท่อย่อย - แสดงเสมอ */}
                 <div className="rounded bg-gray-600 p-4">
                     <h4 className="font-medium text-purple-300">ท่อย่อย</h4>
                     <p className="text-sm">
-                        จำนวน: {results.branchPipeRolls} ม้วน ({selectedBranchPipe?.sizeMM || 'N/A'}mm)
+                        จำนวน: {results.branchPipeRolls} ม้วน ({selectedBranchPipe?.sizeMM || 'N/A'}
+                        mm)
                     </p>
-                    <p className="text-xl font-bold">
-                        {branchPipeCost.toLocaleString()} บาท
-                    </p>
+                    <p className="text-xl font-bold">{branchPipeCost.toLocaleString()} บาท</p>
                 </div>
-                
+
                 {/* ท่อเมนรอง - แสดงเฉพาะเมื่อมีข้อมูล */}
                 {selectedSecondaryPipe && (
                     <div className="rounded bg-gray-600 p-4">
                         <h4 className="font-medium text-orange-300">ท่อเมนรอง</h4>
                         <p className="text-sm">
-                            จำนวน: {results.secondaryPipeRolls} ม้วน ({selectedSecondaryPipe.sizeMM}mm)
+                            จำนวน: {results.secondaryPipeRolls} ม้วน ({selectedSecondaryPipe.sizeMM}
+                            mm)
                         </p>
                         <p className="text-xl font-bold">
                             {secondaryPipeCost.toLocaleString()} บาท
                         </p>
                     </div>
                 )}
-                
+
                 {/* ท่อเมนหลัก - แสดงเฉพาะเมื่อมีข้อมูล */}
                 {selectedMainPipe && (
                     <div className="rounded bg-gray-600 p-4">
@@ -86,21 +82,21 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         <p className="text-sm">
                             จำนวน: {results.mainPipeRolls} ม้วน ({selectedMainPipe.sizeMM}mm)
                         </p>
-                        <p className="text-xl font-bold">
-                            {mainPipeCost.toLocaleString()} บาท
-                        </p>
+                        <p className="text-xl font-bold">{mainPipeCost.toLocaleString()} บาท</p>
                     </div>
                 )}
-                
+
                 {/* รวมทั้งหมด */}
-                <div className={`rounded bg-gradient-to-r from-green-600 to-blue-600 p-4 ${(!selectedSecondaryPipe && !selectedMainPipe) ? 'md:col-span-2 lg:col-span-3' : ''}`}>
+                <div
+                    className={`rounded bg-gradient-to-r from-green-600 to-blue-600 p-4 ${!selectedSecondaryPipe && !selectedMainPipe ? 'md:col-span-2 lg:col-span-3' : ''}`}
+                >
                     <h4 className="font-medium text-white">💎 รวมทั้งหมด</h4>
                     <p className="text-sm text-green-100">ราคาสุทธิ (ไม่รวม VAT)</p>
                     <p className="text-2xl font-bold text-white">
                         {totalCost.toLocaleString()} บาท
                     </p>
                     {(!selectedSecondaryPipe || !selectedMainPipe) && (
-                        <p className="text-xs text-green-200 mt-1">
+                        <p className="mt-1 text-xs text-green-200">
                             * ไม่รวมท่อที่ไม่มีข้อมูลจาก Generate Tree
                         </p>
                     )}

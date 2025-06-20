@@ -245,20 +245,17 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ selectedPump, onPumpChange,
                                 <strong>ท่อเข้า/ออก:</strong> {selectedPump.inlet_size_inch}"/
                                 {selectedPump.outlet_size_inch}"
                             </p>
-                            
                         </div>
                         <div>
                             <p>
-                                <strong>Flow:</strong>{' '}
-                                {selectedAnalyzed.maxFlow || 'N/A'} LPM
+                                <strong>Flow:</strong> {selectedAnalyzed.maxFlow || 'N/A'} LPM
                             </p>
                             <p>
-                                <strong>Head:</strong>{' '}
-                                {selectedAnalyzed.maxHead || 'N/A'} เมตร
+                                <strong>Head:</strong> {selectedAnalyzed.maxHead || 'N/A'} เมตร
                             </p>
                             <p>
-                                <strong>S.D(ความลึกดูด):</strong> {selectedPump.suction_depth_m || 'N/A'}{' '}
-                                เมตร
+                                <strong>S.D(ความลึกดูด):</strong>{' '}
+                                {selectedPump.suction_depth_m || 'N/A'} เมตร
                             </p>
                             <p>
                                 <strong>ราคา:</strong> {selectedPump.price.toLocaleString()} บาท
