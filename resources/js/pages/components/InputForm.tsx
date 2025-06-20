@@ -45,14 +45,14 @@ const InputForm: React.FC<InputFormProps> = ({ input, onInputChange, selectedSpr
         const maxPressure = Array.isArray(selectedSprinkler.pressureBar)
             ? selectedSprinkler.pressureBar[1]
             : parseFloat(String(selectedSprinkler.pressureBar).split('-')[1]);
-        
+
         const avgPressureBar = (minPressure + maxPressure) / 2;
         const pressureM = avgPressureBar * 10.2; // แปลง bar เป็น เมตร
 
         return {
             pressureBar: avgPressureBar,
             pressureM: pressureM,
-            sprinklerName: selectedSprinkler.productCode
+            sprinklerName: selectedSprinkler.productCode,
         };
     };
 

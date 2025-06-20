@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios, { AxiosError } from 'axios';
 import {
@@ -1129,7 +1128,7 @@ export default function MapPlanner() {
                         </FeatureGroup>
 
                         {/* Draw exclusion areas as polygons (yellow) */}
-                        
+
                         {exclusionAreas.map((polygon, idx) => (
                             <Polyline
                                 key={`exclusion-${idx}`}

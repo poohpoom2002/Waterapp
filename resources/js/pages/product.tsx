@@ -32,14 +32,14 @@ export default function Product() {
         console.log('=== Farm & Pipe Data Status ===');
         console.log('Farm Data:', farmData);
         console.log('Pipe Length Data:', pipeLengthData);
-        
+
         if (pipeLengthData) {
             console.log('Main Pipes Valid:', isValidPipeData(pipeLengthData, 'main'));
             console.log('Submain Pipes Valid:', isValidPipeData(pipeLengthData, 'submain'));
-            
+
             const main = pipeLengthData.mainPipes;
             const submain = pipeLengthData.submainPipes;
-            
+
             if (main) {
                 console.log('Main Pipes - Longest:', main.longest, 'Total:', main.total);
             }
@@ -86,14 +86,16 @@ export default function Product() {
     // Helper functions to check if pipe data is valid and not zero
     const isValidPipeData = (pipeData: any, type: 'main' | 'submain'): boolean => {
         if (!pipeData) return false;
-        
+
         const data = type === 'main' ? pipeData.mainPipes : pipeData.submainPipes;
         if (!data) return false;
-        
+
         // Check that both longest and total exist and are greater than 0
         return (
-            typeof data.longest === 'number' && data.longest > 0 &&
-            typeof data.total === 'number' && data.total > 0
+            typeof data.longest === 'number' &&
+            data.longest > 0 &&
+            typeof data.total === 'number' &&
+            data.total > 0
         );
     };
 
@@ -116,28 +118,22 @@ export default function Product() {
         const hasValidSubmainPipe = isValidPipeData(pipeLengthData, 'submain');
 
         // Use pipe data only if it's valid, otherwise use default values
-        const longestBranchPipeM = branches.length && branches.some(z => z.longestBranch > 0)
-            ? Math.max(...branches.map((z) => z.longestBranch))
-            : 30; // ค่าเริ่มต้นสำหรับท่อย่อย
-            
-        const totalBranchPipeM = branches.length && branches.some(z => z.totalBranchLength > 0)
-            ? branches.reduce((sum, z) => sum + z.totalBranchLength, 0)
-            : 500; // ค่าเริ่มต้นสำหรับท่อย่อย
+        const longestBranchPipeM =
+            branches.length && branches.some((z) => z.longestBranch > 0)
+                ? Math.max(...branches.map((z) => z.longestBranch))
+                : 30; // ค่าเริ่มต้นสำหรับท่อย่อย
 
-        const longestSecondaryPipeM = hasValidSubmainPipe && submain?.longest
-            ? submain.longest 
-            : 0; // ถ้าไม่มีข้อมูลให้เป็น 0
-        const totalSecondaryPipeM = hasValidSubmainPipe && submain?.total
-            ? submain.total 
-            : 0; // ถ้าไม่มีข้อมูลให้เป็น 0
+        const totalBranchPipeM =
+            branches.length && branches.some((z) => z.totalBranchLength > 0)
+                ? branches.reduce((sum, z) => sum + z.totalBranchLength, 0)
+                : 500; // ค่าเริ่มต้นสำหรับท่อย่อย
 
-        const longestMainPipeM = hasValidMainPipe && main?.longest
-            ? main.longest 
-            : 0; // ถ้าไม่มีข้อมูลให้เป็น 0
-            
-        const totalMainPipeM = hasValidMainPipe && main?.total
-            ? main.total 
-            : 0; // ถ้าไม่มีข้อมูลให้เป็น 0
+        const longestSecondaryPipeM = hasValidSubmainPipe && submain?.longest ? submain.longest : 0; // ถ้าไม่มีข้อมูลให้เป็น 0
+        const totalSecondaryPipeM = hasValidSubmainPipe && submain?.total ? submain.total : 0; // ถ้าไม่มีข้อมูลให้เป็น 0
+
+        const longestMainPipeM = hasValidMainPipe && main?.longest ? main.longest : 0; // ถ้าไม่มีข้อมูลให้เป็น 0
+
+        const totalMainPipeM = hasValidMainPipe && main?.total ? main.total : 0; // ถ้าไม่มีข้อมูลให้เป็น 0
 
         const result = {
             farmSizeRai: formatNumber(area, 3),
@@ -164,7 +160,7 @@ export default function Product() {
         console.log('Pipe data validity:', {
             hasValidMainPipe,
             hasValidSubmainPipe,
-            hasBranchData: branches.length > 0
+            hasBranchData: branches.length > 0,
         });
 
         return result;
@@ -219,7 +215,7 @@ export default function Product() {
         if (!selectedSprinkler) {
             const newSelectedSprinkler = results.recommendedSprinklers.length
                 ? results.recommendedSprinklers.sort((a, b) => b.score - a.score)[0]
-                : results.analyzedSprinklers?.find(s => s.isUsable) || 
+                : results.analyzedSprinklers?.find((s) => s.isUsable) ||
                   SprinklerData.sort((a, b) => b.price - a.price)[0];
             setSelectedSprinkler(newSelectedSprinkler);
         }
@@ -229,8 +225,8 @@ export default function Product() {
             setSelectedBranchPipe(
                 results.recommendedBranchPipe.length
                     ? results.recommendedBranchPipe.sort((a, b) => b.score - a.score)[0]
-                    : results.analyzedBranchPipes?.find(p => p.isUsable) ||
-                      PipeData.sort((a, b) => a.sizeMM - b.sizeMM)[0] // เลือกขนาดเล็กสุดเป็น default
+                    : results.analyzedBranchPipes?.find((p) => p.isUsable) ||
+                          PipeData.sort((a, b) => a.sizeMM - b.sizeMM)[0] // เลือกขนาดเล็กสุดเป็น default
             );
         }
 
@@ -239,8 +235,8 @@ export default function Product() {
             setSelectedSecondaryPipe(
                 results.recommendedSecondaryPipe.length
                     ? results.recommendedSecondaryPipe.sort((a, b) => b.score - a.score)[0]
-                    : results.analyzedSecondaryPipes?.find(p => p.isUsable) ||
-                      PipeData.sort((a, b) => a.sizeMM - b.sizeMM)[0]
+                    : results.analyzedSecondaryPipes?.find((p) => p.isUsable) ||
+                          PipeData.sort((a, b) => a.sizeMM - b.sizeMM)[0]
             );
         } else if (!hasValidSubmainPipeData) {
             setSelectedSecondaryPipe(null);
@@ -251,8 +247,8 @@ export default function Product() {
             setSelectedMainPipe(
                 results.recommendedMainPipe.length
                     ? results.recommendedMainPipe.sort((a, b) => b.score - a.score)[0]
-                    : results.analyzedMainPipes?.find(p => p.isUsable) ||
-                      PipeData.sort((a, b) => a.sizeMM - b.sizeMM)[0]
+                    : results.analyzedMainPipes?.find((p) => p.isUsable) ||
+                          PipeData.sort((a, b) => a.sizeMM - b.sizeMM)[0]
             );
         } else if (!hasValidMainPipeData) {
             setSelectedMainPipe(null);
@@ -263,8 +259,8 @@ export default function Product() {
             setSelectedPump(
                 results.recommendedPump.length
                     ? results.recommendedPump.sort((a, b) => a.price - b.price)[0]
-                    : results.analyzedPumps?.find(p => p.isUsable) ||
-                      PumpData.sort((a, b) => a.price - b.price)[0]
+                    : results.analyzedPumps?.find((p) => p.isUsable) ||
+                          PumpData.sort((a, b) => a.price - b.price)[0]
             );
         }
     }, [results, hasValidMainPipeData, hasValidSubmainPipeData]);
@@ -272,7 +268,7 @@ export default function Product() {
     // Update pipe-rolls calculations when pipes change
     useEffect(() => {
         if (!results || !selectedBranchPipe) return;
-        
+
         // Only calculate for pipes that are selected and have valid data
         if (selectedBranchPipe) {
             calculatePipeRolls(input.totalBranchPipeM, selectedBranchPipe.lengthM);
@@ -321,12 +317,9 @@ export default function Product() {
             <div className="min-h-screen bg-gray-800 p-6 text-white">
                 <div className="mx-auto max-w-7xl">
                     <h1 className="mb-8 text-center text-3xl font-bold text-blue-400">
-                    Irrigation Layout Planning Application
+                        Irrigation Layout Planning Application
                     </h1>
-                    <InputForm 
-                        input={input} 
-                        onInputChange={setInput} 
-                    />
+                    <InputForm input={input} onInputChange={setInput} />
                     <div className="text-center">กำลังคำนวณ...</div>
                 </div>
             </div>
@@ -343,18 +336,18 @@ export default function Product() {
                         className="h-[80px] w-[80px] rounded-xl"
                     />
                     <div>
-                    <h1 className="text-left text-3xl font-bold text-blue-400">
-                        Irrigation Layout Planning Application
-                    </h1>
-                    <p className="text-left text-lg mt-2 text-blue-400">
-                        แอปพลิเคชันวางแผนผังชลประทานน้ำ บจก.กนกโปรดักส์ จำกัด
-                    </p>
+                        <h1 className="text-left text-3xl font-bold text-blue-400">
+                            Irrigation Layout Planning Application
+                        </h1>
+                        <p className="mt-2 text-left text-lg text-blue-400">
+                            แอปพลิเคชันวางแผนผังชลประทานน้ำ บจก.กนกโปรดักส์ จำกัด
+                        </p>
                     </div>
                 </div>
 
-                <InputForm 
-                    input={input} 
-                    onInputChange={setInput} 
+                <InputForm
+                    input={input}
+                    onInputChange={setInput}
                     selectedSprinkler={selectedSprinkler}
                 />
                 <CalculationSummary
@@ -378,7 +371,7 @@ export default function Product() {
                             onPumpChange={setSelectedPump}
                             results={results}
                         />
-                        
+
                         {/* ท่อย่อย - แสดงเสมอ */}
                         <PipeSelector
                             pipeType="branch"
@@ -395,7 +388,7 @@ export default function Product() {
                             }}
                             input={input}
                         />
-                        
+
                         {/* ท่อเมนรอง - แสดงเฉพาะเมื่อมีข้อมูล */}
                         {hasValidSubmainPipeData ? (
                             <PipeSelector
@@ -415,7 +408,7 @@ export default function Product() {
                             />
                         ) : null}
                     </div>
-                    
+
                     {/* ท่อเมนหลัก - แสดงเฉพาะเมื่อมีข้อมูล */}
                     {hasValidMainPipeData && (
                         <div className="lg:col-span-2">
@@ -499,8 +492,13 @@ export default function Product() {
                 selectedMainPipe={selectedMainPipe}
                 onClose={() => setShowQuotation(false)}
             />
-            <div className="text-center text-sm mt-4">
-                <button onClick={() => location.href = '/planner'} className="rounded-md bg-blue-500 px-4 py-2 text-white hover:bg-blue-600">เริ่มต้นใหม่</button>
+            <div className="mt-4 text-center text-sm">
+                <button
+                    onClick={() => (location.href = '/planner')}
+                    className="rounded-md bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
+                >
+                    เริ่มต้นใหม่
+                </button>
             </div>
         </div>
     );

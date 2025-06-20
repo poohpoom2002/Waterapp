@@ -249,16 +249,21 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 </div>
             `;
 
-            const customerInfoHTML = page === 1 ? `
+            const customerInfoHTML =
+                page === 1
+                    ? `
                 <div class="print-customer-info mb-6 self-end text-left text-sm">
                     <p class="font-semibold">[1234] ${quotationDataCustomer.name || '-'}</p>
                     <p>${quotationDataCustomer.address1 || '-'}</p>
                     <p>${quotationDataCustomer.address2 || '-'}</p>
                     <p>${quotationDataCustomer.phone || '-'}</p>
                 </div>
-            ` : '';
+            `
+                    : '';
 
-            const quotationDetailsHTML = page === 1 ? `
+            const quotationDetailsHTML =
+                page === 1
+                    ? `
                 <h1 class="print-title mb-4 text-xl font-bold">Quotation # QT1234567890</h1>
                 <div class="print-details mb-4 flex flex-row gap-9 text-left text-sm">
                     <div>
@@ -278,7 +283,8 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         <p>${quotationData.paymentTerms || '-'}</p>
                     </div>
                 </div>
-            ` : '';
+            `
+                    : '';
 
             const tableHeaderHTML = `
                 <thead>
@@ -305,9 +311,10 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 </thead>
             `;
 
-            const tableRows = pageItems.map((item) => {
-                const itemAmount = calculateItemAmount(item);
-                return `
+            const tableRows = pageItems
+                .map((item) => {
+                    const itemAmount = calculateItemAmount(item);
+                    return `
                     <tr>
                         <td class="border border-gray-400 p-1 text-center align-top">${item.seq}</td>
                         <td class="border border-gray-400 p-1 text-center align-top">${item.image}</td>
@@ -323,7 +330,8 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         <td class="border border-gray-400 p-1 text-right align-top">${itemAmount.toFixed(2)} ฿</td>
                     </tr>
                 `;
-            }).join('');
+                })
+                .join('');
 
             const tableHTML = `
                 <table class="print-table w-full border-collapse border border-gray-400 text-xs">
@@ -335,13 +343,16 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             `;
 
             const grandTotal = calculateTotal();
-            const totalHTML = page === currentTotalPages ? `
+            const totalHTML =
+                page === currentTotalPages
+                    ? `
                 <div class="print-total text-right">
                     <p class="text-lg font-bold">
                         รวมทั้งหมด: ${grandTotal.toLocaleString()} บาท
                     </p>
                 </div>
-            ` : '';
+            `
+                    : '';
 
             const footerHTML = `
                 <div class="print-footer-container mt-auto text-center text-xs">
@@ -376,7 +387,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         setTimeout(() => {
             printContainer.style.display = 'block';
             window.print();
-            
+
             // ลบ container หลังพิมพ์เสร็จ
             setTimeout(() => {
                 if (document.body.contains(printContainer)) {
@@ -412,7 +423,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             <hr className="print-footer-hr mb-2 border-gray-800" />
             <div className="print-footer">
                 <p>Phone: 02-451-1111 Tax ID: 0105549044446</p>
-                <p>Page: {page} / {totalPages}</p>
+                <p>
+                    Page: {page} / {totalPages}
+                </p>
             </div>
         </div>
     );
@@ -683,7 +696,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 {/* Debug Information */}
                 <div className="no-print fixed bottom-4 left-4 rounded bg-gray-900 p-2 text-xs text-white">
                     <div>Items: {items.length}</div>
-                    <div>Page: {currentPage}/{totalPages}</div>
+                    <div>
+                        Page: {currentPage}/{totalPages}
+                    </div>
                     <div>Editing: {isEditing ? 'Yes' : 'No'}</div>
                 </div>
 
@@ -741,12 +756,16 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             </div>
                         )}
 
-                        {isEditing ? "" : <button
-                            onClick={handlePrint}
-                            className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
-                        >
-                            พิมพ์
-                        </button>}
+                        {isEditing ? (
+                            ''
+                        ) : (
+                            <button
+                                onClick={handlePrint}
+                                className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
+                            >
+                                พิมพ์
+                            </button>
+                        )}
                     </div>
                 </div>
 

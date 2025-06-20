@@ -33,7 +33,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
         if (!selectedSprinkler) {
             return {
                 pressure: input.pressureHeadM,
-                source: 'ค่าเริ่มต้น'
+                source: 'ค่าเริ่มต้น',
             };
         }
 
@@ -43,14 +43,14 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
         const maxPressure = Array.isArray(selectedSprinkler.pressureBar)
             ? selectedSprinkler.pressureBar[1]
             : parseFloat(String(selectedSprinkler.pressureBar).split('-')[1]);
-        
+
         const avgPressureBar = (minPressure + maxPressure) / 2;
         const pressureM = avgPressureBar * 10.2; // แปลง bar เป็น เมตร
 
         return {
             pressure: pressureM,
             source: `จากสปริงเกอร์ (${avgPressureBar.toFixed(1)} bar)`,
-            pressureBar: avgPressureBar
+            pressureBar: avgPressureBar,
         };
     };
 
@@ -91,9 +91,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
 
             {/* สรุปการคำนวณรายละเอียด */}
             <div className="mb-6 rounded-lg bg-gray-700 p-6">
-                <h2 className="mb-4 text-xl font-semibold text-yellow-400">
-                    สรุปการคำนวณ
-                </h2>
+                <h2 className="mb-4 text-xl font-semibold text-yellow-400">สรุปการคำนวณ</h2>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                     {/* การไหลและอัตรา */}
                     <div className="rounded bg-gray-600 p-4">
@@ -271,9 +269,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             <p className="text-yellow-300">
                                 Pressure: {pressureInfo.pressure.toFixed(1)}m
                             </p>
-                            <p className="text-xs text-gray-400">
-                                ({pressureInfo.source})
-                            </p>
+                            <p className="text-xs text-gray-400">({pressureInfo.source})</p>
                         </div>
                     </div>
 
@@ -311,16 +307,20 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                 {/* แสดงข้อมูลแรงดันจากสปริงเกอร์ */}
                 {selectedSprinkler && (
                     <div className="mt-6 rounded bg-blue-900 p-4">
-                        <h3 className="mb-2 font-medium text-blue-300">💧 แรงดันจากสปริงเกอร์ที่เลือก</h3>
+                        <h3 className="mb-2 font-medium text-blue-300">
+                            💧 แรงดันจากสปริงเกอร์ที่เลือก
+                        </h3>
                         <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-3">
                             <p>
                                 <strong>สปริงเกอร์:</strong> {selectedSprinkler.productCode}
                             </p>
                             <p>
-                                <strong>ช่วงแรงดัน:</strong> {pressureInfo.pressureBar?.toFixed(1)} บาร์
+                                <strong>ช่วงแรงดัน:</strong> {pressureInfo.pressureBar?.toFixed(1)}{' '}
+                                บาร์
                             </p>
                             <p>
-                                <strong>แรงดันที่ใช้คำนวณ:</strong> {pressureInfo.pressure.toFixed(1)} เมตร
+                                <strong>แรงดันที่ใช้คำนวณ:</strong>{' '}
+                                {pressureInfo.pressure.toFixed(1)} เมตร
                             </p>
                         </div>
                         <p className="mt-2 text-xs text-blue-200">

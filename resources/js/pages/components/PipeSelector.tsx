@@ -124,9 +124,9 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
         const recommendations: Record<PipeType, string[]> = {
             branch: ['LDPE', 'Flexible PE', 'PE-RT', 'PVC'],
             secondary: ['HDPE PE 80', 'HDPE PE 100', 'PVC'],
-            main: ['HDPE PE 100', 'HDPE PE 80']
+            main: ['HDPE PE 100', 'HDPE PE 80'],
         };
-        
+
         const recommendedTypes = recommendations[sectionType];
         return recommendedTypes.includes(pipeType) ? '⭐' : '';
     };
@@ -147,8 +147,9 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 <option value="">-- เลือกท่อ --</option>
                 {sortedPipes.map((pipe) => (
                     <option key={pipe.id} value={pipe.id}>
-                        {pipe.productCode} ({pipe.pipeType} {pipe.sizeMM}mm) - {pipe.price} บาท | 
-                        {getPipeTypeRecommendation(pipe.pipeType, pipeType)} {getRecommendationIcon(pipe)}
+                        {pipe.productCode} ({pipe.pipeType} {pipe.sizeMM}mm) - {pipe.price} บาท |
+                        {getPipeTypeRecommendation(pipe.pipeType, pipeType)}{' '}
+                        {getRecommendationIcon(pipe)}
                     </option>
                 ))}
             </select>
@@ -159,7 +160,8 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                         <h4 className="font-medium text-white">ข้อมูลท่อที่เลือก</h4>
                         <div className="flex items-center gap-2">
                             <span className="text-sm text-yellow-300">
-                                {getPipeTypeRecommendation(selectedPipe.pipeType, pipeType) && '⭐ เหมาะสำหรับท่อนี้'}
+                                {getPipeTypeRecommendation(selectedPipe.pipeType, pipeType) &&
+                                    '⭐ เหมาะสำหรับท่อนี้'}
                             </span>
                             <span
                                 className={`text-sm font-bold ${getRecommendationColor(getSelectedPipeAnalysis())}`}
@@ -218,7 +220,8 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                 <span className="text-yellow-300">{config.rolls}</span> ม้วน
                             </p>
                             <p>
-                                <strong>ราคาต่อม้วน:</strong> {selectedPipe.price.toLocaleString()} บาท
+                                <strong>ราคาต่อม้วน:</strong> {selectedPipe.price.toLocaleString()}{' '}
+                                บาท
                             </p>
                             <p>
                                 <strong>ราคารวม:</strong>{' '}
@@ -292,7 +295,13 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                     {!getPipeTypeRecommendation(selectedPipe.pipeType, pipeType) && (
                         <div className="mt-3 rounded bg-yellow-900 p-2">
                             <p className="text-sm text-yellow-300">
-                                ⚠️ <strong>หมายเหตุ:</strong> ประเภทท่อ {selectedPipe.pipeType} ไม่ใช่ตัวเลือกที่แนะนำสำหรับ{pipeType === 'branch' ? 'ท่อย่อย' : pipeType === 'secondary' ? 'ท่อเมนรอง' : 'ท่อเมนหลัก'} 
+                                ⚠️ <strong>หมายเหตุ:</strong> ประเภทท่อ {selectedPipe.pipeType}{' '}
+                                ไม่ใช่ตัวเลือกที่แนะนำสำหรับ
+                                {pipeType === 'branch'
+                                    ? 'ท่อย่อย'
+                                    : pipeType === 'secondary'
+                                      ? 'ท่อเมนรอง'
+                                      : 'ท่อเมนหลัก'}
                                 แต่ยังสามารถใช้งานได้หากเหมาะสมกับการไหลและความเร็ว
                             </p>
                         </div>
