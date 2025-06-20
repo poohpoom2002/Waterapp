@@ -1,6 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { MapContainer, TileLayer, FeatureGroup, LayersControl, useMapEvents, Circle, Polygon, useMap } from 'react-leaflet';
+import {
+    MapContainer,
+    TileLayer,
+    FeatureGroup,
+    LayersControl,
+    useMapEvents,
+    Circle,
+    Polygon,
+    useMap,
+} from 'react-leaflet';
 import { EditControl } from 'react-leaflet-draw';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
@@ -57,15 +66,15 @@ const AREA_DESCRIPTIONS: Record<AreaType, string> = {
     powerplant: 'Energy generation facility area.',
     building: 'Structure or facility area.',
     solarcell: 'Solar cell installation area.',
-    custompolygon: 'Other area for flexible drawing.'
+    custompolygon: 'Other area for flexible drawing.',
 };
 
 const AREA_COLORS: Record<AreaType, string> = {
-    river: '#3B82F6',    // Blue
+    river: '#3B82F6', // Blue
     powerplant: '#EF4444', // Red
-    building: '#F59E0B',  // Yellow
+    building: '#F59E0B', // Yellow
     solarcell: '#FFD600', // Bright Yellow
-    custompolygon: '#4B5563' // Black Gray
+    custompolygon: '#4B5563', // Black Gray
 };
 
 // Components
@@ -85,19 +94,24 @@ const AreaTypeButton: React.FC<{
     <button
         onClick={onClick}
         className={`w-32 rounded px-4 py-2 text-white transition-colors duration-200 ${
-            isActive ? 'bg-blue-600 hover:bg-blue-700' :
-            isSelected ? 'bg-blue-500 hover:bg-blue-600' :
-            'bg-gray-700 hover:bg-gray-600'
+            isActive
+                ? 'bg-blue-600 hover:bg-blue-700'
+                : isSelected
+                  ? 'bg-blue-500 hover:bg-blue-600'
+                  : 'bg-gray-700 hover:bg-gray-600'
         }`}
     >
-        {type === 'custompolygon' ? 'Other' :
-         type.charAt(0).toUpperCase() + type.slice(1).replace('powerplant', 'Power Plant')}
+        {type === 'custompolygon'
+            ? 'Other'
+            : type.charAt(0).toUpperCase() + type.slice(1).replace('powerplant', 'Power Plant')}
     </button>
 );
 
 // MapClickHandler component removed - pump functionality no longer needed
 
-const SearchControl: React.FC<{ onSearch: (lat: number, lng: number) => void }> = ({ onSearch }) => {
+const SearchControl: React.FC<{ onSearch: (lat: number, lng: number) => void }> = ({
+    onSearch,
+}) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -178,7 +192,7 @@ const SearchControl: React.FC<{ onSearch: (lat: number, lng: number) => void }> 
     };
 
     return (
-        <div className="absolute top-4 left-[60px] z-[1000] w-80">
+        <div className="absolute left-[60px] top-4 z-[1000] w-80">
             <form onSubmit={handleSearch} className="flex flex-col gap-2">
                 <div className="relative">
                     <input
@@ -216,11 +230,9 @@ const SearchControl: React.FC<{ onSearch: (lat: number, lng: number) => void }> 
                         </div>
                     )}
                 </div>
-                {error && (
-                    <div className="text-sm text-red-400">{error}</div>
-                )}
+                {error && <div className="text-sm text-red-400">{error}</div>}
                 {showSuggestions && suggestions.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 max-h-60 overflow-y-auto rounded bg-white shadow-lg">
+                    <div className="absolute left-0 right-0 top-full mt-1 max-h-60 overflow-y-auto rounded bg-white shadow-lg">
                         {suggestions.map((suggestion, index) => (
                             <button
                                 key={index}
@@ -260,7 +272,7 @@ const CenterController: React.FC<{ center: [number, number] }> = ({ center }) =>
                 map.setView(center, map.getZoom(), {
                     animate: true,
                     duration: 1.5,
-                    easeLinearity: 0.25
+                    easeLinearity: 0.25,
                 });
             }
         }
@@ -326,15 +338,16 @@ const isPointInPolygon = (point: LatLng, polygon: LatLng[]): boolean => {
         const xj = polygon[j].lng;
         const yj = polygon[j].lat;
 
-        const intersect = ((yi > point.lat) !== (yj > point.lat))
-            && (point.lng < (xj - xi) * (point.lat - yi) / (yj - yi) + xi);
+        const intersect =
+            yi > point.lat !== yj > point.lat &&
+            point.lng < ((xj - xi) * (point.lat - yi)) / (yj - yi) + xi;
         if (intersect) inside = !inside;
     }
     return inside;
 };
 
 const isAreaWithinInitialMap = (newArea: LatLng[], initialMap: LatLng[]): boolean => {
-    return newArea.every(point => isPointInPolygon(point, initialMap));
+    return newArea.every((point) => isPointInPolygon(point, initialMap));
 };
 
 // Main Component
@@ -356,7 +369,7 @@ export default function MapPlanner() {
         description: '',
         plant_spacing: 10,
         row_spacing: 10,
-        water_needed: 1.5
+        water_needed: 1.5,
     });
 
     // Mode States
@@ -411,7 +424,7 @@ export default function MapPlanner() {
     const toggleAreaType = (type: AreaType) => {
         if (activeButton === type) {
             resetModes();
-            setSelectedAreaTypes(prev => prev.filter(t => t !== type));
+            setSelectedAreaTypes((prev) => prev.filter((t) => t !== type));
             console.log('Area Type Deselected:', type);
             setStatus('Select an area type to begin');
             return;
@@ -419,13 +432,13 @@ export default function MapPlanner() {
 
         if (activeButton !== null) {
             // If there's an active button, remove its layer first
-            setLayers(prevLayers => {
+            setLayers((prevLayers) => {
                 // Keep the initial map area and remove only the active button's layer
-                return prevLayers.filter(layer =>
-                    layer.isInitialMap || layer.type !== activeButton
+                return prevLayers.filter(
+                    (layer) => layer.isInitialMap || layer.type !== activeButton
                 );
             });
-            setSelectedAreaTypes(prev => prev.filter(t => t !== activeButton));
+            setSelectedAreaTypes((prev) => prev.filter((t) => t !== activeButton));
         }
 
         setActiveButton(type);
@@ -435,7 +448,9 @@ export default function MapPlanner() {
             const map = featureGroupRef.current?.leafletElement?._map;
             if (map) {
                 const layers = map._layers as Record<string, any>;
-                const drawControl = Object.values(layers).find(layer => layer._drawingMode === 'polygon');
+                const drawControl = Object.values(layers).find(
+                    (layer) => layer._drawingMode === 'polygon'
+                );
                 if (drawControl) {
                     drawControl.enable();
                 }
@@ -446,38 +461,38 @@ export default function MapPlanner() {
             river: () => {
                 setIsRiverMode(true);
                 setDrawingMode('polygon');
-                setSelectedAreaTypes(prev => [...prev, 'river']);
+                setSelectedAreaTypes((prev) => [...prev, 'river']);
                 setStatus('Draw the river area');
                 enablePolygonDrawing();
             },
             building: () => {
                 setIsBuildingMode(true);
                 setDrawingMode('polygon');
-                setSelectedAreaTypes(prev => [...prev, 'building']);
+                setSelectedAreaTypes((prev) => [...prev, 'building']);
                 setStatus('Draw the building area');
                 enablePolygonDrawing();
             },
             powerplant: () => {
                 setIsPowerPlantMode(true);
                 setDrawingMode('polygon');
-                setSelectedAreaTypes(prev => [...prev, 'powerplant']);
+                setSelectedAreaTypes((prev) => [...prev, 'powerplant']);
                 setStatus('Draw the power plant area');
                 enablePolygonDrawing();
             },
             custompolygon: () => {
                 setIsOtherMode(true);
                 setDrawingMode('polygon');
-                setSelectedAreaTypes(prev => [...prev, 'custompolygon']);
+                setSelectedAreaTypes((prev) => [...prev, 'custompolygon']);
                 setStatus('Draw a custom area');
                 enablePolygonDrawing();
             },
             solarcell: () => {
                 setIsSolarcellMode(true);
                 setDrawingMode('polygon');
-                setSelectedAreaTypes(prev => [...prev, 'solarcell']);
+                setSelectedAreaTypes((prev) => [...prev, 'solarcell']);
                 setStatus('Draw the solar cell area');
                 enablePolygonDrawing();
-            }
+            },
         };
 
         modeMap[type]();
@@ -494,7 +509,7 @@ export default function MapPlanner() {
                 { lat: bounds.getNorthEast().lat, lng: bounds.getNorthEast().lng },
                 { lat: bounds.getNorthEast().lat, lng: bounds.getSouthWest().lng },
                 { lat: bounds.getSouthWest().lat, lng: bounds.getSouthWest().lng },
-                { lat: bounds.getSouthWest().lat, lng: bounds.getNorthEast().lng }
+                { lat: bounds.getSouthWest().lat, lng: bounds.getNorthEast().lng },
             ];
         } else if (layer.getLatLngs) {
             const latLngs = layer.getLatLngs()[0];
@@ -509,7 +524,7 @@ export default function MapPlanner() {
             powerplant: { color: '#EF4444', fillOpacity: 0.3 },
             building: { color: '#F59E0B', fillOpacity: 0.3 },
             custompolygon: { color: '#4B5563', fillOpacity: 0.3 },
-            solarcell: { color: '#FFD600', fillOpacity: 0.3 }
+            solarcell: { color: '#FFD600', fillOpacity: 0.3 },
         };
 
         if (layers.length === 0) {
@@ -518,13 +533,13 @@ export default function MapPlanner() {
                 color: '#90EE90',
                 fillColor: '#90EE90',
                 fillOpacity: 0.3,
-                weight: 2
+                weight: 2,
             });
 
             const newLayer: LayerData = {
                 type: 'custompolygon',
                 coordinates: coordinates,
-                isInitialMap: true
+                isInitialMap: true,
             };
 
             setLayers([newLayer]);
@@ -541,14 +556,14 @@ export default function MapPlanner() {
                 const currentZoom = map.getZoom();
                 setInitialZoom(currentZoom);
                 setCurrentZoom(currentZoom);
-                
+
                 // Add a small delay to ensure the layout has updated
                 setTimeout(() => {
                     map.invalidateSize();
-                    map.setView(newCenter, currentZoom, { 
-                        animate: true, 
+                    map.setView(newCenter, currentZoom, {
+                        animate: true,
                         duration: 1,
-                        padding: [50, 50]
+                        padding: [50, 50],
                     });
                 }, 100);
             }
@@ -558,11 +573,17 @@ export default function MapPlanner() {
         }
 
         // Determine current area type
-        const currentType = isRiverMode ? 'river' :
-                          isBuildingMode ? 'building' :
-                          isPowerPlantMode ? 'powerplant' :
-                          isOtherMode ? 'custompolygon' :
-                          isSolarcellMode ? 'solarcell' : 'custompolygon';
+        const currentType = isRiverMode
+            ? 'river'
+            : isBuildingMode
+              ? 'building'
+              : isPowerPlantMode
+                ? 'powerplant'
+                : isOtherMode
+                  ? 'custompolygon'
+                  : isSolarcellMode
+                    ? 'solarcell'
+                    : 'custompolygon';
 
         // Apply styling
         if (styleMap[currentType]) {
@@ -570,22 +591,22 @@ export default function MapPlanner() {
                 color: styleMap[currentType].color,
                 fillColor: styleMap[currentType].color,
                 fillOpacity: styleMap[currentType].fillOpacity,
-                weight: 2
+                weight: 2,
             });
         }
 
         const newLayer: LayerData = {
             type: currentType,
             coordinates: coordinates,
-            isInitialMap: false
+            isInitialMap: false,
         };
 
-        setLayers(prevLayers => [...prevLayers, newLayer]);
+        setLayers((prevLayers) => [...prevLayers, newLayer]);
 
         // Reset modes
         resetModes();
         setActiveButton(null);
-        setSelectedAreaTypes(prev => prev.filter(type => type !== currentType));
+        setSelectedAreaTypes((prev) => prev.filter((type) => type !== currentType));
         setStatus(`${currentType} area added. Select another area type to continue.`);
     };
 
@@ -606,21 +627,23 @@ export default function MapPlanner() {
                         if (Array.isArray(polygonLatLngs)) {
                             latLngs = polygonLatLngs.map((latLng: any) => ({
                                 lat: latLng.lat,
-                                lng: latLng.lng
+                                lng: latLng.lng,
                             }));
                         }
                     } else if (layer instanceof L.Circle) {
                         const circleLatLng = layer.getLatLng();
-                        latLngs = [{
-                            lat: circleLatLng.lat,
-                            lng: circleLatLng.lng
-                        }];
+                        latLngs = [
+                            {
+                                lat: circleLatLng.lat,
+                                lng: circleLatLng.lng,
+                            },
+                        ];
                     }
 
                     mapLayers.push({
                         type: 'custompolygon', // Default type for any remaining layers
                         coordinates: latLngs,
-                        isInitialMap: false
+                        isInitialMap: false,
                     });
                 }
             });
@@ -648,10 +671,12 @@ export default function MapPlanner() {
         }
 
         try {
-            const initialMapLayer = layers.find(layer => layer.isInitialMap);
+            const initialMapLayer = layers.find((layer) => layer.isInitialMap);
 
             if (!initialMapLayer) {
-                setError("The initial map area is missing. Please draw the main area for your farm first.");
+                setError(
+                    'The initial map area is missing. Please draw the main area for your farm first.'
+                );
                 return;
             }
 
@@ -663,28 +688,28 @@ export default function MapPlanner() {
                 type: selectedPlant.type,
                 plant_spacing: Number(customParams.plant_spacing),
                 row_spacing: Number(customParams.row_spacing),
-                water_needed: Number(customParams.water_needed)
+                water_needed: Number(customParams.water_needed),
             };
 
             const areaTypes = layers
-                .filter(layer => !layer.isInitialMap)
-                .map(layer => layer.type);
+                .filter((layer) => !layer.isInitialMap)
+                .map((layer) => layer.type);
             const uniqueAreaTypes = Array.from(new Set(areaTypes));
 
-            const formattedLayers = layers.map(layer => ({
+            const formattedLayers = layers.map((layer) => ({
                 type: layer.type,
-                coordinates: layer.coordinates.map(coord => ({
+                coordinates: layer.coordinates.map((coord) => ({
                     lat: Number(coord.lat),
-                    lng: Number(coord.lng)
+                    lng: Number(coord.lng),
                 })),
-                isInitialMap: layer.isInitialMap
+                isInitialMap: layer.isInitialMap,
             }));
 
             const formattedData = {
                 areaType: uniqueAreaTypes.join(','),
                 area: JSON.stringify(mainAreaCoordinates),
                 plantType: JSON.stringify(plantData),
-                layers: JSON.stringify(formattedLayers)
+                layers: JSON.stringify(formattedLayers),
             };
 
             // Log the final data being sent
@@ -719,7 +744,7 @@ export default function MapPlanner() {
             description: '',
             plant_spacing: 10,
             row_spacing: 10,
-            water_needed: 1.5
+            water_needed: 1.5,
         });
         setError(null);
         setStatus('Draw an area on the map first');
@@ -738,7 +763,10 @@ export default function MapPlanner() {
             if (map) {
                 // Remove all layers except tile layers and controls
                 map.eachLayer((layer: any) => {
-                    if (!(layer instanceof L.TileLayer) && !layer.options?.pane?.includes('control')) {
+                    if (
+                        !(layer instanceof L.TileLayer) &&
+                        !layer.options?.pane?.includes('control')
+                    ) {
                         map.removeLayer(layer);
                     }
                 });
@@ -773,7 +801,7 @@ export default function MapPlanner() {
                 description: selectedPlant.description || 'No description available',
                 plant_spacing: Number(selectedPlant.plant_spacing),
                 row_spacing: Number(selectedPlant.row_spacing),
-                water_needed: Number(selectedPlant.water_needed)
+                water_needed: Number(selectedPlant.water_needed),
             });
         }
     };
@@ -787,7 +815,7 @@ export default function MapPlanner() {
             description: plant.description || 'No description available',
             plant_spacing: Number(plant.plant_spacing),
             row_spacing: Number(plant.row_spacing),
-            water_needed: Number(plant.water_needed)
+            water_needed: Number(plant.water_needed),
         });
         setStatus(`${plant.name} selected`);
     };
@@ -795,10 +823,10 @@ export default function MapPlanner() {
     // Update the input handlers
     const handleCustomParamChange = (field: keyof CustomPlantParams, value: string) => {
         const newValue = parseFloat(value) || 0;
-        setCustomParams(prev => {
+        setCustomParams((prev) => {
             const updated = {
                 ...prev,
-                [field]: newValue
+                [field]: newValue,
             };
             console.log('Updated Custom Parameters:', updated);
             return updated;
@@ -813,7 +841,7 @@ export default function MapPlanner() {
     // Add this function to calculate center from layers
     const calculateMapCenter = () => {
         if (layers.length > 0) {
-            const allPoints = layers.flatMap(layer => layer.coordinates);
+            const allPoints = layers.flatMap((layer) => layer.coordinates);
             const totalLat = allPoints.reduce((sum: number, point: LatLng) => sum + point.lat, 0);
             const totalLng = allPoints.reduce((sum: number, point: LatLng) => sum + point.lng, 0);
             return [totalLat / allPoints.length, totalLng / allPoints.length] as [number, number];
@@ -825,7 +853,8 @@ export default function MapPlanner() {
         <div className="min-h-screen bg-gray-900 p-6">
             <h1 className="mb-4 text-xl font-bold text-white">Plant Layout Generator</h1>
             <p className="mb-4 text-sm text-gray-400">
-                Draw an area on the map (recommended not over 10 hectares) and select the area type and plant type to proceed.
+                Draw an area on the map (recommended not over 10 hectares) and select the area type
+                and plant type to proceed.
             </p>
 
             <div className="mb-4 flex items-center justify-between rounded-lg bg-gray-800 p-4">
@@ -836,9 +865,7 @@ export default function MapPlanner() {
             </div>
 
             {error && (
-                <div className="mb-4 rounded bg-red-500/10 p-3 text-sm text-red-400">
-                    {error}
-                </div>
+                <div className="mb-4 rounded bg-red-500/10 p-3 text-sm text-red-400">{error}</div>
             )}
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -856,13 +883,21 @@ export default function MapPlanner() {
                                         setSelectedPlant(null);
                                         console.log('Selected Plant Category:', e.target.value);
                                         if (e.target.value === 'Horticultural') {
-                                            const filtered = plantTypes.filter(plant =>
-                                                ['Mango', 'Durian', 'Pineapple', 'Longkong'].includes(plant.name)
+                                            const filtered = plantTypes.filter((plant) =>
+                                                [
+                                                    'Mango',
+                                                    'Durian',
+                                                    'Pineapple',
+                                                    'Longkong',
+                                                ].includes(plant.name)
                                             );
                                             console.log('Filtered Plants:', filtered);
                                             setFilteredPlants(filtered);
                                         } else {
-                                            console.log('No plants available for category:', e.target.value);
+                                            console.log(
+                                                'No plants available for category:',
+                                                e.target.value
+                                            );
                                             setFilteredPlants([]);
                                         }
                                     }}
@@ -881,13 +916,17 @@ export default function MapPlanner() {
                                     <label className="mb-1 block text-sm font-medium text-gray-300">
                                         Plant Selection
                                         <span className="ml-2 text-sm font-normal text-gray-400">
-                                            {selectedPlant ? `(${selectedPlant.name})` : '(Select a plant)'}
+                                            {selectedPlant
+                                                ? `(${selectedPlant.name})`
+                                                : '(Select a plant)'}
                                         </span>
                                     </label>
                                     <select
                                         value={selectedPlant?.id || ''}
                                         onChange={(e) => {
-                                            const plant = filteredPlants.find(p => p.id === Number(e.target.value));
+                                            const plant = filteredPlants.find(
+                                                (p) => p.id === Number(e.target.value)
+                                            );
                                             if (plant) {
                                                 handlePlantSelect(plant);
                                             } else {
@@ -916,7 +955,12 @@ export default function MapPlanner() {
                                         <input
                                             type="number"
                                             value={customParams.plant_spacing}
-                                            onChange={(e) => handleCustomParamChange('plant_spacing', e.target.value)}
+                                            onChange={(e) =>
+                                                handleCustomParamChange(
+                                                    'plant_spacing',
+                                                    e.target.value
+                                                )
+                                            }
                                             min="0"
                                             step="0.1"
                                             className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
@@ -929,7 +973,12 @@ export default function MapPlanner() {
                                         <input
                                             type="number"
                                             value={customParams.row_spacing}
-                                            onChange={(e) => handleCustomParamChange('row_spacing', e.target.value)}
+                                            onChange={(e) =>
+                                                handleCustomParamChange(
+                                                    'row_spacing',
+                                                    e.target.value
+                                                )
+                                            }
                                             min="0"
                                             step="0.1"
                                             className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
@@ -942,7 +991,12 @@ export default function MapPlanner() {
                                         <input
                                             type="number"
                                             value={customParams.water_needed}
-                                            onChange={(e) => handleCustomParamChange('water_needed', e.target.value)}
+                                            onChange={(e) =>
+                                                handleCustomParamChange(
+                                                    'water_needed',
+                                                    e.target.value
+                                                )
+                                            }
                                             min="0"
                                             step="0.1"
                                             className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
@@ -966,7 +1020,9 @@ export default function MapPlanner() {
                                         <div key={type} className="flex items-center gap-4">
                                             <AreaTypeButton
                                                 type={type as AreaType}
-                                                isSelected={selectedAreaTypes.includes(type as AreaType)}
+                                                isSelected={selectedAreaTypes.includes(
+                                                    type as AreaType
+                                                )}
                                                 isActive={activeButton === type}
                                                 onClick={() => toggleAreaType(type as AreaType)}
                                             />
@@ -981,8 +1037,12 @@ export default function MapPlanner() {
                     )}
                 </div>
 
-                <div className={`space-y-4 ${layers.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
-                    <div className={`${layers.length === 0 ? 'h-[800px]' : 'h-[600px]'} w-full overflow-hidden rounded-lg border border-gray-700 ${layers.length === 0 ? 'w-full' : ''}`}>
+                <div
+                    className={`space-y-4 ${layers.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}`}
+                >
+                    <div
+                        className={`${layers.length === 0 ? 'h-[800px]' : 'h-[600px]'} w-full overflow-hidden rounded-lg border border-gray-700 ${layers.length === 0 ? 'w-full' : ''}`}
+                    >
                         <MapContainer
                             center={searchCenter || calculateMapCenter()}
                             zoom={initialZoom || currentZoom}
@@ -1003,7 +1063,10 @@ export default function MapPlanner() {
                             />
                             <ZoomLevelDisplay />
                             <LayersControl position="topright">
-                                <LayersControl.BaseLayer checked={currentMapType === 'street'} name="Street Map">
+                                <LayersControl.BaseLayer
+                                    checked={currentMapType === 'street'}
+                                    name="Street Map"
+                                >
                                     <TileLayer
                                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                                         attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -1011,7 +1074,10 @@ export default function MapPlanner() {
                                         minZoom={3}
                                     />
                                 </LayersControl.BaseLayer>
-                                <LayersControl.BaseLayer checked={currentMapType === 'satellite'} name="Satellite">
+                                <LayersControl.BaseLayer
+                                    checked={currentMapType === 'satellite'}
+                                    name="Satellite"
+                                >
                                     <TileLayer
                                         url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
                                         attribution='© <a href="https://www.google.com/maps">Google Maps</a>'
@@ -1037,15 +1103,16 @@ export default function MapPlanner() {
                                             showArea: true,
                                             drawError: {
                                                 color: '#e1e4e8',
-                                                message: '<strong>Error:</strong> Cannot draw outside the initial map area!'
+                                                message:
+                                                    '<strong>Error:</strong> Cannot draw outside the initial map area!',
                                             },
                                             shapeOptions: {
                                                 color: '#3B82F6',
                                                 fillOpacity: 0.3,
-                                                weight: 2
+                                                weight: 2,
                                             },
-                                            repeatMode: true
-                                        }
+                                            repeatMode: true,
+                                        },
                                     }}
                                 />
                             </FeatureGroup>
@@ -1055,12 +1122,15 @@ export default function MapPlanner() {
                                     return (
                                         <Polygon
                                             key={`initial-map-${index}`}
-                                            positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
+                                            positions={layer.coordinates.map((coord) => [
+                                                coord.lat,
+                                                coord.lng,
+                                            ])}
                                             pathOptions={{
                                                 color: '#90EE90',
                                                 fillColor: '#90EE90',
                                                 fillOpacity: 0.5,
-                                                weight: 2
+                                                weight: 2,
                                             }}
                                         />
                                     );
@@ -1070,12 +1140,15 @@ export default function MapPlanner() {
                                 return (
                                     <Polygon
                                         key={`${layer.type}-${index}`}
-                                        positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
+                                        positions={layer.coordinates.map((coord) => [
+                                            coord.lat,
+                                            coord.lng,
+                                        ])}
                                         pathOptions={{
                                             color: areaColor,
                                             fillColor: areaColor,
                                             fillOpacity: 0.5,
-                                            weight: 2
+                                            weight: 2,
                                         }}
                                     />
                                 );
