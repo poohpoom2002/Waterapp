@@ -1,7 +1,8 @@
 export const languages = {
     en: {
         title: 'Plant Layout Generator',
-        description: 'Draw an area on the map (recommended not over 10 hectares) and select the area type and plant type to proceed.',
+        description:
+            'Draw an area on the map (recommended not over 10 hectares) and select the area type and plant type to proceed.',
         areaConfiguration: 'Area Configuration',
         plantSelection: 'Plant Selection',
         selectPlantType: 'Select a plant type',
@@ -23,26 +24,29 @@ export const languages = {
             selectAreaOrDraw: 'Select area type(s) or draw an area on the map.',
             calculating: 'Calculating optimal plant positions for {types}...',
             success: 'Successfully generated {count} planting points',
-            failed: 'Failed to generate planting points'
+            failed: 'Failed to generate planting points',
         },
         areaTypes: {
             river: 'Water body for irrigation and water management.',
             powerplant: 'Energy generation facility area.',
             building: 'Structure or facility area.',
-            pump: 'Water pump station for irrigation system.'
+            pump: 'Water pump station for irrigation system.',
         },
         errors: {
             drawAreaFirst: 'Please draw an area on the map first',
             selectPlantType: 'Please select a plant type',
             areaTooLarge: 'Area is too large. Maximum allowed area is {max} hectares',
             finishCurrentAction: 'Please finish the current action first',
-            navigationFailed: 'Failed to navigate to the next page. Please make sure you are logged in.',
-            validationFailed: 'Please select an area type, draw an area, and select a plant type before proceeding.'
-        }
+            navigationFailed:
+                'Failed to navigate to the next page. Please make sure you are logged in.',
+            validationFailed:
+                'Please select an area type, draw an area, and select a plant type before proceeding.',
+        },
     },
     th: {
         title: 'เครื่องมือวางแผนการปลูกพืช',
-        description: 'วาดพื้นที่บนแผนที่ (แนะนำไม่เกิน 10 เฮกตาร์) และเลือกประเภทพื้นที่และประเภทพืชเพื่อดำเนินการต่อ',
+        description:
+            'วาดพื้นที่บนแผนที่ (แนะนำไม่เกิน 10 เฮกตาร์) และเลือกประเภทพื้นที่และประเภทพืชเพื่อดำเนินการต่อ',
         areaConfiguration: 'การกำหนดค่าพื้นที่',
         plantSelection: 'การเลือกพืช',
         selectPlantType: 'เลือกประเภทพืช',
@@ -64,23 +68,25 @@ export const languages = {
             selectAreaOrDraw: 'เลือกประเภทพื้นที่หรือวาดพื้นที่บนแผนที่',
             calculating: 'กำลังคำนวณตำแหน่งการปลูกพืชที่เหมาะสมสำหรับ{types}...',
             success: 'สร้างจุดปลูกพืชสำเร็จ {count} จุด',
-            failed: 'ไม่สามารถสร้างจุดปลูกพืชได้'
+            failed: 'ไม่สามารถสร้างจุดปลูกพืชได้',
         },
         areaTypes: {
             river: 'แหล่งน้ำสำหรับการชลประทานและการจัดการน้ำ',
             powerplant: 'พื้นที่โรงไฟฟ้า',
             building: 'พื้นที่โครงสร้างหรือสิ่งอำนวยความสะดวก',
-            pump: 'สถานีปั๊มน้ำสำหรับระบบชลประทาน'
+            pump: 'สถานีปั๊มน้ำสำหรับระบบชลประทาน',
         },
         errors: {
             drawAreaFirst: 'กรุณาวาดพื้นที่บนแผนที่ก่อน',
             selectPlantType: 'กรุณาเลือกประเภทพืช',
             areaTooLarge: 'พื้นที่ใหญ่เกินไป พื้นที่สูงสุดที่อนุญาตคือ {max} เฮกตาร์',
             finishCurrentAction: 'กรุณาทำการกระทำปัจจุบันให้เสร็จก่อน',
-            navigationFailed: 'ไม่สามารถนำทางไปยังหน้าถัดไปได้ กรุณาตรวจสอบว่าคุณได้เข้าสู่ระบบแล้ว',
-            validationFailed: 'กรุณาเลือกประเภทพื้นที่ วาดพื้นที่ และเลือกประเภทพืชก่อนดำเนินการต่อ'
-        }
-    }
+            navigationFailed:
+                'ไม่สามารถนำทางไปยังหน้าถัดไปได้ กรุณาตรวจสอบว่าคุณได้เข้าสู่ระบบแล้ว',
+            validationFailed:
+                'กรุณาเลือกประเภทพื้นที่ วาดพื้นที่ และเลือกประเภทพืชก่อนดำเนินการต่อ',
+        },
+    },
 };
 
-export type Language = 'en' | 'th'; 
+export type Language = 'en' | 'th';
