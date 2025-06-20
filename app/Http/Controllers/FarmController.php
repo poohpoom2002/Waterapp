@@ -250,17 +250,37 @@ class FarmController extends Controller
         try {
             $points = [];
 
+            // Remove duplicate points between main area and exclusion areas
+            $mainAreaPoints = $area;
+            foreach ($exclusionAreas as $exclusion) {
+                foreach ($exclusion as $exclusionPoint) {
+                    $mainAreaPoints = array_filter($mainAreaPoints, function($point) use ($exclusionPoint) {
+                        // Consider points as different if they're more than 0.000001 degrees apart
+                        return abs($point['lat'] - $exclusionPoint['lat']) > 0.000001 || 
+                               abs($point['lng'] - $exclusionPoint['lng']) > 0.000001;
+                    });
+                }
+            }
+            $mainAreaPoints = array_values($mainAreaPoints); // Reindex array
+
             // 1. Find the two leftmost points (lowest longitude)
-            usort($area, fn($a, $b) => $a['lng'] <=> $b['lng']);
-            $leftmost1 = $area[0];
-            $leftmost2 = $area[1];
+            usort($mainAreaPoints, fn($a, $b) => $a['lng'] <=> $b['lng']);
+            $leftmost1 = $mainAreaPoints[0];
+            $leftmost2 = $mainAreaPoints[1];
             $bottomLeft = $leftmost1['lat'] < $leftmost2['lat'] ? $leftmost1 : $leftmost2;
             $topLeft = $leftmost1['lat'] >= $leftmost2['lat'] ? $leftmost1 : $leftmost2;
 
-            // 2. Find the two bottommost points (lowest latitude)
-            usort($area, fn($a, $b) => $a['lat'] <=> $b['lat']);
-            $bottom1 = $area[0];
-            $bottom2 = $area[1];
+            // 2. Find the bottommost points (lowest latitude)
+            usort($mainAreaPoints, fn($a, $b) => $a['lat'] <=> $b['lat']);
+            $bottom1 = $mainAreaPoints[0];
+            $bottom2 = $mainAreaPoints[1];
+            
+            // Check if bottom2 is one of the leftmost points
+            if (($leftmost1 === $bottom1 && $leftmost2 === $bottom2) || ($leftmost1 === $bottom2 && $leftmost2 === $bottom1)) {
+                // Use the third bottommost point instead
+                $bottom2 = $mainAreaPoints[2];
+            }
+            
             $bottomRight = $bottom1['lng'] > $bottom2['lng'] ? $bottom1 : $bottom2;
 
             // 3. Define plantDir (along bottom edge)
@@ -285,12 +305,12 @@ class FarmController extends Controller
                 'lng' => $rowDir['lng'] / $rowLength,
             ];
 
-            $left = $area[0];
-            $right = $area[0];
-            $bottom = $area[0];
-            $top = $area[0];
+            $left = $mainAreaPoints[0];
+            $right = $mainAreaPoints[0];
+            $bottom = $mainAreaPoints[0];
+            $top = $mainAreaPoints[0];
             
-            foreach ($area as $point) {
+            foreach ($mainAreaPoints as $point) {
                 if ($point['lng'] < $left['lng']) {
                     $left = $point;
                 }
@@ -313,12 +333,16 @@ class FarmController extends Controller
             $maxRowSteps = (int) ($fieldHeightMeters / $plantType->row_spacing);
 
             // 6. Reorder polygon (optional for convex ordering)
-            usort($area, fn($a, $b) => $a['lat'] <=> $b['lat']);
-            $top = [$area[2], $area[3]];
-            $bottom = [$area[0], $area[1]];
+            usort($mainAreaPoints, fn($a, $b) => $a['lat'] <=> $b['lat']);
+            $top = [$mainAreaPoints[2], $mainAreaPoints[3]];
+            $bottom = [$mainAreaPoints[0], $mainAreaPoints[1]];
             usort($top, fn($a, $b) => $a['lng'] <=> $b['lng']);
             usort($bottom, fn($a, $b) => $a['lng'] <=> $b['lng']);
-            $area = [$bottom[0], $bottom[1], $top[1], $top[0], $bottom[0]];
+            $mainAreaPoints = [$bottom[0], $bottom[1], $top[1], $top[0], $bottom[0]];
+
+            // Generate grid lines and intersections
+            $gridLines = [];
+            $gridIntersections = [];
 
             // 7. Generate grid into 2D array
             for ($i = 0; $i <= $maxRowSteps; $i++) {
@@ -335,7 +359,7 @@ class FarmController extends Controller
                     ];
 
                     // Check if point is inside the main area
-                    if ($this->isPointInPolygon($point['lat'], $point['lng'], $area)) {
+                    if ($this->isPointInPolygon($point['lat'], $point['lng'], $mainAreaPoints)) {
                         // Check if point is in any exclusion area
                         $inExclusion = false;
                         foreach ($exclusionAreas as $exclusion) {
@@ -347,12 +371,13 @@ class FarmController extends Controller
 
                         // Only add point if it's not in an exclusion area and is far enough from edges
                         if (!$inExclusion) {
-                            $minDist = $this->minDistanceToPolygonEdge($point['lat'], $point['lng'], $area);
+                            $minDist = $this->minDistanceToPolygonEdge($point['lat'], $point['lng'], $mainAreaPoints);
                             if ($minDist >= ($plantType->row_spacing / 2)) {
                                 $rowPoints[] = $point;
                             }
                         }
                     }
+
                 }
 
                 // Only add the row if it has points
@@ -695,7 +720,7 @@ class FarmController extends Controller
                 }
             }
 
-            // 5. Get field size and calculate steps
+            // Get field size and calculate steps
             $fieldWidthMeters = $this->haversine($leftmost, $rightmost);
             $fieldHeightMeters = $this->haversine($bottommost, $topmost);
 
@@ -712,79 +737,93 @@ class FarmController extends Controller
                 $points = $zone['points'];
                 $pipeDirection = $zone['pipeDirection'];
 
+                // Snap points to grid lines
+                $snappedPoints = [];
+                foreach ($points as $point) {
+                    $snappedPoint = $this->snapPointToGrid(
+                        $point, 
+                        $bottomLeft, 
+                        $plantDir, 
+                        $rowDir, 
+                        $plantType, 
+                        $maxPlantSteps, 
+                        $maxRowSteps, 
+                        $pipeDirection
+                    );
+                    if ($snappedPoint) {
+                        $snappedPoints[] = $snappedPoint;
+                    }
+                }
+
                 if ($pipeDirection === 'horizontal') {
-                    // Generate horizontal grid lines
-                    for ($i = 0; $i <= $maxRowSteps; $i++) {
-                        $rowStart = [
-                            'lat' => $bottomLeft['lat'] + $rowDir['lat'] * $i * ($plantType->row_spacing / 111000),
-                            'lng' => $bottomLeft['lng'] + $rowDir['lng'] * $i * ($plantType->row_spacing / (111000 * cos(deg2rad($bottomLeft['lat'])))),
-                        ];
-
-                        $rowEnd = [
-                            'lat' => $rowStart['lat'] + $plantDir['lat'] * $maxPlantSteps * ($plantType->plant_spacing / 111000),
-                            'lng' => $rowStart['lng'] + $plantDir['lng'] * $maxPlantSteps * ($plantType->plant_spacing / (111000 * cos(deg2rad($rowStart['lat'])))),
-                        ];
-
-                        // Check if any points in this zone are near this grid line
-                        $pointsOnLine = array_filter($points, function($point) use ($rowStart, $rowEnd) {
-                            $distance = $this->pointToLineDistance(
-                                $point['lat'], $point['lng'],
-                                $rowStart['lat'], $rowStart['lng'],
-                                $rowEnd['lat'], $rowEnd['lng']
-                            );
-                            return $distance < 0.0001; // About 10 meters tolerance
-                        });
-
-                        if (count($pointsOnLine) >= 1) {
-                            // Sort points by longitude (left to right)
-                            usort($pointsOnLine, fn($a, $b) => $a['lng'] <=> $b['lng']);
-                            
-                            // Use first and last points as pipe endpoints
-                            $pipeLayout[] = [
-                                'type' => 'horizontal',
-                                'start' => $pointsOnLine[0],
-                                'end' => end($pointsOnLine),
-                                'zone_id' => $zone['id'] ?? null,
-                                'length' => $this->haversine($pointsOnLine[0], end($pointsOnLine))
-                            ];
+                    // Group snapped points by row index
+                    $pointsByRow = [];
+                    foreach ($snappedPoints as $point) {
+                        $rowIndex = $point['rowIndex'];
+                        if (!isset($pointsByRow[$rowIndex])) {
+                            $pointsByRow[$rowIndex] = [];
                         }
+                        $pointsByRow[$rowIndex][] = $point;
+                    }
+
+                    // Create horizontal pipes for each row that has points
+                    foreach ($pointsByRow as $rowIndex => $rowPoints) {
+                        // Sort points by longitude (left to right)
+                        usort($rowPoints, fn($a, $b) => $a['lng'] <=> $b['lng']);
+                        
+                        // Create pipe from leftmost to rightmost point on this row
+                        $pipeLayout[] = [
+                            'type' => 'horizontal',
+                            'start' => [
+                                'lat' => $rowPoints[0]['lat'],
+                                'lng' => $rowPoints[0]['lng']
+                            ],
+                            'end' => [
+                                'lat' => end($rowPoints)['lat'],
+                                'lng' => end($rowPoints)['lng']
+                            ],
+                            'zone_id' => $zone['id'] ?? null,
+                            'length' => $this->haversine(
+                                ['lat' => $rowPoints[0]['lat'], 'lng' => $rowPoints[0]['lng']], 
+                                ['lat' => end($rowPoints)['lat'], 'lng' => end($rowPoints)['lng']]
+                            ),
+                            'rowIndex' => $rowIndex
+                        ];
                     }
                 } else {
-                    // Generate vertical grid lines
-                    for ($j = 0; $j <= $maxPlantSteps; $j++) {
-                        $colStart = [
-                            'lat' => $bottomLeft['lat'] + $plantDir['lat'] * $j * ($plantType->plant_spacing / 111000),
-                            'lng' => $bottomLeft['lng'] + $plantDir['lng'] * $j * ($plantType->plant_spacing / (111000 * cos(deg2rad($bottomLeft['lat'])))),
-                        ];
-
-                        $colEnd = [
-                            'lat' => $colStart['lat'] + $rowDir['lat'] * $maxRowSteps * ($plantType->row_spacing / 111000),
-                            'lng' => $colStart['lng'] + $rowDir['lng'] * $maxRowSteps * ($plantType->row_spacing / (111000 * cos(deg2rad($colStart['lat'])))),
-                        ];
-
-                        // Check if any points in this zone are near this grid line
-                        $pointsOnLine = array_filter($points, function($point) use ($colStart, $colEnd) {
-                            $distance = $this->pointToLineDistance(
-                                $point['lat'], $point['lng'],
-                                $colStart['lat'], $colStart['lng'],
-                                $colEnd['lat'], $colEnd['lng']
-                            );
-                            return $distance < 0.0001; // About 10 meters tolerance
-                        });
-
-                        if (count($pointsOnLine) >= 1) {
-                            // Sort points by latitude (bottom to top)
-                            usort($pointsOnLine, fn($a, $b) => $a['lat'] <=> $b['lat']);
-                            
-                            // Use first and last points as pipe endpoints
-                            $pipeLayout[] = [
-                                'type' => 'vertical',
-                                'start' => $pointsOnLine[0],
-                                'end' => end($pointsOnLine),
-                                'zone_id' => $zone['id'] ?? null,
-                                'length' => $this->haversine($pointsOnLine[0], end($pointsOnLine))
-                            ];
+                    // Group snapped points by column index
+                    $pointsByCol = [];
+                    foreach ($snappedPoints as $point) {
+                        $colIndex = $point['colIndex'];
+                        if (!isset($pointsByCol[$colIndex])) {
+                            $pointsByCol[$colIndex] = [];
                         }
+                        $pointsByCol[$colIndex][] = $point;
+                    }
+
+                    // Create vertical pipes for each column that has points
+                    foreach ($pointsByCol as $colIndex => $colPoints) {
+                        // Sort points by latitude (bottom to top)
+                        usort($colPoints, fn($a, $b) => $a['lat'] <=> $b['lat']);
+                        
+                        // Create pipe from bottom to top point on this column
+                        $pipeLayout[] = [
+                            'type' => 'vertical',
+                            'start' => [
+                                'lat' => $colPoints[0]['lat'],
+                                'lng' => $colPoints[0]['lng']
+                            ],
+                            'end' => [
+                                'lat' => end($colPoints)['lat'],
+                                'lng' => end($colPoints)['lng']
+                            ],
+                            'zone_id' => $zone['id'] ?? null,
+                            'length' => $this->haversine(
+                                ['lat' => $colPoints[0]['lat'], 'lng' => $colPoints[0]['lng']], 
+                                ['lat' => end($colPoints)['lat'], 'lng' => end($colPoints)['lng']]
+                            ),
+                            'colIndex' => $colIndex
+                        ];
                     }
                 }
             }
@@ -812,38 +851,112 @@ class FarmController extends Controller
         }
     }
 
-    // Helper function to calculate distance from point to line segment
-    private function pointToLineDistance($px, $py, $x1, $y1, $x2, $y2) {
-        $A = $px - $x1;
-        $B = $py - $y1;
-        $C = $x2 - $x1;
-        $D = $y2 - $y1;
+    /**
+     * Snap a point to the nearest grid line
+     */
+    private function snapPointToGrid($point, $bottomLeft, $plantDir, $rowDir, $plantType, $maxPlantSteps, $maxRowSteps, $pipeDirection)
+    {
+        $bestDistance = PHP_FLOAT_MAX;
+        $snappedPoint = null;
+
+        if ($pipeDirection === 'horizontal') {
+            // Snap to horizontal grid lines (rows)
+            for ($i = 0; $i <= $maxRowSteps; $i++) {
+                $rowStart = [
+                    'lat' => $bottomLeft['lat'] + $rowDir['lat'] * $i * ($plantType->row_spacing / 111000),
+                    'lng' => $bottomLeft['lng'] + $rowDir['lng'] * $i * ($plantType->row_spacing / (111000 * cos(deg2rad($bottomLeft['lat'])))),
+                ];
+
+                $rowEnd = [
+                    'lat' => $rowStart['lat'] + $plantDir['lat'] * $maxPlantSteps * ($plantType->plant_spacing / 111000),
+                    'lng' => $rowStart['lng'] + $plantDir['lng'] * $maxPlantSteps * ($plantType->plant_spacing / (111000 * cos(deg2rad($rowStart['lat'])))),
+                ];
+
+                $distance = $this->pointToLineDistance(
+                    $point['lat'], $point['lng'],
+                    $rowStart['lat'], $rowStart['lng'],
+                    $rowEnd['lat'], $rowEnd['lng']
+                );
+
+                if ($distance < $bestDistance) {
+                    $bestDistance = $distance;
+                    // Project point onto the line
+                    $projectedPoint = $this->projectPointOntoLine(
+                        $point, $rowStart, $rowEnd
+                    );
+                    $snappedPoint = [
+                        'lat' => $projectedPoint['lat'],
+                        'lng' => $projectedPoint['lng'],
+                        'rowIndex' => $i,
+                        'originalPoint' => $point
+                    ];
+                }
+            }
+        } else {
+            // Snap to vertical grid lines (columns)
+            for ($j = 0; $j <= $maxPlantSteps; $j++) {
+                $colStart = [
+                    'lat' => $bottomLeft['lat'] + $plantDir['lat'] * $j * ($plantType->plant_spacing / 111000),
+                    'lng' => $bottomLeft['lng'] + $plantDir['lng'] * $j * ($plantType->plant_spacing / (111000 * cos(deg2rad($bottomLeft['lat'])))),
+                ];
+
+                $colEnd = [
+                    'lat' => $colStart['lat'] + $rowDir['lat'] * $maxRowSteps * ($plantType->row_spacing / 111000),
+                    'lng' => $colStart['lng'] + $rowDir['lng'] * $maxRowSteps * ($plantType->row_spacing / (111000 * cos(deg2rad($colStart['lat'])))),
+                ];
+
+                $distance = $this->pointToLineDistance(
+                    $point['lat'], $point['lng'],
+                    $colStart['lat'], $colStart['lng'],
+                    $colEnd['lat'], $colEnd['lng']
+                );
+
+                if ($distance < $bestDistance) {
+                    $bestDistance = $distance;
+                    // Project point onto the line
+                    $projectedPoint = $this->projectPointOntoLine(
+                        $point, $colStart, $colEnd
+                    );
+                    $snappedPoint = [
+                        'lat' => $projectedPoint['lat'],
+                        'lng' => $projectedPoint['lng'],
+                        'colIndex' => $j,
+                        'originalPoint' => $point
+                    ];
+                }
+            }
+        }
+
+        return $snappedPoint;
+    }
+
+    /**
+     * Project a point onto a line segment
+     */
+    private function projectPointOntoLine($point, $lineStart, $lineEnd)
+    {
+        $A = $point['lat'] - $lineStart['lat'];
+        $B = $point['lng'] - $lineStart['lng'];
+        $C = $lineEnd['lat'] - $lineStart['lat'];
+        $D = $lineEnd['lng'] - $lineStart['lng'];
 
         $dot = $A * $C + $B * $D;
-        $len_sq = $C * $C + $D * $D;
-        $param = -1;
-
-        if ($len_sq != 0) {
-            $param = $dot / $len_sq;
+        $lenSq = $C * $C + $D * $D;
+        
+        if ($lenSq == 0) {
+            // Line start and end are the same point
+            return $lineStart;
         }
+        
+        $param = $dot / $lenSq;
 
-        $xx = 0;
-        $yy = 0;
+        // Clamp to line segment
+        $param = max(0, min(1, $param));
 
-        if ($param < 0) {
-            $xx = $x1;
-            $yy = $y1;
-        } else if ($param > 1) {
-            $xx = $x2;
-            $yy = $y2;
-        } else {
-            $xx = $x1 + $param * $C;
-            $yy = $y1 + $param * $D;
-        }
-
-        $dx = $px - $xx;
-        $dy = $py - $yy;
-
-        return sqrt($dx * $dx + $dy * $dy);
+        return [
+            'lat' => $lineStart['lat'] + $param * $C,
+            'lng' => $lineStart['lng'] + $param * $D,
+        ];
     }
 }
+
