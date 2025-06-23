@@ -1103,15 +1103,16 @@ export default function MapPlanner() {
                                             showArea: true,
                                             drawError: {
                                                 color: '#e1e4e8',
-                                                message: '<strong>Error:</strong> Cannot draw outside the initial map area!'
+                                                message:
+                                                    '<strong>Error:</strong> Cannot draw outside the initial map area!',
                                             },
                                             shapeOptions: {
                                                 color: '#3B82F6',
                                                 fillOpacity: 0.3,
-                                                weight: 2
+                                                weight: 2,
                                             },
-                                            repeatMode: true
-                                        }
+                                            repeatMode: true,
+                                        },
                                     }}
                                 />
                             </FeatureGroup>
@@ -1121,12 +1122,15 @@ export default function MapPlanner() {
                                     return (
                                         <Polygon
                                             key={`initial-map-${index}`}
-                                            positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
+                                            positions={layer.coordinates.map((coord) => [
+                                                coord.lat,
+                                                coord.lng,
+                                            ])}
                                             pathOptions={{
                                                 color: '#90EE90',
                                                 fillColor: '#90EE90',
                                                 fillOpacity: 0.5,
-                                                weight: 2
+                                                weight: 2,
                                             }}
                                         />
                                     );
@@ -1136,12 +1140,15 @@ export default function MapPlanner() {
                                 return (
                                     <Polygon
                                         key={`${layer.type}-${index}`}
-                                        positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
+                                        positions={layer.coordinates.map((coord) => [
+                                            coord.lat,
+                                            coord.lng,
+                                        ])}
                                         pathOptions={{
                                             color: areaColor,
                                             fillColor: areaColor,
                                             fillOpacity: 0.5,
-                                            weight: 2
+                                            weight: 2,
                                         }}
                                     />
                                 );
