@@ -9,7 +9,7 @@ export default defineConfig({
             input: [
                 'resources/js/app.tsx',
                 'resources/js/pages/mapplanner.tsx',
-                'resources/js/pages/generatetree.tsx'
+                'resources/js/pages/generate-tree.tsx'
             ],
             refresh: true,
         }),
