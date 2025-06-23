@@ -1,15 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import {
-    MapContainer,
-    TileLayer,
-    FeatureGroup,
-    LayersControl,
-    useMapEvents,
-    Circle,
-    Polygon,
-    useMap,
-} from 'react-leaflet';
+import { MapContainer, TileLayer, FeatureGroup, LayersControl, Polygon, useMap } from 'react-leaflet';
 import { EditControl } from 'react-leaflet-draw';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
