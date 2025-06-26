@@ -530,7 +530,7 @@ export default function MapPlanner() {
             layer.setStyle({
                 color: '#90EE90',
                 fillColor: '#90EE90',
-                fillOpacity: 0.3,
+                fillOpacity: 0.5,
                 weight: 2,
             });
 
@@ -614,35 +614,26 @@ export default function MapPlanner() {
             const featureGroup = featureGroupRef.current.leafletElement;
             const map = featureGroup._map;
 
-            // Get all layers from the map
+            // Get all layers from the feature group
             const mapLayers: LayerData[] = [];
-            map.eachLayer((layer: any) => {
-                if (layer instanceof L.Polygon || layer instanceof L.Circle) {
-                    let latLngs: { lat: number; lng: number }[] = [];
-
-                    if (layer instanceof L.Polygon) {
-                        const polygonLatLngs = layer.getLatLngs()[0];
-                        if (Array.isArray(polygonLatLngs)) {
-                            latLngs = polygonLatLngs.map((latLng: any) => ({
-                                lat: latLng.lat,
-                                lng: latLng.lng,
-                            }));
-                        }
-                    } else if (layer instanceof L.Circle) {
-                        const circleLatLng = layer.getLatLng();
-                        latLngs = [
-                            {
-                                lat: circleLatLng.lat,
-                                lng: circleLatLng.lng,
-                            },
-                        ];
+            featureGroup.eachLayer((layer: any) => {
+                if (layer instanceof L.Polygon) {
+                    const polygonLatLngs = layer.getLatLngs()[0];
+                    if (Array.isArray(polygonLatLngs)) {
+                        const latLngs = polygonLatLngs.map((latLng: any) => ({
+                            lat: latLng.lat,
+                            lng: latLng.lng,
+                        }));
+                        
+                        // Determine if this is the initial map layer (first layer)
+                        const isInitialMap = mapLayers.length === 0;
+                        
+                        mapLayers.push({
+                            type: 'custompolygon', // Default type for any remaining layers
+                            coordinates: latLngs,
+                            isInitialMap: isInitialMap,
+                        });
                     }
-
-                    mapLayers.push({
-                        type: 'custompolygon', // Default type for any remaining layers
-                        coordinates: latLngs,
-                        isInitialMap: false,
-                    });
                 }
             });
 
@@ -1114,43 +1105,6 @@ export default function MapPlanner() {
                                     }}
                                 />
                             </FeatureGroup>
-
-                            {layers.map((layer, index) => {
-                                if (layer.isInitialMap) {
-                                    return (
-                                        <Polygon
-                                            key={`initial-map-${index}`}
-                                            positions={layer.coordinates.map((coord) => [
-                                                coord.lat,
-                                                coord.lng,
-                                            ])}
-                                            pathOptions={{
-                                                color: '#90EE90',
-                                                fillColor: '#90EE90',
-                                                fillOpacity: 0.5,
-                                                weight: 2,
-                                            }}
-                                        />
-                                    );
-                                }
-
-                                const areaColor = AREA_COLORS[layer.type];
-                                return (
-                                    <Polygon
-                                        key={`${layer.type}-${index}`}
-                                        positions={layer.coordinates.map((coord) => [
-                                            coord.lat,
-                                            coord.lng,
-                                        ])}
-                                        pathOptions={{
-                                            color: areaColor,
-                                            fillColor: areaColor,
-                                            fillOpacity: 0.5,
-                                            weight: 2,
-                                        }}
-                                    />
-                                );
-                            })}
                         </MapContainer>
                     </div>
                 </div>

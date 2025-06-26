@@ -10,6 +10,7 @@ import {
     LayersControl,
     Polyline,
     Circle,
+    Marker,
 } from 'react-leaflet';
 import { EditControl } from 'react-leaflet-draw';
 import 'leaflet/dist/leaflet.css';
@@ -17,6 +18,55 @@ import 'leaflet-draw/dist/leaflet.draw.css';
 import { router } from '@inertiajs/react';
 import L from 'leaflet';
 import { LeafletMouseEvent } from 'leaflet';
+
+// Fix for default markers in react-leaflet
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+// Create custom pump icon
+const createPumpIcon = () => {
+    return L.divIcon({
+        className: 'custom-pump-icon',
+        html: `
+            <div style="
+                width: 32px;
+                height: 32px;
+                background: #1E40AF;
+                border: 2px solid white;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                font-size: 16px;
+                color: white;
+                font-weight: bold;
+            ">
+                💧
+            </div>
+        `,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+        popupAnchor: [0, -16],
+    });
+};
+
+// Create pump icon with custom image (replace with your pump image URL)
+const createPumpIconWithImage = (imageUrl: string = '/images/pump-icon.png') => {
+    return L.icon({
+        iconUrl: imageUrl,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+        popupAnchor: [0, -16],
+    });
+};
+
+const pumpIcon = createPumpIcon();
+// const pumpIcon = createPumpIconWithImage('/path/to/your/pump-image.png'); // Uncomment and replace with your image path
 
 // TypesMore actions
 type LatLng = {
@@ -1588,16 +1638,10 @@ export default function GenerateTree({
                                 />
                             ))}
                             {pumps.map((pump) => (
-                                <Circle
+                                <Marker
                                     key={pump.id}
-                                    center={pump.position}
-                                    radius={pump.radius}
-                                    pathOptions={{
-                                        color: '#1E40AF',
-                                        fillColor: '#1E40AF',
-                                        fillOpacity: 1,
-                                        weight: 2,
-                                    }}
+                                    position={pump.position}
+                                    icon={pumpIcon}
                                     eventHandlers={{
                                         mousedown: () => handlePumpDragStart(pump),
                                         mouseup: () => setDraggingPump(null),
