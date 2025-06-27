@@ -41,12 +41,13 @@ type CustomPlantParams = {
     water_needed: number;
 };
 
-type AreaType = 'river' | 'powerplant' | 'building' | 'custompolygon' | 'solarcell';
+type AreaType = 'initial' | 'river' | 'powerplant' | 'building' | 'custompolygon' | 'solarcell';
 
 type LayerData = {
     type: AreaType;
     coordinates: LatLng[];
     isInitialMap?: boolean;
+    leafletId?: number;
 };
 
 type Suggestion = {
@@ -60,6 +61,7 @@ const DEFAULT_MAP_CENTER: [number, number] = [13.7563, 100.5018];
 const MAX_AREA = 100000; // 10 hectares
 
 const AREA_DESCRIPTIONS: Record<AreaType, string> = {
+    initial: 'Main farm area boundary.',
     river: 'Water body for irrigation and water management.',
     powerplant: 'Energy generation facility area.',
     building: 'Structure or facility area.',
@@ -68,6 +70,7 @@ const AREA_DESCRIPTIONS: Record<AreaType, string> = {
 };
 
 const AREA_COLORS: Record<AreaType, string> = {
+    initial: '#90EE90', // Light green
     river: '#3B82F6', // Blue
     powerplant: '#EF4444', // Red
     building: '#F59E0B', // Yellow
@@ -358,9 +361,7 @@ export default function MapPlanner() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [status, setStatus] = useState<string>('Draw an area on the map first');
-    const [selectedAreaTypes, setSelectedAreaTypes] = useState<AreaType[]>([]);
     const [activeButton, setActiveButton] = useState<AreaType | null>(null);
-    const [drawingMode, setDrawingMode] = useState<'polygon' | 'rectangle'>('polygon');
     const [customParams, setCustomParams] = useState<CustomPlantParams>({
         name: '',
         type: '',
@@ -369,31 +370,15 @@ export default function MapPlanner() {
         row_spacing: 10,
         water_needed: 1.5,
     });
-
-    // Mode States
-    const [isRiverMode, setIsRiverMode] = useState(false);
-    const [isBuildingMode, setIsBuildingMode] = useState(false);
-    const [isPowerPlantMode, setIsPowerPlantMode] = useState(false);
-    const [isOtherMode, setIsOtherMode] = useState(false);
-    const [isSolarcellMode, setIsSolarcellMode] = useState(false);
     const [selectedPlantCategory, setSelectedPlantCategory] = useState<string>('');
     const [filteredPlants, setFilteredPlants] = useState<PlantType[]>([]);
-
-    // Refs
     const featureGroupRef = useRef<any>(null);
-
-    // In the MapPlanner component, add searchCenter state
-    const [searchCenter, setSearchCenter] = useState<[number, number] | null>(null);
-
-    // Add these to the state declarations at the top of the MapPlanner component
     const [currentZoom, setCurrentZoom] = useState(13);
     const [currentMapType, setCurrentMapType] = useState('street');
     const [initialZoom, setInitialZoom] = useState<number | null>(null);
-
-    // Add new state for storing initial map position
     const [initialMapPosition, setInitialMapPosition] = useState<[number, number] | null>(null);
+    const [searchCenter, setSearchCenter] = useState<[number, number] | null>(null);
 
-    // Effects
     useEffect(() => {
         const fetchPlantTypes = async () => {
             try {
@@ -407,100 +392,28 @@ export default function MapPlanner() {
         fetchPlantTypes();
     }, []);
 
-    // Helper Functions
-    const resetModes = () => {
-        setIsRiverMode(false);
-        setIsBuildingMode(false);
-        setIsPowerPlantMode(false);
-        setIsOtherMode(false);
-        setIsSolarcellMode(false);
-        setActiveButton(null);
-    };
-
-    // handlePumpPlace function removed - pump functionality no longer needed
+    const resetModes = () => setActiveButton(null);
 
     const toggleAreaType = (type: AreaType) => {
         if (activeButton === type) {
             resetModes();
-            setSelectedAreaTypes((prev) => prev.filter((t) => t !== type));
-            console.log('Area Type Deselected:', type);
             setStatus('Select an area type to begin');
             return;
         }
-
-        if (activeButton !== null) {
-            // If there's an active button, remove its layer first
-            setLayers((prevLayers) => {
-                // Keep the initial map area and remove only the active button's layer
-                return prevLayers.filter(
-                    (layer) => layer.isInitialMap || layer.type !== activeButton
-                );
-            });
-            setSelectedAreaTypes((prev) => prev.filter((t) => t !== activeButton));
-        }
-
         setActiveButton(type);
-        console.log('Area Type Selected:', type);
-
-        const enablePolygonDrawing = () => {
-            const map = featureGroupRef.current?.leafletElement?._map;
-            if (map) {
-                const layers = map._layers as Record<string, any>;
-                const drawControl = Object.values(layers).find(
-                    (layer) => layer._drawingMode === 'polygon'
-                );
-                if (drawControl) {
-                    drawControl.enable();
-                }
-            }
-        };
-
-        const modeMap = {
-            river: () => {
-                setIsRiverMode(true);
-                setDrawingMode('polygon');
-                setSelectedAreaTypes((prev) => [...prev, 'river']);
-                setStatus('Draw the river area');
-                enablePolygonDrawing();
-            },
-            building: () => {
-                setIsBuildingMode(true);
-                setDrawingMode('polygon');
-                setSelectedAreaTypes((prev) => [...prev, 'building']);
-                setStatus('Draw the building area');
-                enablePolygonDrawing();
-            },
-            powerplant: () => {
-                setIsPowerPlantMode(true);
-                setDrawingMode('polygon');
-                setSelectedAreaTypes((prev) => [...prev, 'powerplant']);
-                setStatus('Draw the power plant area');
-                enablePolygonDrawing();
-            },
-            custompolygon: () => {
-                setIsOtherMode(true);
-                setDrawingMode('polygon');
-                setSelectedAreaTypes((prev) => [...prev, 'custompolygon']);
-                setStatus('Draw a custom area');
-                enablePolygonDrawing();
-            },
-            solarcell: () => {
-                setIsSolarcellMode(true);
-                setDrawingMode('polygon');
-                setSelectedAreaTypes((prev) => [...prev, 'solarcell']);
-                setStatus('Draw the solar cell area');
-                enablePolygonDrawing();
-            },
-        };
-
-        modeMap[type]();
+        setStatus(`Draw the ${type === 'custompolygon' ? 'custom' : type.replace('powerplant', 'power plant')} area`);
+        // Enable polygon drawing
+        const map = featureGroupRef.current?.leafletElement?._map;
+        if (map) {
+            const drawControl = Object.values(map._layers).find((layer: any) => layer._drawingMode === 'polygon');
+            if (drawControl) (drawControl as any).enable();
+        }
     };
 
     const onCreated = (e: any) => {
         const layer = e.layer;
+        const leafletId = layer._leaflet_id;
         let coordinates: LatLng[] = [];
-
-        // Handle different layer types
         if (layer instanceof L.Rectangle) {
             const bounds = layer.getBounds();
             coordinates = [
@@ -511,134 +424,56 @@ export default function MapPlanner() {
             ];
         } else if (layer.getLatLngs) {
             const latLngs = layer.getLatLngs()[0];
-            coordinates = latLngs.map((latLng: any) => ({
-                lat: latLng.lat,
-                lng: latLng.lng,
-            }));
+            coordinates = latLngs.map((latLng: any) => ({ lat: latLng.lat, lng: latLng.lng }));
         }
-
         const styleMap: Record<AreaType, { color: string; fillOpacity: number }> = {
+            initial: { color: '#90EE90', fillOpacity: 0.5 },
             river: { color: '#3B82F6', fillOpacity: 0.3 },
             powerplant: { color: '#EF4444', fillOpacity: 0.3 },
             building: { color: '#F59E0B', fillOpacity: 0.3 },
             custompolygon: { color: '#4B5563', fillOpacity: 0.3 },
             solarcell: { color: '#FFD600', fillOpacity: 0.3 },
         };
-
         if (layers.length === 0) {
-            // First draw is the initial map area
-            layer.setStyle({
-                color: '#90EE90',
-                fillColor: '#90EE90',
-                fillOpacity: 0.5,
-                weight: 2,
-            });
-
-            const newLayer: LayerData = {
-                type: 'custompolygon',
-                coordinates: coordinates,
-                isInitialMap: true,
-            };
-
-            setLayers([newLayer]);
-
-            // Set map center and zoom
+            layer.setStyle({ color: '#90EE90', fillColor: '#90EE90', fillOpacity: 0.5, weight: 2 });
+            setLayers([{ type: 'initial', coordinates, isInitialMap: true, leafletId }]);
             const bounds = layer.getBounds();
             const center = bounds.getCenter();
             const newCenter: [number, number] = [center.lat, center.lng];
             setMapCenter(newCenter);
             setInitialMapPosition(newCenter);
-
             const map = featureGroupRef.current?.leafletElement?._map;
             if (map) {
                 const currentZoom = map.getZoom();
                 setInitialZoom(currentZoom);
                 setCurrentZoom(currentZoom);
-
-                // Add a small delay to ensure the layout has updated
                 setTimeout(() => {
                     map.invalidateSize();
-                    map.setView(newCenter, currentZoom, {
-                        animate: true,
-                        duration: 1,
-                        padding: [50, 50],
-                    });
+                    map.setView(newCenter, currentZoom, { animate: true, duration: 1, padding: [50, 50] });
                 }, 100);
             }
-
             setStatus('Initial map area drawn. Now select an area type to continue.');
             return;
         }
-
-        // Determine current area type
-        const currentType = isRiverMode
-            ? 'river'
-            : isBuildingMode
-              ? 'building'
-              : isPowerPlantMode
-                ? 'powerplant'
-                : isOtherMode
-                  ? 'custompolygon'
-                  : isSolarcellMode
-                    ? 'solarcell'
-                    : 'custompolygon';
-
-        // Apply styling
-        if (styleMap[currentType]) {
-            layer.setStyle({
-                color: styleMap[currentType].color,
-                fillColor: styleMap[currentType].color,
-                fillOpacity: styleMap[currentType].fillOpacity,
-                weight: 2,
-            });
+        const currentType = activeButton;
+        if (!currentType) {
+            featureGroupRef.current?.leafletElement?.removeLayer(layer);
+            setStatus('Please select an area type before drawing.');
+            return;
         }
-
-        const newLayer: LayerData = {
-            type: currentType,
-            coordinates: coordinates,
-            isInitialMap: false,
-        };
-
-        setLayers((prevLayers) => [...prevLayers, newLayer]);
-
-        // Reset modes
+        if (styleMap[currentType]) {
+            layer.setStyle({ color: styleMap[currentType].color, fillColor: styleMap[currentType].color, fillOpacity: 0.5, weight: 2 });
+        }
+        setLayers((prevLayers) => [...prevLayers, { type: currentType, coordinates, isInitialMap: false, leafletId }]);
         resetModes();
-        setActiveButton(null);
-        setSelectedAreaTypes((prev) => prev.filter((type) => type !== currentType));
         setStatus(`${currentType} area added. Select another area type to continue.`);
     };
 
-    const onDeleted = () => {
-        // When a layer is deleted, update the state
-        if (featureGroupRef.current?.leafletElement) {
-            const featureGroup = featureGroupRef.current.leafletElement;
-            const map = featureGroup._map;
-
-            // Get all layers from the feature group
-            const mapLayers: LayerData[] = [];
-            featureGroup.eachLayer((layer: any) => {
-                if (layer instanceof L.Polygon) {
-                    const polygonLatLngs = layer.getLatLngs()[0];
-                    if (Array.isArray(polygonLatLngs)) {
-                        const latLngs = polygonLatLngs.map((latLng: any) => ({
-                            lat: latLng.lat,
-                            lng: latLng.lng,
-                        }));
-                        
-                        // Determine if this is the initial map layer (first layer)
-                        const isInitialMap = mapLayers.length === 0;
-                        
-                        mapLayers.push({
-                            type: 'custompolygon', // Default type for any remaining layers
-                            coordinates: latLngs,
-                            isInitialMap: isInitialMap,
-                        });
-                    }
-                }
-            });
-
-            // Update the state with the remaining layers
-            setLayers(mapLayers);
+    const onDeleted = (e: any) => {
+        const deletedLayerIds = new Set();
+        e.layers.eachLayer((layer: any) => { deletedLayerIds.add(layer._leaflet_id); });
+        if (deletedLayerIds.size > 0) {
+            setLayers((prevLayers) => prevLayers.filter((l) => !deletedLayerIds.has(l.leafletId)));
             setStatus('Area deleted. Select another area type to continue.');
         }
     };
@@ -724,7 +559,6 @@ export default function MapPlanner() {
 
         // Reset all state
         setLayers([]);
-        setSelectedAreaTypes([]);
         setSelectedPlant(null);
         setSelectedPlantCategory('');
         setCustomParams({
@@ -1005,13 +839,11 @@ export default function MapPlanner() {
                                     Area Configuration
                                 </label>
                                 <div className="space-y-2">
-                                    {Object.keys(AREA_DESCRIPTIONS).map((type) => (
+                                    {Object.keys(AREA_DESCRIPTIONS).filter(type => type !== 'initial').map((type) => (
                                         <div key={type} className="flex items-center gap-4">
                                             <AreaTypeButton
                                                 type={type as AreaType}
-                                                isSelected={selectedAreaTypes.includes(
-                                                    type as AreaType
-                                                )}
+                                                isSelected={layers.some((layer) => layer.type === type)}
                                                 isActive={activeButton === type}
                                                 onClick={() => toggleAreaType(type as AreaType)}
                                             />
