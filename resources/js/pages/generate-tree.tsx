@@ -30,9 +30,9 @@ L.Icon.Default.mergeOptions({
 const createPumpIconWithImage = (imageUrl: string = '/generateTree/wtpump.png') => {
     return L.icon({
         iconUrl: imageUrl,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
-        popupAnchor: [0, -16],
+        iconSize: [48, 48],
+        iconAnchor: [24, 24],
+        popupAnchor: [0, -24],
     });
 };
 
