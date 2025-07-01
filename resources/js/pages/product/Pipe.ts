@@ -1,9 +1,9 @@
-// C:\webchaiyo\Waterapp\resources\js\pages\product\Pipe.ts
+// Pipe.ts
 export const PipeData = [
     {
         id: 1,
         productCode: '398-20-5PE100(PN16)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/398-20-5PE100(PN16).jpg',
         pipeType: 'HDPE PE 100',
         pn: 16,
         sizeMM: 20,
@@ -14,7 +14,7 @@ export const PipeData = [
     {
         id: 2,
         productCode: '398-25-1PE100(PN16)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/398-25-1PE100(PN16).jpg',
         pipeType: 'HDPE PE 100',
         pn: 16,
         sizeMM: 25,
@@ -25,7 +25,7 @@ export const PipeData = [
     {
         id: 3,
         productCode: '398-40-5PE100(PN16)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/398-40-5PE100(PN16).jpg',
         pipeType: 'HDPE PE 100',
         pn: 16,
         sizeMM: 40,
@@ -36,7 +36,7 @@ export const PipeData = [
     {
         id: 4,
         productCode: '398-75-2PE100(PN16)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/398-75-2PE100(PN16).jpg',
         pipeType: 'HDPE PE 100',
         pn: 16,
         sizeMM: 75,
@@ -47,7 +47,7 @@ export const PipeData = [
     {
         id: 5,
         productCode: '398-110-2PE100(PN16)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/398-110-2PE100(PN16).jpg',
         pipeType: 'HDPE PE 100',
         pn: 16,
         sizeMM: 110,
@@ -58,7 +58,7 @@ export const PipeData = [
     {
         id: 6,
         productCode: '398-90-5PE80(PN10)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/398-90-5PE80(PN10).jpg',
         pipeType: 'HDPE PE 80',
         pn: 10,
         sizeMM: 90,
@@ -69,7 +69,7 @@ export const PipeData = [
     {
         id: 7,
         productCode: '398-20-5PE80(PN12.5)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/398-20-5PE80(PN12.5).jpg',
         pipeType: 'HDPE PE 80',
         pn: 12.5,
         sizeMM: 20,
@@ -80,7 +80,7 @@ export const PipeData = [
     {
         id: 8,
         productCode: '398-32-5PE80(PN12.5)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/398-32-5PE80(PN12.5).jpg',
         pipeType: 'HDPE PE 80',
         pn: 12.5,
         sizeMM: 32,
@@ -91,7 +91,7 @@ export const PipeData = [
     {
         id: 9,
         productCode: '398-50-5PE80(PN12.5)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/398-50-5PE80(PN12.5).jpg',
         pipeType: 'HDPE PE 80',
         pn: 12.5,
         sizeMM: 50,
@@ -102,7 +102,7 @@ export const PipeData = [
     {
         id: 10,
         productCode: '398-90-2PE80(PN12.5)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/398-90-2PE80(PN12.5).jpg',
         pipeType: 'HDPE PE 80',
         pn: 12.5,
         sizeMM: 90,
@@ -113,7 +113,7 @@ export const PipeData = [
     {
         id: 11,
         productCode: '398-16-1(PN4)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/398-16-1(PN4).jpg',
         pipeType: 'LDPE',
         pn: 4,
         sizeMM: 16,
@@ -124,7 +124,7 @@ export const PipeData = [
     {
         id: 12,
         productCode: '398-20(PN4)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/398-20(PN4).jpg',
         pipeType: 'LDPE',
         pn: 4,
         sizeMM: 20,
@@ -135,7 +135,7 @@ export const PipeData = [
     {
         id: 13,
         productCode: '398-32(PN4)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/398-32(PN4).jpg',
         pipeType: 'LDPE',
         pn: 4,
         sizeMM: 32,
@@ -146,7 +146,7 @@ export const PipeData = [
     {
         id: 14,
         productCode: '398-40(PN6.3)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/398-40(PN6.3).jpg',
         pipeType: 'LDPE',
         pn: 6.3,
         sizeMM: 40,
@@ -157,7 +157,7 @@ export const PipeData = [
     {
         id: 15,
         productCode: '398-63-1(PN4)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/398-63-1(PN4).jpg',
         pipeType: 'LDPE',
         pn: 4,
         sizeMM: 63,
@@ -168,7 +168,7 @@ export const PipeData = [
     {
         id: 16,
         productCode: 'PVC-20-6(PN13.5)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/PVC-20-6(PN13.5).jpg',
         pipeType: 'PVC',
         pn: 13.5,
         sizeMM: 20,
@@ -179,7 +179,7 @@ export const PipeData = [
     {
         id: 17,
         productCode: 'PVC-40-6(PN13.5)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/PVC-40-6(PN13.5).jpg',
         pipeType: 'PVC',
         pn: 13.5,
         sizeMM: 40,
@@ -190,7 +190,7 @@ export const PipeData = [
     {
         id: 18,
         productCode: 'PVC-63-6(PN13.5)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/PVC-63-6(PN13.5).jpg',
         pipeType: 'PVC',
         pn: 13.5,
         sizeMM: 63,
@@ -201,7 +201,7 @@ export const PipeData = [
     {
         id: 19,
         productCode: 'PVC-75-6(PN13.5)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/PVC-75-6(PN13.5).jpg',
         pipeType: 'PVC',
         pn: 13.5,
         sizeMM: 75,
@@ -212,7 +212,7 @@ export const PipeData = [
     {
         id: 20,
         productCode: 'PVC-110-6(PN13.5)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/PVC-110-6(PN13.5).jpg',
         pipeType: 'PVC',
         pn: 13.5,
         sizeMM: 110,
@@ -233,7 +233,7 @@ export const PipeData = [
     {
         id: 22,
         productCode: 'GI-20-6(PN20)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/GI-20-6(PN20).jpg',
         pipeType: 'Galvanized Steel',
         pn: 20,
         sizeMM: 20,
@@ -244,7 +244,7 @@ export const PipeData = [
     {
         id: 23,
         productCode: 'PERT-20-5(PN16)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/PERT-20-5(PN16).jpg',
         pipeType: 'PE-RT',
         pn: 16,
         sizeMM: 20,
@@ -255,7 +255,7 @@ export const PipeData = [
     {
         id: 24,
         productCode: 'PERT-32-5(PN16)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/PERT-32-5(PN16).jpg',
         pipeType: 'PE-RT',
         pn: 16,
         sizeMM: 32,
@@ -266,7 +266,7 @@ export const PipeData = [
     {
         id: 25,
         productCode: '398-125-2PE100(PN16)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/398-125-2PE100(PN16).jpg',
         pipeType: 'HDPE PE 100',
         pn: 16,
         sizeMM: 125,
@@ -277,7 +277,7 @@ export const PipeData = [
     {
         id: 26,
         productCode: '398-160-2PE100(PN16)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/398-160-2PE100(PN16).jpg',
         pipeType: 'HDPE PE 100',
         pn: 16,
         sizeMM: 160,
@@ -288,7 +288,7 @@ export const PipeData = [
     {
         id: 27,
         productCode: '398-250-1PE100(PN16)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/398-250-1PE100(PN16).jpg',
         pipeType: 'HDPE PE 100',
         pn: 16,
         sizeMM: 250,
@@ -299,7 +299,7 @@ export const PipeData = [
     {
         id: 28,
         productCode: '398-125-2PE80(PN12.5)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/398-125-2PE80(PN12.5).jpg',
         pipeType: 'HDPE PE 80',
         pn: 12.5,
         sizeMM: 125,
@@ -310,7 +310,7 @@ export const PipeData = [
     {
         id: 29,
         productCode: '398-200-1PE80(PN12.5)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/398-200-1PE80(PN12.5).jpg',
         pipeType: 'HDPE PE 80',
         pn: 12.5,
         sizeMM: 200,
@@ -321,7 +321,7 @@ export const PipeData = [
     {
         id: 30,
         productCode: '398-32-5PE100(PN20)',
-        image: 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
+        image: '/images/pipe/398-32-5PE100(PN20).jpg',
         pipeType: 'HDPE PE 100',
         pn: 20,
         sizeMM: 32,
@@ -332,7 +332,7 @@ export const PipeData = [
     {
         id: 31,
         productCode: 'PVC-16-3(PN6)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-16-3(PN6).jpg',
         pipeType: 'PVC',
         pn: 6,
         sizeMM: 16,
@@ -343,7 +343,7 @@ export const PipeData = [
     {
         id: 32,
         productCode: 'PVC-16-6(PN6)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-16-6(PN6).jpg',
         pipeType: 'PVC',
         pn: 6,
         sizeMM: 16,
@@ -354,7 +354,7 @@ export const PipeData = [
     {
         id: 33,
         productCode: 'PVC-20-3(PN8)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-20-3(PN8).jpg',
         pipeType: 'PVC',
         pn: 8,
         sizeMM: 20,
@@ -365,7 +365,7 @@ export const PipeData = [
     {
         id: 34,
         productCode: 'PVC-20-6(PN8)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-20-6(PN8).jpg',
         pipeType: 'PVC',
         pn: 8,
         sizeMM: 20,
@@ -376,7 +376,7 @@ export const PipeData = [
     {
         id: 35,
         productCode: 'PVC-20-12(PN8)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-20-12(PN8).jpg',
         pipeType: 'PVC',
         pn: 8,
         sizeMM: 20,
@@ -387,7 +387,7 @@ export const PipeData = [
     {
         id: 36,
         productCode: 'PVC-25-3(PN8)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-25-3(PN8).jpg',
         pipeType: 'PVC',
         pn: 8,
         sizeMM: 25,
@@ -398,7 +398,7 @@ export const PipeData = [
     {
         id: 37,
         productCode: 'PVC-25-6(PN8)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-25-6(PN8).jpg',
         pipeType: 'PVC',
         pn: 8,
         sizeMM: 25,
@@ -409,7 +409,7 @@ export const PipeData = [
     {
         id: 38,
         productCode: 'PVC-32-3(PN10)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-32-3(PN10).jpg',
         pipeType: 'PVC',
         pn: 10,
         sizeMM: 32,
@@ -420,7 +420,7 @@ export const PipeData = [
     {
         id: 39,
         productCode: 'PVC-32-6(PN10)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-32-6(PN10).jpg',
         pipeType: 'PVC',
         pn: 10,
         sizeMM: 32,
@@ -431,7 +431,7 @@ export const PipeData = [
     {
         id: 40,
         productCode: 'PVC-40-3(PN10)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-40-3(PN10).jpg',
         pipeType: 'PVC',
         pn: 10,
         sizeMM: 40,
@@ -442,7 +442,7 @@ export const PipeData = [
     {
         id: 41,
         productCode: 'PVC-40-6(PN10)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-40-6(PN10).jpg',
         pipeType: 'PVC',
         pn: 10,
         sizeMM: 40,
@@ -453,7 +453,7 @@ export const PipeData = [
     {
         id: 42,
         productCode: 'PVC-50-3(PN12.5)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-50-3(PN12.5).jpg',
         pipeType: 'PVC',
         pn: 12.5,
         sizeMM: 50,
@@ -464,7 +464,7 @@ export const PipeData = [
     {
         id: 43,
         productCode: 'PVC-50-6(PN12.5)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-50-6(PN12.5).jpg',
         pipeType: 'PVC',
         pn: 12.5,
         sizeMM: 50,
@@ -475,7 +475,7 @@ export const PipeData = [
     {
         id: 44,
         productCode: 'PVC-63-3(PN12.5)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-63-3(PN12.5).jpg',
         pipeType: 'PVC',
         pn: 12.5,
         sizeMM: 63,
@@ -486,7 +486,7 @@ export const PipeData = [
     {
         id: 45,
         productCode: 'PVC-63-6(PN12.5)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-63-6(PN12.5).jpg',
         pipeType: 'PVC',
         pn: 12.5,
         sizeMM: 63,
@@ -497,7 +497,7 @@ export const PipeData = [
     {
         id: 46,
         productCode: 'PVC-75-3(PN13.5)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-75-3(PN13.5).jpg',
         pipeType: 'PVC',
         pn: 13.5,
         sizeMM: 75,
@@ -508,7 +508,7 @@ export const PipeData = [
     {
         id: 47,
         productCode: 'PVC-75-6(PN13.5)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-75-6(PN13.5).jpg',
         pipeType: 'PVC',
         pn: 13.5,
         sizeMM: 75,
@@ -519,7 +519,7 @@ export const PipeData = [
     {
         id: 48,
         productCode: 'PVC-90-3(PN13.5)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-90-3(PN13.5).jpg',
         pipeType: 'PVC',
         pn: 13.5,
         sizeMM: 90,
@@ -530,7 +530,7 @@ export const PipeData = [
     {
         id: 49,
         productCode: 'PVC-90-6(PN13.5)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-90-6(PN13.5).jpg',
         pipeType: 'PVC',
         pn: 13.5,
         sizeMM: 90,
@@ -541,7 +541,7 @@ export const PipeData = [
     {
         id: 50,
         productCode: 'PVC-110-3(PN13.5)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-110-3(PN13.5).jpg',
         pipeType: 'PVC',
         pn: 13.5,
         sizeMM: 110,
@@ -552,7 +552,7 @@ export const PipeData = [
     {
         id: 51,
         productCode: 'PVC-110-6(PN13.5)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-110-6(PN13.5).jpg',
         pipeType: 'PVC',
         pn: 13.5,
         sizeMM: 110,
@@ -563,7 +563,7 @@ export const PipeData = [
     {
         id: 52,
         productCode: 'PVC-125-3(PN16)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-125-3(PN16).jpg',
         pipeType: 'PVC',
         pn: 16,
         sizeMM: 125,
@@ -574,7 +574,7 @@ export const PipeData = [
     {
         id: 53,
         productCode: 'PVC-125-6(PN16)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-125-6(PN16).jpg',
         pipeType: 'PVC',
         pn: 16,
         sizeMM: 125,
@@ -585,7 +585,7 @@ export const PipeData = [
     {
         id: 54,
         productCode: 'PVC-150-3(PN16)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-150-3(PN16).jpg',
         pipeType: 'PVC',
         pn: 16,
         sizeMM: 150,
@@ -596,7 +596,7 @@ export const PipeData = [
     {
         id: 55,
         productCode: 'PVC-150-6(PN16)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-150-6(PN16).jpg',
         pipeType: 'PVC',
         pn: 16,
         sizeMM: 150,
@@ -607,7 +607,7 @@ export const PipeData = [
     {
         id: 56,
         productCode: 'PVC-200-3(PN16)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-200-3(PN16).jpg',
         pipeType: 'PVC',
         pn: 16,
         sizeMM: 200,
@@ -618,7 +618,7 @@ export const PipeData = [
     {
         id: 57,
         productCode: 'PVC-200-6(PN16)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-200-6(PN16).jpg',
         pipeType: 'PVC',
         pn: 16,
         sizeMM: 200,
@@ -629,7 +629,7 @@ export const PipeData = [
     {
         id: 58,
         productCode: 'PVC-250-3(PN16)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-250-3(PN16).jpg',
         pipeType: 'PVC',
         pn: 16,
         sizeMM: 250,
@@ -640,7 +640,7 @@ export const PipeData = [
     {
         id: 59,
         productCode: 'PVC-250-6(PN16)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
+        image: '/images/pipe/PVC-250-6(PN16).jpg',
         pipeType: 'PVC',
         pn: 16,
         sizeMM: 250,
@@ -650,13 +650,13 @@ export const PipeData = [
     },
     {
         id: 60,
-        productCode: 'PVC-300-6(PN16)',
-        image: 'https://f.btwcdn.com/store-50036/product-thumb/8930ccae-05ab-00d0-75a4-6663c8fcde91.jpg',
-        pipeType: 'PVC',
-        pn: 16,
-        sizeMM: 300,
-        sizeInch: '12',
-        lengthM: 6,
-        price: 3500,
+        productCode: null,
+        image: null,
+        pipeType: null,
+        pn: null,
+        sizeMM: null,
+        sizeInch: null,
+        lengthM: null,
+        price: null,
     },
 ];

@@ -1,4 +1,4 @@
-// C:\webchaiyo\Waterapp\resources\js\pages\types\interfaces.ts
+// resources\js\pages\types\interfaces.ts
 export interface IrrigationInput {
     farmSizeRai: number;
     totalTrees: number;
@@ -21,6 +21,7 @@ export interface IrrigationInput {
 }
 
 export interface AnalyzedPipe {
+    product_code: string;
     id: number;
     productCode: string;
     pipeType: string;
@@ -43,9 +44,10 @@ export interface AnalyzedSprinkler {
     id: number;
     productCode: string;
     name: string;
-    waterVolumeLitersPerHour: any;
-    radiusMeters: any;
-    pressureBar: any;
+    brand_name: string;
+    waterVolumeLitersPerHour: number;
+    radiusMeters: number;
+    pressureBar: number;
     price: number;
     score: number;
     flowMatch: boolean;
@@ -63,7 +65,7 @@ export interface AnalyzedSprinkler {
 export interface AnalyzedPump {
     id: number;
     productCode: string;
-    powerHP: any;
+    powerHP: number;
     powerKW: number;
     phase: number;
     inlet_size_inch: number;
@@ -84,6 +86,7 @@ export interface AnalyzedPump {
 }
 
 export interface CalculationResults {
+    calculationMetadata: any;
     totalWaterRequiredLPH: number;
     totalWaterRequiredLPM: number;
     waterPerZoneLPH: number;

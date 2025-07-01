@@ -158,7 +158,9 @@ const InputForm: React.FC<InputFormProps> = ({ input, onInputChange, selectedSpr
                 </div>
 
                 <div className="space-y-4 rounded-lg bg-gray-800 p-4 shadow-lg">
-                    <h4 className="text-md font-medium text-orange-300">
+                    {input.longestSecondaryPipeM ? (
+                        <>  
+                        <h4 className="text-md font-medium text-orange-300">
                         ท่อเมนรอง (Secondary Pipe)
                     </h4>
                     <div>
@@ -196,48 +198,57 @@ const InputForm: React.FC<InputFormProps> = ({ input, onInputChange, selectedSpr
                             placeholder="400.000 (0 = ไม่มีท่อนี้)"
                         />
                     </div>
-                    {/* <div className="rounded bg-yellow-900 p-2 text-xs text-yellow-200">
-                        💡 หากไม่มีท่อเมนรอง ให้ใส่ 0 ระบบจะไม่นำมาคำนวณ
-                    </div> */}
+                        </>
+                    ) : (
+                        <div className="rounded bg-gray-900 p-2 text-center text-gray-400 h-full flex items-center justify-center">
+                            ไม่ได้ใช้ท่อเมนรอง
+                        </div>
+                    )}
                 </div>
 
                 <div className="space-y-4 rounded-lg bg-gray-800 p-4 shadow-lg">
-                    <h4 className="text-md font-medium text-cyan-300">ท่อเมนหลัก (Main Pipe)</h4>
-                    <div>
-                        <label className="mb-2 block text-sm font-medium">
-                            ท่อเมนหลักเส้นที่ยาวที่สุด (เมตร)
-                        </label>
-                        <input
-                            type="number"
-                            value={input.longestMainPipeM}
-                            onChange={(e) =>
-                                updateInput('longestMainPipeM', parseFloat(e.target.value) || 0)
-                            }
-                            step="0.001"
-                            min="0"
-                            className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
-                            placeholder="200.000 (0 = ไม่มีท่อนี้)"
-                        />
-                    </div>
-                    <div>
-                        <label className="mb-2 block text-sm font-medium">
-                            ท่อเมนหลักรวมทั้งหมด (เมตร)
-                        </label>
-                        <input
-                            type="number"
-                            value={input.totalMainPipeM}
-                            onChange={(e) =>
-                                updateInput('totalMainPipeM', parseFloat(e.target.value) || 0)
-                            }
-                            step="0.001"
-                            min="0"
-                            className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
-                            placeholder="600.000 (0 = ไม่มีท่อนี้)"
-                        />
-                    </div>
-                    {/* <div className="rounded bg-yellow-900 p-2 text-xs text-yellow-200">
-                        💡 หากไม่มีท่อเมนหลัก ให้ใส่ 0 ระบบจะไม่นำมาคำนวณ
-                    </div> */}
+                    {input.longestMainPipeM > 0 ? (
+                        <>
+                        <h4 className="text-md font-medium text-cyan-300">ท่อเมนหลัก (Main Pipe)</h4>
+                        <div>
+                            <label className="mb-2 block text-sm font-medium">
+                                ท่อเมนหลักเส้นที่ยาวที่สุด (เมตร)
+                            </label>
+                            <input
+                                type="number"
+                                value={input.longestMainPipeM}
+                                onChange={(e) =>
+                                    updateInput('longestMainPipeM', parseFloat(e.target.value) || 0)
+                                }
+                                step="0.001"
+                                min="0"
+                                className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
+                                placeholder="200.000 (0 = ไม่มีท่อนี้)"
+                            />
+                        </div>
+                        <div>
+                            <label className="mb-2 block text-sm font-medium">
+                                ท่อเมนหลักรวมทั้งหมด (เมตร)
+                            </label>
+                            <input
+                                type="number"
+                                value={input.totalMainPipeM}
+                                onChange={(e) =>
+                                    updateInput('totalMainPipeM', parseFloat(e.target.value) || 0)
+                                }
+                                step="0.001"
+                                min="0"
+                                className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
+                                placeholder="600.000 (0 = ไม่มีท่อนี้)"
+                            />
+                        </div>
+                        </>
+                    ) : (
+                        <div className="rounded bg-gray-900 p-2 text-center text-gray-400 h-full flex items-center justify-center">
+                            ไม่ได้ใช้ท่อเมนหลัก
+                        </div>
+                    )
+                    }
                 </div>
             </div>
 
@@ -248,26 +259,26 @@ const InputForm: React.FC<InputFormProps> = ({ input, onInputChange, selectedSpr
                     <label className="mb-2 block text-sm font-medium">สปริงเกอร์ต่อต้น</label>
                     <input
                         type="number"
-                        step="0.001"
+                        step="1"
                         value={input.sprinklersPerTree}
                         onChange={(e) =>
                             updateInput('sprinklersPerTree', parseFloat(e.target.value) || 1)
                         }
-                        min="0.001"
+                        min="1"
                         className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                         placeholder="1.000"
                     />
                 </div>
                 <div>
-                    <label className="mb-2 block text-sm font-medium">เวลารดน้ำ (นาที/วัน)</label>
+                    <label className="mb-2 block text-sm font-medium">เวลารดน้ำ (นาที/ครั้ง)</label>
                     <input
                         type="number"
-                        step="0.001"
+                        step="0.5"
                         value={input.irrigationTimeMinutes}
                         onChange={(e) =>
                             updateInput('irrigationTimeMinutes', parseFloat(e.target.value) || 1)
                         }
-                        min="0.001"
+                        min="1"
                         className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                         placeholder="30.000"
                     />
@@ -355,18 +366,19 @@ const InputForm: React.FC<InputFormProps> = ({ input, onInputChange, selectedSpr
                 </div>
                 <div>
                     <label className="mb-2 block text-sm font-medium">โซนทำงานพร้อมกัน</label>
-                    <input
-                        type="number"
-                        min="1"
-                        max={input.numberOfZones}
+                    <select
                         value={input.simultaneousZones}
                         onChange={(e) =>
-                            updateInput('simultaneousZones', parseInt(e.target.value) || 1)
+                            updateInput('simultaneousZones', parseInt(e.target.value, 10) || 1)
                         }
-                        step="1"
                         className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
-                        placeholder="1"
-                    />
+                    >
+                        {Array.from({ length: input.numberOfZones }, (_, i) => i + 1).map((n) => (
+                            <option key={n} value={n}>
+                                {n}
+                            </option>
+                        ))}
+                    </select>
                 </div>
             </div>
         </div>

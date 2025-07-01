@@ -1,6 +1,5 @@
 // C:\webchaiyo\Waterapp\resources\js\pages\components\PipeSelector.tsx
-import React from 'react';
-import { PipeData } from '../product/Pipe';
+import React, { useState } from 'react';
 import { CalculationResults, PipeType, IrrigationInput, AnalyzedPipe } from '../types/interfaces';
 
 interface PipeSelectorProps {
@@ -18,6 +17,25 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
     results,
     input,
 }) => {
+    // State สำหรับ Modal รูปภาพ
+    const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+    const [modalImageSrc, setModalImageSrc] = useState('');
+    const [modalImageAlt, setModalImageAlt] = useState('');
+
+    // ฟังก์ชันเปิด Modal รูปภาพ
+    const openImageModal = (src: string, alt: string) => {
+        setModalImageSrc(src);
+        setModalImageAlt(alt);
+        setIsImageModalOpen(true);
+    };
+
+    // ฟังก์ชันปิด Modal รูปภาพ
+    const closeImageModal = () => {
+        setIsImageModalOpen(false);
+        setModalImageSrc('');
+        setModalImageAlt('');
+    };
+
     const getPipeConfig = () => {
         switch (pipeType) {
             case 'branch':
@@ -55,25 +73,11 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
 
     const config = getPipeConfig();
 
-    // ไม่กรองท่อตามประเภท แสดงท่อทุกประเภท
-    const allPipes = PipeData;
-
-    // รวมข้อมูลการวิเคราะห์กับข้อมูลท่อ
-    const pipesWithAnalysis = allPipes.map((pipe) => {
-        const analyzed = config.analyzedPipes.find((ap) => ap.id === pipe.id);
-        return {
-            ...pipe,
-            score: analyzed?.score || 0,
-            velocity: analyzed?.velocity || 0,
-            headLoss: analyzed?.headLoss || 0,
-            isRecommended: analyzed?.isRecommended || false,
-            isGoodChoice: analyzed?.isGoodChoice || false,
-            isUsable: analyzed?.isUsable || false,
-        };
-    });
+    // ใช้ข้อมูลที่ได้จาก database และผ่านการวิเคราะห์แล้วใน useCalculations
+    const allPipes = config.analyzedPipes;
 
     // เรียงลำดับ: แนะนำ > ตัวเลือกดี > ใช้ได้ > อื่นๆ (เรียงตามคะแนน)
-    const sortedPipes = pipesWithAnalysis.sort((a, b) => {
+    const sortedPipes = allPipes.sort((a, b) => {
         if (a.isRecommended !== b.isRecommended) {
             return b.isRecommended ? 1 : -1;
         }
@@ -86,7 +90,6 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
         return b.score - a.score; // เรียงตามคะแนนจากมากไปน้อย
     });
 
-    // แก้ไขฟังก์ชันให้รองรับ undefined
     const getRecommendationIcon = (pipe: any) => {
         if (!pipe) return '⚪ ไม่มีข้อมูล';
         if (pipe.isRecommended) return '🌟 แนะนำ';
@@ -103,20 +106,9 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
         return 'text-red-300';
     };
 
-    const getLongestPipe = () => {
-        switch (pipeType) {
-            case 'branch':
-                return input.longestBranchPipeM;
-            case 'secondary':
-                return input.longestSecondaryPipeM;
-            case 'main':
-                return input.longestMainPipeM;
-        }
-    };
-
     // ฟังก์ชันช่วยในการหา pipe analysis ที่ปลอดภัย
     const getSelectedPipeAnalysis = () => {
-        return pipesWithAnalysis.find((p) => p.id === selectedPipe?.id) || null;
+        return allPipes.find((p) => p.id === selectedPipe?.id) || null;
     };
 
     // ฟังก์ชันสำหรับแสดงคำแนะนำสำหรับประเภทท่อ
@@ -136,10 +128,15 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
             <h3 className={`mb-4 text-lg font-semibold ${config.titleColor}`}>{config.title}</h3>
             <p className="mb-3 text-sm text-gray-300">{config.description}</p>
 
+            {/* แสดงสถานะการโหลดข้อมูล */}
+            {/* <div className="mb-3 text-xs text-green-400">
+                🔗 ข้อมูลจากฐานข้อมูล: {allPipes.length} รายการ
+            </div> */}
+
             <select
                 value={selectedPipe?.id || ''}
                 onChange={(e) => {
-                    const selected = PipeData.find((p) => p.id === parseInt(e.target.value));
+                    const selected = allPipes.find((p) => p.id === parseInt(e.target.value));
                     onPipeChange(selected);
                 }}
                 className="mb-4 w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
@@ -147,9 +144,8 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 <option value="">-- เลือกท่อ --</option>
                 {sortedPipes.map((pipe) => (
                     <option key={pipe.id} value={pipe.id}>
-                        {pipe.productCode} ({pipe.pipeType} {pipe.sizeMM}mm) - {pipe.price} บาท |
-                        {getPipeTypeRecommendation(pipe.pipeType, pipeType)}{' '}
-                        {getRecommendationIcon(pipe)}
+                        {pipe.productCode} ({pipe.pipeType} {pipe.sizeMM}mm) - {pipe.price} บาท | 
+                        {getPipeTypeRecommendation(pipe.pipeType, pipeType)} {getRecommendationIcon(pipe)}
                     </option>
                 ))}
             </select>
@@ -157,7 +153,9 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
             {selectedPipe && (
                 <div className="rounded bg-gray-600 p-3">
                     <div className="mb-3 flex items-center justify-between">
-                        <h4 className="font-medium text-white">ข้อมูลท่อที่เลือก</h4>
+                        <h4 className="font-medium text-white">
+                            <strong> {selectedPipe.name}</strong>
+                        </h4>
                         <div className="flex items-center gap-2">
                             <span className="text-sm text-yellow-300">
                                 {getPipeTypeRecommendation(selectedPipe.pipeType, pipeType) &&
@@ -171,17 +169,29 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-3 items-center justify-between gap-3 text-sm">
-                        <div className="flex items-center justify-center">
-                            <img
-                                src={selectedPipe.image}
-                                alt={selectedPipe.name}
-                                className="flex h-auto w-[85px] items-center justify-center"
-                            />
+                    <div className="grid grid-cols-10 items-center justify-between gap-3 text-sm">
+                        <div className="flex items-center justify-center col-span-2">
+                            {selectedPipe.image ? (
+                                <img
+                                    src={selectedPipe.image}
+                                    alt={selectedPipe.name}
+                                    className="flex h-auto w-[85px] items-center justify-center cursor-pointer hover:opacity-80 transition-opacity rounded border border-gray-500 hover:border-blue-400"
+                                    onError={(e) => {
+                                        (e.target as HTMLImageElement).style.display = 'none';
+                                    }}
+                                    onClick={() => openImageModal(selectedPipe.image, selectedPipe.name)}
+                                    title="คลิกเพื่อดูรูปขนาดใหญ่"
+                                />
+                            ) : (
+                                <div className="flex h-[60px] w-[85px] items-center justify-center rounded bg-gray-500 text-xs text-gray-300">
+                                    ไม่มีรูป
+                                </div>
+                            )}
                         </div>
-                        <div>
+                        <div className="col-span-4">
                             <p>
-                                <strong>รหัส:</strong> {selectedPipe.productCode}
+                                <strong>รหัสสินค้า:</strong>{' '}
+                                {selectedPipe.productCode || selectedPipe.product_code}
                             </p>
                             <p>
                                 <strong>ประเภท:</strong> {selectedPipe.pipeType}
@@ -196,11 +206,17 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                             <p>
                                 <strong>ความดัน:</strong> PN{selectedPipe.pn}
                             </p>
-                        </div>
-                        <div>
                             <p>
                                 <strong>อัตราการไหล:</strong> {config.flow.toFixed(1)} LPM
                             </p>
+                        </div>
+                        <div className="col-span-4">
+                            {selectedPipe.brand && (
+                                <p>
+                                    <strong>แบรนด์:</strong> {selectedPipe.brand}
+                                </p>
+                            )}
+
                             <p>
                                 <strong>ความเร็ว:</strong>{' '}
                                 <span
@@ -242,7 +258,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                     <h5 className="text-xs font-medium text-yellow-300">
                                         การวิเคราะห์:
                                     </h5>
-                                    <div className="grid grid-cols-3 gap-2 text-xs">
+                                    <div className="grid grid-cols-2 gap-2 text-xs">
                                         <p>
                                             คะแนนรวม:{' '}
                                             <span className="font-bold">{analysis.score}</span>/100
@@ -255,11 +271,8 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                             m
                                         </p>
                                         {/* <p>
-                                            Optimal Size:{' '}
-                                            <span className="font-bold">
-                                                {analysis.optimalSize?.toFixed(0) || 'N/A'}
-                                            </span>{' '}
-                                            mm
+                                            จากฐานข้อมูล:{' '}
+                                            <span className="font-bold text-green-400">✓</span>
                                         </p> */}
                                     </div>
                                 </div>
@@ -272,16 +285,17 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                     {(() => {
                         const analysis = getSelectedPipeAnalysis();
                         if (analysis && !analysis.isRecommended) {
-                            const betterPipes = pipesWithAnalysis
-                                .filter((p) => p.isRecommended)
-                                .slice(0, 2);
+                            const betterPipes = allPipes.filter((p) => p.isRecommended).slice(0, 2);
                             if (betterPipes.length > 0) {
                                 return (
                                     <div className="mt-3 rounded bg-blue-900 p-2">
                                         <p className="text-sm text-blue-300">
                                             💡 <strong>ท่อที่แนะนำ:</strong>{' '}
                                             {betterPipes
-                                                .map((p) => `${p.productCode} (${p.sizeMM}mm)`)
+                                                .map(
+                                                    (p) =>
+                                                        `${p.productCode || p.product_code} (${p.sizeMM}mm)`
+                                                )
                                                 .join(', ')}
                                         </p>
                                     </div>
@@ -295,19 +309,59 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                     {!getPipeTypeRecommendation(selectedPipe.pipeType, pipeType) && (
                         <div className="mt-3 rounded bg-yellow-900 p-2">
                             <p className="text-sm text-yellow-300">
-                                ⚠️ <strong>หมายเหตุ:</strong> ประเภทท่อ {selectedPipe.pipeType}{' '}
-                                ไม่ใช่ตัวเลือกที่แนะนำสำหรับ
-                                {pipeType === 'branch'
-                                    ? 'ท่อย่อย'
-                                    : pipeType === 'secondary'
-                                      ? 'ท่อเมนรอง'
-                                      : 'ท่อเมนหลัก'}
+                                ⚠️ <strong>หมายเหตุ:</strong> ประเภทท่อ {selectedPipe.pipeType} ไม่ใช่ตัวเลือกที่แนะนำสำหรับ{pipeType === 'branch' ? 'ท่อย่อย' : pipeType === 'secondary' ? 'ท่อเมนรอง' : 'ท่อเมนหลัก'} 
                                 แต่ยังสามารถใช้งานได้หากเหมาะสมกับการไหลและความเร็ว
                             </p>
                         </div>
                     )}
                 </div>
             )}
+
+            {/* Modal สำหรับแสดงรูปขนาดใหญ่ */}
+            {isImageModalOpen && (
+                <div 
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
+                    onClick={closeImageModal}
+                >
+                    <div className="relative max-h-[90vh] max-w-[90vw] p-4">
+                        {/* ปุ่มปิด */}
+                        <button
+                            onClick={closeImageModal}
+                            className="absolute -top-2 -right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors"
+                            title="ปิด"
+                        >
+                            ✕
+                        </button>
+                        
+                        {/* รูปภาพ */}
+                        <img
+                            src={modalImageSrc}
+                            alt={modalImageAlt}
+                            className="max-h-full max-w-full rounded-lg shadow-2xl"
+                            onClick={(e) => e.stopPropagation()} // ป้องกันไม่ให้ปิด modal เมื่อคลิกที่รูป
+                        />
+                        
+                        {/* ชื่อรูป */}
+                        <div className="mt-2 text-center">
+                            <p className="text-white text-sm bg-black bg-opacity-50 rounded px-2 py-1 inline-block">
+                                {modalImageAlt}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* แสดงสถิติจากฐานข้อมูล */}
+            {/* <div className="mt-4 text-xs text-gray-400">
+                <div className="grid grid-cols-2 gap-2">
+                    <div>
+                        ท่อที่แนะนำ: <span className="text-green-400">{allPipes.filter(p => p.isRecommended).length}</span>
+                    </div>
+                    <div>
+                        ท่อที่ใช้ได้: <span className="text-yellow-400">{allPipes.filter(p => p.isUsable).length}</span>
+                    </div>
+                </div>
+            </div> */}
         </div>
     );
 };
