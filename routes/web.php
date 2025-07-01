@@ -5,7 +5,7 @@ use Inertia\Inertia;
 use App\Http\Controllers\FarmController;
 
 Route::get('/', function () {
-    return Inertia::render('welcome');
+    return Inertia::render('home');
 })->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -21,6 +21,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/api/plant-points/add', [FarmController::class, 'addPlantPoint'])->name('plant-points.add');
     Route::post('/api/plant-points/delete', [FarmController::class, 'deletePlantPoint'])->name('plant-points.delete');
     Route::post('/api/plant-points/move', [FarmController::class, 'movePlantPoint'])->name('plant-points.move');
+    Route::post('/api/save-field', [FarmController::class, 'saveField'])->name('save-field');
+    Route::get('/api/fields', [FarmController::class, 'getFields'])->name('get-fields');
+    Route::put('/api/fields/{field}', [FarmController::class, 'updateField'])->name('update-field');
+    Route::delete('/api/fields/{field}', [FarmController::class, 'deleteField'])->name('delete-field');
 });
 
 require __DIR__.'/settings.php';
