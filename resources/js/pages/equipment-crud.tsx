@@ -414,7 +414,7 @@ const Pagination: React.FC<{
     const endItem = Math.min(currentPage * itemsPerPage, totalItems);
 
     const getPageNumbers = () => {
-        const pages = [];
+        const pages: number[] = [];
         const maxVisiblePages = 5;
         
         let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));

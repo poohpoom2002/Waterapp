@@ -1042,7 +1042,7 @@ export const generateEquipmentSummary = (equipment: any, analysisResult: any): a
 
 // ฟังก์ชันสร้างเหตุผลการแนะนำ
 export const generateRecommendationReasons = (equipment: any, analysisResult: any): string[] => {
-    const reasons = [];
+    const reasons: string[] = [];
 
     if (analysisResult.isRecommended) {
         reasons.push('🌟 แนะนำเป็นอันดับต้น');
@@ -1075,7 +1075,7 @@ export const generateRecommendationReasons = (equipment: any, analysisResult: an
 
 // ฟังก์ชันสร้างคำเตือน
 export const generateEquipmentWarnings = (equipment: any, analysisResult: any): string[] => {
-    const warnings = [];
+    const warnings: string[] = [];
 
     if (!analysisResult.isUsable) {
         warnings.push('⚠️ ไม่เหมาะสมสำหรับระบบนี้');
