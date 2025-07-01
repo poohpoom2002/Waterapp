@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Http;
+use Exception;
 
 class FarmController extends Controller
 {
@@ -92,7 +93,6 @@ class FarmController extends Controller
             \Log::info('Starting generatePlantingPoints with request data:', [
                 'plant_type_id' => $request->plant_type_id,
                 'area_points' => count($request->area ?? []),
-                'exclusion_areas' => count($request->exclusion_areas ?? []),
                 'layers' => count($request->layers ?? [])
             ]);
 
@@ -108,11 +108,29 @@ class FarmController extends Controller
             // Get the plant type
             $plantType = PlantType::findOrFail($request->plant_type_id);
             
+            // Extract exclusion areas from layers (exclude the initial map layer)
+            $exclusionAreas = [];
+            if (!empty($request->layers)) {
+                foreach ($request->layers as $layer) {
+                    // Skip the initial map layer and only include exclusion zones
+                    if (!isset($layer['isInitialMap']) || !$layer['isInitialMap']) {
+                        if (isset($layer['coordinates']) && count($layer['coordinates']) >= 3) {
+                            $exclusionAreas[] = $layer['coordinates'];
+                        }
+                    }
+                }
+            }
+
+            \Log::info('Extracted exclusion areas:', [
+                'exclusion_areas_count' => count($exclusionAreas),
+                'exclusion_areas' => $exclusionAreas
+            ]);
+            
             // Calculate plant locations
             $plantLocations = $this->calculatePlantLocations(
                 $request->area,
                 $plantType,
-                $request->exclusion_areas ?? []
+                $exclusionAreas
             );
 
             if (empty($plantLocations)) {
@@ -139,9 +157,20 @@ class FarmController extends Controller
     public function generateTree(Request $request)
     {
         try {
-            $data = $this->prepareGenerateTreeData($request);
-
-            return Inertia::render('generate-tree', $data);
+            // Check if data is provided via request parameters (from map-planner)
+            if ($request->has('area') && $request->has('plantType')) {
+                $data = $this->prepareGenerateTreeData($request);
+                return Inertia::render('generate-tree', $data);
+            } else {
+                // No data provided - render empty generate-tree page
+                // The frontend will handle loading data from localStorage
+                return Inertia::render('generate-tree', [
+                    'areaType' => '',
+                    'area' => [],
+                    'plantType' => null,
+                    'layers' => []
+                ]);
+            }
         } catch (Exception $e) {
             return redirect()->route('planner')
                 ->with('error', 'Invalid data provided. Please try again.');
@@ -250,6 +279,13 @@ class FarmController extends Controller
         try {
             $points = [];
 
+            \Log::info('Starting calculatePlantLocations:', [
+                'main_area_points' => count($area),
+                'exclusion_areas_count' => count($exclusionAreas),
+                'plant_spacing' => $plantType->plant_spacing,
+                'row_spacing' => $plantType->row_spacing
+            ]);
+
             // Remove duplicate points between main area and exclusion areas
             $mainAreaPoints = $area;
             foreach ($exclusionAreas as $exclusion) {
@@ -262,6 +298,10 @@ class FarmController extends Controller
                 }
             }
             $mainAreaPoints = array_values($mainAreaPoints); // Reindex array
+
+            \Log::info('After removing duplicates:', [
+                'main_area_points_remaining' => count($mainAreaPoints)
+            ]);
 
             // 1. Find the two leftmost points (lowest longitude)
             usort($mainAreaPoints, fn($a, $b) => $a['lng'] <=> $b['lng']);
@@ -332,6 +372,13 @@ class FarmController extends Controller
             $maxPlantSteps = (int) ($fieldWidthMeters / $plantType->plant_spacing);
             $maxRowSteps = (int) ($fieldHeightMeters / $plantType->row_spacing);
 
+            \Log::info('Field calculations:', [
+                'field_width_meters' => $fieldWidthMeters,
+                'field_height_meters' => $fieldHeightMeters,
+                'max_plant_steps' => $maxPlantSteps,
+                'max_row_steps' => $maxRowSteps
+            ]);
+
             // 6. Reorder polygon (optional for convex ordering)
             usort($mainAreaPoints, fn($a, $b) => $a['lat'] <=> $b['lat']);
             $top = [$mainAreaPoints[2], $mainAreaPoints[3]];
@@ -345,6 +392,10 @@ class FarmController extends Controller
             $gridIntersections = [];
 
             // 7. Generate grid into 2D array
+            $totalPointsGenerated = 0;
+            $totalPointsExcluded = 0;
+            $totalPointsExcludedByBuffer = 0;
+            
             for ($i = 0; $i <= $maxRowSteps; $i++) {
                 $rowStart = [
                     'lat' => $bottomLeft['lat'] + $rowDir['lat'] * $i * ($plantType->row_spacing / 111000),
@@ -358,19 +409,31 @@ class FarmController extends Controller
                         'lng' => $rowStart['lng'] + $plantDir['lng'] * $j * ($plantType->plant_spacing / (111000 * cos(deg2rad($rowStart['lat'])))),
                     ];
 
+                    $totalPointsGenerated++;
+
                     // Check if point is inside the main area
                     if ($this->isPointInPolygon($point['lat'], $point['lng'], $mainAreaPoints)) {
                         // Check if point is in any exclusion area
                         $inExclusion = false;
+                        $tooCloseToExclusion = false;
                         foreach ($exclusionAreas as $exclusion) {
                             if ($this->isPointInPolygon($point['lat'], $point['lng'], $exclusion)) {
                                 $inExclusion = true;
+                                $totalPointsExcluded++;
+                                break;
+                            }
+                            
+                            // Check if point is too close to exclusion zone edge (buffer)
+                            $minDistToExclusion = $this->minDistanceToPolygonEdge($point['lat'], $point['lng'], $exclusion);
+                            if ($minDistToExclusion < ($plantType->row_spacing / 2)) {
+                                $tooCloseToExclusion = true;
+                                $totalPointsExcludedByBuffer++;
                                 break;
                             }
                         }
 
-                        // Only add point if it's not in an exclusion area and is far enough from edges
-                        if (!$inExclusion) {
+                        // Only add point if it's not in an exclusion area, not too close to exclusion edges, and is far enough from main area edges
+                        if (!$inExclusion && !$tooCloseToExclusion) {
                             $minDist = $this->minDistanceToPolygonEdge($point['lat'], $point['lng'], $mainAreaPoints);
                             if ($minDist >= ($plantType->row_spacing / 2)) {
                                 $rowPoints[] = $point;
@@ -385,6 +448,16 @@ class FarmController extends Controller
                     $points[] = $rowPoints;
                 }
             }
+
+            \Log::info('Generated plant locations:', [
+                'total_rows' => count($points),
+                'total_points' => array_sum(array_map('count', $points)),
+                'exclusion_areas_processed' => count($exclusionAreas),
+                'total_points_generated' => $totalPointsGenerated,
+                'total_points_excluded' => $totalPointsExcluded,
+                'total_points_excluded_by_buffer' => $totalPointsExcludedByBuffer,
+                'buffer_distance' => $plantType->row_spacing / 2
+            ]);
 
             return array_values($points);
 
@@ -663,6 +736,7 @@ class FarmController extends Controller
             $plantType = PlantType::findOrFail($request->plant_type_id);
             $area = $request->area;
             $pipeLayout = [];
+            $zoneStats = [];
 
             // Find the two leftmost points (lowest longitude)
             usort($area, fn($a, $b) => $a['lng'] <=> $b['lng']);
@@ -736,6 +810,13 @@ class FarmController extends Controller
 
                 $points = $zone['points'];
                 $pipeDirection = $zone['pipeDirection'];
+                $zoneId = $zone['id'] ?? null;
+
+                // Skip zones with no points
+                if (empty($points)) {
+                    \Log::warning('Skipping zone with no points:', ['zone_id' => $zoneId]);
+                    continue;
+                }
 
                 // Snap points to grid lines
                 $snappedPoints = [];
@@ -755,6 +836,15 @@ class FarmController extends Controller
                     }
                 }
 
+                if (empty($snappedPoints)) {
+                    \Log::warning('No valid snapped points for zone:', ['zone_id' => $zoneId]);
+                    continue;
+                }
+
+                $zonePipes = [];
+                $totalZoneLength = 0;
+                $zoneWaterFlow = 0;
+
                 if ($pipeDirection === 'horizontal') {
                     // Group snapped points by row index
                     $pointsByRow = [];
@@ -768,11 +858,26 @@ class FarmController extends Controller
 
                     // Create horizontal pipes for each row that has points
                     foreach ($pointsByRow as $rowIndex => $rowPoints) {
+                        if (count($rowPoints) < 2) {
+                            continue; // Skip rows with less than 2 points
+                        }
+
                         // Sort points by longitude (left to right)
                         usort($rowPoints, fn($a, $b) => $a['lng'] <=> $b['lng']);
                         
-                        // Create pipe from leftmost to rightmost point on this row
-                        $pipeLayout[] = [
+                        $pipeLength = $this->haversine(
+                            ['lat' => $rowPoints[0]['lat'], 'lng' => $rowPoints[0]['lng']], 
+                            ['lat' => end($rowPoints)['lat'], 'lng' => end($rowPoints)['lng']]
+                        );
+
+                        // Calculate water flow for this pipe (number of plants * water needed per plant)
+                        $plantsInRow = count($rowPoints);
+                        $waterFlow = $plantsInRow * $plantType->water_needed; // L/day
+
+                        // Calculate pipe diameter based on water flow (simplified calculation)
+                        $pipeDiameter = $this->calculatePipeDiameter($waterFlow, $pipeLength);
+
+                        $zonePipes[] = [
                             'type' => 'horizontal',
                             'start' => [
                                 'lat' => $rowPoints[0]['lat'],
@@ -782,13 +887,16 @@ class FarmController extends Controller
                                 'lat' => end($rowPoints)['lat'],
                                 'lng' => end($rowPoints)['lng']
                             ],
-                            'zone_id' => $zone['id'] ?? null,
-                            'length' => $this->haversine(
-                                ['lat' => $rowPoints[0]['lat'], 'lng' => $rowPoints[0]['lng']], 
-                                ['lat' => end($rowPoints)['lat'], 'lng' => end($rowPoints)['lng']]
-                            ),
-                            'rowIndex' => $rowIndex
+                            'zone_id' => $zoneId,
+                            'length' => $pipeLength,
+                            'rowIndex' => $rowIndex,
+                            'plants_served' => $plantsInRow,
+                            'water_flow' => $waterFlow,
+                            'pipe_diameter' => $pipeDiameter
                         ];
+
+                        $totalZoneLength += $pipeLength;
+                        $zoneWaterFlow += $waterFlow;
                     }
                 } else {
                     // Group snapped points by column index
@@ -803,11 +911,26 @@ class FarmController extends Controller
 
                     // Create vertical pipes for each column that has points
                     foreach ($pointsByCol as $colIndex => $colPoints) {
+                        if (count($colPoints) < 2) {
+                            continue; // Skip columns with less than 2 points
+                        }
+
                         // Sort points by latitude (bottom to top)
                         usort($colPoints, fn($a, $b) => $a['lat'] <=> $b['lat']);
                         
-                        // Create pipe from bottom to top point on this column
-                        $pipeLayout[] = [
+                        $pipeLength = $this->haversine(
+                            ['lat' => $colPoints[0]['lat'], 'lng' => $colPoints[0]['lng']], 
+                            ['lat' => end($colPoints)['lat'], 'lng' => end($colPoints)['lng']]
+                        );
+
+                        // Calculate water flow for this pipe
+                        $plantsInCol = count($colPoints);
+                        $waterFlow = $plantsInCol * $plantType->water_needed; // L/day
+
+                        // Calculate pipe diameter based on water flow
+                        $pipeDiameter = $this->calculatePipeDiameter($waterFlow, $pipeLength);
+
+                        $zonePipes[] = [
                             'type' => 'vertical',
                             'start' => [
                                 'lat' => $colPoints[0]['lat'],
@@ -817,25 +940,53 @@ class FarmController extends Controller
                                 'lat' => end($colPoints)['lat'],
                                 'lng' => end($colPoints)['lng']
                             ],
-                            'zone_id' => $zone['id'] ?? null,
-                            'length' => $this->haversine(
-                                ['lat' => $colPoints[0]['lat'], 'lng' => $colPoints[0]['lng']], 
-                                ['lat' => end($colPoints)['lat'], 'lng' => end($colPoints)['lng']]
-                            ),
-                            'colIndex' => $colIndex
+                            'zone_id' => $zoneId,
+                            'length' => $pipeLength,
+                            'colIndex' => $colIndex,
+                            'plants_served' => $plantsInCol,
+                            'water_flow' => $waterFlow,
+                            'pipe_diameter' => $pipeDiameter
                         ];
+
+                        $totalZoneLength += $pipeLength;
+                        $zoneWaterFlow += $waterFlow;
                     }
                 }
+
+                // Add zone statistics
+                if (!empty($zonePipes)) {
+                    $zoneStats[] = [
+                        'zone_id' => $zoneId,
+                        'pipe_direction' => $pipeDirection,
+                        'total_pipes' => count($zonePipes),
+                        'total_length' => $totalZoneLength,
+                        'total_water_flow' => $zoneWaterFlow,
+                        'plants_served' => array_sum(array_column($zonePipes, 'plants_served')),
+                        'average_pipe_diameter' => array_sum(array_column($zonePipes, 'pipe_diameter')) / count($zonePipes)
+                    ];
+                }
+
+                $pipeLayout = array_merge($pipeLayout, $zonePipes);
             }
 
             \Log::info('Generated pipe layout:', [
                 'total_pipes' => count($pipeLayout),
                 'horizontal_pipes' => count(array_filter($pipeLayout, fn($p) => $p['type'] === 'horizontal')),
-                'vertical_pipes' => count(array_filter($pipeLayout, fn($p) => $p['type'] === 'vertical'))
+                'vertical_pipes' => count(array_filter($pipeLayout, fn($p) => $p['type'] === 'vertical')),
+                'zone_stats' => $zoneStats
             ]);
 
             return response()->json([
                 'pipe_layout' => $pipeLayout,
+                'zone_stats' => $zoneStats,
+                'summary' => [
+                    'total_pipes' => count($pipeLayout),
+                    'total_length' => array_sum(array_column($pipeLayout, 'length')),
+                    'total_water_flow' => array_sum(array_column($pipeLayout, 'water_flow')),
+                    'total_plants_served' => array_sum(array_column($pipeLayout, 'plants_served')),
+                    'average_pipe_diameter' => count($pipeLayout) > 0 ? array_sum(array_column($pipeLayout, 'pipe_diameter')) / count($pipeLayout) : 0
+                ],
+                'pipe_analysis' => $this->analyzePipeNetwork($pipeLayout, $zoneStats),
                 'message' => 'Pipe layout generated successfully'
             ]);
 
@@ -849,6 +1000,472 @@ class FarmController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    public function getFields(): JsonResponse
+    {
+        try {
+            $fields = \App\Models\Field::with(['plantType', 'zones', 'plantingPoints', 'pipes', 'layers'])
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            $formattedFields = $fields->map(function ($field) {
+                return [
+                    'id' => $field->id,
+                    'name' => $field->name,
+                    'area' => $field->area_coordinates,
+                    'plantType' => [
+                        'id' => $field->plantType->id,
+                        'name' => $field->plantType->name,
+                        'type' => $field->plantType->type,
+                        'plant_spacing' => $field->plantType->plant_spacing,
+                        'row_spacing' => $field->plantType->row_spacing,
+                        'water_needed' => $field->plantType->water_needed
+                    ],
+                    'totalPlants' => $field->total_plants,
+                    'totalArea' => $field->total_area,
+                    'createdAt' => $field->created_at->toISOString(),
+                    'layers' => $field->layers->map(function ($layer) {
+                        return [
+                            'type' => $layer->type,
+                            'coordinates' => $layer->coordinates,
+                            'isInitialMap' => $layer->is_initial_map
+                        ];
+                    })->toArray()
+                ];
+            });
+
+            return response()->json([
+                'fields' => $formattedFields
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error fetching fields:', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function deleteField(Request $request, $fieldId): JsonResponse
+    {
+        try {
+            $validator = Validator::make(['field_id' => $fieldId], [
+                'field_id' => 'required|integer|exists:fields,id'
+            ]);
+
+            if ($validator->fails()) {
+                throw new \Exception('Invalid field ID provided');
+            }
+
+            $field = \App\Models\Field::findOrFail($fieldId);
+
+            // Delete related data (this will cascade due to foreign key constraints)
+            $field->delete();
+
+            \Log::info('Field deleted successfully:', [
+                'field_id' => $field->id,
+                'field_name' => $field->name
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Field deleted successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error deleting field:', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function updateField(Request $request, $fieldId): JsonResponse
+    {
+        try {
+            \Log::info('Starting field update with request data:', [
+                'field_id' => $fieldId,
+                'field_name' => $request->field_name,
+                'plant_type_id' => $request->plant_type_id,
+                'zones_count' => count($request->zones ?? []),
+                'planting_points_count' => count($request->planting_points ?? []),
+                'pipes_count' => count($request->pipes ?? [])
+            ]);
+
+            $validator = Validator::make($request->all(), [
+                'field_name' => 'required|string|max:255',
+                'area_coordinates' => 'required|array|min:3',
+                'area_coordinates.*.lat' => 'required|numeric',
+                'area_coordinates.*.lng' => 'required|numeric',
+                'plant_type_id' => 'required|integer|exists:plant_types,id',
+                'total_plants' => 'required|integer|min:0',
+                'total_area' => 'required|numeric|min:0',
+                'total_water_need' => 'required|numeric|min:0',
+                'area_type' => 'nullable|string',
+                'layers' => 'array',
+                'layers.*.type' => 'required|string',
+                'layers.*.coordinates' => 'required|array',
+                'layers.*.coordinates.*.lat' => 'required|numeric',
+                'layers.*.coordinates.*.lng' => 'required|numeric',
+                'layers.*.is_initial_map' => 'boolean',
+                'zones' => 'array',
+                'zones.*.name' => 'required|string',
+                'zones.*.polygon_coordinates' => 'required|array',
+                'zones.*.polygon_coordinates.*.lat' => 'required|numeric',
+                'zones.*.polygon_coordinates.*.lng' => 'required|numeric',
+                'zones.*.color' => 'required|string',
+                'zones.*.pipe_direction' => 'required|in:horizontal,vertical',
+                'planting_points' => 'array',
+                'planting_points.*.lat' => 'required|numeric',
+                'planting_points.*.lng' => 'required|numeric',
+                'planting_points.*.point_id' => 'required|string',
+                'planting_points.*.zone_id' => 'nullable|integer',
+                'pipes' => 'array',
+                'pipes.*.type' => 'required|in:main,submain,branch',
+                'pipes.*.direction' => 'required|in:horizontal,vertical',
+                'pipes.*.start_lat' => 'required|numeric',
+                'pipes.*.start_lng' => 'required|numeric',
+                'pipes.*.end_lat' => 'required|numeric',
+                'pipes.*.end_lng' => 'required|numeric',
+                'pipes.*.length' => 'required|numeric|min:0',
+                'pipes.*.plants_served' => 'required|integer|min:0',
+                'pipes.*.water_flow' => 'required|numeric|min:0',
+                'pipes.*.pipe_diameter' => 'required|integer|min:0',
+                'pipes.*.zone_id' => 'nullable|integer',
+                'pipes.*.row_index' => 'nullable|integer',
+                'pipes.*.col_index' => 'nullable|integer'
+            ]);
+
+            if ($validator->fails()) {
+                throw new \Exception('Invalid request data: ' . json_encode($validator->errors()));
+            }
+
+            // Start database transaction
+            \DB::beginTransaction();
+
+            try {
+                // Find the existing field
+                $field = \App\Models\Field::findOrFail($fieldId);
+
+                // Update the field
+                $field->update([
+                    'name' => $request->field_name,
+                    'area_coordinates' => $request->area_coordinates,
+                    'plant_type_id' => $request->plant_type_id,
+                    'total_plants' => $request->total_plants,
+                    'total_area' => $request->total_area,
+                    'total_water_need' => $request->total_water_need,
+                    'area_type' => $request->area_type
+                ]);
+
+                // Delete existing related data
+                $field->layers()->delete();
+                $field->zones()->delete();
+                $field->plantingPoints()->delete();
+                $field->pipes()->delete();
+
+                // Save new layers
+                if (!empty($request->layers)) {
+                    foreach ($request->layers as $layer) {
+                        \App\Models\FieldLayer::create([
+                            'field_id' => $field->id,
+                            'type' => $layer['type'],
+                            'coordinates' => $layer['coordinates'],
+                            'is_initial_map' => $layer['is_initial_map'] ?? false
+                        ]);
+                    }
+                }
+
+                // Save new zones
+                $zoneMap = []; // Map to track zone IDs for planting points and pipes
+                if (!empty($request->zones)) {
+                    foreach ($request->zones as $zone) {
+                        $fieldZone = \App\Models\FieldZone::create([
+                            'field_id' => $field->id,
+                            'name' => $zone['name'],
+                            'polygon_coordinates' => $zone['polygon_coordinates'],
+                            'color' => $zone['color'],
+                            'pipe_direction' => $zone['pipe_direction']
+                        ]);
+                        $zoneMap[$zone['id']] = $fieldZone->id;
+                    }
+                }
+
+                // Save new planting points
+                if (!empty($request->planting_points)) {
+                    foreach ($request->planting_points as $point) {
+                        \App\Models\PlantingPoint::create([
+                            'field_id' => $field->id,
+                            'field_zone_id' => isset($zoneMap[$point['zone_id']]) ? $zoneMap[$point['zone_id']] : null,
+                            'latitude' => $point['lat'],
+                            'longitude' => $point['lng'],
+                            'point_id' => $point['point_id']
+                        ]);
+                    }
+                }
+
+                // Save new pipes
+                if (!empty($request->pipes)) {
+                    foreach ($request->pipes as $pipe) {
+                        \App\Models\Pipe::create([
+                            'field_id' => $field->id,
+                            'field_zone_id' => isset($zoneMap[$pipe['zone_id']]) ? $zoneMap[$pipe['zone_id']] : null,
+                            'type' => $pipe['type'],
+                            'direction' => $pipe['direction'],
+                            'start_latitude' => $pipe['start_lat'],
+                            'start_longitude' => $pipe['start_lng'],
+                            'end_latitude' => $pipe['end_lat'],
+                            'end_longitude' => $pipe['end_lng'],
+                            'length' => $pipe['length'],
+                            'plants_served' => $pipe['plants_served'],
+                            'water_flow' => $pipe['water_flow'],
+                            'pipe_diameter' => $pipe['pipe_diameter'],
+                            'row_index' => $pipe['row_index'] ?? null,
+                            'col_index' => $pipe['col_index'] ?? null
+                        ]);
+                    }
+                }
+
+                // Commit transaction
+                \DB::commit();
+
+                \Log::info('Field updated successfully:', [
+                    'field_id' => $field->id,
+                    'field_name' => $field->name,
+                    'total_plants' => $field->total_plants,
+                    'total_pipes' => count($request->pipes ?? [])
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'field_id' => $field->id,
+                    'message' => 'Field updated successfully'
+                ]);
+
+            } catch (\Exception $e) {
+                // Rollback transaction on error
+                \DB::rollBack();
+                throw $e;
+            }
+
+        } catch (\Exception $e) {
+            \Log::error('Error updating field:', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function saveField(Request $request): JsonResponse
+    {
+        try {
+            \Log::info('Starting field save with request data:', [
+                'field_name' => $request->field_name,
+                'plant_type_id' => $request->plant_type_id,
+                'zones_count' => count($request->zones ?? []),
+                'planting_points_count' => count($request->planting_points ?? []),
+                'pipes_count' => count($request->pipes ?? [])
+            ]);
+
+            $validator = Validator::make($request->all(), [
+                'field_name' => 'required|string|max:255',
+                'area_coordinates' => 'required|array|min:3',
+                'area_coordinates.*.lat' => 'required|numeric',
+                'area_coordinates.*.lng' => 'required|numeric',
+                'plant_type_id' => 'required|integer|exists:plant_types,id',
+                'total_plants' => 'required|integer|min:0',
+                'total_area' => 'required|numeric|min:0',
+                'total_water_need' => 'required|numeric|min:0',
+                'area_type' => 'nullable|string',
+                'layers' => 'array',
+                'layers.*.type' => 'required|string',
+                'layers.*.coordinates' => 'required|array',
+                'layers.*.coordinates.*.lat' => 'required|numeric',
+                'layers.*.coordinates.*.lng' => 'required|numeric',
+                'layers.*.is_initial_map' => 'boolean',
+                'zones' => 'array',
+                'zones.*.name' => 'required|string',
+                'zones.*.polygon_coordinates' => 'required|array',
+                'zones.*.polygon_coordinates.*.lat' => 'required|numeric',
+                'zones.*.polygon_coordinates.*.lng' => 'required|numeric',
+                'zones.*.color' => 'required|string',
+                'zones.*.pipe_direction' => 'required|in:horizontal,vertical',
+                'planting_points' => 'array',
+                'planting_points.*.lat' => 'required|numeric',
+                'planting_points.*.lng' => 'required|numeric',
+                'planting_points.*.point_id' => 'required|string',
+                'planting_points.*.zone_id' => 'nullable|integer',
+                'pipes' => 'array',
+                'pipes.*.type' => 'required|in:main,submain,branch',
+                'pipes.*.direction' => 'required|in:horizontal,vertical',
+                'pipes.*.start_lat' => 'required|numeric',
+                'pipes.*.start_lng' => 'required|numeric',
+                'pipes.*.end_lat' => 'required|numeric',
+                'pipes.*.end_lng' => 'required|numeric',
+                'pipes.*.length' => 'required|numeric|min:0',
+                'pipes.*.plants_served' => 'required|integer|min:0',
+                'pipes.*.water_flow' => 'required|numeric|min:0',
+                'pipes.*.pipe_diameter' => 'required|integer|min:0',
+                'pipes.*.zone_id' => 'nullable|integer',
+                'pipes.*.row_index' => 'nullable|integer',
+                'pipes.*.col_index' => 'nullable|integer'
+            ]);
+
+            if ($validator->fails()) {
+                throw new \Exception('Invalid request data: ' . json_encode($validator->errors()));
+            }
+
+            // Start database transaction
+            \DB::beginTransaction();
+
+            try {
+                // Create the field
+                $field = \App\Models\Field::create([
+                    'name' => $request->field_name,
+                    'area_coordinates' => $request->area_coordinates,
+                    'plant_type_id' => $request->plant_type_id,
+                    'total_plants' => $request->total_plants,
+                    'total_area' => $request->total_area,
+                    'total_water_need' => $request->total_water_need,
+                    'area_type' => $request->area_type
+                ]);
+
+                // Save layers
+                if (!empty($request->layers)) {
+                    foreach ($request->layers as $layer) {
+                        \App\Models\FieldLayer::create([
+                            'field_id' => $field->id,
+                            'type' => $layer['type'],
+                            'coordinates' => $layer['coordinates'],
+                            'is_initial_map' => $layer['is_initial_map'] ?? false
+                        ]);
+                    }
+                }
+
+                // Save zones
+                $zoneMap = []; // Map to track zone IDs for planting points and pipes
+                if (!empty($request->zones)) {
+                    foreach ($request->zones as $zone) {
+                        $fieldZone = \App\Models\FieldZone::create([
+                            'field_id' => $field->id,
+                            'name' => $zone['name'],
+                            'polygon_coordinates' => $zone['polygon_coordinates'],
+                            'color' => $zone['color'],
+                            'pipe_direction' => $zone['pipe_direction']
+                        ]);
+                        $zoneMap[$zone['id']] = $fieldZone->id;
+                    }
+                }
+
+                // Save planting points
+                if (!empty($request->planting_points)) {
+                    foreach ($request->planting_points as $point) {
+                        \App\Models\PlantingPoint::create([
+                            'field_id' => $field->id,
+                            'field_zone_id' => isset($zoneMap[$point['zone_id']]) ? $zoneMap[$point['zone_id']] : null,
+                            'latitude' => $point['lat'],
+                            'longitude' => $point['lng'],
+                            'point_id' => $point['point_id']
+                        ]);
+                    }
+                }
+
+                // Save pipes
+                if (!empty($request->pipes)) {
+                    foreach ($request->pipes as $pipe) {
+                        \App\Models\Pipe::create([
+                            'field_id' => $field->id,
+                            'field_zone_id' => isset($zoneMap[$pipe['zone_id']]) ? $zoneMap[$pipe['zone_id']] : null,
+                            'type' => $pipe['type'],
+                            'direction' => $pipe['direction'],
+                            'start_latitude' => $pipe['start_lat'],
+                            'start_longitude' => $pipe['start_lng'],
+                            'end_latitude' => $pipe['end_lat'],
+                            'end_longitude' => $pipe['end_lng'],
+                            'length' => $pipe['length'],
+                            'plants_served' => $pipe['plants_served'],
+                            'water_flow' => $pipe['water_flow'],
+                            'pipe_diameter' => $pipe['pipe_diameter'],
+                            'row_index' => $pipe['row_index'] ?? null,
+                            'col_index' => $pipe['col_index'] ?? null
+                        ]);
+                    }
+                }
+
+                // Commit transaction
+                \DB::commit();
+
+                \Log::info('Field saved successfully:', [
+                    'field_id' => $field->id,
+                    'field_name' => $field->name,
+                    'total_plants' => $field->total_plants,
+                    'total_pipes' => count($request->pipes ?? [])
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'field_id' => $field->id,
+                    'message' => 'Field saved successfully'
+                ]);
+
+            } catch (\Exception $e) {
+                // Rollback transaction on error
+                \DB::rollBack();
+                throw $e;
+            }
+
+        } catch (\Exception $e) {
+            \Log::error('Error saving field:', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Calculate pipe diameter based on water flow and pipe length
+     * This is a simplified calculation - in practice, you'd use more complex hydraulic calculations
+     */
+    private function calculatePipeDiameter($waterFlow, $pipeLength)
+    {
+        // Convert water flow from L/day to m³/s
+        $flowRate = $waterFlow / (24 * 3600 * 1000); // L/day to m³/s
+        
+        // Simplified pipe sizing (assuming velocity of 1.5 m/s)
+        $velocity = 1.5; // m/s
+        $area = $flowRate / $velocity;
+        $diameter = sqrt(4 * $area / M_PI);
+        
+        // Convert to mm and round to nearest standard size
+        $diameterMm = $diameter * 1000;
+        
+        // Standard pipe sizes (mm)
+        $standardSizes = [16, 20, 25, 32, 40, 50, 63, 75, 90, 110, 125, 140, 160, 180, 200, 225, 250, 280, 315, 355, 400, 450, 500];
+        
+        foreach ($standardSizes as $size) {
+            if ($diameterMm <= $size) {
+                return $size;
+            }
+        }
+        
+        return 500; // Maximum size if calculated diameter is larger
     }
 
     /**
@@ -958,5 +1575,130 @@ class FarmController extends Controller
             'lng' => $lineStart['lng'] + $param * $D,
         ];
     }
+
+    /**
+     * Calculate distance from point to line segment
+     */
+    private function pointToLineDistance($px, $py, $ax, $ay, $bx, $by)
+    {
+        // Convert lat/lng to meters using equirectangular approximation
+        $R = 6371000; // Earth radius in meters
+        $lat1 = deg2rad($ax);
+        $lat2 = deg2rad($bx);
+        $latP = deg2rad($px);
+        $lng1 = deg2rad($ay);
+        $lng2 = deg2rad($by);
+        $lngP = deg2rad($py);
+        
+        $x1 = $R * $lng1 * cos(($lat1+$lat2)/2);
+        $y1 = $R * $lat1;
+        $x2 = $R * $lng2 * cos(($lat1+$lat2)/2);
+        $y2 = $R * $lat2;
+        $xP = $R * $lngP * cos(($lat1+$lat2)/2);
+        $yP = $R * $latP;
+        
+        $dx = $x2 - $x1;
+        $dy = $y2 - $y1;
+        
+        if ($dx == 0 && $dy == 0) {
+            // Line start and end are the same point
+            return sqrt(pow($xP-$x1,2) + pow($yP-$y1,2));
+        }
+        
+        $t = max(0, min(1, (($xP-$x1)*$dx + ($yP-$y1)*$dy) / ($dx*$dx + $dy*$dy)));
+        $projX = $x1 + $t*$dx;
+        $projY = $y1 + $t*$dy;
+        
+        return sqrt(pow($xP-$projX,2) + pow($yP-$projY,2));
+    }
+
+    private function analyzePipeNetwork($pipeLayout, $zoneStats)
+    {
+        $analysis = [];
+        
+        foreach ($zoneStats as $zoneStat) {
+            $zoneId = $zoneStat['zone_id'];
+            $zonePipes = array_filter($pipeLayout, fn($pipe) => $pipe['zone_id'] == $zoneId);
+            
+            if (empty($zonePipes)) {
+                continue;
+            }
+            
+            // Classify pipes based on length and position
+            $mainPipes = [];
+            $subMainPipes = [];
+            $branchPipes = [];
+            
+            // Sort pipes by length to identify main, sub-main, and branch pipes
+            usort($zonePipes, fn($a, $b) => $b['length'] <=> $a['length']);
+            
+            // The longest pipe is the main pipe
+            if (!empty($zonePipes)) {
+                $mainPipes[] = $zonePipes[0];
+                
+                // Next longest pipes are sub-main pipes (up to 3)
+                $subMainCount = min(3, count($zonePipes) - 1);
+                for ($i = 1; $i <= $subMainCount; $i++) {
+                    if (isset($zonePipes[$i])) {
+                        $subMainPipes[] = $zonePipes[$i];
+                    }
+                }
+                
+                // Remaining pipes are branch pipes
+                for ($i = $subMainCount + 1; $i < count($zonePipes); $i++) {
+                    if (isset($zonePipes[$i])) {
+                        $branchPipes[] = $zonePipes[$i];
+                    }
+                }
+            }
+            
+            // Find the longest pipe in each category
+            $longestMain = !empty($mainPipes) ? max(array_column($mainPipes, 'length')) : 0;
+            $longestSubMain = !empty($subMainPipes) ? max(array_column($subMainPipes, 'length')) : 0;
+            $longestBranch = !empty($branchPipes) ? max(array_column($branchPipes, 'length')) : 0;
+            
+            // Count relationships
+            $subMainsOnLongestMain = count($subMainPipes);
+            $branchesOnLongestSubMain = !empty($subMainPipes) ? count($branchPipes) : 0;
+            
+            // Find plants served by longest branch pipe
+            $longestBranchPlants = 0;
+            if (!empty($branchPipes)) {
+                $longestBranchPipe = null;
+                $maxLength = 0;
+                foreach ($branchPipes as $pipe) {
+                    if ($pipe['length'] > $maxLength) {
+                        $maxLength = $pipe['length'];
+                        $longestBranchPipe = $pipe;
+                    }
+                }
+                $longestBranchPlants = $longestBranchPipe ? $longestBranchPipe['plants_served'] : 0;
+            }
+            
+            $analysis[] = [
+                'zone_id' => $zoneId,
+                'zone_name' => 'Zone ' . $zoneId,
+                'pipe_direction' => $zoneStat['pipe_direction'],
+                'longest_main_pipe' => $longestMain,
+                'longest_submain_pipe' => $longestSubMain,
+                'longest_branch_pipe' => $longestBranch,
+                'submains_on_longest_main' => $subMainsOnLongestMain,
+                'branches_on_longest_submain' => $branchesOnLongestSubMain,
+                'plants_on_longest_branch' => $longestBranchPlants,
+                'total_pipes' => count($zonePipes),
+                'main_pipes' => count($mainPipes),
+                'submain_pipes' => count($subMainPipes),
+                'branch_pipes' => count($branchPipes),
+                'pipe_details' => [
+                    'main_pipes' => $mainPipes,
+                    'submain_pipes' => $subMainPipes,
+                    'branch_pipes' => $branchPipes
+                ]
+            ];
+        }
+        
+        return $analysis;
+    }
 }
+
 
