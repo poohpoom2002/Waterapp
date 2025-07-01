@@ -1,5 +1,5 @@
 <?php
-
+// database\seeders\DatabaseSeeder.php
 namespace Database\Seeders;
 
 use App\Models\User;
@@ -23,6 +23,8 @@ class DatabaseSeeder extends Seeder
         $this->call([
             PlantTypeSeeder::class,
             SprinklerSeeder::class,
+            EquipmentSeeder::class,
+            
         ]);
     }
 }

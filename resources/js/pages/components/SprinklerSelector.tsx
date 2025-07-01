@@ -1,6 +1,5 @@
 // C:\webchaiyo\Waterapp\resources\js\pages\components\SprinklerSelector.tsx
-import React from 'react';
-import { SprinklerData } from '../product/Sprinkler';
+import React, { useState } from 'react';
 import { CalculationResults } from '../types/interfaces';
 import { formatWaterFlow, formatRadius } from '../utils/calculations';
 
@@ -10,121 +9,32 @@ interface SprinklerSelectorProps {
     results: CalculationResults;
 }
 
-// ฟังก์ชันวิเคราะห์และให้คะแนนสปริงเกอร์
-const analyzeSprinkler = (sprinkler: any, targetFlow: number) => {
-    const minFlow = Array.isArray(sprinkler.waterVolumeLitersPerHour)
-        ? sprinkler.waterVolumeLitersPerHour[0]
-        : parseFloat(String(sprinkler.waterVolumeLitersPerHour).split('-')[0]);
-    const maxFlow = Array.isArray(sprinkler.waterVolumeLitersPerHour)
-        ? sprinkler.waterVolumeLitersPerHour[1]
-        : parseFloat(String(sprinkler.waterVolumeLitersPerHour).split('-')[1]);
-
-    let score = 0;
-
-    // คะแนนความเหมาะสมของอัตราการไหล (50%)
-    if (targetFlow >= minFlow && targetFlow <= maxFlow) {
-        // อยู่ในช่วงที่เหมาะสม
-        const flowRange = maxFlow - minFlow;
-        const positionInRange = (targetFlow - minFlow) / flowRange;
-
-        // ให้คะแนนสูงสุดถ้าอยู่ตรงกลางช่วง
-        if (positionInRange >= 0.3 && positionInRange <= 0.7) {
-            score += 50;
-        } else {
-            score += 40;
-        }
-    } else if (targetFlow >= minFlow * 0.8 && targetFlow <= maxFlow * 1.2) {
-        // ใกล้เคียงช่วงที่เหมาะสม
-        score += 30;
-    } else if (targetFlow >= minFlow * 0.6 && targetFlow <= maxFlow * 1.5) {
-        // ใช้ได้แต่ไม่เหมาะสมมาก
-        score += 15;
-    } else {
-        // ไม่เหมาะสม
-        score += 5;
-    }
-
-    // คะแนนราคาต่อประสิทธิภาพ (25%)
-    const avgFlow = (minFlow + maxFlow) / 2;
-    const pricePerFlow = sprinkler.price / avgFlow;
-
-    if (pricePerFlow < 1) {
-        score += 25;
-    } else if (pricePerFlow < 2) {
-        score += 20;
-    } else if (pricePerFlow < 5) {
-        score += 15;
-    } else if (pricePerFlow < 10) {
-        score += 10;
-    } else {
-        score += 5;
-    }
-
-    // คะแนนรัศมีการกระจาย (15%)
-    const minRadius = Array.isArray(sprinkler.radiusMeters)
-        ? sprinkler.radiusMeters[0]
-        : parseFloat(String(sprinkler.radiusMeters).split('-')[0]);
-    const maxRadius = Array.isArray(sprinkler.radiusMeters)
-        ? sprinkler.radiusMeters[1]
-        : parseFloat(String(sprinkler.radiusMeters).split('-')[1]);
-
-    const avgRadius = (minRadius + maxRadius) / 2;
-
-    if (avgRadius >= 8) {
-        score += 15; // รัศมีใหญ่ ครอบคลุมพื้นที่มาก
-    } else if (avgRadius >= 5) {
-        score += 12; // รัศมีกลาง
-    } else if (avgRadius >= 3) {
-        score += 8; // รัศมีเล็ก แต่ใช้ได้
-    } else {
-        score += 5; // รัศมีเล็กมาก
-    }
-
-    // คะแนนความหลากหลายของแรงดัน (10%)
-    const minPressure = Array.isArray(sprinkler.pressureBar)
-        ? sprinkler.pressureBar[0]
-        : parseFloat(String(sprinkler.pressureBar).split('-')[0]);
-    const maxPressure = Array.isArray(sprinkler.pressureBar)
-        ? sprinkler.pressureBar[1]
-        : parseFloat(String(sprinkler.pressureBar).split('-')[1]);
-
-    const pressureRange = maxPressure - minPressure;
-
-    if (pressureRange >= 3) {
-        score += 10; // ช่วงแรงดันกว้าง ปรับได้หลากหลาย
-    } else if (pressureRange >= 2) {
-        score += 8;
-    } else if (pressureRange >= 1) {
-        score += 6;
-    } else {
-        score += 4;
-    }
-
-    return {
-        ...sprinkler,
-        score,
-        flowMatch: targetFlow >= minFlow && targetFlow <= maxFlow,
-        flowCloseMatch: targetFlow >= minFlow * 0.8 && targetFlow <= maxFlow * 1.2,
-        isRecommended: score >= 60,
-        isGoodChoice: score >= 40,
-        isUsable: score >= 20,
-        targetFlow,
-        minFlow,
-        maxFlow,
-        avgRadius: (minRadius + maxRadius) / 2,
-        pricePerFlow,
-    };
-};
-
 const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
     selectedSprinkler,
     onSprinklerChange,
     results,
 }) => {
-    // วิเคราะห์สปริงเกอร์ทั้งหมด
-    const analyzedSprinklers = SprinklerData.map((sprinkler) =>
-        analyzeSprinkler(sprinkler, results.waterPerSprinklerLPH)
-    );
+    // State สำหรับ Modal รูปภาพ
+    const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+    const [modalImageSrc, setModalImageSrc] = useState('');
+    const [modalImageAlt, setModalImageAlt] = useState('');
+
+    // ฟังก์ชันเปิด Modal รูปภาพ
+    const openImageModal = (src: string, alt: string) => {
+        setModalImageSrc(src);
+        setModalImageAlt(alt);
+        setIsImageModalOpen(true);
+    };
+
+    // ฟังก์ชันปิด Modal รูปภาพ
+    const closeImageModal = () => {
+        setIsImageModalOpen(false);
+        setModalImageSrc('');
+        setModalImageAlt('');
+    };
+
+    // ใช้ข้อมูลที่ได้จาก database และผ่านการวิเคราะห์แล้วใน useCalculations
+    const analyzedSprinklers = results.analyzedSprinklers || [];
 
     // เรียงลำดับตามคะแนน
     const sortedSprinklers = analyzedSprinklers.sort((a, b) => {
@@ -141,10 +51,10 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
     });
 
     const getRecommendationIcon = (sprinkler: any) => {
-        if (sprinkler.isRecommended) return '(แนะนำที่สุด)'; // สีเขียว
-        if (sprinkler.isGoodChoice) return '(ตัวเลือกดี)'; // สีฟ้า
-        if (sprinkler.isUsable) return '(ใช้ได้)'; // สีเหลือง
-        return '(ควรพิจารณา)'; // สีแดง
+        if (sprinkler.isRecommended) return '(แนะนำที่สุด)';
+        if (sprinkler.isGoodChoice) return '(ตัวเลือกดี)';
+        if (sprinkler.isUsable) return '(ใช้ได้)';
+        return '(ควรพิจารณา)';
     };
 
     const getRecommendationColor = (sprinkler: any) => {
@@ -157,6 +67,22 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
     const selectedAnalyzed = selectedSprinkler
         ? analyzedSprinklers.find((s) => s.id === selectedSprinkler.id)
         : null;
+
+    // Helper function สำหรับแสดงค่า range
+    const formatRangeValue = (value: any) => {
+        if (Array.isArray(value)) {
+            return `${value[0]}-${value[1]}`;
+        }
+        return String(value);
+    };
+
+    // Helper function สำหรับแสดงค่าเฉลี่ย
+    const getAverageValue = (value: any) => {
+        if (Array.isArray(value)) {
+            return (value[0] + value[1]) / 2;
+        }
+        return parseFloat(String(value)) || 0;
+    };
 
     return (
         <div className="rounded-lg bg-gray-700 p-6">
@@ -181,21 +107,15 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 </div>
             </div>
 
-            {/* คำแนะนำด่วน
-            <div className="mb-4 rounded bg-gray-600 p-3">
-                <h4 className="mb-2 text-sm font-medium text-green-300">💡 คำแนะนำ:</h4>
-                <div className="text-xs text-gray-300">
-                    <p>🌟 = เหมาะสมมาก (คะแนน 60+)</p>
-                    <p>✅ = ตัวเลือกดี (คะแนน 40-59)</p>
-                    <p>⚡ = ใช้ได้ (คะแนน 20-39)</p>
-                    <p>⚠️ = ควรพิจารณา (คะแนน &lt;20)</p>
-                </div>
+            {/* แสดงสถานะการโหลดข้อมูล */}
+            {/* <div className="mb-3 text-xs text-green-400">
+                🔗 ข้อมูลจากฐานข้อมูล: {analyzedSprinklers.length} รายการ
             </div> */}
 
             <select
                 value={selectedSprinkler?.id || ''}
                 onChange={(e) => {
-                    const selected = SprinklerData.find((s) => s.id === parseInt(e.target.value));
+                    const selected = analyzedSprinklers.find((s) => s.id === parseInt(e.target.value));
                     onSprinklerChange(selected);
                 }}
                 className="mb-4 w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
@@ -203,7 +123,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 <option value="">-- เลือกสปริงเกอร์ --</option>
                 {sortedSprinklers.map((sprinkler) => (
                     <option key={sprinkler.id} value={sprinkler.id}>
-                        {sprinkler.name} - {sprinkler.price} บาท | {sprinkler.brand || '-'} |{' '}
+                        {sprinkler.name} - {sprinkler.price} บาท | {sprinkler.brand_name || '-'} |{' '}
                         {getRecommendationIcon(sprinkler)}
                     </option>
                 ))}
@@ -212,7 +132,9 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
             {selectedSprinkler && selectedAnalyzed && (
                 <div className="rounded bg-gray-600 p-3">
                     <div className="mb-3 flex items-center justify-between">
-                        <h4 className="font-medium text-white">ข้อมูลสปริงเกอร์ที่เลือก</h4>
+                        <h4 className="font-medium text-white">
+                            <strong> {selectedSprinkler.name}</strong>
+                        </h4>
                         <span
                             className={`text-sm font-bold ${getRecommendationColor(selectedAnalyzed)}`}
                         >
@@ -220,34 +142,47 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         </span>
                     </div>
 
-                    <div className="grid grid-cols-3 items-center justify-between gap-3 text-sm">
-                        <div className="flex items-center justify-center">
-                            <img
-                                src={selectedSprinkler.image}
-                                alt={selectedSprinkler.name}
-                                className="flex h-auto w-[85px] items-center justify-center"
-                            />
+                    <div className="grid grid-cols-10 items-center justify-between gap-3 text-sm">
+                        <div className="flex items-center justify-center col-span-2">
+                            {selectedSprinkler.image ? (
+                                <img
+                                    src={selectedSprinkler.image}
+                                    alt={selectedSprinkler.name}
+                                    className="flex h-auto w-[85px] items-center justify-center cursor-pointer hover:opacity-80 transition-opacity rounded border border-gray-500 hover:border-blue-400"
+                                    onError={(e) => {
+                                        (e.target as HTMLImageElement).style.display = 'none';
+                                    }}
+                                    onClick={() => openImageModal(selectedSprinkler.image, selectedSprinkler.name)}
+                                    title="คลิกเพื่อดูรูปขนาดใหญ่"
+                                />
+                            ) : (
+                                <div className="w-[85px] h-[60px] bg-gray-500 rounded flex items-center justify-center text-xs text-gray-300">
+                                    ไม่มีรูป
+                                </div>
+                            )}
                         </div>
-                        <div>
+                        <div className="col-span-4">
                             <p>
-                                <strong>รุ่น:</strong> {selectedSprinkler.productCode}
+                                <strong>รหัสสินค้า:</strong>{' '}
+                                {selectedSprinkler.productCode || selectedSprinkler.product_code}
                             </p>
+                            
                             <p>
                                 <strong>อัตราการไหล:</strong>{' '}
-                                {formatWaterFlow(selectedSprinkler.waterVolumeLitersPerHour)} L/H
+                                {formatRangeValue(selectedSprinkler.waterVolumeLitersPerHour)} L/H
                             </p>
                             <p>
                                 <strong>รัศมี:</strong>{' '}
-                                {formatRadius(selectedSprinkler.radiusMeters)} เมตร
+                                {formatRangeValue(selectedSprinkler.radiusMeters)} เมตร
                             </p>
                             <p>
                                 <strong>แรงดัน:</strong>{' '}
-                                {formatWaterFlow(selectedSprinkler.pressureBar)} บาร์
+                                {formatRangeValue(selectedSprinkler.pressureBar)} บาร์
                             </p>
                         </div>
-                        <div>
+                        <div className="col-span-4">
                             <p>
-                                <strong>แบรนด์:</strong> {selectedSprinkler.brand}
+                                <strong>แบรนด์:</strong> {selectedSprinkler.brand || '-'}
                             </p>
                             <p>
                                 <strong>ราคาต่อหัว:</strong> {selectedSprinkler.price} บาท
@@ -264,12 +199,6 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                                 </span>{' '}
                                 บาท
                             </p>
-                            {/* <p>
-                                <strong>ราคา/ประสิทธิภาพ:</strong>{' '}
-                                <span className="text-blue-300">
-                                    {selectedAnalyzed.pricePerFlow.toFixed(2)} บาท/ลิตร/ชม.
-                                </span>
-                            </p> */}
                         </div>
                     </div>
 
@@ -299,36 +228,87 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                                           : '❌ ไม่เหมาะสม'}
                                 </span>
                             </p>
+                            {/* <p>
+                                จากฐานข้อมูล:{' '}
+                                <span className="font-bold text-green-400">✓</span>
+                            </p> */}
                         </div>
                     </div>
 
-                    {/* คำแนะนำการปรับปรุง */}
-                    {/* {!selectedAnalyzed.isRecommended && (
-                        <div className="mt-3 rounded bg-blue-900 p-2">
-                            <p className="text-sm text-blue-300">
-                                💡 <strong>สปริงเกอร์ที่แนะนำ:</strong>{' '}
-                                {sortedSprinklers
-                                    .filter((s) => s.isRecommended)
-                                    .slice(0, 2)
-                                    .map((s) => s.productCode)
-                                    .join(', ') || 'ไม่มีตัวเลือกที่แนะนำ'}
-                            </p>
-                        </div>
-                    )} */}
-
-                    {/* เตือนการไหลที่ไม่เหมาะสม */}
-                    {!selectedAnalyzed.flowCloseMatch && (
-                        <div className="mt-3 rounded bg-red-900 p-2">
-                            <p className="text-sm text-red-300">
-                                ⚠️ <strong>คำเตือน:</strong> อัตราการไหลที่ต้องการ (
-                                {results.waterPerSprinklerLPH.toFixed(1)} ลิตร/ชม.)
-                                อยู่นอกช่วงที่เหมาะสม ({selectedAnalyzed.minFlow}-
-                                {selectedAnalyzed.maxFlow} ลิตร/ชม.)
+                    {/* แสดงข้อมูลเพิ่มเติมจากฐานข้อมูล */}
+                    {selectedSprinkler.description && (
+                        <div className="mt-3 rounded bg-gray-800 p-2">
+                            <p className="text-xs text-gray-300">
+                                <strong>รายละเอียด:</strong> {selectedSprinkler.description}
                             </p>
                         </div>
                     )}
+
+                    {/* แสดงการเปรียบเทียบกับความต้องการ */}
+                    <div className="mt-3 rounded bg-blue-900 p-2">
+                        <h5 className="text-xs font-medium text-blue-300">การเปรียบเทียบ:</h5>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                                <p>ความต้องการ: {results.waterPerSprinklerLPH.toFixed(1)} L/H</p>
+                                <p>ช่วงสปริงเกอร์: {formatRangeValue(selectedSprinkler.waterVolumeLitersPerHour)} L/H</p>
+                            </div>
+                            <div>
+                                <p>รัศมีเฉลี่ย: {getAverageValue(selectedSprinkler.radiusMeters).toFixed(1)} ม.</p>
+                                <p>แรงดันเฉลี่ย: {getAverageValue(selectedSprinkler.pressureBar).toFixed(1)} บาร์</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
+
+            {/* Modal สำหรับแสดงรูปขนาดใหญ่ */}
+            {isImageModalOpen && (
+                <div 
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
+                    onClick={closeImageModal}
+                >
+                    <div className="relative max-h-[90vh] max-w-[90vw] p-4">
+                        {/* ปุ่มปิด */}
+                        <button
+                            onClick={closeImageModal}
+                            className="absolute -top-2 -right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors"
+                            title="ปิด"
+                        >
+                            ✕
+                        </button>
+                        
+                        {/* รูปภาพ */}
+                        <img
+                            src={modalImageSrc}
+                            alt={modalImageAlt}
+                            className="max-h-full max-w-full rounded-lg shadow-2xl"
+                            onClick={(e) => e.stopPropagation()} // ป้องกันไม่ให้ปิด modal เมื่อคลิกที่รูป
+                        />
+                        
+                        {/* ชื่อรูป */}
+                        <div className="mt-2 text-center">
+                            <p className="text-white text-sm bg-black bg-opacity-50 rounded px-2 py-1 inline-block">
+                                {modalImageAlt}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* แสดงสถิติจากฐานข้อมูล */}
+            {/* <div className="mt-4 text-xs text-gray-400">
+                <div className="grid grid-cols-3 gap-2">
+                    <div>
+                        แนะนำ: <span className="text-green-400">{analyzedSprinklers.filter(s => s.isRecommended).length}</span>
+                    </div>
+                    <div>
+                        ตัวเลือกดี: <span className="text-blue-400">{analyzedSprinklers.filter(s => s.isGoodChoice).length}</span>
+                    </div>
+                    <div>
+                        ใช้ได้: <span className="text-yellow-400">{analyzedSprinklers.filter(s => s.isUsable).length}</span>
+                    </div>
+                </div>
+            </div> */}
         </div>
     );
 };
