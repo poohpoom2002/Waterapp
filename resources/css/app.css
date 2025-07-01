@@ -2,8 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import 'tailwindcss';
-
 @plugin 'tailwindcss-animate';
 
 @source '../views';
@@ -158,4 +156,90 @@
     --color-sidebar-border: oklch(0.269 0 0);
     --color-sidebar-ring: oklch(0.439 0 0);
     --radius: 0.625rem;
+}
+
+/* Custom Styles for Map Planner and Generate Tree */
+@layer components {
+    /* Map Planner Styles */
+    .map-planner-container {
+        @apply relative h-screen w-full;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background-attachment: fixed;
+    }
+
+    .map-container {
+        @apply relative h-full w-full overflow-hidden;
+        border-radius: 20px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        backdrop-filter: blur(10px);
+    }
+
+    .search-control {
+        @apply absolute left-6 top-6 z-[1000] w-96;
+    }
+
+    .search-input {
+        @apply w-full rounded-2xl border-0 bg-white/90 px-6 py-4 pr-16 text-base shadow-2xl backdrop-blur-md transition-all duration-300;
+    }
+
+    .area-type-buttons {
+        @apply absolute right-6 top-6 z-[1000] flex flex-col gap-3;
+    }
+
+    .area-type-button {
+        @apply w-36 rounded-2xl px-6 py-3 text-sm font-semibold text-white transition-all duration-300 shadow-lg backdrop-blur-sm;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .area-type-button.active {
+        background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+        transform: translateY(-2px) scale(1.05);
+        box-shadow: 0 15px 35px rgba(59, 130, 246, 0.4);
+    }
+
+    /* Generate Tree Styles */
+    .generate-tree-container {
+        @apply relative h-screen w-full;
+        background: linear-gradient(135deg, #4ade80 0%, #06b6d4 50%, #8b5cf6 100%);
+        background-attachment: fixed;
+    }
+
+    .tree-map-container {
+        @apply relative h-full w-full overflow-hidden;
+        border-radius: 24px;
+        box-shadow: 0 32px 64px -12px rgba(0, 0, 0, 0.3);
+        backdrop-filter: blur(15px);
+    }
+
+    .sidebar-panel {
+        @apply absolute left-6 top-6 z-[1000] w-[420px] max-h-[calc(100vh-3rem)] overflow-y-auto rounded-3xl bg-white/95 p-8 shadow-2xl backdrop-blur-xl;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .equipment-button {
+        @apply w-full rounded-2xl px-6 py-4 text-left font-semibold transition-all duration-300;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+    }
+
+    .equipment-button.active {
+        background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+        @apply text-white shadow-xl;
+        transform: translateY(-2px) scale(1.02);
+        box-shadow: 0 15px 35px rgba(59, 130, 246, 0.3);
+    }
+
+    .generate-button {
+        @apply w-full rounded-2xl px-6 py-4 font-bold text-white transition-all duration-300;
+        background: linear-gradient(135deg, #10b981, #059669);
+        box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+    }
+
+    .generate-button:hover:not(:disabled) {
+        background: linear-gradient(135deg, #059669, #047857);
+        transform: translateY(-2px);
+        box-shadow: 0 15px 35px rgba(16, 185, 129, 0.4);
+    }
 }

@@ -36,7 +36,28 @@ const createPumpIconWithImage = (imageUrl: string = '/generateTree/wtpump.png') 
     });
 };
 
+// Create valve icons with custom images
+const createSolenoidValveIconWithImage = (imageUrl: string = '/generateTree/solv.png') => {
+    return L.icon({
+        iconUrl: imageUrl,
+        iconSize: [48, 48],
+        iconAnchor: [24, 24],
+        popupAnchor: [0, -24],
+    });
+};
+
+const createBallValveIconWithImage = (imageUrl: string = '/generateTree/ballv.png') => {
+    return L.icon({
+        iconUrl: imageUrl,
+        iconSize: [48, 48],
+        iconAnchor: [24, 24],
+        popupAnchor: [0, -24],
+    });
+};
+
 const pumpIcon = createPumpIconWithImage('/generateTree/wtpump.png');
+const solenoidValveIcon = createSolenoidValveIconWithImage('/generateTree/solv.png');
+const ballValveIcon = createBallValveIconWithImage('/generateTree/ballv.png');
 
 // TypesMore actions
 type LatLng = {
@@ -741,18 +762,7 @@ const isPointInZonePolygon = (lat: number, lng: number, polygon: [number, number
     return inside;
 };
 
-// Add this utility function after the existing utility functions
-const createTrianglePoints = (
-    center: [number, number],
-    size: number = 0.00003
-): [number, number][] => {
-    const [lat, lng] = center;
-    return [
-        [lat + size, lng], // Bottom point
-        [lat - size / 2, lng - size], // Top left
-        [lat - size / 2, lng + size], // Top right
-    ];
-};
+
 
 // Add after the existing utility functions
 const ValveUndoRedoControl = ({
@@ -1591,16 +1601,10 @@ export default function GenerateTree({
                             )}
                             <UserPipes userPipes={userPipes} />
                             {valves.map((valve) => (
-                                <Polygon
+                                <Marker
                                     key={valve.id}
-                                    positions={createTrianglePoints(valve.position)}
-                                    pathOptions={{
-                                        color: valve.type === 'solenoid' ? '#9333EA' : '#4F46E5',
-                                        fillColor:
-                                            valve.type === 'solenoid' ? '#9333EA' : '#4F46E5',
-                                        fillOpacity: 1,
-                                        weight: 2,
-                                    }}
+                                    position={valve.position}
+                                    icon={valve.type === 'solenoid' ? solenoidValveIcon : ballValveIcon}
                                     eventHandlers={{
                                         mousedown: () => handleValveDragStart(valve),
                                         mouseup: () => setDraggingValve(null),

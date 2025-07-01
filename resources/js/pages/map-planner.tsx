@@ -552,69 +552,7 @@ export default function MapPlanner() {
     };
 
     // Update handleBack function
-    const handleBack = () => {
-        // Store current map position and zoom before reset
-        const currentCenter = mapCenter;
-        const currentZoomLevel = currentZoom;
 
-        // Reset all state
-        setLayers([]);
-        setSelectedPlant(null);
-        setSelectedPlantCategory('');
-        setCustomParams({
-            name: '',
-            type: '',
-            description: '',
-            plant_spacing: 10,
-            row_spacing: 10,
-            water_needed: 1.5,
-        });
-        setError(null);
-        setStatus('Draw an area on the map first');
-        setActiveButton(null);
-
-        // Reset map view to previous position
-        setMapCenter(currentCenter);
-        setCurrentZoom(currentZoomLevel);
-        setInitialZoom(null);
-        setInitialMapPosition(null);
-        setSearchCenter(null);
-
-        // Clear all map elements
-        if (featureGroupRef.current?.leafletElement) {
-            const map = featureGroupRef.current.leafletElement._map;
-            if (map) {
-                // Remove all layers except tile layers and controls
-                map.eachLayer((layer: any) => {
-                    if (
-                        !(layer instanceof L.TileLayer) &&
-                        !layer.options?.pane?.includes('control')
-                    ) {
-                        map.removeLayer(layer);
-                    }
-                });
-
-                // Clear the feature group
-                featureGroupRef.current.leafletElement.clearLayers();
-
-                // Force a redraw of the map
-                map.invalidateSize();
-            }
-        }
-
-        // Reset all modes
-        resetModes();
-
-        // Force a re-render of the map container
-        setTimeout(() => {
-            if (featureGroupRef.current?.leafletElement) {
-                const map = featureGroupRef.current.leafletElement._map;
-                if (map) {
-                    map.invalidateSize();
-                }
-            }
-        }, 100);
-    };
 
     const resetToDefault = () => {
         if (selectedPlant) {
@@ -941,13 +879,7 @@ export default function MapPlanner() {
                     </div>
                 </div>
             </div>
-            <div className="mt-4 flex justify-between">
-                <button
-                    onClick={handleBack}
-                    className="rounded bg-gray-600 px-6 py-3 text-white transition-colors duration-200 hover:bg-gray-700"
-                >
-                    Back
-                </button>
+            <div className="mt-4 flex justify-end">
                 <button
                     onClick={handleNext}
                     disabled={layers.length === 0 || !selectedPlantCategory || !selectedPlant}
