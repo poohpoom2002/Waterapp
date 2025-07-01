@@ -311,7 +311,7 @@ const MapStateTracker: React.FC<{
 
 const ZoomLevelDisplay: React.FC = () => {
     const map = useMap();
-    const [zoom, setZoom] = useState(map.getZoom());
+    const [zoom, setZoom] = useState<number | undefined>(map?.getZoom?.());
 
     useEffect(() => {
         const handleZoom = () => {
@@ -326,7 +326,7 @@ const ZoomLevelDisplay: React.FC = () => {
 
     return (
         <div className="absolute bottom-4 left-4 z-[1000] rounded bg-white px-3 py-1 text-sm font-medium text-gray-700 shadow-md">
-            Zoom: {zoom.toFixed(1)}
+            Zoom: {typeof zoom === 'number' ? zoom.toFixed(1) : '-'}
         </div>
     );
 };
@@ -350,6 +350,51 @@ const isPointInPolygon = (point: LatLng, polygon: LatLng[]): boolean => {
 const isAreaWithinInitialMap = (newArea: LatLng[], initialMap: LatLng[]): boolean => {
     return newArea.every((point) => isPointInPolygon(point, initialMap));
 };
+
+// Toast Notification Component
+const Toast: React.FC<{ message: string; onClose: () => void }> = ({ message, onClose }) => (
+  <div className="fixed top-6 right-6 z-[2000] bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg flex items-center animate-fade-in">
+    <span>{message}</span>
+    <button onClick={onClose} className="ml-4 text-white hover:text-gray-200 focus:outline-none">&times;</button>
+  </div>
+);
+
+// Area Configurator Component
+const AreaConfigurator: React.FC<{
+  layers: LayerData[];
+  activeButton: AreaType | null;
+  setActiveButton: (type: AreaType | null) => void;
+  toggleAreaType: (type: AreaType) => void;
+  AREA_DESCRIPTIONS: Record<AreaType, string>;
+  AREA_COLORS: Record<AreaType, string>;
+  canDraw: boolean;
+}> = ({ layers, activeButton, setActiveButton, toggleAreaType, AREA_DESCRIPTIONS, AREA_COLORS, canDraw }) => (
+  <div className="sticky top-6 animate-fade-in">
+    <label className="mb-1 block text-sm font-medium text-gray-300">Area Configuration</label>
+    <div className="space-y-2">
+      {Object.keys(AREA_DESCRIPTIONS).filter(type => type !== 'initial').map(type => (
+        <div key={type} className="flex items-center gap-4">
+          <span className="inline-block w-5 h-5 rounded-full border border-gray-400" style={{ background: AREA_COLORS[type as AreaType] }}></span>
+          <button
+            type="button"
+            onClick={() => canDraw && toggleAreaType(type as AreaType)}
+            className={`w-32 rounded px-4 py-2 text-white transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400
+              ${activeButton === type ? 'bg-blue-600 scale-105 shadow-lg' : 'bg-gray-700'}
+              ${!canDraw ? 'opacity-50 cursor-not-allowed' : ''}`}
+            style={{ borderColor: AREA_COLORS[type as AreaType], borderWidth: activeButton === type ? 2 : 0 }}
+            aria-pressed={activeButton === type}
+            aria-label={AREA_DESCRIPTIONS[type as AreaType]}
+            title={AREA_DESCRIPTIONS[type as AreaType]}
+            tabIndex={canDraw ? 0 : -1}
+            disabled={!canDraw}
+          >
+            {type === 'custompolygon' ? 'Other' : type.charAt(0).toUpperCase() + type.slice(1).replace('powerplant', 'Power Plant')}
+          </button>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 // Main Component
 export default function MapPlanner() {
@@ -378,6 +423,11 @@ export default function MapPlanner() {
     const [initialZoom, setInitialZoom] = useState<number | null>(null);
     const [initialMapPosition, setInitialMapPosition] = useState<[number, number] | null>(null);
     const [searchCenter, setSearchCenter] = useState<[number, number] | null>(null);
+    const [toast, setToast] = useState<string | null>(null);
+    const [mapShouldRecenter, setMapShouldRecenter] = useState(false);
+    const mapRef = useRef<any>(null);
+    const [recenterKey, setRecenterKey] = useState(0);
+    const [sidebarPanned, setSidebarPanned] = useState(false);
 
     useEffect(() => {
         const fetchPlantTypes = async () => {
@@ -453,6 +503,8 @@ export default function MapPlanner() {
                 }, 100);
             }
             setStatus('Initial map area drawn. Now select an area type to continue.');
+            setToast('Initial map area created!');
+            setMapShouldRecenter(true);
             return;
         }
         const currentType = activeButton;
@@ -467,6 +519,8 @@ export default function MapPlanner() {
         setLayers((prevLayers) => [...prevLayers, { type: currentType, coordinates, isInitialMap: false, leafletId }]);
         resetModes();
         setStatus(`${currentType} area added. Select another area type to continue.`);
+        setToast(`${currentType.charAt(0).toUpperCase() + currentType.slice(1)} area created!`);
+        setActiveButton(null);
     };
 
     const onDeleted = (e: any) => {
@@ -475,6 +529,7 @@ export default function MapPlanner() {
         if (deletedLayerIds.size > 0) {
             setLayers((prevLayers) => prevLayers.filter((l) => !deletedLayerIds.has(l.leafletId)));
             setStatus('Area deleted. Select another area type to continue.');
+            setToast('Area deleted!');
         }
     };
 
@@ -600,10 +655,18 @@ export default function MapPlanner() {
     // Add handleSearch function
     const handleSearch = (lat: number, lng: number) => {
         setSearchCenter([lat, lng]);
+        setMapShouldRecenter(true);
     };
 
     // Add this function to calculate center from layers
     const calculateMapCenter = () => {
+        const initialLayer = layers.find((layer) => layer.isInitialMap);
+        if (initialLayer && initialLayer.coordinates.length > 0) {
+            const coords = initialLayer.coordinates;
+            const totalLat = coords.reduce((sum, point) => sum + point.lat, 0);
+            const totalLng = coords.reduce((sum, point) => sum + point.lng, 0);
+            return [totalLat / coords.length, totalLng / coords.length] as [number, number];
+        }
         if (layers.length > 0) {
             const allPoints = layers.flatMap((layer) => layer.coordinates);
             const totalLat = allPoints.reduce((sum: number, point: LatLng) => sum + point.lat, 0);
@@ -613,8 +676,41 @@ export default function MapPlanner() {
         return mapCenter;
     };
 
+    // Effect to recenter the map only when needed
+    useEffect(() => {
+        if (mapShouldRecenter && mapRef.current) {
+            const map = mapRef.current;
+            const center = searchCenter || calculateMapCenter();
+            map.setView(center, map.getZoom(), { animate: true });
+            setMapShouldRecenter(false);
+        }
+    }, [mapShouldRecenter, searchCenter, layers]);
+
+    // Recenter handler
+    const handleRecenter = () => {
+      setRecenterKey(prev => prev + 1);
+      setMapShouldRecenter(true);
+    };
+
+    // Pan map to the right when sidebar appears
+    useEffect(() => {
+      if (mapRef.current && layers.length > 0 && !sidebarPanned) {
+        // Estimate sidebar width (1/3 of screen on large screens)
+        const sidebarWidth = window.innerWidth >= 1024 ? window.innerWidth / 3 : 0;
+        if (sidebarWidth > 0) {
+          mapRef.current.panBy([sidebarWidth / 3, 0], { animate: true });
+          setSidebarPanned(true);
+        }
+      }
+      if (layers.length === 0 && sidebarPanned) {
+        setSidebarPanned(false); // Reset if user removes all layers
+      }
+    }, [layers.length, sidebarPanned]);
+
     return (
         <div className="min-h-screen bg-gray-900 p-6">
+            {/* Toast Notification */}
+            {toast && <Toast message={toast} onClose={() => setToast(null)} />}
             <h1 className="mb-4 text-xl font-bold text-white">Plant Layout Generator</h1>
             <p className="mb-4 text-sm text-gray-400">
                 Draw an area on the map (recommended not over 10 hectares) and select the area type
@@ -626,6 +722,14 @@ export default function MapPlanner() {
                     <div className="h-4 w-4 rounded-full bg-green-500"></div>
                     <span className="text-sm text-gray-300">{status}</span>
                 </div>
+                {/* Recenter Map Button */}
+                <button
+                  onClick={handleRecenter}
+                  className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  title="Recenter map to main area"
+                >
+                  Recenter Map
+                </button>
             </div>
 
             {error && (
@@ -775,26 +879,16 @@ export default function MapPlanner() {
                                 </div>
                             )}
 
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-300">
-                                    Area Configuration
-                                </label>
-                                <div className="space-y-2">
-                                    {Object.keys(AREA_DESCRIPTIONS).filter(type => type !== 'initial').map((type) => (
-                                        <div key={type} className="flex items-center gap-4">
-                                            <AreaTypeButton
-                                                type={type as AreaType}
-                                                isSelected={layers.some((layer) => layer.type === type)}
-                                                isActive={activeButton === type}
-                                                onClick={() => toggleAreaType(type as AreaType)}
-                                            />
-                                            <span className="text-sm text-gray-400">
-                                                {AREA_DESCRIPTIONS[type as AreaType]}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
+                            {/* Area Configurator - only allow drawing if initial area exists */}
+                            <AreaConfigurator
+                              layers={layers}
+                              activeButton={activeButton}
+                              setActiveButton={setActiveButton}
+                              toggleAreaType={toggleAreaType}
+                              AREA_DESCRIPTIONS={AREA_DESCRIPTIONS}
+                              AREA_COLORS={AREA_COLORS}
+                              canDraw={!!layers.find(l => l.isInitialMap)}
+                            />
                         </>
                     )}
                 </div>
@@ -803,11 +897,12 @@ export default function MapPlanner() {
                     className={`space-y-4 ${layers.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}`}
                 >
                     <div
-                        className={`${layers.length === 0 ? 'h-[800px]' : 'h-[600px]'} w-full overflow-hidden rounded-lg border border-gray-700 ${layers.length === 0 ? 'w-full' : ''}`}
+                        className={`relative ${layers.length === 0 ? 'h-[800px]' : 'h-[750px]'} w-full overflow-hidden rounded-2xl border border-gray-700 shadow-2xl bg-gradient-to-br from-gray-800 to-gray-900 ${layers.length === 0 ? 'w-full' : ''}`}
                     >
                         <MapContainer
                             center={searchCenter || calculateMapCenter()}
                             zoom={initialZoom || currentZoom}
+                            ref={mapRef}
                             maxZoom={25}
                             minZoom={3}
                             style={{ height: '100%', width: '100%' }}
@@ -818,7 +913,6 @@ export default function MapPlanner() {
                         >
                             <SearchControl onSearch={handleSearch} />
                             <ZoomController zoom={initialZoom || currentZoom} />
-                            <CenterController center={searchCenter || calculateMapCenter()} />
                             <MapStateTracker
                                 onZoomChange={setCurrentZoom}
                                 onMapTypeChange={setCurrentMapType}
@@ -860,25 +954,39 @@ export default function MapPlanner() {
                                         circlemarker: false,
                                         marker: false,
                                         polyline: false,
-                                        polygon: {
-                                            allowIntersection: true,
-                                            showArea: true,
-                                            drawError: {
-                                                color: '#e1e4e8',
-                                                message:
-                                                    '<strong>Error:</strong> Cannot draw outside the initial map area!',
-                                            },
-                                            shapeOptions: {
-                                                color: '#3B82F6',
-                                                fillOpacity: 0.3,
-                                                weight: 2,
-                                            },
-                                            repeatMode: true,
-                                        },
+                                        polygon:
+                                            layers.length === 0 || activeButton
+                                                ? {
+                                                    allowIntersection: true,
+                                                    showArea: true,
+                                                    drawError: {
+                                                        color: '#e1e4e8',
+                                                        message: '<strong>Error:</strong> Cannot draw outside the initial map area!',
+                                                    },
+                                                    shapeOptions: {
+                                                        color: '#3B82F6',
+                                                        fillOpacity: 0.3,
+                                                        weight: 2,
+                                                    },
+                                                    repeatMode: true,
+                                                }
+                                                : false,
                                     }}
                                 />
                             </FeatureGroup>
                         </MapContainer>
+                        {/* Floating Legend - only show in area config, smaller size */}
+                        {layers.length > 0 && (
+                          <div className="absolute bottom-4 right-4 z-[1100] bg-white/90 rounded-lg shadow-lg p-2 flex flex-col gap-1 min-w-[120px] w-fit text-sm">
+                            <div className="font-semibold text-gray-800 mb-1 text-xs">Legend</div>
+                            {Object.entries(AREA_DESCRIPTIONS).filter(([type]) => type !== 'initial').map(([type, desc]) => (
+                              <div key={type} className="flex items-center gap-1">
+                                <span className="inline-block w-3 h-3 rounded-full border border-gray-400" style={{ background: AREA_COLORS[type as AreaType] }}></span>
+                                <span className="text-xs text-gray-700">{desc}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                     </div>
                 </div>
             </div>
