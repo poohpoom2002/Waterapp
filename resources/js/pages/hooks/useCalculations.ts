@@ -33,8 +33,8 @@ const fetchEquipmentData = async (categoryName: string) => {
             `/api/equipments/by-category-name/${categoryName}`
         ];
         
-        let data = [];
-        let successEndpoint = null;
+        let data: any[] = [];
+        let successEndpoint: string | null = null;
         
         for (const endpoint of endpoints) {
             try {
@@ -694,7 +694,7 @@ export const useCalculations = (
             : 0;
 
         // Enhanced velocity warnings
-        const velocityWarnings = [];
+        const velocityWarnings: string[] = [];
         if (branchLoss.velocity > 0) {
             const warning = checkVelocity(branchLoss.velocity, 'ท่อย่อย');
             if (!warning.includes('🟢')) velocityWarnings.push(warning);

@@ -17,7 +17,7 @@ use App\Http\Controllers\HomeGardenController;
 */
 
 Route::get('/', function () {
-    return Inertia::render('welcome');
+    return Inertia::render('home');
 })->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -66,6 +66,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     // =======================================================
 
+    Route::post('/api/save-field', [FarmController::class, 'saveField'])->name('save-field');
+    Route::get('/api/fields', [FarmController::class, 'getFields'])->name('get-fields');
+    Route::put('/api/fields/{field}', [FarmController::class, 'updateField'])->name('update-field');
+    Route::delete('/api/fields/{field}', [FarmController::class, 'deleteField'])->name('delete-field');
 });
 
 // Include other route files
