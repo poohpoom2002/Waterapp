@@ -60,6 +60,102 @@ const pumpIcon = createPumpIconWithImage('/generateTree/wtpump.png');
 const solenoidValveIcon = createSolenoidValveIconWithImage('/generateTree/solv.png');
 const ballValveIcon = createBallValveIconWithImage('/generateTree/ballv.png');
 
+// Loading Spinner Component
+const LoadingSpinner = ({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) => {
+    const sizeClasses = {
+        sm: 'w-4 h-4',
+        md: 'w-6 h-6',
+        lg: 'w-8 h-8'
+    };
+    
+    return (
+        <div className={`${sizeClasses[size]} animate-spin rounded-full border-2 border-gray-300 border-t-blue-600`}></div>
+    );
+};
+
+// Success/Error Toast Component
+const Toast = ({ message, type, onClose }: { message: string; type: 'success' | 'error' | 'warning'; onClose: () => void }) => {
+    const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-yellow-500';
+    const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : '⚠';
+    
+    return (
+        <div className={`fixed top-4 right-4 z-50 ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-slide-in`}>
+            <span className="font-bold">{icon}</span>
+            <span>{message}</span>
+            <button onClick={onClose} className="ml-2 hover:opacity-75">✕</button>
+        </div>
+    );
+};
+
+// Progress Bar Component
+const ProgressBar = ({ progress, label }: { progress: number; label: string }) => (
+    <div className="w-full bg-gray-700 rounded-full h-2 mb-2">
+        <div 
+            className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+            style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+        ></div>
+        <div className="text-xs text-gray-400 mt-1">{label}</div>
+    </div>
+);
+
+// Enhanced Button Component
+const ActionButton = ({ 
+    onClick, 
+    disabled, 
+    loading, 
+    variant = 'primary', 
+    size = 'md',
+    icon,
+    children 
+}: { 
+    onClick: () => void; 
+    disabled?: boolean; 
+    loading?: boolean;
+    variant?: 'primary' | 'secondary' | 'success' | 'danger' | 'warning';
+    size?: 'sm' | 'md' | 'lg';
+    icon?: string;
+    children: React.ReactNode;
+}) => {
+    const baseClasses = 'rounded font-medium transition-all duration-200 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50 hover:shadow-md active:scale-95';
+    
+    const variantClasses = {
+        primary: 'bg-blue-600 hover:bg-blue-700 text-white',
+        secondary: 'bg-gray-600 hover:bg-gray-700 text-white',
+        success: 'bg-green-600 hover:bg-green-700 text-white',
+        danger: 'bg-red-600 hover:bg-red-700 text-white',
+        warning: 'bg-yellow-600 hover:bg-yellow-700 text-white'
+    };
+    
+    const sizeClasses = {
+        sm: 'px-3 py-1.5 text-sm',
+        md: 'px-4 py-2 text-sm',
+        lg: 'px-6 py-3 text-base'
+    };
+    
+    return (
+        <button
+            onClick={onClick}
+            disabled={disabled || loading}
+            className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]}`}
+        >
+            {loading && <LoadingSpinner size="sm" />}
+            {icon && !loading && <span>{icon}</span>}
+            {children}
+        </button>
+    );
+};
+
+// Tooltip Component
+const Tooltip = ({ content, children }: { content: string; children: React.ReactNode }) => (
+    <div className="group relative inline-block">
+        {children}
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+            {content}
+            <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+        </div>
+    </div>
+);
+
 // TypesMore actions
 type LatLng = {
     lat: number;
@@ -347,8 +443,11 @@ const MapBounds = ({ positions }: { positions: LatLng[] }) => {
 };
 
 const InfoSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="mb-4 rounded-lg bg-gray-800 p-4">
-        <h3 className="mb-6 text-xl font-semibold text-white">{title}</h3>
+    <div className="mb-4 rounded-xl bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 p-6 shadow-lg hover:shadow-xl transition-all duration-300">
+        <h3 className="mb-6 text-xl font-semibold text-white flex items-center gap-2">
+            <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+            {title}
+        </h3>
         <div className="space-y-6 text-sm text-gray-300">{children}</div>
     </div>
 );
@@ -1099,6 +1198,12 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
     // Add selected points state for moving functionality
     const [selectedPoints, setSelectedPoints] = useState<Set<string>>(new Set());
     const [movingGroup, setMovingGroup] = useState<{ points: LatLng[]; offset: [number, number] } | null>(null);
+    
+    // Enhanced UI states
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+    const [progress, setProgress] = useState(0);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     // Memoized values
     const areaInRai = useMemo(() => calculateAreaInRai(area), [area]);
@@ -1136,7 +1241,9 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
     // Handlers
     const handleGenerate = async () => {
         setIsLoading(true);
+        setIsGenerating(true);
         setError(null);
+        setProgress(0);
 
         try {
             // Use props directly since we're using URL parameters consistently
@@ -1150,6 +1257,8 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
             // Debug logging
             console.log('Sending layers to API:', currentLayers);
             console.log('Exclusion layers (non-initial map):', currentLayers.filter(layer => !layer.isInitialMap));
+            
+            setProgress(30);
             
             const { data } = await axios.post<{ plant_locations: LatLng[][] }>(
                 '/api/generate-planting-points',
@@ -1169,6 +1278,8 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                 }
             );
 
+            setProgress(80);
+
             if (!data?.plant_locations) {
                 throw new Error('Invalid response format from server');
             }
@@ -1180,15 +1291,20 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
             setPlantLocations(flattenedPoints);
             setGrid(data.plant_locations);
             setIsPlantLayoutGenerated(true);
+            
+            setProgress(100);
+            setToast({ message: `Generated ${flattenedPoints.length} planting points successfully!`, type: 'success' });
         } catch (error) {
             console.error('Error details:', error);
-            setError(
-                axios.isAxiosError(error)
-                    ? error.response?.data?.message || error.message || 'Error generating points'
-                    : 'An unexpected error occurred'
-            );
+            const errorMessage = axios.isAxiosError(error)
+                ? error.response?.data?.message || error.message || 'Error generating points'
+                : 'An unexpected error occurred';
+            setError(errorMessage);
+            setToast({ message: errorMessage, type: 'error' });
         } finally {
             setIsLoading(false);
+            setIsGenerating(false);
+            setProgress(0);
         }
     };
 
@@ -1197,6 +1313,8 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
 
         try {
             setIsLoading(true);
+            setProgress(0);
+            
             const requestData = {
                 plant_type_id: plantType.id,
                 area: area,
@@ -1218,18 +1336,29 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                 }).filter(zone => zone.points.length > 0) // Only include zones with points
             };
 
+            setProgress(40);
             const response = await axios.post('/api/generate-pipe-layout', requestData);
+            
+            setProgress(80);
             setPipeLayout(response.data.pipe_layout);
             setZoneStats(response.data.zone_stats || []);
             setPipeSummary(response.data.summary || null);
             setPipeAnalysis(response.data.pipe_analysis || []);
             
+            setProgress(100);
+            setToast({ 
+                message: `Generated pipe layout with ${response.data.pipe_layout.length} pipes successfully!`, 
+                type: 'success' 
+            });
+            
             console.log('Pipe generation response:', response.data);
         } catch (error) {
             console.error('Error generating pipe layout:', error);
-            alert('Failed to generate pipe layout');
+            const errorMessage = 'Failed to generate pipe layout';
+            setToast({ message: errorMessage, type: 'error' });
         } finally {
             setIsLoading(false);
+            setProgress(0);
         }
     };
 
@@ -1517,14 +1646,17 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
     const handleSaveToDatabase = async () => {
         if (!isPlantLayoutGenerated || pipeLayout.length === 0) return;
 
-        setIsLoading(true);
+        setIsSaving(true);
         setError(null);
+        setProgress(0);
 
         try {
             // Use props directly since we're using URL parameters consistently
             const currentArea = area;
             const currentPlantType = processedPlantType;
             const currentLayers = layers;
+
+            setProgress(20);
 
             // Prepare zones data
             const zonesData = zones.map(zone => ({
@@ -1534,6 +1666,8 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                 color: zone.color,
                 pipe_direction: zone.pipeDirection
             }));
+
+            setProgress(40);
 
             // Prepare planting points data
             const plantingPointsData = plantLocations.map(point => {
@@ -1555,6 +1689,8 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                     zone_id: zoneId
                 };
             });
+
+            setProgress(60);
 
             // Prepare pipes data
             const pipesData = pipeLayout.map(pipe => ({
@@ -1592,6 +1728,8 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                 });
             });
 
+            setProgress(80);
+
             // Prepare layers data
             const layersData = currentLayers.map(layer => ({
                 type: layer.type,
@@ -1622,21 +1760,30 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                 response = await axios.post('/api/save-field', requestData);
             }
 
+            setProgress(100);
+
             if (response.data.success) {
-                alert('Field saved successfully to database!');
-                router.visit('/');
+                setToast({ 
+                    message: existingFieldId ? 'Field updated successfully!' : 'Field saved successfully to database!', 
+                    type: 'success' 
+                });
+                setTimeout(() => {
+                    router.visit('/');
+                }, 2000);
             } else {
                 throw new Error('Failed to save field');
             }
 
         } catch (error) {
             console.error('Error saving field:', error);
-            setError(axios.isAxiosError(error) 
+            const errorMessage = axios.isAxiosError(error) 
                 ? error.response?.data?.message || error.message || 'Error saving field'
-                : 'An unexpected error occurred'
-            );
+                : 'An unexpected error occurred';
+            setError(errorMessage);
+            setToast({ message: errorMessage, type: 'error' });
         } finally {
-            setIsLoading(false);
+            setIsSaving(false);
+            setProgress(0);
         }
     };
 
@@ -1703,14 +1850,44 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
     }, [valves, pumps]);
 
     return (
-        <div className="min-h-screen bg-gray-900 p-6">
-            <h1 className="mb-4 text-xl font-bold text-white">Plant Layout Generator</h1>
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6">
+            {/* Toast Notification */}
+            {toast && (
+                <Toast 
+                    message={toast.message} 
+                    type={toast.type} 
+                    onClose={() => setToast(null)} 
+                />
+            )}
+            
+            {/* Header */}
+            <div className="mb-6">
+                <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
+                    <span className="text-blue-400">🌱</span>
+                    Plant Layout Generator
+                </h1>
+                <p className="text-gray-400">Design and optimize your irrigation system layout</p>
+            </div>
 
+            {/* Error Display */}
             {error && (
-                <div className="mb-4 rounded bg-red-500/10 p-3 text-sm text-red-400">{error}</div>
+                <div className="mb-6 rounded-lg bg-red-500/10 border border-red-500/20 p-4 text-red-400 flex items-center gap-2">
+                    <span className="text-lg">⚠</span>
+                    <span>{error}</span>
+                </div>
             )}
 
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+            {/* Progress Bar */}
+            {(isGenerating || isSaving) && (
+                <div className="mb-6">
+                    <ProgressBar 
+                        progress={progress} 
+                        label={isGenerating ? 'Generating plant layout...' : 'Saving to database...'} 
+                    />
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
                 <div className="space-y-4 lg:col-span-1">
                     <InfoSection title="Plant Information">
                         <InfoItem title="Basic Details">
@@ -1756,7 +1933,6 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                             </p>
                         </InfoItem>
                     </InfoSection>
-                    Add commentMore actions
                     <InfoSection title="Zoning Configuration">
                         <InfoItem title="Zones">
                             <div className="flex flex-col gap-2">
@@ -1817,14 +1993,6 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                                                 <span>N: {pointsInZone.length}</span>
                                                 <span>•</span>
                                                 <span>W: {totalWaterNeed.toFixed(2)} L/day</span>
-                                                {longestPipeLength > 0 && (
-                                                    <>
-                                                        <span>•</span>
-                                                        <span>
-                                                            L: {longestPipeLength.toFixed(2)}m
-                                                        </span>
-                                                    </>
-                                                )}
                                             </div>
                                             {zone.polygon && (
                                                 <div className="flex items-center gap-2">
@@ -1856,15 +2024,15 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                                         </div>
                                     );
                                 })}
-                                <button
-                                    className={`mt-2 rounded bg-blue-600 px-2 py-1 text-xs text-white ${
-                                        zones.length >= 4 ? 'cursor-not-allowed opacity-50' : ''
-                                    }`}
+                                <ActionButton
                                     onClick={handleAddZone}
                                     disabled={zones.length >= 4 || currentZoneIndex !== null}
+                                    variant={zones.length >= 4 ? 'secondary' : 'primary'}
+                                    size="sm"
+                                    icon="➕"
                                 >
-                                    + Add Zone
-                                </button>
+                                    Add Zone
+                                </ActionButton>
                                 {zones.length >= 4 && (
                                     <span className="text-xs text-gray-400">Max 4 zones</span>
                                 )}
@@ -1877,8 +2045,8 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                             </div>
                         </InfoItem>
                     </InfoSection>
+                    
                     <InfoSection title="Valve Configuration">
-                        Add commentMore actions
                         <InfoItem title="Valve Count">
                             <div className="flex flex-col gap-2">
                                 <div className="flex items-center justify-between rounded bg-gray-800 p-2">
@@ -1935,71 +2103,11 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                             </div>
                         </InfoItem>
                     </InfoSection>
-                    <InfoSection title="Pipe Configuration">
-                        <InfoItem title="Pipe Summary">
-                            {pipeSummary ? (
-                                <div className="flex flex-col gap-2">
-                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
-                                        <span className="text-white font-medium">Total Pipes</span>
-                                        <span className="text-white font-medium">{pipeSummary.total_pipes}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
-                                        <span className="text-white font-medium">Total Length</span>
-                                        <span className="text-white font-medium">{pipeSummary.total_length.toFixed(2)} m</span>
-                                    </div>
-                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
-                                        <span className="text-white font-medium">Total Water Flow</span>
-                                        <span className="text-white font-medium">{pipeSummary.total_water_flow.toFixed(2)} L/day</span>
-                                    </div>
-                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
-                                        <span className="text-white font-medium">Plants Served</span>
-                                        <span className="text-white font-medium">{pipeSummary.total_plants_served}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
-                                        <span className="text-white font-medium">Avg Pipe Diameter</span>
-                                        <span className="text-white font-medium">{pipeSummary.average_pipe_diameter.toFixed(0)} mm</span>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="text-gray-400 text-sm">Generate pipe layout to see statistics</div>
-                            )}
-                        </InfoItem>
-                        <InfoItem title="Zone Pipe Details">
-                            <div className="flex flex-col gap-2">
-                                {zoneStats.map((stat) => {
-                                    const zone = zones.find(z => z.id === stat.zone_id);
-                                    return (
-                                        <div key={stat.zone_id} className="p-2 rounded bg-gray-800">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <span style={{ 
-                                                    background: zone?.color || '#666', 
-                                                    width: 12, 
-                                                    height: 12, 
-                                                    display: 'inline-block', 
-                                                    borderRadius: 2 
-                                                }}></span>
-                                                <span className="text-white font-medium">{zone?.name || `Zone ${stat.zone_id}`}</span>
-                                                <span className="text-gray-400 text-xs">({stat.pipe_direction})</span>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-1 text-xs text-gray-300">
-                                                <span>Pipes: {stat.total_pipes}</span>
-                                                <span>Length: {stat.total_length.toFixed(1)}m</span>
-                                                <span>Flow: {stat.total_water_flow.toFixed(1)} L/day</span>
-                                                <span>Plants: {stat.plants_served}</span>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                                {zoneStats.length === 0 && (
-                                    <div className="text-gray-400 text-sm">No zone statistics available</div>
-                                )}
-                            </div>
-                        </InfoItem>
-                    </InfoSection>
+
                 </div>
 
                 <div className="space-y-4 lg:col-span-3">
-                    <div className="h-[900px] w-full overflow-hidden rounded-lg border border-gray-700">
+                    <div className="h-[600px] md:h-[700px] lg:h-[900px] w-full overflow-hidden rounded-xl border border-gray-700/50 shadow-2xl bg-gray-800/20 backdrop-blur-sm">
                         <MapContainer
                             center={mapCenter}
                             zoom={18}
@@ -2280,125 +2388,236 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                             {pipeLayout.length > 0 && <PipeLegend />}
                         </MapContainer>
                     </div>
-                    <div className="mt-4 flex flex-col gap-2">
-                        <div className="grid grid-cols-5 gap-2">
-                            <button
-                                className={`rounded px-6 py-2 text-white transition-colors duration-200 ${
-                                    drawingPipeType === 'main'
-                                        ? 'bg-red-600'
-                                        : 'bg-red-500 hover:bg-red-600'
-                                }`}
-                                onClick={() =>
-                                    setDrawingPipeType(drawingPipeType === 'main' ? null : 'main')
-                                }
-                                disabled={
-                                    drawingPipeType === 'submain' ||
-                                    selectedValveType !== null ||
-                                    selectedPumpType
-                                }
+                    <div className="mt-6 flex flex-col gap-4">
+                        {/* Action Buttons Row */}
+                        <div className="flex items-center justify-between gap-4">
+                            {/* Left side - Pipe and Valve buttons grouped together */}
+                            <div className="flex gap-2">
+                                <Tooltip content="Draw main water supply pipes">
+                                    <ActionButton
+                                        onClick={() => {
+                                            if (drawingPipeType === 'main') {
+                                                setDrawingPipeType(null);
+                                            } else {
+                                                setDrawingPipeType('main');
+                                                setSelectedValveType(null);
+                                                setSelectedPumpType(false);
+                                            }
+                                        }}
+                                        variant={drawingPipeType === 'main' ? 'danger' : 'secondary'}
+                                        icon="🔴"
+                                    >
+                                        {drawingPipeType === 'main' ? 'Drawing...' : 'Main Pipe'}
+                                    </ActionButton>
+                                </Tooltip>
+                                
+                                <Tooltip content="Draw sub-main distribution pipes">
+                                    <ActionButton
+                                        onClick={() => {
+                                            if (drawingPipeType === 'submain') {
+                                                setDrawingPipeType(null);
+                                            } else {
+                                                setDrawingPipeType('submain');
+                                                setSelectedValveType(null);
+                                                setSelectedPumpType(false);
+                                            }
+                                        }}
+                                        variant={drawingPipeType === 'submain' ? 'warning' : 'secondary'}
+                                        icon="🟠"
+                                    >
+                                        {drawingPipeType === 'submain' ? 'Drawing...' : 'Sub-Main'}
+                                    </ActionButton>
+                                </Tooltip>
+                                
+                                <Tooltip content="Add solenoid valve for zone control">
+                                    <ActionButton
+                                        onClick={() => {
+                                            if (selectedValveType === 'solenoid') {
+                                                setSelectedValveType(null);
+                                            } else {
+                                                setSelectedValveType('solenoid');
+                                                setDrawingPipeType(null);
+                                                setSelectedPumpType(false);
+                                            }
+                                        }}
+                                        variant={selectedValveType === 'solenoid' ? 'success' : 'secondary'}
+                                        icon="🔌"
+                                    >
+                                        {selectedValveType === 'solenoid' ? 'Placing...' : 'Solenoid'}
+                                    </ActionButton>
+                                </Tooltip>
+                                
+                                <Tooltip content="Add ball valve for manual control">
+                                    <ActionButton
+                                        onClick={() => {
+                                            if (selectedValveType === 'ball') {
+                                                setSelectedValveType(null);
+                                            } else {
+                                                setSelectedValveType('ball');
+                                                setDrawingPipeType(null);
+                                                setSelectedPumpType(false);
+                                            }
+                                        }}
+                                        variant={selectedValveType === 'ball' ? 'success' : 'secondary'}
+                                        icon="🔵"
+                                    >
+                                        {selectedValveType === 'ball' ? 'Placing...' : 'Ball Valve'}
+                                    </ActionButton>
+                                </Tooltip>
+                                
+                                <Tooltip content="Add water pump">
+                                    <ActionButton
+                                        onClick={() => {
+                                            if (selectedPumpType) {
+                                                setSelectedPumpType(false);
+                                            } else {
+                                                setSelectedPumpType(true);
+                                                setDrawingPipeType(null);
+                                                setSelectedValveType(null);
+                                            }
+                                        }}
+                                        variant={selectedPumpType ? 'primary' : 'secondary'}
+                                        icon="💧"
+                                    >
+                                        {selectedPumpType ? 'Placing...' : 'Pump'}
+                                    </ActionButton>
+                                </Tooltip>
+                            </div>
+                            
+                            {/* Right side - Generate Pipe Layout Button */}
+                            <ActionButton
+                                onClick={handleGeneratePipeLayout}
+                                disabled={isLoading || zones.filter(zone => zone.polygon).length === 0}
+                                loading={isLoading}
+                                variant="primary"
+                                size="lg"
+                                icon="⚡"
                             >
-                                {drawingPipeType === 'main'
-                                    ? 'Drawing Main Pipe...'
-                                    : 'Draw Main Pipe'}
-                            </button>
-                            <button
-                                className={`rounded px-6 py-2 text-white transition-colors duration-200 ${
-                                    drawingPipeType === 'submain'
-                                        ? 'bg-orange-600'
-                                        : 'bg-orange-500 hover:bg-orange-600'
-                                }`}
-                                onClick={() =>
-                                    setDrawingPipeType(
-                                        drawingPipeType === 'submain' ? null : 'submain'
-                                    )
-                                }
-                                disabled={
-                                    drawingPipeType === 'main' ||
-                                    selectedValveType !== null ||
-                                    selectedPumpType
-                                }
-                            >
-                                {drawingPipeType === 'submain'
-                                    ? 'Drawing Sub-Main Pipe...'
-                                    : 'Draw Sub-Main Pipe'}
-                            </button>
-                            <button
-                                className={`rounded px-6 py-2 text-white transition-colors duration-200 ${
-                                    selectedValveType === 'solenoid'
-                                        ? 'bg-purple-600'
-                                        : 'bg-purple-500 hover:bg-purple-600'
-                                }`}
-                                onClick={() => handleValveTypeSelect('solenoid')}
-                                disabled={drawingPipeType !== null || selectedPumpType}
-                            >
-                                {selectedValveType === 'solenoid'
-                                    ? 'Placing Solenoid Valve...'
-                                    : 'Add Solenoid Valve'}
-                            </button>
-                            <button
-                                className={`rounded px-6 py-2 text-white transition-colors duration-200 ${
-                                    selectedValveType === 'ball'
-                                        ? 'bg-indigo-600'
-                                        : 'bg-indigo-500 hover:bg-indigo-600'
-                                }`}
-                                onClick={() => handleValveTypeSelect('ball')}
-                                disabled={drawingPipeType !== null || selectedPumpType}
-                            >
-                                {selectedValveType === 'ball'
-                                    ? 'Placing Ball Valve...'
-                                    : 'Add Ball Valve'}
-                            </button>
-                            <button
-                                className={`rounded px-6 py-2 text-white transition-colors duration-200 ${
-                                    selectedPumpType
-                                        ? 'bg-blue-600'
-                                        : 'bg-blue-500 hover:bg-blue-600'
-                                }`}
-                                onClick={handlePumpTypeSelect}
-                                disabled={drawingPipeType !== null || selectedValveType !== null}
-                            >
-                                {selectedPumpType ? 'Placing Pump...' : 'Add Pump'}
-                            </button>
+                                {isLoading ? 'Generating...' : 'Generate Pipe Layout'}
+                            </ActionButton>
                         </div>
-                        <button
-                            onClick={handleGeneratePipeLayout}
-                            disabled={isLoading || !isPlantLayoutGenerated || zones.length === 0}
-                            className="rounded bg-blue-600 px-6 py-2 text-white transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-700"
-                        >
-                            {isLoading ? 'Generating...' : 'Generate Pipe Layout'}
-                        </button>
-                        {zones.length === 0 && (
-                            <div className="text-sm text-yellow-400 text-center">
-                                Create at least one zone to generate pipe layout
+                        
+                        {/* Status Messages and Pipe Configuration */}
+                        <div>
+                            <div className="flex flex-col items-center gap-2">
+                                {zones.length === 0 && (
+                                    <div className="text-sm text-yellow-400 text-center flex items-center gap-1">
+                                        <span>⚠</span>
+                                        <span>Create at least one zone to generate pipe layout</span>
+                                    </div>
+                                )}
+                                {zones.length > 0 && zones.filter(zone => zone.polygon).length === 0 && (
+                                    <div className="text-sm text-yellow-400 text-center flex items-center gap-1">
+                                        <span>⚠</span>
+                                        <span>Draw polygon for your zone(s) to generate pipe layout</span>
+                                    </div>
+                                )}
+                                {zones.filter(zone => zone.polygon).length > 0 && !isPlantLayoutGenerated && (
+                                    <div className="text-sm text-blue-400 text-center flex items-center gap-1">
+                                        <span>ℹ</span>
+                                        <span>Ready to generate pipe layout for {zones.filter(zone => zone.polygon).length} zone{zones.filter(zone => zone.polygon).length > 1 ? 's' : ''}</span>
+                                    </div>
+                                )}
+                                {pipeLayout.length > 0 && (
+                                    <div className="text-sm text-green-400 text-center flex items-center gap-1">
+                                        <span>✓</span>
+                                        <span>Pipe layout generated successfully</span>
+                                    </div>
+                                )}
                             </div>
-                        )}
-                        {pipeLayout.length > 0 && (
-                            <div className="text-sm text-green-400 text-center">
-                                ✓ Pipe layout generated successfully
-                            </div>
-                        )}
+
+                            <InfoSection title="Pipe Configuration">
+                                <div className="flex flex-col md:flex-row gap-4">
+                                    <div className="flex-1 min-w-0">
+                                        <InfoItem title="Pipe Summary">
+                                            {pipeSummary ? (
+                                                <div className="flex flex-col gap-2">
+                                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
+                                                        <span className="text-white font-medium">Total Pipes</span>
+                                                        <span className="text-white font-medium">{pipeSummary.total_pipes}</span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
+                                                        <span className="text-white font-medium">Total Length</span>
+                                                        <span className="text-white font-medium">{pipeSummary.total_length.toFixed(2)} m</span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
+                                                        <span className="text-white font-medium">Total Water Flow</span>
+                                                        <span className="text-white font-medium">{pipeSummary.total_water_flow.toFixed(2)} L/day</span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
+                                                        <span className="text-white font-medium">Plants Served</span>
+                                                        <span className="text-white font-medium">{pipeSummary.total_plants_served}</span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
+                                                        <span className="text-white font-medium">Avg Pipe Diameter</span>
+                                                        <span className="text-white font-medium">{pipeSummary.average_pipe_diameter.toFixed(0)} mm</span>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="text-gray-400 text-sm">Generate pipe layout to see statistics</div>
+                                            )}
+                                        </InfoItem>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <InfoItem title="Zone Pipe Details">
+                                            <div className="flex flex-col gap-2">
+                                                {zoneStats.map((stat) => {
+                                                    const zone = zones.find(z => z.id === stat.zone_id);
+                                                    return (
+                                                        <div key={stat.zone_id} className="p-2 rounded bg-gray-800">
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <span style={{ 
+                                                                    background: zone?.color || '#666', 
+                                                                    width: 12, 
+                                                                    height: 12, 
+                                                                    display: 'inline-block', 
+                                                                    borderRadius: 2 
+                                                                }}></span>
+                                                                <span className="text-white font-medium">{zone?.name || `Zone ${stat.zone_id}`}</span>
+                                                                <span className="text-gray-400 text-xs">({stat.pipe_direction})</span>
+                                                            </div>
+                                                            <div className="grid grid-cols-2 gap-1 text-xs text-gray-300">
+                                                                <span>Pipes: {stat.total_pipes}</span>
+                                                                <span>Length: {stat.total_length.toFixed(1)}m</span>
+                                                                <span>Flow: {stat.total_water_flow.toFixed(1)} L/day</span>
+                                                                <span>Plants: {stat.plants_served}</span>
+                                                                <span>Longest: {Math.max(...pipeLayout.filter(pipe => pipe.zone_id === stat.zone_id).map(pipe => pipe.length)).toFixed(1)}m</span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                                {zoneStats.length === 0 && (
+                                                    <div className="text-gray-400 text-sm">No zone statistics available</div>
+                                                )}
+                                            </div>
+                                        </InfoItem>
+                                    </div>
+                                </div>
+                            </InfoSection>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div className="mt-6 flex items-center justify-between">
-                <button
+            <div className="mt-8 flex items-center justify-between bg-gray-800/30 rounded-xl p-6 border border-gray-700/50">
+                <ActionButton
                     onClick={() => router.get('/', {}, { preserveState: true })}
-                    className="rounded bg-gray-700 px-6 py-2 text-white transition-colors duration-200 hover:bg-gray-600"
+                    variant="secondary"
+                    icon="←"
                 >
                     Back to Home
-                </button>
+                </ActionButton>
+                
                 <div className="flex gap-3">
-                                            <button
-                            onClick={handleSaveToDatabase}
-                            disabled={!isPlantLayoutGenerated || pipeLayout.length === 0}
-                            className={`rounded px-6 py-2 text-white transition-colors duration-200
-                                ${!isPlantLayoutGenerated || pipeLayout.length === 0
-                                    ? 'bg-gray-700 cursor-not-allowed'
-                                    : 'bg-green-600 hover:bg-green-700'}`}
-                        >
-                            {isLoading ? 'Saving...' : (existingFieldId ? 'Update Field' : 'Save to Database')}
-                        </button>
+                    <ActionButton
+                        onClick={handleSaveToDatabase}
+                        disabled={!isPlantLayoutGenerated || pipeLayout.length === 0}
+                        loading={isSaving}
+                        variant={!isPlantLayoutGenerated || pipeLayout.length === 0 ? 'secondary' : 'success'}
+                        icon="💾"
+                    >
+                        {isSaving ? 'Saving...' : (existingFieldId ? 'Update Field' : 'Save to Database')}
+                    </ActionButton>
                 </div>
             </div>
 
