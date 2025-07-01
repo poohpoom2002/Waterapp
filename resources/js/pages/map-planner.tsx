@@ -552,7 +552,10 @@ export default function MapPlanner() {
     };
 
     // Update handleBack function
-
+    const handleBack = () => {
+        // Navigate back to homepage
+        router.visit('/');
+    };
 
     const resetToDefault = () => {
         if (selectedPlant) {
@@ -879,7 +882,13 @@ export default function MapPlanner() {
                     </div>
                 </div>
             </div>
-            <div className="mt-4 flex justify-end">
+            <div className="mt-4 flex justify-between">
+                <button
+                    onClick={handleBack}
+                    className="rounded bg-gray-600 px-6 py-3 text-white transition-colors duration-200 hover:bg-gray-700"
+                >
+                    Back to Home
+                </button>
                 <button
                     onClick={handleNext}
                     disabled={layers.length === 0 || !selectedPlantCategory || !selectedPlant}
