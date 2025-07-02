@@ -1665,7 +1665,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                 polygon_coordinates: zone.polygon ? zone.polygon.map(([lat, lng]) => ({ lat, lng })) : [],
                 color: zone.color,
                 pipe_direction: zone.pipeDirection
-            }));
+            })).filter(zone => zone.polygon_coordinates.length > 0); // Only include zones with polygons
 
             setProgress(40);
 
@@ -1751,13 +1751,40 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                 pipes: pipesData
             };
 
+            // Debug logging
+            console.log('Sending request data:', requestData);
+
+            // Validate required data
+            if (!currentArea || currentArea.length < 3) {
+                throw new Error('Invalid area: Must have at least 3 coordinates');
+            }
+            if (!currentPlantType || !currentPlantType.id) {
+                throw new Error('Invalid plant type');
+            }
+            if (!plantLocations || plantLocations.length === 0) {
+                throw new Error('No planting points available');
+            }
+            if (!pipeLayout || pipeLayout.length === 0) {
+                throw new Error('No pipe layout available');
+            }
+
             let response;
             if (existingFieldId) {
                 // Update existing field
-                response = await axios.put(`/api/fields/${existingFieldId}`, requestData);
+                response = await axios.put(`/api/fields/${existingFieldId}`, requestData, {
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                        'Content-Type': 'application/json',
+                    }
+                });
             } else {
                 // Create new field
-                response = await axios.post('/api/save-field', requestData);
+                response = await axios.post('/api/save-field', requestData, {
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                        'Content-Type': 'application/json',
+                    }
+                });
             }
 
             setProgress(100);
@@ -1776,8 +1803,9 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
 
         } catch (error) {
             console.error('Error saving field:', error);
+            console.error('Error response:', axios.isAxiosError(error) ? error.response?.data : 'Not an axios error');
             const errorMessage = axios.isAxiosError(error) 
-                ? error.response?.data?.message || error.message || 'Error saving field'
+                ? error.response?.data?.message || error.response?.data?.error || error.message || 'Error saving field'
                 : 'An unexpected error occurred';
             setError(errorMessage);
             setToast({ message: errorMessage, type: 'error' });

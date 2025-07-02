@@ -23,8 +23,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/api/plant-points/move', [FarmController::class, 'movePlantPoint'])->name('plant-points.move');
     Route::post('/api/save-field', [FarmController::class, 'saveField'])->name('save-field');
     Route::get('/api/fields', [FarmController::class, 'getFields'])->name('get-fields');
-    Route::put('/api/fields/{field}', [FarmController::class, 'updateField'])->name('update-field');
-    Route::delete('/api/fields/{field}', [FarmController::class, 'deleteField'])->name('delete-field');
+    Route::put('/api/fields/{fieldId}', [FarmController::class, 'updateField'])->name('update-field');
+    Route::delete('/api/fields/{fieldId}', [FarmController::class, 'deleteField'])->name('delete-field');
 });
 
 require __DIR__.'/settings.php';
