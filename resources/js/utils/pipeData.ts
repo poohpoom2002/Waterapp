@@ -1,3 +1,4 @@
+// resources/js/utils/pipeData.ts
 import { router } from '@inertiajs/react';
 
 export interface PipeLengthData {

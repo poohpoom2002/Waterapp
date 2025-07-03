@@ -1,3 +1,4 @@
+// resources/js/utils/farmData.ts
 import { router } from '@inertiajs/react';
 
 export interface FarmData {
