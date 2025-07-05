@@ -1273,6 +1273,7 @@ class FarmController extends Controller
     {
         try {
             \Log::info('Starting field save with request data:', [
+                'user_id' => auth()->id(),
                 'field_name' => $request->field_name,
                 'plant_type_id' => $request->plant_type_id,
                 'zones_count' => count($request->zones ?? []),

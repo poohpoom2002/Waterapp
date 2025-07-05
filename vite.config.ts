@@ -7,6 +7,7 @@ export default defineConfig({
     plugins: [
         laravel({
             input: [
+                'resources/css/app.css',
                 'resources/js/app.tsx',
                 'resources/js/pages/mapplanner.tsx',
                 'resources/js/pages/generatetree.tsx',
