@@ -36,10 +36,10 @@ const ChatBox = () => {
     };
 
     return (
-        <div className="mx-auto max-w-xl p-6">
+        <div className="mx-auto h-[200px] w-[500px] p-6">
             <h2 className="mb-4 text-xl font-bold">สอบถามข้อมูลเพิ่มเติม (เป็นการตอบกลับจาก AI)</h2>
 
-            <div className="h-[400px] space-y-4 overflow-y-auto rounded border border-gray-300 bg-white p-4">
+            <div className="h-[300px] space-y-4 overflow-y-auto rounded border border-gray-300 bg-white p-4">
                 {chatHistory.map((msg, index) => (
                     <div
                         key={index}

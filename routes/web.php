@@ -1,5 +1,5 @@
 <?php
-
+// routes\web.php
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\FarmController;
@@ -28,6 +28,27 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Main Farm Planner Routes
     Route::get('planner', [FarmController::class, 'planner'])->name('planner');
     Route::get('generate-tree', [FarmController::class, 'generateTree'])->name('generateTree');
+    
+    // Horticulture Irrigation System Routes (ระบบชลประทานสวนผลไม้)
+    Route::prefix('horticulture')->name('horticulture.')->group(function () {
+        // หน้าวางแผนระบบน้ำสวนผลไม้
+        Route::get('planner', function () {
+            return Inertia::render('HorticulturePlannerPage');
+        })->name('planner');
+        
+        // หน้าแสดงผลลัพธ์ระบบน้ำสวนผลไม้
+        Route::get('results', function () {
+            return Inertia::render('HorticultureResultsPage');
+        })->name('results');
+    });
+
+    // Legacy routes for backward compatibility
+    Route::get('horticulture-planner', function () {
+        return redirect()->route('horticulture.planner');
+    });
+    Route::get('horticulture-results', function () {
+        return redirect()->route('horticulture.results');
+    });
 
     // Equipment & Product Page Routes
     Route::get('product', function () {
@@ -66,6 +87,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     // =======================================================
 
+    // Field Management Routes
     Route::post('/api/save-field', [FarmController::class, 'saveField'])->name('save-field');
     Route::get('/api/fields', [FarmController::class, 'getFields'])->name('get-fields');
     Route::put('/api/fields/{field}', [FarmController::class, 'updateField'])->name('update-field');

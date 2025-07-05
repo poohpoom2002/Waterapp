@@ -8,6 +8,12 @@ import { router } from '@inertiajs/react';
 import L from 'leaflet';
 import { LeafletMouseEvent } from 'leaflet';
 import { usePipeLengthData } from '../utils/pipeData';
+import HorticultureIrrigationSystem from './HorticultureIrrigationSystem';
+import { 
+    HorticultureIrrigationData, 
+    PlantData as HorticulturePlantData, 
+    ExclusionArea 
+} from '../utils/horticultureIrrigationData';
 
 // TypesMore actions
 type LatLng = {
