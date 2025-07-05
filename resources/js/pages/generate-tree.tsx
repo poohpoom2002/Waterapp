@@ -1,6 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { MapContainer, TileLayer, CircleMarker, Polygon, useMap, FeatureGroup, LayersControl, Polyline, Circle } from 'react-leaflet';
+import {
+    MapContainer,
+    TileLayer,
+    CircleMarker,
+    Polygon,
+    useMap,
+    FeatureGroup,
+    LayersControl,
+    Polyline,
+    Marker,
+} from 'react-leaflet';
 import { EditControl } from 'react-leaflet-draw';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
@@ -14,6 +24,143 @@ import {
     PlantData as HorticulturePlantData, 
     ExclusionArea 
 } from '../utils/horticultureIrrigationData';
+
+// Fix for default markers in react-leaflet
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+// Create pump icon with custom image (replace with your pump image URL)
+const createPumpIconWithImage = (imageUrl: string = '/generateTree/wtpump.png') => {
+    return L.icon({
+        iconUrl: imageUrl,
+        iconSize: [48, 48],
+        iconAnchor: [24, 24],
+        popupAnchor: [0, -24],
+    });
+};
+
+// Create valve icons with custom images
+const createSolenoidValveIconWithImage = (imageUrl: string = '/generateTree/solv.png') => {
+    return L.icon({
+        iconUrl: imageUrl,
+        iconSize: [48, 48],
+        iconAnchor: [24, 24],
+        popupAnchor: [0, -24],
+    });
+};
+
+const createBallValveIconWithImage = (imageUrl: string = '/generateTree/ballv.png') => {
+    return L.icon({
+        iconUrl: imageUrl,
+        iconSize: [48, 48],
+        iconAnchor: [24, 24],
+        popupAnchor: [0, -24],
+    });
+};
+
+const pumpIcon = createPumpIconWithImage('/generateTree/wtpump.png');
+const solenoidValveIcon = createSolenoidValveIconWithImage('/generateTree/solv.png');
+const ballValveIcon = createBallValveIconWithImage('/generateTree/ballv.png');
+
+// Loading Spinner Component
+const LoadingSpinner = ({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) => {
+    const sizeClasses = {
+        sm: 'w-4 h-4',
+        md: 'w-6 h-6',
+        lg: 'w-8 h-8'
+    };
+    
+    return (
+        <div className={`${sizeClasses[size]} animate-spin rounded-full border-2 border-gray-300 border-t-blue-600`}></div>
+    );
+};
+
+// Success/Error Toast Component
+const Toast = ({ message, type, onClose }: { message: string; type: 'success' | 'error' | 'warning'; onClose: () => void }) => {
+    const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-yellow-500';
+    const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : '⚠';
+    
+    return (
+        <div className={`fixed top-4 right-4 z-50 ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-slide-in`}>
+            <span className="font-bold">{icon}</span>
+            <span>{message}</span>
+            <button onClick={onClose} className="ml-2 hover:opacity-75">✕</button>
+        </div>
+    );
+};
+
+// Progress Bar Component
+const ProgressBar = ({ progress, label }: { progress: number; label: string }) => (
+    <div className="w-full bg-gray-700 rounded-full h-2 mb-2">
+        <div 
+            className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+            style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+        ></div>
+        <div className="text-xs text-gray-400 mt-1">{label}</div>
+    </div>
+);
+
+// Enhanced Button Component
+const ActionButton = ({ 
+    onClick, 
+    disabled, 
+    loading, 
+    variant = 'primary', 
+    size = 'md',
+    icon,
+    children 
+}: { 
+    onClick: () => void; 
+    disabled?: boolean; 
+    loading?: boolean;
+    variant?: 'primary' | 'secondary' | 'success' | 'danger' | 'warning';
+    size?: 'sm' | 'md' | 'lg';
+    icon?: string;
+    children: React.ReactNode;
+}) => {
+    const baseClasses = 'rounded font-medium transition-all duration-200 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50 hover:shadow-md active:scale-95';
+    
+    const variantClasses = {
+        primary: 'bg-blue-600 hover:bg-blue-700 text-white',
+        secondary: 'bg-gray-600 hover:bg-gray-700 text-white',
+        success: 'bg-green-600 hover:bg-green-700 text-white',
+        danger: 'bg-red-600 hover:bg-red-700 text-white',
+        warning: 'bg-yellow-600 hover:bg-yellow-700 text-white'
+    };
+    
+    const sizeClasses = {
+        sm: 'px-3 py-1.5 text-sm',
+        md: 'px-4 py-2 text-sm',
+        lg: 'px-6 py-3 text-base'
+    };
+    
+    return (
+        <button
+            onClick={onClick}
+            disabled={disabled || loading}
+            className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]}`}
+        >
+            {loading && <LoadingSpinner size="sm" />}
+            {icon && !loading && <span>{icon}</span>}
+            {children}
+        </button>
+    );
+};
+
+// Tooltip Component
+const Tooltip = ({ content, children }: { content: string; children: React.ReactNode }) => (
+    <div className="group relative inline-block">
+        {children}
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+            {content}
+            <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+        </div>
+    </div>
+);
 
 // TypesMore actions
 type LatLng = {
@@ -133,11 +280,11 @@ type PipeAnalysis = {
 const DEFAULT_CENTER: [number, number] = [13.7563, 100.5018];
 
 const AREA_COLORS: Record<string, string> = {
-    river: '#3B82F6',    // Blue
-    field: '#22C55E',    // Green
+    river: '#3B82F6', // Blue
+    field: '#22C55E', // Green
     powerplant: '#EF4444', // Red
-    building: '#F59E0B',  // Yellow
-    pump: '#1E40AF',      // Dark Blue
+    building: '#F59E0B', // Yellow
+    pump: '#1E40AF', // Dark Blue
     custompolygon: '#4B5563', // Black Gray
     solarcell: '#FFD600', // Bright Yellow
 };
@@ -150,12 +297,15 @@ const calculateAreaInRai = (coordinates: LatLng[]): number => {
 
     const toMeters = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
         const R = 6371000;
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLng = (lng2 - lng1) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                 Math.sin(dLng/2) * Math.sin(dLng/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const dLat = ((lat2 - lat1) * Math.PI) / 180;
+        const dLng = ((lng2 - lng1) * Math.PI) / 180;
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos((lat1 * Math.PI) / 180) *
+                Math.cos((lat2 * Math.PI) / 180) *
+                Math.sin(dLng / 2) *
+                Math.sin(dLng / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return R * c;
     };
 
@@ -167,44 +317,59 @@ const calculateAreaInRai = (coordinates: LatLng[]): number => {
     }
     area = Math.abs(area) / 2;
 
-    const areaInSquareMeters = area * 111000 * 111000 * Math.cos(coordinates[0].lat * Math.PI / 180);
+    const areaInSquareMeters =
+        area * 111000 * 111000 * Math.cos((coordinates[0].lat * Math.PI) / 180);
     return areaInSquareMeters / 1600;
 };
 
-const isPointInPolygon = (lat: number, lng: number, polygon: { lat: number; lng: number }[]): boolean => {
+const isPointInPolygon = (
+    lat: number,
+    lng: number,
+    polygon: { lat: number; lng: number }[]
+): boolean => {
     let inside = false;
     for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const xi = polygon[i].lat, yi = polygon[i].lng;
-        const xj = polygon[j].lat, yj = polygon[j].lng;
-        const intersect = ((yi > lng) !== (yj > lng)) &&
-            (lat < (xj - xi) * (lng - yi) / (yj - yi + 0.0000001) + xi);
+        const xi = polygon[i].lat,
+            yi = polygon[i].lng;
+        const xj = polygon[j].lat,
+            yj = polygon[j].lng;
+        const intersect =
+            yi > lng !== yj > lng && lat < ((xj - xi) * (lng - yi)) / (yj - yi + 0.0000001) + xi;
         if (intersect) inside = !inside;
     }
     return inside;
 };
 
-const findNearestGridPoint = (lat: number, lng: number, plantType: PlantType, area: LatLng[]): [number, number] => {
+const findNearestGridPoint = (
+    lat: number,
+    lng: number,
+    plantType: PlantType,
+    area: LatLng[]
+): [number, number] => {
     const plantSpacing = plantType.plant_spacing;
     const rowSpacing = plantType.row_spacing;
     const padding = rowSpacing / 2;
 
-    const bounds = area.reduce((acc, point) => ({
-        minLat: Math.min(acc.minLat, point.lat),
-        maxLat: Math.max(acc.maxLat, point.lat),
-        minLng: Math.min(acc.minLng, point.lng),
-        maxLng: Math.max(acc.maxLng, point.lng)
-    }), {
-        minLat: area[0].lat,
-        maxLat: area[0].lat,
-        minLng: area[0].lng,
-        maxLng: area[0].lng
-    });
+    const bounds = area.reduce(
+        (acc, point) => ({
+            minLat: Math.min(acc.minLat, point.lat),
+            maxLat: Math.max(acc.maxLat, point.lat),
+            minLng: Math.min(acc.minLng, point.lng),
+            maxLng: Math.max(acc.maxLng, point.lng),
+        }),
+        {
+            minLat: area[0].lat,
+            maxLat: area[0].lat,
+            minLng: area[0].lng,
+            maxLng: area[0].lng,
+        }
+    );
 
     const paddedBounds = {
-        minLat: bounds.minLat + (padding / 111000),
-        maxLat: bounds.maxLat - (padding / 111000),
-        minLng: bounds.minLng + (padding / (111000 * Math.cos(bounds.minLat * Math.PI / 180))),
-        maxLng: bounds.maxLng - (padding / (111000 * Math.cos(bounds.minLat * Math.PI / 180)))
+        minLat: bounds.minLat + padding / 111000,
+        maxLat: bounds.maxLat - padding / 111000,
+        minLng: bounds.minLng + padding / (111000 * Math.cos((bounds.minLat * Math.PI) / 180)),
+        maxLng: bounds.maxLng - padding / (111000 * Math.cos((bounds.minLat * Math.PI) / 180)),
     };
 
     const latPoints: number[] = [];
@@ -213,7 +378,11 @@ const findNearestGridPoint = (lat: number, lng: number, plantType: PlantType, ar
     for (let lat = paddedBounds.minLat; lat <= paddedBounds.maxLat; lat += rowSpacing / 111000) {
         latPoints.push(lat);
     }
-    for (let lng = paddedBounds.minLng; lng <= paddedBounds.maxLng; lng += plantSpacing / (111000 * Math.cos(bounds.minLat * Math.PI / 180))) {
+    for (
+        let lng = paddedBounds.minLng;
+        lng <= paddedBounds.maxLng;
+        lng += plantSpacing / (111000 * Math.cos((bounds.minLat * Math.PI) / 180))
+    ) {
         lngPoints.push(lng);
     }
 
@@ -223,10 +392,7 @@ const findNearestGridPoint = (lat: number, lng: number, plantType: PlantType, ar
 
     for (const gridLat of latPoints) {
         for (const gridLng of lngPoints) {
-            const distance = Math.sqrt(
-                Math.pow(lat - gridLat, 2) + 
-                Math.pow(lng - gridLng, 2)
-            );
+            const distance = Math.sqrt(Math.pow(lat - gridLat, 2) + Math.pow(lng - gridLng, 2));
             if (distance < minDistance) {
                 minDistance = distance;
                 nearestLat = gridLat;
@@ -244,12 +410,15 @@ const polylineLength = (coords: [number, number][]): number => {
         const [lat1, lng1] = coords[i - 1];
         const [lat2, lng2] = coords[i];
         const R = 6371000;
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLng = (lng2 - lng1) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-            Math.sin(dLng/2) * Math.sin(dLng/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const dLat = ((lat2 - lat1) * Math.PI) / 180;
+        const dLng = ((lng2 - lng1) * Math.PI) / 180;
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos((lat1 * Math.PI) / 180) *
+                Math.cos((lat2 * Math.PI) / 180) *
+                Math.sin(dLng / 2) *
+                Math.sin(dLng / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         total += R * c;
     }
     return total;
@@ -280,11 +449,12 @@ const MapBounds = ({ positions }: { positions: LatLng[] }) => {
 };
 
 const InfoSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="rounded-lg bg-gray-800 p-4 mb-4">
-        <h3 className="mb-6 text-xl font-semibold text-white">{title}</h3>
-        <div className="space-y-6 text-sm text-gray-300">
-            {children}
-        </div>
+    <div className="mb-4 rounded-xl bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 p-6 shadow-lg hover:shadow-xl transition-all duration-300">
+        <h3 className="mb-6 text-xl font-semibold text-white flex items-center gap-2">
+            <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+            {title}
+        </h3>
+        <div className="space-y-6 text-sm text-gray-300">{children}</div>
     </div>
 );
 
@@ -353,8 +523,8 @@ const MapDragHandler = ({ isDragging, editMode, selectedPoints }: {
     return null;
 };
 
-const PointManagementControls = ({ 
-    plantLocations, 
+const PointManagementControls = ({
+    plantLocations,
     setPlantLocations,
     area,
     plantType,
@@ -372,7 +542,10 @@ const PointManagementControls = ({
 }) => {
     const map = useMap();
     const [selectedPoints, setSelectedPoints] = useState<Set<string>>(new Set());
-    const [movingPoint, setMovingPoint] = useState<{ id: string; position: [number, number] } | null>(null);
+    const [movingPoint, setMovingPoint] = useState<{
+        id: string;
+        position: [number, number];
+    } | null>(null);
     const [history, setHistory] = useState<LatLng[][]>([]);
     const [historyIndex, setHistoryIndex] = useState(-1);
     const [deletePolygon, setDeletePolygon] = useState<[number, number][] | null>(null);
@@ -387,12 +560,12 @@ const PointManagementControls = ({
 
     // Add function to save state to history
     const saveToHistory = (newLocations: LatLng[]) => {
-        setHistory(prev => {
+        setHistory((prev) => {
             const newHistory = prev.slice(0, historyIndex + 1);
             newHistory.push(newLocations);
             return newHistory;
         });
-        setHistoryIndex(prev => prev + 1);
+        setHistoryIndex((prev) => prev + 1);
     };
 
     // Add undo function
@@ -439,7 +612,7 @@ const PointManagementControls = ({
         event.originalEvent?.stopPropagation();
 
         if (editMode === 'select') {
-            setSelectedPoints(prev => {
+            setSelectedPoints((prev) => {
                 const newSet = new Set(prev);
                 if (newSet.has(pointId)) {
                     newSet.delete(pointId);
@@ -449,12 +622,12 @@ const PointManagementControls = ({
                 return newSet;
             });
         } else if (editMode === 'delete') {
-            const pointIndex = plantLocations.findIndex(p => p.id === pointId);
+            const pointIndex = plantLocations.findIndex((p) => p.id === pointId);
             if (pointIndex !== -1) {
                 const newLocations = plantLocations.filter((_, index) => index !== pointIndex);
                 saveToHistory(newLocations);
                 setPlantLocations(newLocations);
-                setSelectedPoints(prev => {
+                setSelectedPoints((prev) => {
                     const newSet = new Set(prev);
                     newSet.delete(pointId);
                     return newSet;
@@ -474,14 +647,16 @@ const PointManagementControls = ({
 
             // Only update if the point is inside the area
             if (isPointInPolygon(nearestLat, nearestLng, area)) {
-                setMovingPoint(prev => prev ? { ...prev, position: [nearestLat, nearestLng] } : null);
+                setMovingPoint((prev) =>
+                    prev ? { ...prev, position: [nearestLat, nearestLng] } : null
+                );
             }
         }
     };
 
     const handleMouseUp = () => {
         if (movingPoint) {
-            const newLocations = plantLocations.map(p => 
+            const newLocations = plantLocations.map((p) =>
                 p.id === movingPoint.id
                     ? { ...p, lat: movingPoint.position[0], lng: movingPoint.position[1] }
                     : p
@@ -494,15 +669,15 @@ const PointManagementControls = ({
 
     return (
         <>
-            <div className="absolute top-4 left-[60px] z-[1000] bg-white p-2 rounded-lg shadow-lg">
+            <div className="absolute left-[60px] top-4 z-[1000] rounded-lg bg-white p-2 shadow-lg">
                 <div className="flex flex-col space-y-2">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="mb-2 flex items-center justify-between">
                         <h3 className="font-medium text-gray-700">Edit Points</h3>
                         <div className="flex space-x-2">
                             {editMode && (
                                 <button
                                     onClick={handleCancel}
-                                    className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors text-sm"
+                                    className="rounded bg-gray-500 px-3 py-1 text-sm text-white transition-colors hover:bg-gray-600"
                                 >
                                     Cancel
                                 </button>
@@ -581,9 +756,8 @@ const PointManagementControls = ({
                 const pointId = point.id || `point-${plantLocations.indexOf(point)}`;
                 const isSelected = selectedPoints.has(pointId);
                 const isMoving = movingPoint?.id === pointId;
-                const position: [number, number] = isMoving && movingPoint
-                    ? movingPoint.position
-                    : [point.lat, point.lng];
+                const position: [number, number] =
+                    isMoving && movingPoint ? movingPoint.position : [point.lat, point.lng];
                 return (
                     <CircleMarker
                         key={pointId}
@@ -606,10 +780,10 @@ const PointManagementControls = ({
                                     mouseEvent.originalEvent?.stopPropagation();
                                     setMovingPoint({
                                         id: pointId,
-                                        position: [point.lat, point.lng]
+                                        position: [point.lat, point.lng],
                                     });
                                 }
-                            }
+                            },
                         }}
                     />
                 );
@@ -628,23 +802,23 @@ const MapLayers = ({ layers = [] }: { layers?: Props['layers'] }) => (
                 building: { color: '#F59E0B', fillOpacity: 0.3 },
                 pump: { color: '#1E40AF', fillOpacity: 0.3 },
                 custompolygon: { color: '#4B5563', fillOpacity: 0.3 },
-                solarcell: { color: '#FFD600', fillOpacity: 0.3 }
+                solarcell: { color: '#FFD600', fillOpacity: 0.3 },
             };
 
-            const style = layer.isInitialMap 
+            const style = layer.isInitialMap
                 ? { color: '#90EE90', fillColor: '#90EE90', fillOpacity: 0.3, weight: 2 }
                 : {
-                    ...styleMap[layer.type] || styleMap.custompolygon,
-                    fillColor: styleMap[layer.type]?.color || styleMap.custompolygon.color
-                };
+                      ...(styleMap[layer.type] || styleMap.custompolygon),
+                      fillColor: styleMap[layer.type]?.color || styleMap.custompolygon.color,
+                  };
 
             return (
                 <Polygon
                     key={`layer-${index}`}
-                    positions={layer.coordinates.map(coord => [coord.lat, coord.lng])}
+                    positions={layer.coordinates.map((coord) => [coord.lat, coord.lng])}
                     pathOptions={{
                         ...style,
-                        weight: 2
+                        weight: 2,
                     }}
                 />
             );
@@ -654,7 +828,7 @@ const MapLayers = ({ layers = [] }: { layers?: Props['layers'] }) => (
 
 const ZonePolygons = ({ zones }: { zones: Zone[] }) => (
     <>
-        {zones.map((zone) => (
+        {zones.map((zone) =>
             zone.polygon ? (
                 <Polygon
                     key={zone.id}
@@ -662,7 +836,7 @@ const ZonePolygons = ({ zones }: { zones: Zone[] }) => (
                     pathOptions={{ color: zone.color, weight: 2, fillOpacity: 0.2 }}
                 />
             ) : null
-        ))}
+        )}
     </>
 );
 
@@ -704,8 +878,11 @@ const PlantPoints = ({ plantLocations, getPointColor, selectedPoints, movingGrou
     </>
 );
 
-const PipeLayouts = ({ pipeLayout, getPipeColor }: { 
-    pipeLayout: PipeLayout[]; 
+const PipeLayouts = ({
+    pipeLayout,
+    getPipeColor,
+}: {
+    pipeLayout: PipeLayout[];
     getPipeColor: (pipe: PipeLayout) => string;
 }) => (
     <FeatureGroup>
@@ -747,7 +924,7 @@ const PipeLayouts = ({ pipeLayout, getPipeColor }: {
 
 const UserPipes = ({ userPipes }: { userPipes: UserPipe[] }) => (
     <>
-        {userPipes.map(pipe => (
+        {userPipes.map((pipe) => (
             <Polyline
                 key={pipe.id}
                 positions={pipe.coordinates}
@@ -763,28 +940,27 @@ const UserPipes = ({ userPipes }: { userPipes: UserPipe[] }) => (
 const isPointInZonePolygon = (lat: number, lng: number, polygon: [number, number][]): boolean => {
     let inside = false;
     for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const xi = polygon[i][0], yi = polygon[i][1];
-        const xj = polygon[j][0], yj = polygon[j][1];
-        const intersect = ((yi > lng) !== (yj > lng)) &&
-            (lat < (xj - xi) * (lng - yi) / (yj - yi + 0.0000001) + xi);
+        const xi = polygon[i][0],
+            yi = polygon[i][1];
+        const xj = polygon[j][0],
+            yj = polygon[j][1];
+        const intersect =
+            yi > lng !== yj > lng && lat < ((xj - xi) * (lng - yi)) / (yj - yi + 0.0000001) + xi;
         if (intersect) inside = !inside;
     }
     return inside;
 };
 
-// Add this utility function after the existing utility functions
-const createTrianglePoints = (center: [number, number], size: number = 0.00003): [number, number][] => {
-    const [lat, lng] = center;
-    return [
-        [lat + size, lng], // Bottom point
-        [lat - size/2, lng - size], // Top left
-        [lat - size/2, lng + size], // Top right
-    ];
-};
+
 
 // Add after the existing utility functions
-const ValveUndoRedoControl = ({ onUndo, onRedo, canUndo, canRedo }: { 
-    onUndo: () => void; 
+const ValveUndoRedoControl = ({
+    onUndo,
+    onRedo,
+    canUndo,
+    canRedo,
+}: {
+    onUndo: () => void;
     onRedo: () => void;
     canUndo: boolean;
     canRedo: boolean;
@@ -1016,7 +1192,9 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
     const [selectedPumpType, setSelectedPumpType] = useState<boolean>(false);
     const [draggingPump, setDraggingPump] = useState<Pump | null>(null);
     // Combined equipment history
-    const [equipmentHistory, setEquipmentHistory] = useState<EquipmentState[]>([{ valves: [], pumps: [] }]);
+    const [equipmentHistory, setEquipmentHistory] = useState<EquipmentState[]>([
+        { valves: [], pumps: [] },
+    ]);
     const [equipmentHistoryIndex, setEquipmentHistoryIndex] = useState(0);
     // Add edit mode state
     const [editMode, setEditMode] = useState<'select' | 'add' | 'addPolygon' | 'selectPolygon' | 'delete' | 'deletePolygon' | null>(null);
@@ -1026,15 +1204,24 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
     // Add selected points state for moving functionality
     const [selectedPoints, setSelectedPoints] = useState<Set<string>>(new Set());
     const [movingGroup, setMovingGroup] = useState<{ points: LatLng[]; offset: [number, number] } | null>(null);
+    
+    // Enhanced UI states
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+    const [progress, setProgress] = useState(0);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     // Memoized values
     const areaInRai = useMemo(() => calculateAreaInRai(area), [area]);
-    const processedPlantType = useMemo(() => ({
-        ...plantType,
-        plant_spacing: Number(plantType.plant_spacing),
-        row_spacing: Number(plantType.row_spacing),
-        water_needed: Number(plantType.water_needed)
-    }), [plantType]);
+    const processedPlantType = useMemo(
+        () => ({
+            ...plantType,
+            plant_spacing: Number(plantType.plant_spacing),
+            row_spacing: Number(plantType.row_spacing),
+            water_needed: Number(plantType.water_needed),
+        }),
+        [plantType]
+    );
 
     const totalPlants = useMemo(() => plantLocations.length, [plantLocations]);
 
@@ -1052,15 +1239,17 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
         const newPoint: LatLng = {
             lat: latlng.lat,
             lng: latlng.lng,
-            id: `point-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+            id: `point-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         };
-        setPlantLocations(prev => [...prev, newPoint]);
+        setPlantLocations((prev) => [...prev, newPoint]);
     };
 
     // Handlers
     const handleGenerate = async () => {
         setIsLoading(true);
+        setIsGenerating(true);
         setError(null);
+        setProgress(0);
 
         try {
             // Use props directly since we're using URL parameters consistently
@@ -1075,6 +1264,8 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
             console.log('Sending layers to API:', currentLayers);
             console.log('Exclusion layers (non-initial map):', currentLayers.filter(layer => !layer.isInitialMap));
             
+            setProgress(30);
+            
             const { data } = await axios.post<{ plant_locations: LatLng[][] }>(
                 '/api/generate-planting-points',
                 {
@@ -1085,13 +1276,15 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                     area_types: areaTypes,
                     layers: currentLayers.map(layer => ({
                         ...layer,
-                        coordinates: layer.coordinates.map(coord => ({
+                        coordinates: layer.coordinates.map((coord) => ({
                             lat: Number(coord.lat),
-                            lng: Number(coord.lng)
-                        }))
-                    }))
+                            lng: Number(coord.lng),
+                        })),
+                    })),
                 }
             );
+
+            setProgress(80);
 
             if (!data?.plant_locations) {
                 throw new Error('Invalid response format from server');
@@ -1099,19 +1292,25 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
 
             const flattenedPoints = data.plant_locations.flat().map((point, index) => ({
                 ...point,
-                id: `point-${index}`
+                id: `point-${index}`,
             }));
             setPlantLocations(flattenedPoints);
             setGrid(data.plant_locations);
             setIsPlantLayoutGenerated(true);
+            
+            setProgress(100);
+            setToast({ message: `Generated ${flattenedPoints.length} planting points successfully!`, type: 'success' });
         } catch (error) {
             console.error('Error details:', error);
-            setError(axios.isAxiosError(error) 
+            const errorMessage = axios.isAxiosError(error)
                 ? error.response?.data?.message || error.message || 'Error generating points'
-                : 'An unexpected error occurred'
-            );
+                : 'An unexpected error occurred';
+            setError(errorMessage);
+            setToast({ message: errorMessage, type: 'error' });
         } finally {
             setIsLoading(false);
+            setIsGenerating(false);
+            setProgress(0);
         }
     };
 
@@ -1120,37 +1319,52 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
 
         try {
             setIsLoading(true);
+            setProgress(0);
+            
             const requestData = {
                 plant_type_id: plantType.id,
                 area: area,
-                zones: zones.map(zone => {
-                    const zonePoints = plantLocations.filter(point => 
-                        zone.polygon && isPointInPolygon(
-                            point.lat, 
-                            point.lng, 
-                            zone.polygon.map(([lat, lng]) => ({ lat, lng }))
-                        )
+                zones: zones.map((zone) => {
+                    const zonePoints = plantLocations.filter(
+                        (point) =>
+                            zone.polygon &&
+                            isPointInPolygon(
+                                point.lat,
+                                point.lng,
+                                zone.polygon.map(([lat, lng]) => ({ lat, lng }))
+                            )
                     );
                     return {
                         id: zone.id,
                         pipeDirection: zone.pipeDirection,
-                        points: zonePoints
+                        points: zonePoints,
                     };
                 }).filter(zone => zone.points.length > 0) // Only include zones with points
             };
 
+            setProgress(40);
             const response = await axios.post('/api/generate-pipe-layout', requestData);
+            
+            setProgress(80);
             setPipeLayout(response.data.pipe_layout);
             setZoneStats(response.data.zone_stats || []);
             setPipeSummary(response.data.summary || null);
             setPipeAnalysis(response.data.pipe_analysis || []);
             
+            setProgress(100);
+            setToast({ 
+                message: `Generated pipe layout with ${response.data.pipe_layout.length} pipes successfully!`, 
+                type: 'success' 
+            });
+            
             console.log('Pipe generation response:', response.data);
         } catch (error) {
             console.error('Error generating pipe layout:', error);
-            alert('Failed to generate pipe layout');
+            const errorMessage = 'Failed to generate pipe layout';
+            setToast({ message: errorMessage, type: 'error' });
         } finally {
             setIsLoading(false);
+            setProgress(0);
         }
     };
 
@@ -1161,16 +1375,16 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
             name: `Zone ${zones.length + 1}`,
             color: ZONE_COLORS[zones.length],
             polygon: null,
-            pipeDirection: 'horizontal'
+            pipeDirection: 'horizontal',
         };
         setZones([...zones, newZone]);
         setCurrentZoneIndex(zones.length);
     };
 
     const handleDeleteZone = (zoneId: number) => {
-        setZones(prevZones => prevZones.filter(zone => zone.id !== zoneId));
+        setZones((prevZones) => prevZones.filter((zone) => zone.id !== zoneId));
         if (currentZoneIndex !== null) {
-            const deletedZoneIndex = zones.findIndex(zone => zone.id === zoneId);
+            const deletedZoneIndex = zones.findIndex((zone) => zone.id === zoneId);
             if (deletedZoneIndex === currentZoneIndex) {
                 setCurrentZoneIndex(null);
             } else if (deletedZoneIndex < currentZoneIndex) {
@@ -1180,11 +1394,9 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
     };
 
     const handlePipeDirectionChange = (zoneId: number, direction: 'horizontal' | 'vertical') => {
-        setZones(prevZones => 
-            prevZones.map(zone => 
-                zone.id === zoneId 
-                    ? { ...zone, pipeDirection: direction }
-                    : zone
+        setZones((prevZones) =>
+            prevZones.map((zone) =>
+                zone.id === zoneId ? { ...zone, pipeDirection: direction } : zone
             )
         );
     };
@@ -1200,21 +1412,24 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
     };
 
     const getPipeColor = (pipe: PipeLayout) => {
-        const zone = zones.find(z => z.id === pipe.zone_id);
+        const zone = zones.find((z) => z.id === pipe.zone_id);
         return zone?.pipeDirection === 'horizontal' ? '#3B82F6' : '#10B981';
     };
 
     const handleUserPipeCreated = (e: any) => {
         if (drawingPipeType && e.layerType === 'polyline' && e.layer instanceof L.Polyline) {
             const latlngs: L.LatLng[] = flattenLatLngs(e.layer.getLatLngs());
-            const coordinates: [number, number][] = latlngs.map(latlng => [latlng.lat, latlng.lng]);
-            setUserPipes(prev => [
+            const coordinates: [number, number][] = latlngs.map((latlng) => [
+                latlng.lat,
+                latlng.lng,
+            ]);
+            setUserPipes((prev) => [
                 ...prev,
                 {
                     id: `userpipe-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                     type: drawingPipeType,
-                    coordinates
-                }
+                    coordinates,
+                },
             ]);
             setDrawingPipeType(null);
         }
@@ -1225,20 +1440,23 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
         layers.eachLayer((layer: any) => {
             if (layer instanceof L.Polyline) {
                 const latlngs: L.LatLng[] = flattenLatLngs(layer.getLatLngs());
-                setUserPipes(prev => prev.filter(pipe => {
-                    if (pipe.coordinates.length !== latlngs.length) return true;
-                    for (let i = 0; i < latlngs.length; i++) {
-                        if (Math.abs(pipe.coordinates[i][0] - latlngs[i].lat) > 1e-8 || 
-                            Math.abs(pipe.coordinates[i][1] - latlngs[i].lng) > 1e-8) {
-                            return true;
+                setUserPipes((prev) =>
+                    prev.filter((pipe) => {
+                        if (pipe.coordinates.length !== latlngs.length) return true;
+                        for (let i = 0; i < latlngs.length; i++) {
+                            if (
+                                Math.abs(pipe.coordinates[i][0] - latlngs[i].lat) > 1e-8 ||
+                                Math.abs(pipe.coordinates[i][1] - latlngs[i].lng) > 1e-8
+                            ) {
+                                return true;
+                            }
                         }
-                    }
-                    return false;
-                }));
+                        return false;
+                    })
+                );
             }
         });
     };
-
 
 
     // Add after the existing handlers
@@ -1258,10 +1476,8 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
 
     const handleValveDragEnd = (position: [number, number]) => {
         if (draggingValve) {
-            const newValves = valves.map(v => 
-                v.id === draggingValve.id 
-                    ? { ...v, position } 
-                    : v
+            const newValves = valves.map((v) =>
+                v.id === draggingValve.id ? { ...v, position } : v
             );
             saveEquipmentToHistory({ valves: newValves, pumps: pumps });
             setValves(newValves);
@@ -1275,11 +1491,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
 
     const handlePumpDragEnd = (position: [number, number]) => {
         if (draggingPump) {
-            const newPumps = pumps.map(p => 
-                p.id === draggingPump.id 
-                    ? { ...p, position } 
-                    : p
-            );
+            const newPumps = pumps.map((p) => (p.id === draggingPump.id ? { ...p, position } : p));
             saveEquipmentToHistory({ valves: valves, pumps: newPumps });
             setPumps(newPumps);
             setDraggingPump(null);
@@ -1291,7 +1503,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
             const newValve: Valve = {
                 id: `valve-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                 type: selectedValveType,
-                position: [e.latlng.lat, e.latlng.lng]
+                position: [e.latlng.lat, e.latlng.lng],
             };
             const newValves = [...valves, newValve];
             saveEquipmentToHistory({ valves: newValves, pumps: pumps });
@@ -1301,7 +1513,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
             const newPump: Pump = {
                 id: `pump-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                 position: [e.latlng.lat, e.latlng.lng],
-                radius: 4 // Reduced from 100 to 50 meters
+                radius: 4, // Reduced from 100 to 50 meters
             };
             const newPumps = [...pumps, newPump];
             saveEquipmentToHistory({ valves: valves, pumps: newPumps });
@@ -1328,12 +1540,12 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
     };
 
     const saveEquipmentToHistory = (newEquipment: EquipmentState) => {
-        setEquipmentHistory(prev => {
+        setEquipmentHistory((prev) => {
             const newHistory = prev.slice(0, equipmentHistoryIndex + 1);
             newHistory.push(newEquipment);
             return newHistory;
         });
-        setEquipmentHistoryIndex(prev => prev + 1);
+        setEquipmentHistoryIndex((prev) => prev + 1);
     };
 
     const handleValveUndo = () => {
@@ -1440,14 +1652,17 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
     const handleSaveToDatabase = async () => {
         if (!isPlantLayoutGenerated || pipeLayout.length === 0) return;
 
-        setIsLoading(true);
+        setIsSaving(true);
         setError(null);
+        setProgress(0);
 
         try {
             // Use props directly since we're using URL parameters consistently
             const currentArea = area;
             const currentPlantType = processedPlantType;
             const currentLayers = layers;
+
+            setProgress(20);
 
             // Prepare zones data
             const zonesData = zones.map(zone => ({
@@ -1456,7 +1671,9 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                 polygon_coordinates: zone.polygon ? zone.polygon.map(([lat, lng]) => ({ lat, lng })) : [],
                 color: zone.color,
                 pipe_direction: zone.pipeDirection
-            }));
+            })).filter(zone => zone.polygon_coordinates.length > 0); // Only include zones with polygons
+
+            setProgress(40);
 
             // Prepare planting points data
             const plantingPointsData = plantLocations.map(point => {
@@ -1478,6 +1695,8 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                     zone_id: zoneId
                 };
             });
+
+            setProgress(60);
 
             // Prepare pipes data
             const pipesData = pipeLayout.map(pipe => ({
@@ -1515,6 +1734,8 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                 });
             });
 
+            setProgress(80);
+
             // Prepare layers data
             const layersData = currentLayers.map(layer => ({
                 type: layer.type,
@@ -1536,30 +1757,67 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                 pipes: pipesData
             };
 
+            // Debug logging
+            console.log('Sending request data:', requestData);
+
+            // Validate required data
+            if (!currentArea || currentArea.length < 3) {
+                throw new Error('Invalid area: Must have at least 3 coordinates');
+            }
+            if (!currentPlantType || !currentPlantType.id) {
+                throw new Error('Invalid plant type');
+            }
+            if (!plantLocations || plantLocations.length === 0) {
+                throw new Error('No planting points available');
+            }
+            if (!pipeLayout || pipeLayout.length === 0) {
+                throw new Error('No pipe layout available');
+            }
+
             let response;
             if (existingFieldId) {
                 // Update existing field
-                response = await axios.put(`/api/fields/${existingFieldId}`, requestData);
+                response = await axios.put(`/api/fields/${existingFieldId}`, requestData, {
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                        'Content-Type': 'application/json',
+                    }
+                });
             } else {
                 // Create new field
-                response = await axios.post('/api/save-field', requestData);
+                response = await axios.post('/api/save-field', requestData, {
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                        'Content-Type': 'application/json',
+                    }
+                });
             }
 
+            setProgress(100);
+
             if (response.data.success) {
-                alert('Field saved successfully to database!');
-                router.visit('/');
+                setToast({ 
+                    message: existingFieldId ? 'Field updated successfully!' : 'Field saved successfully to database!', 
+                    type: 'success' 
+                });
+                setTimeout(() => {
+                    router.visit('/');
+                }, 2000);
             } else {
                 throw new Error('Failed to save field');
             }
 
         } catch (error) {
             console.error('Error saving field:', error);
-            setError(axios.isAxiosError(error) 
-                ? error.response?.data?.message || error.message || 'Error saving field'
-                : 'An unexpected error occurred'
-            );
+            console.error('Error response:', axios.isAxiosError(error) ? error.response?.data : 'Not an axios error');
+            const errorMessage = axios.isAxiosError(error) 
+                ? error.response?.data?.message || error.response?.data?.error || error.message || 'Error saving field'
+                : 'An unexpected error occurred';
+            setError(errorMessage);
+            setToast({ message: errorMessage, type: 'error' });
         } finally {
-            setIsLoading(false);
+            setIsSaving(false);
+            setProgress(0);
         }
     };
 
@@ -1577,8 +1835,14 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
         console.log('Area:', area);
         console.log('Plant Type:', plantType);
         console.log('Layers:', layers);
-        console.log('Initial Map Layer:', layers.find(layer => layer.isInitialMap));
-        console.log('Other Layers:', layers.filter(layer => !layer.isInitialMap));
+        console.log(
+            'Initial Map Layer:',
+            layers.find((layer) => layer.isInitialMap)
+        );
+        console.log(
+            'Other Layers:',
+            layers.filter((layer) => !layer.isInitialMap)
+        );
         console.log('Total Layers:', layers.length);
         console.log('--------------------------------');
     }, []);
@@ -1597,7 +1861,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
         generatePoints();
     }, [area, processedPlantType, layers]);
 
-    useEffect(()=> {
+    useEffect(() => {
         if (pumpLocation) {
             console.log('Pump location received:', pumpLocation);
             console.log('Pump coordinates:', [pumpLocation.lat, pumpLocation.lng]);
@@ -1605,36 +1869,88 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
     }, [pumpLocation]);
 
     useEffect(() => {
-        if (equipmentHistory.length === 1 && equipmentHistory[0].valves.length === 0 && equipmentHistory[0].pumps.length === 0 && (valves.length > 0 || pumps.length > 0)) {
-            setEquipmentHistory([{ valves: [], pumps: [] }, { valves: valves, pumps: pumps }]);
+        if (
+            equipmentHistory.length === 1 &&
+            equipmentHistory[0].valves.length === 0 &&
+            equipmentHistory[0].pumps.length === 0 &&
+            (valves.length > 0 || pumps.length > 0)
+        ) {
+            setEquipmentHistory([
+                { valves: [], pumps: [] },
+                { valves: valves, pumps: pumps },
+            ]);
             setEquipmentHistoryIndex(1);
         }
     }, [valves, pumps]);
 
     return (
-        <div className="min-h-screen bg-gray-900 p-6">
-            <h1 className="mb-4 text-xl font-bold text-white">Plant Layout Generator</h1>
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6">
+            {/* Toast Notification */}
+            {toast && (
+                <Toast 
+                    message={toast.message} 
+                    type={toast.type} 
+                    onClose={() => setToast(null)} 
+                />
+            )}
+            
+            {/* Header */}
+            <div className="mb-6">
+                <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
+                    <span className="text-blue-400">🌱</span>
+                    Plant Layout Generator
+                </h1>
+                <p className="text-gray-400">Design and optimize your irrigation system layout</p>
+            </div>
 
+            {/* Error Display */}
             {error && (
-                <div className="mb-4 rounded bg-red-500/10 p-3 text-sm text-red-400">{error}</div>
+                <div className="mb-6 rounded-lg bg-red-500/10 border border-red-500/20 p-4 text-red-400 flex items-center gap-2">
+                    <span className="text-lg">⚠</span>
+                    <span>{error}</span>
+                </div>
             )}
 
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+            {/* Progress Bar */}
+            {(isGenerating || isSaving) && (
+                <div className="mb-6">
+                    <ProgressBar 
+                        progress={progress} 
+                        label={isGenerating ? 'Generating plant layout...' : 'Saving to database...'} 
+                    />
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
                 <div className="space-y-4 lg:col-span-1">
                     <InfoSection title="Plant Information">
                         <InfoItem title="Basic Details">
-                            <p><span className="font-medium">Plant Category:</span> {processedPlantType.name}</p>
-                            <p><span className="font-medium">Plant Selection:</span> {processedPlantType.type}</p>
+                            <p>
+                                <span className="font-medium">Plant Category:</span>{' '}
+                                {processedPlantType.name}
+                            </p>
+                            <p>
+                                <span className="font-medium">Plant Selection:</span>{' '}
+                                {processedPlantType.type}
+                            </p>
                         </InfoItem>
                         <InfoItem title="Spacing Requirements">
-                            <p><span className="font-medium">Plant Spacing:</span> {processedPlantType.plant_spacing.toFixed(2)}m</p>
-                            <p><span className="font-medium">Row Spacing:</span> {processedPlantType.row_spacing.toFixed(2)}m</p>
+                            <p>
+                                <span className="font-medium">Plant Spacing:</span>{' '}
+                                {processedPlantType.plant_spacing.toFixed(2)}m
+                            </p>
+                            <p>
+                                <span className="font-medium">Row Spacing:</span>{' '}
+                                {processedPlantType.row_spacing.toFixed(2)}m
+                            </p>
                         </InfoItem>
                         <InfoItem title="Water Requirements">
-                            <p><span className="font-medium">Daily Water Need:</span> {processedPlantType.water_needed.toFixed(2)}L/day</p>
+                            <p>
+                                <span className="font-medium">Daily Water Need:</span>{' '}
+                                {processedPlantType.water_needed.toFixed(2)}L/day
+                            </p>
                         </InfoItem>
                     </InfoSection>
-
                     <InfoSection title="Area Information">
                         <InfoItem title="Area Size (A)">
                             <p>{areaInRai.toFixed(2)} rai</p>
@@ -1643,42 +1959,63 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                             <p>{plantLocations.length} plants</p>
                         </InfoItem>
                         <InfoItem title="Total Water Need (W)">
-                            <p>{(plantLocations.length * processedPlantType.water_needed).toFixed(2)} L/day</p>
+                            <p>
+                                {(plantLocations.length * processedPlantType.water_needed).toFixed(
+                                    2
+                                )}{' '}
+                                L/day
+                            </p>
                         </InfoItem>
-                        </InfoSection>Add commentMore actions
-                        <InfoSection title="Zoning Configuration">
+                    </InfoSection>
+                    <InfoSection title="Zoning Configuration">
                         <InfoItem title="Zones">
                             <div className="flex flex-col gap-2">
                                 {zones.map((zone, idx) => {
-                                    const pointsInZone = plantLocations.filter(point => 
-                                        zone.polygon && isPointInZonePolygon(point.lat, point.lng, zone.polygon)
+                                    const pointsInZone = plantLocations.filter(
+                                        (point) =>
+                                            zone.polygon &&
+                                            isPointInZonePolygon(point.lat, point.lng, zone.polygon)
                                     );
-                                    const zoneArea = zone.polygon ? 
-                                        calculateAreaInRai(zone.polygon.map(([lat, lng]) => ({ lat, lng }))) : 0;
-                                    const totalWaterNeed = pointsInZone.length * processedPlantType.water_needed;
+                                    const zoneArea = zone.polygon
+                                        ? calculateAreaInRai(
+                                              zone.polygon.map(([lat, lng]) => ({ lat, lng }))
+                                          )
+                                        : 0;
+                                    const totalWaterNeed =
+                                        pointsInZone.length * processedPlantType.water_needed;
 
                                     // Calculate longest pipe length for this zone
-                                    const zonePipes = pipeLayout.filter(pipe => pipe.zone_id === zone.id);
-                                    const longestPipeLength = zonePipes.length > 0 
-                                        ? Math.max(...zonePipes.map(pipe => pipe.length))
-                                        : 0;
+                                    const zonePipes = pipeLayout.filter(
+                                        (pipe) => pipe.zone_id === zone.id
+                                    );
+                                    const longestPipeLength =
+                                        zonePipes.length > 0
+                                            ? Math.max(...zonePipes.map((pipe) => pipe.length))
+                                            : 0;
 
                                     return (
-                                        <div key={zone.id} className="flex flex-col gap-2 p-2 rounded bg-gray-800">
+                                        <div
+                                            key={zone.id}
+                                            className="flex flex-col gap-2 rounded bg-gray-800 p-2"
+                                        >
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
-                                                    <span style={{ 
-                                                        background: zone.color, 
-                                                        width: 16, 
-                                                        height: 16, 
-                                                        display: 'inline-block', 
-                                                        borderRadius: 4 
-                                                    }}></span>
-                                                    <span className="text-white font-medium">{zone.name}</span>
+                                                    <span
+                                                        style={{
+                                                            background: zone.color,
+                                                            width: 16,
+                                                            height: 16,
+                                                            display: 'inline-block',
+                                                            borderRadius: 4,
+                                                        }}
+                                                    ></span>
+                                                    <span className="font-medium text-white">
+                                                        {zone.name}
+                                                    </span>
                                                 </div>
                                                 <button
                                                     onClick={() => handleDeleteZone(zone.id)}
-                                                    className="px-2 py-1 text-xs text-red-400 hover:text-red-300 transition-colors"
+                                                    className="px-2 py-1 text-xs text-red-400 transition-colors hover:text-red-300"
                                                     disabled={currentZoneIndex !== null}
                                                 >
                                                     Delete
@@ -1690,164 +2027,121 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                                                 <span>N: {pointsInZone.length}</span>
                                                 <span>•</span>
                                                 <span>W: {totalWaterNeed.toFixed(2)} L/day</span>
-                                                {longestPipeLength > 0 && (
-                                                    <>
-                                                        <span>•</span>
-                                                        <span>L: {longestPipeLength.toFixed(2)}m</span>
-                                                    </>
-                                                )}
                                             </div>
                                             {zone.polygon && (
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-sm text-gray-300">Pipe Direction:</span>
+                                                    <span className="text-sm text-gray-300">
+                                                        Pipe Direction:
+                                                    </span>
                                                     <select
                                                         value={zone.pipeDirection}
-                                                        onChange={(e) => handlePipeDirectionChange(zone.id, e.target.value as 'horizontal' | 'vertical')}
-                                                        className="px-2 py-1 text-sm bg-gray-700 text-white rounded border border-gray-600 focus:outline-none focus:border-blue-500"
+                                                        onChange={(e) =>
+                                                            handlePipeDirectionChange(
+                                                                zone.id,
+                                                                e.target.value as
+                                                                    | 'horizontal'
+                                                                    | 'vertical'
+                                                            )
+                                                        }
+                                                        className="rounded border border-gray-600 bg-gray-700 px-2 py-1 text-sm text-white focus:border-blue-500 focus:outline-none"
                                                         disabled={currentZoneIndex !== null}
                                                     >
-                                                        <option value="horizontal">Horizontal (Width)</option>
-                                                        <option value="vertical">Vertical (Height)</option>
+                                                        <option value="horizontal">
+                                                            Horizontal (Width)
+                                                        </option>
+                                                        <option value="vertical">
+                                                            Vertical (Height)
+                                                        </option>
                                                     </select>
                                                 </div>
                                             )}
                                         </div>
                                     );
                                 })}
-                                <button
-                                    className={`mt-2 px-2 py-1 rounded bg-blue-600 text-white text-xs ${
-                                        zones.length >= 4 ? 'opacity-50 cursor-not-allowed' : ''
-                                    }`}
+                                <ActionButton
                                     onClick={handleAddZone}
                                     disabled={zones.length >= 4 || currentZoneIndex !== null}
+                                    variant={zones.length >= 4 ? 'secondary' : 'primary'}
+                                    size="sm"
+                                    icon="➕"
                                 >
-                                    + Add Zone
-                                </button>
-                                {zones.length >= 4 && <span className="text-xs text-gray-400">Max 4 zones</span>}
-                                {currentZoneIndex !== null && 
+                                    Add Zone
+                                </ActionButton>
+                                {zones.length >= 4 && (
+                                    <span className="text-xs text-gray-400">Max 4 zones</span>
+                                )}
+                                {currentZoneIndex !== null && (
                                     <span className="text-xs text-yellow-400">
                                         Draw polygon for {zones[currentZoneIndex]?.name}
                                     </span>
-                                }More actions
+                                )}
+                                More actions
                             </div>
                         </InfoItem>
                     </InfoSection>
-                    <InfoSection title="Valve Configuration">Add commentMore actions
+                    
+                    <InfoSection title="Valve Configuration">
                         <InfoItem title="Valve Count">
                             <div className="flex flex-col gap-2">
-                                <div className="flex items-center justify-between p-2 rounded bg-gray-800">
+                                <div className="flex items-center justify-between rounded bg-gray-800 p-2">
                                     <div className="flex items-center gap-2">
-                                        <span style={{ 
-                                            background: '#9333EA', 
-                                            width: 16, 
-                                            height: 16, 
-                                            display: 'inline-block', 
-                                            borderRadius: 4 
-                                        }}></span>
-                                        <span className="text-white font-medium">Solenoid Valves</span>
+                                        <span
+                                            style={{
+                                                background: '#9333EA',
+                                                width: 16,
+                                                height: 16,
+                                                display: 'inline-block',
+                                                borderRadius: 4,
+                                            }}
+                                        ></span>
+                                        <span className="font-medium text-white">
+                                            Solenoid Valves
+                                        </span>
                                     </div>
-                                    <span className="text-white font-medium">
-                                        {valves.filter(v => v.type === 'solenoid').length}
+                                    <span className="font-medium text-white">
+                                        {valves.filter((v) => v.type === 'solenoid').length}
                                     </span>
                                 </div>
-                                <div className="flex items-center justify-between p-2 rounded bg-gray-800">
+                                <div className="flex items-center justify-between rounded bg-gray-800 p-2">
                                     <div className="flex items-center gap-2">
-                                        <span style={{ 
-                                            background: '#4F46E5', 
-                                            width: 16, 
-                                            height: 16, 
-                                            display: 'inline-block', 
-                                            borderRadius: 4 
-                                        }}></span>
-                                        <span className="text-white font-medium">Ball Valves</span>
+                                        <span
+                                            style={{
+                                                background: '#4F46E5',
+                                                width: 16,
+                                                height: 16,
+                                                display: 'inline-block',
+                                                borderRadius: 4,
+                                            }}
+                                        ></span>
+                                        <span className="font-medium text-white">Ball Valves</span>
                                     </div>
-                                    <span className="text-white font-medium">
-                                        {valves.filter(v => v.type === 'ball').length}
+                                    <span className="font-medium text-white">
+                                        {valves.filter((v) => v.type === 'ball').length}
                                     </span>
                                 </div>
-                                <div className="flex items-center justify-between p-2 rounded bg-gray-800">
+                                <div className="flex items-center justify-between rounded bg-gray-800 p-2">
                                     <div className="flex items-center gap-2">
-                                        <span style={{ 
-                                            background: '#1E40AF', 
-                                            width: 16, 
-                                            height: 16, 
-                                            display: 'inline-block', 
-                                            borderRadius: 4 
-                                        }}></span>
-                                        <span className="text-white font-medium">Pumps</span>
+                                        <span
+                                            style={{
+                                                background: '#1E40AF',
+                                                width: 16,
+                                                height: 16,
+                                                display: 'inline-block',
+                                                borderRadius: 4,
+                                            }}
+                                        ></span>
+                                        <span className="font-medium text-white">Pumps</span>
                                     </div>
-                                    <span className="text-white font-medium">
-                                        {pumps.length}
-                                    </span>
+                                    <span className="font-medium text-white">{pumps.length}</span>
                                 </div>
                             </div>
                         </InfoItem>
                     </InfoSection>
-                    <InfoSection title="Pipe Configuration">
-                        <InfoItem title="Pipe Summary">
-                            {pipeSummary ? (
-                                <div className="flex flex-col gap-2">
-                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
-                                        <span className="text-white font-medium">Total Pipes</span>
-                                        <span className="text-white font-medium">{pipeSummary.total_pipes}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
-                                        <span className="text-white font-medium">Total Length</span>
-                                        <span className="text-white font-medium">{pipeSummary.total_length.toFixed(2)} m</span>
-                                    </div>
-                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
-                                        <span className="text-white font-medium">Total Water Flow</span>
-                                        <span className="text-white font-medium">{pipeSummary.total_water_flow.toFixed(2)} L/day</span>
-                                    </div>
-                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
-                                        <span className="text-white font-medium">Plants Served</span>
-                                        <span className="text-white font-medium">{pipeSummary.total_plants_served}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
-                                        <span className="text-white font-medium">Avg Pipe Diameter</span>
-                                        <span className="text-white font-medium">{pipeSummary.average_pipe_diameter.toFixed(0)} mm</span>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="text-gray-400 text-sm">Generate pipe layout to see statistics</div>
-                            )}
-                        </InfoItem>
-                        <InfoItem title="Zone Pipe Details">
-                            <div className="flex flex-col gap-2">
-                                {zoneStats.map((stat) => {
-                                    const zone = zones.find(z => z.id === stat.zone_id);
-                                    return (
-                                        <div key={stat.zone_id} className="p-2 rounded bg-gray-800">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <span style={{ 
-                                                    background: zone?.color || '#666', 
-                                                    width: 12, 
-                                                    height: 12, 
-                                                    display: 'inline-block', 
-                                                    borderRadius: 2 
-                                                }}></span>
-                                                <span className="text-white font-medium">{zone?.name || `Zone ${stat.zone_id}`}</span>
-                                                <span className="text-gray-400 text-xs">({stat.pipe_direction})</span>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-1 text-xs text-gray-300">
-                                                <span>Pipes: {stat.total_pipes}</span>
-                                                <span>Length: {stat.total_length.toFixed(1)}m</span>
-                                                <span>Flow: {stat.total_water_flow.toFixed(1)} L/day</span>
-                                                <span>Plants: {stat.plants_served}</span>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                                {zoneStats.length === 0 && (
-                                    <div className="text-gray-400 text-sm">No zone statistics available</div>
-                                )}
-                            </div>
-                        </InfoItem>
-                    </InfoSection>
+
                 </div>
 
                 <div className="space-y-4 lg:col-span-3">
-                    <div className="h-[900px] w-full overflow-hidden rounded-lg border border-gray-700">
+                    <div className="h-[600px] md:h-[700px] lg:h-[900px] w-full overflow-hidden rounded-xl border border-gray-700/50 shadow-2xl bg-gray-800/20 backdrop-blur-sm">
                         <MapContainer
                             center={mapCenter}
                             zoom={18}
@@ -1889,7 +2183,11 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                                     position="topright"
                                     onCreated={(e) => {
                                         // Polygon for zone
-                                        if (currentZoneIndex !== null && e.layerType === 'polygon' && e.layer instanceof L.Polygon) {
+                                        if (
+                                            currentZoneIndex !== null &&
+                                            e.layerType === 'polygon' &&
+                                            e.layer instanceof L.Polygon
+                                        ) {
                                             const layer = e.layer;
                                             const latlngsRaw = layer.getLatLngs();
                                             let latlngs: L.LatLng[] = [];
@@ -1899,9 +2197,20 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                                                 latlngs = latlngsRaw as L.LatLng[];
                                             }
                                             const polygon = latlngs
-                                                .filter((latlng: L.LatLng) => typeof latlng.lat === 'number' && typeof latlng.lng === 'number')
-                                                .map((latlng: L.LatLng) => [latlng.lat, latlng.lng] as [number, number]);
-                                            setZones(prev => prev.map((z, idx) => idx === currentZoneIndex ? { ...z, polygon } : z));
+                                                .filter(
+                                                    (latlng: L.LatLng) =>
+                                                        typeof latlng.lat === 'number' &&
+                                                        typeof latlng.lng === 'number'
+                                                )
+                                                .map(
+                                                    (latlng: L.LatLng) =>
+                                                        [latlng.lat, latlng.lng] as [number, number]
+                                                );
+                                            setZones((prev) =>
+                                                prev.map((z, idx) =>
+                                                    idx === currentZoneIndex ? { ...z, polygon } : z
+                                                )
+                                            );
                                             setCurrentZoneIndex(null);
                                             featureGroupRef.current?.removeLayer(layer);
                                         }
@@ -2000,8 +2309,12 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                                         layers.eachLayer((layer: any) => {
                                             if (layer instanceof L.Marker) {
                                                 const latlng = layer.getLatLng();
-                                                setPlantLocations(prev => 
-                                                    prev.filter(p => p.lat !== latlng.lat || p.lng !== latlng.lng)
+                                                setPlantLocations((prev) =>
+                                                    prev.filter(
+                                                        (p) =>
+                                                            p.lat !== latlng.lat ||
+                                                            p.lng !== latlng.lng
+                                                    )
                                                 );
                                             }
                                         });
@@ -2012,8 +2325,8 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                                         layers.eachLayer((layer: any) => {
                                             if (layer instanceof L.Marker) {
                                                 const latlng = layer.getLatLng();
-                                                setPlantLocations(prev => 
-                                                    prev.map(p => 
+                                                setPlantLocations((prev) =>
+                                                    prev.map((p) =>
                                                         p.lat === latlng.lat && p.lng === latlng.lng
                                                             ? { lat: latlng.lat, lng: latlng.lng }
                                                             : p
@@ -2028,19 +2341,19 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                                         circle: false,
                                         circlemarker: false,
                                         marker: true,
-                                        polyline: drawingPipeType !== null // Only allow polyline when drawing mode is active
+                                        polyline: drawingPipeType !== null, // Only allow polyline when drawing mode is active
                                     }}
                                     edit={{
                                         edit: {
                                             selectedPathOptions: {
-                                                dashArray: '10, 10'
-                                            }
+                                                dashArray: '10, 10',
+                                            },
                                         },
-                                        remove: true
+                                        remove: true,
                                     }}
                                 />
                             </FeatureGroup>
-                            <PointManagementControls 
+                            <PointManagementControls
                                 plantLocations={plantLocations}
                                 setPlantLocations={setPlantLocations}
                                 area={area}
@@ -2051,49 +2364,35 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                             />
 
                             <ZonePolygons zones={zones} />
-                            <PlantPoints 
+                            <PlantPoints
                                 plantLocations={plantLocations}
                                 getPointColor={getPointColor}
                                 selectedPoints={selectedPoints}
                                 movingGroup={movingGroup}
                             />
                             {pipeLayout.length > 0 && (
-                                <PipeLayouts 
-                                    pipeLayout={pipeLayout}
-                                    getPipeColor={getPipeColor}
-                                />
+                                <PipeLayouts pipeLayout={pipeLayout} getPipeColor={getPipeColor} />
                             )}
                             <UserPipes userPipes={userPipes} />
                             {valves.map((valve) => (
-                                <Polygon
+                                <Marker
                                     key={valve.id}
-                                    positions={createTrianglePoints(valve.position)}
-                                    pathOptions={{
-                                        color: valve.type === 'solenoid' ? '#9333EA' : '#4F46E5',
-                                        fillColor: valve.type === 'solenoid' ? '#9333EA' : '#4F46E5',
-                                        fillOpacity: 1,
-                                        weight: 2
-                                    }}
+                                    position={valve.position}
+                                    icon={valve.type === 'solenoid' ? solenoidValveIcon : ballValveIcon}
                                     eventHandlers={{
                                         mousedown: () => handleValveDragStart(valve),
-                                        mouseup: () => setDraggingValve(null)
+                                        mouseup: () => setDraggingValve(null),
                                     }}
                                 />
                             ))}
                             {pumps.map((pump) => (
-                                <Circle
+                                <Marker
                                     key={pump.id}
-                                    center={pump.position}
-                                    radius={pump.radius}
-                                    pathOptions={{ 
-                                        color: '#1E40AF', 
-                                        fillColor: '#1E40AF', 
-                                        fillOpacity: 1,
-                                        weight: 2
-                                    }}
+                                    position={pump.position}
+                                    icon={pumpIcon}
                                     eventHandlers={{
                                         mousedown: () => handlePumpDragStart(pump),
-                                        mouseup: () => setDraggingPump(null)
+                                        mouseup: () => setDraggingPump(null),
                                     }}
                                 />
                             ))}
@@ -2123,106 +2422,238 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                             {pipeLayout.length > 0 && <PipeLegend />}
                         </MapContainer>
                     </div>
-                    <div className="flex flex-col gap-2 mt-4">
-                        <div className="grid grid-cols-5 gap-2">
-                            <button
-                                className={`rounded px-6 py-2 text-white transition-colors duration-200 ${
-                                    drawingPipeType === 'main' 
-                                        ? 'bg-red-600' 
-                                        : 'bg-red-500 hover:bg-red-600'
-                                }`}
-                                onClick={() => setDrawingPipeType(drawingPipeType === 'main' ? null : 'main')}
-                                disabled={drawingPipeType === 'submain' || selectedValveType !== null || selectedPumpType}
+                    <div className="mt-6 flex flex-col gap-4">
+                        {/* Action Buttons Row */}
+                        <div className="flex items-center justify-between gap-4">
+                            {/* Left side - Pipe and Valve buttons grouped together */}
+                            <div className="flex gap-2">
+                                <Tooltip content="Draw main water supply pipes">
+                                    <ActionButton
+                                        onClick={() => {
+                                            if (drawingPipeType === 'main') {
+                                                setDrawingPipeType(null);
+                                            } else {
+                                                setDrawingPipeType('main');
+                                                setSelectedValveType(null);
+                                                setSelectedPumpType(false);
+                                            }
+                                        }}
+                                        variant={drawingPipeType === 'main' ? 'danger' : 'secondary'}
+                                        icon="🔴"
+                                    >
+                                        {drawingPipeType === 'main' ? 'Drawing...' : 'Main Pipe'}
+                                    </ActionButton>
+                                </Tooltip>
+                                
+                                <Tooltip content="Draw sub-main distribution pipes">
+                                    <ActionButton
+                                        onClick={() => {
+                                            if (drawingPipeType === 'submain') {
+                                                setDrawingPipeType(null);
+                                            } else {
+                                                setDrawingPipeType('submain');
+                                                setSelectedValveType(null);
+                                                setSelectedPumpType(false);
+                                            }
+                                        }}
+                                        variant={drawingPipeType === 'submain' ? 'warning' : 'secondary'}
+                                        icon="🟠"
+                                    >
+                                        {drawingPipeType === 'submain' ? 'Drawing...' : 'Sub-Main'}
+                                    </ActionButton>
+                                </Tooltip>
+                                
+                                <Tooltip content="Add solenoid valve for zone control">
+                                    <ActionButton
+                                        onClick={() => {
+                                            if (selectedValveType === 'solenoid') {
+                                                setSelectedValveType(null);
+                                            } else {
+                                                setSelectedValveType('solenoid');
+                                                setDrawingPipeType(null);
+                                                setSelectedPumpType(false);
+                                            }
+                                        }}
+                                        variant={selectedValveType === 'solenoid' ? 'success' : 'secondary'}
+                                        icon="🔌"
+                                    >
+                                        {selectedValveType === 'solenoid' ? 'Placing...' : 'Solenoid'}
+                                    </ActionButton>
+                                </Tooltip>
+                                
+                                <Tooltip content="Add ball valve for manual control">
+                                    <ActionButton
+                                        onClick={() => {
+                                            if (selectedValveType === 'ball') {
+                                                setSelectedValveType(null);
+                                            } else {
+                                                setSelectedValveType('ball');
+                                                setDrawingPipeType(null);
+                                                setSelectedPumpType(false);
+                                            }
+                                        }}
+                                        variant={selectedValveType === 'ball' ? 'success' : 'secondary'}
+                                        icon="🔵"
+                                    >
+                                        {selectedValveType === 'ball' ? 'Placing...' : 'Ball Valve'}
+                                    </ActionButton>
+                                </Tooltip>
+                                
+                                <Tooltip content="Add water pump">
+                                    <ActionButton
+                                        onClick={() => {
+                                            if (selectedPumpType) {
+                                                setSelectedPumpType(false);
+                                            } else {
+                                                setSelectedPumpType(true);
+                                                setDrawingPipeType(null);
+                                                setSelectedValveType(null);
+                                            }
+                                        }}
+                                        variant={selectedPumpType ? 'primary' : 'secondary'}
+                                        icon="💧"
+                                    >
+                                        {selectedPumpType ? 'Placing...' : 'Pump'}
+                                    </ActionButton>
+                                </Tooltip>
+                            </div>
+                            
+                            {/* Right side - Generate Pipe Layout Button */}
+                            <ActionButton
+                                onClick={handleGeneratePipeLayout}
+                                disabled={isLoading || zones.filter(zone => zone.polygon).length === 0}
+                                loading={isLoading}
+                                variant="primary"
+                                size="lg"
+                                icon="⚡"
                             >
-                                {drawingPipeType === 'main' ? 'Drawing Main Pipe...' : 'Draw Main Pipe'}
-                            </button>
-                            <button
-                                className={`rounded px-6 py-2 text-white transition-colors duration-200 ${
-                                    drawingPipeType === 'submain' 
-                                        ? 'bg-orange-600' 
-                                        : 'bg-orange-500 hover:bg-orange-600'
-                                }`}
-                                onClick={() => setDrawingPipeType(drawingPipeType === 'submain' ? null : 'submain')}
-                                disabled={drawingPipeType === 'main' || selectedValveType !== null || selectedPumpType}
-                            >
-                                {drawingPipeType === 'submain' ? 'Drawing Sub-Main Pipe...' : 'Draw Sub-Main Pipe'}
-                            </button>
-                            <button
-                                className={`rounded px-6 py-2 text-white transition-colors duration-200 ${
-                                    selectedValveType === 'solenoid' 
-                                        ? 'bg-purple-600' 
-                                        : 'bg-purple-500 hover:bg-purple-600'
-                                }`}
-                                onClick={() => handleValveTypeSelect('solenoid')}
-                                disabled={drawingPipeType !== null || selectedPumpType}
-                            >
-                                {selectedValveType === 'solenoid' ? 'Placing Solenoid Valve...' : 'Add Solenoid Valve'}
-                            </button>
-                            <button
-                                className={`rounded px-6 py-2 text-white transition-colors duration-200 ${
-                                    selectedValveType === 'ball' 
-                                        ? 'bg-indigo-600' 
-                                        : 'bg-indigo-500 hover:bg-indigo-600'
-                                }`}
-                                onClick={() => handleValveTypeSelect('ball')}
-                                disabled={drawingPipeType !== null || selectedPumpType}
-                            >
-                                {selectedValveType === 'ball' ? 'Placing Ball Valve...' : 'Add Ball Valve'}
-                            </button>
-                            <button
-                                className={`rounded px-6 py-2 text-white transition-colors duration-200 ${
-                                    selectedPumpType 
-                                        ? 'bg-blue-600' 
-                                        : 'bg-blue-500 hover:bg-blue-600'
-                                }`}
-                                onClick={handlePumpTypeSelect}
-                                disabled={drawingPipeType !== null || selectedValveType !== null}
-                            >
-                                {selectedPumpType ? 'Placing Pump...' : 'Add Pump'}
-                            </button>
+                                {isLoading ? 'Generating...' : 'Generate Pipe Layout'}
+                            </ActionButton>
                         </div>
-                        <button
-                            onClick={handleGeneratePipeLayout}
-                            disabled={isLoading || !isPlantLayoutGenerated || zones.length === 0}
-                            className="rounded bg-blue-600 px-6 py-2 text-white transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-700"
-                        >
-                            {isLoading ? 'Generating...' : 'Generate Pipe Layout'}
-                        </button>
-                        {zones.length === 0 && (
-                            <div className="text-sm text-yellow-400 text-center">
-                                Create at least one zone to generate pipe layout
+                        
+                        {/* Status Messages and Pipe Configuration */}
+                        <div>
+                            <div className="flex flex-col items-center gap-2">
+                                {zones.length === 0 && (
+                                    <div className="text-sm text-yellow-400 text-center flex items-center gap-1">
+                                        <span>⚠</span>
+                                        <span>Create at least one zone to generate pipe layout</span>
+                                    </div>
+                                )}
+                                {zones.length > 0 && zones.filter(zone => zone.polygon).length === 0 && (
+                                    <div className="text-sm text-yellow-400 text-center flex items-center gap-1">
+                                        <span>⚠</span>
+                                        <span>Draw polygon for your zone(s) to generate pipe layout</span>
+                                    </div>
+                                )}
+                                {zones.filter(zone => zone.polygon).length > 0 && !isPlantLayoutGenerated && (
+                                    <div className="text-sm text-blue-400 text-center flex items-center gap-1">
+                                        <span>ℹ</span>
+                                        <span>Ready to generate pipe layout for {zones.filter(zone => zone.polygon).length} zone{zones.filter(zone => zone.polygon).length > 1 ? 's' : ''}</span>
+                                    </div>
+                                )}
+                                {pipeLayout.length > 0 && (
+                                    <div className="text-sm text-green-400 text-center flex items-center gap-1">
+                                        <span>✓</span>
+                                        <span>Pipe layout generated successfully</span>
+                                    </div>
+                                )}
                             </div>
-                        )}
-                        {pipeLayout.length > 0 && (
-                            <div className="text-sm text-green-400 text-center">
-                                ✓ Pipe layout generated successfully
-                            </div>
-                        )}
+
+                            <InfoSection title="Pipe Configuration">
+                                <div className="flex flex-col md:flex-row gap-4">
+                                    <div className="flex-1 min-w-0">
+                                        <InfoItem title="Pipe Summary">
+                                            {pipeSummary ? (
+                                                <div className="flex flex-col gap-2">
+                                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
+                                                        <span className="text-white font-medium">Total Pipes</span>
+                                                        <span className="text-white font-medium">{pipeSummary.total_pipes}</span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
+                                                        <span className="text-white font-medium">Total Length</span>
+                                                        <span className="text-white font-medium">{pipeSummary.total_length.toFixed(2)} m</span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
+                                                        <span className="text-white font-medium">Total Water Flow</span>
+                                                        <span className="text-white font-medium">{pipeSummary.total_water_flow.toFixed(2)} L/day</span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
+                                                        <span className="text-white font-medium">Plants Served</span>
+                                                        <span className="text-white font-medium">{pipeSummary.total_plants_served}</span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
+                                                        <span className="text-white font-medium">Avg Pipe Diameter</span>
+                                                        <span className="text-white font-medium">{pipeSummary.average_pipe_diameter.toFixed(0)} mm</span>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="text-gray-400 text-sm">Generate pipe layout to see statistics</div>
+                                            )}
+                                        </InfoItem>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <InfoItem title="Zone Pipe Details">
+                                            <div className="flex flex-col gap-2">
+                                                {zoneStats.map((stat) => {
+                                                    const zone = zones.find(z => z.id === stat.zone_id);
+                                                    return (
+                                                        <div key={stat.zone_id} className="p-2 rounded bg-gray-800">
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <span style={{ 
+                                                                    background: zone?.color || '#666', 
+                                                                    width: 12, 
+                                                                    height: 12, 
+                                                                    display: 'inline-block', 
+                                                                    borderRadius: 2 
+                                                                }}></span>
+                                                                <span className="text-white font-medium">{zone?.name || `Zone ${stat.zone_id}`}</span>
+                                                                <span className="text-gray-400 text-xs">({stat.pipe_direction})</span>
+                                                            </div>
+                                                            <div className="grid grid-cols-2 gap-1 text-xs text-gray-300">
+                                                                <span>Pipes: {stat.total_pipes}</span>
+                                                                <span>Length: {stat.total_length.toFixed(1)}m</span>
+                                                                <span>Flow: {stat.total_water_flow.toFixed(1)} L/day</span>
+                                                                <span>Plants: {stat.plants_served}</span>
+                                                                <span>Longest: {Math.max(...pipeLayout.filter(pipe => pipe.zone_id === stat.zone_id).map(pipe => pipe.length)).toFixed(1)}m</span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                                {zoneStats.length === 0 && (
+                                                    <div className="text-gray-400 text-sm">No zone statistics available</div>
+                                                )}
+                                            </div>
+                                        </InfoItem>
+                                    </div>
+                                </div>
+                            </InfoSection>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div className="mt-6 flex justify-between items-center">
-                <button
+            <div className="mt-8 flex items-center justify-between bg-gray-800/30 rounded-xl p-6 border border-gray-700/50">
+                <ActionButton
                     onClick={() => router.get('/', {}, { preserveState: true })}
-                    className="rounded bg-gray-700 px-6 py-2 text-white transition-colors duration-200 hover:bg-gray-600"
+                    variant="secondary"
+                    icon="←"
                 >
                     Back to Home
-                </button>
+                </ActionButton>
+                
                 <div className="flex gap-3">
-                                            <button
-                            onClick={handleSaveToDatabase}
-                            disabled={!isPlantLayoutGenerated || pipeLayout.length === 0}
-                            className={`rounded px-6 py-2 text-white transition-colors duration-200
-                                ${!isPlantLayoutGenerated || pipeLayout.length === 0
-                                    ? 'bg-gray-700 cursor-not-allowed'
-                                    : 'bg-green-600 hover:bg-green-700'}`}
-                        >
-                            {isLoading ? 'Saving...' : (existingFieldId ? 'Update Field' : 'Save to Database')}
-                        </button>
+                    <ActionButton
+                        onClick={handleSaveToDatabase}
+                        disabled={!isPlantLayoutGenerated || pipeLayout.length === 0}
+                        loading={isSaving}
+                        variant={!isPlantLayoutGenerated || pipeLayout.length === 0 ? 'secondary' : 'success'}
+                        icon="💾"
+                    >
+                        {isSaving ? 'Saving...' : (existingFieldId ? 'Update Field' : 'Save to Database')}
+                    </ActionButton>
                 </div>
             </div>
-
 
         </div>
     );
@@ -2243,5 +2674,3 @@ const PipeLegend = () => (
         </div>
     </div>
 );
-
-
