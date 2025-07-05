@@ -115,7 +115,7 @@ const ChatBox = () => {
     };
 
     return (
-        <div className="mx-auto flex h-screen max-w-2xl flex-col p-6 text-black">
+        <div className="mx-auto flex h-[250px] w-[300px] flex-col p-6 text-black">
             {' '}
             {/* Increased max-w for questions */}
             <h2 className="mb-4 text-xl font-bold">AI Chat</h2>
