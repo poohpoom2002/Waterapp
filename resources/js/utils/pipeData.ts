@@ -62,10 +62,10 @@ export const getPipeLengthData = (): PipeLengthData | null => {
 export const usePipeLengthData = () => {
     const data = getPipeLengthData();
 
-    // If no data is found, you might want to redirect to the generate-tree page
+    // If no data is found, you might want to redirect to the horticulture planner page
     if (!data) {
-        console.warn('No pipe length data found. Redirecting to generate-tree page...');
-        router.visit('/generate-tree');
+        console.warn('No pipe length data found. Redirecting to horticulture planner page...');
+        router.visit('/horticulture/planner');
         return null;
     }
 

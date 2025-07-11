@@ -23,6 +23,7 @@ import { Link, usePage } from '@inertiajs/react';
 import { BookOpen, Folder, LayoutGrid, Menu, Search } from 'lucide-react';
 import AppLogo from './app-logo';
 import AppLogoIcon from './app-logo-icon';
+import LanguageSwitcher from './LanguageSwitcher';
 
 const mainNavItems: NavItem[] = [
     {
@@ -163,6 +164,7 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                     </div>
 
                     <div className="ml-auto flex items-center space-x-2">
+                        <LanguageSwitcher />
                         <div className="relative flex items-center space-x-1">
                             <Button
                                 variant="ghost"
