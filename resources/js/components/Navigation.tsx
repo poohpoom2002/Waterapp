@@ -21,12 +21,6 @@ const Navigation: React.FC = () => {
             description: 'ภาพรวมและสถิติ'
         },
         {
-            name: 'Farm Planner',
-            href: '/planner',
-            icon: '🌾',
-            description: 'วางแผนเกษตรแปลงใหญ่'
-        },
-        {
             name: 'Home Garden',
             href: '/home-garden/planner',
             icon: '🏡',

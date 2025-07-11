@@ -25,10 +25,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('dashboard');
     })->name('dashboard');
 
-    // Main Farm Planner Routes
-    Route::get('planner', [FarmController::class, 'planner'])->name('planner');
-    Route::get('generate-tree', [FarmController::class, 'generateTree'])->name('generateTree');
-    
     // Horticulture Irrigation System Routes (ระบบชลประทานสวนผลไม้)
     Route::prefix('horticulture')->name('horticulture.')->group(function () {
         // หน้าวางแผนระบบน้ำสวนผลไม้
@@ -48,6 +44,28 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     Route::get('horticulture-results', function () {
         return redirect()->route('horticulture.results');
+    });
+
+    // Greenhouse Irrigation System Routes
+    Route::prefix('greenhouse')->name('greenhouse.')->group(function () {
+        Route::get('planner', function () {
+            return Inertia::render('greenhouse-planner');
+        })->name('planner');
+        
+        Route::get('results', function () {
+            return Inertia::render('greenhouse-results');
+        })->name('results');
+    });
+
+    // Field Crop Irrigation System Routes
+    Route::prefix('field-crop')->name('field-crop.')->group(function () {
+        Route::get('planner', function () {
+            return Inertia::render('field-crop-planner');
+        })->name('planner');
+        
+        Route::get('results', function () {
+            return Inertia::render('field-crop-results');
+        })->name('results');
     });
 
     // Equipment & Product Page Routes

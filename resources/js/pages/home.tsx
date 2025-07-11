@@ -4,6 +4,9 @@ import { MapContainer, TileLayer, Polygon, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import axios from 'axios';
+import { useLanguage } from '../contexts/LanguageContext';
+import LanguageSwitcher from '../components/LanguageSwitcher';
+import Footer from '../components/Footer';
 
 // Types
 type Field = {
@@ -28,8 +31,82 @@ type Field = {
     }>;
 };
 
+// Plant category types
+type PlantCategory = {
+    id: string;
+    name: string;
+    description: string;
+    icon: string;
+    color: string;
+    route: string;
+    features: string[];
+};
+
 // Constants
 const DEFAULT_CENTER: [number, number] = [13.7563, 100.5018];
+
+const getPlantCategories = (t: (key: string) => string): PlantCategory[] => [
+    {
+        id: 'horticulture',
+        name: t('horticulture'),
+        description: t('horticulture_desc'),
+        icon: '🌳',
+        color: 'from-green-600 to-green-800',
+        route: '/horticulture/planner',
+        features: [
+            t('zone_based_planning'),
+            t('multiple_plant_types'),
+            t('advanced_pipe_layout'),
+            t('elevation_analysis'),
+            t('comprehensive_stats')
+        ]
+    },
+    {
+        id: 'home-garden',
+        name: t('home_garden'),
+        description: t('home_garden_desc'),
+        icon: '🏡',
+        color: 'from-blue-600 to-blue-800',
+        route: '/home-garden/planner',
+        features: [
+            t('automated_sprinkler'),
+            t('coverage_optimization'),
+            t('water_flow_calc'),
+            t('easy_interface'),
+            t('residential_focus')
+        ]
+    },
+    {
+        id: 'greenhouse',
+        name: t('greenhouse'),
+        description: t('greenhouse_desc'),
+        icon: '🌱',
+        color: 'from-purple-600 to-purple-800',
+        route: '/greenhouse/planner',
+        features: [
+            t('controlled_environment'),
+            t('precision_irrigation'),
+            t('climate_control'),
+            t('crop_optimization'),
+            t('environmental_monitoring')
+        ]
+    },
+    {
+        id: 'field-crop',
+        name: t('field_crop'),
+        description: t('field_crop_desc'),
+        icon: '🌾',
+        color: 'from-yellow-600 to-yellow-800',
+        route: '/field-crop/planner',
+        features: [
+            t('large_scale_planning'),
+            t('crop_rotation'),
+            t('efficient_distribution'),
+            t('weather_integration'),
+            t('yield_optimization')
+        ]
+    }
+];
 
 // Components
 const MapBounds = ({ positions }: { positions: Array<{ lat: number; lng: number }> }) => {
@@ -48,10 +125,11 @@ const MapBounds = ({ positions }: { positions: Array<{ lat: number; lng: number 
     return null;
 };
 
-const FieldCard = ({ field, onSelect, onDelete }: { 
+const FieldCard = ({ field, onSelect, onDelete, t }: { 
     field: Field; 
     onSelect: (field: Field) => void;
     onDelete: (fieldId: string) => void;
+    t: (key: string) => string;
 }) => {
     const calculateAreaInRai = (coordinates: Array<{ lat: number; lng: number }>): number => {
         if (coordinates.length < 3) return 0;
@@ -109,22 +187,22 @@ const FieldCard = ({ field, onSelect, onDelete }: {
             </div>
             
             <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                    <span className="text-gray-400">Plant Type:</span>
-                    <span className="text-white">{field.plantType.name}</span>
-                </div>
-                <div className="flex justify-between">
-                    <span className="text-gray-400">Area:</span>
-                    <span className="text-white">{areaInRai.toFixed(2)} rai</span>
-                </div>
-                <div className="flex justify-between">
-                    <span className="text-gray-400">Plants:</span>
-                    <span className="text-white">{field.totalPlants}</span>
-                </div>
-                <div className="flex justify-between">
-                    <span className="text-gray-400">Water Need:</span>
-                    <span className="text-white">{totalWaterNeed.toFixed(2)} L/day</span>
-                </div>
+                                        <div className="flex justify-between">
+                            <span className="text-gray-400">{t('plant_type')}:</span>
+                            <span className="text-white">{field.plantType.name}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-gray-400">{t('area')}:</span>
+                            <span className="text-white">{areaInRai.toFixed(2)} rai</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-gray-400">{t('plants')}:</span>
+                            <span className="text-white">{field.totalPlants}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-gray-400">{t('water_need')}:</span>
+                            <span className="text-white">{totalWaterNeed.toFixed(2)} L/day</span>
+                        </div>
             </div>
             
             <div className="mt-3 pt-3 border-t border-gray-700">
@@ -191,12 +269,101 @@ const FieldCard = ({ field, onSelect, onDelete }: {
     );
 };
 
+const CategoryCard = ({ category, onSelect, t }: { 
+    category: PlantCategory; 
+    onSelect: (category: PlantCategory) => void;
+    t: (key: string) => string;
+}) => {
+    return (
+        <div 
+            className={`bg-gradient-to-br ${category.color} rounded-xl p-6 cursor-pointer transform transition-all duration-300 hover:scale-105 hover:shadow-2xl`}
+            onClick={() => onSelect(category)}
+        >
+            <div className="flex items-center mb-4">
+                <div className="text-4xl mr-4">{category.icon}</div>
+                <div>
+                    <h3 className="text-xl font-bold text-white">{category.name}</h3>
+                    <p className="text-white/80 text-sm">{category.description}</p>
+                </div>
+            </div>
+            
+            <div className="space-y-2">
+                {category.features.map((feature, index) => (
+                    <div key={index} className="flex items-center text-white/90 text-sm">
+                        <svg className="w-4 h-4 mr-2 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        {feature}
+                    </div>
+                ))}
+            </div>
+            
+            <div className="mt-6 flex items-center justify-between">
+                <span className="text-white/80 text-sm">{t('click_start_planning')}</span>
+                <svg className="w-5 h-5 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+            </div>
+        </div>
+    );
+};
+
+const CategorySelectionModal = ({ isOpen, onClose, onSelectCategory, plantCategories, t }: {
+    isOpen: boolean;
+    onClose: () => void;
+    onSelectCategory: (category: PlantCategory) => void;
+    plantCategories: PlantCategory[];
+    t: (key: string) => string;
+}) => {
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+            <div className="bg-gray-900 rounded-2xl p-8 max-w-6xl w-full max-h-[90vh] overflow-y-auto relative z-[10000]">
+                <div className="flex justify-between items-center mb-8">
+                    <div>
+                        <h2 className="text-3xl font-bold text-white mb-2">
+                            {t('choose_irrigation_category')}
+                        </h2>
+                        <p className="text-gray-400">
+                            {t('select_irrigation_type')}
+                        </p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="text-gray-400 hover:text-white transition-colors"
+                    >
+                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {plantCategories.map((category) => (
+                        <CategoryCard 
+                            key={category.id} 
+                            category={category} 
+                            onSelect={onSelectCategory}
+                            t={t}
+                        />
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export default function Home() {
+    const { t } = useLanguage();
     const [fields, setFields] = useState<Field[]>([]);
     const [loading, setLoading] = useState(true);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [fieldToDelete, setFieldToDelete] = useState<Field | null>(null);
     const [deleting, setDeleting] = useState(false);
+    const [showCategoryModal, setShowCategoryModal] = useState(false);
+    
+    const plantCategories = getPlantCategories(t);
 
     useEffect(() => {
         // Load saved fields from database
@@ -217,7 +384,14 @@ export default function Home() {
     }, []);
 
     const handleAddField = () => {
-        router.visit('/planner');
+        setShowCategoryModal(true);
+    };
+
+    const handleCategorySelect = (category: PlantCategory) => {
+        setShowCategoryModal(false);
+        // Clear any saved data when starting a new project
+        localStorage.removeItem('horticultureIrrigationData');
+        router.visit(category.route);
     };
 
     const handleFieldSelect = (field: Field) => {
@@ -230,8 +404,8 @@ export default function Home() {
             fieldId: field.id // Add field ID for editing
         });
         
-        // Navigate to generate-tree with URL parameters
-        router.visit(`/generate-tree?${params.toString()}`);
+                        // Navigate to horticulture planner with URL parameters
+                router.visit(`/horticulture/planner?${params.toString()}`);
     };
 
     const handleFieldDelete = (fieldId: string) => {
@@ -272,7 +446,7 @@ export default function Home() {
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-                <div className="text-white text-xl">Loading...</div>
+                <div className="text-white text-xl">{t('loading')}</div>
             </div>
         );
     }
@@ -283,39 +457,42 @@ export default function Home() {
                 {/* Header */}
                 <div className="flex justify-between items-center mb-8">
                     <div>
-                        <h1 className="text-3xl font-bold text-white">Water Management System</h1>
-                        <p className="text-gray-400 mt-2">Manage your irrigation fields and pipe networks</p>
+                        <h1 className="text-3xl font-bold text-white">{t('water_management_system')}</h1>
+                        <p className="text-gray-400 mt-2">{t('manage_irrigation_fields')}</p>
                     </div>
-                    <button
-                        onClick={handleAddField}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors duration-200 flex items-center gap-2"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                        Add Field
-                    </button>
+                    <div className="flex items-center gap-4">
+                        <LanguageSwitcher />
+                        <button
+                            onClick={handleAddField}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors duration-200 flex items-center gap-2"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                            {t('add_field')}
+                        </button>
+                    </div>
                 </div>
 
                 {/* Content */}
                 {fields.length === 0 ? (
                     <div className="text-center py-16">
                         <div className="text-6xl mb-4">🌾</div>
-                        <h2 className="text-2xl font-semibold text-white mb-2">No Fields Yet</h2>
-                        <p className="text-gray-400 mb-6">Start by creating your first irrigation field</p>
+                        <h2 className="text-2xl font-semibold text-white mb-2">{t('no_fields_yet')}</h2>
+                        <p className="text-gray-400 mb-6">{t('start_first_field')}</p>
                         <button
                             onClick={handleAddField}
                             className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors duration-200"
                         >
-                            Create Your First Field
+                            {t('create_first_field')}
                         </button>
                     </div>
                 ) : (
                     <div>
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-semibold text-white">Your Fields ({fields.length})</h2>
+                            <h2 className="text-xl font-semibold text-white">{t('your_fields')} ({fields.length})</h2>
                             <div className="text-sm text-gray-400">
-                                Click on a field to view and manage its pipe network
+                                {t('click_field_manage')}
                             </div>
                         </div>
                         
@@ -326,6 +503,7 @@ export default function Home() {
                                     field={field}
                                     onSelect={handleFieldSelect}
                                     onDelete={handleFieldDelete}
+                                    t={t}
                                 />
                             ))}
                         </div>
@@ -333,10 +511,22 @@ export default function Home() {
                 )}
             </div>
 
+            {/* Footer */}
+            <Footer />
+
+            {/* Category Selection Modal */}
+            <CategorySelectionModal
+                isOpen={showCategoryModal}
+                onClose={() => setShowCategoryModal(false)}
+                onSelectCategory={handleCategorySelect}
+                plantCategories={plantCategories}
+                t={t}
+            />
+
             {/* Delete Confirmation Dialog */}
             {showDeleteConfirm && fieldToDelete && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
+                    <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 relative z-[10000]">
                         <div className="flex items-center mb-4">
                             <div className="flex-shrink-0">
                                 <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -344,15 +534,15 @@ export default function Home() {
                                 </svg>
                             </div>
                             <div className="ml-3">
-                                <h3 className="text-lg font-medium text-white">Delete Field</h3>
+                                <h3 className="text-lg font-medium text-white">{t('delete_field')}</h3>
                             </div>
                         </div>
                         <div className="mb-6">
                             <p className="text-gray-300">
-                                Are you sure you want to delete <span className="font-semibold text-white">"{fieldToDelete.name}"</span>?
+                                {t('delete_confirm')} <span className="font-semibold text-white">"{fieldToDelete.name}"</span>?
                             </p>
                             <p className="text-sm text-gray-400 mt-2">
-                                This action cannot be undone. All field data, planting points, pipes, and zones will be permanently deleted.
+                                {t('delete_warning')}
                             </p>
                         </div>
                         <div className="flex justify-end space-x-3">
@@ -361,7 +551,7 @@ export default function Home() {
                                 disabled={deleting}
                                 className="px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors disabled:opacity-50"
                             >
-                                Cancel
+                                {t('cancel')}
                             </button>
                             <button
                                 onClick={confirmDelete}
@@ -374,10 +564,10 @@ export default function Home() {
                                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                         </svg>
-                                        Deleting...
+                                        {t('deleting')}
                                     </>
                                 ) : (
-                                    'Delete Field'
+                                    t('delete_field')
                                 )}
                             </button>
                         </div>

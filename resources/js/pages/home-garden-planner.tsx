@@ -6,6 +6,9 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import { router } from '@inertiajs/react';
 import L from 'leaflet';
+import { useLanguage } from '../contexts/LanguageContext';
+import LanguageSwitcher from '../components/LanguageSwitcher';
+import Footer from '../components/Footer';
 
 // Types
 type LatLng = {
@@ -98,6 +101,7 @@ const MapController: React.FC<{ center: [number, number]; zoom?: number }> = ({ 
 
 // Main Component
 export default function HomeGardenPlanner() {
+    const { t } = useLanguage();
     const [area, setArea] = useState<LatLng[]>([]);
     const [sprinklerRadius, setSprinklerRadius] = useState<number>(3);
     const [mapCenter, setMapCenter] = useState<[number, number]>(DEFAULT_MAP_CENTER);
@@ -186,10 +190,15 @@ export default function HomeGardenPlanner() {
     return (
         <div className="min-h-screen bg-gray-900 p-6 text-white">
             <div className="mx-auto w-full">
-                <h1 className="mb-4 text-3xl font-bold">🏡 Home Garden Sprinkler Calculator</h1>
-                <p className="mb-6 text-gray-400">
-                    วาดพื้นที่สวน → กำหนดรัศมี Sprinkler → ดูผลการคำนวณ
-                </p>
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h1 className="text-3xl font-bold">🏡 Home Garden Sprinkler Calculator</h1>
+                        <p className="text-gray-400">
+                            วาดพื้นที่สวน → กำหนดรัศมี Sprinkler → ดูผลการคำนวณ
+                        </p>
+                    </div>
+                    <LanguageSwitcher />
+                </div>
 
                 {error && (
                     <div className="mb-4 rounded border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
@@ -311,7 +320,7 @@ export default function HomeGardenPlanner() {
                                 </LayersControl>
                                 <FeatureGroup ref={featureGroupRef}>
                                     <EditControl
-                                        position="topleft"
+                                        position="topright"
                                         onCreated={onCreated}
                                         onDeleted={onDeleted}
                                         onEdited={onEdited}
@@ -330,6 +339,9 @@ export default function HomeGardenPlanner() {
                     </div>
                 </div>
             </div>
+            
+            {/* Footer */}
+            <Footer />
         </div>
     );
 }
