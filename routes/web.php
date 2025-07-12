@@ -36,6 +36,33 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('equipment-crud', function () {
         return Inertia::render('equipment-crud');
     })->name('equipment-crud');
+    
+    // Field Crop Management Route
+    Route::get('field-crop', function () {
+        $cropType = request()->query('crop_type');
+        $crops = request()->query('crops');
+        $irrigation = request()->query('irrigation');
+        return Inertia::render('field-crop', [
+            'cropType' => $cropType,
+            'crops' => $crops,
+            'irrigation' => $irrigation
+        ]);
+    })->name('field-crop');
+
+    // Field Map Route
+    Route::get('field-map', function () {
+        $crops = request()->query('crops');
+        $irrigation = request()->query('irrigation');
+        return Inertia::render('field-map', [
+            'crops' => $crops,
+            'irrigation' => $irrigation
+        ]);
+    })->name('field-map');
+
+    // Field Crop Summary Route
+    Route::get('field-crop-summary', function () {
+        return Inertia::render('field-crop-summary');
+    })->name('field-crop-summary');
 
     // Farm-related API calls that might be using web sessions
     Route::get('/api/plant-types', [FarmController::class, 'getPlantTypes']);

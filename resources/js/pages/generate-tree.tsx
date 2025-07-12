@@ -65,73 +65,89 @@ const LoadingSpinner = ({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) => {
     const sizeClasses = {
         sm: 'w-4 h-4',
         md: 'w-6 h-6',
-        lg: 'w-8 h-8'
+        lg: 'w-8 h-8',
     };
-    
+
     return (
-        <div className={`${sizeClasses[size]} animate-spin rounded-full border-2 border-gray-300 border-t-blue-600`}></div>
+        <div
+            className={`${sizeClasses[size]} animate-spin rounded-full border-2 border-gray-300 border-t-blue-600`}
+        ></div>
     );
 };
 
 // Success/Error Toast Component
-const Toast = ({ message, type, onClose }: { message: string; type: 'success' | 'error' | 'warning'; onClose: () => void }) => {
-    const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-yellow-500';
+const Toast = ({
+    message,
+    type,
+    onClose,
+}: {
+    message: string;
+    type: 'success' | 'error' | 'warning';
+    onClose: () => void;
+}) => {
+    const bgColor =
+        type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-yellow-500';
     const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : '⚠';
-    
+
     return (
-        <div className={`fixed top-4 right-4 z-50 ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-slide-in`}>
+        <div
+            className={`fixed right-4 top-4 z-50 ${bgColor} flex animate-slide-in items-center gap-2 rounded-lg px-6 py-3 text-white shadow-lg`}
+        >
             <span className="font-bold">{icon}</span>
             <span>{message}</span>
-            <button onClick={onClose} className="ml-2 hover:opacity-75">✕</button>
+            <button onClick={onClose} className="ml-2 hover:opacity-75">
+                ✕
+            </button>
         </div>
     );
 };
 
 // Progress Bar Component
 const ProgressBar = ({ progress, label }: { progress: number; label: string }) => (
-    <div className="w-full bg-gray-700 rounded-full h-2 mb-2">
-        <div 
-            className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+    <div className="mb-2 h-2 w-full rounded-full bg-gray-700">
+        <div
+            className="h-2 rounded-full bg-blue-600 transition-all duration-300 ease-out"
             style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
         ></div>
-        <div className="text-xs text-gray-400 mt-1">{label}</div>
+        <div className="mt-1 text-xs text-gray-400">{label}</div>
     </div>
 );
 
 // Enhanced Button Component
-const ActionButton = ({ 
-    onClick, 
-    disabled, 
-    loading, 
-    variant = 'primary', 
+const ActionButton = ({
+    onClick,
+    disabled,
+    loading,
+    variant = 'primary',
     size = 'md',
     icon,
-    children 
-}: { 
-    onClick: () => void; 
-    disabled?: boolean; 
+    children,
+}: {
+    onClick: () => void;
+    disabled?: boolean;
     loading?: boolean;
     variant?: 'primary' | 'secondary' | 'success' | 'danger' | 'warning';
     size?: 'sm' | 'md' | 'lg';
     icon?: string;
     children: React.ReactNode;
 }) => {
-    const baseClasses = 'rounded font-medium transition-all duration-200 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50 hover:shadow-md active:scale-95';
-    
+    const baseClasses =
+        'rounded font-medium transition-all duration-200 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50 hover:shadow-md active:scale-95';
+
     const variantClasses = {
         primary: 'bg-blue-600 hover:bg-blue-700 text-white',
         secondary: 'bg-gray-600 hover:bg-gray-700 text-white',
         success: 'bg-green-600 hover:bg-green-700 text-white',
         danger: 'bg-red-600 hover:bg-red-700 text-white',
-        warning: 'bg-yellow-600 hover:bg-yellow-700 text-white'
+        warning: 'bg-yellow-600 hover:bg-yellow-700 text-white',
     };
-    
+
     const sizeClasses = {
         sm: 'px-3 py-1.5 text-sm',
         md: 'px-4 py-2 text-sm',
-        lg: 'px-6 py-3 text-base'
+        lg: 'px-6 py-3 text-base',
     };
-    
+
     return (
         <button
             onClick={onClick}
@@ -149,9 +165,9 @@ const ActionButton = ({
 const Tooltip = ({ content, children }: { content: string; children: React.ReactNode }) => (
     <div className="group relative inline-block">
         {children}
-        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+        <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 transform whitespace-nowrap rounded-lg bg-gray-900 px-3 py-1 text-xs text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100">
             {content}
-            <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+            <div className="absolute left-1/2 top-full -translate-x-1/2 transform border-4 border-transparent border-t-gray-900"></div>
         </div>
     </div>
 );
@@ -443,9 +459,9 @@ const MapBounds = ({ positions }: { positions: LatLng[] }) => {
 };
 
 const InfoSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="mb-4 rounded-xl bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 p-6 shadow-lg hover:shadow-xl transition-all duration-300">
-        <h3 className="mb-6 text-xl font-semibold text-white flex items-center gap-2">
-            <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+    <div className="mb-4 rounded-xl border border-gray-700/50 bg-gray-800/50 p-6 shadow-lg backdrop-blur-sm transition-all duration-300 hover:shadow-xl">
+        <h3 className="mb-6 flex items-center gap-2 text-xl font-semibold text-white">
+            <div className="h-2 w-2 rounded-full bg-blue-400"></div>
             {title}
         </h3>
         <div className="space-y-6 text-sm text-gray-300">{children}</div>
@@ -495,15 +511,23 @@ const MapMouseUpHandler = ({ onMouseUp }: { onMouseUp: () => void }) => {
     return null;
 };
 
-const MapDragHandler = ({ isDragging, editMode, selectedPoints }: { 
-    isDragging: boolean; 
+const MapDragHandler = ({
+    isDragging,
+    editMode,
+    selectedPoints,
+}: {
+    isDragging: boolean;
     editMode: 'select' | 'add' | 'addPolygon' | 'selectPolygon' | 'delete' | 'deletePolygon' | null;
     selectedPoints: Set<string>;
 }) => {
     const map = useMap();
 
     useEffect(() => {
-        if (isDragging || (editMode === 'select' && selectedPoints.size > 0) || editMode === 'selectPolygon') {
+        if (
+            isDragging ||
+            (editMode === 'select' && selectedPoints.size > 0) ||
+            editMode === 'selectPolygon'
+        ) {
             map.dragging.disable();
             map.doubleClickZoom.disable();
             map.scrollWheelZoom.disable();
@@ -524,15 +548,19 @@ const PointManagementControls = ({
     plantType,
     featureGroupRef,
     editMode,
-    setEditMode
-}: { 
-    plantLocations: LatLng[]; 
+    setEditMode,
+}: {
+    plantLocations: LatLng[];
     setPlantLocations: React.Dispatch<React.SetStateAction<LatLng[]>>;
     area: LatLng[];
     plantType: PlantType;
     featureGroupRef: React.MutableRefObject<L.FeatureGroup | null>;
     editMode: 'select' | 'add' | 'addPolygon' | 'selectPolygon' | 'delete' | 'deletePolygon' | null;
-    setEditMode: React.Dispatch<React.SetStateAction<'select' | 'add' | 'addPolygon' | 'selectPolygon' | 'delete' | 'deletePolygon' | null>>;
+    setEditMode: React.Dispatch<
+        React.SetStateAction<
+            'select' | 'add' | 'addPolygon' | 'selectPolygon' | 'delete' | 'deletePolygon' | null
+        >
+    >;
 }) => {
     const map = useMap();
     const [selectedPoints, setSelectedPoints] = useState<Set<string>>(new Set());
@@ -692,7 +720,7 @@ const PointManagementControls = ({
                     <div className="flex space-x-2">
                         <button
                             onClick={handleAddPoints}
-                            className={`px-3 py-2 rounded transition-colors ${
+                            className={`rounded px-3 py-2 transition-colors ${
                                 editMode === 'addPolygon'
                                     ? 'bg-green-600 text-white'
                                     : 'bg-green-500 text-white hover:bg-green-600'
@@ -702,7 +730,7 @@ const PointManagementControls = ({
                         </button>
                         <button
                             onClick={handleDeletePoints}
-                            className={`px-3 py-2 rounded transition-colors ${
+                            className={`rounded px-3 py-2 transition-colors ${
                                 editMode === 'deletePolygon'
                                     ? 'bg-red-600 text-white'
                                     : 'bg-red-500 text-white hover:bg-red-600'
@@ -712,7 +740,7 @@ const PointManagementControls = ({
                         </button>
                         <button
                             onClick={handleMovePoints}
-                            className={`px-3 py-2 rounded transition-colors ${
+                            className={`rounded px-3 py-2 transition-colors ${
                                 editMode === 'selectPolygon'
                                     ? 'bg-blue-600 text-white'
                                     : 'bg-blue-500 text-white hover:bg-blue-600'
@@ -722,26 +750,28 @@ const PointManagementControls = ({
                         </button>
                     </div>
                     {editMode === 'deletePolygon' && (
-                        <div className="text-xs text-gray-600 bg-yellow-100 p-2 rounded">
-                            Draw a polygon to select and delete all planting points within that area.
+                        <div className="rounded bg-yellow-100 p-2 text-xs text-gray-600">
+                            Draw a polygon to select and delete all planting points within that
+                            area.
                         </div>
                     )}
                     {editMode === 'addPolygon' && (
-                        <div className="text-xs text-gray-600 bg-green-100 p-2 rounded">
+                        <div className="rounded bg-green-100 p-2 text-xs text-gray-600">
                             Draw a polygon to generate planting points within that area.
                         </div>
                     )}
                     {editMode === 'selectPolygon' && (
-                        <div className="text-xs text-gray-600 bg-blue-100 p-2 rounded">
-                            Draw a polygon to select points, then click anywhere to move them as a group.
+                        <div className="rounded bg-blue-100 p-2 text-xs text-gray-600">
+                            Draw a polygon to select points, then click anywhere to move them as a
+                            group.
                         </div>
                     )}
                 </div>
             </div>
             <MapClickHandler onMapClick={() => {}} />
-            <MapDragHandler 
-                isDragging={!!movingPoint} 
-                editMode={editMode} 
+            <MapDragHandler
+                isDragging={!!movingPoint}
+                editMode={editMode}
                 selectedPoints={selectedPoints}
             />
             <MouseTracker onMove={handleMouseMove} />
@@ -834,8 +864,13 @@ const ZonePolygons = ({ zones }: { zones: Zone[] }) => (
     </>
 );
 
-const PlantPoints = ({ plantLocations, getPointColor, selectedPoints, movingGroup }: { 
-    plantLocations: LatLng[]; 
+const PlantPoints = ({
+    plantLocations,
+    getPointColor,
+    selectedPoints,
+    movingGroup,
+}: {
+    plantLocations: LatLng[];
     getPointColor: (point: LatLng) => string;
     selectedPoints?: Set<string>;
     movingGroup?: { points: LatLng[]; offset: [number, number] } | null;
@@ -844,17 +879,24 @@ const PlantPoints = ({ plantLocations, getPointColor, selectedPoints, movingGrou
         {plantLocations.map((point, index) => {
             const pointId = point.id || `point-${index}`;
             const isSelected = selectedPoints?.has(pointId) || false;
-            const isMoving = movingGroup?.points.some(p => (p.id || `point-${plantLocations.indexOf(p)}`) === pointId) || false;
-            
+            const isMoving =
+                movingGroup?.points.some(
+                    (p) => (p.id || `point-${plantLocations.indexOf(p)}`) === pointId
+                ) || false;
+
             let position: [number, number] = [point.lat, point.lng];
             if (isMoving && movingGroup) {
-                const centerLat = movingGroup.points.reduce((sum, p) => sum + p.lat, 0) / movingGroup.points.length;
-                const centerLng = movingGroup.points.reduce((sum, p) => sum + p.lng, 0) / movingGroup.points.length;
+                const centerLat =
+                    movingGroup.points.reduce((sum, p) => sum + p.lat, 0) /
+                    movingGroup.points.length;
+                const centerLng =
+                    movingGroup.points.reduce((sum, p) => sum + p.lng, 0) /
+                    movingGroup.points.length;
                 const newLat = centerLat + movingGroup.offset[0];
                 const newLng = centerLng + movingGroup.offset[1];
                 position = [newLat, newLng];
             }
-            
+
             const color = isSelected ? 'blue' : getPointColor(point);
             return (
                 <CircleMarker
@@ -882,16 +924,16 @@ const PipeLayouts = ({
     <FeatureGroup>
         {pipeLayout.map((pipe, index) => {
             const color = getPipeColor(pipe);
-            const tooltipText = pipe.pipe_diameter 
+            const tooltipText = pipe.pipe_diameter
                 ? `Pipe ${index + 1}: ${pipe.length.toFixed(1)}m, ${pipe.pipe_diameter}mm, ${pipe.water_flow?.toFixed(1)} L/day`
                 : `Pipe ${index + 1}: ${pipe.length.toFixed(1)}m`;
-            
+
             return (
                 <Polyline
                     key={`pipe-${index}`}
                     positions={[
                         [pipe.start.lat, pipe.start.lng],
-                        [pipe.end.lat, pipe.end.lng]
+                        [pipe.end.lat, pipe.end.lng],
                     ]}
                     color={color}
                     weight={3}
@@ -899,16 +941,18 @@ const PipeLayouts = ({
                     eventHandlers={{
                         mouseover: (e) => {
                             const layer = e.target;
-                            layer.bindTooltip(tooltipText, {
-                                permanent: false,
-                                direction: 'top',
-                                className: 'pipe-tooltip'
-                            }).openTooltip();
+                            layer
+                                .bindTooltip(tooltipText, {
+                                    permanent: false,
+                                    direction: 'top',
+                                    className: 'pipe-tooltip',
+                                })
+                                .openTooltip();
                         },
                         mouseout: (e) => {
                             const layer = e.target;
                             layer.closeTooltip();
-                        }
+                        },
                     }}
                 />
             );
@@ -944,8 +988,6 @@ const isPointInZonePolygon = (lat: number, lng: number, polygon: [number, number
     }
     return inside;
 };
-
-
 
 // Add after the existing utility functions
 const ValveUndoRedoControl = ({
@@ -1013,9 +1055,13 @@ const ValveUndoRedoControl = ({
 };
 
 // Add this utility function after the existing utility functions
-const generatePointsInPolygon = (polygon: [number, number][], plantType: PlantType, mainArea: LatLng[]): LatLng[] => {
+const generatePointsInPolygon = (
+    polygon: [number, number][],
+    plantType: PlantType,
+    mainArea: LatLng[]
+): LatLng[] => {
     const points: LatLng[] = [];
-    
+
     // Find the two leftmost points (lowest longitude) from main area
     const sortedByLng = [...mainArea].sort((a, b) => a.lng - b.lng);
     const leftmost1 = sortedByLng[0];
@@ -1067,23 +1113,42 @@ const generatePointsInPolygon = (polygon: [number, number][], plantType: PlantTy
     for (let i = 0; i <= maxRowSteps; i++) {
         const rowStart = {
             lat: bottomLeft.lat + rowDirNormalized.lat * i * (plantType.row_spacing / 111000),
-            lng: bottomLeft.lng + rowDirNormalized.lng * i * (plantType.row_spacing / (111000 * Math.cos(bottomLeft.lat * Math.PI / 180))),
+            lng:
+                bottomLeft.lng +
+                rowDirNormalized.lng *
+                    i *
+                    (plantType.row_spacing / (111000 * Math.cos((bottomLeft.lat * Math.PI) / 180))),
         };
 
         for (let j = 0; j <= maxPlantSteps; j++) {
             const point = {
                 lat: rowStart.lat + plantDirNormalized.lat * j * (plantType.plant_spacing / 111000),
-                lng: rowStart.lng + plantDirNormalized.lng * j * (plantType.plant_spacing / (111000 * Math.cos(rowStart.lat * Math.PI / 180))),
+                lng:
+                    rowStart.lng +
+                    plantDirNormalized.lng *
+                        j *
+                        (plantType.plant_spacing /
+                            (111000 * Math.cos((rowStart.lat * Math.PI) / 180))),
             };
 
             // Check if point is inside the drawn polygon
-            if (isPointInPolygon(point.lat, point.lng, polygon.map(([lat, lng]) => ({ lat, lng })))) {
+            if (
+                isPointInPolygon(
+                    point.lat,
+                    point.lng,
+                    polygon.map(([lat, lng]) => ({ lat, lng }))
+                )
+            ) {
                 // Check if point is far enough from polygon edges
-                const minDist = minDistanceToPolygonEdge(point.lat, point.lng, polygon.map(([lat, lng]) => ({ lat, lng })));
-                if (minDist >= (plantType.row_spacing / 2)) {
+                const minDist = minDistanceToPolygonEdge(
+                    point.lat,
+                    point.lng,
+                    polygon.map(([lat, lng]) => ({ lat, lng }))
+                );
+                if (minDist >= plantType.row_spacing / 2) {
                     points.push({
                         ...point,
-                        id: `point-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+                        id: `point-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                     });
                 }
             }
@@ -1096,24 +1161,28 @@ const generatePointsInPolygon = (polygon: [number, number][], plantType: PlantTy
 // Helper function to calculate distance between two points
 const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
     const R = 6371000; // Earth radius in meters
-    const lat1Rad = lat1 * Math.PI / 180;
-    const lat2Rad = lat2 * Math.PI / 180;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const lat1Rad = (lat1 * Math.PI) / 180;
+    const lat2Rad = (lat2 * Math.PI) / 180;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
 
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-             Math.cos(lat1Rad) * Math.cos(lat2Rad) *
-             Math.sin(dLng/2) * Math.sin(dLng/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
     return R * c;
 };
 
 // Helper function to calculate minimum distance from point to polygon edge
-const minDistanceToPolygonEdge = (lat: number, lng: number, polygon: { lat: number; lng: number }[]): number => {
+const minDistanceToPolygonEdge = (
+    lat: number,
+    lng: number,
+    polygon: { lat: number; lng: number }[]
+): number => {
     let minDist = Infinity;
     const n = polygon.length;
-    
+
     for (let i = 0; i < n; i++) {
         const a = polygon[i];
         const b = polygon[(i + 1) % n];
@@ -1122,46 +1191,59 @@ const minDistanceToPolygonEdge = (lat: number, lng: number, polygon: { lat: numb
             minDist = dist;
         }
     }
-    
+
     return minDist;
 };
 
 // Helper function to calculate distance from point to line segment
-const pointToSegmentDistance = (px: number, py: number, ax: number, ay: number, bx: number, by: number): number => {
+const pointToSegmentDistance = (
+    px: number,
+    py: number,
+    ax: number,
+    ay: number,
+    bx: number,
+    by: number
+): number => {
     const R = 6371000; // Earth radius in meters
-    const lat1 = ax * Math.PI / 180;
-    const lat2 = bx * Math.PI / 180;
-    const latP = px * Math.PI / 180;
-    const lng1 = ay * Math.PI / 180;
-    const lng2 = by * Math.PI / 180;
-    const lngP = py * Math.PI / 180;
-    
+    const lat1 = (ax * Math.PI) / 180;
+    const lat2 = (bx * Math.PI) / 180;
+    const latP = (px * Math.PI) / 180;
+    const lng1 = (ay * Math.PI) / 180;
+    const lng2 = (by * Math.PI) / 180;
+    const lngP = (py * Math.PI) / 180;
+
     const x1 = R * lng1 * Math.cos((lat1 + lat2) / 2);
     const y1 = R * lat1;
     const x2 = R * lng2 * Math.cos((lat1 + lat2) / 2);
     const y2 = R * lat2;
     const xP = R * lngP * Math.cos((lat1 + lat2) / 2);
     const yP = R * latP;
-    
+
     const dx = x2 - x1;
     const dy = y2 - y1;
-    
+
     if (dx === 0 && dy === 0) {
         return Math.sqrt(Math.pow(xP - x1, 2) + Math.pow(yP - y1, 2));
     }
-    
+
     const t = Math.max(0, Math.min(1, ((xP - x1) * dx + (yP - y1) * dy) / (dx * dx + dy * dy)));
     const projX = x1 + t * dx;
     const projY = y1 + t * dy;
-    
+
     return Math.sqrt(Math.pow(xP - projX, 2) + Math.pow(yP - projY, 2));
 };
 
 // Main Component
-export default function GenerateTree({ areaType, area, plantType, layers = [], pumpLocation }: Props) {
+export default function GenerateTree({
+    areaType,
+    area,
+    plantType,
+    layers = [],
+    pumpLocation,
+}: Props) {
     // No longer needed since we're using URL parameters consistently
     const [plantLocations, setPlantLocations] = useState<LatLng[]>([]);
-    
+
     // Check if this is an existing field (check URL for field ID)
     const urlParams = new URLSearchParams(window.location.search);
     const existingFieldId = urlParams.get('fieldId');
@@ -1191,16 +1273,24 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
     ]);
     const [equipmentHistoryIndex, setEquipmentHistoryIndex] = useState(0);
     // Add edit mode state
-    const [editMode, setEditMode] = useState<'select' | 'add' | 'addPolygon' | 'selectPolygon' | 'delete' | 'deletePolygon' | null>(null);
+    const [editMode, setEditMode] = useState<
+        'select' | 'add' | 'addPolygon' | 'selectPolygon' | 'delete' | 'deletePolygon' | null
+    >(null);
     // Add history management for plant locations
     const [plantHistory, setPlantHistory] = useState<LatLng[][]>([]);
     const [plantHistoryIndex, setPlantHistoryIndex] = useState(-1);
     // Add selected points state for moving functionality
     const [selectedPoints, setSelectedPoints] = useState<Set<string>>(new Set());
-    const [movingGroup, setMovingGroup] = useState<{ points: LatLng[]; offset: [number, number] } | null>(null);
-    
+    const [movingGroup, setMovingGroup] = useState<{
+        points: LatLng[];
+        offset: [number, number];
+    } | null>(null);
+
     // Enhanced UI states
-    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+    const [toast, setToast] = useState<{
+        message: string;
+        type: 'success' | 'error' | 'warning';
+    } | null>(null);
     const [progress, setProgress] = useState(0);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -1251,15 +1341,20 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
             const currentPlantType = plantType;
             const currentLayers = layers;
             const currentAreaType = areaType;
-            
-            const areaTypes = currentAreaType ? currentAreaType.split(',').map(type => type.trim()) : ['default'];
-            
+
+            const areaTypes = currentAreaType
+                ? currentAreaType.split(',').map((type) => type.trim())
+                : ['default'];
+
             // Debug logging
             console.log('Sending layers to API:', currentLayers);
-            console.log('Exclusion layers (non-initial map):', currentLayers.filter(layer => !layer.isInitialMap));
-            
+            console.log(
+                'Exclusion layers (non-initial map):',
+                currentLayers.filter((layer) => !layer.isInitialMap)
+            );
+
             setProgress(30);
-            
+
             const { data } = await axios.post<{ plant_locations: LatLng[][] }>(
                 '/api/generate-planting-points',
                 {
@@ -1268,7 +1363,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                     plant_spacing: currentPlantType.plant_spacing,
                     row_spacing: currentPlantType.row_spacing,
                     area_types: areaTypes,
-                    layers: currentLayers.map(layer => ({
+                    layers: currentLayers.map((layer) => ({
                         ...layer,
                         coordinates: layer.coordinates.map((coord) => ({
                             lat: Number(coord.lat),
@@ -1291,9 +1386,12 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
             setPlantLocations(flattenedPoints);
             setGrid(data.plant_locations);
             setIsPlantLayoutGenerated(true);
-            
+
             setProgress(100);
-            setToast({ message: `Generated ${flattenedPoints.length} planting points successfully!`, type: 'success' });
+            setToast({
+                message: `Generated ${flattenedPoints.length} planting points successfully!`,
+                type: 'success',
+            });
         } catch (error) {
             console.error('Error details:', error);
             const errorMessage = axios.isAxiosError(error)
@@ -1314,43 +1412,45 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
         try {
             setIsLoading(true);
             setProgress(0);
-            
+
             const requestData = {
                 plant_type_id: plantType.id,
                 area: area,
-                zones: zones.map((zone) => {
-                    const zonePoints = plantLocations.filter(
-                        (point) =>
-                            zone.polygon &&
-                            isPointInPolygon(
-                                point.lat,
-                                point.lng,
-                                zone.polygon.map(([lat, lng]) => ({ lat, lng }))
-                            )
-                    );
-                    return {
-                        id: zone.id,
-                        pipeDirection: zone.pipeDirection,
-                        points: zonePoints,
-                    };
-                }).filter(zone => zone.points.length > 0) // Only include zones with points
+                zones: zones
+                    .map((zone) => {
+                        const zonePoints = plantLocations.filter(
+                            (point) =>
+                                zone.polygon &&
+                                isPointInPolygon(
+                                    point.lat,
+                                    point.lng,
+                                    zone.polygon.map(([lat, lng]) => ({ lat, lng }))
+                                )
+                        );
+                        return {
+                            id: zone.id,
+                            pipeDirection: zone.pipeDirection,
+                            points: zonePoints,
+                        };
+                    })
+                    .filter((zone) => zone.points.length > 0), // Only include zones with points
             };
 
             setProgress(40);
             const response = await axios.post('/api/generate-pipe-layout', requestData);
-            
+
             setProgress(80);
             setPipeLayout(response.data.pipe_layout);
             setZoneStats(response.data.zone_stats || []);
             setPipeSummary(response.data.summary || null);
             setPipeAnalysis(response.data.pipe_analysis || []);
-            
+
             setProgress(100);
-            setToast({ 
-                message: `Generated pipe layout with ${response.data.pipe_layout.length} pipes successfully!`, 
-                type: 'success' 
+            setToast({
+                message: `Generated pipe layout with ${response.data.pipe_layout.length} pipes successfully!`,
+                type: 'success',
             });
-            
+
             console.log('Pipe generation response:', response.data);
         } catch (error) {
             console.error('Error generating pipe layout:', error);
@@ -1452,7 +1552,6 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
         });
     };
 
-
     // Add after the existing handlers
     const handleValveTypeSelect = (type: ValveType) => {
         setSelectedValveType(type);
@@ -1516,18 +1615,25 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
         } else if (editMode === 'selectPolygon' && selectedPoints.size > 0) {
             // Start group dragging
             const selectedPointIds = Array.from(selectedPoints);
-            const selectedPointObjects = plantLocations.filter(p => 
+            const selectedPointObjects = plantLocations.filter((p) =>
                 selectedPointIds.includes(p.id || `point-${plantLocations.indexOf(p)}`)
             );
-            
+
             if (selectedPointObjects.length > 0) {
-                const centerLat = selectedPointObjects.reduce((sum, p) => sum + p.lat, 0) / selectedPointObjects.length;
-                const centerLng = selectedPointObjects.reduce((sum, p) => sum + p.lng, 0) / selectedPointObjects.length;
-                const offset: [number, number] = [e.latlng.lat - centerLat, e.latlng.lng - centerLng];
-                
+                const centerLat =
+                    selectedPointObjects.reduce((sum, p) => sum + p.lat, 0) /
+                    selectedPointObjects.length;
+                const centerLng =
+                    selectedPointObjects.reduce((sum, p) => sum + p.lng, 0) /
+                    selectedPointObjects.length;
+                const offset: [number, number] = [
+                    e.latlng.lat - centerLat,
+                    e.latlng.lng - centerLng,
+                ];
+
                 setMovingGroup({
                     points: selectedPointObjects,
-                    offset
+                    offset,
                 });
             }
         }
@@ -1562,30 +1668,37 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
 
     // Add function to save plant locations to history
     const savePlantToHistory = (newLocations: LatLng[]) => {
-        setPlantHistory(prev => {
+        setPlantHistory((prev) => {
             const newHistory = prev.slice(0, plantHistoryIndex + 1);
             newHistory.push(newLocations);
             return newHistory;
         });
-        setPlantHistoryIndex(prev => prev + 1);
+        setPlantHistoryIndex((prev) => prev + 1);
     };
 
     // Add handlers for moving selected points as a group
     const handleGroupDragStart = (e: LeafletMouseEvent) => {
         if (editMode === 'selectPolygon' && selectedPoints.size > 0) {
             const selectedPointIds = Array.from(selectedPoints);
-            const selectedPointObjects = plantLocations.filter(p => 
+            const selectedPointObjects = plantLocations.filter((p) =>
                 selectedPointIds.includes(p.id || `point-${plantLocations.indexOf(p)}`)
             );
-            
+
             if (selectedPointObjects.length > 0) {
-                const centerLat = selectedPointObjects.reduce((sum, p) => sum + p.lat, 0) / selectedPointObjects.length;
-                const centerLng = selectedPointObjects.reduce((sum, p) => sum + p.lng, 0) / selectedPointObjects.length;
-                const offset: [number, number] = [e.latlng.lat - centerLat, e.latlng.lng - centerLng];
-                
+                const centerLat =
+                    selectedPointObjects.reduce((sum, p) => sum + p.lat, 0) /
+                    selectedPointObjects.length;
+                const centerLng =
+                    selectedPointObjects.reduce((sum, p) => sum + p.lng, 0) /
+                    selectedPointObjects.length;
+                const offset: [number, number] = [
+                    e.latlng.lat - centerLat,
+                    e.latlng.lng - centerLng,
+                ];
+
                 setMovingGroup({
                     points: selectedPointObjects,
-                    offset
+                    offset,
                 });
             }
         }
@@ -1594,43 +1707,62 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
     const handleGroupDragMove = (position: [number, number]) => {
         if (movingGroup) {
             // Update the moving group with new position
-            setMovingGroup(prev => prev ? {
-                ...prev,
-                offset: [position[0] - (prev.points.reduce((sum, p) => sum + p.lat, 0) / prev.points.length), 
-                        position[1] - (prev.points.reduce((sum, p) => sum + p.lng, 0) / prev.points.length)]
-            } : null);
+            setMovingGroup((prev) =>
+                prev
+                    ? {
+                          ...prev,
+                          offset: [
+                              position[0] -
+                                  prev.points.reduce((sum, p) => sum + p.lat, 0) /
+                                      prev.points.length,
+                              position[1] -
+                                  prev.points.reduce((sum, p) => sum + p.lng, 0) /
+                                      prev.points.length,
+                          ],
+                      }
+                    : null
+            );
         }
     };
 
     const handleGroupDragEnd = () => {
         if (movingGroup) {
             const selectedPointIds = Array.from(selectedPoints);
-            const newLocations = plantLocations.map(point => {
+            const newLocations = plantLocations.map((point) => {
                 const pointId = point.id || `point-${plantLocations.indexOf(point)}`;
                 if (selectedPointIds.includes(pointId)) {
                     // Find the corresponding point in movingGroup
-                    const movingPoint = movingGroup.points.find(p => 
-                        (p.id || `point-${plantLocations.indexOf(p)}`) === pointId
+                    const movingPoint = movingGroup.points.find(
+                        (p) => (p.id || `point-${plantLocations.indexOf(p)}`) === pointId
                     );
                     if (movingPoint) {
-                        const centerLat = movingGroup.points.reduce((sum, p) => sum + p.lat, 0) / movingGroup.points.length;
-                        const centerLng = movingGroup.points.reduce((sum, p) => sum + p.lng, 0) / movingGroup.points.length;
+                        const centerLat =
+                            movingGroup.points.reduce((sum, p) => sum + p.lat, 0) /
+                            movingGroup.points.length;
+                        const centerLng =
+                            movingGroup.points.reduce((sum, p) => sum + p.lng, 0) /
+                            movingGroup.points.length;
                         const newLat = centerLat + movingGroup.offset[0];
                         const newLng = centerLng + movingGroup.offset[1];
-                        
+
                         // Snap to grid
-                        const [nearestLat, nearestLng] = findNearestGridPoint(newLat, newLng, processedPlantType, area);
-                        
+                        const [nearestLat, nearestLng] = findNearestGridPoint(
+                            newLat,
+                            newLng,
+                            processedPlantType,
+                            area
+                        );
+
                         return {
                             ...point,
                             lat: nearestLat,
-                            lng: nearestLng
+                            lng: nearestLng,
                         };
                     }
                 }
                 return point;
             });
-            
+
             savePlantToHistory(newLocations);
             setPlantLocations(newLocations);
             setMovingGroup(null);
@@ -1659,20 +1791,26 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
             setProgress(20);
 
             // Prepare zones data
-            const zonesData = zones.map(zone => ({
-                id: zone.id,
-                name: zone.name,
-                polygon_coordinates: zone.polygon ? zone.polygon.map(([lat, lng]) => ({ lat, lng })) : [],
-                color: zone.color,
-                pipe_direction: zone.pipeDirection
-            })).filter(zone => zone.polygon_coordinates.length > 0); // Only include zones with polygons
+            const zonesData = zones
+                .map((zone) => ({
+                    id: zone.id,
+                    name: zone.name,
+                    polygon_coordinates: zone.polygon
+                        ? zone.polygon.map(([lat, lng]) => ({ lat, lng }))
+                        : [],
+                    color: zone.color,
+                    pipe_direction: zone.pipeDirection,
+                }))
+                .filter((zone) => zone.polygon_coordinates.length > 0); // Only include zones with polygons
 
             setProgress(40);
 
             // Prepare planting points data
-            const plantingPointsData = plantLocations.map(point => {
+            const plantingPointsData = plantLocations.map((point) => {
                 // Generate unique point ID using timestamp and random string
-                const pointId = point.id || `point-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${plantLocations.indexOf(point)}`;
+                const pointId =
+                    point.id ||
+                    `point-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${plantLocations.indexOf(point)}`;
                 // Find which zone this point belongs to
                 let zoneId: number | null = null;
                 for (let i = 0; i < zones.length; i++) {
@@ -1686,14 +1824,14 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                     lat: point.lat,
                     lng: point.lng,
                     point_id: pointId,
-                    zone_id: zoneId
+                    zone_id: zoneId,
                 };
             });
 
             setProgress(60);
 
             // Prepare pipes data
-            const pipesData = pipeLayout.map(pipe => ({
+            const pipesData = pipeLayout.map((pipe) => ({
                 type: pipe.type === 'horizontal' ? 'branch' : 'branch', // All generated pipes are branch pipes
                 direction: pipe.type,
                 start_lat: pipe.start.lat,
@@ -1706,11 +1844,11 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                 pipe_diameter: pipe.pipe_diameter || 0,
                 zone_id: pipe.zone_id as number | null,
                 row_index: pipe.rowIndex || null,
-                col_index: pipe.colIndex || null
+                col_index: pipe.colIndex || null,
             }));
 
             // Add user-drawn pipes
-            userPipes.forEach(pipe => {
+            userPipes.forEach((pipe) => {
                 pipesData.push({
                     type: pipe.type,
                     direction: pipe.type === 'main' ? 'horizontal' : 'horizontal', // Default direction
@@ -1724,21 +1862,23 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                     pipe_diameter: 0,
                     zone_id: null,
                     row_index: null,
-                    col_index: null
+                    col_index: null,
                 });
             });
 
             setProgress(80);
 
             // Prepare layers data
-            const layersData = currentLayers.map(layer => ({
+            const layersData = currentLayers.map((layer) => ({
                 type: layer.type,
                 coordinates: layer.coordinates,
-                is_initial_map: layer.isInitialMap || false
+                is_initial_map: layer.isInitialMap || false,
             }));
 
             const requestData = {
-                field_name: existingFieldId ? `Field ${new Date().toLocaleDateString()} (Updated)` : `Field ${new Date().toLocaleDateString()}`,
+                field_name: existingFieldId
+                    ? `Field ${new Date().toLocaleDateString()} (Updated)`
+                    : `Field ${new Date().toLocaleDateString()}`,
                 area_coordinates: currentArea,
                 plant_type_id: currentPlantType.id,
                 total_plants: plantLocations.length,
@@ -1748,7 +1888,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                 layers: layersData,
                 zones: zonesData,
                 planting_points: plantingPointsData,
-                pipes: pipesData
+                pipes: pipesData,
             };
 
             // Debug logging
@@ -1773,26 +1913,32 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                 // Update existing field
                 response = await axios.put(`/api/fields/${existingFieldId}`, requestData, {
                     headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                        'X-CSRF-TOKEN': document
+                            .querySelector('meta[name="csrf-token"]')
+                            ?.getAttribute('content'),
                         'Content-Type': 'application/json',
-                    }
+                    },
                 });
             } else {
                 // Create new field
                 response = await axios.post('/api/save-field', requestData, {
                     headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                        'X-CSRF-TOKEN': document
+                            .querySelector('meta[name="csrf-token"]')
+                            ?.getAttribute('content'),
                         'Content-Type': 'application/json',
-                    }
+                    },
                 });
             }
 
             setProgress(100);
 
             if (response.data.success) {
-                setToast({ 
-                    message: existingFieldId ? 'Field updated successfully!' : 'Field saved successfully to database!', 
-                    type: 'success' 
+                setToast({
+                    message: existingFieldId
+                        ? 'Field updated successfully!'
+                        : 'Field saved successfully to database!',
+                    type: 'success',
                 });
                 setTimeout(() => {
                     router.visit('/');
@@ -1800,12 +1946,17 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
             } else {
                 throw new Error('Failed to save field');
             }
-
         } catch (error) {
             console.error('Error saving field:', error);
-            console.error('Error response:', axios.isAxiosError(error) ? error.response?.data : 'Not an axios error');
-            const errorMessage = axios.isAxiosError(error) 
-                ? error.response?.data?.message || error.response?.data?.error || error.message || 'Error saving field'
+            console.error(
+                'Error response:',
+                axios.isAxiosError(error) ? error.response?.data : 'Not an axios error'
+            );
+            const errorMessage = axios.isAxiosError(error)
+                ? error.response?.data?.message ||
+                  error.response?.data?.error ||
+                  error.message ||
+                  'Error saving field'
                 : 'An unexpected error occurred';
             setError(errorMessage);
             setToast({ message: errorMessage, type: 'error' });
@@ -1847,7 +1998,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
             const currentArea = area;
             const currentPlantType = processedPlantType;
             const currentLayers = layers;
-            
+
             if (currentArea.length > 0 && !isPlantLayoutGenerated) {
                 await handleGenerate();
             }
@@ -1881,16 +2032,12 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
         <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6">
             {/* Toast Notification */}
             {toast && (
-                <Toast 
-                    message={toast.message} 
-                    type={toast.type} 
-                    onClose={() => setToast(null)} 
-                />
+                <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
             )}
-            
+
             {/* Header */}
             <div className="mb-6">
-                <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
+                <h1 className="mb-2 flex items-center gap-3 text-3xl font-bold text-white">
                     <span className="text-blue-400">🌱</span>
                     Plant Layout Generator
                 </h1>
@@ -1899,7 +2046,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
 
             {/* Error Display */}
             {error && (
-                <div className="mb-6 rounded-lg bg-red-500/10 border border-red-500/20 p-4 text-red-400 flex items-center gap-2">
+                <div className="mb-6 flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-red-400">
                     <span className="text-lg">⚠</span>
                     <span>{error}</span>
                 </div>
@@ -1908,9 +2055,11 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
             {/* Progress Bar */}
             {(isGenerating || isSaving) && (
                 <div className="mb-6">
-                    <ProgressBar 
-                        progress={progress} 
-                        label={isGenerating ? 'Generating plant layout...' : 'Saving to database...'} 
+                    <ProgressBar
+                        progress={progress}
+                        label={
+                            isGenerating ? 'Generating plant layout...' : 'Saving to database...'
+                        }
                     />
                 </div>
             )}
@@ -2073,7 +2222,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                             </div>
                         </InfoItem>
                     </InfoSection>
-                    
+
                     <InfoSection title="Valve Configuration">
                         <InfoItem title="Valve Count">
                             <div className="flex flex-col gap-2">
@@ -2131,11 +2280,10 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                             </div>
                         </InfoItem>
                     </InfoSection>
-
                 </div>
 
                 <div className="space-y-4 lg:col-span-3">
-                    <div className="h-[600px] md:h-[700px] lg:h-[900px] w-full overflow-hidden rounded-xl border border-gray-700/50 shadow-2xl bg-gray-800/20 backdrop-blur-sm">
+                    <div className="h-[600px] w-full overflow-hidden rounded-xl border border-gray-700/50 bg-gray-800/20 shadow-2xl backdrop-blur-sm md:h-[700px] lg:h-[900px]">
                         <MapContainer
                             center={mapCenter}
                             zoom={18}
@@ -2209,7 +2357,11 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                                             featureGroupRef.current?.removeLayer(layer);
                                         }
                                         // Polygon for delete mode
-                                        else if (editMode === 'deletePolygon' && e.layerType === 'polygon' && e.layer instanceof L.Polygon) {
+                                        else if (
+                                            editMode === 'deletePolygon' &&
+                                            e.layerType === 'polygon' &&
+                                            e.layer instanceof L.Polygon
+                                        ) {
                                             const layer = e.layer;
                                             const latlngsRaw = layer.getLatLngs();
                                             let latlngs: L.LatLng[] = [];
@@ -2219,27 +2371,50 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                                                 latlngs = latlngsRaw as L.LatLng[];
                                             }
                                             const polygon = latlngs
-                                                .filter((latlng: L.LatLng) => typeof latlng.lat === 'number' && typeof latlng.lng === 'number')
-                                                .map((latlng: L.LatLng) => [latlng.lat, latlng.lng] as [number, number]);
-                                            
+                                                .filter(
+                                                    (latlng: L.LatLng) =>
+                                                        typeof latlng.lat === 'number' &&
+                                                        typeof latlng.lng === 'number'
+                                                )
+                                                .map(
+                                                    (latlng: L.LatLng) =>
+                                                        [latlng.lat, latlng.lng] as [number, number]
+                                                );
+
                                             // Find points within the polygon and delete them
-                                            const pointsToDelete = plantLocations.filter(point => 
-                                                isPointInPolygon(point.lat, point.lng, polygon.map(([lat, lng]) => ({ lat, lng })))
+                                            const pointsToDelete = plantLocations.filter((point) =>
+                                                isPointInPolygon(
+                                                    point.lat,
+                                                    point.lng,
+                                                    polygon.map(([lat, lng]) => ({ lat, lng }))
+                                                )
                                             );
-                                            
+
                                             if (pointsToDelete.length > 0) {
-                                                const newLocations = plantLocations.filter(point => 
-                                                    !isPointInPolygon(point.lat, point.lng, polygon.map(([lat, lng]) => ({ lat, lng })))
+                                                const newLocations = plantLocations.filter(
+                                                    (point) =>
+                                                        !isPointInPolygon(
+                                                            point.lat,
+                                                            point.lng,
+                                                            polygon.map(([lat, lng]) => ({
+                                                                lat,
+                                                                lng,
+                                                            }))
+                                                        )
                                                 );
                                                 setPlantLocations(newLocations);
                                             }
-                                            
+
                                             // Remove the polygon from the map
                                             featureGroupRef.current?.removeLayer(layer);
                                             setEditMode(null);
                                         }
                                         // Polygon for add mode
-                                        else if (editMode === 'addPolygon' && e.layerType === 'polygon' && e.layer instanceof L.Polygon) {
+                                        else if (
+                                            editMode === 'addPolygon' &&
+                                            e.layerType === 'polygon' &&
+                                            e.layer instanceof L.Polygon
+                                        ) {
                                             const layer = e.layer;
                                             const latlngsRaw = layer.getLatLngs();
                                             let latlngs: L.LatLng[] = [];
@@ -2249,24 +2424,42 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                                                 latlngs = latlngsRaw as L.LatLng[];
                                             }
                                             const polygon = latlngs
-                                                .filter((latlng: L.LatLng) => typeof latlng.lat === 'number' && typeof latlng.lng === 'number')
-                                                .map((latlng: L.LatLng) => [latlng.lat, latlng.lng] as [number, number]);
-                                            
+                                                .filter(
+                                                    (latlng: L.LatLng) =>
+                                                        typeof latlng.lat === 'number' &&
+                                                        typeof latlng.lng === 'number'
+                                                )
+                                                .map(
+                                                    (latlng: L.LatLng) =>
+                                                        [latlng.lat, latlng.lng] as [number, number]
+                                                );
+
                                             // Generate points within the polygon using the same grid system
-                                            const newPoints = generatePointsInPolygon(polygon, plantType, area);
-                                            
+                                            const newPoints = generatePointsInPolygon(
+                                                polygon,
+                                                plantType,
+                                                area
+                                            );
+
                                             if (newPoints.length > 0) {
-                                                const newLocations = [...plantLocations, ...newPoints];
+                                                const newLocations = [
+                                                    ...plantLocations,
+                                                    ...newPoints,
+                                                ];
                                                 savePlantToHistory(newLocations);
                                                 setPlantLocations(newLocations);
                                             }
-                                            
+
                                             // Remove the polygon from the map
                                             featureGroupRef.current?.removeLayer(layer);
                                             setEditMode(null);
                                         }
                                         // Polygon for select mode (moving points)
-                                        else if (editMode === 'selectPolygon' && e.layerType === 'polygon' && e.layer instanceof L.Polygon) {
+                                        else if (
+                                            editMode === 'selectPolygon' &&
+                                            e.layerType === 'polygon' &&
+                                            e.layer instanceof L.Polygon
+                                        ) {
                                             const layer = e.layer;
                                             const latlngsRaw = layer.getLatLngs();
                                             let latlngs: L.LatLng[] = [];
@@ -2276,19 +2469,33 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                                                 latlngs = latlngsRaw as L.LatLng[];
                                             }
                                             const polygon = latlngs
-                                                .filter((latlng: L.LatLng) => typeof latlng.lat === 'number' && typeof latlng.lng === 'number')
-                                                .map((latlng: L.LatLng) => [latlng.lat, latlng.lng] as [number, number]);
-                                            
+                                                .filter(
+                                                    (latlng: L.LatLng) =>
+                                                        typeof latlng.lat === 'number' &&
+                                                        typeof latlng.lng === 'number'
+                                                )
+                                                .map(
+                                                    (latlng: L.LatLng) =>
+                                                        [latlng.lat, latlng.lng] as [number, number]
+                                                );
+
                                             // Find points within the polygon and select them
-                                            const pointsToSelect = plantLocations.filter(point => 
-                                                isPointInPolygon(point.lat, point.lng, polygon.map(([lat, lng]) => ({ lat, lng })))
+                                            const pointsToSelect = plantLocations.filter((point) =>
+                                                isPointInPolygon(
+                                                    point.lat,
+                                                    point.lng,
+                                                    polygon.map(([lat, lng]) => ({ lat, lng }))
+                                                )
                                             );
-                                            
+
                                             if (pointsToSelect.length > 0) {
-                                                const selectedIds = pointsToSelect.map(p => p.id || `point-${plantLocations.indexOf(p)}`);
+                                                const selectedIds = pointsToSelect.map(
+                                                    (p) =>
+                                                        p.id || `point-${plantLocations.indexOf(p)}`
+                                                );
                                                 setSelectedPoints(new Set(selectedIds));
                                             }
-                                            
+
                                             // Remove the polygon from the map
                                             featureGroupRef.current?.removeLayer(layer);
                                             // Don't exit edit mode - stay in selectPolygon mode for moving
@@ -2331,7 +2538,11 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                                     }}
                                     draw={{
                                         rectangle: false,
-                                        polygon: currentZoneIndex !== null || editMode === 'deletePolygon' || editMode === 'addPolygon' || editMode === 'selectPolygon',
+                                        polygon:
+                                            currentZoneIndex !== null ||
+                                            editMode === 'deletePolygon' ||
+                                            editMode === 'addPolygon' ||
+                                            editMode === 'selectPolygon',
                                         circle: false,
                                         circlemarker: false,
                                         marker: true,
@@ -2372,7 +2583,11 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                                 <Marker
                                     key={valve.id}
                                     position={valve.position}
-                                    icon={valve.type === 'solenoid' ? solenoidValveIcon : ballValveIcon}
+                                    icon={
+                                        valve.type === 'solenoid'
+                                            ? solenoidValveIcon
+                                            : ballValveIcon
+                                    }
                                     eventHandlers={{
                                         mousedown: () => handleValveDragStart(valve),
                                         mouseup: () => setDraggingValve(null),
@@ -2391,23 +2606,27 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                                 />
                             ))}
                             <MapClickHandler onMapClick={handleMapClick} />
-                            <MouseTracker onMove={(position) => {
-                                if (draggingValve) {
-                                    handleValveDragEnd(position);
-                                }
-                                if (draggingPump) {
-                                    handlePumpDragEnd(position);
-                                }
-                                if (movingGroup) {
-                                    handleGroupDragMove(position);
-                                }
-                            }} />
-                            <MapMouseUpHandler onMouseUp={() => {
-                                if (movingGroup) {
-                                    handleGroupDragEnd();
-                                }
-                            }} />
-                            <ValveUndoRedoControl 
+                            <MouseTracker
+                                onMove={(position) => {
+                                    if (draggingValve) {
+                                        handleValveDragEnd(position);
+                                    }
+                                    if (draggingPump) {
+                                        handlePumpDragEnd(position);
+                                    }
+                                    if (movingGroup) {
+                                        handleGroupDragMove(position);
+                                    }
+                                }}
+                            />
+                            <MapMouseUpHandler
+                                onMouseUp={() => {
+                                    if (movingGroup) {
+                                        handleGroupDragEnd();
+                                    }
+                                }}
+                            />
+                            <ValveUndoRedoControl
                                 onUndo={handleValveUndo}
                                 onRedo={handleValveRedo}
                                 canUndo={equipmentHistoryIndex > 0}
@@ -2432,13 +2651,15 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                                                 setSelectedPumpType(false);
                                             }
                                         }}
-                                        variant={drawingPipeType === 'main' ? 'danger' : 'secondary'}
+                                        variant={
+                                            drawingPipeType === 'main' ? 'danger' : 'secondary'
+                                        }
                                         icon="🔴"
                                     >
                                         {drawingPipeType === 'main' ? 'Drawing...' : 'Main Pipe'}
                                     </ActionButton>
                                 </Tooltip>
-                                
+
                                 <Tooltip content="Draw sub-main distribution pipes">
                                     <ActionButton
                                         onClick={() => {
@@ -2450,13 +2671,15 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                                                 setSelectedPumpType(false);
                                             }
                                         }}
-                                        variant={drawingPipeType === 'submain' ? 'warning' : 'secondary'}
+                                        variant={
+                                            drawingPipeType === 'submain' ? 'warning' : 'secondary'
+                                        }
                                         icon="🟠"
                                     >
                                         {drawingPipeType === 'submain' ? 'Drawing...' : 'Sub-Main'}
                                     </ActionButton>
                                 </Tooltip>
-                                
+
                                 <Tooltip content="Add solenoid valve for zone control">
                                     <ActionButton
                                         onClick={() => {
@@ -2468,13 +2691,19 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                                                 setSelectedPumpType(false);
                                             }
                                         }}
-                                        variant={selectedValveType === 'solenoid' ? 'success' : 'secondary'}
+                                        variant={
+                                            selectedValveType === 'solenoid'
+                                                ? 'success'
+                                                : 'secondary'
+                                        }
                                         icon="🔌"
                                     >
-                                        {selectedValveType === 'solenoid' ? 'Placing...' : 'Solenoid'}
+                                        {selectedValveType === 'solenoid'
+                                            ? 'Placing...'
+                                            : 'Solenoid'}
                                     </ActionButton>
                                 </Tooltip>
-                                
+
                                 <Tooltip content="Add ball valve for manual control">
                                     <ActionButton
                                         onClick={() => {
@@ -2486,13 +2715,15 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                                                 setSelectedPumpType(false);
                                             }
                                         }}
-                                        variant={selectedValveType === 'ball' ? 'success' : 'secondary'}
+                                        variant={
+                                            selectedValveType === 'ball' ? 'success' : 'secondary'
+                                        }
                                         icon="🔵"
                                     >
                                         {selectedValveType === 'ball' ? 'Placing...' : 'Ball Valve'}
                                     </ActionButton>
                                 </Tooltip>
-                                
+
                                 <Tooltip content="Add water pump">
                                     <ActionButton
                                         onClick={() => {
@@ -2511,11 +2742,13 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                                     </ActionButton>
                                 </Tooltip>
                             </div>
-                            
+
                             {/* Right side - Generate Pipe Layout Button */}
                             <ActionButton
                                 onClick={handleGeneratePipeLayout}
-                                disabled={isLoading || zones.filter(zone => zone.polygon).length === 0}
+                                disabled={
+                                    isLoading || zones.filter((zone) => zone.polygon).length === 0
+                                }
                                 loading={isLoading}
                                 variant="primary"
                                 size="lg"
@@ -2524,30 +2757,43 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                                 {isLoading ? 'Generating...' : 'Generate Pipe Layout'}
                             </ActionButton>
                         </div>
-                        
+
                         {/* Status Messages and Pipe Configuration */}
                         <div>
                             <div className="flex flex-col items-center gap-2">
                                 {zones.length === 0 && (
-                                    <div className="text-sm text-yellow-400 text-center flex items-center gap-1">
+                                    <div className="flex items-center gap-1 text-center text-sm text-yellow-400">
                                         <span>⚠</span>
-                                        <span>Create at least one zone to generate pipe layout</span>
+                                        <span>
+                                            Create at least one zone to generate pipe layout
+                                        </span>
                                     </div>
                                 )}
-                                {zones.length > 0 && zones.filter(zone => zone.polygon).length === 0 && (
-                                    <div className="text-sm text-yellow-400 text-center flex items-center gap-1">
-                                        <span>⚠</span>
-                                        <span>Draw polygon for your zone(s) to generate pipe layout</span>
-                                    </div>
-                                )}
-                                {zones.filter(zone => zone.polygon).length > 0 && !isPlantLayoutGenerated && (
-                                    <div className="text-sm text-blue-400 text-center flex items-center gap-1">
-                                        <span>ℹ</span>
-                                        <span>Ready to generate pipe layout for {zones.filter(zone => zone.polygon).length} zone{zones.filter(zone => zone.polygon).length > 1 ? 's' : ''}</span>
-                                    </div>
-                                )}
+                                {zones.length > 0 &&
+                                    zones.filter((zone) => zone.polygon).length === 0 && (
+                                        <div className="flex items-center gap-1 text-center text-sm text-yellow-400">
+                                            <span>⚠</span>
+                                            <span>
+                                                Draw polygon for your zone(s) to generate pipe
+                                                layout
+                                            </span>
+                                        </div>
+                                    )}
+                                {zones.filter((zone) => zone.polygon).length > 0 &&
+                                    !isPlantLayoutGenerated && (
+                                        <div className="flex items-center gap-1 text-center text-sm text-blue-400">
+                                            <span>ℹ</span>
+                                            <span>
+                                                Ready to generate pipe layout for{' '}
+                                                {zones.filter((zone) => zone.polygon).length} zone
+                                                {zones.filter((zone) => zone.polygon).length > 1
+                                                    ? 's'
+                                                    : ''}
+                                            </span>
+                                        </div>
+                                    )}
                                 {pipeLayout.length > 0 && (
-                                    <div className="text-sm text-green-400 text-center flex items-center gap-1">
+                                    <div className="flex items-center gap-1 text-center text-sm text-green-400">
                                         <span>✓</span>
                                         <span>Pipe layout generated successfully</span>
                                     </div>
@@ -2555,67 +2801,138 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                             </div>
 
                             <InfoSection title="Pipe Configuration">
-                                <div className="flex flex-col md:flex-row gap-4">
-                                    <div className="flex-1 min-w-0">
+                                <div className="flex flex-col gap-4 md:flex-row">
+                                    <div className="min-w-0 flex-1">
                                         <InfoItem title="Pipe Summary">
                                             {pipeSummary ? (
                                                 <div className="flex flex-col gap-2">
-                                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
-                                                        <span className="text-white font-medium">Total Pipes</span>
-                                                        <span className="text-white font-medium">{pipeSummary.total_pipes}</span>
+                                                    <div className="flex items-center justify-between rounded bg-gray-800 p-2">
+                                                        <span className="font-medium text-white">
+                                                            Total Pipes
+                                                        </span>
+                                                        <span className="font-medium text-white">
+                                                            {pipeSummary.total_pipes}
+                                                        </span>
                                                     </div>
-                                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
-                                                        <span className="text-white font-medium">Total Length</span>
-                                                        <span className="text-white font-medium">{pipeSummary.total_length.toFixed(2)} m</span>
+                                                    <div className="flex items-center justify-between rounded bg-gray-800 p-2">
+                                                        <span className="font-medium text-white">
+                                                            Total Length
+                                                        </span>
+                                                        <span className="font-medium text-white">
+                                                            {pipeSummary.total_length.toFixed(2)} m
+                                                        </span>
                                                     </div>
-                                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
-                                                        <span className="text-white font-medium">Total Water Flow</span>
-                                                        <span className="text-white font-medium">{pipeSummary.total_water_flow.toFixed(2)} L/day</span>
+                                                    <div className="flex items-center justify-between rounded bg-gray-800 p-2">
+                                                        <span className="font-medium text-white">
+                                                            Total Water Flow
+                                                        </span>
+                                                        <span className="font-medium text-white">
+                                                            {pipeSummary.total_water_flow.toFixed(
+                                                                2
+                                                            )}{' '}
+                                                            L/day
+                                                        </span>
                                                     </div>
-                                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
-                                                        <span className="text-white font-medium">Plants Served</span>
-                                                        <span className="text-white font-medium">{pipeSummary.total_plants_served}</span>
+                                                    <div className="flex items-center justify-between rounded bg-gray-800 p-2">
+                                                        <span className="font-medium text-white">
+                                                            Plants Served
+                                                        </span>
+                                                        <span className="font-medium text-white">
+                                                            {pipeSummary.total_plants_served}
+                                                        </span>
                                                     </div>
-                                                    <div className="flex items-center justify-between p-2 rounded bg-gray-800">
-                                                        <span className="text-white font-medium">Avg Pipe Diameter</span>
-                                                        <span className="text-white font-medium">{pipeSummary.average_pipe_diameter.toFixed(0)} mm</span>
+                                                    <div className="flex items-center justify-between rounded bg-gray-800 p-2">
+                                                        <span className="font-medium text-white">
+                                                            Avg Pipe Diameter
+                                                        </span>
+                                                        <span className="font-medium text-white">
+                                                            {pipeSummary.average_pipe_diameter.toFixed(
+                                                                0
+                                                            )}{' '}
+                                                            mm
+                                                        </span>
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <div className="text-gray-400 text-sm">Generate pipe layout to see statistics</div>
+                                                <div className="text-sm text-gray-400">
+                                                    Generate pipe layout to see statistics
+                                                </div>
                                             )}
                                         </InfoItem>
                                     </div>
-                                    <div className="flex-1 min-w-0">
+                                    <div className="min-w-0 flex-1">
                                         <InfoItem title="Zone Pipe Details">
                                             <div className="flex flex-col gap-2">
                                                 {zoneStats.map((stat) => {
-                                                    const zone = zones.find(z => z.id === stat.zone_id);
+                                                    const zone = zones.find(
+                                                        (z) => z.id === stat.zone_id
+                                                    );
                                                     return (
-                                                        <div key={stat.zone_id} className="p-2 rounded bg-gray-800">
-                                                            <div className="flex items-center gap-2 mb-2">
-                                                                <span style={{ 
-                                                                    background: zone?.color || '#666', 
-                                                                    width: 12, 
-                                                                    height: 12, 
-                                                                    display: 'inline-block', 
-                                                                    borderRadius: 2 
-                                                                }}></span>
-                                                                <span className="text-white font-medium">{zone?.name || `Zone ${stat.zone_id}`}</span>
-                                                                <span className="text-gray-400 text-xs">({stat.pipe_direction})</span>
+                                                        <div
+                                                            key={stat.zone_id}
+                                                            className="rounded bg-gray-800 p-2"
+                                                        >
+                                                            <div className="mb-2 flex items-center gap-2">
+                                                                <span
+                                                                    style={{
+                                                                        background:
+                                                                            zone?.color || '#666',
+                                                                        width: 12,
+                                                                        height: 12,
+                                                                        display: 'inline-block',
+                                                                        borderRadius: 2,
+                                                                    }}
+                                                                ></span>
+                                                                <span className="font-medium text-white">
+                                                                    {zone?.name ||
+                                                                        `Zone ${stat.zone_id}`}
+                                                                </span>
+                                                                <span className="text-xs text-gray-400">
+                                                                    ({stat.pipe_direction})
+                                                                </span>
                                                             </div>
                                                             <div className="grid grid-cols-2 gap-1 text-xs text-gray-300">
-                                                                <span>Pipes: {stat.total_pipes}</span>
-                                                                <span>Length: {stat.total_length.toFixed(1)}m</span>
-                                                                <span>Flow: {stat.total_water_flow.toFixed(1)} L/day</span>
-                                                                <span>Plants: {stat.plants_served}</span>
-                                                                <span>Longest: {Math.max(...pipeLayout.filter(pipe => pipe.zone_id === stat.zone_id).map(pipe => pipe.length)).toFixed(1)}m</span>
+                                                                <span>
+                                                                    Pipes: {stat.total_pipes}
+                                                                </span>
+                                                                <span>
+                                                                    Length:{' '}
+                                                                    {stat.total_length.toFixed(1)}m
+                                                                </span>
+                                                                <span>
+                                                                    Flow:{' '}
+                                                                    {stat.total_water_flow.toFixed(
+                                                                        1
+                                                                    )}{' '}
+                                                                    L/day
+                                                                </span>
+                                                                <span>
+                                                                    Plants: {stat.plants_served}
+                                                                </span>
+                                                                <span>
+                                                                    Longest:{' '}
+                                                                    {Math.max(
+                                                                        ...pipeLayout
+                                                                            .filter(
+                                                                                (pipe) =>
+                                                                                    pipe.zone_id ===
+                                                                                    stat.zone_id
+                                                                            )
+                                                                            .map(
+                                                                                (pipe) =>
+                                                                                    pipe.length
+                                                                            )
+                                                                    ).toFixed(1)}
+                                                                    m
+                                                                </span>
                                                             </div>
                                                         </div>
                                                     );
                                                 })}
                                                 {zoneStats.length === 0 && (
-                                                    <div className="text-gray-400 text-sm">No zone statistics available</div>
+                                                    <div className="text-sm text-gray-400">
+                                                        No zone statistics available
+                                                    </div>
                                                 )}
                                             </div>
                                         </InfoItem>
@@ -2627,7 +2944,7 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                 </div>
             </div>
 
-            <div className="mt-8 flex items-center justify-between bg-gray-800/30 rounded-xl p-6 border border-gray-700/50">
+            <div className="mt-8 flex items-center justify-between rounded-xl border border-gray-700/50 bg-gray-800/30 p-6">
                 <ActionButton
                     onClick={() => router.get('/', {}, { preserveState: true })}
                     variant="secondary"
@@ -2635,34 +2952,41 @@ export default function GenerateTree({ areaType, area, plantType, layers = [], p
                 >
                     Back to Home
                 </ActionButton>
-                
+
                 <div className="flex gap-3">
                     <ActionButton
                         onClick={handleSaveToDatabase}
                         disabled={!isPlantLayoutGenerated || pipeLayout.length === 0}
                         loading={isSaving}
-                        variant={!isPlantLayoutGenerated || pipeLayout.length === 0 ? 'secondary' : 'success'}
+                        variant={
+                            !isPlantLayoutGenerated || pipeLayout.length === 0
+                                ? 'secondary'
+                                : 'success'
+                        }
                         icon="💾"
                     >
-                        {isSaving ? 'Saving...' : (existingFieldId ? 'Update Field' : 'Save to Database')}
+                        {isSaving
+                            ? 'Saving...'
+                            : existingFieldId
+                              ? 'Update Field'
+                              : 'Save to Database'}
                     </ActionButton>
                 </div>
             </div>
-
         </div>
     );
 }
 
 const PipeLegend = () => (
-    <div className="absolute bottom-4 right-4 z-[1000] bg-white p-3 rounded-lg shadow-lg">
-        <h4 className="font-medium text-gray-700 mb-2">Pipe Direction Legend</h4>
+    <div className="absolute bottom-4 right-4 z-[1000] rounded-lg bg-white p-3 shadow-lg">
+        <h4 className="mb-2 font-medium text-gray-700">Pipe Direction Legend</h4>
         <div className="space-y-1 text-xs">
             <div className="flex items-center gap-2">
-                <div className="w-4 h-1 bg-blue-500"></div>
+                <div className="h-1 w-4 bg-blue-500"></div>
                 <span className="text-gray-600">Horizontal Pipes</span>
             </div>
             <div className="flex items-center gap-2">
-                <div className="w-4 h-1 bg-green-500"></div>
+                <div className="h-1 w-4 bg-green-500"></div>
                 <span className="text-gray-600">Vertical Pipes</span>
             </div>
         </div>

@@ -159,48 +159,51 @@ const InputForm: React.FC<InputFormProps> = ({ input, onInputChange, selectedSpr
 
                 <div className="space-y-4 rounded-lg bg-gray-800 p-4 shadow-lg">
                     {input.longestSecondaryPipeM ? (
-                        <>  
-                        <h4 className="text-md font-medium text-orange-300">
-                        ท่อเมนรอง (Secondary Pipe)
-                    </h4>
-                    <div>
-                        <label className="mb-2 block text-sm font-medium">
-                            ท่อเมนรองเส้นที่ยาวที่สุด (เมตร)
-                        </label>
-                        <input
-                            type="number"
-                            value={input.longestSecondaryPipeM}
-                            onChange={(e) =>
-                                updateInput(
-                                    'longestSecondaryPipeM',
-                                    parseFloat(e.target.value) || 0
-                                )
-                            }
-                            step="0.001"
-                            min="0"
-                            className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
-                            placeholder="80.000 (0 = ไม่มีท่อนี้)"
-                        />
-                    </div>
-                    <div>
-                        <label className="mb-2 block text-sm font-medium">
-                            ท่อเมนรองรวมทั้งหมด (เมตร)
-                        </label>
-                        <input
-                            type="number"
-                            value={input.totalSecondaryPipeM}
-                            onChange={(e) =>
-                                updateInput('totalSecondaryPipeM', parseFloat(e.target.value) || 0)
-                            }
-                            step="0.001"
-                            min="0"
-                            className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
-                            placeholder="400.000 (0 = ไม่มีท่อนี้)"
-                        />
-                    </div>
+                        <>
+                            <h4 className="text-md font-medium text-orange-300">
+                                ท่อเมนรอง (Secondary Pipe)
+                            </h4>
+                            <div>
+                                <label className="mb-2 block text-sm font-medium">
+                                    ท่อเมนรองเส้นที่ยาวที่สุด (เมตร)
+                                </label>
+                                <input
+                                    type="number"
+                                    value={input.longestSecondaryPipeM}
+                                    onChange={(e) =>
+                                        updateInput(
+                                            'longestSecondaryPipeM',
+                                            parseFloat(e.target.value) || 0
+                                        )
+                                    }
+                                    step="0.001"
+                                    min="0"
+                                    className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
+                                    placeholder="80.000 (0 = ไม่มีท่อนี้)"
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-2 block text-sm font-medium">
+                                    ท่อเมนรองรวมทั้งหมด (เมตร)
+                                </label>
+                                <input
+                                    type="number"
+                                    value={input.totalSecondaryPipeM}
+                                    onChange={(e) =>
+                                        updateInput(
+                                            'totalSecondaryPipeM',
+                                            parseFloat(e.target.value) || 0
+                                        )
+                                    }
+                                    step="0.001"
+                                    min="0"
+                                    className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
+                                    placeholder="400.000 (0 = ไม่มีท่อนี้)"
+                                />
+                            </div>
                         </>
                     ) : (
-                        <div className="rounded bg-gray-900 p-2 text-center text-gray-400 h-full flex items-center justify-center">
+                        <div className="flex h-full items-center justify-center rounded bg-gray-900 p-2 text-center text-gray-400">
                             ไม่ได้ใช้ท่อเมนรอง
                         </div>
                     )}
@@ -209,46 +212,53 @@ const InputForm: React.FC<InputFormProps> = ({ input, onInputChange, selectedSpr
                 <div className="space-y-4 rounded-lg bg-gray-800 p-4 shadow-lg">
                     {input.longestMainPipeM > 0 ? (
                         <>
-                        <h4 className="text-md font-medium text-cyan-300">ท่อเมนหลัก (Main Pipe)</h4>
-                        <div>
-                            <label className="mb-2 block text-sm font-medium">
-                                ท่อเมนหลักเส้นที่ยาวที่สุด (เมตร)
-                            </label>
-                            <input
-                                type="number"
-                                value={input.longestMainPipeM}
-                                onChange={(e) =>
-                                    updateInput('longestMainPipeM', parseFloat(e.target.value) || 0)
-                                }
-                                step="0.001"
-                                min="0"
-                                className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
-                                placeholder="200.000 (0 = ไม่มีท่อนี้)"
-                            />
-                        </div>
-                        <div>
-                            <label className="mb-2 block text-sm font-medium">
-                                ท่อเมนหลักรวมทั้งหมด (เมตร)
-                            </label>
-                            <input
-                                type="number"
-                                value={input.totalMainPipeM}
-                                onChange={(e) =>
-                                    updateInput('totalMainPipeM', parseFloat(e.target.value) || 0)
-                                }
-                                step="0.001"
-                                min="0"
-                                className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
-                                placeholder="600.000 (0 = ไม่มีท่อนี้)"
-                            />
-                        </div>
+                            <h4 className="text-md font-medium text-cyan-300">
+                                ท่อเมนหลัก (Main Pipe)
+                            </h4>
+                            <div>
+                                <label className="mb-2 block text-sm font-medium">
+                                    ท่อเมนหลักเส้นที่ยาวที่สุด (เมตร)
+                                </label>
+                                <input
+                                    type="number"
+                                    value={input.longestMainPipeM}
+                                    onChange={(e) =>
+                                        updateInput(
+                                            'longestMainPipeM',
+                                            parseFloat(e.target.value) || 0
+                                        )
+                                    }
+                                    step="0.001"
+                                    min="0"
+                                    className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
+                                    placeholder="200.000 (0 = ไม่มีท่อนี้)"
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-2 block text-sm font-medium">
+                                    ท่อเมนหลักรวมทั้งหมด (เมตร)
+                                </label>
+                                <input
+                                    type="number"
+                                    value={input.totalMainPipeM}
+                                    onChange={(e) =>
+                                        updateInput(
+                                            'totalMainPipeM',
+                                            parseFloat(e.target.value) || 0
+                                        )
+                                    }
+                                    step="0.001"
+                                    min="0"
+                                    className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
+                                    placeholder="600.000 (0 = ไม่มีท่อนี้)"
+                                />
+                            </div>
                         </>
                     ) : (
-                        <div className="rounded bg-gray-900 p-2 text-center text-gray-400 h-full flex items-center justify-center">
+                        <div className="flex h-full items-center justify-center rounded bg-gray-900 p-2 text-center text-gray-400">
                             ไม่ได้ใช้ท่อเมนหลัก
                         </div>
-                    )
-                    }
+                    )}
                 </div>
             </div>
 

@@ -49,7 +49,7 @@ const showAlert = {
                 title: title,
                 text: text,
                 confirmButtonText: 'ตกลง',
-                confirmButtonColor: '#10b981'
+                confirmButtonColor: '#10b981',
             });
         } else {
             // Fallback ถ้า SweetAlert2 ไม่ load
@@ -64,7 +64,7 @@ const showAlert = {
                 title: title,
                 text: text,
                 confirmButtonText: 'ตกลง',
-                confirmButtonColor: '#ef4444'
+                confirmButtonColor: '#ef4444',
             });
         } else {
             alert(`${title}${text ? '\n' + text : ''}`);
@@ -78,7 +78,7 @@ const showAlert = {
                 title: title,
                 text: text,
                 confirmButtonText: 'ตกลง',
-                confirmButtonColor: '#f59e0b'
+                confirmButtonColor: '#f59e0b',
             });
         } else {
             alert(`${title}${text ? '\n' + text : ''}`);
@@ -95,7 +95,7 @@ const showAlert = {
                 confirmButtonText: 'ยืนยัน',
                 cancelButtonText: 'ยกเลิก',
                 confirmButtonColor: '#ef4444',
-                cancelButtonColor: '#6b7280'
+                cancelButtonColor: '#6b7280',
             });
         } else {
             const result = confirm(`${title}${text ? '\n' + text : ''}`);
@@ -109,13 +109,13 @@ const showAlert = {
                 title: title,
                 text: text,
                 confirmButtonText: 'ตกลง',
-                confirmButtonColor: '#3b82f6'
+                confirmButtonColor: '#3b82f6',
             });
         } else {
             alert(`${title}${text ? '\n' + text : ''}`);
             return Promise.resolve({ isConfirmed: true });
         }
-    }
+    },
 };
 
 // Enhanced API helper functions
@@ -416,53 +416,53 @@ const Pagination: React.FC<{
     const getPageNumbers = () => {
         const pages: number[] = [];
         const maxVisiblePages = 5;
-        
+
         let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-        let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-        
+        const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
         if (endPage - startPage + 1 < maxVisiblePages) {
             startPage = Math.max(1, endPage - maxVisiblePages + 1);
         }
-        
+
         for (let i = startPage; i <= endPage; i++) {
             pages.push(i);
         }
-        
+
         return pages;
     };
 
     if (totalPages <= 1) return null;
 
     return (
-        <div className="flex items-center justify-center gap-2 mt-6">
-            <div className="text-sm text-gray-400 mr-4">
+        <div className="mt-6 flex items-center justify-center gap-2">
+            <div className="mr-4 text-sm text-gray-400">
                 แสดง {startItem}-{endItem} จาก {totalItems} รายการ
             </div>
-            
+
             <button
-                className="px-3 py-1 border border-gray-600 bg-gray-700 text-white rounded hover:bg-gray-600 disabled:opacity-50"
+                className="rounded border border-gray-600 bg-gray-700 px-3 py-1 text-white hover:bg-gray-600 disabled:opacity-50"
                 onClick={() => onPageChange(1)}
                 disabled={currentPage === 1}
                 title="หน้าแรก"
             >
                 <ChevronFirst className="h-4 w-4" />
             </button>
-            
+
             <button
-                className="px-3 py-1 border border-gray-600 bg-gray-700 text-white rounded hover:bg-gray-600 disabled:opacity-50"
+                className="rounded border border-gray-600 bg-gray-700 px-3 py-1 text-white hover:bg-gray-600 disabled:opacity-50"
                 onClick={() => onPageChange(currentPage - 1)}
                 disabled={currentPage === 1}
                 title="หน้าก่อนหน้า"
             >
                 <ChevronLeft className="h-4 w-4" />
             </button>
-            
-            {getPageNumbers().map(page => (
+
+            {getPageNumbers().map((page) => (
                 <button
                     key={page}
-                    className={`px-3 py-1 border rounded ${
-                        page === currentPage 
-                            ? 'border-blue-500 bg-blue-600 text-white' 
+                    className={`rounded border px-3 py-1 ${
+                        page === currentPage
+                            ? 'border-blue-500 bg-blue-600 text-white'
                             : 'border-gray-600 bg-gray-700 text-white hover:bg-gray-600'
                     }`}
                     onClick={() => onPageChange(page)}
@@ -470,18 +470,18 @@ const Pagination: React.FC<{
                     {page}
                 </button>
             ))}
-            
+
             <button
-                className="px-3 py-1 border border-gray-600 bg-gray-700 text-white rounded hover:bg-gray-600 disabled:opacity-50"
+                className="rounded border border-gray-600 bg-gray-700 px-3 py-1 text-white hover:bg-gray-600 disabled:opacity-50"
                 onClick={() => onPageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
                 title="หน้าถัดไป"
             >
                 <ChevronRight className="h-4 w-4" />
             </button>
-            
+
             <button
-                className="px-3 py-1 border border-gray-600 bg-gray-700 text-white rounded hover:bg-gray-600 disabled:opacity-50"
+                className="rounded border border-gray-600 bg-gray-700 px-3 py-1 text-white hover:bg-gray-600 disabled:opacity-50"
                 onClick={() => onPageChange(totalPages)}
                 disabled={currentPage === totalPages}
                 title="หน้าสุดท้าย"
@@ -523,7 +523,8 @@ const CategoryForm: React.FC<{
         if (!formData.name.trim()) {
             newErrors.name = 'กรุณากรอกชื่อระบบ';
         } else if (!/^[a-z0-9_]+$/.test(formData.name)) {
-            newErrors.name = 'ชื่อระบบต้องเป็นตัวอักษรภาษาอังกฤษพิมพ์เล็ก ตัวเลข และ underscore เท่านั้น';
+            newErrors.name =
+                'ชื่อระบบต้องเป็นตัวอักษรภาษาอังกฤษพิมพ์เล็ก ตัวเลข และ underscore เท่านั้น';
         }
 
         if (!formData.display_name.trim()) {
@@ -539,7 +540,7 @@ const CategoryForm: React.FC<{
             showAlert.warning('ข้อมูลไม่ครบถ้วน', 'กรุณากรอกชื่อระบบและชื่อแสดงของคุณสมบัติ');
             return;
         }
-        
+
         // @ts-expect-error
         setFormData((prev) => {
             const newAttr = {
@@ -595,7 +596,7 @@ const CategoryForm: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4 overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black bg-opacity-50 p-4">
             <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-lg bg-gray-800 text-white shadow-2xl">
                 <div className="p-6">
                     <h2 className="mb-4 text-xl font-bold">
@@ -615,7 +616,7 @@ const CategoryForm: React.FC<{
                                     onChange={(e) => {
                                         setFormData((prev) => ({ ...prev, name: e.target.value }));
                                         if (errors.name) {
-                                            setErrors(prev => ({ ...prev, name: '' }));
+                                            setErrors((prev) => ({ ...prev, name: '' }));
                                         }
                                     }}
                                     className={`w-full rounded-lg border bg-gray-700 p-3 focus:ring-2 focus:ring-blue-500 ${
@@ -624,7 +625,9 @@ const CategoryForm: React.FC<{
                                     placeholder="เช่น sprinkler, pump"
                                     required
                                 />
-                                {errors.name && <div className="mt-1 text-xs text-red-400">{errors.name}</div>}
+                                {errors.name && (
+                                    <div className="mt-1 text-xs text-red-400">{errors.name}</div>
+                                )}
                             </div>
 
                             <div>
@@ -638,7 +641,7 @@ const CategoryForm: React.FC<{
                                             display_name: e.target.value,
                                         }));
                                         if (errors.display_name) {
-                                            setErrors(prev => ({ ...prev, display_name: '' }));
+                                            setErrors((prev) => ({ ...prev, display_name: '' }));
                                         }
                                     }}
                                     className={`w-full rounded-lg border bg-gray-700 p-3 focus:ring-2 focus:ring-blue-500 ${
@@ -647,7 +650,11 @@ const CategoryForm: React.FC<{
                                     placeholder="เช่น สปริงเกอร์, ปั๊มน้ำ"
                                     required
                                 />
-                                {errors.display_name && <div className="mt-1 text-xs text-red-400">{errors.display_name}</div>}
+                                {errors.display_name && (
+                                    <div className="mt-1 text-xs text-red-400">
+                                        {errors.display_name}
+                                    </div>
+                                )}
                             </div>
 
                             <div>
@@ -755,7 +762,7 @@ const CategoryForm: React.FC<{
                                         <button
                                             type="button"
                                             onClick={addAttribute}
-                                            className="ml-2 rounded bg-green-600 px-3 py-1 text-white hover:bg-green-700 transition-colors"
+                                            className="ml-2 rounded bg-green-600 px-3 py-1 text-white transition-colors hover:bg-green-700"
                                         >
                                             <Plus className="h-4 w-4" />
                                         </button>
@@ -795,7 +802,7 @@ const CategoryForm: React.FC<{
                                             <button
                                                 type="button"
                                                 onClick={() => removeAttribute(index)}
-                                                className="p-1 text-red-400 hover:text-red-300 transition-colors"
+                                                className="p-1 text-red-400 transition-colors hover:text-red-300"
                                             >
                                                 <Trash2 className="h-4 w-4" />
                                             </button>
@@ -810,14 +817,14 @@ const CategoryForm: React.FC<{
                             <button
                                 type="button"
                                 onClick={onCancel}
-                                className="flex items-center rounded-lg border border-gray-600 px-6 py-3 text-gray-300 hover:bg-gray-700 transition-colors"
+                                className="flex items-center rounded-lg border border-gray-600 px-6 py-3 text-gray-300 transition-colors hover:bg-gray-700"
                             >
                                 <X className="mr-2 h-4 w-4" />
                                 ยกเลิก
                             </button>
                             <button
                                 onClick={handleSubmit}
-                                className="flex items-center rounded-lg bg-blue-600 px-6 py-3 text-white hover:bg-blue-700 transition-colors"
+                                className="flex items-center rounded-lg bg-blue-600 px-6 py-3 text-white transition-colors hover:bg-blue-700"
                             >
                                 <Save className="mr-2 h-4 w-4" />
                                 บันทึก
@@ -927,7 +934,7 @@ const PumpAccessoryForm: React.FC<{
                 <button
                     type="button"
                     onClick={addAccessory}
-                    className="flex items-center rounded bg-green-600 px-3 py-2 text-white hover:bg-green-700 transition-colors"
+                    className="flex items-center rounded bg-green-600 px-3 py-2 text-white transition-colors hover:bg-green-700"
                 >
                     <Plus className="mr-1 h-4 w-4" />
                     เพิ่มอุปกรณ์
@@ -960,7 +967,7 @@ const PumpAccessoryForm: React.FC<{
                                     type="button"
                                     onClick={() => index > 0 && moveAccessory(index, index - 1)}
                                     disabled={index === 0}
-                                    className="rounded p-1 text-gray-400 hover:text-white disabled:opacity-50 transition-colors"
+                                    className="rounded p-1 text-gray-400 transition-colors hover:text-white disabled:opacity-50"
                                     title="ย้ายขึ้น"
                                 >
                                     <ChevronDown className="h-4 w-4 rotate-180" />
@@ -972,7 +979,7 @@ const PumpAccessoryForm: React.FC<{
                                         moveAccessory(index, index + 1)
                                     }
                                     disabled={index === accessories.length - 1}
-                                    className="rounded p-1 text-gray-400 hover:text-white disabled:opacity-50 transition-colors"
+                                    className="rounded p-1 text-gray-400 transition-colors hover:text-white disabled:opacity-50"
                                     title="ย้ายลง"
                                 >
                                     <ChevronDown className="h-4 w-4" />
@@ -980,7 +987,7 @@ const PumpAccessoryForm: React.FC<{
                                 <button
                                     type="button"
                                     onClick={() => removeAccessory(index)}
-                                    className="rounded p-1 text-red-400 hover:text-red-300 transition-colors"
+                                    className="rounded p-1 text-red-400 transition-colors hover:text-red-300"
                                     title="ลบ"
                                 >
                                     <Trash2 className="h-4 w-4" />
@@ -1021,7 +1028,9 @@ const PumpAccessoryForm: React.FC<{
                             </div>
 
                             <div>
-                                <label className="mb-1 block text-sm font-medium">ขนาด/คำอธิบาย</label>
+                                <label className="mb-1 block text-sm font-medium">
+                                    ขนาด/คำอธิบาย
+                                </label>
                                 <input
                                     type="text"
                                     value={accessory.size || ''}
@@ -1090,12 +1099,15 @@ const PumpAccessoryForm: React.FC<{
                                     <img
                                         src={accessory.image}
                                         alt="Accessory"
-                                        className="h-20 w-20 rounded-lg border border-gray-600 object-cover cursor-pointer hover:opacity-80 transition-opacity hover:border-blue-400"
+                                        className="h-20 w-20 cursor-pointer rounded-lg border border-gray-600 object-cover transition-opacity hover:border-blue-400 hover:opacity-80"
                                         onError={(e) => {
                                             const target = e.target as HTMLImageElement;
                                             target.style.display = 'none';
                                         }}
-                                        onClick={() => onImageClick && onImageClick(accessory.image!, accessory.name)}
+                                        onClick={() =>
+                                            onImageClick &&
+                                            onImageClick(accessory.image!, accessory.name)
+                                        }
                                         title="คลิกเพื่อดูรูปขนาดใหญ่"
                                     />
                                 )}
@@ -1162,7 +1174,7 @@ const PumpAccessoryForm: React.FC<{
                                                 <button
                                                     type="button"
                                                     onClick={() => removeSpecification(index, key)}
-                                                    className="rounded p-2 text-red-400 hover:text-red-300 transition-colors"
+                                                    className="rounded p-2 text-red-400 transition-colors hover:text-red-300"
                                                 >
                                                     <X className="h-4 w-4" />
                                                 </button>
@@ -1172,7 +1184,7 @@ const PumpAccessoryForm: React.FC<{
                                 <button
                                     type="button"
                                     onClick={() => updateSpecification(index, '', '')}
-                                    className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                                    className="text-sm text-blue-400 transition-colors hover:text-blue-300"
                                 >
                                     + เพิ่มข้อมูลจำเพาะ
                                 </button>
@@ -1221,18 +1233,15 @@ const EquipmentForm: React.FC<{
 
             if (equipment.attributes_raw && typeof equipment.attributes_raw === 'object') {
                 initialAttributes = { ...equipment.attributes_raw };
-            }
-            else if (Array.isArray(equipment.attributes)) {
+            } else if (Array.isArray(equipment.attributes)) {
                 equipment.attributes.forEach((attr: any) => {
                     if (attr.attribute_name && attr.value !== undefined) {
                         (initialAttributes as any)[attr.attribute_name] = attr.value;
                     }
                 });
-            }
-            else if (equipment.attributes && typeof equipment.attributes === 'object') {
+            } else if (equipment.attributes && typeof equipment.attributes === 'object') {
                 initialAttributes = { ...equipment.attributes };
-            }
-            else {
+            } else {
                 const rootAttributes = {};
                 Object.keys(equipment).forEach((key) => {
                     if (
@@ -1349,11 +1358,12 @@ const EquipmentForm: React.FC<{
         }
 
         // Attribute validation
-        attributes.forEach(attr => {
+        attributes.forEach((attr) => {
             if (attr.is_required) {
                 const value = formData.attributes?.[attr.attribute_name];
                 if (!value || (Array.isArray(value) && value.length === 0) || value === '') {
-                    newErrors[`attributes.${attr.attribute_name}`] = `กรุณากรอก${attr.display_name}`;
+                    newErrors[`attributes.${attr.attribute_name}`] =
+                        `กรุณากรอก${attr.display_name}`;
                 }
             }
         });
@@ -1419,7 +1429,7 @@ const EquipmentForm: React.FC<{
         }
 
         setLoading(true);
-        
+
         const attributesData: any = {};
         attributes.forEach((attr) => {
             const value = formData.attributes?.[attr.attribute_name];
@@ -1430,7 +1440,7 @@ const EquipmentForm: React.FC<{
 
         const processedAccessories = accessories.map((acc, index) => {
             let specifications = acc.specifications;
-            
+
             if (!specifications || (Array.isArray(specifications) && specifications.length === 0)) {
                 specifications = {};
             }
@@ -1472,7 +1482,7 @@ const EquipmentForm: React.FC<{
             );
         } catch (error: any) {
             console.error('Submit error:', error);
-            
+
             if (error.response && error.response.data) {
                 console.error('Server response:', error.response.data);
                 if (error.response.data.errors) {
@@ -1650,7 +1660,7 @@ const EquipmentForm: React.FC<{
     const isPump = selectedCategory?.name === 'pump';
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4 overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black bg-opacity-50 p-4">
             <div className="max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-lg bg-gray-800 text-white shadow-2xl">
                 <div className="p-6">
                     <h2 className="mb-6 text-2xl font-bold">
@@ -1700,7 +1710,10 @@ const EquipmentForm: React.FC<{
                                             product_code: e.target.value,
                                         }));
                                         if (validationErrors.product_code) {
-                                            setValidationErrors((prev: any) => ({ ...prev, product_code: undefined }));
+                                            setValidationErrors((prev: any) => ({
+                                                ...prev,
+                                                product_code: undefined,
+                                            }));
                                         }
                                     }}
                                     className={`w-full rounded-lg border bg-gray-700 p-3 text-white focus:ring-2 focus:ring-blue-500 ${
@@ -1729,7 +1742,10 @@ const EquipmentForm: React.FC<{
                                     onChange={(e) => {
                                         setFormData((prev) => ({ ...prev, name: e.target.value }));
                                         if (validationErrors.name) {
-                                            setValidationErrors((prev: any) => ({ ...prev, name: undefined }));
+                                            setValidationErrors((prev: any) => ({
+                                                ...prev,
+                                                name: undefined,
+                                            }));
                                         }
                                     }}
                                     className={`w-full rounded-lg border bg-gray-700 p-3 text-white focus:ring-2 focus:ring-blue-500 ${
@@ -1779,11 +1795,16 @@ const EquipmentForm: React.FC<{
                                             price: parseFloat(e.target.value) || 0,
                                         }));
                                         if (validationErrors.price) {
-                                            setValidationErrors((prev: any) => ({ ...prev, price: undefined }));
+                                            setValidationErrors((prev: any) => ({
+                                                ...prev,
+                                                price: undefined,
+                                            }));
                                         }
                                     }}
                                     className={`w-full rounded-lg border bg-gray-700 p-3 text-white focus:ring-2 focus:ring-blue-500 ${
-                                        validationErrors.price ? 'border-red-500' : 'border-gray-600'
+                                        validationErrors.price
+                                            ? 'border-red-500'
+                                            : 'border-gray-600'
                                     }`}
                                     required
                                 />
@@ -1820,8 +1841,11 @@ const EquipmentForm: React.FC<{
                                         <img
                                             src={formData.image}
                                             alt="Product"
-                                            className="h-20 w-20 rounded-lg border border-gray-600 object-cover cursor-pointer hover:opacity-80 transition-opacity hover:border-blue-400"
-                                            onClick={() => onImageClick && onImageClick(formData.image!, 'สินค้า')}
+                                            className="h-20 w-20 cursor-pointer rounded-lg border border-gray-600 object-cover transition-opacity hover:border-blue-400 hover:opacity-80"
+                                            onClick={() =>
+                                                onImageClick &&
+                                                onImageClick(formData.image!, 'สินค้า')
+                                            }
                                             title="คลิกเพื่อดูรูปขนาดใหญ่"
                                         />
                                     )}
@@ -1894,7 +1918,7 @@ const EquipmentForm: React.FC<{
                             <button
                                 type="button"
                                 onClick={onCancel}
-                                className="flex items-center rounded-lg border border-gray-600 px-6 py-3 text-gray-300 hover:bg-gray-700 transition-colors"
+                                className="flex items-center rounded-lg border border-gray-600 px-6 py-3 text-gray-300 transition-colors hover:bg-gray-700"
                                 disabled={loading}
                             >
                                 <X className="mr-2 h-4 w-4" />
@@ -1903,7 +1927,7 @@ const EquipmentForm: React.FC<{
                             <button
                                 onClick={handleSubmit}
                                 disabled={loading || imageUploading}
-                                className="flex items-center rounded-lg bg-blue-600 px-6 py-3 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                                className="flex items-center rounded-lg bg-blue-600 px-6 py-3 text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
                             >
                                 {loading ? (
                                     <>
@@ -2064,58 +2088,58 @@ const EquipmentDetailModal: React.FC<{
     const getThaiDisplayName = (attributeName: string) => {
         const thaiDisplayMap: { [key: string]: string } = {
             // สปริงเกอร์
-            'flow_rate': 'อัตราการไหล',
-            'pressure': 'ความดัน', 
-            'radius': 'รัศมีการพ่น',
-            'waterVolumeLitersPerHour': 'อัตราการไหล',
-            'pressureBar': 'ความดัน',
-            'radiusMeters': 'รัศมีการพ่น',
-            
+            flow_rate: 'อัตราการไหล',
+            pressure: 'ความดัน',
+            radius: 'รัศมีการพ่น',
+            waterVolumeLitersPerHour: 'อัตราการไหล',
+            pressureBar: 'ความดัน',
+            radiusMeters: 'รัศมีการพ่น',
+
             // ปั๊มน้ำ
-            'power_hp': 'กำลัง',
-            'powerHP': 'กำลัง',
-            'powerKW': 'กำลัง',
-            'phase': 'เฟส',
-            'inlet_size_inch': 'ขนาดท่อดูด',
-            'outlet_size_inch': 'ขนาดท่อส่ง',
-            'flow_rate_lpm': 'อัตราการไหล',
-            'head_m': 'หัวดัน',
-            'max_head_m': 'หัวดันสูงสุด',
-            'max_flow_rate_lpm': 'อัตราการไหลสูงสุด',
-            'suction_depth_m': 'ความลึกดูด',
-            'weight_kg': 'น้ำหนัก',
-            
+            power_hp: 'กำลัง',
+            powerHP: 'กำลัง',
+            powerKW: 'กำลัง',
+            phase: 'เฟส',
+            inlet_size_inch: 'ขนาดท่อดูด',
+            outlet_size_inch: 'ขนาดท่อส่ง',
+            flow_rate_lpm: 'อัตราการไหล',
+            head_m: 'หัวดัน',
+            max_head_m: 'หัวดันสูงสุด',
+            max_flow_rate_lpm: 'อัตราการไหลสูงสุด',
+            suction_depth_m: 'ความลึกดูด',
+            weight_kg: 'น้ำหนัก',
+
             // ท่อ
-            'size_mm': 'ขนาด',
-            'size_inch': 'ขนาด',
-            'sizeMM': 'ขนาด',
-            'sizeInch': 'ขนาด',
-            'lengthM': 'ความยาว',
-            'dimensions_cm': 'ขนาด',
-            'material': 'วัสดุ',
-            
+            size_mm: 'ขนาด',
+            size_inch: 'ขนาด',
+            sizeMM: 'ขนาด',
+            sizeInch: 'ขนาด',
+            lengthM: 'ความยาว',
+            dimensions_cm: 'ขนาด',
+            material: 'วัสดุ',
+
             // ไฟฟ้า
-            'voltage': 'แรงดันไฟฟ้า',
-            'current': 'กระแสไฟฟ้า',
-            'frequency': 'ความถี่',
-            
+            voltage: 'แรงดันไฟฟ้า',
+            current: 'กระแสไฟฟ้า',
+            frequency: 'ความถี่',
+
             // ทั่วไป
-            'brand': 'แบรนด์',
-            'model': 'รุ่น',
-            'color': 'สี',
-            'weight': 'น้ำหนัก',
-            'height': 'ความสูง',
-            'width': 'ความกว้าง',
-            'length': 'ความยาว',
-            'diameter': 'เส้นผ่านศูนย์กลาง',
-            'thickness': 'ความหนา',
-            'capacity': 'ความจุ',
-            'efficiency': 'ประสิทธิภาพ',
-            'temperature_range': 'ช่วงอุณหภูมิ',
-            'operating_pressure': 'ความดันใช้งาน',
-            'max_pressure': 'ความดันสูงสุด',
-            'connection_type': 'ประเภทการต่อ',
-            'thread_size': 'ขนาดเกลียว',
+            brand: 'แบรนด์',
+            model: 'รุ่น',
+            color: 'สี',
+            weight: 'น้ำหนัก',
+            height: 'ความสูง',
+            width: 'ความกว้าง',
+            length: 'ความยาว',
+            diameter: 'เส้นผ่านศูนย์กลาง',
+            thickness: 'ความหนา',
+            capacity: 'ความจุ',
+            efficiency: 'ประสิทธิภาพ',
+            temperature_range: 'ช่วงอุณหภูมิ',
+            operating_pressure: 'ความดันใช้งาน',
+            max_pressure: 'ความดันสูงสุด',
+            connection_type: 'ประเภทการต่อ',
+            thread_size: 'ขนาดเกลียว',
         };
 
         // ถ้าพบใน mapping ให้ใช้ภาษาไทย
@@ -2180,7 +2204,7 @@ const EquipmentDetailModal: React.FC<{
     const pumpAccessories = equipment.pumpAccessories || equipment.pumpAccessory || [];
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4 overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black bg-opacity-50 p-4">
             <div className="max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-lg bg-gray-800 text-white shadow-2xl">
                 <div className="p-6">
                     <div className="mb-6 flex items-start justify-between">
@@ -2188,14 +2212,14 @@ const EquipmentDetailModal: React.FC<{
                         <div className="flex gap-2">
                             <button
                                 onClick={onEdit}
-                                className="flex items-center rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 transition-colors"
+                                className="flex items-center rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
                             >
                                 <Edit2 className="mr-2 h-4 w-4" />
                                 แก้ไข
                             </button>
                             <button
                                 onClick={onClose}
-                                className="p-2 text-gray-400 hover:text-white transition-colors"
+                                className="p-2 text-gray-400 transition-colors hover:text-white"
                             >
                                 <X className="h-6 w-6" />
                             </button>
@@ -2209,13 +2233,16 @@ const EquipmentDetailModal: React.FC<{
                                 <img
                                     src={equipment.image}
                                     alt={equipment.name}
-                                    className="h-64 w-full rounded-lg border border-gray-600 object-cover cursor-pointer hover:opacity-80 transition-opacity hover:border-blue-400"
+                                    className="h-64 w-full cursor-pointer rounded-lg border border-gray-600 object-cover transition-opacity hover:border-blue-400 hover:opacity-80"
                                     onError={(e) => {
                                         const target = e.target as HTMLImageElement;
                                         target.style.display = 'none';
                                         target.nextElementSibling?.classList.remove('hidden');
                                     }}
-                                    onClick={() => onImageClick && onImageClick(equipment.image!, equipment.name)}
+                                    onClick={() =>
+                                        onImageClick &&
+                                        onImageClick(equipment.image!, equipment.name)
+                                    }
                                     title="คลิกเพื่อดูรูปขนาดใหญ่"
                                 />
                             ) : null}
@@ -2258,7 +2285,13 @@ const EquipmentDetailModal: React.FC<{
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-gray-400">คุณสมบัติ:</span>
-                                        <span>{attributes.length - attributes.filter(attr => attr.formatted_value == 0).length} รายการ</span>
+                                        <span>
+                                            {attributes.length -
+                                                attributes.filter(
+                                                    (attr) => attr.formatted_value == 0
+                                                ).length}{' '}
+                                            รายการ
+                                        </span>
                                     </div>
                                     {pumpAccessories.length > 0 && (
                                         <div className="flex justify-between">
@@ -2271,7 +2304,7 @@ const EquipmentDetailModal: React.FC<{
                             {/* Pump Accessories */}
                             {pumpAccessories.length > 0 && (
                                 <div>
-                                    <h3 className="mb-3 mt-6 flex items-center text-lg font-semibold text-orange-400 overflow-hidden">
+                                    <h3 className="mb-3 mt-6 flex items-center overflow-hidden text-lg font-semibold text-orange-400">
                                         <Wrench className="mr-2 h-5 w-5" />
                                         อุปกรณ์ประกอบ ({pumpAccessories.length} รายการ)
                                     </h3>
@@ -2293,7 +2326,7 @@ const EquipmentDetailModal: React.FC<{
                                                                     <img
                                                                         src={accessory.image}
                                                                         alt={accessory.name}
-                                                                        className="h-16 w-16 rounded-lg border border-gray-600 object-cover cursor-pointer hover:opacity-80 transition-opacity hover:border-blue-400"
+                                                                        className="h-16 w-16 cursor-pointer rounded-lg border border-gray-600 object-cover transition-opacity hover:border-blue-400 hover:opacity-80"
                                                                         onError={(e) => {
                                                                             const target =
                                                                                 e.target as HTMLImageElement;
@@ -2303,7 +2336,13 @@ const EquipmentDetailModal: React.FC<{
                                                                                 'hidden'
                                                                             );
                                                                         }}
-                                                                        onClick={() => onImageClick && onImageClick(accessory.image!, accessory.name)}
+                                                                        onClick={() =>
+                                                                            onImageClick &&
+                                                                            onImageClick(
+                                                                                accessory.image!,
+                                                                                accessory.name
+                                                                            )
+                                                                        }
                                                                         title="คลิกเพื่อดูรูปขนาดใหญ่"
                                                                     />
                                                                 ) : null}
@@ -2449,56 +2488,59 @@ const EquipmentDetailModal: React.FC<{
                             {attributes.length > 0 && (
                                 <div>
                                     <h3 className="mb-3 text-lg font-semibold text-purple-400">
-                                        คุณสมบัติเฉพาะ ({attributes.length - attributes.filter(attr => attr.formatted_value == 0).length} รายการ)
+                                        คุณสมบัติเฉพาะ (
+                                        {attributes.length -
+                                            attributes.filter((attr) => attr.formatted_value == 0)
+                                                .length}{' '}
+                                        รายการ)
                                     </h3>
                                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                         {attributes.map((attr, index) => (
-                                            <div
-                                                key={attr.attribute_name || index}
-                                            >
+                                            <div key={attr.attribute_name || index}>
                                                 {attr.formatted_value != 0 ? (
-                                                    <div className="rounded-lg bg-gray-700 p-4" >
-                                                    <div className="flex items-start justify-between">
-                                                    <div className="flex-1">
-                                                        <label className="text-sm font-medium text-gray-300">
-                                                            {attr.display_name}
-                                                            {attr.unit && (
-                                                                <span className="ml-1 text-gray-500">
-                                                                    ({attr.unit})
-                                                                </span>
-                                                            )}
-                                                        </label>
-                                                        <p className="mt-1 font-medium text-white">
-                                                            {attr.formatted_value ||
-                                                                formatAttributeValue(attr.value)}
-                                                        </p>
-                                                    </div>
+                                                    <div className="rounded-lg bg-gray-700 p-4">
+                                                        <div className="flex items-start justify-between">
+                                                            <div className="flex-1">
+                                                                <label className="text-sm font-medium text-gray-300">
+                                                                    {attr.display_name}
+                                                                    {attr.unit && (
+                                                                        <span className="ml-1 text-gray-500">
+                                                                            ({attr.unit})
+                                                                        </span>
+                                                                    )}
+                                                                </label>
+                                                                <p className="mt-1 font-medium text-white">
+                                                                    {attr.formatted_value ||
+                                                                        formatAttributeValue(
+                                                                            attr.value
+                                                                        )}
+                                                                </p>
+                                                            </div>
 
-                                                    {/* Type indicator */}
-                                                    <span
-                                                        className={`ml-2 rounded px-2 py-1 text-xs ${
-                                                            attr.data_type === 'array'
-                                                                ? 'bg-blue-900 text-blue-300'
-                                                                : attr.data_type === 'number'
-                                                                  ? 'bg-green-900 text-green-300'
-                                                                  : attr.data_type === 'boolean'
-                                                                    ? 'bg-yellow-900 text-yellow-300'
-                                                                    : 'bg-gray-600 text-gray-300'
-                                                        }`}
-                                                    >
-                                                        {attr.data_type}
-                                                    </span>
-                                                </div>
-                                                </div>
+                                                            {/* Type indicator */}
+                                                            <span
+                                                                className={`ml-2 rounded px-2 py-1 text-xs ${
+                                                                    attr.data_type === 'array'
+                                                                        ? 'bg-blue-900 text-blue-300'
+                                                                        : attr.data_type ===
+                                                                            'number'
+                                                                          ? 'bg-green-900 text-green-300'
+                                                                          : attr.data_type ===
+                                                                              'boolean'
+                                                                            ? 'bg-yellow-900 text-yellow-300'
+                                                                            : 'bg-gray-600 text-gray-300'
+                                                                }`}
+                                                            >
+                                                                {attr.data_type}
+                                                            </span>
+                                                        </div>
+                                                    </div>
                                                 ) : null}
-                                                
                                             </div>
                                         ))}
                                     </div>
                                 </div>
                             )}
-
-                            
                         </div>
                     </div>
                 </div>
@@ -2569,7 +2611,7 @@ const ImageModal: React.FC<{
     if (!isOpen) return null;
 
     return (
-        <div 
+        <div
             className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-75"
             onClick={onClose}
         >
@@ -2577,12 +2619,12 @@ const ImageModal: React.FC<{
                 {/* ปุ่มปิด */}
                 <button
                     onClick={onClose}
-                    className="absolute -top-2 -right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors shadow-lg"
+                    className="absolute -right-2 -top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white shadow-lg transition-colors hover:bg-red-700"
                     title="ปิด"
                 >
                     <X className="h-4 w-4" />
                 </button>
-                
+
                 {/* รูปภาพ */}
                 <img
                     src={imageSrc}
@@ -2590,10 +2632,10 @@ const ImageModal: React.FC<{
                     className="max-h-full max-w-full rounded-lg shadow-2xl"
                     onClick={(e) => e.stopPropagation()}
                 />
-                
+
                 {/* ชื่อรูป */}
                 <div className="mt-2 text-center">
-                    <p className="text-white text-sm bg-black bg-opacity-50 rounded px-2 py-1 inline-block">
+                    <p className="inline-block rounded bg-black bg-opacity-50 px-2 py-1 text-sm text-white">
                         {imageAlt}
                     </p>
                 </div>
@@ -2609,7 +2651,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
     const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10); // 10 รายการต่อหน้า
-    
+
     const [filters, setFilters] = useState<FilterOptions>({
         search: '',
         categoryId: null,
@@ -2714,7 +2756,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
 
     // Filter and sort equipments
     const filteredAndSortedEquipments = useMemo(() => {
-        let result = equipments.filter((equipment) => {
+        const result = equipments.filter((equipment) => {
             const searchFields = [
                 equipment.name,
                 equipment.product_code || equipment.productCode,
@@ -2834,10 +2876,16 @@ const EnhancedEquipmentCRUD: React.FC = () => {
         try {
             if (editingCategory) {
                 await api.updateCategory(editingCategory.id, categoryData);
-                showAlert.success('แก้ไขหมวดหมู่สำเร็จ', `${categoryData.display_name} ได้รับการแก้ไขเรียบร้อยแล้ว`);
+                showAlert.success(
+                    'แก้ไขหมวดหมู่สำเร็จ',
+                    `${categoryData.display_name} ได้รับการแก้ไขเรียบร้อยแล้ว`
+                );
             } else {
                 await api.createCategory(categoryData);
-                showAlert.success('เพิ่มหมวดหมู่สำเร็จ', `${categoryData.display_name} ได้รับการเพิ่มเรียบร้อยแล้ว`);
+                showAlert.success(
+                    'เพิ่มหมวดหมู่สำเร็จ',
+                    `${categoryData.display_name} ได้รับการเพิ่มเรียบร้อยแล้ว`
+                );
             }
 
             // Reload categories
@@ -2893,7 +2941,10 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                 if (selectedCategoryId === category.id) {
                     setSelectedCategoryId(categoriesData[0]?.id || null);
                 }
-                showAlert.success('ลบสำเร็จ', `หมวดหมู่ ${category.display_name} ได้รับการลบเรียบร้อยแล้ว`);
+                showAlert.success(
+                    'ลบสำเร็จ',
+                    `หมวดหมู่ ${category.display_name} ได้รับการลบเรียบร้อยแล้ว`
+                );
             } catch (error) {
                 console.error('Failed to delete category:', error);
                 showAlert.error('เกิดข้อผิดพลาด', 'ไม่สามารถลบหมวดหมู่ได้');
@@ -2919,7 +2970,10 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                 setEquipments(equipmentsData);
                 setStats(statsData);
                 setSelectedItems([]);
-                showAlert.success('ลบสำเร็จ', `ลบสินค้า ${selectedItems.length} รายการเรียบร้อยแล้ว`);
+                showAlert.success(
+                    'ลบสำเร็จ',
+                    `ลบสินค้า ${selectedItems.length} รายการเรียบร้อยแล้ว`
+                );
             } catch (error) {
                 console.error('Failed to bulk delete:', error);
                 showAlert.error('เกิดข้อผิดพลาด', 'ไม่สามารถลบสินค้าได้');
@@ -2940,7 +2994,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
             setStats(statsData);
             setSelectedItems([]);
             showAlert.success(
-                'อัปเดตสำเร็จ', 
+                'อัปเดตสำเร็จ',
                 `อัปเดตสถานะสินค้า ${selectedItems.length} รายการเป็น${isActive ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}เรียบร้อยแล้ว`
             );
         } catch (error) {
@@ -2983,8 +3037,13 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                 <img
                                     src="https://f.btwcdn.com/store-50036/store/e4c1b5ae-cf8e-5017-536b-66ecd994018d.jpg"
                                     alt="logo"
-                                    className="h-[80px] w-[80px] rounded-xl cursor-pointer hover:opacity-80 transition-opacity shadow-lg"
-                                    onClick={() => openImageModal('https://f.btwcdn.com/store-50036/store/e4c1b5ae-cf8e-5017-536b-66ecd994018d.jpg', 'Logo บริษัท')}
+                                    className="h-[80px] w-[80px] cursor-pointer rounded-xl shadow-lg transition-opacity hover:opacity-80"
+                                    onClick={() =>
+                                        openImageModal(
+                                            'https://f.btwcdn.com/store-50036/store/e4c1b5ae-cf8e-5017-536b-66ecd994018d.jpg',
+                                            'Logo บริษัท'
+                                        )
+                                    }
                                     title="คลิกเพื่อดูรูปขนาดใหญ่"
                                 />
                                 <h1 className="flex items-center text-3xl font-bold text-gray-50">
@@ -2997,7 +3056,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                         setEditingCategory(undefined);
                                         setShowCategoryForm(true);
                                     }}
-                                    className="flex items-center rounded-lg bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700 shadow-lg"
+                                    className="flex items-center rounded-lg bg-green-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-green-700"
                                 >
                                     <Tag className="mr-2 h-5 w-5" />
                                     เพิ่มหมวดหมู่
@@ -3008,7 +3067,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                         setShowEquipmentForm(true);
                                     }}
                                     disabled={saving}
-                                    className="flex items-center rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 disabled:opacity-50 shadow-lg"
+                                    className="flex items-center rounded-lg bg-blue-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-blue-700 disabled:opacity-50"
                                 >
                                     <Plus className="mr-2 h-5 w-5" />
                                     เพิ่มสินค้า
@@ -3036,7 +3095,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                 search: e.target.value,
                                             }))
                                         }
-                                        className="flex-1 rounded-lg border border-gray-500 bg-gray-600 p-3 text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 shadow-sm"
+                                        className="flex-1 rounded-lg border border-gray-500 bg-gray-600 p-3 text-white placeholder-gray-400 shadow-sm focus:ring-2 focus:ring-blue-500"
                                     />
                                 </div>
 
@@ -3052,7 +3111,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                             setSelectedCategoryId(categoryId);
                                             setFilters((prev) => ({ ...prev, categoryId }));
                                         }}
-                                        className="rounded-lg border border-gray-500 bg-gray-600 p-3 text-white focus:ring-2 focus:ring-blue-500 shadow-sm"
+                                        className="rounded-lg border border-gray-500 bg-gray-600 p-3 text-white shadow-sm focus:ring-2 focus:ring-blue-500"
                                     >
                                         <option value="">ทุกหมวดหมู่</option>
                                         {categories.map((category) => (
@@ -3072,7 +3131,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                             status: e.target.value as any,
                                         }))
                                     }
-                                    className="rounded-lg border border-gray-500 bg-gray-600 p-3 text-white focus:ring-2 focus:ring-blue-500 shadow-sm"
+                                    className="rounded-lg border border-gray-500 bg-gray-600 p-3 text-white shadow-sm focus:ring-2 focus:ring-blue-500"
                                 >
                                     <option value="all">ทุกสถานะ</option>
                                     <option value="active">เปิดใช้งาน</option>
@@ -3090,7 +3149,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                             sortOrder: sortOrder as any,
                                         }));
                                     }}
-                                    className="rounded-lg border border-gray-500 bg-gray-600 p-3 text-white focus:ring-2 focus:ring-blue-500 shadow-sm"
+                                    className="rounded-lg border border-gray-500 bg-gray-600 p-3 text-white shadow-sm focus:ring-2 focus:ring-blue-500"
                                 >
                                     <option value="name-asc">ชื่อ ก-ฮ</option>
                                     <option value="name-desc">ชื่อ ฮ-ก</option>
@@ -3125,25 +3184,25 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                     </span>
                                     <button
                                         onClick={() => handleBulkToggleStatus(true)}
-                                        className="rounded bg-green-600 px-3 py-1 text-white hover:bg-green-700 transition-colors shadow-sm"
+                                        className="rounded bg-green-600 px-3 py-1 text-white shadow-sm transition-colors hover:bg-green-700"
                                     >
                                         เปิดใช้งาน
                                     </button>
                                     <button
                                         onClick={() => handleBulkToggleStatus(false)}
-                                        className="rounded bg-yellow-600 px-3 py-1 text-white hover:bg-yellow-700 transition-colors shadow-sm"
+                                        className="rounded bg-yellow-600 px-3 py-1 text-white shadow-sm transition-colors hover:bg-yellow-700"
                                     >
                                         ปิดใช้งาน
                                     </button>
                                     <button
                                         onClick={handleBulkDelete}
-                                        className="rounded bg-red-600 px-3 py-1 text-white hover:bg-red-700 transition-colors shadow-sm"
+                                        className="rounded bg-red-600 px-3 py-1 text-white shadow-sm transition-colors hover:bg-red-700"
                                     >
                                         ลบทั้งหมด
                                     </button>
                                     <button
                                         onClick={() => setSelectedItems([])}
-                                        className="rounded bg-gray-600 px-3 py-1 text-white hover:bg-gray-700 transition-colors shadow-sm"
+                                        className="rounded bg-gray-600 px-3 py-1 text-white shadow-sm transition-colors hover:bg-gray-700"
                                     >
                                         ยกเลิก
                                     </button>
@@ -3153,7 +3212,9 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                             {/* Results Summary */}
                             <div className="flex items-center justify-between text-sm text-gray-300">
                                 <div>
-                                    แสดง {paginatedEquipments.length} จาก {filteredAndSortedEquipments.length} รายการทั้งหมด {equipments.length} รายการ
+                                    แสดง {paginatedEquipments.length} จาก{' '}
+                                    {filteredAndSortedEquipments.length} รายการทั้งหมด{' '}
+                                    {equipments.length} รายการ
                                     {selectedCategoryId && (
                                         <span className="ml-2 text-blue-300">
                                             (หมวดหมู่:{' '}
@@ -3194,7 +3255,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                         <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
                             {/* ปุ่มแสดงทุกหมวดหมู่ */}
                             <div
-                                className={`cursor-pointer rounded-lg border-2 p-4 transition-all hover:scale-105 shadow-lg ${
+                                className={`cursor-pointer rounded-lg border-2 p-4 shadow-lg transition-all hover:scale-105 ${
                                     selectedCategoryId === null
                                         ? 'border-purple-500 bg-purple-900 shadow-purple-500/20'
                                         : 'border-gray-500 bg-gray-600 hover:border-gray-400 hover:bg-gray-500'
@@ -3202,7 +3263,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                 onClick={() => setSelectedCategoryId(null)}
                             >
                                 <div className="text-center">
-                                    <div className="mb-2 text-2xl flex justify-center">
+                                    <div className="mb-2 flex justify-center text-2xl">
                                         <Package className="h-8 w-8 text-purple-400" />
                                     </div>
                                     <div className="mb-1 text-sm font-medium text-white">
@@ -3227,7 +3288,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                 return (
                                     <div
                                         key={category.id}
-                                        className={`cursor-pointer rounded-lg border-2 p-4 transition-all hover:scale-105 shadow-lg ${
+                                        className={`cursor-pointer rounded-lg border-2 p-4 shadow-lg transition-all hover:scale-105 ${
                                             isSelected
                                                 ? 'border-blue-500 bg-blue-900 shadow-blue-500/20'
                                                 : 'border-gray-500 bg-gray-600 hover:border-gray-400 hover:bg-gray-500'
@@ -3254,7 +3315,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                         setEditingCategory(category);
                                                         setShowCategoryForm(true);
                                                     }}
-                                                    className="rounded p-1 text-blue-400 hover:bg-blue-800 hover:text-blue-300 transition-colors"
+                                                    className="rounded p-1 text-blue-400 transition-colors hover:bg-blue-800 hover:text-blue-300"
                                                     title="แก้ไข"
                                                 >
                                                     <Edit2 className="h-3 w-3" />
@@ -3264,7 +3325,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                         e.stopPropagation();
                                                         handleDeleteCategory(category);
                                                     }}
-                                                    className="rounded p-1 text-red-400 hover:bg-red-800 hover:text-red-300 transition-colors"
+                                                    className="rounded p-1 text-red-400 transition-colors hover:bg-red-800 hover:text-red-300"
                                                     title="ลบ"
                                                 >
                                                     <Trash2 className="h-3 w-3" />
@@ -3300,7 +3361,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                         return (
                                             <div
                                                 key={equipment.id}
-                                                className="group cursor-pointer rounded-lg border border-gray-600 bg-gray-800 p-4 transition-all hover:shadow-xl hover:shadow-blue-500/20 hover:border-blue-400"
+                                                className="group cursor-pointer rounded-lg border border-gray-600 bg-gray-800 p-4 transition-all hover:border-blue-400 hover:shadow-xl hover:shadow-blue-500/20"
                                                 onClick={() => {
                                                     setSelectedEquipment(equipment);
                                                     setShowEquipmentDetail(true);
@@ -3328,7 +3389,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                                 setEditingEquipment(equipment);
                                                                 setShowEquipmentForm(true);
                                                             }}
-                                                            className="rounded p-1 text-blue-400 hover:bg-blue-900 transition-colors"
+                                                            className="rounded p-1 text-blue-400 transition-colors hover:bg-blue-900"
                                                             title="แก้ไข"
                                                         >
                                                             <Edit2 className="h-3 w-3" />
@@ -3338,7 +3399,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                                 e.stopPropagation();
                                                                 handleDeleteEquipment(equipment);
                                                             }}
-                                                            className="rounded p-1 text-red-400 hover:bg-red-900 transition-colors"
+                                                            className="rounded p-1 text-red-400 transition-colors hover:bg-red-900"
                                                             title="ลบ"
                                                         >
                                                             <Trash2 className="h-3 w-3" />
@@ -3350,7 +3411,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                     <img
                                                         src={equipment.image}
                                                         alt={equipment.name}
-                                                        className="mb-3 h-24 w-full rounded object-cover transition-transform group-hover:scale-105 cursor-pointer hover:opacity-80 shadow-lg"
+                                                        className="mb-3 h-24 w-full cursor-pointer rounded object-cover shadow-lg transition-transform hover:opacity-80 group-hover:scale-105"
                                                         onError={(e) => {
                                                             (
                                                                 e.target as HTMLImageElement
@@ -3358,7 +3419,10 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                         }}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            openImageModal(equipment.image!, equipment.name);
+                                                            openImageModal(
+                                                                equipment.image!,
+                                                                equipment.name
+                                                            );
                                                         }}
                                                         title="คลิกเพื่อดูรูปขนาดใหญ่"
                                                     />
@@ -3376,9 +3440,11 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                         </span>
                                                     </div>
                                                     <div className="flex justify-between">
-                                                        <span className="text-gray-400">สถานะ:</span>
+                                                        <span className="text-gray-400">
+                                                            สถานะ:
+                                                        </span>
                                                         <span
-                                                            className={`font-semibold ${Boolean(equipment.is_active) ? 'text-green-400' : 'text-red-400'}`}
+                                                            className={`font-semibold ${equipment.is_active ? 'text-green-400' : 'text-red-400'}`}
                                                         >
                                                             {equipment.is_active
                                                                 ? 'ใช้งาน'
@@ -3386,12 +3452,15 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                         </span>
                                                     </div>
                                                     <div className="flex justify-between">
-                                                        <span className="text-gray-400">หมวดหมู่:</span>
+                                                        <span className="text-gray-400">
+                                                            หมวดหมู่:
+                                                        </span>
                                                         <span className="truncate text-blue-400">
                                                             {
                                                                 categories.find(
                                                                     (c) =>
-                                                                        c.id === equipment.category_id
+                                                                        c.id ===
+                                                                        equipment.category_id
                                                                 )?.display_name
                                                             }
                                                         </span>
@@ -3406,35 +3475,43 @@ const EnhancedEquipmentCRUD: React.FC = () => {
 
                                                 {/* Attributes Preview */}
                                                 {equipment.attributes &&
-                                                    Object.keys(equipment.attributes).length > 0 && (
+                                                    Object.keys(equipment.attributes).length >
+                                                        0 && (
                                                         <div className="mt-2 text-xs">
                                                             <div className="mb-1 text-gray-400">
                                                                 คุณสมบัติ:
                                                             </div>
                                                             <div className="flex flex-wrap gap-1">
-                                                                {Object.entries(equipment.attributes)
+                                                                {Object.entries(
+                                                                    equipment.attributes
+                                                                )
                                                                     .slice(0, 2)
                                                                     .map(([key, value]) => {
                                                                         // Format the value for display
                                                                         let displayValue = '';
                                                                         if (Array.isArray(value)) {
                                                                             if (
-                                                                                value.length === 2 &&
+                                                                                value.length ===
+                                                                                    2 &&
                                                                                 typeof value[0] ===
                                                                                     'number'
                                                                             ) {
                                                                                 displayValue = `${value[0]}-${value[1]}`;
                                                                             } else {
                                                                                 displayValue =
-                                                                                    value.join(', ');
+                                                                                    value.join(
+                                                                                        ', '
+                                                                                    );
                                                                             }
                                                                         } else if (
-                                                                            typeof value === 'number'
+                                                                            typeof value ===
+                                                                            'number'
                                                                         ) {
                                                                             displayValue =
                                                                                 value.toLocaleString();
                                                                         } else if (
-                                                                            typeof value === 'boolean'
+                                                                            typeof value ===
+                                                                            'boolean'
                                                                         ) {
                                                                             displayValue = value
                                                                                 ? 'ใช่'
@@ -3492,7 +3569,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                         );
                                     })}
                                 </div>
-                                
+
                                 <Pagination
                                     currentPage={currentPage}
                                     totalPages={totalPages}
@@ -3504,7 +3581,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                         ) : (
                             // Table View
                             <>
-                                <div className="overflow-x-auto shadow-lg rounded-lg">
+                                <div className="overflow-x-auto rounded-lg shadow-lg">
                                     <table className="w-full text-left text-sm text-gray-300">
                                         <thead className="bg-gray-600 text-xs uppercase text-gray-400">
                                             <tr>
@@ -3535,7 +3612,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                             {paginatedEquipments.map((equipment) => (
                                                 <tr
                                                     key={equipment.id}
-                                                    className={`cursor-pointer border-b border-gray-600 hover:bg-gray-600 transition-colors ${
+                                                    className={`cursor-pointer border-b border-gray-600 transition-colors hover:bg-gray-600 ${
                                                         selectedItems.includes(equipment.id)
                                                             ? 'bg-blue-900'
                                                             : 'bg-gray-700'
@@ -3565,15 +3642,18 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                             <img
                                                                 src={equipment.image}
                                                                 alt={equipment.name}
-                                                                className="h-12 w-12 rounded object-cover cursor-pointer hover:opacity-80 transition-opacity hover:border-blue-400 border border-gray-600 shadow-sm"
+                                                                className="h-12 w-12 cursor-pointer rounded border border-gray-600 object-cover shadow-sm transition-opacity hover:border-blue-400 hover:opacity-80"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    openImageModal(equipment.image!, equipment.name);
+                                                                    openImageModal(
+                                                                        equipment.image!,
+                                                                        equipment.name
+                                                                    );
                                                                 }}
                                                                 title="คลิกเพื่อดูรูปขนาดใหญ่"
                                                             />
                                                         ) : (
-                                                            <div className="flex h-12 w-12 items-center justify-center rounded bg-gray-600 border border-gray-500 shadow-sm">
+                                                            <div className="flex h-12 w-12 items-center justify-center rounded border border-gray-500 bg-gray-600 shadow-sm">
                                                                 <Package className="h-6 w-6 text-gray-400" />
                                                             </div>
                                                         )}
@@ -3593,7 +3673,8 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                             {
                                                                 categories.find(
                                                                     (c) =>
-                                                                        c.id === equipment.category_id
+                                                                        c.id ===
+                                                                        equipment.category_id
                                                                 )?.display_name
                                                             }
                                                         </span>
@@ -3639,8 +3720,8 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                             {(equipment.pumpAccessories ||
                                                                 equipment.pumpAccessory) &&
                                                                 (equipment.pumpAccessories ||
-                                                                    equipment.pumpAccessory)!.length >
-                                                                    0 && (
+                                                                    equipment.pumpAccessory)!
+                                                                    .length > 0 && (
                                                                     <span className="flex items-center rounded bg-orange-900 px-2 py-1 text-xs text-orange-300 shadow-sm">
                                                                         <Wrench className="mr-1 h-3 w-3" />
                                                                         {
@@ -3663,7 +3744,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                                     setSelectedEquipment(equipment);
                                                                     setShowEquipmentDetail(true);
                                                                 }}
-                                                                className="rounded p-2 text-blue-400 hover:bg-blue-900 transition-colors shadow-sm"
+                                                                className="rounded p-2 text-blue-400 shadow-sm transition-colors hover:bg-blue-900"
                                                                 title="ดูรายละเอียด"
                                                             >
                                                                 <Eye className="h-4 w-4" />
@@ -3673,7 +3754,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                                     setEditingEquipment(equipment);
                                                                     setShowEquipmentForm(true);
                                                                 }}
-                                                                className="rounded p-2 text-green-400 hover:bg-green-900 transition-colors shadow-sm"
+                                                                className="rounded p-2 text-green-400 shadow-sm transition-colors hover:bg-green-900"
                                                                 title="แก้ไข"
                                                             >
                                                                 <Edit2 className="h-4 w-4" />
@@ -3682,7 +3763,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                                 onClick={() =>
                                                                     handleDeleteEquipment(equipment)
                                                                 }
-                                                                className="rounded p-2 text-red-400 hover:bg-red-900 transition-colors shadow-sm"
+                                                                className="rounded p-2 text-red-400 shadow-sm transition-colors hover:bg-red-900"
                                                                 title="ลบ"
                                                             >
                                                                 <Trash2 className="h-4 w-4" />
@@ -3694,7 +3775,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                         </tbody>
                                     </table>
                                 </div>
-                                
+
                                 <Pagination
                                     currentPage={currentPage}
                                     totalPages={totalPages}

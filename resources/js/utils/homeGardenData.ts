@@ -157,8 +157,7 @@ export const calculateAreaFromCoordinates = (
 
     // Convert to square meters (approximate)
     const areaInSquareMeters =
-        area * 111000 * 111000 *
-        Math.cos((coordinates[0].lat * Math.PI) / 180);
+        area * 111000 * 111000 * Math.cos((coordinates[0].lat * Math.PI) / 180);
     return areaInSquareMeters;
 };
 
@@ -184,10 +183,7 @@ export const estimateInstallationCost = (
     return sprinklerCost + pipeCost + laborCost + miscCost;
 };
 
-export const estimateInstallationTime = (
-    sprinklerCount: number,
-    pipeLength: number
-): number => {
+export const estimateInstallationTime = (sprinklerCount: number, pipeLength: number): number => {
     const sprinklerTime = sprinklerCount * 0.5; // 30 minutes per sprinkler
     const pipeTime = pipeLength * 0.1; // 6 minutes per meter
     const setupTime = 2;
