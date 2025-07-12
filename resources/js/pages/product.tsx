@@ -133,24 +133,37 @@ export default function Product() {
         // คำนวณค่าเริ่มต้นสำหรับฟิลด์ใหม่โดยใช้ข้อมูลจากฟาร์ม
         const totalTrees = Math.round(plants);
         const numberOfZones = zones.length || 1;
-        
+
         // คำนวณจำนวนสปริงเกอร์ต่อท่อย่อยโดยประมาณ
-        const estimatedSprinklersPerBranch = Math.max(1, Math.ceil(totalTrees / (numberOfZones * 10))); // ประมาณ 10 ท่อย่อยต่อโซน
-        
+        const estimatedSprinklersPerBranch = Math.max(
+            1,
+            Math.ceil(totalTrees / (numberOfZones * 10))
+        ); // ประมาณ 10 ท่อย่อยต่อโซน
+
         // สำหรับท่อย่อยเส้นที่ยาวที่สุด อาจมีสปริงเกอร์มากกว่าเฉลี่ย 20-50%
-        const sprinklersPerLongestBranch = Math.max(estimatedSprinklersPerBranch, Math.ceil(estimatedSprinklersPerBranch * 1.3));
-        
+        const sprinklersPerLongestBranch = Math.max(
+            estimatedSprinklersPerBranch,
+            Math.ceil(estimatedSprinklersPerBranch * 1.3)
+        );
+
         // คำนวณจำนวนท่อย่อยต่อท่อรอง
-        const estimatedBranchesPerSecondary = hasValidSubmainPipe ? 
-            Math.max(1, Math.ceil(totalTrees / (numberOfZones * sprinklersPerLongestBranch))) : 1;
-        const branchesPerLongestSecondary = hasValidSubmainPipe ? 
-            Math.max(estimatedBranchesPerSecondary, Math.ceil(estimatedBranchesPerSecondary * 1.2)) : 1;
-        
+        const estimatedBranchesPerSecondary = hasValidSubmainPipe
+            ? Math.max(1, Math.ceil(totalTrees / (numberOfZones * sprinklersPerLongestBranch)))
+            : 1;
+        const branchesPerLongestSecondary = hasValidSubmainPipe
+            ? Math.max(
+                  estimatedBranchesPerSecondary,
+                  Math.ceil(estimatedBranchesPerSecondary * 1.2)
+              )
+            : 1;
+
         // คำนวณจำนวนท่อรองต่อท่อเมน
-        const estimatedSecondariesPerMain = hasValidMainPipe ? 
-            Math.max(1, Math.ceil(estimatedBranchesPerSecondary / 2)) : 1;
-        const secondariesPerLongestMain = hasValidMainPipe ? 
-            Math.max(estimatedSecondariesPerMain, Math.ceil(estimatedSecondariesPerMain * 1.1)) : 1;
+        const estimatedSecondariesPerMain = hasValidMainPipe
+            ? Math.max(1, Math.ceil(estimatedBranchesPerSecondary / 2))
+            : 1;
+        const secondariesPerLongestMain = hasValidMainPipe
+            ? Math.max(estimatedSecondariesPerMain, Math.ceil(estimatedSecondariesPerMain * 1.1))
+            : 1;
 
         const result = {
             farmSizeRai: formatNumber(area, 3),
@@ -162,17 +175,17 @@ export default function Product() {
             staticHeadM: 0,
             pressureHeadM: 20, // ค่าเริ่มต้น จะถูกเปลี่ยนจากสปริงเกอร์ที่เลือกในภายหลัง
             pipeAgeYears: 0,
-            
+
             // ฟิลด์เดิม
             sprinklersPerBranch: estimatedSprinklersPerBranch,
             branchesPerSecondary: estimatedBranchesPerSecondary,
             simultaneousZones: 1,
-            
+
             // ฟิลด์ใหม่สำหรับการคำนวณแบบละเอียด
             sprinklersPerLongestBranch: sprinklersPerLongestBranch,
             branchesPerLongestSecondary: branchesPerLongestSecondary,
             secondariesPerLongestMain: secondariesPerLongestMain,
-            
+
             // ข้อมูลท่อ
             longestBranchPipeM: formatNumber(longestBranchPipeM, 3),
             totalBranchPipeM: formatNumber(totalBranchPipeM, 3),
@@ -240,42 +253,40 @@ export default function Product() {
     // Default selections when results update (ใช้ข้อมูลจาก database)
     useEffect(() => {
         if (!results) return;
-    
+
         console.log('Setting default equipment selections from database');
-    
+
         // ฟังก์ชันเลือกอุปกรณ์ที่ดีที่สุด (ราคาสูงสุดในกลุ่มแนะนำ)
-        const selectBestEquipment = (
-            recommended: any[], 
-            analyzed: any[], 
-            currentSelected: any
-        ) => {
+        const selectBestEquipment = (recommended: any[], analyzed: any[], currentSelected: any) => {
             // ถ้ามีอุปกรณ์ปัจจุบันและยังอยู่ในกลุ่มแนะนำ ให้ใช้ต่อ
             if (currentSelected) {
-                const currentInRecommended = recommended.find(item => item.id === currentSelected.id);
+                const currentInRecommended = recommended.find(
+                    (item) => item.id === currentSelected.id
+                );
                 if (currentInRecommended && currentInRecommended.isRecommended) {
                     return currentSelected;
                 }
             }
-    
+
             // เลือกจากกลุ่มแนะนำ (ราคาสูงสุด)
             if (recommended.length > 0) {
                 return recommended.sort((a, b) => b.price - a.price)[0];
             }
-    
+
             // เลือกจากกลุ่มที่ใช้ได้ (ราคาสูงสุด)
-            const usableItems = analyzed?.filter(item => item.isUsable) || [];
+            const usableItems = analyzed?.filter((item) => item.isUsable) || [];
             if (usableItems.length > 0) {
                 return usableItems.sort((a, b) => b.price - a.price)[0];
             }
-    
+
             // เลือกจากทั้งหมด (คะแนนสูงสุด)
             if (analyzed && analyzed.length > 0) {
                 return analyzed.sort((a, b) => b.score - a.score)[0];
             }
-    
+
             return null;
         };
-    
+
         // Sprinkler - เลือกราคาสูงสุดในกลุ่มแนะนำ
         const newSelectedSprinkler = selectBestEquipment(
             results.recommendedSprinklers || [],
@@ -285,7 +296,7 @@ export default function Product() {
         if (newSelectedSprinkler && newSelectedSprinkler.id !== selectedSprinkler?.id) {
             setSelectedSprinkler(newSelectedSprinkler);
         }
-    
+
         // Branch pipe - เลือกราคาสูงสุดในกลุ่มแนะนำ
         const newSelectedBranchPipe = selectBestEquipment(
             results.recommendedBranchPipe || [],
@@ -295,7 +306,7 @@ export default function Product() {
         if (newSelectedBranchPipe && newSelectedBranchPipe.id !== selectedBranchPipe?.id) {
             setSelectedBranchPipe(newSelectedBranchPipe);
         }
-    
+
         // Secondary pipe - เฉพาะเมื่อมีข้อมูล
         if (hasValidSubmainPipeData) {
             const newSelectedSecondaryPipe = selectBestEquipment(
@@ -303,13 +314,16 @@ export default function Product() {
                 results.analyzedSecondaryPipes || [],
                 selectedSecondaryPipe
             );
-            if (newSelectedSecondaryPipe && newSelectedSecondaryPipe.id !== selectedSecondaryPipe?.id) {
+            if (
+                newSelectedSecondaryPipe &&
+                newSelectedSecondaryPipe.id !== selectedSecondaryPipe?.id
+            ) {
                 setSelectedSecondaryPipe(newSelectedSecondaryPipe);
             }
         } else if (selectedSecondaryPipe) {
             setSelectedSecondaryPipe(null);
         }
-    
+
         // Main pipe - เฉพาะเมื่อมีข้อมูล
         if (hasValidMainPipeData) {
             const newSelectedMainPipe = selectBestEquipment(
@@ -323,7 +337,7 @@ export default function Product() {
         } else if (selectedMainPipe) {
             setSelectedMainPipe(null);
         }
-    
+
         // Pump - เลือกราคาสูงสุดในกลุ่มแนะนำ
         const newSelectedPump = selectBestEquipment(
             results.recommendedPump || [],
@@ -333,22 +347,23 @@ export default function Product() {
         if (newSelectedPump && newSelectedPump.id !== selectedPump?.id) {
             setSelectedPump(newSelectedPump);
         }
-    
     }, [results, hasValidMainPipeData, hasValidSubmainPipeData, input]);
 
     useEffect(() => {
         if (!results) return;
-    
+
         // ตรวจสอบว่า input เปลี่ยนแปลงมากพอที่จะต้อง reset
-        const shouldReset = (
+        const shouldReset =
             // เปลี่ยนจำนวนโซน
             input.numberOfZones !== (input.numberOfZones || 1) ||
             // เปลี่ยนจำนวนต้นไม้มากกว่า 20%
-            Math.abs((input.totalTrees || 0) - (input.totalTrees || 0)) / (input.totalTrees || 1) > 0.2 ||
+            Math.abs((input.totalTrees || 0) - (input.totalTrees || 0)) / (input.totalTrees || 1) >
+                0.2 ||
             // เปลี่ยนความต้องการน้ำมากกว่า 20%
-            Math.abs((input.waterPerTreeLiters || 0) - (input.waterPerTreeLiters || 0)) / (input.waterPerTreeLiters || 1) > 0.2
-        );
-    
+            Math.abs((input.waterPerTreeLiters || 0) - (input.waterPerTreeLiters || 0)) /
+                (input.waterPerTreeLiters || 1) >
+                0.2;
+
         if (shouldReset) {
             console.log('Major input change detected, resetting equipment selections');
             setSelectedSprinkler(null);
