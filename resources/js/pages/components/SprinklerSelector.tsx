@@ -115,7 +115,9 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
             <select
                 value={selectedSprinkler?.id || ''}
                 onChange={(e) => {
-                    const selected = analyzedSprinklers.find((s) => s.id === parseInt(e.target.value));
+                    const selected = analyzedSprinklers.find(
+                        (s) => s.id === parseInt(e.target.value)
+                    );
                     onSprinklerChange(selected);
                 }}
                 className="mb-4 w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
@@ -143,20 +145,25 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                     </div>
 
                     <div className="grid grid-cols-10 items-center justify-between gap-3 text-sm">
-                        <div className="flex items-center justify-center col-span-2">
+                        <div className="col-span-2 flex items-center justify-center">
                             {selectedSprinkler.image ? (
                                 <img
                                     src={selectedSprinkler.image}
                                     alt={selectedSprinkler.name}
-                                    className="flex h-auto w-[85px] items-center justify-center cursor-pointer hover:opacity-80 transition-opacity rounded border border-gray-500 hover:border-blue-400"
+                                    className="flex h-auto w-[85px] cursor-pointer items-center justify-center rounded border border-gray-500 transition-opacity hover:border-blue-400 hover:opacity-80"
                                     onError={(e) => {
                                         (e.target as HTMLImageElement).style.display = 'none';
                                     }}
-                                    onClick={() => openImageModal(selectedSprinkler.image, selectedSprinkler.name)}
+                                    onClick={() =>
+                                        openImageModal(
+                                            selectedSprinkler.image,
+                                            selectedSprinkler.name
+                                        )
+                                    }
                                     title="คลิกเพื่อดูรูปขนาดใหญ่"
                                 />
                             ) : (
-                                <div className="w-[85px] h-[60px] bg-gray-500 rounded flex items-center justify-center text-xs text-gray-300">
+                                <div className="flex h-[60px] w-[85px] items-center justify-center rounded bg-gray-500 text-xs text-gray-300">
                                     ไม่มีรูป
                                 </div>
                             )}
@@ -166,7 +173,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                                 <strong>รหัสสินค้า:</strong>{' '}
                                 {selectedSprinkler.productCode || selectedSprinkler.product_code}
                             </p>
-                            
+
                             <p>
                                 <strong>อัตราการไหล:</strong>{' '}
                                 {formatRangeValue(selectedSprinkler.waterVolumeLitersPerHour)} L/H
@@ -250,11 +257,21 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         <div className="grid grid-cols-2 gap-2 text-xs">
                             <div>
                                 <p>ความต้องการ: {results.waterPerSprinklerLPH.toFixed(1)} L/H</p>
-                                <p>ช่วงสปริงเกอร์: {formatRangeValue(selectedSprinkler.waterVolumeLitersPerHour)} L/H</p>
+                                <p>
+                                    ช่วงสปริงเกอร์:{' '}
+                                    {formatRangeValue(selectedSprinkler.waterVolumeLitersPerHour)}{' '}
+                                    L/H
+                                </p>
                             </div>
                             <div>
-                                <p>รัศมีเฉลี่ย: {getAverageValue(selectedSprinkler.radiusMeters).toFixed(1)} ม.</p>
-                                <p>แรงดันเฉลี่ย: {getAverageValue(selectedSprinkler.pressureBar).toFixed(1)} บาร์</p>
+                                <p>
+                                    รัศมีเฉลี่ย:{' '}
+                                    {getAverageValue(selectedSprinkler.radiusMeters).toFixed(1)} ม.
+                                </p>
+                                <p>
+                                    แรงดันเฉลี่ย:{' '}
+                                    {getAverageValue(selectedSprinkler.pressureBar).toFixed(1)} บาร์
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -263,7 +280,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
 
             {/* Modal สำหรับแสดงรูปขนาดใหญ่ */}
             {isImageModalOpen && (
-                <div 
+                <div
                     className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
                     onClick={closeImageModal}
                 >
@@ -271,12 +288,12 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         {/* ปุ่มปิด */}
                         <button
                             onClick={closeImageModal}
-                            className="absolute -top-2 -right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors"
+                            className="absolute -right-2 -top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white transition-colors hover:bg-red-700"
                             title="ปิด"
                         >
                             ✕
                         </button>
-                        
+
                         {/* รูปภาพ */}
                         <img
                             src={modalImageSrc}
@@ -284,10 +301,10 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                             className="max-h-full max-w-full rounded-lg shadow-2xl"
                             onClick={(e) => e.stopPropagation()} // ป้องกันไม่ให้ปิด modal เมื่อคลิกที่รูป
                         />
-                        
+
                         {/* ชื่อรูป */}
                         <div className="mt-2 text-center">
-                            <p className="text-white text-sm bg-black bg-opacity-50 rounded px-2 py-1 inline-block">
+                            <p className="inline-block rounded bg-black bg-opacity-50 px-2 py-1 text-sm text-white">
                                 {modalImageAlt}
                             </p>
                         </div>

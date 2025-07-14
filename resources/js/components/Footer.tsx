@@ -5,39 +5,66 @@ const Footer: React.FC = () => {
     const { t } = useLanguage();
 
     return (
-        <footer className="bg-gray-800 border-t border-gray-700 mt-8">
-            <div className="max-w-7xl mx-auto px-6 py-6">
+        <footer className="mt-8 border-t border-gray-700 bg-gray-800">
+            <div className="mx-auto max-w-7xl px-6 py-4">
                 <div className="text-center">
-                    <div className="bg-gray-900 rounded-xl p-4">
-                        <h3 className="text-lg font-bold text-white mb-3">
-                            Contact Us
-                        </h3>
-                        
-                        {/* Contact Buttons */}
-                        <div className="flex justify-center gap-3 mb-4">
-                            <a 
-                                href="https://line.me/ti/p/@kanokproduct" 
-                                target="_blank" 
+                    <div className="rounded-xl bg-gray-900 p-4">
+                        <h3 className="mb-3 text-lg font-bold text-white">Contact Us</h3>
+
+                        {/* Contact Buttons with Image Logos */}
+                        <div className="mb-3 flex justify-center gap-4">
+                            {/* Line with Image Logo */}
+                            <a
+                                href="https://line.me/ti/p/@kanokproduct"
+                                target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors"
+                                className="flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 text-white transition-colors hover:bg-green-600"
                             >
-                                <span className="text-lg">💬</span>
+                                {/* Line Logo - Replace with your actual Line logo image */}
+                                <img 
+                                    src="/images/line-logo.png" 
+                                    alt="Line" 
+                                    className="h-5 w-5"
+                                    onError={(e) => {
+                                        // Fallback to emoji if image fails to load
+                                        const target = e.target as HTMLImageElement;
+                                        target.style.display = 'none';
+                                        const emojiSpan = target.nextElementSibling as HTMLSpanElement;
+                                        if (emojiSpan) emojiSpan.style.display = 'inline';
+                                    }}
+                                />
+                                <span className="text-lg" style={{ display: 'none' }}>💬</span>
                                 <span className="text-sm font-medium">Line</span>
                             </a>
-                            
-                            <a 
-                                href="https://www.facebook.com/kanokproduct" 
-                                target="_blank" 
+
+                            {/* Facebook with Image Logo */}
+                            <a
+                                href="https://www.facebook.com/kanokproduct"
+                                target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+                                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
                             >
-                                <span className="text-lg">📘</span>
+                                {/* Facebook Logo - Replace with your actual Facebook logo image */}
+                                <img 
+                                    src="/images/facebook-logo.png" 
+                                    alt="Facebook" 
+                                    className="h-5 w-5"
+                                    onError={(e) => {
+                                        // Fallback to emoji if image fails to load
+                                        const target = e.target as HTMLImageElement;
+                                        target.style.display = 'none';
+                                        const emojiSpan = target.nextElementSibling as HTMLSpanElement;
+                                        if (emojiSpan) emojiSpan.style.display = 'inline';
+                                    }}
+                                />
+                                <span className="text-lg" style={{ display: 'none' }}>📘</span>
                                 <span className="text-sm font-medium">Facebook</span>
                             </a>
-                            
-                            <a 
-                                href="tel:024511111" 
-                                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"
+
+                            {/* Phone - Keep as is */}
+                            <a
+                                href="tel:024511111"
+                                className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700"
                             >
                                 <span className="text-lg">📞</span>
                                 <span className="text-sm font-medium">Phone</span>
@@ -45,7 +72,7 @@ const Footer: React.FC = () => {
                         </div>
 
                         {/* Contact Information */}
-                        <div className="text-gray-300 text-sm space-y-1">
+                        <div className="space-y-0.5 text-sm text-gray-300">
                             <p className="font-semibold text-white">KANOK PRODUCT</p>
                             <p>โทร. 02-451-1111 กด 2</p>
                             <p>15 ซอย พระยามนธาตุ แยก 10</p>
@@ -54,9 +81,9 @@ const Footer: React.FC = () => {
                             <p>Thailand</p>
                         </div>
                     </div>
-                    
+
                     {/* Copyright */}
-                    <div className="mt-4 text-gray-400 text-xs">
+                    <div className="mt-3 text-xs text-gray-400">
                         © 2024 KANOK PRODUCT. All rights reserved.
                     </div>
                 </div>
@@ -65,4 +92,4 @@ const Footer: React.FC = () => {
     );
 };
 
-export default Footer; 
+export default Footer;

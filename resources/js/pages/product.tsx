@@ -546,7 +546,7 @@ export default function Product() {
         <div className="min-h-screen bg-gray-800 p-6 text-white">
             <div className="flex w-full items-start justify-start gap-4">
                 {/* Fixed sidebar - ลดขนาดลง */}
-                <div className="fixed left-2 top-6 z-50 flex w-[570px] flex-col items-center ml-4 justify-center gap-3">
+                <div className="fixed left-2 top-6 z-50 ml-4 flex w-[570px] flex-col items-center justify-center gap-3">
                     <div className="w-full">
                         <h1 className="mb-2 text-center text-xl font-bold text-blue-400">
                             แผนผังโครงการ

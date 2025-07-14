@@ -78,13 +78,13 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ selectedPump, onPumpChange,
     const renderPumpImage = (pump: any) => {
         // ตรวจสอบ field image ทั้งหมดที่เป็นไปได้
         const imageUrl = pump.image_url || pump.image || pump.imageUrl;
-        
+
         if (imageUrl) {
             return (
                 <img
                     src={imageUrl}
                     alt={pump.name || 'Pump'}
-                    className="h-auto w-[100px] max-h-[100px] object-contain cursor-pointer hover:opacity-80 transition-opacity rounded border border-gray-500 hover:border-blue-400"
+                    className="h-auto max-h-[100px] w-[100px] cursor-pointer rounded border border-gray-500 object-contain transition-opacity hover:border-blue-400 hover:opacity-80"
                     onError={(e) => {
                         console.log('Failed to load pump image:', imageUrl);
                         const target = e.target as HTMLImageElement;
@@ -99,16 +99,16 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ selectedPump, onPumpChange,
                 />
             );
         }
-        
+
         return null;
     };
 
     // Helper function สำหรับ fallback image ปั๊ม
     const renderPumpImageFallback = (pump: any) => {
         const imageUrl = pump.image_url || pump.image || pump.imageUrl;
-        
+
         return (
-            <div 
+            <div
                 className="flex h-[60px] w-[85px] items-center justify-center rounded border border-gray-600 bg-gray-500 text-xs text-gray-300"
                 style={{ display: imageUrl ? 'none' : 'flex' }}
             >
@@ -121,13 +121,13 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ selectedPump, onPumpChange,
     const renderAccessoryImage = (accessory: any) => {
         // ตรวจสอบว่ามีรูปภาพหรือไม่ (รองรับทั้ง image_url, image, และ imageUrl)
         const imageUrl = accessory.image_url || accessory.image || accessory.imageUrl;
-        
+
         if (imageUrl) {
             return (
-                <img 
-                    src={imageUrl} 
-                    alt={accessory.name} 
-                    className="h-10 w-10 rounded border border-gray-600 object-cover cursor-pointer hover:opacity-80 transition-opacity hover:border-blue-400"
+                <img
+                    src={imageUrl}
+                    alt={accessory.name}
+                    className="h-10 w-10 cursor-pointer rounded border border-gray-600 object-cover transition-opacity hover:border-blue-400 hover:opacity-80"
                     onError={(e) => {
                         console.log('Failed to load accessory image:', imageUrl);
                         // ถ้าโหลดรูปไม่ได้ ให้แสดง fallback
@@ -143,7 +143,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ selectedPump, onPumpChange,
                 />
             );
         }
-        
+
         return null; // ถ้าไม่มีรูปจะแสดง fallback
     };
 
@@ -152,18 +152,23 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ selectedPump, onPumpChange,
         // Icon ตามประเภทอุปกรณ์
         const getIconForType = (type: string) => {
             switch (type) {
-                case 'foot_valve': return '🔧';
-                case 'check_valve': return '⚙️';
-                case 'ball_valve': return '🔩';
-                case 'pressure_gauge': return '📊';
-                default: return '🔧';
+                case 'foot_valve':
+                    return '🔧';
+                case 'check_valve':
+                    return '⚙️';
+                case 'ball_valve':
+                    return '🔩';
+                case 'pressure_gauge':
+                    return '📊';
+                default:
+                    return '🔧';
             }
         };
 
         const imageUrl = accessory.image_url || accessory.image || accessory.imageUrl;
 
         return (
-            <div 
+            <div
                 className="flex h-10 w-10 items-center justify-center rounded border border-gray-600 bg-gray-600 text-sm"
                 style={{ display: imageUrl ? 'none' : 'flex' }}
             >
@@ -206,8 +211,8 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ selectedPump, onPumpChange,
                 <option value="">-- เลือกปั๊ม --</option>
                 {sortedPumps.map((pump) => (
                     <option key={pump.id} value={pump.id}>
-                        {pump.productCode || pump.productCode} ({pump.powerHP}HP) - {pump.price} บาท |{' '}
-                        {getRecommendationIcon(pump)}
+                        {pump.productCode || pump.productCode} ({pump.powerHP}HP) - {pump.price} บาท
+                        | {getRecommendationIcon(pump)}
                     </option>
                 ))}
             </select>
@@ -233,14 +238,22 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ selectedPump, onPumpChange,
                         </div>
                         <div>
                             <p>
-                                <strong>รุ่น:</strong> {selectedPump.productCode || selectedPump.product_code}
+                                <strong>รุ่น:</strong>{' '}
+                                {selectedPump.productCode || selectedPump.product_code}
                             </p>
                             <p>
                                 <strong>ชื่อ:</strong> {selectedPump.name}
                             </p>
                             <p>
-                                <strong>กำลัง:</strong> {selectedPump.powerHP != null ? selectedPump.powerHP : (selectedPump.powerKW * 1.341).toFixed(1)} HP (
-                                {selectedPump.powerKW != null ? selectedPump.powerKW : (selectedPump.powerHP * 0.7457).toFixed(1)} kW)
+                                <strong>กำลัง:</strong>{' '}
+                                {selectedPump.powerHP != null
+                                    ? selectedPump.powerHP
+                                    : (selectedPump.powerKW * 1.341).toFixed(1)}{' '}
+                                HP (
+                                {selectedPump.powerKW != null
+                                    ? selectedPump.powerKW
+                                    : (selectedPump.powerHP * 0.7457).toFixed(1)}{' '}
+                                kW)
                             </p>
                             <p>
                                 <strong>เฟส:</strong> {selectedPump.phase} เฟส
@@ -257,12 +270,10 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ selectedPump, onPumpChange,
                         </div>
                         <div>
                             <p>
-                                <strong>Flow Max:</strong>{' '}
-                                {selectedAnalyzed.maxFlow || 'N/A'} LPM
+                                <strong>Flow Max:</strong> {selectedAnalyzed.maxFlow || 'N/A'} LPM
                             </p>
                             <p>
-                                <strong>Head Max:</strong>{' '}
-                                {selectedAnalyzed.maxHead || 'N/A'} เมตร
+                                <strong>Head Max:</strong> {selectedAnalyzed.maxHead || 'N/A'} เมตร
                             </p>
                             <p>
                                 <strong>S.D(ความลึกดูด):</strong>{' '}
@@ -345,7 +356,9 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ selectedPump, onPumpChange,
                         <h5 className="text-xs font-medium text-blue-300">ช่วงการทำงาน:</h5>
                         <div className="grid grid-cols-2 gap-2 text-xs">
                             <div>
-                                <p>อัตราการไหล: {formatRangeValue(selectedPump.flow_rate_lpm)} LPM</p>
+                                <p>
+                                    อัตราการไหล: {formatRangeValue(selectedPump.flow_rate_lpm)} LPM
+                                </p>
                                 <p>Head: {formatRangeValue(selectedPump.head_m)} เมตร</p>
                             </div>
                             <div>
@@ -363,73 +376,101 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ selectedPump, onPumpChange,
                             </h5>
                             <div className="space-y-2">
                                 {selectedPump.pumpAccessories
-                                    .sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
+                                    .sort(
+                                        (a: any, b: any) =>
+                                            (a.sort_order || 0) - (b.sort_order || 0)
+                                    )
                                     .map((accessory: any, index: number) => (
-                                    <div 
-                                        key={accessory.id || index} 
-                                        className="flex items-center justify-between rounded bg-purple-800 p-2"
-                                    >
-                                        {/* รูปภาพและข้อมูลอุปกรณ์ */}
-                                        <div className="flex items-center space-x-3">
-                                            {/* Container สำหรับรูปและ fallback - WITH MODAL */}
-                                            <div className="relative">
-                                                {renderAccessoryImage(accessory)}
-                                                {renderAccessoryFallback(accessory)}
-                                            </div>
-                                            
-                                            {/* ข้อมูลอุปกรณ์ */}
-                                            <div className="text-xs">
-                                                <p className="font-medium text-white">
-                                                    {accessory.name}
-                                                </p>
-                                                <p className="capitalize text-purple-200">
-                                                    {accessory.accessory_type?.replace('_', ' ')}
-                                                    {accessory.size && ` • ${accessory.size}`}
-                                                </p>
-                                                {accessory.specifications && 
-                                                 Object.keys(accessory.specifications).length > 0 && (
-                                                    <p className="text-purple-300">
-                                                        {Object.entries(accessory.specifications)
-                                                            .slice(0, 1) // แสดงแค่ 1 spec แรก
-                                                            .map(([key, value]) => `${key}: ${value}`)
-                                                            .join(', ')}
-                                                        {Object.keys(accessory.specifications).length > 1 && '...'}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
-                                        
-                                        {/* ราคาและสถานะ */}
-                                        <div className="text-right text-xs">
-                                            <div className={`font-medium ${
-                                                accessory.is_included ? 'text-green-300' : 'text-yellow-300'
-                                            }`}>
-                                                {accessory.is_included ? (
-                                                    <span>✅ รวมในชุด</span>
-                                                ) : (
-                                                    <span>💰 +{Number(accessory.price || 0).toLocaleString()} บาท</span>
-                                                )}
-                                            </div>
-                                            {!accessory.is_included && (
-                                                <div className="text-purple-200">
-                                                    (แยกขาย)
+                                        <div
+                                            key={accessory.id || index}
+                                            className="flex items-center justify-between rounded bg-purple-800 p-2"
+                                        >
+                                            {/* รูปภาพและข้อมูลอุปกรณ์ */}
+                                            <div className="flex items-center space-x-3">
+                                                {/* Container สำหรับรูปและ fallback - WITH MODAL */}
+                                                <div className="relative">
+                                                    {renderAccessoryImage(accessory)}
+                                                    {renderAccessoryFallback(accessory)}
                                                 </div>
-                                            )}
+
+                                                {/* ข้อมูลอุปกรณ์ */}
+                                                <div className="text-xs">
+                                                    <p className="font-medium text-white">
+                                                        {accessory.name}
+                                                    </p>
+                                                    <p className="capitalize text-purple-200">
+                                                        {accessory.accessory_type?.replace(
+                                                            '_',
+                                                            ' '
+                                                        )}
+                                                        {accessory.size && ` • ${accessory.size}`}
+                                                    </p>
+                                                    {accessory.specifications &&
+                                                        Object.keys(accessory.specifications)
+                                                            .length > 0 && (
+                                                            <p className="text-purple-300">
+                                                                {Object.entries(
+                                                                    accessory.specifications
+                                                                )
+                                                                    .slice(0, 1) // แสดงแค่ 1 spec แรก
+                                                                    .map(
+                                                                        ([key, value]) =>
+                                                                            `${key}: ${value}`
+                                                                    )
+                                                                    .join(', ')}
+                                                                {Object.keys(
+                                                                    accessory.specifications
+                                                                ).length > 1 && '...'}
+                                                            </p>
+                                                        )}
+                                                </div>
+                                            </div>
+
+                                            {/* ราคาและสถานะ */}
+                                            <div className="text-right text-xs">
+                                                <div
+                                                    className={`font-medium ${
+                                                        accessory.is_included
+                                                            ? 'text-green-300'
+                                                            : 'text-yellow-300'
+                                                    }`}
+                                                >
+                                                    {accessory.is_included ? (
+                                                        <span>✅ รวมในชุด</span>
+                                                    ) : (
+                                                        <span>
+                                                            💰 +
+                                                            {Number(
+                                                                accessory.price || 0
+                                                            ).toLocaleString()}{' '}
+                                                            บาท
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {!accessory.is_included && (
+                                                    <div className="text-purple-200">(แยกขาย)</div>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))}
                             </div>
-                            
+
                             {/* สรุปราคาอุปกรณ์เสริม */}
                             {selectedPump.pumpAccessories.some((acc: any) => !acc.is_included) && (
                                 <div className="mt-2 rounded bg-purple-800 p-2 text-xs">
                                     <div className="flex justify-between text-purple-200">
                                         <span>ราคาอุปกรณ์เสริม:</span>
                                         <span className="font-medium text-yellow-300">
-                                            +{selectedPump.pumpAccessories
+                                            +
+                                            {selectedPump.pumpAccessories
                                                 .filter((acc: any) => !acc.is_included)
-                                                .reduce((sum: number, acc: any) => sum + (Number(acc.price) || 0), 0)
-                                                .toLocaleString()} บาท
+                                                .reduce(
+                                                    (sum: number, acc: any) =>
+                                                        sum + (Number(acc.price) || 0),
+                                                    0
+                                                )
+                                                .toLocaleString()}{' '}
+                                            บาท
                                         </span>
                                     </div>
                                 </div>
@@ -466,7 +507,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ selectedPump, onPumpChange,
 
             {/* Modal สำหรับแสดงรูปขนาดใหญ่ */}
             {isImageModalOpen && (
-                <div 
+                <div
                     className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
                     onClick={closeImageModal}
                 >
@@ -474,12 +515,12 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ selectedPump, onPumpChange,
                         {/* ปุ่มปิด */}
                         <button
                             onClick={closeImageModal}
-                            className="absolute -top-2 -right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors"
+                            className="absolute -right-2 -top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white transition-colors hover:bg-red-700"
                             title="ปิด"
                         >
                             ✕
                         </button>
-                        
+
                         {/* รูปภาพ */}
                         <img
                             src={modalImageSrc}
@@ -487,10 +528,10 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ selectedPump, onPumpChange,
                             className="max-h-full max-w-full rounded-lg shadow-2xl"
                             onClick={(e) => e.stopPropagation()} // ป้องกันไม่ให้ปิด modal เมื่อคลิกที่รูป
                         />
-                        
+
                         {/* ชื่อรูป */}
                         <div className="mt-2 text-center">
-                            <p className="text-white text-sm bg-black bg-opacity-50 rounded px-2 py-1 inline-block">
+                            <p className="inline-block rounded bg-black bg-opacity-50 px-2 py-1 text-sm text-white">
                                 {modalImageAlt}
                             </p>
                         </div>

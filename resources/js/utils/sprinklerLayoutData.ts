@@ -117,7 +117,7 @@ export const calculateTotalPipeLength = (connections: PipeConnection[]): number 
 
 export const findLongestPipe = (connections: PipeConnection[]): number => {
     if (connections.length === 0) return 0;
-    return Math.max(...connections.map(pipe => pipe.length));
+    return Math.max(...connections.map((pipe) => pipe.length));
 };
 
 export const calculateCoverage = (
@@ -126,14 +126,16 @@ export const calculateCoverage = (
     areaCoords: Array<{ lat: number; lng: number }>
 ): number => {
     if (sprinklers.length === 0 || areaCoords.length === 0) return 0;
-    
+
     const totalAreaSize = calculateAreaFromCoordinates(areaCoords);
     const totalCoverageArea = sprinklers.length * Math.PI * Math.pow(radius, 2);
-    
+
     return Math.min((totalCoverageArea / totalAreaSize) * 100, 100);
 };
 
-export const calculateAreaFromCoordinates = (coordinates: Array<{ lat: number; lng: number }>): number => {
+export const calculateAreaFromCoordinates = (
+    coordinates: Array<{ lat: number; lng: number }>
+): number => {
     if (coordinates.length < 3) return 0;
 
     let area = 0;
@@ -145,7 +147,8 @@ export const calculateAreaFromCoordinates = (coordinates: Array<{ lat: number; l
     area = Math.abs(area) / 2;
 
     // Convert to square meters (approximate)
-    const areaInSquareMeters = area * 111000 * 111000 * Math.cos((coordinates[0].lat * Math.PI) / 180);
+    const areaInSquareMeters =
+        area * 111000 * 111000 * Math.cos((coordinates[0].lat * Math.PI) / 180);
     return areaInSquareMeters;
 };
 
@@ -157,23 +160,26 @@ export const estimateInstallationCost = (
     const sprinklerCost = sprinklerCount * sprinklerPrice;
     const pipeCost = pipeLength * 50; // 50 baht per meter
     const fittingsCost = sprinklerCount * 100; // 100 baht per connection
-    const laborCost = (sprinklerCount * 200) + (pipeLength * 30);
+    const laborCost = sprinklerCount * 200 + pipeLength * 30;
     const miscCost = 1000;
-    
+
     return sprinklerCost + pipeCost + fittingsCost + laborCost + miscCost;
 };
 
-export const estimateInstallationTime = (
-    sprinklerCount: number,
-    pipeLength: number
-): number => {
+export const estimateInstallationTime = (sprinklerCount: number, pipeLength: number): number => {
     const planningTime = 1; // 1 hour for planning
     const excavationTime = pipeLength * 0.05; // 3 minutes per meter
     const pipeInstallationTime = pipeLength * 0.08; // 5 minutes per meter
     const sprinklerInstallationTime = sprinklerCount * 0.5; // 30 minutes per sprinkler
     const testingTime = 1; // 1 hour for testing
-    
-    return planningTime + excavationTime + pipeInstallationTime + sprinklerInstallationTime + testingTime;
+
+    return (
+        planningTime +
+        excavationTime +
+        pipeInstallationTime +
+        sprinklerInstallationTime +
+        testingTime
+    );
 };
 
 // Distance calculation using Haversine formula
@@ -186,13 +192,14 @@ export const calculateDistance = (
     const R = 6371000; // Earth radius in meters
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
     const dLng = ((lng2 - lng1) * Math.PI) / 180;
-    
-    const a = 
+
+    const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLng / 2) * Math.sin(dLng / 2);
-    
+            Math.cos((lat2 * Math.PI) / 180) *
+            Math.sin(dLng / 2) *
+            Math.sin(dLng / 2);
+
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
 };

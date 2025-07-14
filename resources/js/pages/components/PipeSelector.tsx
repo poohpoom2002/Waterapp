@@ -144,8 +144,9 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 <option value="">-- เลือกท่อ --</option>
                 {sortedPipes.map((pipe) => (
                     <option key={pipe.id} value={pipe.id}>
-                        {pipe.productCode} ({pipe.pipeType} {pipe.sizeMM}mm) - {pipe.price} บาท | 
-                        {getPipeTypeRecommendation(pipe.pipeType, pipeType)} {getRecommendationIcon(pipe)}
+                        {pipe.productCode} ({pipe.pipeType} {pipe.sizeMM}mm) - {pipe.price} บาท |
+                        {getPipeTypeRecommendation(pipe.pipeType, pipeType)}{' '}
+                        {getRecommendationIcon(pipe)}
                     </option>
                 ))}
             </select>
@@ -170,16 +171,18 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                     </div>
 
                     <div className="grid grid-cols-10 items-center justify-between gap-3 text-sm">
-                        <div className="flex items-center justify-center col-span-2">
+                        <div className="col-span-2 flex items-center justify-center">
                             {selectedPipe.image ? (
                                 <img
                                     src={selectedPipe.image}
                                     alt={selectedPipe.name}
-                                    className="flex h-auto w-[85px] items-center justify-center cursor-pointer hover:opacity-80 transition-opacity rounded border border-gray-500 hover:border-blue-400"
+                                    className="flex h-auto w-[85px] cursor-pointer items-center justify-center rounded border border-gray-500 transition-opacity hover:border-blue-400 hover:opacity-80"
                                     onError={(e) => {
                                         (e.target as HTMLImageElement).style.display = 'none';
                                     }}
-                                    onClick={() => openImageModal(selectedPipe.image, selectedPipe.name)}
+                                    onClick={() =>
+                                        openImageModal(selectedPipe.image, selectedPipe.name)
+                                    }
                                     title="คลิกเพื่อดูรูปขนาดใหญ่"
                                 />
                             ) : (
@@ -309,7 +312,13 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                     {!getPipeTypeRecommendation(selectedPipe.pipeType, pipeType) && (
                         <div className="mt-3 rounded bg-yellow-900 p-2">
                             <p className="text-sm text-yellow-300">
-                                ⚠️ <strong>หมายเหตุ:</strong> ประเภทท่อ {selectedPipe.pipeType} ไม่ใช่ตัวเลือกที่แนะนำสำหรับ{pipeType === 'branch' ? 'ท่อย่อย' : pipeType === 'secondary' ? 'ท่อเมนรอง' : 'ท่อเมนหลัก'} 
+                                ⚠️ <strong>หมายเหตุ:</strong> ประเภทท่อ {selectedPipe.pipeType}{' '}
+                                ไม่ใช่ตัวเลือกที่แนะนำสำหรับ
+                                {pipeType === 'branch'
+                                    ? 'ท่อย่อย'
+                                    : pipeType === 'secondary'
+                                      ? 'ท่อเมนรอง'
+                                      : 'ท่อเมนหลัก'}
                                 แต่ยังสามารถใช้งานได้หากเหมาะสมกับการไหลและความเร็ว
                             </p>
                         </div>
@@ -319,7 +328,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
 
             {/* Modal สำหรับแสดงรูปขนาดใหญ่ */}
             {isImageModalOpen && (
-                <div 
+                <div
                     className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
                     onClick={closeImageModal}
                 >
@@ -327,12 +336,12 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                         {/* ปุ่มปิด */}
                         <button
                             onClick={closeImageModal}
-                            className="absolute -top-2 -right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors"
+                            className="absolute -right-2 -top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white transition-colors hover:bg-red-700"
                             title="ปิด"
                         >
                             ✕
                         </button>
-                        
+
                         {/* รูปภาพ */}
                         <img
                             src={modalImageSrc}
@@ -340,10 +349,10 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                             className="max-h-full max-w-full rounded-lg shadow-2xl"
                             onClick={(e) => e.stopPropagation()} // ป้องกันไม่ให้ปิด modal เมื่อคลิกที่รูป
                         />
-                        
+
                         {/* ชื่อรูป */}
                         <div className="mt-2 text-center">
-                            <p className="text-white text-sm bg-black bg-opacity-50 rounded px-2 py-1 inline-block">
+                            <p className="inline-block rounded bg-black bg-opacity-50 px-2 py-1 text-sm text-white">
                                 {modalImageAlt}
                             </p>
                         </div>

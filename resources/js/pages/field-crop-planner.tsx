@@ -93,7 +93,7 @@ export default function FieldCropPlanner() {
                 const response = await fetch('/api/plant-types');
                 const data = await response.json();
                 // Filter for field crops
-                const fieldCrops = data.filter((plant: PlantType) => 
+                const fieldCrops = data.filter((plant: PlantType) =>
                     ['Rice', 'Corn', 'Sugarcane', 'Wheat', 'Soybeans'].includes(plant.name)
                 );
                 setPlantTypes(fieldCrops);
@@ -172,7 +172,9 @@ export default function FieldCropPlanner() {
             const data = await response.json();
             if (response.ok) {
                 setResults(data.plant_locations);
-                setStatus(`Successfully generated ${data.plant_locations.length} planting points for field crop`);
+                setStatus(
+                    `Successfully generated ${data.plant_locations.length} planting points for field crop`
+                );
             } else {
                 setError(data.message || 'Error generating points');
             }
@@ -247,11 +249,14 @@ export default function FieldCropPlanner() {
 
     return (
         <div className="min-h-screen bg-gray-900 p-6">
-            <div className="flex justify-between items-center mb-6">
+            <div className="mb-6 flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold text-white">🌾 Field Crop Irrigation Planner</h1>
+                    <h1 className="text-3xl font-bold text-white">
+                        🌾 Field Crop Irrigation Planner
+                    </h1>
                     <p className="text-gray-400">
-                        Design large-scale irrigation systems for agricultural fields and crop production
+                        Design large-scale irrigation systems for agricultural fields and crop
+                        production
                     </p>
                 </div>
                 <LanguageSwitcher />
@@ -281,7 +286,9 @@ export default function FieldCropPlanner() {
                             className="w-full rounded border border-gray-700 bg-gray-700 p-2 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                             value={selectedPlant?.id || ''}
                             onChange={(e) => {
-                                const plant = plantTypes.find((p) => p.id === Number(e.target.value));
+                                const plant = plantTypes.find(
+                                    (p) => p.id === Number(e.target.value)
+                                );
                                 setSelectedPlant(plant || null);
                             }}
                         >
@@ -296,25 +303,35 @@ export default function FieldCropPlanner() {
 
                     {/* Field Management */}
                     <div className="rounded-lg bg-gray-800 p-4">
-                        <h3 className="mb-3 text-lg font-semibold text-white">🏞️ Field Management</h3>
+                        <h3 className="mb-3 text-lg font-semibold text-white">
+                            🏞️ Field Management
+                        </h3>
                         <div className="space-y-3">
                             <div className="flex items-center space-x-2">
                                 <input
                                     type="checkbox"
                                     checked={fieldManagement.crop_rotation}
                                     onChange={(e) =>
-                                        setFieldManagement((prev) => ({ ...prev, crop_rotation: e.target.checked }))
+                                        setFieldManagement((prev) => ({
+                                            ...prev,
+                                            crop_rotation: e.target.checked,
+                                        }))
                                     }
                                     className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
                                 />
                                 <label className="text-sm text-gray-300">Crop Rotation</label>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-300">Soil Type</label>
+                                <label className="block text-sm font-medium text-gray-300">
+                                    Soil Type
+                                </label>
                                 <select
                                     value={fieldManagement.soil_type}
                                     onChange={(e) =>
-                                        setFieldManagement((prev) => ({ ...prev, soil_type: e.target.value }))
+                                        setFieldManagement((prev) => ({
+                                            ...prev,
+                                            soil_type: e.target.value,
+                                        }))
                                     }
                                     className="w-full rounded border border-gray-700 bg-gray-700 p-2 text-white"
                                 >
@@ -325,11 +342,16 @@ export default function FieldCropPlanner() {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-300">Irrigation Schedule</label>
+                                <label className="block text-sm font-medium text-gray-300">
+                                    Irrigation Schedule
+                                </label>
                                 <select
                                     value={fieldManagement.irrigation_schedule}
                                     onChange={(e) =>
-                                        setFieldManagement((prev) => ({ ...prev, irrigation_schedule: e.target.value }))
+                                        setFieldManagement((prev) => ({
+                                            ...prev,
+                                            irrigation_schedule: e.target.value,
+                                        }))
                                     }
                                     className="w-full rounded border border-gray-700 bg-gray-700 p-2 text-white"
                                 >
@@ -344,14 +366,21 @@ export default function FieldCropPlanner() {
 
                     {/* Seasonal Factors */}
                     <div className="rounded-lg bg-gray-800 p-4">
-                        <h3 className="mb-3 text-lg font-semibold text-white">🌤️ Seasonal Factors</h3>
+                        <h3 className="mb-3 text-lg font-semibold text-white">
+                            🌤️ Seasonal Factors
+                        </h3>
                         <div className="space-y-3">
                             <div>
-                                <label className="block text-sm font-medium text-gray-300">Season</label>
+                                <label className="block text-sm font-medium text-gray-300">
+                                    Season
+                                </label>
                                 <select
                                     value={seasonalFactors.season}
                                     onChange={(e) =>
-                                        setSeasonalFactors((prev) => ({ ...prev, season: e.target.value }))
+                                        setSeasonalFactors((prev) => ({
+                                            ...prev,
+                                            season: e.target.value,
+                                        }))
                                     }
                                     className="w-full rounded border border-gray-700 bg-gray-700 p-2 text-white"
                                 >
@@ -362,11 +391,16 @@ export default function FieldCropPlanner() {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-300">Expected Rainfall</label>
+                                <label className="block text-sm font-medium text-gray-300">
+                                    Expected Rainfall
+                                </label>
                                 <select
                                     value={seasonalFactors.rainfall_expected}
                                     onChange={(e) =>
-                                        setSeasonalFactors((prev) => ({ ...prev, rainfall_expected: e.target.value }))
+                                        setSeasonalFactors((prev) => ({
+                                            ...prev,
+                                            rainfall_expected: e.target.value,
+                                        }))
                                     }
                                     className="w-full rounded border border-gray-700 bg-gray-700 p-2 text-white"
                                 >
@@ -380,12 +414,16 @@ export default function FieldCropPlanner() {
 
                     {/* Sprinkler Selection */}
                     <div className="rounded-lg bg-gray-800 p-4">
-                        <h3 className="mb-3 text-lg font-semibold text-white">💧 Irrigation System</h3>
+                        <h3 className="mb-3 text-lg font-semibold text-white">
+                            💧 Irrigation System
+                        </h3>
                         <select
                             className="w-full rounded border border-gray-700 bg-gray-700 p-2 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                             value={selectedSprinkler?.id || ''}
                             onChange={(e) => {
-                                const sprinkler = sprinklers.find((s) => s.id === Number(e.target.value));
+                                const sprinkler = sprinklers.find(
+                                    (s) => s.id === Number(e.target.value)
+                                );
                                 setSelectedSprinkler(sprinkler || null);
                             }}
                         >
@@ -504,4 +542,4 @@ export default function FieldCropPlanner() {
             <Footer />
         </div>
     );
-} 
+}
