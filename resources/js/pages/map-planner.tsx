@@ -803,6 +803,14 @@ export default function MapPlanner() {
                                             return;
                                         }
 
+                                        if (selectedCategory === 'Greenhouse') {
+                                            router.visit('/greenhouse-crop', {
+                                                preserveState: false,
+                                                preserveScroll: false,
+                                            });
+                                            return;
+                                        }
+
                                         if (selectedCategory === 'Horticultural') {
                                             const filtered = plantTypes.filter((plant) =>
                                                 [
