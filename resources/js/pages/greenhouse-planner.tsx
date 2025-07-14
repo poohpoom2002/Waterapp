@@ -170,7 +170,9 @@ export default function GreenhousePlanner() {
             const data = await response.json();
             if (response.ok) {
                 setResults(data.plant_locations);
-                setStatus(`Successfully generated ${data.plant_locations.length} planting points for greenhouse`);
+                setStatus(
+                    `Successfully generated ${data.plant_locations.length} planting points for greenhouse`
+                );
             } else {
                 setError(data.message || 'Error generating points');
             }
@@ -245,9 +247,11 @@ export default function GreenhousePlanner() {
 
     return (
         <div className="min-h-screen bg-gray-900 p-6">
-            <div className="flex justify-between items-center mb-6">
+            <div className="mb-6 flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold text-white">🌱 Greenhouse Irrigation Planner</h1>
+                    <h1 className="text-3xl font-bold text-white">
+                        🌱 Greenhouse Irrigation Planner
+                    </h1>
                     <p className="text-gray-400">
                         Design specialized irrigation systems for controlled environment agriculture
                     </p>
@@ -274,12 +278,16 @@ export default function GreenhousePlanner() {
                 <div className="space-y-6 lg:col-span-1">
                     {/* Plant Selection */}
                     <div className="rounded-lg bg-gray-800 p-4">
-                        <h3 className="mb-3 text-lg font-semibold text-white">🌿 Plant Selection</h3>
+                        <h3 className="mb-3 text-lg font-semibold text-white">
+                            🌿 Plant Selection
+                        </h3>
                         <select
                             className="w-full rounded border border-gray-700 bg-gray-700 p-2 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                             value={selectedPlant?.id || ''}
                             onChange={(e) => {
-                                const plant = plantTypes.find((p) => p.id === Number(e.target.value));
+                                const plant = plantTypes.find(
+                                    (p) => p.id === Number(e.target.value)
+                                );
                                 setSelectedPlant(plant || null);
                             }}
                         >
@@ -294,42 +302,61 @@ export default function GreenhousePlanner() {
 
                     {/* Climate Control */}
                     <div className="rounded-lg bg-gray-800 p-4">
-                        <h3 className="mb-3 text-lg font-semibold text-white">🌡️ Climate Control</h3>
+                        <h3 className="mb-3 text-lg font-semibold text-white">
+                            🌡️ Climate Control
+                        </h3>
                         <div className="space-y-3">
                             <div>
-                                <label className="block text-sm font-medium text-gray-300">Temperature (°C)</label>
+                                <label className="block text-sm font-medium text-gray-300">
+                                    Temperature (°C)
+                                </label>
                                 <input
                                     type="range"
                                     min="15"
                                     max="35"
                                     value={climateControl.temperature}
                                     onChange={(e) =>
-                                        setClimateControl((prev) => ({ ...prev, temperature: Number(e.target.value) }))
+                                        setClimateControl((prev) => ({
+                                            ...prev,
+                                            temperature: Number(e.target.value),
+                                        }))
                                     }
                                     className="w-full"
                                 />
-                                <span className="text-sm text-gray-400">{climateControl.temperature}°C</span>
+                                <span className="text-sm text-gray-400">
+                                    {climateControl.temperature}°C
+                                </span>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-300">Humidity (%)</label>
+                                <label className="block text-sm font-medium text-gray-300">
+                                    Humidity (%)
+                                </label>
                                 <input
                                     type="range"
                                     min="40"
                                     max="90"
                                     value={climateControl.humidity}
                                     onChange={(e) =>
-                                        setClimateControl((prev) => ({ ...prev, humidity: Number(e.target.value) }))
+                                        setClimateControl((prev) => ({
+                                            ...prev,
+                                            humidity: Number(e.target.value),
+                                        }))
                                     }
                                     className="w-full"
                                 />
-                                <span className="text-sm text-gray-400">{climateControl.humidity}%</span>
+                                <span className="text-sm text-gray-400">
+                                    {climateControl.humidity}%
+                                </span>
                             </div>
                             <div className="flex items-center space-x-2">
                                 <input
                                     type="checkbox"
                                     checked={climateControl.ventilation}
                                     onChange={(e) =>
-                                        setClimateControl((prev) => ({ ...prev, ventilation: e.target.checked }))
+                                        setClimateControl((prev) => ({
+                                            ...prev,
+                                            ventilation: e.target.checked,
+                                        }))
                                     }
                                     className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
                                 />
@@ -340,14 +367,21 @@ export default function GreenhousePlanner() {
 
                     {/* Environmental Factors */}
                     <div className="rounded-lg bg-gray-800 p-4">
-                        <h3 className="mb-3 text-lg font-semibold text-white">🌍 Environmental Factors</h3>
+                        <h3 className="mb-3 text-lg font-semibold text-white">
+                            🌍 Environmental Factors
+                        </h3>
                         <div className="space-y-3">
                             <div>
-                                <label className="block text-sm font-medium text-gray-300">Light Intensity</label>
+                                <label className="block text-sm font-medium text-gray-300">
+                                    Light Intensity
+                                </label>
                                 <select
                                     value={environmentalFactors.light_intensity}
                                     onChange={(e) =>
-                                        setEnvironmentalFactors((prev) => ({ ...prev, light_intensity: e.target.value }))
+                                        setEnvironmentalFactors((prev) => ({
+                                            ...prev,
+                                            light_intensity: e.target.value,
+                                        }))
                                     }
                                     className="w-full rounded border border-gray-700 bg-gray-700 p-2 text-white"
                                 >
@@ -357,12 +391,17 @@ export default function GreenhousePlanner() {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-300">CO₂ Level (ppm)</label>
+                                <label className="block text-sm font-medium text-gray-300">
+                                    CO₂ Level (ppm)
+                                </label>
                                 <input
                                     type="number"
                                     value={environmentalFactors.co2_level}
                                     onChange={(e) =>
-                                        setEnvironmentalFactors((prev) => ({ ...prev, co2_level: Number(e.target.value) }))
+                                        setEnvironmentalFactors((prev) => ({
+                                            ...prev,
+                                            co2_level: Number(e.target.value),
+                                        }))
                                     }
                                     className="w-full rounded border border-gray-700 bg-gray-700 p-2 text-white"
                                 />
@@ -372,12 +411,16 @@ export default function GreenhousePlanner() {
 
                     {/* Sprinkler Selection */}
                     <div className="rounded-lg bg-gray-800 p-4">
-                        <h3 className="mb-3 text-lg font-semibold text-white">💧 Irrigation System</h3>
+                        <h3 className="mb-3 text-lg font-semibold text-white">
+                            💧 Irrigation System
+                        </h3>
                         <select
                             className="w-full rounded border border-gray-700 bg-gray-700 p-2 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                             value={selectedSprinkler?.id || ''}
                             onChange={(e) => {
-                                const sprinkler = sprinklers.find((s) => s.id === Number(e.target.value));
+                                const sprinkler = sprinklers.find(
+                                    (s) => s.id === Number(e.target.value)
+                                );
                                 setSelectedSprinkler(sprinkler || null);
                             }}
                         >
@@ -496,4 +539,4 @@ export default function GreenhousePlanner() {
             <Footer />
         </div>
     );
-} 
+}

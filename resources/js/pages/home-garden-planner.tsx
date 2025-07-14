@@ -190,7 +190,7 @@ export default function HomeGardenPlanner() {
     return (
         <div className="min-h-screen bg-gray-900 p-6 text-white">
             <div className="mx-auto w-full">
-                <div className="flex justify-between items-center mb-6">
+                <div className="mb-6 flex items-center justify-between">
                     <div>
                         <h1 className="text-3xl font-bold">🏡 Home Garden Sprinkler Calculator</h1>
                         <p className="text-gray-400">
@@ -339,7 +339,7 @@ export default function HomeGardenPlanner() {
                     </div>
                 </div>
             </div>
-            
+
             {/* Footer */}
             <Footer />
         </div>

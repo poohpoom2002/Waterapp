@@ -85,10 +85,10 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     // คำนวณจำนวนหน้าทั้งหมด - ปรับให้คิดถึง total table
     const calculateTotalPages = (totalItems: number) => {
         if (totalItems <= 7) return 1; // หน้าเดียว เหลือพื้นที่สำหรับ total
-        
+
         let remainingItems = totalItems - 10; // หักหน้าแรก 10 รายการ
         let additionalPages = 0;
-        
+
         while (remainingItems > 0) {
             if (remainingItems <= 11) {
                 // หน้าสุดท้าย: สามารถใส่ได้สูงสุด 11 รายการ (เหลือพื้นที่สำหรับ total)
@@ -100,7 +100,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 additionalPages += 1;
             }
         }
-        
+
         return 1 + additionalPages;
     };
 
@@ -485,7 +485,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
     const getItemsForPage = (page: number) => {
         const itemsPerPage = getItemsPerPage(page, totalPages, items.length);
-        
+
         if (page === 1) {
             return items.slice(0, itemsPerPage);
         } else {
@@ -497,17 +497,17 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
     // ฟังก์ชันสำหรับ render total table - ใช้ร่วมกันระหว่างหน้าจอและการพิมพ์
     const renderTotalTable = (grandTotal: number, isForPrint: boolean = false) => {
-        const tableClasses = isForPrint ? 
-            "w-[250px] border-collapse border-gray-400 text-sm" : 
-            "w-[250px] border-collapse border-gray-400 text-sm";
-        
-        const cellClasses = isForPrint ?
-            "border border-x-0 border-gray-400 p-1 text-left align-top font-bold" :
-            "border border-x-0 border-gray-400 p-1 text-left align-top font-bold";
-            
-        const valueCellClasses = isForPrint ?
-            "w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top" :
-            "w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top";
+        const tableClasses = isForPrint
+            ? 'w-[250px] border-collapse border-gray-400 text-sm'
+            : 'w-[250px] border-collapse border-gray-400 text-sm';
+
+        const cellClasses = isForPrint
+            ? 'border border-x-0 border-gray-400 p-1 text-left align-top font-bold'
+            : 'border border-x-0 border-gray-400 p-1 text-left align-top font-bold';
+
+        const valueCellClasses = isForPrint
+            ? 'w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top'
+            : 'w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top';
 
         return `
             <table class="${tableClasses}">
@@ -711,7 +711,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         for (let page = 1; page <= currentTotalPages; page++) {
             let pageItems;
             const itemsPerPage = getItemsPerPage(page, currentTotalPages, currentItems.length);
-            
+
             if (page === 1) {
                 pageItems = currentItems.slice(0, itemsPerPage);
             } else {
@@ -1458,8 +1458,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
 export default QuotationDocument;
 
-
-
 // // components/QuotationDocument.tsx - Enhanced with all fixes + Subtotal fixes
 // import React, { useState, useEffect, useRef } from 'react';
 // import { CalculationResults, QuotationData, QuotationDataCustomer } from '../types/interfaces';
@@ -1551,15 +1549,15 @@ export default QuotationDocument;
 //     // คำนวณจำนวนหน้าทั้งหมด - ปรับให้คิดถึง total table แบบกลุ่ม
 //     const calculateTotalPages = (totalItems: number) => {
 //         if (totalItems === 0) return 1;
-        
+
 //         if (totalItems <= 5) {
 //             // รายการน้อย สามารถใส่ total ในหน้าเดียวได้
 //             return 1;
 //         }
-        
+
 //         let remainingItems = totalItems - 10; // หักหน้าแรก 10 รายการ
 //         let additionalPages = 0;
-        
+
 //         while (remainingItems > 0) {
 //             if (remainingItems <= 9) {
 //                 // หน้าสุดท้าย: ถ้าเหลือ 9 รายการหรือน้อยกว่า สามารถใส่ total ได้
@@ -1571,25 +1569,25 @@ export default QuotationDocument;
 //                 additionalPages += 1;
 //             }
 //         }
-        
+
 //         // ตรวจสอบว่าหน้าสุดท้ายมีพื้นที่พอสำหรับ total table หรือไม่
 //         const lastPageItems = totalItems - 10 - (additionalPages - 1) * 14;
 //         if (lastPageItems > 9) {
 //             // ถ้าหน้าสุดท้ายมีรายการมากกว่า 9 รายการ ต้องสร้างหน้าใหม่สำหรับ total
 //             additionalPages += 1;
 //         }
-        
+
 //         return 1 + additionalPages;
 //     };
 
 //     // ตรวจสอบว่าหน้าไหนมี total table
 //     const shouldShowTotal = (page: number) => {
 //         if (items.length === 0) return page === 1;
-        
+
 //         if (items.length <= 5) {
 //             return page === 1; // หน้าเดียว
 //         }
-        
+
 //         const itemsInLastPage = items.length - 10 - (totalPages - 2) * 14;
 //         if (totalPages > 1 && itemsInLastPage <= 9 && itemsInLastPage > 0) {
 //             return page === totalPages; // total อยู่ในหน้าสุดท้ายที่มีรายการ
@@ -1979,7 +1977,7 @@ export default QuotationDocument;
 
 //     const getItemsForPage = (page: number) => {
 //         if (items.length === 0) return [];
-        
+
 //         if (page === 1) {
 //             if (totalPages === 1) {
 //                 // หน้าเดียว: แสดงรายการทั้งหมด
@@ -1988,7 +1986,7 @@ export default QuotationDocument;
 //             return items.slice(0, 10);
 //         } else {
 //             const startIndex = 10 + (page - 2) * 14;
-            
+
 //             // ตรวจสอบว่าเป็นหน้าสุดท้ายหรือไม่
 //             if (page === totalPages) {
 //                 const remainingItems = items.length - startIndex;
@@ -2011,14 +2009,14 @@ export default QuotationDocument;
 
 //     // ฟังก์ชันสำหรับ render total table - ใช้ร่วมกันระหว่างหน้าจอและการพิมพ์
 //     const renderTotalTable = (grandTotal: number, isForPrint: boolean = false) => {
-//         const tableClasses = isForPrint ? 
-//             "w-[250px] border-collapse border-gray-400 text-sm" : 
+//         const tableClasses = isForPrint ?
+//             "w-[250px] border-collapse border-gray-400 text-sm" :
 //             "w-[250px] border-collapse border-gray-400 text-sm";
-        
+
 //         const cellClasses = isForPrint ?
 //             "border border-x-0 border-gray-400 p-1 text-left align-top font-bold" :
 //             "border border-x-0 border-gray-400 p-1 text-left align-top font-bold";
-            
+
 //         const valueCellClasses = isForPrint ?
 //             "w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top" :
 //             "w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top";
@@ -2226,7 +2224,7 @@ export default QuotationDocument;
 //             // ใช้ function เดียวกันกับการแสดงบนหน้าจอ
 //             const pageItems = (() => {
 //                 if (currentItems.length === 0) return [];
-                
+
 //                 if (page === 1) {
 //                     if (currentTotalPages === 1) {
 //                         return currentItems;
@@ -2234,7 +2232,7 @@ export default QuotationDocument;
 //                     return currentItems.slice(0, 10);
 //                 } else {
 //                     const startIndex = 10 + (page - 2) * 14;
-                    
+
 //                     if (page === currentTotalPages) {
 //                         const remainingItems = currentItems.length - startIndex;
 //                         if (remainingItems <= 9 && remainingItems > 0) {
@@ -2253,11 +2251,11 @@ export default QuotationDocument;
 //             // ตรวจสอบว่าหน้านี้มี total หรือไม่
 //             const shouldShowTotalOnThisPage = (() => {
 //                 if (currentItems.length === 0) return page === 1;
-                
+
 //                 if (currentItems.length <= 5) {
 //                     return page === 1;
 //                 }
-                
+
 //                 const itemsInLastPage = currentItems.length - 10 - (currentTotalPages - 2) * 14;
 //                 if (currentTotalPages > 1 && itemsInLastPage <= 9 && itemsInLastPage > 0) {
 //                     return page === currentTotalPages;
@@ -2709,17 +2707,17 @@ export default QuotationDocument;
 //                             size: A4 portrait;
 //                             margin: 0;
 //                         }
-                        
+
 //                         * {
 //                             -webkit-print-color-adjust: exact !important;
 //                             color-adjust: exact !important;
 //                             box-sizing: border-box !important;
 //                         }
-                        
+
 //                         body > *:not(.print-document-container) {
 //                             display: none !important;
 //                         }
-                        
+
 //                         .print-document-container {
 //                             display: block !important;
 //                             position: static !important;
@@ -2730,7 +2728,7 @@ export default QuotationDocument;
 //                             background: white !important;
 //                             font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif !important;
 //                         }
-                        
+
 //                         /* ใช้ class structure เดียวกันกับหน้าจอ */
 //                         .mx-auto { margin-left: auto !important; margin-right: auto !important; }
 //                         .flex { display: flex !important; }
@@ -2741,52 +2739,52 @@ export default QuotationDocument;
 //                         .p-8 { padding: 2rem !important; }
 //                         .text-black { color: black !important; }
 //                         .shadow-lg { box-shadow: none !important; }
-                        
-//                         .print-page { 
-//                             display: flex !important; 
-//                             min-height: 100% !important; 
-//                             flex-direction: column !important; 
+
+//                         .print-page {
+//                             display: flex !important;
+//                             min-height: 100% !important;
+//                             flex-direction: column !important;
 //                         }
-                        
+
 //                         .mb-2 { margin-bottom: 0.5rem !important; }
 //                         .mb-4 { margin-bottom: 1rem !important; }
 //                         .mb-6 { margin-bottom: 1.5rem !important; }
 //                         .mt-auto { margin-top: auto !important; }
 //                         .mt-4 { margin-top: 1rem !important; }
-                        
+
 //                         .items-center { align-items: center !important; }
 //                         .justify-between { justify-content: space-between !important; }
 //                         .justify-end { justify-content: flex-end !important; }
 //                         .self-start { align-self: flex-start !important; }
 //                         .self-end { align-self: flex-end !important; }
-                        
+
 //                         .h-10 { height: 2.5rem !important; }
 //                         .w-10 { width: 2.5rem !important; }
-                        
+
 //                         .border-gray-800 { border-color: rgb(31, 41, 55) !important; }
 //                         .border-gray-400 { border-color: rgb(156, 163, 175) !important; }
 //                         .bg-gray-100 { background-color: rgb(243, 244, 246) !important; }
-                        
+
 //                         .text-sm { font-size: 0.875rem !important; line-height: 1.25rem !important; }
 //                         .text-xs { font-size: 0.75rem !important; line-height: 1rem !important; }
 //                         .text-xl { font-size: 1.25rem !important; line-height: 1.75rem !important; }
 //                         .text-lg { font-size: 1.125rem !important; line-height: 1.75rem !important; }
-                        
+
 //                         .font-semibold { font-weight: 600 !important; }
 //                         .font-bold { font-weight: 700 !important; }
-                        
+
 //                         .text-left { text-align: left !important; }
 //                         .text-right { text-align: right !important; }
 //                         .text-center { text-align: center !important; }
-                        
+
 //                         .flex-row { flex-direction: row !important; }
 //                         .gap-9 { gap: 2.25rem !important; }
-                        
+
 //                         .w-full { width: 100% !important; }
 //                         .border-collapse { border-collapse: collapse !important; }
 //                         .border { border-width: 1px !important; }
 //                         .border-x-0 { border-left-width: 0 !important; border-right-width: 0 !important; }
-                        
+
 //                         .w-\\[50px\\] { width: 50px !important; }
 //                         .w-\\[60px\\] { width: 60px !important; }
 //                         .w-\\[80px\\] { width: 80px !important; }
@@ -2797,14 +2795,14 @@ export default QuotationDocument;
 //                         .p-1 { padding: 0.25rem !important; }
 //                         .p-2 { padding: 0.5rem !important; }
 //                         .align-top { vertical-align: top !important; }
-                        
+
 //                         .no-print { display: none !important; }
-                        
+
 //                         strong { font-weight: bold !important; }
-                        
-//                         hr { 
-//                             border: none !important; 
-//                             border-top: 1px solid !important; 
+
+//                         hr {
+//                             border: none !important;
+//                             border-top: 1px solid !important;
 //                         }
 //                     }
 //                 `,

@@ -962,104 +962,122 @@ export default function ComprehensiveHorticultureResultsPage() {
             // Check if we're editing an existing field by looking for fieldId in URL or localStorage
             const urlParams = new URLSearchParams(window.location.search);
             const fieldId = urlParams.get('fieldId') || localStorage.getItem('editingFieldId');
-            
+
             console.log('Detected fieldId for save operation:', fieldId);
             // Prepare zones data
-            const zonesData = projectData.zones?.map(zone => ({
-                id: zone.id,
-                name: zone.name,
-                polygon_coordinates: zone.coordinates.map((coord) => ({ lat: coord.lat, lng: coord.lng })),
-                color: zone.color,
-                pipe_direction: 'horizontal' // Default direction
-            })) || [];
+            const zonesData =
+                projectData.zones?.map((zone) => ({
+                    id: zone.id,
+                    name: zone.name,
+                    polygon_coordinates: zone.coordinates.map((coord) => ({
+                        lat: coord.lat,
+                        lng: coord.lng,
+                    })),
+                    color: zone.color,
+                    pipe_direction: 'horizontal', // Default direction
+                })) || [];
 
             // Prepare planting points data
-            const plantingPointsData = projectData.plants?.map(plant => {
-                // Find which zone this plant belongs to
-                let zoneId: number | null = null;
-                if (projectData.useZones && projectData.zones) {
-                    for (const zone of projectData.zones) {
-                        if (isPointInPolygon(plant.position, zone.coordinates)) {
-                            zoneId = parseInt(zone.id);
-                            break;
+            const plantingPointsData =
+                projectData.plants?.map((plant) => {
+                    // Find which zone this plant belongs to
+                    let zoneId: number | null = null;
+                    if (projectData.useZones && projectData.zones) {
+                        for (const zone of projectData.zones) {
+                            if (isPointInPolygon(plant.position, zone.coordinates)) {
+                                zoneId = parseInt(zone.id);
+                                break;
+                            }
                         }
                     }
-                }
-                
-                return {
-                    lat: plant.position.lat,
-                    lng: plant.position.lng,
-                    point_id: plant.id, // Keep original ID for new saves, will be regenerated for updates
-                    zone_id: zoneId
-                };
-            }) || [];
+
+                    return {
+                        lat: plant.position.lat,
+                        lng: plant.position.lng,
+                        point_id: plant.id, // Keep original ID for new saves, will be regenerated for updates
+                        zone_id: zoneId,
+                    };
+                }) || [];
 
             // Prepare main pipes data
-            const mainPipesData = projectData.mainPipes?.map(pipe => ({
-                type: 'main',
-                direction: 'horizontal',
-                start_lat: pipe.coordinates[0]?.lat || 0,
-                start_lng: pipe.coordinates[0]?.lng || 0,
-                end_lat: pipe.coordinates[pipe.coordinates.length - 1]?.lat || 0,
-                end_lng: pipe.coordinates[pipe.coordinates.length - 1]?.lng || 0,
-                length: pipe.length,
-                plants_served: 0,
-                water_flow: pipe.flowRate || 0,
-                pipe_diameter: pipe.diameter,
-                zone_id: null,
-                row_index: null,
-                col_index: null
-            })) || [];
+            const mainPipesData =
+                projectData.mainPipes?.map((pipe) => ({
+                    type: 'main',
+                    direction: 'horizontal',
+                    start_lat: pipe.coordinates[0]?.lat || 0,
+                    start_lng: pipe.coordinates[0]?.lng || 0,
+                    end_lat: pipe.coordinates[pipe.coordinates.length - 1]?.lat || 0,
+                    end_lng: pipe.coordinates[pipe.coordinates.length - 1]?.lng || 0,
+                    length: pipe.length,
+                    plants_served: 0,
+                    water_flow: pipe.flowRate || 0,
+                    pipe_diameter: pipe.diameter,
+                    zone_id: null,
+                    row_index: null,
+                    col_index: null,
+                })) || [];
 
             // Prepare sub-main pipes data
-            const subMainPipesData = projectData.subMainPipes?.map(pipe => ({
-                type: 'submain',
-                direction: 'horizontal',
-                start_lat: pipe.coordinates[0]?.lat || 0,
-                start_lng: pipe.coordinates[0]?.lng || 0,
-                end_lat: pipe.coordinates[pipe.coordinates.length - 1]?.lat || 0,
-                end_lng: pipe.coordinates[pipe.coordinates.length - 1]?.lng || 0,
-                length: pipe.length,
-                plants_served: 0,
-                water_flow: 0,
-                pipe_diameter: pipe.diameter || 0,
-                zone_id: parseInt(pipe.zoneId),
-                row_index: null,
-                col_index: null
-            })) || [];
+            const subMainPipesData =
+                projectData.subMainPipes?.map((pipe) => ({
+                    type: 'submain',
+                    direction: 'horizontal',
+                    start_lat: pipe.coordinates[0]?.lat || 0,
+                    start_lng: pipe.coordinates[0]?.lng || 0,
+                    end_lat: pipe.coordinates[pipe.coordinates.length - 1]?.lat || 0,
+                    end_lng: pipe.coordinates[pipe.coordinates.length - 1]?.lng || 0,
+                    length: pipe.length,
+                    plants_served: 0,
+                    water_flow: 0,
+                    pipe_diameter: pipe.diameter || 0,
+                    zone_id: parseInt(pipe.zoneId),
+                    row_index: null,
+                    col_index: null,
+                })) || [];
 
             // Prepare branch pipes data
-            const branchPipesData = projectData.subMainPipes?.flatMap(subMainPipe => 
-                subMainPipe.branchPipes?.map(branchPipe => ({
-                    type: 'branch',
-                    direction: 'horizontal',
-                    start_lat: branchPipe.coordinates[0]?.lat || 0,
-                    start_lng: branchPipe.coordinates[0]?.lng || 0,
-                    end_lat: branchPipe.coordinates[branchPipe.coordinates.length - 1]?.lat || 0,
-                    end_lng: branchPipe.coordinates[branchPipe.coordinates.length - 1]?.lng || 0,
-                    length: branchPipe.length,
-                    plants_served: branchPipe.plants?.length || 0,
-                    water_flow: 0,
-                    pipe_diameter: branchPipe.diameter || 0,
-                    zone_id: parseInt(subMainPipe.zoneId),
-                    row_index: null,
-                    col_index: null
-                })) || []
-            ) || [];
+            const branchPipesData =
+                projectData.subMainPipes?.flatMap(
+                    (subMainPipe) =>
+                        subMainPipe.branchPipes?.map((branchPipe) => ({
+                            type: 'branch',
+                            direction: 'horizontal',
+                            start_lat: branchPipe.coordinates[0]?.lat || 0,
+                            start_lng: branchPipe.coordinates[0]?.lng || 0,
+                            end_lat:
+                                branchPipe.coordinates[branchPipe.coordinates.length - 1]?.lat || 0,
+                            end_lng:
+                                branchPipe.coordinates[branchPipe.coordinates.length - 1]?.lng || 0,
+                            length: branchPipe.length,
+                            plants_served: branchPipe.plants?.length || 0,
+                            water_flow: 0,
+                            pipe_diameter: branchPipe.diameter || 0,
+                            zone_id: parseInt(subMainPipe.zoneId),
+                            row_index: null,
+                            col_index: null,
+                        })) || []
+                ) || [];
 
             // Prepare layers data (exclusion areas)
-            const layersData = projectData.exclusionAreas?.map(area => ({
-                type: area.type,
-                coordinates: area.coordinates.map((coord) => ({ lat: coord.lat, lng: coord.lng })),
-                is_initial_map: false
-            })) || [];
+            const layersData =
+                projectData.exclusionAreas?.map((area) => ({
+                    type: area.type,
+                    coordinates: area.coordinates.map((coord) => ({
+                        lat: coord.lat,
+                        lng: coord.lng,
+                    })),
+                    is_initial_map: false,
+                })) || [];
 
             // Add main area as initial map layer
             if (projectData.mainArea && projectData.mainArea.length > 0) {
                 layersData.unshift({
                     type: 'other',
-                    coordinates: projectData.mainArea.map((coord) => ({ lat: coord.lat, lng: coord.lng })),
-                    is_initial_map: true
+                    coordinates: projectData.mainArea.map((coord) => ({
+                        lat: coord.lat,
+                        lng: coord.lng,
+                    })),
+                    is_initial_map: true,
                 });
             }
 
@@ -1074,7 +1092,7 @@ export default function ComprehensiveHorticultureResultsPage() {
                 layers: layersData,
                 zones: zonesData,
                 planting_points: plantingPointsData,
-                pipes: [...mainPipesData, ...subMainPipesData, ...branchPipesData]
+                pipes: [...mainPipesData, ...subMainPipesData, ...branchPipesData],
             };
 
             console.log('Saving horticulture project to database:', requestData);
@@ -1085,38 +1103,44 @@ export default function ComprehensiveHorticultureResultsPage() {
                 console.log('Updating existing field with ID:', fieldId);
                 response = await axios.put(`/api/fields/${fieldId}`, requestData, {
                     headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                        'X-CSRF-TOKEN': document
+                            .querySelector('meta[name="csrf-token"]')
+                            ?.getAttribute('content'),
                         'Content-Type': 'application/json',
-                    }
+                    },
                 });
             } else {
                 // Create new field
                 console.log('Creating new field');
                 response = await axios.post('/api/save-field', requestData, {
                     headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                        'X-CSRF-TOKEN': document
+                            .querySelector('meta[name="csrf-token"]')
+                            ?.getAttribute('content'),
                         'Content-Type': 'application/json',
-                    }
+                    },
                 });
             }
 
             if (response.data.success) {
                 setSaveSuccess(true);
                 console.log('✅ Horticulture project saved successfully');
-                
+
                 // Clear editing field ID after successful save
                 localStorage.removeItem('editingFieldId');
-                
+
                 // Redirect immediately to home page
                 router.visit('/');
             } else {
                 throw new Error('Failed to save project');
             }
-
         } catch (error) {
             console.error('❌ Error saving horticulture project:', error);
-            const errorMessage = axios.isAxiosError(error) 
-                ? error.response?.data?.message || error.response?.data?.error || error.message || 'Error saving project'
+            const errorMessage = axios.isAxiosError(error)
+                ? error.response?.data?.message ||
+                  error.response?.data?.error ||
+                  error.message ||
+                  'Error saving project'
                 : 'An unexpected error occurred';
             setSaveError(errorMessage);
         } finally {
@@ -1421,7 +1445,10 @@ export default function ComprehensiveHorticultureResultsPage() {
                                     <span>ปั๊มน้ำ</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAABlklEQVR4nI1TW0sCQRTel/plqSlGEUTPQRqRRBSE9tJDd7tApVI+VERRWcvMbNkFDArsSsLOZV8q+yXFiZ20dtdZaeB7OXO+M+d88x1N8xwhCq0WJZ2C4Zyg+FSC4ayMiUKr1uxwTqKC4apgBJSg5N1iKKIkM4aHOSVfvuQaajmJhpe5gvxQ2YPHyr6yiEWN8O/MgpJ3Z8L+zTTMFPth4CgokS8l4ex+1VMIf0hNLGZ0OS9MU4fBQjvEDtsaoJcX3Z2YqEOTatcClOowjnqU5DpQefmvACMZjVNSrAeun/Ku5GQuAFPLIUjlgjC88xPD5RXHr+BTTVBy5uwghXohftAG4xsBWJpph42JMCR2A5I8pnd7BTXsEbJeDexOZosxmEuHYG0yDGtXIzB/HofSc96tgT2CJV2n/G9A26NwnO7z9wQnUe3lZbOFU/ymSrjcSsLJgl8BXP21tsVQRGWku4sM3CL319XwybkRdC8RI4l/W5niIeU+2Pb0G+dHNPzKTRRqupFSExN12ArX15lTvG7H7Dsv4Rsa94hVuqmogAAAAABJRU5ErkJggg==" alt="tree" />
+                                    <img
+                                        src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAABlklEQVR4nI1TW0sCQRTel/plqSlGEUTPQRqRRBSE9tJDd7tApVI+VERRWcvMbNkFDArsSsLOZV8q+yXFiZ20dtdZaeB7OXO+M+d88x1N8xwhCq0WJZ2C4Zyg+FSC4ayMiUKr1uxwTqKC4apgBJSg5N1iKKIkM4aHOSVfvuQaajmJhpe5gvxQ2YPHyr6yiEWN8O/MgpJ3Z8L+zTTMFPth4CgokS8l4ex+1VMIf0hNLGZ0OS9MU4fBQjvEDtsaoJcX3Z2YqEOTatcClOowjnqU5DpQefmvACMZjVNSrAeun/Ku5GQuAFPLIUjlgjC88xPD5RXHr+BTTVBy5uwghXohftAG4xsBWJpph42JMCR2A5I8pnd7BTXsEbJeDexOZosxmEuHYG0yDGtXIzB/HofSc96tgT2CJV2n/G9A26NwnO7z9wQnUe3lZbOFU/ymSrjcSsLJgl8BXP21tsVQRGWku4sM3CL319XwybkRdC8RI4l/W5niIeU+2Pb0G+dHNPzKTRRqupFSExN12ArX15lTvG7H7Dsv4Rsa94hVuqmogAAAAABJRU5ErkJggg=="
+                                        alt="tree"
+                                    />
                                     <span>ต้นไม้ (แต่ละจุด)</span>
                                 </div>
                             </div>
@@ -2440,14 +2467,14 @@ export default function ComprehensiveHorticultureResultsPage() {
 
                 {/* Success/Error Messages */}
                 {saveSuccess && (
-                    <div className="mt-6 rounded-lg bg-green-500/10 border border-green-500/20 p-4 text-green-400 flex items-center gap-2">
+                    <div className="mt-6 flex items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/10 p-4 text-green-400">
                         <span className="text-lg">✅</span>
                         <span>โครงการบันทึกสำเร็จ! กำลังกลับไปหน้าหลัก</span>
                     </div>
                 )}
 
                 {saveError && (
-                    <div className="mt-6 rounded-lg bg-red-500/10 border border-red-500/20 p-4 text-red-400 flex items-center gap-2">
+                    <div className="mt-6 flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-red-400">
                         <span className="text-lg">❌</span>
                         <span>เกิดข้อผิดพลาด: {saveError}</span>
                     </div>
@@ -2470,11 +2497,11 @@ export default function ComprehensiveHorticultureResultsPage() {
                     <button
                         onClick={handleSaveToDatabase}
                         disabled={savingToDatabase || saveSuccess}
-                        className="rounded-lg bg-yellow-600 px-6 py-3 font-semibold transition-colors hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed"
+                        className="rounded-lg bg-yellow-600 px-6 py-3 font-semibold transition-colors hover:bg-yellow-700 disabled:cursor-not-allowed disabled:bg-gray-600"
                     >
                         {savingToDatabase ? (
                             <>
-                                <div className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2"></div>
+                                <div className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
                                 กำลังบันทึก...
                             </>
                         ) : (
