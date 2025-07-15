@@ -14,6 +14,8 @@ return new class extends Migration
         Schema::create('fields', function (Blueprint $table) {
             $table->id();
             $table->string('name');
+            $table->string('customer_name')->nullable(); // Add customer name field
+            $table->foreignId('user_id')->constrained('users'); // Add user relationship
             $table->text('area_coordinates'); // JSON array of lat/lng coordinates
             $table->foreignId('plant_type_id')->constrained('plant_types');
             $table->integer('total_plants');

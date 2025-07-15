@@ -15,6 +15,7 @@ import {
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { getSprinklerLayoutData, SprinklerLayoutData } from '../utils/sprinklerLayoutData';
+import Navbar from '../components/Navbar';
 
 // Custom Icons (Copied from generate-sprinkler.tsx for consistency)
 const createSprinklerIcon = () =>
@@ -97,6 +98,7 @@ export default function HomeGardenSummary() {
 
     return (
         <div className="min-h-screen bg-gray-900 p-6 text-white">
+            <Navbar />
             <div className="mx-auto w-full">
                 <h1 className="mb-4 text-3xl font-bold">📄 สรุปผลการออกแบบระบบ Home Garden</h1>
 

@@ -35,7 +35,7 @@ export const PumpData = [
                 size: '1/2"',
                 price: 300,
                 description: 'ใช้เพื่อป้องกันการกลับน้ำออกจากปั๊ม',
-                },
+            },
             {
                 id: 3,
                 code: '1-CPM075-BV',
@@ -121,7 +121,7 @@ export const PumpData = [
                 size: '1/2"',
                 price: 300,
                 description: 'ใช้เพื่อป้องกันการกลับน้ำออกจากปั๊ม',
-                },
+            },
             {
                 id: 3,
                 code: '1-CPM075-BV',
@@ -172,7 +172,7 @@ export const PumpData = [
             },
             // สามารถเพิ่มได้เอง เพิ่มข้อมูลตามที่ต้องการ
             {
-                id: 9, 
+                id: 9,
                 code: '', //unique
                 name: '',
                 size: null,
@@ -199,7 +199,7 @@ export const PumpData = [
         suction_depth_m: null,
         dimensions_cm: null,
         weight_kg: null,
-        price: null,    
+        price: null,
         pumpAccessory: [],
     },
     {
@@ -236,7 +236,7 @@ export const PumpData = [
                 size: '1/2"',
                 price: 300,
                 description: 'ใช้เพื่อป้องกันการกลับน้ำออกจากปั๊ม',
-                },
+            },
             {
                 id: 3,
                 code: '1-CPM075-BV',
@@ -332,7 +332,7 @@ export const PumpData = [
                 size: '1/2"',
                 price: 300,
                 description: 'ใช้เพื่อป้องกันการกลับน้ำออกจากปั๊ม',
-                },
+            },
             {
                 id: 3,
                 code: '1-CPM075-BV',
@@ -365,10 +365,10 @@ export const PumpData = [
                 price: 100,
                 description: 'ใช้ปิดปล่อยน้ำออกจากปั๊ม',
             },
-            
+
             // สามารถเพิ่มได้เอง เพิ่มข้อมูลตามที่ต้องการ
             {
-                id: 7, 
+                id: 7,
                 code: '', //unique
                 name: '',
                 size: null,
@@ -413,7 +413,7 @@ export const PumpData = [
                 size: '2"',
                 price: 300,
                 description: 'ใช้เพื่อป้องกันการกลับน้ำออกจากปั๊ม',
-                },
+            },
             {
                 id: 3,
                 code: '1-CPM075-BV',
@@ -464,7 +464,7 @@ export const PumpData = [
             },
             // สามารถเพิ่มได้เอง เพิ่มข้อมูลตามที่ต้องการ
             {
-                id: 9, 
+                id: 9,
                 code: '', //unique
                 name: '',
                 size: null,
@@ -509,7 +509,7 @@ export const PumpData = [
                 size: '1/2"',
                 price: 300,
                 description: 'ใช้เพื่อป้องกันการกลับน้ำออกจากปั๊ม',
-                },
+            },
             {
                 id: 3,
                 code: '1-CPM075-BV',
@@ -560,7 +560,7 @@ export const PumpData = [
             },
             // สามารถเพิ่มได้เอง เพิ่มข้อมูลตามที่ต้องการ
             {
-                id: 9, 
+                id: 9,
                 code: '', //unique
                 name: '',
                 size: null,
@@ -570,7 +570,7 @@ export const PumpData = [
             },
         ],
     },
-    
+
     {
         id: 7,
         productCode: '1-CPM300',
@@ -629,7 +629,7 @@ export const PumpData = [
                 size: '1/2"',
                 price: 300,
                 description: 'ใช้เพื่อป้องกันการกลับน้ำออกจากปั๊ม',
-                },
+            },
             {
                 id: 3,
                 code: '1-CPM075-BV',
@@ -681,7 +681,7 @@ export const PumpData = [
             },
             // สามารถเพิ่มได้เอง เพิ่มข้อมูลตามที่ต้องการ
             {
-                id: 9, 
+                id: 9,
                 code: '', //unique
                 name: '',
                 size: null,
@@ -786,7 +786,7 @@ export const PumpData = [
                 size: '1/2"',
                 price: 300,
                 description: 'ใช้เพื่อป้องกันการกลับน้ำออกจากปั๊ม',
-                },
+            },
             {
                 id: 3,
                 code: '1-CPM075-BV',
@@ -837,7 +837,7 @@ export const PumpData = [
             },
             // สามารถเพิ่มได้เอง เพิ่มข้อมูลตามที่ต้องการ
             {
-                id: 9, 
+                id: 9,
                 code: '', //unique
                 name: '',
                 size: null,

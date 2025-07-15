@@ -18,8 +18,12 @@ import CostSummary from './components/CostSummary';
 import QuotationModal from './components/QuotationModal';
 import QuotationDocument from './components/QuotationDocument';
 import ChatBox from '@/components/ChatBox';
+import { useLanguage } from '../contexts/LanguageContext';
+import LanguageSwitcher from '../components/LanguageSwitcher';
+import { router } from '@inertiajs/react';
 
 export default function Product() {
+    const { t } = useLanguage();
     // Load saved farm & pipe-length data with state to track changes
     const [farmData, setFarmData] = useState(() => getFarmData());
     const [pipeLengthData, setPipeLengthData] = useState(() => getPipeLengthData());
@@ -410,7 +414,7 @@ export default function Product() {
                         <p className="mb-4 text-yellow-400">ไม่พบข้อมูลจากหน้า Generate Tree</p>
                         <p className="text-gray-300">กรุณากลับไปทำการวางแผนการปลูกและวางท่อก่อน</p>
                         <button
-                            onClick={() => (window.location.href = '/generate-tree')}
+                            onClick={() => router.visit('/horticulture/planner')}
                             className="mt-4 rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700"
                         >
                             ไปหน้า Generate Tree
@@ -542,7 +546,7 @@ export default function Product() {
         <div className="min-h-screen bg-gray-800 p-6 text-white">
             <div className="flex w-full items-start justify-start gap-4">
                 {/* Fixed sidebar - ลดขนาดลง */}
-                <div className="fixed left-2 top-6 z-50 flex w-[570px] flex-col items-center ml-4 justify-center gap-3">
+                <div className="fixed left-2 top-6 z-50 ml-4 flex w-[570px] flex-col items-center justify-center gap-3">
                     <div className="w-full">
                         <h1 className="mb-2 text-center text-xl font-bold text-blue-400">
                             แผนผังโครงการ
@@ -579,7 +583,8 @@ export default function Product() {
                                 </p>
                             </div>
                         </div>
-                        <div className="flex items-center justify-end">
+                        <div className="flex items-center justify-end gap-4">
+                            <LanguageSwitcher />
                             <button
                                 onClick={() => (window.location.href = '/equipment-crud')}
                                 className="rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700"
@@ -750,7 +755,7 @@ export default function Product() {
             <div className="mt-4 text-center text-sm">
                 <div className="flex justify-center gap-4">
                     <button
-                        onClick={() => (location.href = '/planner')}
+                        onClick={() => (location.href = '/')}
                         className="rounded-md bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
                     >
                         เริ่มต้นใหม่
