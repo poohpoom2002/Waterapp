@@ -22,27 +22,491 @@ import {
     useMapEvents,
 } from 'react-leaflet';
 import { EditControl } from 'react-leaflet-draw';
-import { FaTree, FaUndo, FaRedo, FaEdit, FaTrash, FaPlus } from 'react-icons/fa';
 import { router } from '@inertiajs/react';
 import { useLanguage } from '../contexts/LanguageContext';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import Footer from '../components/Footer';
+import Navbar from '../components/Navbar';
 
 import {
-    isPointInPolygon,
-    calculatePipeLength,
-    generateBranchPipes,
-    generateUniqueId,
-    calculateAreaFromCoordinates,
-} from '@/utils/horticultureUtils';
+    FaTree,
+    FaUndo,
+    FaRedo,
+    FaEdit,
+    FaTrash,
+    FaPlus,
+    FaSave,
+    FaTimes,
+    FaArrowsAlt,
+    FaCog,
+    FaSearch,
+    FaSpinner,
+    FaLink,
+    FaUnlink,
+} from 'react-icons/fa';
 
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
+const isPointInPolygon = (point: { lat: number; lng: number }, polygon: { lat: number; lng: number }[]): boolean => {
+    if (!point || !polygon || polygon.length < 3) return false;
 
+    try {
+        let inside = false;
+        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+            const xi = polygon[i].lat;
+            const yi = polygon[i].lng;
+            const xj = polygon[j].lat;
+            const yj = polygon[j].lng;
+
+            const intersect =
+                yi > point.lng !== yj > point.lng &&
+                point.lat < ((xj - xi) * (point.lng - yi)) / (yj - yi) + xi;
+            if (intersect) inside = !inside;
+        }
+        return inside;
+    } catch (error) {
+        console.error('Error checking point in polygon:', error);
+        return false;
+    }
+};
+
+const calculatePipeLength = (coordinates: { lat: number; lng: number }[]): number => {
+    if (!coordinates || coordinates.length < 2) return 0;
+
+    try {
+        let totalLength = 0;
+        for (let i = 1; i < coordinates.length; i++) {
+            totalLength += calculateDistanceBetweenPoints(coordinates[i - 1], coordinates[i]);
+        }
+        return totalLength;
+    } catch (error) {
+        console.error('Error calculating pipe length:', error);
+        return 0;
+    }
+};
+
+const calculateDistanceBetweenPoints = (point1: { lat: number; lng: number }, point2: { lat: number; lng: number }): number => {
+    try {
+        const R = 6371000;
+        const dLat = ((point2.lat - point1.lat) * Math.PI) / 180;
+        const dLng = ((point2.lng - point1.lng) * Math.PI) / 180;
+
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos((point1.lat * Math.PI) / 180) *
+                Math.cos((point2.lat * Math.PI) / 180) *
+                Math.sin(dLng / 2) *
+                Math.sin(dLng / 2);
+
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return Math.max(0, R * c);
+    } catch (error) {
+        console.error('Error calculating distance:', error);
+        return 0;
+    }
+};
+
+const generateUniqueId = (prefix: string = 'id'): string => {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substr(2, 9);
+    return `${prefix}-${timestamp}-${random}`;
+};
+
+const calculateAreaFromCoordinates = (coordinates: { lat: number; lng: number }[]): number => {
+    if (!coordinates || coordinates.length < 3) return 0;
+
+    try {
+        let area = 0;
+        for (let i = 0; i < coordinates.length; i++) {
+            const j = (i + 1) % coordinates.length;
+            area += coordinates[i].lat * coordinates[j].lng;
+            area -= coordinates[j].lat * coordinates[i].lng;
+        }
+        area = Math.abs(area) / 2;
+
+        const avgLat = coordinates.reduce((sum, coord) => sum + coord.lat, 0) / coordinates.length;
+        const latFactor = 111000;
+        const lngFactor = 111000 * Math.cos((avgLat * Math.PI) / 180);
+
+        const areaInSquareMeters = area * latFactor * lngFactor;
+        return Math.max(0, areaInSquareMeters);
+    } catch (error) {
+        console.error('Error calculating area:', error);
+        return 0;
+    }
+};
+
+const interpolatePositionAlongPipe = (
+    coordinates: { lat: number; lng: number }[],
+    targetDistance: number
+): { lat: number; lng: number } | null => {
+    if (!coordinates || coordinates.length < 2 || targetDistance < 0) return null;
+
+    try {
+        let accumulatedDistance = 0;
+
+        for (let i = 1; i < coordinates.length; i++) {
+            const segmentLength = calculateDistanceBetweenPoints(
+                coordinates[i - 1],
+                coordinates[i]
+            );
+
+            if (accumulatedDistance + segmentLength >= targetDistance) {
+                const segmentProgress =
+                    segmentLength > 0 ? (targetDistance - accumulatedDistance) / segmentLength : 0;
+
+                return {
+                    lat:
+                        coordinates[i - 1].lat +
+                        (coordinates[i].lat - coordinates[i - 1].lat) * segmentProgress,
+                    lng:
+                        coordinates[i - 1].lng +
+                        (coordinates[i].lng - coordinates[i - 1].lng) * segmentProgress,
+                };
+            }
+
+            accumulatedDistance += segmentLength;
+        }
+
+        return coordinates[coordinates.length - 1];
+    } catch (error) {
+        console.error('Error interpolating position:', error);
+        return null;
+    }
+};
+
+const findClosestPointOnPipe = (
+    position: { lat: number; lng: number },
+    pipeCoordinates: { lat: number; lng: number }[]
+): { position: { lat: number; lng: number }; distance: number; segmentIndex: number } | null => {
+    if (!pipeCoordinates || pipeCoordinates.length < 2) return null;
+
+    let closestPoint: { lat: number; lng: number } | null = null;
+    let minDistance = Infinity;
+    let bestSegmentIndex = 0;
+
+    for (let i = 0; i < pipeCoordinates.length - 1; i++) {
+        const segmentStart = pipeCoordinates[i];
+        const segmentEnd = pipeCoordinates[i + 1];
+        
+
+        const segmentLength = calculateDistanceBetweenPoints(segmentStart, segmentEnd);
+        if (segmentLength === 0) continue;
+
+        const t = Math.max(0, Math.min(1, 
+            ((position.lat - segmentStart.lat) * (segmentEnd.lat - segmentStart.lat) +
+             (position.lng - segmentStart.lng) * (segmentEnd.lng - segmentStart.lng)) /
+            (segmentLength * segmentLength / (111000 * 111000))
+        ));
+
+        const closestOnSegment = {
+            lat: segmentStart.lat + t * (segmentEnd.lat - segmentStart.lat),
+            lng: segmentStart.lng + t * (segmentEnd.lng - segmentStart.lng)
+        };
+
+        const distance = calculateDistanceBetweenPoints(position, closestOnSegment);
+        
+        if (distance < minDistance) {
+            minDistance = distance;
+            closestPoint = closestOnSegment;
+            bestSegmentIndex = i;
+        }
+    }
+
+    return closestPoint ? {
+        position: closestPoint,
+        distance: minDistance,
+        segmentIndex: bestSegmentIndex
+    } : null;
+};
+
+const generateEnhancedBranchPipes = (
+    subMainCoordinates: { lat: number; lng: number }[],
+    zone: any,
+    plantData: any,
+    exclusions: any[],
+    mainArea: { lat: number; lng: number }[],
+    useZones?: boolean,
+    branchSettings?: any
+): any[] => {
+    const branchPipes: any[] = [];
+    const pipeLength = calculatePipeLength(subMainCoordinates);
+
+    const settings = branchSettings || {
+        defaultAngle: 90,
+        maxAngle: 180,
+        minAngle: 0,
+        angleStep: 1,
+    };
+
+    let targetArea: { lat: number; lng: number }[];
+    let zoneName: string;
+
+    if (useZones && zone.coordinates && zone.coordinates.length > 0) {
+        targetArea = zone.coordinates;
+        zoneName = zone.name;
+    } else {
+        targetArea = mainArea;
+        zoneName = 'พื้นที่หลัก';
+    }
+
+    if (!targetArea || targetArea.length < 3) {
+        console.error('❌ Invalid target area for enhanced branch generation');
+        return [];
+    }
+
+    const exactRowSpacing = plantData.rowSpacing;
+    const numberOfBranches = Math.max(2, Math.floor(pipeLength / exactRowSpacing) + 1);
+
+    for (let i = 0; i < numberOfBranches; i++) {
+        const distanceFromStart = exactRowSpacing * 0.5 + i * exactRowSpacing;
+        if (distanceFromStart > pipeLength) break;
+
+        const position = interpolatePositionAlongPipe(subMainCoordinates, distanceFromStart);
+
+        if (position) {
+            const segmentIndex = Math.max(
+                0,
+                Math.min(
+                    Math.floor((distanceFromStart / pipeLength) * (subMainCoordinates.length - 1)),
+                    subMainCoordinates.length - 2
+                )
+            );
+
+            const direction = calculatePipeDirection(subMainCoordinates, segmentIndex);
+            const perpendicular = calculatePerpendicularDirection(direction);
+
+            ['left', 'right'].forEach((side, sideIndex) => {
+                const multiplier = sideIndex === 0 ? -1 : 1;
+                const branchAngle = settings.defaultAngle;
+                const adjustedDirection = rotatePerpendicular(perpendicular, branchAngle - 90);
+
+                const optimalDistance = calculateOptimalDistanceToPolygonBoundary(
+                    position,
+                    adjustedDirection,
+                    multiplier,
+                    targetArea,
+                    plantData.plantSpacing
+                );
+
+                if (optimalDistance >= 15) {
+                    const endPosition = calculateBranchEndPosition(
+                        position,
+                        adjustedDirection,
+                        multiplier,
+                        optimalDistance
+                    );
+
+                    const startInTargetArea = isPointInPolygon(position, targetArea);
+                    const endInTargetArea = isPointInPolygon(endPosition, targetArea);
+
+                    if (startInTargetArea && endInTargetArea) {
+                        const branchCoordinates = [position, endPosition];
+                        const plants = generateOptimalSpacingPlants(
+                            branchCoordinates,
+                            plantData,
+                            exclusions,
+                            targetArea
+                        );
+
+                        const branchPipe = {
+                            id: generateUniqueId('branch'),
+                            subMainPipeId: '',
+                            coordinates: branchCoordinates,
+                            length: calculatePipeLength(branchCoordinates),
+                            diameter: 25,
+                            plants,
+                            isEditable: true,
+                            sprinklerType: 'standard',
+                            angle: branchAngle,
+                            connectionPoint: distanceFromStart / pipeLength,
+                        };
+
+                        branchPipes.push(branchPipe);
+                    }
+                }
+            });
+        }
+    }
+
+    return branchPipes;
+};
+
+
+const calculatePipeDirection = (coordinates: { lat: number; lng: number }[], segmentIndex: number) => {
+    const start = coordinates[segmentIndex];
+    const end = coordinates[Math.min(segmentIndex + 1, coordinates.length - 1)];
+    return { lat: end.lat - start.lat, lng: end.lng - start.lng };
+};
+
+const calculatePerpendicularDirection = (direction: { lat: number; lng: number }) => {
+    const perpendicular = { lat: -direction.lng, lng: direction.lat };
+    const length = Math.sqrt(perpendicular.lat ** 2 + perpendicular.lng ** 2);
+    return length > 0 ? { lat: perpendicular.lat / length, lng: perpendicular.lng / length } : { lat: 0, lng: 1 };
+};
+
+const rotatePerpendicular = (direction: { lat: number; lng: number }, angleDegrees: number) => {
+    const angleRad = (angleDegrees * Math.PI) / 180;
+    const cos = Math.cos(angleRad);
+    const sin = Math.sin(angleRad);
+    return {
+        lat: direction.lat * cos - direction.lng * sin,
+        lng: direction.lat * sin + direction.lng * cos,
+    };
+};
+
+const calculateOptimalDistanceToPolygonBoundary = (
+    startPoint: { lat: number; lng: number },
+    direction: { lat: number; lng: number },
+    multiplier: number,
+    polygon: { lat: number; lng: number }[],
+    plantSpacing: number
+): number => {
+    if (!polygon || polygon.length < 3) return 0;
+
+    try {
+        const maxTestDistance = 500;
+        let low = 0;
+        let high = maxTestDistance;
+        let maxValidDistance = 0;
+
+        while (high - low > 0.1) {
+            const mid = (low + high) / 2;
+            const testPoint = calculateBranchEndPosition(startPoint, direction, multiplier, mid);
+
+            if (isPointInPolygon(testPoint, polygon)) {
+                maxValidDistance = mid;
+                low = mid;
+            } else {
+                high = mid;
+            }
+        }
+
+        const startBufferFromSubMain = plantSpacing * 0.5;
+        const availableLengthForPlants = maxValidDistance - startBufferFromSubMain;
+        
+        if (availableLengthForPlants <= 0) return 0;
+
+        const numberOfPlantsOnBranch = Math.max(1, Math.floor(availableLengthForPlants / plantSpacing) + 1);
+        const optimalBranchLength = startBufferFromSubMain + (numberOfPlantsOnBranch - 1) * plantSpacing;
+        return Math.min(optimalBranchLength, maxValidDistance);
+    } catch (error) {
+        console.error('Error calculating optimal distance to boundary:', error);
+        return 0;
+    }
+};
+
+const calculateBranchEndPosition = (
+    startPos: { lat: number; lng: number },
+    direction: { lat: number; lng: number },
+    multiplier: number,
+    length: number
+) => {
+    return {
+        lat: startPos.lat + (direction.lat * multiplier * length) / 111000,
+        lng: startPos.lng + (direction.lng * multiplier * length) / (111000 * Math.cos((startPos.lat * Math.PI) / 180)),
+    };
+};
+
+const generateOptimalSpacingPlants = (
+    pipeCoordinates: { lat: number; lng: number }[],
+    plantData: any,
+    exclusionAreas: any[] = [],
+    zoneCoordinates: { lat: number; lng: number }[]
+): any[] => {
+    if (!pipeCoordinates || pipeCoordinates.length < 2 || !plantData) return [];
+
+    try {
+        const plants: any[] = [];
+        const pipeLength = calculatePipeLength(pipeCoordinates);
+        const exactSpacing = plantData.plantSpacing;
+        const startBuffer = exactSpacing * 0.5;
+        const availableLength = pipeLength - startBuffer;
+        const numberOfPlants = Math.max(1, Math.floor(availableLength / exactSpacing) + 1);
+
+        for (let i = 0; i < numberOfPlants; i++) {
+            const exactDistanceOnPipe = startBuffer + i * exactSpacing;
+            if (exactDistanceOnPipe > pipeLength) break;
+
+            const position = interpolatePositionAlongPipe(pipeCoordinates, exactDistanceOnPipe);
+
+            if (position) {
+                const inZone = isPointInPolygon(position, zoneCoordinates);
+                const inExclusion = exclusionAreas.some((exclusion) =>
+                    isPointInPolygon(position, exclusion.coordinates)
+                );
+
+                if (inZone && !inExclusion) {
+                    plants.push({
+                        id: generateUniqueId('plant'),
+                        position,
+                        plantData,
+                        isSelected: false,
+                        isEditable: true,
+                        health: 'good',
+                    });
+                }
+            }
+        }
+
+        return plants;
+    } catch (error) {
+        console.error('Error generating enhanced optimal spacing plants:', error);
+        return [];
+    }
+};
+
+const extractCoordinatesFromLayer = (layer: any): { lat: number; lng: number }[] => {
+    try {
+        let coordinates: { lat: number; lng: number }[] = [];
+
+        if (layer instanceof L.Rectangle) {
+            const latLngs = layer.getLatLngs();
+            if (Array.isArray(latLngs) && latLngs.length > 0) {
+                const coords = latLngs[0];
+                coordinates = (coords as any[]).map((latLng: any) => ({
+                    lat: latLng.lat,
+                    lng: latLng.lng,
+                }));
+            }
+        } else if (layer instanceof L.Circle) {
+            const center = layer.getLatLng();
+            const radius = layer.getRadius();
+            const points = 32;
+
+            for (let i = 0; i < points; i++) {
+                const angle = (i * 360) / points;
+                const rad = (angle * Math.PI) / 180;
+                const latOffset = (radius / 111320) * Math.cos(rad);
+                const lngOffset =
+                    (radius / (111320 * Math.cos((center.lat * Math.PI) / 180))) * Math.sin(rad);
+
+                coordinates.push({
+                    lat: center.lat + latOffset,
+                    lng: center.lng + lngOffset,
+                });
+            }
+        } else if (layer instanceof L.Polygon || layer instanceof L.Polyline) {
+            const latLngs = layer.getLatLngs();
+            if (Array.isArray(latLngs) && latLngs.length > 0) {
+                const coords =
+                    Array.isArray(latLngs[0]) && (latLngs[0] as any).lat === undefined
+                        ? latLngs[0]
+                        : latLngs;
+
+                coordinates = (coords as any[]).map((latLng: any) => ({
+                    lat: latLng.lat,
+                    lng: latLng.lng,
+                }));
+            }
+        }
+
+        return coordinates;
+    } catch (error) {
+        console.error('❌ Error extracting coordinates:', error);
+        return [];
+    }
+};
+
+// Interface definitions
 interface Coordinate {
     lat: number;
     lng: number;
@@ -54,8 +518,6 @@ interface PlantData {
     plantSpacing: number;
     rowSpacing: number;
     waterNeed: number;
-    category?: string;
-    description?: string;
 }
 
 interface Zone {
@@ -122,6 +584,8 @@ interface BranchPipe {
     isDisabled?: boolean;
     isVisible?: boolean;
     isActive?: boolean;
+    angle?: number; 
+    connectionPoint?: number; 
 }
 
 interface PlantLocation {
@@ -133,6 +597,7 @@ interface PlantLocation {
     elevation?: number;
     soilType?: string;
     health?: 'good' | 'fair' | 'poor';
+    zoneId?: string;
 }
 
 interface ExclusionArea {
@@ -157,11 +622,23 @@ interface ProjectState {
     useZones: boolean;
     selectedPlantType: PlantData;
     availablePlants: PlantData[];
+    spacingValidationStats: {
+        totalBranches: number;
+        averageRowSpacing: number;
+        averagePlantSpacing: number;
+        spacingAccuracy: number;
+    };
     areaUtilizationStats: {
         totalBranches: number;
         averageUtilization: number;
         maxUtilization: number;
-        minUtilization: number;
+    };
+    isEditModeEnabled: boolean;
+    branchPipeSettings: {
+        defaultAngle: number;
+        maxAngle: number;
+        minAngle: number;
+        angleStep: number;
     };
 }
 
@@ -177,56 +654,16 @@ type HistoryAction =
     | { type: 'REDO' }
     | { type: 'CLEAR_HISTORY' };
 
+// Default data
 const DEFAULT_PLANT_TYPES: PlantData[] = [
-    {
-        id: 1,
-        name: 'มะม่วง',
-        plantSpacing: 8,
-        rowSpacing: 8,
-        waterNeed: 50,
-        category: 'ผลไม้',
-        description: 'ไม้ผลเขตร้อน',
-    },
-    {
-        id: 2,
-        name: 'ทุเรียน',
-        plantSpacing: 10,
-        rowSpacing: 10,
-        waterNeed: 80,
-        category: 'ผลไม้',
-        description: 'ไม้ผลมีค่า',
-    },
-    {
-        id: 3,
-        name: 'สับปะรด',
-        plantSpacing: 1,
-        rowSpacing: 1.2,
-        waterNeed: 3,
-        category: 'ผลไม้',
-        description: 'ไม้ผลทุ่งหญ้า',
-    },
-    {
-        id: 99,
-        name: 'กำหนดเอง',
-        plantSpacing: 5,
-        rowSpacing: 5,
-        waterNeed: 10,
-        category: 'กำหนดเอง',
-        description: 'พืชกำหนดเอง',
-    },
+    { id: 1, name: 'มะม่วง', plantSpacing: 8, rowSpacing: 8, waterNeed: 50 },
+    { id: 2, name: 'ทุเรียน', plantSpacing: 10, rowSpacing: 10, waterNeed: 80 },
+    { id: 3, name: 'สับปะรด', plantSpacing: 1, rowSpacing: 1.2, waterNeed: 3 },
 ];
 
 const ZONE_COLORS = [
-    '#FF6B6B',
-    '#4ECDC4',
-    '#45B7D1',
-    '#96CEB4',
-    '#FFEAA7',
-    '#DDA0DD',
-    '#FFA07A',
-    '#87CEEB',
-    '#98FB98',
-    '#F0E68C',
+    '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+    '#DDA0DD', '#FFA07A', '#87CEEB', '#98FB98', '#F0E68C',
 ];
 
 const EXCLUSION_COLORS = {
@@ -237,9 +674,9 @@ const EXCLUSION_COLORS = {
     other: '#8B5CF6',
 };
 
+// Utility functions
 const formatArea = (area: number): string => {
     if (typeof area !== 'number' || isNaN(area) || area < 0) return '0 ตร.ม.';
-
     if (area >= 1600) {
         return `${(area / 1600).toFixed(2)} ไร่`;
     } else {
@@ -249,7 +686,6 @@ const formatArea = (area: number): string => {
 
 const formatWaterVolume = (volume: number): string => {
     if (typeof volume !== 'number' || isNaN(volume) || volume < 0) return '0 ลิตร';
-
     if (volume >= 1000000) {
         return `${(volume / 1000000).toFixed(2)} ล้านลิตร`;
     } else if (volume >= 1000) {
@@ -263,18 +699,12 @@ const getZoneColor = (index: number): string => {
     return ZONE_COLORS[index % ZONE_COLORS.length];
 };
 
-const calculatePlantCount = (
-    zoneArea: number,
-    plantSpacing: number,
-    rowSpacing: number
-): number => {
+const calculatePlantCount = (zoneArea: number, plantSpacing: number, rowSpacing: number): number => {
     if (zoneArea <= 0 || plantSpacing <= 0 || rowSpacing <= 0) return 0;
-
     try {
         const effectiveArea = zoneArea * 0.85;
         const plantArea = plantSpacing * rowSpacing;
         const estimatedPlants = Math.floor(effectiveArea / plantArea);
-
         return Math.max(0, estimatedPlants);
     } catch (error) {
         console.error('Error calculating plant count:', error);
@@ -282,56 +712,112 @@ const calculatePlantCount = (
     }
 };
 
-const extractCoordinatesFromLayer = (layer: any): Coordinate[] => {
-    try {
-        let coordinates: Coordinate[] = [];
+const findZoneContainingPoint = (point: Coordinate, zones: Zone[]): Zone | null => {
+    for (const zone of zones) {
+        if (isPointInPolygon(point, zone.coordinates)) {
+            return zone;
+        }
+    }
+    return null;
+};
 
-        if (layer instanceof L.Rectangle) {
-            const latLngs = layer.getLatLngs();
-            if (Array.isArray(latLngs) && latLngs.length > 0) {
-                const coords = latLngs[0];
-                coordinates = (coords as any[]).map((latLng: any) => ({
-                    lat: latLng.lat,
-                    lng: latLng.lng,
-                }));
-            }
-        } else if (layer instanceof L.Circle) {
-            const center = layer.getLatLng();
-            const radius = layer.getRadius();
-            const points = 32;
+const findZoneForPipe = (coordinates: Coordinate[], zones: Zone[]): Zone | null => {
+    if (coordinates.length === 0) return null;
+    const midIndex = Math.floor(coordinates.length / 2);
+    const midPoint = coordinates[midIndex];
+    const midZone = findZoneContainingPoint(midPoint, zones);
+    if (midZone) return midZone;
+    const startZone = findZoneContainingPoint(coordinates[0], zones);
+    if (startZone) return startZone;
+    const endZone = findZoneContainingPoint(coordinates[coordinates.length - 1], zones);
+    return endZone;
+};
 
-            for (let i = 0; i < points; i++) {
-                const angle = (i * 360) / points;
-                const rad = (angle * Math.PI) / 180;
-                const latOffset = (radius / 111320) * Math.cos(rad);
-                const lngOffset =
-                    (radius / (111320 * Math.cos((center.lat * Math.PI) / 180))) * Math.sin(rad);
+const findTargetZoneForMainPipe = (coordinates: Coordinate[], zones: Zone[], useZones: boolean): string => {
+    if (!useZones || zones.length === 0) {
+        return 'main-area';
+    }
+    const endPoint = coordinates[coordinates.length - 1];
+    const targetZone = findZoneContainingPoint(endPoint, zones);
+    return targetZone ? targetZone.id : zones[0].id;
+};
 
-                coordinates.push({
-                    lat: center.lat + latOffset,
-                    lng: center.lng + lngOffset,
-                });
-            }
-        } else if (layer instanceof L.Polygon || layer instanceof L.Polyline) {
-            const latLngs = layer.getLatLngs();
-            if (Array.isArray(latLngs) && latLngs.length > 0) {
-                const coords =
-                    Array.isArray(latLngs[0]) && (latLngs[0] as any).lat === undefined
-                        ? latLngs[0]
-                        : latLngs;
+const calculateExactSpacingStats = (subMainPipes: SubMainPipe[]) => {
+    let totalBranches = 0;
+    let totalRowSpacings: number[] = [];
+    let totalPlantSpacings: number[] = [];
 
-                coordinates = (coords as any[]).map((latLng: any) => ({
-                    lat: latLng.lat,
-                    lng: latLng.lng,
-                }));
+    subMainPipes.forEach((subMain) => {
+        const branchCount = subMain.branchPipes.length;
+        totalBranches += branchCount;
+
+        if (branchCount > 1) {
+            for (let i = 1; i < subMain.branchPipes.length; i++) {
+                const prevBranch = subMain.branchPipes[i - 1];
+                const currentBranch = subMain.branchPipes[i];
+
+                const distance1 = calculateDistanceAlongPipe(subMain.coordinates, prevBranch.coordinates[0]);
+                const distance2 = calculateDistanceAlongPipe(subMain.coordinates, currentBranch.coordinates[0]);
+                const branchSpacing = Math.abs(distance2 - distance1);
+
+                totalRowSpacings.push(branchSpacing);
             }
         }
 
-        return coordinates;
-    } catch (error) {
-        console.error('❌ Error extracting coordinates:', error);
-        return [];
+        subMain.branchPipes.forEach((branch) => {
+            if (branch.plants.length > 1) {
+                for (let i = 1; i < branch.plants.length; i++) {
+                    const plant1 = branch.plants[i - 1];
+                    const plant2 = branch.plants[i];
+
+                    const distance1 = calculateDistanceAlongPipe(branch.coordinates, plant1.position);
+                    const distance2 = calculateDistanceAlongPipe(branch.coordinates, plant2.position);
+                    const plantSpacing = Math.abs(distance2 - distance1);
+
+                    totalPlantSpacings.push(plantSpacing);
+                }
+            }
+        });
+    });
+
+    const averageRowSpacing = totalRowSpacings.length > 0
+        ? totalRowSpacings.reduce((sum, spacing) => sum + spacing, 0) / totalRowSpacings.length
+        : 0;
+
+    const averagePlantSpacing = totalPlantSpacings.length > 0
+        ? totalPlantSpacings.reduce((sum, spacing) => sum + spacing, 0) / totalPlantSpacings.length
+        : 0;
+
+    return {
+        totalBranches,
+        averageRowSpacing,
+        averagePlantSpacing,
+        spacingAccuracy: 100,
+    };
+};
+
+const calculateDistanceAlongPipe = (pipeCoords: Coordinate[], targetPoint: Coordinate): number => {
+    let minDistance = Infinity;
+    let closestIndex = 0;
+
+    for (let i = 0; i < pipeCoords.length; i++) {
+        const distance = Math.sqrt(
+            Math.pow(pipeCoords[i].lat - targetPoint.lat, 2) +
+                Math.pow(pipeCoords[i].lng - targetPoint.lng, 2)
+        );
+        if (distance < minDistance) {
+            minDistance = distance;
+            closestIndex = i;
+        }
     }
+
+    let accumulatedDistance = 0;
+    for (let i = 1; i <= closestIndex; i++) {
+        const segmentDistance = calculateDistanceBetweenPoints(pipeCoords[i - 1], pipeCoords[i]);
+        accumulatedDistance += segmentDistance;
+    }
+
+    return accumulatedDistance;
 };
 
 // History reducer
@@ -368,6 +854,135 @@ const historyReducer = (state: HistoryState, action: HistoryAction): HistoryStat
     }
 };
 
+// Set up Leaflet default icons
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+// Component definitions
+const SearchControl: React.FC<{ onSearch: (lat: number, lng: number) => void }> = ({ onSearch }) => {
+    const [searchQuery, setSearchQuery] = useState('');
+    const [suggestions, setSuggestions] = useState<any[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [searchError, setSearchError] = useState<string>('');
+
+    const handleSearchChange = useCallback(async (query: string) => {
+        setSearchQuery(query);
+        setSearchError('');
+        
+        if (query.length < 3) {
+            setSuggestions([]);
+            return;
+        }
+
+        setIsSearching(true);
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); 
+            
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/search?` +
+                `format=json&q=${encodeURIComponent(query)}&limit=8&` +
+                `countrycodes=th&addressdetails=1&dedupe=1&` +
+                `accept-language=th,en&bounded=0`,
+                {
+                    signal: controller.signal,
+                    headers: {
+                        'User-Agent': 'HorticulturePlanner/1.0',
+                        'Accept': 'application/json',
+                    },
+                }
+            );
+            
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            
+            if (Array.isArray(data)) {
+                setSuggestions(data);
+                if (data.length === 0) {
+                    setSearchError('ไม่พบสถานที่ที่ค้นหา');
+                }
+            } else {
+                setSuggestions([]);
+                setSearchError('ข้อมูลจากเซิร์ฟเวอร์ไม่ถูกต้อง');
+            }
+        } catch (error: any) {
+            console.error('Search error:', error);
+            setSuggestions([]);
+            
+            if (error.name === 'AbortError') {
+                setSearchError('การค้นหาใช้เวลานานเกินไป กรุณาลองใหม่');
+            } else if (error.message.includes('fetch')) {
+                setSearchError('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+            } else {
+                setSearchError('เกิดข้อผิดพลาดในการค้นหา');
+            }
+        } finally {
+            setIsSearching(false);
+        }
+    }, []);
+
+    const handleSuggestionClick = (item: any) => {
+        setSearchQuery(item.display_name);
+        setSuggestions([]);
+        setSearchError('');
+        onSearch(parseFloat(item.lat), parseFloat(item.lon));
+    };
+
+    return (
+        <div className="absolute left-[60px] top-4 z-[1000] w-80">
+            <div className="relative">
+                <div className="relative">
+                    <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => handleSearchChange(e.target.value)}
+                        placeholder="ค้นหาสถานที่ในประเทศไทย..."
+                        className="w-full rounded-t-lg bg-white pl-10 pr-10 py-3 text-gray-900 shadow-md focus:border-blue-500 focus:outline-none"
+                    />
+                    {isSearching && (
+                        <FaSpinner className="absolute right-3 top-1/2 transform -translate-y-1/2 animate-spin text-blue-500" />
+                    )}
+                </div>
+                
+                {searchError && (
+                    <div className="w-full bg-red-100 border border-red-300 text-red-700 px-3 py-2 text-sm">
+                        ⚠️ {searchError}
+                    </div>
+                )}
+                
+                {suggestions.length > 0 && (
+                    <ul className="absolute max-h-60 w-full overflow-y-auto rounded-b-lg bg-white shadow-lg border-t border-gray-200">
+                        {suggestions.map((item) => (
+                            <li
+                                key={item.place_id}
+                                onClick={() => handleSuggestionClick(item)}
+                                className="cursor-pointer p-3 text-sm text-gray-800 hover:bg-gray-100 border-b border-gray-100 last:border-b-0"
+                            >
+                                <div className="font-medium text-gray-900">
+                                    {item.display_name.split(',')[0]}
+                                </div>
+                                <div className="text-xs text-gray-600 mt-1">
+                                    {item.display_name}
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+        </div>
+    );
+};
+
 const CustomPlantModal = ({
     isOpen,
     onClose,
@@ -385,8 +1000,6 @@ const CustomPlantModal = ({
         plantSpacing: defaultValues?.plantSpacing || 5,
         rowSpacing: defaultValues?.rowSpacing || 5,
         waterNeed: defaultValues?.waterNeed || 10,
-        category: 'กำหนดเอง',
-        description: defaultValues?.description || '',
     });
 
     const handleSave = () => {
@@ -410,7 +1023,8 @@ const CustomPlantModal = ({
                 <h3 className="mb-4 text-xl font-semibold">🌱 กำหนดพืชใหม่</h3>
 
                 <div className="space-y-4">
-                    <div>
+                   <div className="grid grid-cols-2 gap-4">
+                   <div>
                         <label className="mb-2 block text-sm font-medium">ชื่อพืช *</label>
                         <input
                             type="text"
@@ -420,6 +1034,26 @@ const CustomPlantModal = ({
                             placeholder="เช่น มะม่วงพันธุ์ใหม่"
                         />
                     </div>
+
+                    <div>
+                        <label className="mb-2 block text-sm font-medium">
+                            น้ำต่อต้น (ลิตร/ครั้ง) *
+                        </label>
+                        <input
+                            type="number"
+                            step="0.1"
+                            min="0.1"
+                            value={plantData.waterNeed}
+                            onChange={(e) =>
+                                setPlantData({
+                                    ...plantData,
+                                    waterNeed: parseFloat(e.target.value) || 0,
+                                })
+                            }
+                            className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+                   </div>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -458,66 +1092,6 @@ const CustomPlantModal = ({
                                 }
                                 className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="mb-2 block text-sm font-medium">
-                            น้ำต่อต้น (ลิตร/ครั้ง) *
-                        </label>
-                        <input
-                            type="number"
-                            step="0.1"
-                            min="0.1"
-                            value={plantData.waterNeed}
-                            onChange={(e) =>
-                                setPlantData({
-                                    ...plantData,
-                                    waterNeed: parseFloat(e.target.value) || 0,
-                                })
-                            }
-                            className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="mb-2 block text-sm font-medium">
-                            รายละเอียดเพิ่มเติม
-                        </label>
-                        <textarea
-                            value={plantData.description}
-                            onChange={(e) =>
-                                setPlantData({ ...plantData, description: e.target.value })
-                            }
-                            className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            rows={3}
-                            placeholder="ข้อมูลเพิ่มเติมเกี่ยวกับพืชชนิดนี้"
-                        />
-                    </div>
-
-                    <div className="rounded bg-blue-900/30 p-3 text-sm text-blue-300">
-                        <div>📊 ประมาณการ:</div>
-                        <div>
-                            • พื้นที่ต่อต้น:{' '}
-                            {(plantData.plantSpacing * plantData.rowSpacing).toFixed(2)} ตร.ม.
-                        </div>
-                        <div>
-                            • ต้นต่อไร่:{' '}
-                            {Math.floor(
-                                1600 / (plantData.plantSpacing * plantData.rowSpacing)
-                            ).toLocaleString()}{' '}
-                            ต้น
-                        </div>
-                        <div>
-                            • น้ำต่อไร่:{' '}
-                            {formatWaterVolume(
-                                Math.floor(1600 / (plantData.plantSpacing * plantData.rowSpacing)) *
-                                    plantData.waterNeed
-                            )}
-                        </div>
-                        <div className="mt-2 text-xs text-green-300">
-                            ✅ FIXED: ปลายท่อห่างจากขอบ {(plantData.plantSpacing * 0.3).toFixed(1)}{' '}
-                            ม. (30%)
                         </div>
                     </div>
                 </div>
@@ -605,7 +1179,6 @@ const ZonePlantSelectionModal = ({
                                 ระยะ: {plant.plantSpacing}×{plant.rowSpacing}ม. | น้ำ:{' '}
                                 {plant.waterNeed}ล./ครั้ง
                             </div>
-                            <div className="text-xs text-gray-400">{plant.description}</div>
                         </div>
                     ))}
                 </div>
@@ -615,47 +1188,9 @@ const ZonePlantSelectionModal = ({
                         onClick={onCreateCustomPlant}
                         className="w-full rounded bg-purple-600 px-4 py-2 text-sm transition-colors hover:bg-purple-700"
                     >
-                        ➕ สร้างพืชใหม่
+                        ➕ เพิ่มพืชใหม่
                     </button>
                 </div>
-
-                {selectedPlant && (
-                    <div className="mt-4 rounded bg-green-900/30 p-3 text-sm">
-                        <div>
-                            ✅ พืชที่เลือก: <strong>{selectedPlant.name}</strong>
-                        </div>
-                        <div>• ระยะห่างต้น: {selectedPlant.plantSpacing} ม.</div>
-                        <div>• ระยะห่างแถว: {selectedPlant.rowSpacing} ม.</div>
-                        <div>• น้ำต่อต้น: {selectedPlant.waterNeed} ลิตร/ครั้ง</div>
-
-                        <div className="mt-2 border-t border-green-600 pt-2">
-                            <div>📊 ประมาณการในโซนนี้:</div>
-                            <div>
-                                • ต้นไม้:{' '}
-                                {calculatePlantCount(
-                                    zone.area,
-                                    selectedPlant.plantSpacing,
-                                    selectedPlant.rowSpacing
-                                ).toLocaleString()}{' '}
-                                ต้น
-                            </div>
-                            <div>
-                                • น้ำรวม:{' '}
-                                {formatWaterVolume(
-                                    calculatePlantCount(
-                                        zone.area,
-                                        selectedPlant.plantSpacing,
-                                        selectedPlant.rowSpacing
-                                    ) * selectedPlant.waterNeed
-                                )}
-                            </div>
-                            <div className="text-xs text-green-300">
-                                ✅ FIXED: ปลายท่อห่างจากขอบ{' '}
-                                {(selectedPlant.plantSpacing * 0.3).toFixed(1)} ม.
-                            </div>
-                        </div>
-                    </div>
-                )}
 
                 <div className="mt-6 flex gap-3">
                     <button
@@ -681,14 +1216,15 @@ const ZonePlantSelectionModal = ({
     );
 };
 
-// Plant Edit Modal
-const PlantEditModal = ({
+const EnhancedPlantEditModal = ({
     isOpen,
     onClose,
     plant,
     onSave,
     onDelete,
     availablePlants,
+    isNewPlant = false,
+    onCreateConnection,
 }: {
     isOpen: boolean;
     onClose: () => void;
@@ -696,6 +1232,8 @@ const PlantEditModal = ({
     onSave: (plantId: string, newPosition: Coordinate, newPlantData: PlantData) => void;
     onDelete: (plantId: string) => void;
     availablePlants: PlantData[];
+    isNewPlant?: boolean;
+    onCreateConnection?: (plantId: string) => void;
 }) => {
     const [position, setPosition] = useState<Coordinate>({ lat: 0, lng: 0 });
     const [selectedPlantData, setSelectedPlantData] = useState<PlantData | null>(null);
@@ -721,16 +1259,81 @@ const PlantEditModal = ({
         }
     };
 
+    const handleCreateConnection = () => {
+        if (!plant || !onCreateConnection) return;
+        onCreateConnection(plant.id);
+        onClose();
+    };
+
+    const adjustPosition = (direction: 'up' | 'down' | 'left' | 'right', amount: number = 0.00001) => {
+        setPosition((prev) => {
+            switch (direction) {
+                case 'up':
+                    return { ...prev, lat: prev.lat + amount };
+                case 'down':
+                    return { ...prev, lat: prev.lat - amount };
+                case 'left':
+                    return { ...prev, lng: prev.lng - amount };
+                case 'right':
+                    return { ...prev, lng: prev.lng + amount };
+                default:
+                    return prev;
+            }
+        });
+    };
+
     if (!isOpen || !plant) return null;
 
     return (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black bg-opacity-50">
-            <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-gray-800 p-6 text-white">
-                <h3 className="mb-4 text-xl font-semibold">✏️ แก้ไขต้นไม้</h3>
+            <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-gray-800 p-6 text-white">
+                <h3 className="mb-4 text-xl font-semibold">
+                    {isNewPlant ? '🌱 เพิ่มต้นไม้ใหม่' : '✏️ แก้ไขต้นไม้'}
+                </h3>
 
                 <div className="space-y-4">
                     <div>
                         <label className="mb-2 block text-sm font-medium">ตำแหน่ง</label>
+
+                        <div className="mb-3 rounded bg-gray-700 p-4">
+                            <div className="mb-2 text-center text-sm text-gray-300">
+                                ปรับตำแหน่งด้วยปุ่ม
+                            </div>
+                            <div className="mx-auto grid w-32 grid-cols-3 gap-2">
+                                <div></div>
+                                <button
+                                    onClick={() => adjustPosition('up')}
+                                    className="rounded bg-blue-600 px-2 py-1 text-xs hover:bg-blue-700"
+                                >
+                                    ↑
+                                </button>
+                                <div></div>
+                                <button
+                                    onClick={() => adjustPosition('left')}
+                                    className="rounded bg-blue-600 px-2 py-1 text-xs hover:bg-blue-700"
+                                >
+                                    ←
+                                </button>
+                                <div className="flex items-center justify-center">
+                                    <FaArrowsAlt className="text-gray-400" />
+                                </div>
+                                <button
+                                    onClick={() => adjustPosition('right')}
+                                    className="rounded bg-blue-600 px-2 py-1 text-xs hover:bg-blue-700"
+                                >
+                                    →
+                                </button>
+                                <div></div>
+                                <button
+                                    onClick={() => adjustPosition('down')}
+                                    className="rounded bg-blue-600 px-2 py-1 text-xs hover:bg-blue-700"
+                                >
+                                    ↓
+                                </button>
+                                <div></div>
+                            </div>
+                        </div>
+
                         <div className="grid grid-cols-2 gap-2">
                             <div>
                                 <label className="text-xs text-gray-400">Latitude</label>
@@ -787,18 +1390,29 @@ const PlantEditModal = ({
 
                     {selectedPlantData && (
                         <div className="rounded bg-green-900/30 p-3 text-sm">
-                            <div>
-                                <strong>พืช:</strong> {selectedPlantData.name}
-                            </div>
-                            <div>
-                                <strong>ระยะห่างต้น:</strong> {selectedPlantData.plantSpacing} ม.
-                            </div>
-                            <div>
-                                <strong>ระยะห่างแถว:</strong> {selectedPlantData.rowSpacing} ม.
-                            </div>
-                            <div>
-                                <strong>น้ำต่อต้น:</strong> {selectedPlantData.waterNeed} ลิตร/ครั้ง
-                            </div>
+                            <div><strong>พืช:</strong> {selectedPlantData.name}</div>
+                            <div><strong>ระยะห่างต้น:</strong> {selectedPlantData.plantSpacing} ม.</div>
+                            <div><strong>ระยะห่างแถว:</strong> {selectedPlantData.rowSpacing} ม.</div>
+                            <div><strong>น้ำต่อต้น:</strong> {selectedPlantData.waterNeed} ลิตร/ครั้ง</div>
+                        </div>
+                    )}
+
+                    {/* New Connection Feature */}
+                    {isNewPlant && onCreateConnection && (
+                        <div className="rounded bg-blue-900/30 p-4">
+                            <h4 className="mb-3 text-sm font-semibold text-blue-300">
+                                🔗 เชื่อมต่อท่อย่อย
+                            </h4>
+                            <p className="mb-3 text-xs text-gray-300">
+                                หลังจากบันทึกต้นไม้แล้ว คุณสามารถสร้างท่อย่อยเชื่อมต่อไปยังท่อเมนรองหรือท่อย่อยอื่นได้
+                            </p>
+                            <button
+                                onClick={handleCreateConnection}
+                                className="w-full rounded bg-blue-600 px-4 py-2 text-sm transition-colors hover:bg-blue-700"
+                            >
+                                <FaLink className="mr-2 inline" />
+                                สร้างท่อเชื่อมต่อ
+                            </button>
                         </div>
                     )}
                 </div>
@@ -810,13 +1424,15 @@ const PlantEditModal = ({
                     >
                         ยกเลิก
                     </button>
-                    <button
-                        onClick={handleDelete}
-                        className="flex-1 rounded bg-red-600 px-4 py-2 transition-colors hover:bg-red-700"
-                    >
-                        <FaTrash className="mr-2 inline" />
-                        ลบ
-                    </button>
+                    {!isNewPlant && (
+                        <button
+                            onClick={handleDelete}
+                            className="flex-1 rounded bg-red-600 px-4 py-2 transition-colors hover:bg-red-700"
+                        >
+                            <FaTrash className="mr-2 inline" />
+                            ลบ
+                        </button>
+                    )}
                     <button
                         onClick={handleSave}
                         className="flex-1 rounded bg-green-600 px-4 py-2 transition-colors hover:bg-green-700"
@@ -829,14 +1445,15 @@ const PlantEditModal = ({
     );
 };
 
-// Pipe Edit Modal
-const PipeEditModal = ({
+const EnhancedPipeEditModal = ({
     isOpen,
     onClose,
     pipe,
     onSave,
     onDelete,
     type,
+    branchSettings,
+    onDeleteBranchPipe,
 }: {
     isOpen: boolean;
     onClose: () => void;
@@ -844,25 +1461,47 @@ const PipeEditModal = ({
     onSave: (pipe: MainPipe | SubMainPipe | BranchPipe) => void;
     onDelete: (pipeId: string) => void;
     type: 'main' | 'subMain' | 'branch';
+    branchSettings?: {
+        defaultAngle: number;
+        maxAngle: number;
+        minAngle: number;
+        angleStep: number;
+    };
+    onDeleteBranchPipe?: (branchId: string, subMainId: string) => void;
 }) => {
     const [coordinates, setCoordinates] = useState<Coordinate[]>([]);
     const [diameter, setDiameter] = useState<number>(100);
+    const [selectedPointIndex, setSelectedPointIndex] = useState<number>(-1);
+    const [angle, setAngle] = useState<number>(90);
+    const [connectionPoint, setConnectionPoint] = useState<number>(0.5);
 
     useEffect(() => {
         if (pipe) {
             setCoordinates([...pipe.coordinates]);
             setDiameter(pipe.diameter);
+            
+            if (type === 'branch' && 'angle' in pipe) {
+                setAngle(pipe.angle || 90);
+                setConnectionPoint(pipe.connectionPoint || 0.5);
+            }
         }
-    }, [pipe]);
+    }, [pipe, type]);
 
     const handleSave = () => {
         if (!pipe) return;
+        
         const updatedPipe = {
             ...pipe,
             coordinates,
             diameter,
             length: calculatePipeLength(coordinates),
         };
+
+        if (type === 'branch') {
+            (updatedPipe as BranchPipe).angle = angle;
+            (updatedPipe as BranchPipe).connectionPoint = connectionPoint;
+        }
+
         onSave(updatedPipe);
         onClose();
     };
@@ -871,6 +1510,14 @@ const PipeEditModal = ({
         if (!pipe) return;
         if (confirm('คุณต้องการลบท่อนี้หรือไม่?')) {
             onDelete(pipe.id);
+            onClose();
+        }
+    };
+
+    const handleDeleteBranchPipe = () => {
+        if (!pipe || type !== 'branch' || !onDeleteBranchPipe) return;
+        if (confirm('คุณต้องการลบท่อย่อยนี้หรือไม่? ต้นไม้ที่เชื่อมต่อจะถูกลบด้วย')) {
+            onDeleteBranchPipe(pipe.id, (pipe as BranchPipe).subMainPipeId);
             onClose();
         }
     };
@@ -892,7 +1539,68 @@ const PipeEditModal = ({
     const removeCoordinate = (index: number) => {
         if (coordinates.length > 2) {
             setCoordinates(coordinates.filter((_, i) => i !== index));
+            if (selectedPointIndex === index) {
+                setSelectedPointIndex(-1);
+            } else if (selectedPointIndex > index) {
+                setSelectedPointIndex(selectedPointIndex - 1);
+            }
         }
+    };
+
+    const insertCoordinate = (index: number) => {
+        if (index < coordinates.length - 1) {
+            const coord1 = coordinates[index];
+            const coord2 = coordinates[index + 1];
+            const midPoint = {
+                lat: (coord1.lat + coord2.lat) / 2,
+                lng: (coord1.lng + coord2.lng) / 2,
+            };
+            const newCoordinates = [...coordinates];
+            newCoordinates.splice(index + 1, 0, midPoint);
+            setCoordinates(newCoordinates);
+        }
+    };
+
+    const adjustPoint = (index: number, direction: 'up' | 'down' | 'left' | 'right', amount: number = 0.00001) => {
+        const newCoordinates = [...coordinates];
+        switch (direction) {
+            case 'up':
+                newCoordinates[index].lat += amount;
+                break;
+            case 'down':
+                newCoordinates[index].lat -= amount;
+                break;
+            case 'left':
+                newCoordinates[index].lng -= amount;
+                break;
+            case 'right':
+                newCoordinates[index].lng += amount;
+                break;
+        }
+        setCoordinates(newCoordinates);
+    };
+
+    const rotatePipe = (angleIncrement: number) => {
+        if (coordinates.length < 2) return;
+
+        const centerLat = coordinates.reduce((sum, coord) => sum + coord.lat, 0) / coordinates.length;
+        const centerLng = coordinates.reduce((sum, coord) => sum + coord.lng, 0) / coordinates.length;
+
+        const angleRad = (angleIncrement * Math.PI) / 180;
+        const cos = Math.cos(angleRad);
+        const sin = Math.sin(angleRad);
+
+        const newCoordinates = coordinates.map((coord) => {
+            const dx = coord.lat - centerLat;
+            const dy = coord.lng - centerLng;
+
+            return {
+                lat: centerLat + dx * cos - dy * sin,
+                lng: centerLng + dx * sin + dy * cos,
+            };
+        });
+
+        setCoordinates(newCoordinates);
     };
 
     if (!isOpen || !pipe) return null;
@@ -905,37 +1613,190 @@ const PipeEditModal = ({
 
     return (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black bg-opacity-50">
-            <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-gray-800 p-6 text-white">
+            <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-lg bg-gray-800 p-6 text-white">
                 <h3 className="mb-4 text-xl font-semibold">✏️ แก้ไข{typeNames[type]}</h3>
 
-                <div className="space-y-4">
-                    <div>
-                        <label className="mb-2 block text-sm font-medium">
-                            เส้นผ่านศูนย์กลาง (มม.)
-                        </label>
-                        <input
-                            type="number"
-                            min="1"
-                            value={diameter}
-                            onChange={(e) => setDiameter(parseInt(e.target.value) || 100)}
-                            className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                    <div className="space-y-4">
+                        <div>
+                            <label className="mb-2 block text-sm font-medium">
+                                เส้นผ่านศูนย์กลาง (มม.)
+                            </label>
+                            <input
+                                type="number"
+                                min="1"
+                                value={diameter}
+                                onChange={(e) => setDiameter(parseInt(e.target.value) || 100)}
+                                className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+
+                        <div className="rounded bg-gray-700 p-4">
+                            <h4 className="mb-3 text-sm font-semibold">🔄 การหมุนท่อ (แม่นยำ)</h4>
+                            <div className="grid grid-cols-2 gap-2 mb-3">
+                                <button onClick={() => rotatePipe(1)} className="rounded bg-purple-600 px-3 py-2 text-xs transition-colors hover:bg-purple-700">↻ +1°</button>
+                                <button onClick={() => rotatePipe(-1)} className="rounded bg-purple-600 px-3 py-2 text-xs transition-colors hover:bg-purple-700">↺ -1°</button>
+                                <button onClick={() => rotatePipe(5)} className="rounded bg-purple-600 px-3 py-2 text-xs transition-colors hover:bg-purple-700">↻ +5°</button>
+                                <button onClick={() => rotatePipe(-5)} className="rounded bg-purple-600 px-3 py-2 text-xs transition-colors hover:bg-purple-700">↺ -5°</button>
+                                <button onClick={() => rotatePipe(15)} className="rounded bg-purple-600 px-3 py-2 text-xs transition-colors hover:bg-purple-700">↻ +15°</button>
+                                <button onClick={() => rotatePipe(-15)} className="rounded bg-purple-600 px-3 py-2 text-xs transition-colors hover:bg-purple-700">↺ -15°</button>
+                                <button onClick={() => rotatePipe(45)} className="rounded bg-indigo-600 px-3 py-2 text-xs transition-colors hover:bg-indigo-700">↻ +45°</button>
+                                <button onClick={() => rotatePipe(90)} className="rounded bg-indigo-600 px-3 py-2 text-xs transition-colors hover:bg-indigo-700">↻ +90°</button>
+                            </div>
+                        </div>
+
+                        {type === 'branch' && branchSettings && (
+                            <div className="rounded bg-yellow-900/30 p-4">
+                                <h4 className="mb-3 text-sm font-semibold">🔧 การควบคุมท่อย่อย</h4>
+                                
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="mb-2 block text-xs font-medium">
+                                            มุมของท่อย่อย: {angle}°
+                                        </label>
+                                        <input
+                                            type="range"
+                                            min={branchSettings.minAngle}
+                                            max={branchSettings.maxAngle}
+                                            step={branchSettings.angleStep}
+                                            value={angle}
+                                            onChange={(e) => setAngle(parseFloat(e.target.value))}
+                                            className="w-full accent-yellow-600"
+                                        />
+                                        <div className="flex justify-between text-xs text-gray-400">
+                                            <span>{branchSettings.minAngle}°</span>
+                                            <span>{branchSettings.maxAngle}°</span>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-2 block text-xs font-medium">
+                                            จุดต่อกับท่อเมนรอง: {(connectionPoint * 100).toFixed(1)}%
+                                        </label>
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max="1"
+                                            step="0.01"
+                                            value={connectionPoint}
+                                            onChange={(e) => setConnectionPoint(parseFloat(e.target.value))}
+                                            className="w-full accent-blue-600"
+                                        />
+                                        <div className="flex justify-between text-xs text-gray-400">
+                                            <span>จุดเริ่ม</span>
+                                            <span>จุดสิ้นสุด</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="rounded bg-gray-700 p-4">
+                            <h4 className="mb-3 text-sm font-semibold">การดำเนินการท่อ</h4>
+                            <div className="grid grid-cols-1 gap-2">
+                                <button
+                                    onClick={addCoordinate}
+                                    className="rounded bg-green-600 px-3 py-2 text-sm transition-colors hover:bg-green-700"
+                                >
+                                    <FaPlus className="mr-1 inline" />
+                                    เพิ่มจุด
+                                </button>
+                                
+                                {/* Branch pipe specific delete button */}
+                                {type === 'branch' && onDeleteBranchPipe && (
+                                    <button
+                                        onClick={handleDeleteBranchPipe}
+                                        className="rounded bg-red-600 px-3 py-2 text-sm transition-colors hover:bg-red-700"
+                                    >
+                                        <FaUnlink className="mr-1 inline" />
+                                        ลบท่อย่อย
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {selectedPointIndex >= 0 && (
+                            <div className="rounded bg-blue-900/30 p-4">
+                                <h4 className="mb-3 text-sm font-semibold">
+                                    แก้ไขจุด {selectedPointIndex + 1}
+                                </h4>
+                                <div className="mx-auto mb-3 grid w-32 grid-cols-3 gap-2">
+                                    <div></div>
+                                    <button onClick={() => adjustPoint(selectedPointIndex, 'up', 0.00001)} className="rounded bg-blue-600 px-2 py-1 text-xs hover:bg-blue-700">↑</button>
+                                    <div></div>
+                                    <button onClick={() => adjustPoint(selectedPointIndex, 'left', 0.00001)} className="rounded bg-blue-600 px-2 py-1 text-xs hover:bg-blue-700">←</button>
+                                    <div className="flex items-center justify-center">
+                                        <FaArrowsAlt className="text-gray-400" />
+                                    </div>
+                                    <button onClick={() => adjustPoint(selectedPointIndex, 'right', 0.00001)} className="rounded bg-blue-600 px-2 py-1 text-xs hover:bg-blue-700">→</button>
+                                    <div></div>
+                                    <button onClick={() => adjustPoint(selectedPointIndex, 'down', 0.00001)} className="rounded bg-blue-600 px-2 py-1 text-xs hover:bg-blue-700">↓</button>
+                                    <div></div>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-2 mb-2">
+                                    <button onClick={() => adjustPoint(selectedPointIndex, 'up', 0.000001)} className="rounded bg-cyan-600 px-2 py-1 text-xs hover:bg-cyan-700">↑ ละเอียด</button>
+                                    <button onClick={() => adjustPoint(selectedPointIndex, 'down', 0.000001)} className="rounded bg-cyan-600 px-2 py-1 text-xs hover:bg-cyan-700">↓ ละเอียด</button>
+                                    <button onClick={() => adjustPoint(selectedPointIndex, 'left', 0.000001)} className="rounded bg-cyan-600 px-2 py-1 text-xs hover:bg-cyan-700">← ละเอียด</button>
+                                    <button onClick={() => adjustPoint(selectedPointIndex, 'right', 0.000001)} className="rounded bg-cyan-600 px-2 py-1 text-xs hover:bg-cyan-700">→ ละเอียด</button>
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => insertCoordinate(selectedPointIndex)}
+                                        className="flex-1 rounded bg-green-600 px-3 py-1 text-xs transition-colors hover:bg-green-700"
+                                        disabled={selectedPointIndex >= coordinates.length - 1}
+                                    >
+                                        ➕ แทรกจุด
+                                    </button>
+                                    <button
+                                        onClick={() => removeCoordinate(selectedPointIndex)}
+                                        className="flex-1 rounded bg-red-600 px-3 py-1 text-xs transition-colors hover:bg-red-700"
+                                        disabled={coordinates.length <= 2}
+                                    >
+                                        🗑️ ลบจุด
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="rounded bg-blue-900/30 p-3 text-sm">
+                            <div><strong>ความยาวท่อ:</strong> {calculatePipeLength(coordinates).toFixed(2)} ม.</div>
+                            <div><strong>จำนวนจุด:</strong> {coordinates.length} จุด</div>
+                            {type === 'branch' && (
+                                <>
+                                    <div><strong>มุม:</strong> {angle}°</div>
+                                    <div><strong>จุดต่อ:</strong> {(connectionPoint * 100).toFixed(1)}%</div>
+                                </>
+                            )}
+                            <div className="text-xs text-green-300">
+                                ✅ แก้ไขได้แม่นยำทีละ 1 องศา
+                            </div>
+                        </div>
                     </div>
 
-                    <div>
+                    <div className="lg:col-span-2">
                         <div className="mb-2 flex items-center justify-between">
                             <label className="text-sm font-medium">จุดพิกัด</label>
-                            <button
-                                onClick={addCoordinate}
-                                className="rounded bg-green-600 px-3 py-1 text-sm transition-colors hover:bg-green-700"
-                            >
-                                <FaPlus className="mr-1 inline" />
-                                เพิ่มจุด
-                            </button>
                         </div>
-                        <div className="max-h-64 space-y-2 overflow-y-auto">
+                        <div className="max-h-96 space-y-2 overflow-y-auto">
                             {coordinates.map((coord, index) => (
-                                <div key={index} className="grid grid-cols-5 gap-2">
+                                <div
+                                    key={index}
+                                    className={`grid cursor-pointer grid-cols-6 gap-2 rounded p-2 transition-colors ${
+                                        selectedPointIndex === index
+                                            ? 'bg-blue-600'
+                                            : 'bg-gray-700 hover:bg-gray-600'
+                                    }`}
+                                    onClick={() =>
+                                        setSelectedPointIndex(
+                                            selectedPointIndex === index ? -1 : index
+                                        )
+                                    }
+                                >
+                                    <div className="col-span-1 flex items-center justify-center text-xs text-gray-300">
+                                        {index + 1}
+                                    </div>
                                     <div className="col-span-2">
                                         <label className="text-xs text-gray-400">Lat</label>
                                         <input
@@ -949,7 +1810,7 @@ const PipeEditModal = ({
                                                     parseFloat(e.target.value) || 0
                                                 )
                                             }
-                                            className="w-full rounded bg-gray-700 px-2 py-1 text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            className="w-full rounded bg-gray-600 px-2 py-1 text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                                         />
                                     </div>
                                     <div className="col-span-2">
@@ -965,31 +1826,16 @@ const PipeEditModal = ({
                                                     parseFloat(e.target.value) || 0
                                                 )
                                             }
-                                            className="w-full rounded bg-gray-700 px-2 py-1 text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            className="w-full rounded bg-gray-600 px-2 py-1 text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                                         />
                                     </div>
-                                    <div>
-                                        <label className="text-xs text-gray-400">&nbsp;</label>
-                                        <button
-                                            onClick={() => removeCoordinate(index)}
-                                            disabled={coordinates.length <= 2}
-                                            className="w-full rounded bg-red-600 px-2 py-1 text-sm transition-colors hover:bg-red-700 disabled:bg-gray-600"
-                                        >
-                                            <FaTrash />
-                                        </button>
+                                    <div className="col-span-1 flex items-center justify-center">
+                                        {selectedPointIndex === index && (
+                                            <FaEdit className="text-blue-300" />
+                                        )}
                                     </div>
                                 </div>
                             ))}
-                        </div>
-                    </div>
-
-                    <div className="rounded bg-blue-900/30 p-3 text-sm">
-                        <div>
-                            <strong>ความยาวท่อ:</strong>{' '}
-                            {calculatePipeLength(coordinates).toFixed(2)} ม.
-                        </div>
-                        <div>
-                            <strong>จำนวนจุด:</strong> {coordinates.length} จุด
                         </div>
                     </div>
                 </div>
@@ -1020,73 +1866,10 @@ const PipeEditModal = ({
     );
 };
 
-const SearchControl: React.FC<{ onSearch: (lat: number, lng: number) => void }> = ({
-    onSearch,
-}) => {
-    const [searchQuery, setSearchQuery] = useState('');
-    const [suggestions, setSuggestions] = useState<any[]>([]);
-    const [isSearching, setIsSearching] = useState(false);
-
-    const handleSearchChange = useCallback(async (query: string) => {
-        setSearchQuery(query);
-        if (query.length < 3) {
-            setSuggestions([]);
-            return;
-        }
-
-        setIsSearching(true);
-        try {
-            const response = await fetch(
-                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`
-            );
-            const data = await response.json();
-            setSuggestions(data);
-        } catch (err) {
-            console.error('Search error:', err);
-        } finally {
-            setIsSearching(false);
-        }
-    }, []);
-
-    return (
-        <div className="absolute left-[60px] top-4 z-[1000] w-80">
-            <div className="relative">
-                <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => handleSearchChange(e.target.value)}
-                    placeholder="ค้นหาสถานที่..."
-                    className="w-full rounded-t-lg bg-white p-3 text-gray-900 shadow-md focus:border-blue-500 focus:outline-none"
-                />
-                {isSearching && (
-                    <div className="absolute right-3 top-3">
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
-                    </div>
-                )}
-                {suggestions.length > 0 && (
-                    <ul className="absolute max-h-60 w-full overflow-y-auto rounded-b-lg bg-white shadow-lg">
-                        {suggestions.map((item) => (
-                            <li
-                                key={item.place_id}
-                                onClick={() => {
-                                    setSearchQuery(item.display_name);
-                                    setSuggestions([]);
-                                    onSearch(parseFloat(item.lat), parseFloat(item.lon));
-                                }}
-                                className="cursor-pointer p-3 text-sm text-gray-800 hover:bg-gray-200"
-                            >
-                                {item.display_name}
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </div>
-        </div>
-    );
-};
 
 export default function EnhancedHorticulturePlannerPage() {
     const [projectName, setProjectName] = useState<string>('โครงการระบบน้ำพืชสวน จ.จันทบุรี');
+    const [customerName, setCustomerName] = useState<string>('');
     const [showCustomPlantModal, setShowCustomPlantModal] = useState(false);
     const [showZonePlantModal, setShowZonePlantModal] = useState(false);
     const [selectedZoneForPlant, setSelectedZoneForPlant] = useState<Zone | null>(null);
@@ -1150,30 +1933,26 @@ export default function EnhancedHorticulturePlannerPage() {
 
     const [editMode, setEditMode] = useState<string | null>(null);
     const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
-    const [selectedExclusionType, setSelectedExclusionType] =
-        useState<keyof typeof EXCLUSION_COLORS>('building');
+    const [selectedExclusionType, setSelectedExclusionType] = useState<keyof typeof EXCLUSION_COLORS>('building');
     const [mapCenter, setMapCenter] = useState<[number, number]>([12.609731, 102.050412]);
-    const [drawingMainPipe, setDrawingMainPipe] = useState<{ toZone: string | null }>({
-        toZone: null,
-    });
+    const [drawingMainPipe, setDrawingMainPipe] = useState<{ toZone: string | null }>({ toZone: null });
 
-    // Edit modals
     const [showPlantEditModal, setShowPlantEditModal] = useState(false);
     const [selectedPlantForEdit, setSelectedPlantForEdit] = useState<PlantLocation | null>(null);
     const [showPipeEditModal, setShowPipeEditModal] = useState(false);
-    const [selectedPipeForEdit, setSelectedPipeForEdit] = useState<
-        MainPipe | SubMainPipe | BranchPipe | null
-    >(null);
+    const [selectedPipeForEdit, setSelectedPipeForEdit] = useState<MainPipe | SubMainPipe | BranchPipe | null>(null);
     const [selectedPipeType, setSelectedPipeType] = useState<'main' | 'subMain' | 'branch'>('main');
 
-    // Dragging state
-    const [isDragging, setIsDragging] = useState(false);
-    const [draggedPlant, setDraggedPlant] = useState<PlantLocation | null>(null);
+    const [isNewPlantMode, setIsNewPlantMode] = useState(false);
+    const [isCreatingConnection, setIsCreatingConnection] = useState(false);
+    const [connectionStartPlant, setConnectionStartPlant] = useState<PlantLocation | null>(null);
+    const [highlightedPipes, setHighlightedPipes] = useState<string[]>([]);
+    const [dragMode, setDragMode] = useState<'none' | 'connecting'>('none');
+    const [tempConnectionLine, setTempConnectionLine] = useState<Coordinate[] | null>(null);
 
     const featureGroupRef = useRef<L.FeatureGroup | null>(null);
     const mapRef = useRef<any>(null);
 
-    // Initialize project state
     const initialState: ProjectState = {
         mainArea: [],
         zones: [],
@@ -1185,43 +1964,52 @@ export default function EnhancedHorticulturePlannerPage() {
         useZones: false,
         selectedPlantType: DEFAULT_PLANT_TYPES[0],
         availablePlants: DEFAULT_PLANT_TYPES,
+        spacingValidationStats: {
+            totalBranches: 0,
+            averageRowSpacing: 0,
+            averagePlantSpacing: 0,
+            spacingAccuracy: 0,
+        },
         areaUtilizationStats: {
             totalBranches: 0,
             averageUtilization: 0,
             maxUtilization: 0,
-            minUtilization: 0,
+        },
+        isEditModeEnabled: false,
+        branchPipeSettings: {
+            defaultAngle: 90,
+            maxAngle: 180,
+            minAngle: 0,
+            angleStep: 1,
         },
     };
 
-    // History management
     const [history, dispatchHistory] = useReducer(historyReducer, {
         past: [],
         present: initialState,
         future: [],
     });
 
-    const totalArea = useMemo(
-        () => calculateAreaFromCoordinates(history.present.mainArea),
-        [history.present.mainArea]
-    );
-    const actualTotalPlants = useMemo(
-        () => history.present.plants.length,
-        [history.present.plants]
-    );
+    const totalArea = useMemo(() => calculateAreaFromCoordinates(history.present.mainArea), [history.present.mainArea]);
+    const actualTotalPlants = useMemo(() => history.present.plants.length, [history.present.plants]);
     const actualTotalWaterNeed = useMemo(() => {
         return history.present.plants.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
     }, [history.present.plants]);
 
-    // Push state to history
-    const pushToHistory = useCallback(
-        (newState: Partial<ProjectState>) => {
-            const updatedState = { ...history.present, ...newState };
-            dispatchHistory({ type: 'PUSH_STATE', state: updatedState });
-        },
-        [history.present]
-    );
+    const canEnableEditMode = useMemo(() => {
+        return (
+            history.present.mainArea.length > 0 &&
+            history.present.pump &&
+            history.present.plants.length > 0 &&
+            (history.present.mainPipes.length > 0 || history.present.subMainPipes.length > 0)
+        );
+    }, [history.present]);
 
-    // Undo/Redo functions
+    const pushToHistory = useCallback((newState: Partial<ProjectState>) => {
+        const updatedState = { ...history.present, ...newState };
+        dispatchHistory({ type: 'PUSH_STATE', state: updatedState });
+    }, [history.present]);
+
     const handleUndo = useCallback(() => {
         dispatchHistory({ type: 'UNDO' });
     }, []);
@@ -1229,6 +2017,28 @@ export default function EnhancedHorticulturePlannerPage() {
     const handleRedo = useCallback(() => {
         dispatchHistory({ type: 'REDO' });
     }, []);
+
+    const handleToggleEditMode = useCallback(() => {
+        if (!canEnableEditMode) {
+            alert('กรุณาสร้างพื้นที่หลัก ปั๊ม และสร้างท่อพร้อมต้นไม้ก่อนเข้าสู่โหมดแก้ไข');
+            return;
+        }
+
+        pushToHistory({
+            isEditModeEnabled: !history.present.isEditModeEnabled,
+        });
+
+        if (!history.present.isEditModeEnabled) {
+            setEditMode(null);
+        }
+
+        setIsNewPlantMode(false);
+        setIsCreatingConnection(false);
+        setConnectionStartPlant(null);
+        setHighlightedPipes([]);
+        setDragMode('none');
+        setTempConnectionLine(null);
+    }, [canEnableEditMode, history.present.isEditModeEnabled, pushToHistory]);
 
     useEffect(() => {
         if (!history.present.useZones && editMode === 'mainPipe') {
@@ -1242,52 +2052,37 @@ export default function EnhancedHorticulturePlannerPage() {
         setShowCustomPlantModal(true);
     }, []);
 
-    const handleSaveCustomPlant = useCallback(
-        (plantData: PlantData) => {
-            const newPlant = {
-                ...plantData,
-                id: plantData.id || Date.now(),
-            };
+    const handleSaveCustomPlant = useCallback((plantData: PlantData) => {
+        const newPlant = { ...plantData, id: plantData.id || Date.now() };
 
-            const updatedAvailablePlants = history.present.availablePlants.some(
-                (p) => p.id === newPlant.id
-            )
-                ? history.present.availablePlants.map((p) => (p.id === newPlant.id ? newPlant : p))
-                : [...history.present.availablePlants, newPlant];
+        const updatedAvailablePlants = history.present.availablePlants.some((p) => p.id === newPlant.id)
+            ? history.present.availablePlants.map((p) => (p.id === newPlant.id ? newPlant : p))
+            : [...history.present.availablePlants, newPlant];
 
-            let updatedZones = history.present.zones;
-            if (editingPlant) {
-                updatedZones = history.present.zones.map((zone) =>
-                    zone.plantData.id === editingPlant.id
-                        ? {
-                              ...zone,
-                              plantData: newPlant,
-                              plantCount: calculatePlantCount(
-                                  zone.area,
-                                  newPlant.plantSpacing,
-                                  newPlant.rowSpacing
-                              ),
-                              totalWaterNeed:
-                                  calculatePlantCount(
-                                      zone.area,
-                                      newPlant.plantSpacing,
-                                      newPlant.rowSpacing
-                                  ) * newPlant.waterNeed,
-                          }
-                        : zone
-                );
-            }
+        let updatedZones = history.present.zones;
+        if (editingPlant) {
+            updatedZones = history.present.zones.map((zone) =>
+                zone.plantData.id === editingPlant.id
+                    ? {
+                          ...zone,
+                          plantData: newPlant,
+                          plantCount: calculatePlantCount(zone.area, newPlant.plantSpacing, newPlant.rowSpacing),
+                          totalWaterNeed: calculatePlantCount(zone.area, newPlant.plantSpacing, newPlant.rowSpacing) * newPlant.waterNeed,
+                          isCustomPlant: true,
+                      }
+                    : zone
+            );
+        }
 
-            pushToHistory({
-                availablePlants: updatedAvailablePlants,
-                zones: updatedZones,
-            });
+        pushToHistory({
+            availablePlants: updatedAvailablePlants,
+            zones: updatedZones,
+        });
 
-            console.log('✅ Custom plant saved:', newPlant);
-            setEditingPlant(null);
-        },
-        [editingPlant, history.present.availablePlants, history.present.zones, pushToHistory]
-    );
+        setShowCustomPlantModal(false);
+        setEditingPlant(null);
+        console.log('✅ Custom plant saved:', newPlant);
+    }, [history.present.availablePlants, history.present.zones, editingPlant, pushToHistory]);
 
     const handleZonePlantSelection = useCallback((zone: Zone) => {
         setSelectedZoneForPlant(zone);
@@ -1304,180 +2099,217 @@ export default function EnhancedHorticulturePlannerPage() {
 
             // Store fieldId in localStorage for the results page to detect editing mode
             localStorage.setItem('editingFieldId', fieldId);
+        } else {
+            // Clear editing field ID if no fieldId in URL (new project)
+            localStorage.removeItem('editingFieldId');
+        }
 
-            // Load saved data from localStorage or fetch from API
-            const loadSavedField = async () => {
-                try {
-                    // First try to get from localStorage (if it was saved from results page)
-                    const savedData = localStorage.getItem('horticultureIrrigationData');
+        // Load saved data from localStorage or fetch from API
+        const loadSavedField = async () => {
+            try {
+                // First try to get from localStorage (if it was saved from results page)
+                const savedData = localStorage.getItem('horticultureIrrigationData');
 
-                    if (savedData) {
-                        const data = JSON.parse(savedData);
-                        console.log('📊 Loaded saved data from localStorage:', data);
+                if (savedData) {
+                    const data = JSON.parse(savedData);
+                    console.log('📊 Loaded saved data from localStorage:', data);
 
-                        // Convert saved data to planner format
+                    // Convert saved data to planner format
+                    const loadedState: ProjectState = {
+                        mainArea: data.mainArea || [],
+                        zones: data.zones || [],
+                        pump: data.pump || null,
+                        mainPipes: data.mainPipes || [],
+                        subMainPipes: data.subMainPipes || [],
+                        plants: data.plants || [],
+                        exclusionAreas: data.exclusionAreas || [],
+                        useZones: data.useZones || false,
+                        selectedPlantType:
+                            data.plants?.[0]?.plantData || DEFAULT_PLANT_TYPES[0],
+                        availablePlants: DEFAULT_PLANT_TYPES,
+                        spacingValidationStats: {
+                            totalBranches: 0,
+                            averageRowSpacing: 0,
+                            averagePlantSpacing: 0,
+                            spacingAccuracy: 0,
+                        },
+                        areaUtilizationStats: {
+                            totalBranches: 0,
+                            averageUtilization: 0,
+                            maxUtilization: 0,
+                        },
+                        isEditModeEnabled: false,
+                        branchPipeSettings: {
+                            defaultAngle: 90,
+                            maxAngle: 180,
+                            minAngle: 0,
+                            angleStep: 15,
+                        },
+                    };
+
+                    // Update project name if available
+                    if (data.projectName) {
+                        setProjectName(data.projectName);
+                    }
+
+                    // Update customer name if available
+                    if (data.customerName) {
+                        setCustomerName(data.customerName);
+                    }
+
+                    // Set the loaded state
+                    dispatchHistory({ type: 'PUSH_STATE', state: loadedState });
+
+                    // Auto-advance to step 4 (pipes) if we have pump and zones
+                    if (
+                        loadedState.pump &&
+                        (loadedState.useZones ? loadedState.zones.length > 0 : true)
+                    ) {
+                        setCurrentStep(4);
+                    } else if (loadedState.pump) {
+                        setCurrentStep(3);
+                    } else if (
+                        loadedState.useZones
+                            ? loadedState.zones.length > 0
+                            : loadedState.mainArea.length > 0
+                    ) {
+                        setCurrentStep(2);
+                    }
+
+                    console.log('✅ Successfully loaded saved field data');
+                } else {
+                    // If no localStorage data, try to fetch from API
+                    console.log('📡 Fetching field data from API...');
+                    const response = await axios.get(`/api/fields/${fieldId}`);
+
+                    if (response.data.success && response.data.field) {
+                        const fieldData = response.data.field;
+                        console.log('📊 Loaded field data from API:', fieldData);
+
+                        // Convert API data to planner format
                         const loadedState: ProjectState = {
-                            mainArea: data.mainArea || [],
-                            zones: data.zones || [],
-                            pump: data.pump || null,
-                            mainPipes: data.mainPipes || [],
-                            subMainPipes: data.subMainPipes || [],
-                            plants: data.plants || [],
-                            exclusionAreas: data.exclusionAreas || [],
-                            useZones: data.useZones || false,
-                            selectedPlantType:
-                                data.plants?.[0]?.plantData || DEFAULT_PLANT_TYPES[0],
+                            mainArea: fieldData.area_coordinates || [],
+                            zones:
+                                fieldData.zones?.map((zone: any) => ({
+                                    id: zone.id.toString(),
+                                    name: zone.name,
+                                    coordinates: zone.polygon_coordinates || [],
+                                    plantData: {
+                                        id: 1,
+                                        name: 'พืชทั่วไป',
+                                        plantSpacing: 5,
+                                        rowSpacing: 5,
+                                        waterNeed: 50,
+                                    },
+                                    plantCount: 0,
+                                    totalWaterNeed: 0,
+                                    area: 0,
+                                    color: zone.color || '#4ECDC4',
+                                })) || [],
+                            pump: null, // Will need to be reconstructed from pipes
+                            mainPipes:
+                                fieldData.pipes
+                                    ?.filter((pipe: any) => pipe.type === 'main')
+                                    .map((pipe: any) => ({
+                                        id: pipe.id,
+                                        fromPump: 'pump-1',
+                                        toZone: pipe.zone_id?.toString() || 'main-area',
+                                        coordinates: [
+                                            { lat: pipe.start_lat, lng: pipe.start_lng },
+                                            { lat: pipe.end_lat, lng: pipe.end_lng },
+                                        ],
+                                        length: pipe.length || 0,
+                                        diameter: pipe.pipe_diameter || 50,
+                                        material: 'pvc',
+                                        pressure: 0,
+                                        flowRate: pipe.water_flow || 0,
+                                    })) || [],
+                            subMainPipes:
+                                fieldData.pipes
+                                    ?.filter((pipe: any) => pipe.type === 'submain')
+                                    .map((pipe: any) => ({
+                                        id: pipe.id,
+                                        zoneId: pipe.zone_id?.toString() || 'main-area',
+                                        coordinates: [
+                                            { lat: pipe.start_lat, lng: pipe.start_lng },
+                                            { lat: pipe.end_lat, lng: pipe.end_lng },
+                                        ],
+                                        length: pipe.length || 0,
+                                        diameter: pipe.pipe_diameter || 32,
+                                        branchPipes: [],
+                                        material: 'pvc',
+                                    })) || [],
+                            plants:
+                                fieldData.planting_points?.map((point: any) => ({
+                                    id: point.point_id,
+                                    position: { lat: point.lat, lng: point.lng },
+                                    plantData: {
+                                        id: 1,
+                                        name: 'พืชทั่วไป',
+                                        plantSpacing: 5,
+                                        rowSpacing: 5,
+                                        waterNeed: 50,
+                                    },
+                                })) || [],
+                            exclusionAreas: [],
+                            useZones: fieldData.zones && fieldData.zones.length > 0,
+                            selectedPlantType: DEFAULT_PLANT_TYPES[0],
                             availablePlants: DEFAULT_PLANT_TYPES,
+                            spacingValidationStats: {
+                                totalBranches: 0,
+                                averageRowSpacing: 0,
+                                averagePlantSpacing: 0,
+                                spacingAccuracy: 0,
+                            },
                             areaUtilizationStats: {
                                 totalBranches: 0,
                                 averageUtilization: 0,
                                 maxUtilization: 0,
-                                minUtilization: 0,
+                            },
+                            isEditModeEnabled: false,
+                            branchPipeSettings: {
+                                defaultAngle: 90,
+                                maxAngle: 180,
+                                minAngle: 0,
+                                angleStep: 15,
                             },
                         };
-
-                        // Update project name if available
-                        if (data.projectName) {
-                            setProjectName(data.projectName);
-                        }
 
                         // Set the loaded state
                         dispatchHistory({ type: 'PUSH_STATE', state: loadedState });
 
-                        // Auto-advance to step 4 (pipes) if we have pump and zones
+                        // Update project name
+                        if (fieldData.field_name) {
+                            setProjectName(fieldData.field_name);
+                        }
+
+                        // Update customer name
+                        if (fieldData.customer_name) {
+                            setCustomerName(fieldData.customer_name);
+                        }
+
+                        // Auto-advance to appropriate step
                         if (
-                            loadedState.pump &&
-                            (loadedState.useZones ? loadedState.zones.length > 0 : true)
+                            loadedState.mainPipes.length > 0 ||
+                            loadedState.subMainPipes.length > 0
                         ) {
                             setCurrentStep(4);
-                        } else if (loadedState.pump) {
-                            setCurrentStep(3);
-                        } else if (
-                            loadedState.useZones
-                                ? loadedState.zones.length > 0
-                                : loadedState.mainArea.length > 0
-                        ) {
+                        } else if (loadedState.plants.length > 0) {
                             setCurrentStep(2);
                         }
 
-                        console.log('✅ Successfully loaded saved field data');
-                    } else {
-                        // If no localStorage data, try to fetch from API
-                        console.log('📡 Fetching field data from API...');
-                        const response = await axios.get(`/api/fields/${fieldId}`);
-
-                        if (response.data.success && response.data.field) {
-                            const fieldData = response.data.field;
-                            console.log('📊 Loaded field data from API:', fieldData);
-
-                            // Convert API data to planner format
-                            const loadedState: ProjectState = {
-                                mainArea: fieldData.area_coordinates || [],
-                                zones:
-                                    fieldData.zones?.map((zone: any) => ({
-                                        id: zone.id.toString(),
-                                        name: zone.name,
-                                        coordinates: zone.polygon_coordinates || [],
-                                        plantData: {
-                                            id: 1,
-                                            name: 'พืชทั่วไป',
-                                            plantSpacing: 5,
-                                            rowSpacing: 5,
-                                            waterNeed: 50,
-                                        },
-                                        plantCount: 0,
-                                        totalWaterNeed: 0,
-                                        area: 0,
-                                        color: zone.color || '#4ECDC4',
-                                    })) || [],
-                                pump: null, // Will need to be reconstructed from pipes
-                                mainPipes:
-                                    fieldData.pipes
-                                        ?.filter((pipe: any) => pipe.type === 'main')
-                                        .map((pipe: any) => ({
-                                            id: pipe.id,
-                                            fromPump: 'pump-1',
-                                            toZone: pipe.zone_id?.toString() || 'main-area',
-                                            coordinates: [
-                                                { lat: pipe.start_lat, lng: pipe.start_lng },
-                                                { lat: pipe.end_lat, lng: pipe.end_lng },
-                                            ],
-                                            length: pipe.length || 0,
-                                            diameter: pipe.pipe_diameter || 50,
-                                            material: 'pvc',
-                                            pressure: 0,
-                                            flowRate: pipe.water_flow || 0,
-                                        })) || [],
-                                subMainPipes:
-                                    fieldData.pipes
-                                        ?.filter((pipe: any) => pipe.type === 'submain')
-                                        .map((pipe: any) => ({
-                                            id: pipe.id,
-                                            zoneId: pipe.zone_id?.toString() || 'main-area',
-                                            coordinates: [
-                                                { lat: pipe.start_lat, lng: pipe.start_lng },
-                                                { lat: pipe.end_lat, lng: pipe.end_lng },
-                                            ],
-                                            length: pipe.length || 0,
-                                            diameter: pipe.pipe_diameter || 32,
-                                            branchPipes: [],
-                                            material: 'pvc',
-                                        })) || [],
-                                plants:
-                                    fieldData.planting_points?.map((point: any) => ({
-                                        id: point.point_id,
-                                        position: { lat: point.lat, lng: point.lng },
-                                        plantData: {
-                                            id: 1,
-                                            name: 'พืชทั่วไป',
-                                            plantSpacing: 5,
-                                            rowSpacing: 5,
-                                            waterNeed: 50,
-                                        },
-                                    })) || [],
-                                exclusionAreas: [],
-                                useZones: fieldData.zones && fieldData.zones.length > 0,
-                                selectedPlantType: DEFAULT_PLANT_TYPES[0],
-                                availablePlants: DEFAULT_PLANT_TYPES,
-                                areaUtilizationStats: {
-                                    totalBranches: 0,
-                                    averageUtilization: 0,
-                                    maxUtilization: 0,
-                                    minUtilization: 0,
-                                },
-                            };
-
-                            // Set the loaded state
-                            dispatchHistory({ type: 'PUSH_STATE', state: loadedState });
-
-                            // Update project name
-                            if (fieldData.field_name) {
-                                setProjectName(fieldData.field_name);
-                            }
-
-                            // Auto-advance to appropriate step
-                            if (
-                                loadedState.mainPipes.length > 0 ||
-                                loadedState.subMainPipes.length > 0
-                            ) {
-                                setCurrentStep(4);
-                            } else if (loadedState.plants.length > 0) {
-                                setCurrentStep(2);
-                            }
-
-                            console.log('✅ Successfully loaded field data from API');
-                        }
+                        console.log('✅ Successfully loaded field data from API');
                     }
-                } catch (error) {
-                    console.error('❌ Error loading saved field data:', error);
                 }
-            };
+            } catch (error) {
+                console.error('❌ Error loading saved field data:', error);
+            }
+        };
 
-            loadSavedField();
-        }
+        loadSavedField();
     }, []);
 
-    const handleSaveZonePlant = useCallback(
+        const handleSaveZonePlant = useCallback(
         (zoneId: string, plantData: PlantData) => {
             const updatedZones = history.present.zones.map((zone) => {
                 if (zone.id === zoneId) {
@@ -1493,7 +2325,7 @@ export default function EnhancedHorticulturePlannerPage() {
                         plantData,
                         plantCount: newPlantCount,
                         totalWaterNeed: newWaterNeed,
-                        isCustomPlant: plantData.category === 'กำหนดเอง',
+                        isCustomPlant: plantData.id === 99,
                     };
                 }
                 return zone;
@@ -1501,130 +2333,259 @@ export default function EnhancedHorticulturePlannerPage() {
 
             pushToHistory({ zones: updatedZones });
             console.log(`✅ Zone ${zoneId} plant updated to:`, plantData);
-        },
-        [history.present.zones, pushToHistory]
-    );
+        }, [history.present.zones, pushToHistory]);
 
-    // Plant management functions
     const handlePlantEdit = useCallback((plant: PlantLocation) => {
         setSelectedPlantForEdit(plant);
+        setIsNewPlantMode(false);
         setShowPlantEditModal(true);
     }, []);
 
-    const handlePlantSave = useCallback(
-        (plantId: string, newPosition: Coordinate, newPlantData: PlantData) => {
-            const updatedPlants = history.present.plants.map((plant) =>
-                plant.id === plantId
-                    ? { ...plant, position: newPosition, plantData: newPlantData }
-                    : plant
+    const handlePlantSave = useCallback((plantId: string, newPosition: Coordinate, newPlantData: PlantData) => {
+        const updatedPlants = history.present.plants.map((plant) =>
+            plant.id === plantId ? { ...plant, position: newPosition, plantData: newPlantData } : plant
+        );
+        pushToHistory({ plants: updatedPlants });
+    }, [history.present.plants, pushToHistory]);
+
+    const handlePlantDelete = useCallback((plantId: string) => {
+        const updatedPlants = history.present.plants.filter((plant) => plant.id !== plantId);
+        
+
+        const updatedSubMainPipes = history.present.subMainPipes.map(subMain => ({
+            ...subMain,
+            branchPipes: subMain.branchPipes.filter(branch => {
+                const hasOtherPlants = branch.plants.some(plant => plant.id !== plantId);
+                return hasOtherPlants || branch.plants.length === 0;
+            }).map(branch => ({
+                ...branch,
+                plants: branch.plants.filter(plant => plant.id !== plantId)
+            }))
+        }));
+
+        pushToHistory({ 
+            plants: updatedPlants,
+            subMainPipes: updatedSubMainPipes
+        });
+    }, [history.present.plants, history.present.subMainPipes, pushToHistory]);
+
+    const handleAddPlant = useCallback((position: Coordinate, plantData?: PlantData) => {
+        const newPlant: PlantLocation = {
+            id: generateUniqueId('plant'),
+            position,
+            plantData: plantData || history.present.selectedPlantType,
+            isSelected: false,
+            isEditable: true,
+            health: 'good',
+            zoneId: history.present.useZones
+                ? findZoneContainingPoint(position, history.present.zones)?.id
+                : 'main-area',
+        };
+
+        const updatedPlants = [...history.present.plants, newPlant];
+        pushToHistory({ plants: updatedPlants });
+
+        setConnectionStartPlant(newPlant);
+        setIsCreatingConnection(true);
+        setDragMode('connecting');
+        setIsNewPlantMode(true);
+        setSelectedPlantForEdit(newPlant);
+        setShowPlantEditModal(true);
+
+        console.log('✅ New plant added, entering connection mode');
+    }, [history.present.plants, history.present.selectedPlantType, history.present.useZones, history.present.zones, pushToHistory]);
+
+    const handleCreatePlantConnection = useCallback((plantId: string) => {
+        const plant = history.present.plants.find(p => p.id === plantId);
+        if (!plant) return;
+
+        setConnectionStartPlant(plant);
+        setIsCreatingConnection(true);
+        setDragMode('connecting');
+        
+        const availablePipeIds: string[] = [
+            ...history.present.subMainPipes.map(p => p.id),
+            ...history.present.subMainPipes.flatMap(sm => sm.branchPipes.map(bp => bp.id))
+        ];
+        setHighlightedPipes(availablePipeIds);
+
+        console.log('🔗 Connection mode activated for plant:', plant.id);
+    }, [history.present.plants, history.present.subMainPipes]);
+
+    const handleConnectToPipe = useCallback((clickPosition: Coordinate, pipeId: string, pipeType: 'subMain' | 'branch') => {
+        if (!connectionStartPlant || !isCreatingConnection) return;
+
+        let targetPipe: SubMainPipe | BranchPipe | null = null;
+        let targetSubMainId = '';
+
+        if (pipeType === 'subMain') {
+            targetPipe = history.present.subMainPipes.find(p => p.id === pipeId) || null;
+            targetSubMainId = pipeId;
+        } else {
+            for (const subMain of history.present.subMainPipes) {
+                const branch = subMain.branchPipes.find(bp => bp.id === pipeId);
+                if (branch) {
+                    targetPipe = branch;
+                    targetSubMainId = subMain.id;
+                    break;
+                }
+            }
+        }
+
+        if (!targetPipe) return;
+
+        const closestPoint = findClosestPointOnPipe(clickPosition, targetPipe.coordinates);
+        if (!closestPoint) return;
+
+        const newBranchPipe: BranchPipe = {
+            id: generateUniqueId('branch'),
+            subMainPipeId: targetSubMainId,
+            coordinates: [closestPoint.position, connectionStartPlant.position],
+            length: calculateDistanceBetweenPoints(closestPoint.position, connectionStartPlant.position),
+            diameter: 20,
+            plants: [connectionStartPlant],
+            isEditable: true,
+            sprinklerType: 'standard',
+            angle: 90,
+            connectionPoint: 0.5,
+        };
+
+        const updatedSubMainPipes = history.present.subMainPipes.map(subMain => {
+            if (subMain.id === targetSubMainId) {
+                return {
+                    ...subMain,
+                    branchPipes: [...subMain.branchPipes, newBranchPipe]
+                };
+            }
+            return subMain;
+        });
+
+        pushToHistory({ subMainPipes: updatedSubMainPipes });
+
+        setIsCreatingConnection(false);
+        setConnectionStartPlant(null);
+        setHighlightedPipes([]);
+        setDragMode('none');
+        setTempConnectionLine(null);
+
+        console.log('✅ Created new branch pipe connection to', pipeType, pipeId);
+    }, [connectionStartPlant, isCreatingConnection, history.present.subMainPipes, pushToHistory]);
+
+    const handlePipeEdit = useCallback((pipe: MainPipe | SubMainPipe | BranchPipe, type: 'main' | 'subMain' | 'branch') => {
+        setSelectedPipeForEdit(pipe);
+        setSelectedPipeType(type);
+        setShowPipeEditModal(true);
+    }, []);
+
+    const handlePipeSave = useCallback((updatedPipe: MainPipe | SubMainPipe | BranchPipe) => {
+        let newState: Partial<ProjectState> = {};
+
+        if (selectedPipeType === 'main') {
+            const updatedMainPipes = history.present.mainPipes.map((pipe) =>
+                pipe.id === updatedPipe.id ? (updatedPipe as MainPipe) : pipe
             );
-            pushToHistory({ plants: updatedPlants });
-        },
-        [history.present.plants, pushToHistory]
-    );
-
-    const handlePlantDelete = useCallback(
-        (plantId: string) => {
-            const updatedPlants = history.present.plants.filter((plant) => plant.id !== plantId);
-            pushToHistory({ plants: updatedPlants });
-        },
-        [history.present.plants, pushToHistory]
-    );
-
-    // Pipe management functions
-    const handlePipeEdit = useCallback(
-        (pipe: MainPipe | SubMainPipe | BranchPipe, type: 'main' | 'subMain' | 'branch') => {
-            setSelectedPipeForEdit(pipe);
-            setSelectedPipeType(type);
-            setShowPipeEditModal(true);
-        },
-        []
-    );
-
-    const handlePipeSave = useCallback(
-        (updatedPipe: MainPipe | SubMainPipe | BranchPipe) => {
-            let newState: Partial<ProjectState> = {};
-
-            if (selectedPipeType === 'main') {
-                const updatedMainPipes = history.present.mainPipes.map((pipe) =>
-                    pipe.id === updatedPipe.id ? (updatedPipe as MainPipe) : pipe
+            newState.mainPipes = updatedMainPipes;
+        } else if (selectedPipeType === 'subMain') {
+            const updatedSubMainPipes = history.present.subMainPipes.map((pipe) =>
+                pipe.id === updatedPipe.id ? (updatedPipe as SubMainPipe) : pipe
+            );
+            newState.subMainPipes = updatedSubMainPipes;
+        } else if (selectedPipeType === 'branch') {
+            const updatedSubMainPipes = history.present.subMainPipes.map((subMainPipe) => {
+                const updatedBranchPipes = subMainPipe.branchPipes.map((branchPipe) =>
+                    branchPipe.id === updatedPipe.id ? (updatedPipe as BranchPipe) : branchPipe
                 );
-                newState.mainPipes = updatedMainPipes;
-            } else if (selectedPipeType === 'subMain') {
-                const updatedSubMainPipes = history.present.subMainPipes.map((pipe) =>
-                    pipe.id === updatedPipe.id ? (updatedPipe as SubMainPipe) : pipe
-                );
-                newState.subMainPipes = updatedSubMainPipes;
-            } else if (selectedPipeType === 'branch') {
-                const updatedSubMainPipes = history.present.subMainPipes.map((subMainPipe) => {
-                    const updatedBranchPipes = subMainPipe.branchPipes.map((branchPipe) =>
-                        branchPipe.id === updatedPipe.id ? (updatedPipe as BranchPipe) : branchPipe
+                return { ...subMainPipe, branchPipes: updatedBranchPipes };
+            });
+            newState.subMainPipes = updatedSubMainPipes;
+        }
+
+        pushToHistory(newState);
+    }, [selectedPipeType, history.present.mainPipes, history.present.subMainPipes, pushToHistory]);
+
+    const handlePipeDelete = useCallback((pipeId: string) => {
+        let newState: Partial<ProjectState> = {};
+
+        if (selectedPipeType === 'main') {
+            const updatedMainPipes = history.present.mainPipes.filter((pipe) => pipe.id !== pipeId);
+            newState.mainPipes = updatedMainPipes;
+        } else if (selectedPipeType === 'subMain') {
+            const updatedSubMainPipes = history.present.subMainPipes.filter((pipe) => pipe.id !== pipeId);
+            newState.subMainPipes = updatedSubMainPipes;
+        } else if (selectedPipeType === 'branch') {
+            const updatedSubMainPipes = history.present.subMainPipes.map((subMainPipe) => {
+                const updatedBranchPipes = subMainPipe.branchPipes.filter((branchPipe) => branchPipe.id !== pipeId);
+                return { ...subMainPipe, branchPipes: updatedBranchPipes };
+            });
+            newState.subMainPipes = updatedSubMainPipes;
+        }
+
+        pushToHistory(newState);
+    }, [selectedPipeType, history.present.mainPipes, history.present.subMainPipes, pushToHistory]);
+
+    const handleDeleteBranchPipe = useCallback((branchId: string, subMainId: string) => {
+        const updatedSubMainPipes = history.present.subMainPipes.map((subMainPipe) => {
+            if (subMainPipe.id === subMainId) {
+                const branchToDelete = subMainPipe.branchPipes.find(bp => bp.id === branchId);
+                if (branchToDelete) {
+                    const plantsToRemove = branchToDelete.plants.map(p => p.id);
+                    const updatedPlants = history.present.plants.filter(plant => 
+                        !plantsToRemove.includes(plant.id)
                     );
-                    return { ...subMainPipe, branchPipes: updatedBranchPipes };
-                });
-                newState.subMainPipes = updatedSubMainPipes;
+                    
+                    pushToHistory({ plants: updatedPlants });
+                }
+                
+                return {
+                    ...subMainPipe,
+                    branchPipes: subMainPipe.branchPipes.filter(bp => bp.id !== branchId)
+                };
             }
+            return subMainPipe;
+        });
 
-            pushToHistory(newState);
-        },
-        [selectedPipeType, history.present.mainPipes, history.present.subMainPipes, pushToHistory]
-    );
-
-    const handlePipeDelete = useCallback(
-        (pipeId: string) => {
-            let newState: Partial<ProjectState> = {};
-
-            if (selectedPipeType === 'main') {
-                const updatedMainPipes = history.present.mainPipes.filter(
-                    (pipe) => pipe.id !== pipeId
-                );
-                newState.mainPipes = updatedMainPipes;
-            } else if (selectedPipeType === 'subMain') {
-                const updatedSubMainPipes = history.present.subMainPipes.filter(
-                    (pipe) => pipe.id !== pipeId
-                );
-                newState.subMainPipes = updatedSubMainPipes;
-            } else if (selectedPipeType === 'branch') {
-                const updatedSubMainPipes = history.present.subMainPipes.map((subMainPipe) => {
-                    const updatedBranchPipes = subMainPipe.branchPipes.filter(
-                        (branchPipe) => branchPipe.id !== pipeId
-                    );
-                    return { ...subMainPipe, branchPipes: updatedBranchPipes };
-                });
-                newState.subMainPipes = updatedSubMainPipes;
-            }
-
-            pushToHistory(newState);
-        },
-        [selectedPipeType, history.present.mainPipes, history.present.subMainPipes, pushToHistory]
-    );
+        pushToHistory({ subMainPipes: updatedSubMainPipes });
+        console.log('✅ Deleted branch pipe and associated plants');
+    }, [history.present.subMainPipes, history.present.plants, pushToHistory]);
 
     const MapClickHandler: React.FC<{
         editMode: string | null;
+        isEditModeEnabled: boolean;
         onPumpPlace: (latlng: L.LatLng) => void;
         onPlantPlace: (latlng: L.LatLng) => void;
-    }> = ({ editMode, onPumpPlace, onPlantPlace }) => {
+        onAddPlant: (position: Coordinate) => void;
+        onConnectToPipe?: (position: Coordinate, pipeId: string, pipeType: 'subMain' | 'branch') => void;
+        isCreatingConnection?: boolean;
+    }> = ({ editMode, isEditModeEnabled, onPumpPlace, onPlantPlace, onAddPlant, onConnectToPipe, isCreatingConnection }) => {
         useMapEvents({
-            click: (e) => {
+            click: (e: LeafletMouseEvent) => {
+                if (!isEditModeEnabled) return;
+
                 if (editMode === 'pump') {
-                    e.originalEvent?.stopPropagation();
                     onPumpPlace(e.latlng);
                 } else if (editMode === 'plant') {
-                    e.originalEvent?.stopPropagation();
                     onPlantPlace(e.latlng);
+                } else if (editMode === 'addPlant') {
+                    onAddPlant({ lat: e.latlng.lat, lng: e.latlng.lng });
+                } else if (isCreatingConnection && onConnectToPipe) {
+                    onConnectToPipe({ lat: e.latlng.lat, lng: e.latlng.lng }, '', 'subMain');
                 }
             },
         });
+
         return null;
     };
 
     const MapBounds = ({ positions }: { positions: Coordinate[] }) => {
         const map = useMap();
 
-        useEffect(() => {
+        React.useEffect(() => {
             if (positions.length > 0) {
-                const bounds = L.latLngBounds(positions.map((p) => [p.lat, p.lng]));
-                map.fitBounds(bounds, { padding: [50, 50], maxZoom: 25 });
+                const bounds = positions.reduce(
+                    (bounds, point) => bounds.extend([point.lat, point.lng]),
+                    L.latLngBounds([])
+                );
+                map.fitBounds(bounds, { padding: [50, 50], maxZoom: 18, animate: true });
             }
         }, [positions, map]);
 
@@ -1635,140 +2596,153 @@ export default function EnhancedHorticulturePlannerPage() {
         setMapCenter([lat, lng]);
     }, []);
 
-    const handlePumpPlace = useCallback(
-        (latlng: L.LatLng) => {
-            const clickPoint = { lat: latlng.lat, lng: latlng.lng };
+    const handlePumpPlace = useCallback((latlng: L.LatLng) => {
+        const clickPoint = { lat: latlng.lat, lng: latlng.lng };
 
-            if (history.present.mainArea.length > 0) {
-                const isInMainArea = isPointInPolygon(clickPoint, history.present.mainArea);
-                if (!isInMainArea) {
-                    console.warn('⚠️ Pump placement outside main area');
-                    return;
-                }
+        if (history.present.mainArea.length > 0) {
+            const isInMainArea = isPointInPolygon(clickPoint, history.present.mainArea);
+            if (!isInMainArea) {
+                console.warn('⚠️ Pump placement outside main area');
+                return;
             }
+        }
 
-            const newPump: Pump = {
-                id: generateUniqueId('pump'),
-                position: { lat: latlng.lat, lng: latlng.lng },
-                type: 'centrifugal',
-                capacity: 100,
-                head: 50,
+        const newPump: Pump = {
+            id: generateUniqueId('pump'),
+            position: clickPoint,
+            type: 'submersible',
+            capacity: 1000,
+            head: 50,
+        };
+
+        pushToHistory({ pump: newPump });
+        setEditMode(null);
+        console.log('✅ Pump placed successfully');
+    }, [history.present.mainArea, pushToHistory]);
+
+    const handlePlantPlace = useCallback((latlng: L.LatLng) => {
+        const clickPoint = { lat: latlng.lat, lng: latlng.lng };
+
+        let targetZoneId = 'main-area';
+        if (history.present.useZones && history.present.zones.length > 0) {
+            const containingZone = findZoneContainingPoint(clickPoint, history.present.zones);
+            if (containingZone) {
+                targetZoneId = containingZone.id;
+            } else {
+                console.warn('⚠️ Plant placement outside any zone');
+                return;
+            }
+        }
+
+        const newPlant: PlantLocation = {
+            id: generateUniqueId('plant'),
+            position: { lat: latlng.lat, lng: latlng.lng },
+            plantData: history.present.selectedPlantType,
+            isSelected: false,
+            isEditable: true,
+            health: 'good',
+            zoneId: targetZoneId,
+        };
+
+        pushToHistory({ plants: [...history.present.plants, newPlant] });
+        console.log('✅ Plant placed successfully in zone:', targetZoneId);
+    }, [history.present.selectedPlantType, history.present.plants, history.present.useZones, history.present.zones, pushToHistory]);
+
+    const onCreated = useCallback((e: any) => {
+        const layer = e.layer;
+        const coordinates = extractCoordinatesFromLayer(layer);
+
+        if (!coordinates || coordinates.length === 0) {
+            console.error('❌ No valid coordinates extracted from layer');
+            return;
+        }
+
+        const isPolyline = editMode === 'mainPipe' || editMode === 'subMainPipe';
+        const isValidForPolyline = isPolyline && coordinates.length >= 2;
+        const isValidForPolygon = !isPolyline && coordinates.length >= 3;
+
+        if (!isValidForPolyline && !isValidForPolygon) {
+            console.error('❌ Invalid coordinates for mode:', editMode);
+            return;
+        }
+
+        if (history.present.mainArea.length === 0) {
+            console.log('🎯 Creating main area');
+            const center = coordinates.reduce((acc, point) => [acc[0] + point.lat, acc[1] + point.lng], [0, 0]);
+            setMapCenter([center[0] / coordinates.length, center[1] / coordinates.length]);
+            pushToHistory({ mainArea: coordinates });
+            return;
+        }
+
+        if (editMode === 'zone') {
+            const zoneArea = calculateAreaFromCoordinates(coordinates);
+            const plantDataForZone = history.present.selectedPlantType;
+            const estimatedPlantCount = calculatePlantCount(zoneArea, plantDataForZone.plantSpacing, plantDataForZone.rowSpacing);
+            const estimatedWaterNeed = estimatedPlantCount * plantDataForZone.waterNeed;
+
+            const newZone: Zone = {
+                id: generateUniqueId('zone'),
+                name: `โซน ${history.present.zones.length + 1}`,
+                coordinates,
+                plantData: plantDataForZone,
+                plantCount: estimatedPlantCount,
+                totalWaterNeed: estimatedWaterNeed,
+                area: zoneArea,
+                color: getZoneColor(history.present.zones.length),
+                isCustomPlant: plantDataForZone.id === 99,
             };
 
-            pushToHistory({ pump: newPump });
+            pushToHistory({ zones: [...history.present.zones, newZone] });
             setEditMode(null);
-            console.log('✅ Pump placed successfully');
-        },
-        [history.present.mainArea, pushToHistory]
-    );
-
-    const handlePlantPlace = useCallback(
-        (latlng: L.LatLng) => {
-            const newPlant: PlantLocation = {
-                id: generateUniqueId('plant'),
-                position: { lat: latlng.lat, lng: latlng.lng },
-                plantData: history.present.selectedPlantType,
-                isSelected: false,
-                isEditable: true,
-                health: 'good',
+            console.log(`✅ Zone created: ${newZone.name}`);
+        } else if (editMode === 'exclusion') {
+            const newExclusion: ExclusionArea = {
+                id: generateUniqueId('exclusion'),
+                type: selectedExclusionType,
+                coordinates,
+                name: `${selectedExclusionType} ${history.present.exclusionAreas.filter((e) => e.type === selectedExclusionType).length + 1}`,
+                color: EXCLUSION_COLORS[selectedExclusionType],
             };
-            pushToHistory({ plants: [...history.present.plants, newPlant] });
-            console.log('✅ Plant placed successfully');
-        },
-        [history.present.selectedPlantType, history.present.plants, pushToHistory]
-    );
 
-    const onCreated = useCallback(
-        (e: any) => {
-            const layer = e.layer;
-            const coordinates = extractCoordinatesFromLayer(layer);
+            pushToHistory({ exclusionAreas: [...history.present.exclusionAreas, newExclusion] });
+            setEditMode(null);
+            console.log(`✅ Exclusion area created: ${newExclusion.name}`);
+        } else if (editMode === 'mainPipe' && history.present.pump) {
+            const pipeLength = calculatePipeLength(coordinates);
+            const targetZoneId = findTargetZoneForMainPipe(coordinates, history.present.zones, history.present.useZones);
 
-            if (coordinates.length === 0) {
-                console.error('❌ Failed to extract coordinates');
-                return;
-            }
+            const newMainPipe: MainPipe = {
+                id: generateUniqueId('mainpipe'),
+                fromPump: history.present.pump.id,
+                toZone: targetZoneId,
+                coordinates,
+                length: pipeLength,
+                diameter: 50,
+            };
 
-            const isPolyline = editMode === 'mainPipe' || editMode === 'subMainPipe';
-            const isValidForPolyline = isPolyline && coordinates.length >= 2;
-            const isValidForPolygon = !isPolyline && coordinates.length >= 3;
+            pushToHistory({ mainPipes: [...history.present.mainPipes, newMainPipe] });
+            setDrawingMainPipe({ toZone: null });
+            setEditMode(null);
+            console.log(`✅ Main pipe created: ${pipeLength.toFixed(2)}m to zone: ${targetZoneId}`);
+        } else if (editMode === 'subMainPipe') {
+            console.log('🔩 Creating enhanced sub-main pipe with optimal branch generation...');
 
-            if (!isValidForPolyline && !isValidForPolygon) {
-                console.error('❌ Invalid coordinates for mode:', editMode);
-                return;
-            }
+            const pipeLength = calculatePipeLength(coordinates);
 
-            if (history.present.mainArea.length === 0) {
-                console.log('🎯 Creating main area');
-                const center = coordinates.reduce(
-                    (acc, point) => [acc[0] + point.lat, acc[1] + point.lng],
-                    [0, 0]
-                );
-                setMapCenter([center[0] / coordinates.length, center[1] / coordinates.length]);
-                pushToHistory({ mainArea: coordinates });
-                return;
-            }
-
-            if (editMode === 'zone') {
-                const zoneArea = calculateAreaFromCoordinates(coordinates);
-                const plantDataForZone = history.present.selectedPlantType;
-                const estimatedPlantCount = calculatePlantCount(
-                    zoneArea,
-                    plantDataForZone.plantSpacing,
-                    plantDataForZone.rowSpacing
-                );
-                const estimatedWaterNeed = estimatedPlantCount * plantDataForZone.waterNeed;
-
-                const newZone: Zone = {
-                    id: generateUniqueId('zone'),
-                    name: `โซน ${history.present.zones.length + 1}`,
-                    coordinates,
-                    plantData: plantDataForZone,
-                    plantCount: estimatedPlantCount,
-                    totalWaterNeed: estimatedWaterNeed,
-                    area: zoneArea,
-                    color: getZoneColor(history.present.zones.length),
-                    isCustomPlant: plantDataForZone.category === 'กำหนดเอง',
-                };
-
-                pushToHistory({ zones: [...history.present.zones, newZone] });
-                setEditMode(null);
-                console.log(`✅ Zone created: ${newZone.name}`);
-            } else if (editMode === 'exclusion') {
-                const newExclusion: ExclusionArea = {
-                    id: generateUniqueId('exclusion'),
-                    type: selectedExclusionType,
-                    coordinates,
-                    name: `${selectedExclusionType} ${history.present.exclusionAreas.filter((e) => e.type === selectedExclusionType).length + 1}`,
-                    color: EXCLUSION_COLORS[selectedExclusionType],
-                };
-
-                pushToHistory({
-                    exclusionAreas: [...history.present.exclusionAreas, newExclusion],
-                });
-                setEditMode(null);
-                console.log(`✅ Exclusion area created: ${newExclusion.name}`);
-            } else if (editMode === 'mainPipe' && history.present.pump && drawingMainPipe.toZone) {
-                const pipeLength = calculatePipeLength(coordinates);
-                const newMainPipe: MainPipe = {
-                    id: generateUniqueId('mainpipe'),
-                    fromPump: history.present.pump.id,
-                    toZone: drawingMainPipe.toZone,
-                    coordinates,
-                    length: pipeLength,
-                    diameter: 100,
-                };
-
-                pushToHistory({ mainPipes: [...history.present.mainPipes, newMainPipe] });
-                setDrawingMainPipe({ toZone: null });
-                setEditMode(null);
-                console.log(`✅ Main pipe created: ${pipeLength.toFixed(2)}m`);
-            } else if (editMode === 'subMainPipe') {
-                console.log(
-                    '🔩 Creating sub-main pipe with COMPLETE COVERAGE branch generation...'
-                );
-
-                const pipeLength = calculatePipeLength(coordinates);
-                const targetZone = selectedZone || {
+            let targetZone: Zone;
+            if (history.present.useZones) {
+                if (selectedZone) {
+                    targetZone = selectedZone;
+                } else {
+                    const detectedZone = findZoneForPipe(coordinates, history.present.zones);
+                    if (!detectedZone) {
+                        console.error('❌ Cannot create sub-main pipe: not in any zone');
+                        return;
+                    }
+                    targetZone = detectedZone;
+                }
+            } else {
+                targetZone = {
                     id: 'main-area',
                     name: 'พื้นที่หลัก',
                     coordinates: history.present.mainArea,
@@ -1778,93 +2752,74 @@ export default function EnhancedHorticulturePlannerPage() {
                     area: calculateAreaFromCoordinates(history.present.mainArea),
                     color: '#4ECDC4',
                 };
-
-                const branchPipes = generateBranchPipes(
-                    coordinates,
-                    targetZone,
-                    targetZone.plantData,
-                    history.present.exclusionAreas,
-                    history.present.mainArea,
-                    history.present.useZones
-                );
-
-                const newSubMainPipe: SubMainPipe = {
-                    id: generateUniqueId('submainpipe'),
-                    zoneId: targetZone.id,
-                    coordinates,
-                    length: pipeLength,
-                    diameter: 75,
-                    branchPipes,
-                };
-
-                const newPlants = branchPipes.flatMap((pipe) => pipe.plants);
-
-                const utilizationStats = branchPipes.map((pipe) => {
-                    const endPlantBuffer = targetZone.plantData.plantSpacing * 0.3;
-                    const theoreticalMaxLength = pipe.length + endPlantBuffer;
-                    const actualUtilization = (pipe.length / theoreticalMaxLength) * 100;
-                    return actualUtilization;
-                });
-
-                const avgUtilization =
-                    utilizationStats.length > 0
-                        ? utilizationStats.reduce((sum, util) => sum + util, 0) /
-                          utilizationStats.length
-                        : 0;
-
-                const areaUtilizationStats = {
-                    totalBranches: branchPipes.length,
-                    averageUtilization: avgUtilization,
-                    maxUtilization: utilizationStats.length > 0 ? Math.max(...utilizationStats) : 0,
-                    minUtilization: utilizationStats.length > 0 ? Math.min(...utilizationStats) : 0,
-                };
-
-                pushToHistory({
-                    subMainPipes: [...history.present.subMainPipes, newSubMainPipe],
-                    plants: [...history.present.plants, ...newPlants],
-                    areaUtilizationStats,
-                });
-
-                console.log(
-                    `✅ COMPLETE COVERAGE: ${branchPipes.length} branches, ${newPlants.length} plants in ${targetZone.name}`
-                );
-                console.log(
-                    `📊 COMPLETE COVERAGE utilization: ${avgUtilization.toFixed(1)}% average`
-                );
-
-                setEditMode(null);
-                setSelectedZone(null);
             }
 
-            if (featureGroupRef.current) {
-                featureGroupRef.current.removeLayer(layer);
-            }
-        },
-        [
-            history.present.mainArea,
-            editMode,
-            history.present.selectedPlantType,
-            history.present.zones,
-            selectedExclusionType,
-            history.present.exclusionAreas,
-            history.present.pump,
-            drawingMainPipe,
-            selectedZone,
-            history.present.useZones,
-            history.present.subMainPipes,
-            history.present.plants,
-            pushToHistory,
-        ]
-    );
+            const branchPipes = generateEnhancedBranchPipes(
+                coordinates,
+                targetZone,
+                targetZone.plantData,
+                history.present.exclusionAreas,
+                targetZone.coordinates,
+                history.present.useZones,
+                history.present.branchPipeSettings
+            );
+
+            // Extract plants from branch pipes
+            const newPlants = branchPipes.flatMap(branch => branch.plants || []);
+
+            const newSubMainPipe: SubMainPipe = {
+                id: generateUniqueId('submain'),
+                zoneId: targetZone.id,
+                coordinates,
+                length: pipeLength,
+                diameter: 32,
+                branchPipes,
+                material: 'pvc',
+            };
+
+            const exactSpacingStats = calculateExactSpacingStats([...history.present.subMainPipes, newSubMainPipe]);
+
+            pushToHistory({
+                subMainPipes: [...history.present.subMainPipes, newSubMainPipe],
+                plants: [...history.present.plants, ...newPlants],
+                spacingValidationStats: exactSpacingStats,
+            });
+
+            console.log(`✅ ENHANCED: ${branchPipes.length} branches, ${newPlants.length} plants in ${targetZone.name}`);
+            setEditMode(null);
+            setSelectedZone(null);
+        }
+
+        if (featureGroupRef.current) {
+            featureGroupRef.current.removeLayer(layer);
+        }
+    }, [
+        history.present.mainArea,
+        editMode,
+        history.present.selectedPlantType,
+        history.present.zones,
+        selectedExclusionType,
+        history.present.exclusionAreas,
+        history.present.pump,
+        drawingMainPipe,
+        selectedZone,
+        history.present.useZones,
+        history.present.subMainPipes,
+        history.present.plants,
+        history.present.branchPipeSettings,
+        pushToHistory,
+    ]);
 
     const handleSaveProject = useCallback(() => {
         if (!history.present.pump || history.present.mainArea.length === 0) {
+            alert('กรุณาวางปั๊มและสร้างพื้นที่หลักก่อนบันทึก');
             return;
         }
 
         const projectData = {
             projectName,
-            version: '3.0.0',
+            customerName,
+            version: '3.2.0',
             totalArea,
             mainArea: history.present.mainArea,
             pump: history.present.pump,
@@ -1874,18 +2829,22 @@ export default function EnhancedHorticulturePlannerPage() {
             exclusionAreas: history.present.exclusionAreas,
             plants: history.present.plants,
             useZones: history.present.useZones,
-            areaUtilizationStats: history.present.areaUtilizationStats,
+            branchPipeSettings: history.present.branchPipeSettings,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         };
 
-        try {
-            localStorage.setItem('horticultureIrrigationData', JSON.stringify(projectData));
-            console.log(`✅ COMPLETE COVERAGE: Project saved with enhanced branch system`);
-            router.visit('/horticulture/results');
-        } catch (error) {
-            console.error('❌ Save failed:', error);
-        }
+        localStorage.setItem('horticultureIrrigationData', JSON.stringify(projectData));
+        console.log('✅ Project saved to localStorage');
+
+        // Navigate to results page
+        const params = new URLSearchParams({
+            projectName,
+            customerName,
+            totalArea: totalArea.toString(),
+        });
+
+        router.visit(`/horticulture/results?${params.toString()}`);
     }, [
         history.present.pump,
         history.present.mainArea,
@@ -1897,7 +2856,7 @@ export default function EnhancedHorticulturePlannerPage() {
         history.present.exclusionAreas,
         history.present.plants,
         history.present.useZones,
-        history.present.areaUtilizationStats,
+        history.present.branchPipeSettings,
     ]);
 
     const canSaveProject = history.present.pump && history.present.mainArea.length > 0;
@@ -1905,30 +2864,50 @@ export default function EnhancedHorticulturePlannerPage() {
     const { t } = useLanguage();
 
     return (
-        <div className="min-h-screen overflow-hidden bg-gray-900 p-6 text-white">
-            <div className="mx-auto w-full">
-                {/* Header with Language Switcher */}
-                <div className="mb-6 flex items-center justify-between">
-                    <h1 className="text-3xl font-bold">
-                        <FaTree color="green" /> ระบบออกแบบระบบน้ำพืชสวน
-                    </h1>
-                    <LanguageSwitcher />
+        <div className="min-h-screen overflow-hidden bg-gray-900 text-white">
+            <Navbar />
+            <div className="p-4">
+                <div className="mx-auto w-full">
+                <div className="flex items-center justify-between">
+                    <h1 className="mb-4 text-2xl font-bold">🌳 ระบบออกแบบระบบน้ำพืชสวน</h1>
+                    <div className="mb-4">
+                        <button
+                            onClick={handleUndo}
+                            disabled={history.past.length === 0}
+                            className={`mr-2 flex-1 rounded px-2 py-2 text-sm transition-colors ${
+                                history.past.length === 0
+                                    ? 'cursor-not-allowed bg-gray-600 text-gray-400'
+                                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                            }`}
+                        >
+                            <FaUndo className="mr-2 inline" />
+                            ย้อนกลับ
+                        </button>
+                        <button
+                            onClick={handleRedo}
+                            disabled={history.future.length === 0}
+                            className={`flex-1 rounded px-2 py-2 text-sm transition-colors ${
+                                history.future.length === 0
+                                    ? 'cursor-not-allowed bg-gray-600 text-gray-400'
+                                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                            }`}
+                        >
+                            <FaRedo className="mr-2 inline" />
+                            ไปข้างหน้า
+                        </button>
+                    </div>
                 </div>
-
-                {/* Step-by-Step Progress Indicator */}
-                <div className="mb-8">
-                    <div className="mb-4 flex items-center justify-between">
-                        <h2 className="text-xl font-semibold text-gray-300">
-                            ขั้นตอนที่ {currentStep} จาก {steps.length}:{' '}
-                            {steps[currentStep - 1].name}
-                        </h2>
-                        <div className="flex items-center gap-2">
+                {/* Step Navigation */}
+                <div className="mb-6 rounded-lg bg-gray-800 p-4">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-lg font-semibold">📋 ขั้นตอนการทำงาน</h2>
+                        <div className="flex gap-2">
                             <button
                                 onClick={handlePrevStep}
-                                disabled={currentStep === 1}
-                                className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                                    currentStep === 1
-                                        ? 'cursor-not-allowed bg-gray-700 text-gray-500'
+                                disabled={currentStep <= 1}
+                                className={`rounded px-3 py-1 text-sm transition-colors ${
+                                    currentStep <= 1
+                                        ? 'cursor-not-allowed bg-gray-600 text-gray-400'
                                         : 'bg-blue-600 text-white hover:bg-blue-700'
                                 }`}
                             >
@@ -1936,10 +2915,10 @@ export default function EnhancedHorticulturePlannerPage() {
                             </button>
                             <button
                                 onClick={handleNextStep}
-                                disabled={!canProceedToStep(currentStep + 1)}
-                                className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                                    !canProceedToStep(currentStep + 1)
-                                        ? 'cursor-not-allowed bg-gray-700 text-gray-500'
+                                disabled={currentStep >= 5}
+                                className={`rounded px-3 py-1 text-sm transition-colors ${
+                                    currentStep >= 5
+                                        ? 'cursor-not-allowed bg-gray-600 text-gray-400'
                                         : 'bg-green-600 text-white hover:bg-green-700'
                                 }`}
                             >
@@ -1947,67 +2926,66 @@ export default function EnhancedHorticulturePlannerPage() {
                             </button>
                         </div>
                     </div>
-
-                    {/* Progress Steps */}
-                    <div className="flex items-center justify-between">
-                        {steps.map((step, index) => {
-                            const status = getStepStatus(step.id);
-                            const isClickable = canProceedToStep(step.id);
-
-                            return (
-                                <div key={step.id} className="flex items-center">
-                                    <button
-                                        onClick={() => handleStepClick(step.id)}
-                                        disabled={!isClickable}
-                                        className={`flex items-center gap-2 rounded-lg px-4 py-2 transition-all ${
-                                            status === 'completed'
-                                                ? 'bg-green-600 text-white hover:bg-green-700'
-                                                : status === 'active'
-                                                  ? 'bg-blue-600 text-white'
-                                                  : isClickable
-                                                    ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                                    : 'cursor-not-allowed bg-gray-800 text-gray-500'
-                                        }`}
-                                    >
-                                        <span className="text-lg">{step.icon}</span>
-                                        <div className="text-left">
-                                            <div className="font-medium">{step.name}</div>
-                                            <div className="text-xs opacity-75">
-                                                {step.description}
-                                            </div>
-                                        </div>
-                                    </button>
-
-                                    {index < steps.length - 1 && (
-                                        <div
-                                            className={`mx-2 h-0.5 w-8 ${
-                                                status === 'completed'
-                                                    ? 'bg-green-600'
-                                                    : 'bg-gray-600'
-                                            }`}
-                                        />
-                                    )}
+                    
+                    <div className="mt-4 grid grid-cols-5 gap-2">
+                        {[1, 2, 3, 4, 5].map((stepId) => (
+                            <button
+                                key={stepId}
+                                onClick={() => handleStepClick(stepId)}
+                                disabled={!canProceedToStep(stepId)}
+                                className={`rounded-lg p-3 text-center text-sm font-medium transition-all ${
+                                    getStepStatus(stepId) === 'active'
+                                        ? 'bg-blue-600 text-white shadow-lg'
+                                        : getStepStatus(stepId) === 'completed'
+                                        ? 'bg-green-600 text-white'
+                                        : canProceedToStep(stepId)
+                                        ? 'bg-blue-500 text-white hover:bg-blue-600 cursor-pointer'
+                                        : 'cursor-not-allowed bg-gray-600 text-gray-400'
+                                }`}
+                            >
+                                <div className="mb-1 text-lg">
+                                    {stepId === 1 && '🗺️'}
+                                    {stepId === 2 && '🌿'}
+                                    {stepId === 3 && '🚰'}
+                                    {stepId === 4 && '🔧'}
+                                    {stepId === 5 && '✅'}
                                 </div>
-                            );
-                        })}
+                                <div className="text-xs">
+                                    {stepId === 1 && 'พื้นที่หลัก'}
+                                    {stepId === 2 && 'พืช/โซน'}
+                                    {stepId === 3 && 'ปั๊มน้ำ'}
+                                    {stepId === 4 && 'ท่อน้ำ'}
+                                    {stepId === 5 && 'เสร็จสิ้น'}
+                                </div>
+                            </button>
+                        ))}
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
                     <div className="h-[88vh] space-y-6 overflow-y-auto lg:col-span-1">
-                        {/* Project Info - Always Visible */}
                         <div className="rounded-lg bg-gray-800 p-4">
                             <h3 className="mb-3 text-lg font-semibold">📊 ข้อมูลโครงการ</h3>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="mb-2 block text-sm font-medium">
-                                        ชื่อโครงการ
-                                    </label>
+                                    <label className="mb-2 block text-sm font-medium">ชื่อโครงการ</label>
                                     <input
                                         type="text"
                                         value={projectName}
                                         onChange={(e) => setProjectName(e.target.value)}
                                         className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        disabled={history.present.isEditModeEnabled}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium">ชื่อลูกค้า</label>
+                                    <input
+                                        type="text"
+                                        value={customerName}
+                                        onChange={(e) => setCustomerName(e.target.value)}
+                                        className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="ชื่อ - นามสกุล"
+                                        disabled={history.present.isEditModeEnabled}
                                     />
                                 </div>
                                 <div className="text-sm text-gray-300">
@@ -2018,10 +2996,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                     <div className="flex justify-between">
                                         <span>จำนวนโซน:</span>
                                         <span className="font-medium">
-                                            {history.present.useZones
-                                                ? history.present.zones.length
-                                                : 1}{' '}
-                                            โซน
+                                            {history.present.useZones ? history.present.zones.length : 1} โซน
                                         </span>
                                     </div>
                                     <div className="flex justify-between">
@@ -2040,37 +3015,98 @@ export default function EnhancedHorticulturePlannerPage() {
                             </div>
                         </div>
 
-                        {/* Step 1: Main Area */}
-                        {currentStep === 1 && (
-                            <div className="rounded-lg bg-blue-900/30 p-4">
-                                <h3 className="mb-3 text-lg font-semibold text-blue-400">
-                                    🗺️ ขั้นตอนที่ 1: วาดพื้นที่หลัก
+                        {canEnableEditMode && (
+                            <div className="rounded-lg bg-gradient-to-r from-purple-800 to-blue-800 p-4">
+                                <h3 className="mb-3 text-lg font-semibold text-yellow-300">
+                                    ✨ โหมดแก้ไขขั้นสูง
                                 </h3>
-                                <p className="mb-4 text-sm text-blue-200">
-                                    วาดพื้นที่หลักของโครงการบนแผนที่ ใช้เครื่องมือวาดด้านขวา
-                                </p>
                                 <div className="space-y-3">
-                                    <div className="rounded bg-blue-800/50 p-3">
-                                        <h4 className="mb-2 font-medium text-blue-300">วิธีการ:</h4>
-                                        <ul className="space-y-1 text-xs text-blue-200">
-                                            <li>• คลิกที่เครื่องมือวาดด้านขวา</li>
-                                            <li>• วาดรูปหลายเหลี่ยมรอบพื้นที่</li>
-                                            <li>• คลิก "ถัดไป" เมื่อเสร็จ</li>
-                                        </ul>
-                                    </div>
-                                    {history.present.mainArea.length > 0 && (
-                                        <div className="rounded bg-green-800/50 p-3">
-                                            <div className="flex items-center gap-2 text-green-300">
-                                                <span>✅</span>
-                                                <span className="font-medium">
-                                                    วาดพื้นที่เสร็จแล้ว
-                                                </span>
+                                    <button
+                                        onClick={handleToggleEditMode}
+                                        className={`w-full rounded px-4 py-3 font-semibold transition-all ${
+                                            history.present.isEditModeEnabled
+                                                ? 'bg-red-600 text-white hover:bg-red-700'
+                                                : 'bg-green-600 text-white hover:bg-green-700'
+                                        }`}
+                                    >
+                                        {history.present.isEditModeEnabled ? (
+                                            <>
+                                                <FaTimes className="mr-2 inline" />
+                                                ออกจากโหมดแก้ไข
+                                            </>
+                                        ) : (
+                                            <>
+                                                <FaEdit className="mr-2 inline" />
+                                                เข้าสู่โหมดแก้ไข
+                                            </>
+                                        )}
+                                    </button>
+
+                                    {isCreatingConnection && (
+                                        <div className="rounded bg-blue-900/50 p-3 text-sm">
+                                            <div className="text-blue-300 font-semibold mb-2">
+                                                🔗 โหมดเชื่อมต่อท่อ
                                             </div>
-                                            <div className="mt-1 text-xs text-green-200">
-                                                ขนาด: {formatArea(totalArea)}
+                                            <div className="text-xs text-gray-300">
+                                                คลิกที่ท่อเมนรองหรือท่อย่อยเพื่อเชื่อมต่อ
                                             </div>
+                                            <button
+                                                onClick={() => {
+                                                    setIsCreatingConnection(false);
+                                                    setConnectionStartPlant(null);
+                                                    setHighlightedPipes([]);
+                                                    setDragMode('none');
+                                                }}
+                                                className="mt-2 w-full rounded bg-red-600 px-3 py-1 text-xs hover:bg-red-700"
+                                            >
+                                                ยกเลิกการเชื่อมต่อ
+                                            </button>
                                         </div>
                                     )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Step 1: Main Area */}
+                        {currentStep === 1 && (
+                            <div className="space-y-4">
+                                <div className="rounded-lg bg-green-900/30 p-4">
+                                    <h3 className="mb-3 text-lg font-semibold text-green-400">
+                                        🗺️ ขั้นตอนที่ 1: สร้างพื้นที่หลัก
+                                    </h3>
+                                    <p className="mb-4 text-sm text-green-200">
+                                        วาดพื้นที่หลักของโครงการบนแผนที่
+                                    </p>
+                                </div>
+
+                                <div className="rounded-lg bg-gray-800 p-4">
+                                    <h3 className="mb-3 text-lg font-semibold">🗺️ พื้นที่หลัก</h3>
+                                    <div className="space-y-3">
+                                        <button
+                                            onClick={() => setEditMode(editMode === 'mainArea' ? null : 'mainArea')}
+                                            className={`w-full rounded px-4 py-2 text-white transition-colors ${
+                                                editMode === 'mainArea'
+                                                    ? 'bg-green-600'
+                                                    : 'bg-green-500 hover:bg-green-600'
+                                            }`}
+                                        >
+                                            {editMode === 'mainArea' ? '⏹ หยุดวาดพื้นที่' : '🗺️ วาดพื้นที่หลัก'}
+                                        </button>
+
+                                        {history.present.mainArea.length > 0 && (
+                                            <div className="rounded bg-green-800/50 p-3">
+                                                <div className="flex items-center gap-2 text-green-300">
+                                                    <span>✅</span>
+                                                    <span className="font-medium">
+                                                        สร้างพื้นที่หลักเสร็จแล้ว
+                                                    </span>
+                                                </div>
+                                                <div className="mt-1 text-xs text-green-200">
+                                                    พื้นที่: {formatArea(totalArea)}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -2078,177 +3114,177 @@ export default function EnhancedHorticulturePlannerPage() {
                         {/* Step 2: Plants and Zones */}
                         {currentStep === 2 && (
                             <div className="space-y-4">
-                                <div className="rounded-lg bg-green-900/30 p-4">
-                                    <h3 className="mb-3 text-lg font-semibold text-green-400">
-                                        🌱 ขั้นตอนที่ 2: เลือกพืชและโซน
+                                <div className="rounded-lg bg-orange-900/30 p-4">
+                                    <h3 className="mb-3 text-lg font-semibold text-orange-400">
+                                        🌿 ขั้นตอนที่ 2: กำหนดพืชและโซน
                                     </h3>
-                                    <p className="mb-4 text-sm text-green-200">
-                                        เลือกชนิดพืชและกำหนดโซนการปลูก
+                                    <p className="mb-4 text-sm text-orange-200">
+                                        เลือกชนิดพืชและแบ่งโซน (ถ้าต้องการ)
                                     </p>
                                 </div>
 
-                                {/* Zone Configuration */}
-                                <div className="rounded-lg bg-gray-800 p-4">
-                                    <h3 className="mb-3 text-lg font-semibold">🏞️ การจัดการโซน</h3>
-                                    <div className="space-y-4">
-                                        <label className="flex items-center space-x-2">
-                                            <input
-                                                type="checkbox"
-                                                checked={history.present.useZones}
-                                                onChange={(e) =>
-                                                    pushToHistory({ useZones: e.target.checked })
-                                                }
-                                                className="rounded border-gray-600 bg-gray-700 text-blue-500"
-                                            />
-                                            <span className="text-sm">แบ่งเป็นหลายโซน</span>
-                                        </label>
-                                        {!history.present.useZones && (
-                                            <div className="rounded bg-yellow-900/20 p-2 text-xs text-yellow-400">
-                                                จะใช้พื้นที่ทั้งหมดเป็นโซนเดียว
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Plant Management */}
-                                <div className="rounded-lg bg-gray-800 p-4">
-                                    <div className="mb-3 flex items-center justify-between">
-                                        <h3 className="text-lg font-semibold">🌿 การจัดการพืช</h3>
-                                        <button
-                                            onClick={() => handleCreateCustomPlant()}
-                                            className="rounded bg-purple-600 px-3 py-1 text-sm transition-colors hover:bg-purple-700"
-                                        >
-                                            ➕ สร้างพืชใหม่
-                                        </button>
-                                    </div>
-
-                                    {!history.present.useZones && (
-                                        <div className="space-y-3">
-                                            <label className="mb-2 block text-sm font-medium">
-                                                เลือกชนิดพืช (โซนเดียว)
-                                            </label>
-                                            <select
-                                                value={history.present.selectedPlantType.id}
-                                                onChange={(e) => {
-                                                    const plantType =
-                                                        history.present.availablePlants.find(
-                                                            (p) => p.id === Number(e.target.value)
-                                                        );
-                                                    if (plantType) {
-                                                        pushToHistory({
-                                                            selectedPlantType: plantType,
-                                                        });
+                                <div className="space-y-4">
+                                    {/* Zone Configuration */}
+                                    <div className="rounded-lg bg-gray-800 p-4">
+                                        <h3 className="mb-3 text-lg font-semibold">🏞️ การจัดการโซน</h3>
+                                        <div className="space-y-4">
+                                            <label className="flex items-center space-x-2">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={history.present.useZones}
+                                                    onChange={(e) =>
+                                                        pushToHistory({ useZones: e.target.checked })
                                                     }
-                                                }}
-                                                className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            >
-                                                {history.present.availablePlants.map((plant) => (
-                                                    <option key={plant.id} value={plant.id}>
-                                                        {plant.category === 'กำหนดเอง'
-                                                            ? '🔧'
-                                                            : '🌱'}{' '}
-                                                        {plant.name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <div className="text-sm text-gray-300">
-                                                <div className="flex justify-between">
-                                                    <span>ระยะห่างต้น:</span>
-                                                    <span>
-                                                        {
-                                                            history.present.selectedPlantType
-                                                                .plantSpacing
-                                                        }{' '}
-                                                        ม.
-                                                    </span>
+                                                    className="rounded border-gray-600 bg-gray-700 text-blue-500"
+                                                />
+                                                <span className="text-sm">แบ่งเป็นหลายโซน</span>
+                                            </label>
+                                            {!history.present.useZones && (
+                                                <div className="rounded bg-yellow-900/20 p-2 text-xs text-yellow-400">
+                                                    จะใช้พื้นที่ทั้งหมดเป็นโซนเดียว
                                                 </div>
-                                                <div className="flex justify-between">
-                                                    <span>ระยะห่างแถว:</span>
-                                                    <span>
-                                                        {
-                                                            history.present.selectedPlantType
-                                                                .rowSpacing
-                                                        }{' '}
-                                                        ม.
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span>น้ำต่อต้น:</span>
-                                                    <span>
-                                                        {
-                                                            history.present.selectedPlantType
-                                                                .waterNeed
-                                                        }{' '}
-                                                        ล./ครั้ง
-                                                    </span>
-                                                </div>
-                                            </div>
+                                            )}
                                         </div>
-                                    )}
+                                    </div>
 
-                                    {/* Zone Plant List */}
-                                    {history.present.useZones &&
-                                        history.present.zones.length > 0 && (
-                                            <div className="space-y-2">
-                                                <div className="text-sm font-medium text-gray-300">
-                                                    พืชในแต่ละโซน:
-                                                </div>
-                                                <div className="max-h-48 space-y-2 overflow-y-auto">
-                                                    {history.present.zones.map((zone) => (
-                                                        <div
-                                                            key={zone.id}
-                                                            className="rounded bg-gray-700 p-3"
-                                                        >
-                                                            <div className="mb-2 flex items-center justify-between">
-                                                                <span className="font-medium">
-                                                                    {zone.name}
-                                                                </span>
-                                                                <div className="flex items-center gap-2">
-                                                                    <div
-                                                                        className="h-4 w-4 rounded"
-                                                                        style={{
-                                                                            backgroundColor:
-                                                                                zone.color,
-                                                                        }}
-                                                                    ></div>
-                                                                </div>
-                                                            </div>
-                                                            <div className="text-sm text-gray-300">
-                                                                <div className="flex items-center gap-2">
-                                                                    <span>
-                                                                        {zone.isCustomPlant
-                                                                            ? '🌱'
-                                                                            : '🌱'}{' '}
-                                                                        {zone.plantData.name}
-                                                                    </span>
-                                                                    <button
-                                                                        onClick={() =>
-                                                                            handleZonePlantSelection(
-                                                                                zone
-                                                                            )
-                                                                        }
-                                                                        className="ml-auto rounded bg-blue-600 px-2 py-1 text-xs transition-colors hover:bg-blue-700"
-                                                                    >
-                                                                        เปลี่ยน
-                                                                    </button>
-                                                                </div>
-                                                                <div className="mt-1 text-xs text-gray-400">
-                                                                    {zone.plantData.plantSpacing}×
-                                                                    {zone.plantData.rowSpacing}ม. |{' '}
-                                                                    {zone.plantData.waterNeed}
-                                                                    ล./ครั้ง
-                                                                </div>
-                                                                <div className="text-xs text-gray-400">
-                                                                    ประมาณ:{' '}
-                                                                    {zone.plantCount.toLocaleString()}{' '}
-                                                                    ต้น
-                                                                </div>
-                                                            </div>
-                                                        </div>
+                                    {/* Plant Management */}
+                                    <div className="rounded-lg bg-gray-800 p-4">
+                                        <div className="mb-3 flex items-center justify-between">
+                                            <h3 className="text-lg font-semibold">🌿 การจัดการพืช</h3>
+                                            <button
+                                                onClick={() => handleCreateCustomPlant()}
+                                                className="rounded bg-purple-600 px-3 py-1 text-sm transition-colors hover:bg-purple-700"
+                                            >
+                                                ➕ สร้างพืชใหม่
+                                            </button>
+                                        </div>
+
+                                        {!history.present.useZones && (
+                                            <div className="space-y-3">
+                                                <label className="mb-2 block text-sm font-medium">
+                                                    เลือกชนิดพืช (โซนเดียว)
+                                                </label>
+                                                <select
+                                                    value={history.present.selectedPlantType.id}
+                                                    onChange={(e) => {
+                                                        const plantType =
+                                                            history.present.availablePlants.find(
+                                                                (p) => p.id === Number(e.target.value)
+                                                            );
+                                                        if (plantType) {
+                                                            pushToHistory({
+                                                                selectedPlantType: plantType,
+                                                            });
+                                                        }
+                                                    }}
+                                                    className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                >
+                                                    {history.present.availablePlants.map((plant) => (
+                                                        <option key={plant.id} value={plant.id}>
+                                                            {plant.id > 3 ? '🔧' : '🌱'}{' '}
+                                                            {plant.name}
+                                                        </option>
                                                     ))}
+                                                </select>
+                                                <div className="text-sm text-gray-300">
+                                                    <div className="flex justify-between">
+                                                        <span>ระยะห่างต้น:</span>
+                                                        <span>
+                                                            {
+                                                                history.present.selectedPlantType
+                                                                    .plantSpacing
+                                                            }{' '}
+                                                            ม.
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span>ระยะห่างแถว:</span>
+                                                        <span>
+                                                            {
+                                                                history.present.selectedPlantType
+                                                                    .rowSpacing
+                                                            }{' '}
+                                                            ม.
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span>น้ำต่อต้น:</span>
+                                                        <span>
+                                                            {
+                                                                history.present.selectedPlantType
+                                                                    .waterNeed
+                                                            }{' '}
+                                                            ล./ครั้ง
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}
+
+                                        {/* Zone Plant List */}
+                                        {history.present.useZones &&
+                                            history.present.zones.length > 0 && (
+                                                <div className="space-y-2">
+                                                    <div className="text-sm font-medium text-gray-300">
+                                                        พืชในแต่ละโซน:
+                                                    </div>
+                                                    <div className="max-h-48 space-y-2 overflow-y-auto">
+                                                        {history.present.zones.map((zone) => (
+                                                            <div
+                                                                key={zone.id}
+                                                                className="rounded bg-gray-700 p-3"
+                                                            >
+                                                                <div className="mb-2 flex items-center justify-between">
+                                                                    <span className="font-medium">
+                                                                        {zone.name}
+                                                                    </span>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div
+                                                                            className="h-4 w-4 rounded"
+                                                                            style={{
+                                                                                backgroundColor:
+                                                                                    zone.color,
+                                                                            }}
+                                                                        ></div>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="text-sm text-gray-300">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span>
+                                                                            {zone.isCustomPlant
+                                                                                ? '🌱'
+                                                                                : '🌱'}{' '}
+                                                                            {zone.plantData.name}
+                                                                        </span>
+                                                                        <button
+                                                                            onClick={() =>
+                                                                                handleZonePlantSelection(
+                                                                                    zone
+                                                                                )
+                                                                            }
+                                                                            className="ml-auto rounded bg-blue-600 px-2 py-1 text-xs transition-colors hover:bg-blue-700"
+                                                                        >
+                                                                            เปลี่ยน
+                                                                        </button>
+                                                                    </div>
+                                                                    <div className="mt-1 text-xs text-gray-400">
+                                                                        {zone.plantData.plantSpacing}×
+                                                                        {zone.plantData.rowSpacing}ม. |{' '}
+                                                                        {zone.plantData.waterNeed}
+                                                                        ล./ครั้ง
+                                                                    </div>
+                                                                    <div className="text-xs text-gray-400">
+                                                                        ประมาณ:{' '}
+                                                                        {zone.plantCount.toLocaleString()}{' '}
+                                                                        ต้น
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -2663,9 +3699,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                         {history.present.subMainPipes.length > 0 && (
                                             <div className="flex justify-between">
                                                 <span>ท่อเมนรอง:</span>
-                                                <span>
-                                                    {history.present.subMainPipes.length} เส้น
-                                                </span>
+                                                <span>{history.present.subMainPipes.length} เส้น</span>
                                             </div>
                                         )}
                                         <div className="flex justify-between border-t border-gray-600 pt-1">
@@ -2681,12 +3715,14 @@ export default function EnhancedHorticulturePlannerPage() {
                                             </span>
                                         </div>
                                     </div>
+                                    <div className="text-xs text-purple-300 mt-2 p-2 bg-purple-900/20 rounded">
+                                        🆕 ปรับปรุงใหม่: ลบท่อย่อย, ลากเชื่อมต่อท่อ, แก้ไขขั้นสูง
+                                    </div>
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    {/* Map */}
                     <div className="lg:col-span-3">
                         <div className="top-18 sticky z-10 h-[88vh]">
                             <div
@@ -2732,17 +3768,18 @@ export default function EnhancedHorticulturePlannerPage() {
 
                                     <MapClickHandler
                                         editMode={editMode}
+                                        isEditModeEnabled={history.present.isEditModeEnabled}
                                         onPumpPlace={handlePumpPlace}
                                         onPlantPlace={handlePlantPlace}
+                                        onAddPlant={handleAddPlant}
+                                        onConnectToPipe={handleConnectToPipe}
+                                        isCreatingConnection={isCreatingConnection}
                                     />
 
                                     {/* Main Area */}
                                     {history.present.mainArea.length > 0 && (
                                         <Polygon
-                                            positions={history.present.mainArea.map((coord) => [
-                                                coord.lat,
-                                                coord.lng,
-                                            ])}
+                                            positions={history.present.mainArea.map((coord) => [coord.lat, coord.lng])}
                                             pathOptions={{
                                                 color: '#22C55E',
                                                 fillColor: '#22C55E',
@@ -2754,6 +3791,9 @@ export default function EnhancedHorticulturePlannerPage() {
                                                     if (editMode === 'pump') {
                                                         e.originalEvent?.stopPropagation();
                                                         handlePumpPlace(e.latlng);
+                                                    } else if (history.present.isEditModeEnabled && !editMode) {
+                                                        e.originalEvent?.stopPropagation();
+                                                        handleAddPlant({ lat: e.latlng.lat, lng: e.latlng.lng });
                                                     }
                                                 },
                                             }}
@@ -2765,8 +3805,12 @@ export default function EnhancedHorticulturePlannerPage() {
                                                     ขนาด: {formatArea(totalArea)}
                                                     <br />
                                                     <div className="text-xs text-green-600">
-                                                        🎯 ท่อย่อยครอบคลุมจนปลาย
-                                                        <br />✅ ต้นไม้กระจายตลอดความยาว
+                                                        {history.present.isEditModeEnabled && (
+                                                            <>
+                                                                <br />
+                                                                🎛️ คลิกเพื่อเพิ่มต้นไม้
+                                                            </>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </Popup>
@@ -2777,10 +3821,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                     {history.present.exclusionAreas.map((area) => (
                                         <Polygon
                                             key={area.id}
-                                            positions={area.coordinates.map((coord) => [
-                                                coord.lat,
-                                                coord.lng,
-                                            ])}
+                                            positions={area.coordinates.map((coord) => [coord.lat, coord.lng])}
                                             pathOptions={{
                                                 color: area.color,
                                                 fillColor: area.color,
@@ -2803,10 +3844,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                         history.present.zones.map((zone) => (
                                             <Polygon
                                                 key={zone.id}
-                                                positions={zone.coordinates.map((coord) => [
-                                                    coord.lat,
-                                                    coord.lng,
-                                                ])}
+                                                positions={zone.coordinates.map((coord) => [coord.lat, coord.lng])}
                                                 pathOptions={{
                                                     color: zone.color,
                                                     fillColor: zone.color,
@@ -2814,38 +3852,47 @@ export default function EnhancedHorticulturePlannerPage() {
                                                     weight: 2,
                                                 }}
                                                 eventHandlers={{
-                                                    dblclick: () => handleZonePlantSelection(zone),
+                                                    dblclick: () =>
+                                                        !history.present.isEditModeEnabled &&
+                                                        handleZonePlantSelection(zone),
+                                                    click: (e) => {
+                                                        if (history.present.isEditModeEnabled && !editMode) {
+                                                            e.originalEvent?.stopPropagation();
+                                                            handleAddPlant({ lat: e.latlng.lat, lng: e.latlng.lng });
+                                                        }
+                                                    },
                                                 }}
                                             >
                                                 <Popup>
                                                     <div className="text-center">
                                                         <strong>{zone.name}</strong>
                                                         <br />
-                                                        พืช: {zone.isCustomPlant ? '🔧' : '🌱'}{' '}
-                                                        {zone.plantData.name}
+                                                        พืช: {zone.isCustomPlant ? '🔧' : '🌱'} {zone.plantData.name}
                                                         <br />
                                                         ขนาด: {formatArea(zone.area)}
                                                         <br />
-                                                        ประมาณ: {zone.plantCount.toLocaleString()}{' '}
-                                                        ต้น
+                                                        ประมาณ: {zone.plantCount.toLocaleString()} ต้น
                                                         <br />
-                                                        น้ำ:{' '}
-                                                        {formatWaterVolume(zone.totalWaterNeed)}
+                                                        น้ำ: {formatWaterVolume(zone.totalWaterNeed)}
                                                         <br />
                                                         <div className="text-xs text-green-600">
-                                                            🎯 ท่อย่อยครอบคลุมปลาย
-                                                            <br />✅ ใช้พื้นที่เต็มศักยภาพ
+                                                            {history.present.isEditModeEnabled && (
+                                                                <>
+                                                                    <br />
+                                                                    🎛️ คลิกเพื่อเพิ่มต้นไม้
+                                                                </>
+                                                            )}
                                                         </div>
-                                                        <div className="mt-2">
-                                                            <button
-                                                                onClick={() =>
-                                                                    handleZonePlantSelection(zone)
-                                                                }
-                                                                className="rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700"
-                                                            >
-                                                                เปลี่ยนพืช
-                                                            </button>
-                                                        </div>
+                                                        {!history.present.isEditModeEnabled && (
+                                                            <div className="mt-2">
+                                                                <button
+                                                                    onClick={() => handleZonePlantSelection(zone)}
+                                                                    className="rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700"
+                                                                >
+                                                                    เปลี่ยนพืช
+                                                                </button>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </Popup>
                                             </Polygon>
@@ -2854,14 +3901,11 @@ export default function EnhancedHorticulturePlannerPage() {
                                     {/* Pump */}
                                     {history.present.pump && (
                                         <Marker
-                                            position={[
-                                                history.present.pump.position.lat,
-                                                history.present.pump.position.lng,
-                                            ]}
+                                            position={[history.present.pump.position.lat, history.present.pump.position.lng]}
                                             icon={L.divIcon({
                                                 html: `<div style="
-                                            width: 36px;
-                                            height: 36px;
+                                            width: 24px;
+                                            height: 24px;
                                             background: linear-gradient(135deg, #3B82F6, #1E40AF);
                                             border: 3px solid #ffffff;
                                             border-radius: 50%;
@@ -2874,8 +3918,8 @@ export default function EnhancedHorticulturePlannerPage() {
                                             font-size: 14px;
                                         ">🚰</div>`,
                                                 className: '',
-                                                iconSize: [36, 36],
-                                                iconAnchor: [18, 18],
+                                                iconSize: [24, 24],
+                                                iconAnchor: [12, 12],
                                             })}
                                         >
                                             <Popup>
@@ -2887,6 +3931,11 @@ export default function EnhancedHorticulturePlannerPage() {
                                                     กำลัง: {history.present.pump.capacity} L/min
                                                     <br />
                                                     แรงดัน: {history.present.pump.head} ม.
+                                                    {history.present.isEditModeEnabled && (
+                                                        <div className="mt-2 text-xs text-yellow-600">
+                                                            💡 ในโหมดแก้ไข: สร้างปั๊มใหม่เพื่อเปลี่ยนตำแหน่ง
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </Popup>
                                         </Marker>
@@ -2896,17 +3945,15 @@ export default function EnhancedHorticulturePlannerPage() {
                                     {history.present.mainPipes.map((pipe) => (
                                         <Polyline
                                             key={pipe.id}
-                                            positions={pipe.coordinates.map((coord) => [
-                                                coord.lat,
-                                                coord.lng,
-                                            ])}
+                                            positions={pipe.coordinates.map((coord) => [coord.lat, coord.lng])}
                                             pathOptions={{
                                                 color: '#3B82F6',
                                                 weight: 6,
                                                 opacity: 0.9,
                                             }}
                                             eventHandlers={{
-                                                dblclick: () => handlePipeEdit(pipe, 'main'),
+                                                dblclick: () =>
+                                                    history.present.isEditModeEnabled && handlePipeEdit(pipe, 'main'),
                                             }}
                                         >
                                             <Popup>
@@ -2917,20 +3964,20 @@ export default function EnhancedHorticulturePlannerPage() {
                                                     <br />
                                                     เส้นผ่านศูนย์กลาง: {pipe.diameter} มม.
                                                     <br />
-                                                    <div className="text-xs text-blue-600">
-                                                        🎯 AUTO: เลือกจุดหมายอัตโนมัติ
-                                                    </div>
-                                                    <div className="mt-2">
-                                                        <button
-                                                            onClick={() =>
-                                                                handlePipeEdit(pipe, 'main')
-                                                            }
-                                                            className="rounded bg-orange-600 px-2 py-1 text-xs text-white hover:bg-orange-700"
-                                                        >
-                                                            <FaEdit className="mr-1 inline" />
-                                                            แก้ไข
-                                                        </button>
-                                                    </div>
+                                                    ไปยังโซน: {pipe.toZone}
+                                                    <br />
+                                                    <div className="text-xs text-blue-600">🎯 AUTO-DETECT โซนปลายทาง</div>
+                                                    {history.present.isEditModeEnabled && (
+                                                        <div className="mt-2">
+                                                            <button
+                                                                onClick={() => handlePipeEdit(pipe, 'main')}
+                                                                className="rounded bg-orange-600 px-2 py-1 text-xs text-white hover:bg-orange-700"
+                                                            >
+                                                                <FaEdit className="mr-1 inline" />
+                                                                แก้ไข
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </Popup>
                                         </Polyline>
@@ -2940,17 +3987,25 @@ export default function EnhancedHorticulturePlannerPage() {
                                     {history.present.subMainPipes.map((pipe) => (
                                         <React.Fragment key={pipe.id}>
                                             <Polyline
-                                                positions={pipe.coordinates.map((coord) => [
-                                                    coord.lat,
-                                                    coord.lng,
-                                                ])}
+                                                positions={pipe.coordinates.map((coord) => [coord.lat, coord.lng])}
                                                 pathOptions={{
-                                                    color: '#8B5CF6',
-                                                    weight: 5,
-                                                    opacity: 0.9,
+                                                    color: highlightedPipes.includes(pipe.id) ? '#FFD700' : '#8B5CF6',
+                                                    weight: highlightedPipes.includes(pipe.id) ? 7 : 5,
+                                                    opacity: highlightedPipes.includes(pipe.id) ? 1 : 0.9,
                                                 }}
                                                 eventHandlers={{
-                                                    dblclick: () => handlePipeEdit(pipe, 'subMain'),
+                                                    dblclick: () =>
+                                                        history.present.isEditModeEnabled && handlePipeEdit(pipe, 'subMain'),
+                                                    click: (e) => {
+                                                        if (isCreatingConnection && highlightedPipes.includes(pipe.id)) {
+                                                            e.originalEvent?.stopPropagation();
+                                                            handleConnectToPipe(
+                                                                { lat: e.latlng.lat, lng: e.latlng.lng },
+                                                                pipe.id,
+                                                                'subMain'
+                                                            );
+                                                        }
+                                                    },
                                                 }}
                                             >
                                                 <Popup>
@@ -2959,81 +4014,113 @@ export default function EnhancedHorticulturePlannerPage() {
                                                         <br />
                                                         ความยาว: {pipe.length.toFixed(2)} ม.
                                                         <br />
+                                                        โซน: {pipe.zoneId}
+                                                        <br />
                                                         ท่อย่อย: {pipe.branchPipes.length} เส้น
                                                         <br />
-                                                        ต้นไม้:{' '}
-                                                        {pipe.branchPipes.reduce(
-                                                            (sum, branch) =>
-                                                                sum + branch.plants.length,
-                                                            0
-                                                        )}{' '}
-                                                        ต้น
+                                                        ต้นไม้: {pipe.branchPipes.reduce((sum, branch) => sum + branch.plants.length, 0)} ต้น
                                                         <br />
                                                         <div className="text-xs text-green-600">
-                                                            🎯 ครอบคลุมจนปลาย submain
-                                                            <br />✅ ใช้พื้นที่สูงสุด &gt;95%
+                                                            ✅ ปรับปรุง: ท่อย่อยยาวถึงต้นสุดท้าย
+                                                            <br />
+                                                            🎯 ปรับมุมและตำแหน่งได้
+                                                            <br />
+                                                            🌱 ต้นไม้ = plantSpacing
                                                         </div>
-                                                        <div className="mt-2">
-                                                            <button
-                                                                onClick={() =>
-                                                                    handlePipeEdit(pipe, 'subMain')
-                                                                }
-                                                                className="rounded bg-orange-600 px-2 py-1 text-xs text-white hover:bg-orange-700"
-                                                            >
-                                                                <FaEdit className="mr-1 inline" />
-                                                                แก้ไข
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </Popup>
-                                            </Polyline>
-
-                                            {/* Branch Pipes */}
-                                            {pipe.branchPipes.map((branchPipe) => (
-                                                <Polyline
-                                                    key={branchPipe.id}
-                                                    positions={branchPipe.coordinates.map(
-                                                        (coord) => [coord.lat, coord.lng]
-                                                    )}
-                                                    pathOptions={{
-                                                        color: '#10B981',
-                                                        weight: 2,
-                                                        opacity: 0.8,
-                                                    }}
-                                                    eventHandlers={{
-                                                        dblclick: () =>
-                                                            handlePipeEdit(branchPipe, 'branch'),
-                                                    }}
-                                                >
-                                                    <Popup>
-                                                        <div className="text-center">
-                                                            <strong>ท่อย่อย</strong>
-                                                            <br />
-                                                            ความยาว: {branchPipe.length.toFixed(
-                                                                2
-                                                            )}{' '}
-                                                            ม.
-                                                            <br />
-                                                            ต้นไม้: {branchPipe.plants.length} ต้น
-                                                            <br />
-                                                            <div className="text-xs text-green-600">
-                                                                🎯 ครอบคลุมปลาย submain
-                                                                <br />✅ การใช้พื้นที่เต็มที่
-                                                            </div>
+                                                        {history.present.isEditModeEnabled && (
                                                             <div className="mt-2">
                                                                 <button
-                                                                    onClick={() =>
-                                                                        handlePipeEdit(
-                                                                            branchPipe,
-                                                                            'branch'
-                                                                        )
-                                                                    }
+                                                                    onClick={() => handlePipeEdit(pipe, 'subMain')}
                                                                     className="rounded bg-orange-600 px-2 py-1 text-xs text-white hover:bg-orange-700"
                                                                 >
                                                                     <FaEdit className="mr-1 inline" />
                                                                     แก้ไข
                                                                 </button>
                                                             </div>
+                                                        )}
+                                                        {isCreatingConnection && highlightedPipes.includes(pipe.id) && (
+                                                            <div className="mt-2 text-xs text-yellow-300">
+                                                                🔗 คลิกเพื่อเชื่อมต่อ
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </Popup>
+                                            </Polyline>
+
+                                            {pipe.branchPipes.map((branchPipe) => (
+                                                <Polyline
+                                                    key={branchPipe.id}
+                                                    positions={branchPipe.coordinates.map((coord) => [coord.lat, coord.lng])}
+                                                    pathOptions={{
+                                                        color: highlightedPipes.includes(branchPipe.id) ? '#FFD700' : '#FFFF66',
+                                                        weight: highlightedPipes.includes(branchPipe.id) ? 4 : 2,
+                                                        opacity: highlightedPipes.includes(branchPipe.id) ? 1 : 0.8,
+                                                    }}
+                                                    eventHandlers={{
+                                                        dblclick: () =>
+                                                            history.present.isEditModeEnabled && handlePipeEdit(branchPipe, 'branch'),
+                                                        click: (e) => {
+                                                            if (isCreatingConnection && highlightedPipes.includes(branchPipe.id)) {
+                                                                e.originalEvent?.stopPropagation();
+                                                                handleConnectToPipe(
+                                                                    { lat: e.latlng.lat, lng: e.latlng.lng },
+                                                                    branchPipe.id,
+                                                                    'branch'
+                                                                );
+                                                            }
+                                                        },
+                                                    }}
+                                                >
+                                                    <Popup>
+                                                        <div className="text-center">
+                                                            <strong>ท่อย่อย</strong>
+                                                            <br />
+                                                            ความยาว: {branchPipe.length.toFixed(2)} ม.
+                                                            <br />
+                                                            ต้นไม้: {branchPipe.plants.length} ต้น
+                                                            <br />
+                                                            {branchPipe.angle && (
+                                                                <>
+                                                                    มุม: {branchPipe.angle}°
+                                                                    <br />
+                                                                </>
+                                                            )}
+                                                            {branchPipe.connectionPoint && (
+                                                                <>
+                                                                    จุดต่อ: {(branchPipe.connectionPoint * 100).toFixed(1)}%
+                                                                    <br />
+                                                                </>
+                                                            )}
+                                                            <div className="text-xs text-green-600">
+                                                                ✅ ปรับปรุง: ยาวถึงต้นสุดท้าย
+                                                                <br />
+                                                                🎯 ปรับมุม 0-180° ได้
+                                                                <br />
+                                                                🔧 ลากจุดต่อได้ตามต้องการ
+                                                            </div>
+                                                            {history.present.isEditModeEnabled && (
+                                                                <div className="mt-2">
+                                                                    <button
+                                                                        onClick={() => handlePipeEdit(branchPipe, 'branch')}
+                                                                        className="mr-2 rounded bg-orange-600 px-2 py-1 text-xs text-white hover:bg-orange-700"
+                                                                    >
+                                                                        <FaEdit className="mr-1 inline" />
+                                                                        แก้ไข
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleDeleteBranchPipe(branchPipe.id, pipe.id)}
+                                                                        className="rounded bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700"
+                                                                    >
+                                                                        <FaUnlink className="mr-1 inline" />
+                                                                        ลบท่อย่อย
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                            {isCreatingConnection && highlightedPipes.includes(branchPipe.id) && (
+                                                                <div className="mt-2 text-xs text-yellow-300">
+                                                                    🔗 คลิกเพื่อเชื่อมต่อ
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </Popup>
                                                 </Polyline>
@@ -3050,13 +4137,20 @@ export default function EnhancedHorticulturePlannerPage() {
                                                 html: `<div style="
                                             width: 24px;
                                             height: 24px;
+                                            cursor: ${history.present.isEditModeEnabled ? 'pointer' : 'default'};
+                                            ${plant.id === connectionStartPlant?.id ? 'border: 3px solid #FFD700; border-radius: 50%;' : ''}
                                         "><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAABlklEQVR4nI1TW0sCQRTel/plqSlGEUTPQRqRRBSE9tJDd7tApVI+VERRWcvMbNkFDArsSsLOZV8q+yXFiZ20dtdZaeB7OXO+M+d88x1N8xwhCq0WJZ2C4Zyg+FSC4ayMiUKr1uxwTqKC4apgBJSg5N1iKKIkM4aHOSVfvuQaajmJhpe5gvxQ2YPHyr6yiEWN8O/MgpJ3Z8L+zTTMFPth4CgokS8l4ex+1VMIf0hNLGZ0OS9MU4fBQjvEDtsaoJcX3Z2YqEOTatcClOowjnqU5DpQefmvACMZjVNSrAeun/Ku5GQuAFPLIUjlgjC88xPD5RXHr+BTTVBy5uwghXohftAG4xsBWJpph42JMCR2A5I8pnd7BTXsEbJeDexOZosxmEuHYG0yDGtXIzB/HofSc96tgT2CJV2n/G9A26NwnO7z9wQnUe3lZbOFU/ymSrjcSsLJgl8BXP21tsVQRGWku4sM3CL319XwybkRdC8RI4l/W5niIeU+2Pb0G+dHNPzKTRRqupFSExN12ArX15lTvG7H7Dsv4Rsa94hVuqmogAAAAABJRU5ErkJggg==" alt="tree"></div>`,
                                                 className: '',
                                                 iconSize: [24, 24],
                                                 iconAnchor: [12, 12],
                                             })}
                                             eventHandlers={{
-                                                dblclick: () => handlePlantEdit(plant),
+                                                dblclick: () => history.present.isEditModeEnabled && handlePlantEdit(plant),
+                                                click: () => {
+                                                    if (history.present.isEditModeEnabled && !isCreatingConnection) {
+                                                        handleCreatePlantConnection(plant.id);
+                                                    }
+                                                },
                                             }}
                                         >
                                             <Popup>
@@ -3065,55 +4159,87 @@ export default function EnhancedHorticulturePlannerPage() {
                                                     <br />
                                                     น้ำ: {plant.plantData.waterNeed} ล./ครั้ง
                                                     <br />
-                                                    ระยะปลูก: {plant.plantData.plantSpacing}×
-                                                    {plant.plantData.rowSpacing} ม.
+                                                    ระยะปลูก: {plant.plantData.plantSpacing}×{plant.plantData.rowSpacing} ม.
                                                     <br />
-                                                    <div className="text-xs text-green-600">
-                                                        🎯 กระจายตลอดความยาวท่อ
-                                                        <br />
-                                                        ✅ ระยะห่างจากขอบเหมาะสม
-                                                        <br />✅ ครอบคลุมจนปลาย submain
-                                                    </div>
-                                                    <div className="mt-2">
-                                                        <button
-                                                            onClick={() => handlePlantEdit(plant)}
-                                                            className="rounded bg-orange-600 px-2 py-1 text-xs text-white hover:bg-orange-700"
-                                                        >
-                                                            <FaEdit className="mr-1 inline" />
-                                                            แก้ไข
-                                                        </button>
-                                                    </div>
+                                                    {plant.zoneId && (
+                                                        <>
+                                                            โซน: {plant.zoneId}
+                                                            <br />
+                                                        </>
+                                                    )}
+                                                    {history.present.isEditModeEnabled && (
+                                                        <div className="mt-2">
+                                                            <button
+                                                                onClick={() => handlePlantEdit(plant)}
+                                                                className="mr-2 rounded bg-orange-600 px-2 py-1 text-xs text-white hover:bg-orange-700"
+                                                            >
+                                                                <FaEdit className="mr-1 inline" />
+                                                                แก้ไข
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleCreatePlantConnection(plant.id)}
+                                                                className="rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700"
+                                                            >
+                                                                <FaLink className="mr-1 inline" />
+                                                                เชื่อมต่อ
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </Popup>
                                         </Marker>
                                     ))}
 
-                                    {/* Drawing Controls */}
-                                    <FeatureGroup ref={featureGroupRef}>
-                                        <EditControl
-                                            position="topright"
-                                            onCreated={onCreated}
-                                            draw={{
-                                                rectangle:
-                                                    editMode === 'zone' ||
-                                                    editMode === 'exclusion' ||
-                                                    !editMode,
-                                                circle:
-                                                    editMode === 'zone' ||
-                                                    editMode === 'exclusion' ||
-                                                    !editMode,
-                                                polygon:
-                                                    editMode === 'zone' ||
-                                                    editMode === 'exclusion' ||
-                                                    !editMode,
-                                                polyline:
-                                                    editMode === 'mainPipe' ||
-                                                    editMode === 'subMainPipe',
-                                                marker: false,
-                                                circlemarker: false,
+                                    {/* Temporary connection line */}
+                                    {tempConnectionLine && (
+                                        <Polyline
+                                            positions={tempConnectionLine.map(coord => [coord.lat, coord.lng])}
+                                            pathOptions={{
+                                                color: '#FFD700',
+                                                weight: 3,
+                                                opacity: 0.7,
+                                                dashArray: '10, 10'
                                             }}
                                         />
-                                    </FeatureGroup>
+                                    )}
+
+                                    {!history.present.isEditModeEnabled && (
+                                        <FeatureGroup ref={featureGroupRef}>
+                                            <EditControl
+                                                position="topright"
+                                                onCreated={onCreated}
+                                                draw={{
+                                                    rectangle: editMode === 'zone' || editMode === 'exclusion' || !editMode,
+                                                    circle: editMode === 'zone' || editMode === 'exclusion' || !editMode,
+                                                    polygon: editMode === 'zone' || editMode === 'exclusion' || !editMode,
+                                                    polyline: editMode === 'mainPipe' || editMode === 'subMainPipe',
+                                                    marker: false,
+                                                    circlemarker: false,
+                                                }}
+                                            />
+                                        </FeatureGroup>
+                                    )}
+
+                                    {history.present.isEditModeEnabled && (
+                                        <div className="absolute right-4 top-4 z-[1000] rounded-lg bg-black bg-opacity-70 p-4 text-white">
+                                            <h4 className="mb-2 font-semibold text-yellow-300">🎛️ โหมดแก้ไขขั้นสูง</h4>
+                                            <div className="space-y-1 text-sm">
+                                                <div>• คลิกแผนที่ = เพิ่มต้นไม้</div>
+                                                <div>• ดับเบิลคลิก = แก้ไข/ลบ</div>
+                                                <div>• คลิกต้นไม้ = สร้างการเชื่อมต่อ</div>
+                                                <div>• ลบท่อย่อยได้ในโปอปอัพ</div>
+                                                <div>• ลากเชื่อมต่อท่อได้ทุกจุด</div>
+                                                <div>• หมุนท่อ = แม่นยำทีละ 1°</div>
+                                                <div>• ปรับมุมท่อย่อย = 0-180°</div>
+                                            </div>
+                                            {isCreatingConnection && (
+                                                <div className="mt-3 rounded bg-yellow-900/50 p-2 text-xs">
+                                                    <div className="text-yellow-300 font-semibold">🔗 กำลังเชื่อมต่อ</div>
+                                                    <div>คลิกท่อที่ต้องการเชื่อมต่อ</div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </MapContainer>
                             </div>
                         </div>
@@ -3146,19 +4272,22 @@ export default function EnhancedHorticulturePlannerPage() {
                     }}
                 />
 
-                <PlantEditModal
+                <EnhancedPlantEditModal
                     isOpen={showPlantEditModal}
                     onClose={() => {
                         setShowPlantEditModal(false);
                         setSelectedPlantForEdit(null);
+                        setIsNewPlantMode(false);
                     }}
                     plant={selectedPlantForEdit}
                     onSave={handlePlantSave}
                     onDelete={handlePlantDelete}
                     availablePlants={history.present.availablePlants}
+                    isNewPlant={isNewPlantMode}
+                    onCreateConnection={handleCreatePlantConnection}
                 />
 
-                <PipeEditModal
+                <EnhancedPipeEditModal
                     isOpen={showPipeEditModal}
                     onClose={() => {
                         setShowPipeEditModal(false);
@@ -3168,7 +4297,10 @@ export default function EnhancedHorticulturePlannerPage() {
                     onSave={handlePipeSave}
                     onDelete={handlePipeDelete}
                     type={selectedPipeType}
+                    branchSettings={history.present.branchPipeSettings}
+                    onDeleteBranchPipe={handleDeleteBranchPipe}
                 />
+            </div>
             </div>
             {/* Footer */}
             <Footer />
