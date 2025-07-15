@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import {
     MapContainer,
@@ -13,766 +13,44 @@ import {
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import Footer from '../components/Footer';
-
-interface Coordinate {
-    lat: number;
-    lng: number;
-}
-
-interface PlantData {
-    id: number;
-    name: string;
-    plantSpacing: number;
-    rowSpacing: number;
-    waterNeed: number;
-    category?: string;
-    description?: string;
-}
-
-interface Zone {
-    id: string;
-    name: string;
-    coordinates: Coordinate[];
-    plantData: PlantData;
-    plantCount: number;
-    totalWaterNeed: number;
-    area: number;
-    color: string;
-    isCustomPlant?: boolean;
-}
-
-interface Pump {
-    id: string;
-    position: Coordinate;
-    type: 'submersible' | 'centrifugal' | 'jet';
-    capacity: number;
-    head: number;
-    power?: number;
-    efficiency?: number;
-}
-
-interface MainPipe {
-    id: string;
-    fromPump: string;
-    toZone: string;
-    coordinates: Coordinate[];
-    length: number;
-    diameter: number;
-    material?: string;
-    pressure?: number;
-    flowRate?: number;
-}
-
-interface SubMainPipe {
-    id: string;
-    zoneId: string;
-    coordinates: Coordinate[];
-    length: number;
-    diameter: number;
-    branchPipes: BranchPipe[];
-    material?: string;
-    isEditable?: boolean;
-}
-
-interface BranchPipe {
-    id: string;
-    subMainPipeId: string;
-    coordinates: Coordinate[];
-    length: number;
-    diameter: number;
-    plants: PlantLocation[];
-    sprinklerType?: string;
-    isEditable?: boolean;
-}
-
-interface PlantLocation {
-    id: string;
-    position: Coordinate;
-    plantData: PlantData;
-    isSelected?: boolean;
-    isEditable?: boolean;
-    elevation?: number;
-    soilType?: string;
-    health?: 'good' | 'fair' | 'poor';
-}
-
-interface ExclusionArea {
-    id: string;
-    type: 'building' | 'powerplant' | 'river' | 'road' | 'other';
-    coordinates: Coordinate[];
-    name: string;
-    color: string;
-    description?: string;
-    isLocked?: boolean;
-}
-
-interface HorticultureProjectData {
-    projectName: string;
-    version?: string;
-    totalArea: number;
-    mainArea: Coordinate[];
-    pump: Pump | null;
-    zones: Zone[];
-    mainPipes: MainPipe[];
-    subMainPipes: SubMainPipe[];
-    exclusionAreas: ExclusionArea[];
-    plants: PlantLocation[];
-    useZones: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-interface ComprehensiveZoneStats {
-    zoneId: string;
-    zoneName: string;
-    plantType: string;
-    plantSpacing: number;
-    rowSpacing: number;
-    actualPlantCount: number;
-    waterNeedPerPlant: number;
-    actualTotalWaterPerSession: number;
-    zoneArea: number;
-
-    longestBranchPipe: number;
-    shortestBranchPipe: number;
-    averageBranchPipeLength: number;
-    totalBranchPipeLength: number;
-    branchPipeCount: number;
-    branchPipeDetails: Array<{
-        id: string;
-        length: number;
-        plantCount: number;
-    }>;
-
-    longestSubMainPipe: number;
-    shortestSubMainPipe: number;
-    averageSubMainPipeLength: number;
-    totalSubMainPipeLength: number;
-    subMainPipeCount: number;
-    subMainPipeDetails: Array<{
-        id: string;
-        length: number;
-        branchCount: number;
-    }>;
-
-    plantDensityPerSquareMeter: number;
-    waterEfficiencyPerSquareMeter: number;
-    coveragePercentage: number;
-}
-
-interface ComprehensiveMainPipeStats {
-    totalMainPipes: number;
-    longestMainPipe: number;
-    shortestMainPipe: number;
-    averageMainPipeLength: number;
-    totalMainPipeLength: number;
-
-    farthestDestination: {
-        zoneName: string;
-        distance: number;
-        pipeId: string;
-    };
-    closestDestination: {
-        zoneName: string;
-        distance: number;
-        pipeId: string;
-    };
-
-    allMainPipeDetails: Array<{
-        pipeId: string;
-        fromPump: string;
-        toZone: string;
-        destinationName: string;
-        length: number;
-        diameter: number;
-        material: string;
-        flowRate: number;
-        pressure: number;
-    }>;
-
-    totalFlowCapacity: number;
-    averagePressure: number;
-    mainPipeEfficiency: number;
-}
-
-interface ComprehensiveProjectStats {
-    projectName: string;
-    totalArea: number;
-    actualTotalPlants: number;
-    actualTotalWaterPerSession: number;
-    numberOfZones: number;
-
-    zoneStats: ComprehensiveZoneStats[];
-
-    mainPipeStats: ComprehensiveMainPipeStats;
-
-    totalPipeLength: number;
-    totalMainPipeLength: number;
-    totalSubMainPipeLength: number;
-    totalBranchPipeLength: number;
-
-    totalMainPipes: number;
-    totalSubMainPipes: number;
-    totalBranchPipes: number;
-    totalPipeSections: number;
-
-    systemEfficiency: number;
-    waterDistributionBalance: number;
-    pipeOptimization: number;
-
-    plantVarieties: Record<
-        string,
-        {
-            totalCount: number;
-            zones: Array<{
-                zoneName: string;
-                count: number;
-            }>;
-        }
-    >;
-}
-
-const formatArea = (area: number): string => {
-    if (typeof area !== 'number' || isNaN(area) || area < 0) return '0 ตร.ม.';
-
-    if (area >= 1600) {
-        return `${(area / 1600).toFixed(2)} ไร่`;
-    } else {
-        return `${area.toFixed(2)} ตร.ม.`;
-    }
-};
-
-const formatWaterVolume = (volume: number): string => {
-    if (typeof volume !== 'number' || isNaN(volume) || volume < 0) return '0 ลิตร';
-
-    if (volume >= 1000000) {
-        return `${(volume / 1000000).toFixed(2)} ล้านลิตร`;
-    } else if (volume >= 1000) {
-        return `${volume.toLocaleString('th-TH')} ลิตร`;
-    } else {
-        return `${volume.toFixed(2)} ลิตร`;
-    }
-};
-
-const formatDistance = (distance: number): string => {
-    if (typeof distance !== 'number' || isNaN(distance) || distance < 0) return '0 ม.';
-
-    if (distance >= 1000) {
-        return `${(distance / 1000).toFixed(2)} กม.`;
-    }
-    return `${distance.toFixed(2)} ม.`;
-};
-
-const isPointInPolygon = (point: Coordinate, polygon: Coordinate[]): boolean => {
-    if (!point || !polygon || polygon.length < 3) return false;
-
-    try {
-        let inside = false;
-        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-            const xi = polygon[i].lat;
-            const yi = polygon[i].lng;
-            const xj = polygon[j].lat;
-            const yj = polygon[j].lng;
-
-            const intersect =
-                yi > point.lng !== yj > point.lng &&
-                point.lat < ((xj - xi) * (point.lng - yi)) / (yj - yi) + xi;
-            if (intersect) inside = !inside;
-        }
-        return inside;
-    } catch (error) {
-        console.error('Error checking point in polygon:', error);
-        return false;
-    }
-};
-
-const calculateComprehensiveProjectStats = (
-    projectData: HorticultureProjectData
-): ComprehensiveProjectStats => {
-    console.log('📊 Calculating comprehensive project statistics...');
-
-    const actualTotalPlants = projectData.plants?.length || 0;
-    const actualTotalWaterPerSession =
-        projectData.plants?.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0) || 0;
-
-    const zoneStats: ComprehensiveZoneStats[] =
-        projectData.useZones && projectData.zones
-            ? projectData.zones.map((zone) => {
-                  console.log(`🏞️ Processing zone: ${zone.name}`);
-
-                  const plantsInZone =
-                      projectData.plants?.filter((plant) =>
-                          isPointInPolygon(plant.position, zone.coordinates)
-                      ) || [];
-
-                  const actualPlantCount = plantsInZone.length;
-                  const actualWaterNeed = plantsInZone.reduce(
-                      (sum, plant) => sum + plant.plantData.waterNeed,
-                      0
-                  );
-
-                  const zoneSubMainPipes =
-                      projectData.subMainPipes?.filter((pipe) => pipe.zoneId === zone.id) || [];
-
-                  const subMainLengths = zoneSubMainPipes.map((pipe) => pipe.length);
-                  const longestSubMainPipe =
-                      subMainLengths.length > 0 ? Math.max(...subMainLengths) : 0;
-                  const shortestSubMainPipe =
-                      subMainLengths.length > 0 ? Math.min(...subMainLengths) : 0;
-                  const averageSubMainPipeLength =
-                      subMainLengths.length > 0
-                          ? subMainLengths.reduce((sum, length) => sum + length, 0) /
-                            subMainLengths.length
-                          : 0;
-                  const totalSubMainPipeLength = subMainLengths.reduce(
-                      (sum, length) => sum + length,
-                      0
-                  );
-
-                  const subMainPipeDetails = zoneSubMainPipes.map((pipe) => ({
-                      id: pipe.id,
-                      length: pipe.length,
-                      branchCount: pipe.branchPipes?.length || 0,
-                  }));
-
-                  const zoneBranchPipes = zoneSubMainPipes.flatMap(
-                      (pipe) => pipe.branchPipes || []
-                  );
-
-                  const branchLengths = zoneBranchPipes.map((pipe) => pipe.length);
-                  const longestBranchPipe =
-                      branchLengths.length > 0 ? Math.max(...branchLengths) : 0;
-                  const shortestBranchPipe =
-                      branchLengths.length > 0 ? Math.min(...branchLengths) : 0;
-                  const averageBranchPipeLength =
-                      branchLengths.length > 0
-                          ? branchLengths.reduce((sum, length) => sum + length, 0) /
-                            branchLengths.length
-                          : 0;
-                  const totalBranchPipeLength = branchLengths.reduce(
-                      (sum, length) => sum + length,
-                      0
-                  );
-
-                  const branchPipeDetails = zoneBranchPipes.map((pipe) => ({
-                      id: pipe.id,
-                      length: pipe.length,
-                      plantCount: pipe.plants?.length || 0,
-                  }));
-
-                  const plantDensityPerSquareMeter =
-                      zone.area > 0 ? actualPlantCount / zone.area : 0;
-                  const waterEfficiencyPerSquareMeter =
-                      zone.area > 0 ? actualWaterNeed / zone.area : 0;
-                  const coveragePercentage = 100;
-
-                  const zoneStatsItem: ComprehensiveZoneStats = {
-                      zoneId: zone.id,
-                      zoneName: zone.name,
-                      plantType: zone.plantData.name,
-                      plantSpacing: zone.plantData.plantSpacing,
-                      rowSpacing: zone.plantData.rowSpacing,
-                      actualPlantCount,
-                      waterNeedPerPlant: zone.plantData.waterNeed,
-                      actualTotalWaterPerSession: actualWaterNeed,
-                      zoneArea: zone.area,
-
-                      longestBranchPipe,
-                      shortestBranchPipe,
-                      averageBranchPipeLength,
-                      totalBranchPipeLength,
-                      branchPipeCount: zoneBranchPipes.length,
-                      branchPipeDetails,
-
-                      longestSubMainPipe,
-                      shortestSubMainPipe,
-                      averageSubMainPipeLength,
-                      totalSubMainPipeLength,
-                      subMainPipeCount: zoneSubMainPipes.length,
-                      subMainPipeDetails,
-
-                      plantDensityPerSquareMeter,
-                      waterEfficiencyPerSquareMeter,
-                      coveragePercentage,
-                  };
-
-                  console.log(`✅ Zone ${zone.name} stats:`, {
-                      plants: actualPlantCount,
-                      water: actualWaterNeed,
-                      subMainPipes: zoneSubMainPipes.length,
-                      branchPipes: zoneBranchPipes.length,
-                  });
-
-                  return zoneStatsItem;
-              })
-            : [
-                  {
-                      zoneId: 'single-zone',
-                      zoneName: 'พื้นที่เดียว',
-                      plantType: projectData.plants?.[0]?.plantData.name || 'ไม่ระบุ',
-                      plantSpacing: projectData.plants?.[0]?.plantData.plantSpacing || 5,
-                      rowSpacing: projectData.plants?.[0]?.plantData.rowSpacing || 5,
-                      actualPlantCount: actualTotalPlants,
-                      waterNeedPerPlant: projectData.plants?.[0]?.plantData.waterNeed || 10,
-                      actualTotalWaterPerSession: actualTotalWaterPerSession,
-                      zoneArea: projectData.totalArea,
-
-                      longestBranchPipe:
-                          projectData.subMainPipes?.flatMap((pipe) => pipe.branchPipes || [])
-                              .length > 0
-                              ? Math.max(
-                                    ...projectData.subMainPipes
-                                        .flatMap((pipe) => pipe.branchPipes || [])
-                                        .map((b) => b.length)
-                                )
-                              : 0,
-                      shortestBranchPipe:
-                          projectData.subMainPipes?.flatMap((pipe) => pipe.branchPipes || [])
-                              .length > 0
-                              ? Math.min(
-                                    ...projectData.subMainPipes
-                                        .flatMap((pipe) => pipe.branchPipes || [])
-                                        .map((b) => b.length)
-                                )
-                              : 0,
-                      averageBranchPipeLength: (() => {
-                          const allBranches =
-                              projectData.subMainPipes?.flatMap((pipe) => pipe.branchPipes || []) ||
-                              [];
-                          return allBranches.length > 0
-                              ? allBranches.reduce((sum, branch) => sum + branch.length, 0) /
-                                    allBranches.length
-                              : 0;
-                      })(),
-                      totalBranchPipeLength:
-                          projectData.subMainPipes
-                              ?.flatMap((pipe) => pipe.branchPipes || [])
-                              .reduce((sum, branch) => sum + branch.length, 0) || 0,
-                      branchPipeCount:
-                          projectData.subMainPipes?.flatMap((pipe) => pipe.branchPipes || [])
-                              .length || 0,
-                      branchPipeDetails:
-                          projectData.subMainPipes
-                              ?.flatMap((pipe) => pipe.branchPipes || [])
-                              .map((branch) => ({
-                                  id: branch.id,
-                                  length: branch.length,
-                                  plantCount: branch.plants?.length || 0,
-                              })) || [],
-
-                      longestSubMainPipe:
-                          projectData.subMainPipes?.length > 0
-                              ? Math.max(...projectData.subMainPipes.map((pipe) => pipe.length))
-                              : 0,
-                      shortestSubMainPipe:
-                          projectData.subMainPipes?.length > 0
-                              ? Math.min(...projectData.subMainPipes.map((pipe) => pipe.length))
-                              : 0,
-                      averageSubMainPipeLength:
-                          projectData.subMainPipes?.length > 0
-                              ? projectData.subMainPipes.reduce(
-                                    (sum, pipe) => sum + pipe.length,
-                                    0
-                                ) / projectData.subMainPipes.length
-                              : 0,
-                      totalSubMainPipeLength:
-                          projectData.subMainPipes?.reduce((sum, pipe) => sum + pipe.length, 0) ||
-                          0,
-                      subMainPipeCount: projectData.subMainPipes?.length || 0,
-                      subMainPipeDetails:
-                          projectData.subMainPipes?.map((pipe) => ({
-                              id: pipe.id,
-                              length: pipe.length,
-                              branchCount: pipe.branchPipes?.length || 0,
-                          })) || [],
-
-                      plantDensityPerSquareMeter:
-                          projectData.totalArea > 0 ? actualTotalPlants / projectData.totalArea : 0,
-                      waterEfficiencyPerSquareMeter:
-                          projectData.totalArea > 0
-                              ? actualTotalWaterPerSession / projectData.totalArea
-                              : 0,
-                      coveragePercentage: 100,
-                  },
-              ];
-
-    const mainPipeStats: ComprehensiveMainPipeStats = (() => {
-        if (!projectData.mainPipes || projectData.mainPipes.length === 0) {
-            return {
-                totalMainPipes: 0,
-                longestMainPipe: 0,
-                shortestMainPipe: 0,
-                averageMainPipeLength: 0,
-                totalMainPipeLength: 0,
-                farthestDestination: { zoneName: '', distance: 0, pipeId: '' },
-                closestDestination: { zoneName: '', distance: 0, pipeId: '' },
-                allMainPipeDetails: [],
-                totalFlowCapacity: 0,
-                averagePressure: 0,
-                mainPipeEfficiency: 0,
-            };
-        }
-
-        const mainPipeLengths = projectData.mainPipes.map((pipe) => pipe.length);
-        const longestMainPipe = Math.max(...mainPipeLengths);
-        const shortestMainPipe = Math.min(...mainPipeLengths);
-        const averageMainPipeLength =
-            mainPipeLengths.reduce((sum, length) => sum + length, 0) / mainPipeLengths.length;
-        const totalMainPipeLength = mainPipeLengths.reduce((sum, length) => sum + length, 0);
-
-        const longestPipe = projectData.mainPipes.find((pipe) => pipe.length === longestMainPipe);
-        const shortestPipe = projectData.mainPipes.find((pipe) => pipe.length === shortestMainPipe);
-
-        const getZoneName = (zoneId: string) => {
-            if (projectData.useZones && projectData.zones) {
-                const zone = projectData.zones.find((z) => z.id === zoneId);
-                return zone ? zone.name : 'พื้นที่หลัก';
-            }
-            return 'พื้นที่หลัก';
-        };
-
-        const farthestDestination = {
-            zoneName: longestPipe ? getZoneName(longestPipe.toZone) : '',
-            distance: longestMainPipe,
-            pipeId: longestPipe?.id || '',
-        };
-
-        const closestDestination = {
-            zoneName: shortestPipe ? getZoneName(shortestPipe.toZone) : '',
-            distance: shortestMainPipe,
-            pipeId: shortestPipe?.id || '',
-        };
-
-        const allMainPipeDetails = projectData.mainPipes.map((pipe) => ({
-            pipeId: pipe.id,
-            fromPump: pipe.fromPump,
-            toZone: pipe.toZone,
-            destinationName: getZoneName(pipe.toZone),
-            length: pipe.length,
-            diameter: pipe.diameter,
-            material: pipe.material || 'PVC',
-            flowRate: pipe.flowRate || 0,
-            pressure: pipe.pressure || 0,
-        }));
-
-        const totalFlowCapacity = allMainPipeDetails.reduce((sum, pipe) => sum + pipe.flowRate, 0);
-        const averagePressure =
-            allMainPipeDetails.length > 0
-                ? allMainPipeDetails.reduce((sum, pipe) => sum + pipe.pressure, 0) /
-                  allMainPipeDetails.length
-                : 0;
-
-        const mainPipeEfficiency = Math.max(0, 100 - averageMainPipeLength / 100);
-
-        return {
-            totalMainPipes: projectData.mainPipes.length,
-            longestMainPipe,
-            shortestMainPipe,
-            averageMainPipeLength,
-            totalMainPipeLength,
-            farthestDestination,
-            closestDestination,
-            allMainPipeDetails,
-            totalFlowCapacity,
-            averagePressure,
-            mainPipeEfficiency,
-        };
-    })();
-
-    const totalSubMainPipeLength = zoneStats.reduce(
-        (sum, zone) => sum + zone.totalSubMainPipeLength,
-        0
-    );
-    const totalBranchPipeLength = zoneStats.reduce(
-        (sum, zone) => sum + zone.totalBranchPipeLength,
-        0
-    );
-    const totalPipeLength =
-        mainPipeStats.totalMainPipeLength + totalSubMainPipeLength + totalBranchPipeLength;
-
-    const totalSubMainPipes = zoneStats.reduce((sum, zone) => sum + zone.subMainPipeCount, 0);
-    const totalBranchPipes = zoneStats.reduce((sum, zone) => sum + zone.branchPipeCount, 0);
-    const totalPipeSections = mainPipeStats.totalMainPipes + totalSubMainPipes + totalBranchPipes;
-
-    const systemEfficiency = Math.min(
-        100,
-        (actualTotalPlants > 0 ? 80 : 0) +
-            (totalPipeLength > 0 ? 15 : 0) +
-            (projectData.pump ? 5 : 0)
-    );
-
-    const waterDistributionBalance =
-        zoneStats.length > 1
-            ? (() => {
-                  const zoneWaterNeeds = zoneStats.map((zone) => zone.actualTotalWaterPerSession);
-                  const avgWater =
-                      zoneWaterNeeds.reduce((sum, need) => sum + need, 0) / zoneWaterNeeds.length;
-                  const variance =
-                      zoneWaterNeeds.reduce((sum, need) => sum + Math.pow(need - avgWater, 2), 0) /
-                      zoneWaterNeeds.length;
-                  return Math.max(0, 100 - (Math.sqrt(variance) / avgWater) * 100);
-              })()
-            : 100;
-
-    const pipeOptimization = Math.max(0, 100 - (totalPipeLength / projectData.totalArea) * 100);
-
-    const plantVarieties: Record<
-        string,
-        { totalCount: number; zones: Array<{ zoneName: string; count: number }> }
-    > = {};
-
-    zoneStats.forEach((zone) => {
-        const plantName = zone.plantType;
-        if (!plantVarieties[plantName]) {
-            plantVarieties[plantName] = { totalCount: 0, zones: [] };
-        }
-        plantVarieties[plantName].totalCount += zone.actualPlantCount;
-        plantVarieties[plantName].zones.push({
-            zoneName: zone.zoneName,
-            count: zone.actualPlantCount,
-        });
-    });
-
-    const comprehensiveStats: ComprehensiveProjectStats = {
-        projectName: projectData.projectName,
-        totalArea: projectData.totalArea,
-        actualTotalPlants,
-        actualTotalWaterPerSession,
-        numberOfZones: projectData.useZones ? projectData.zones?.length || 0 : 1,
-
-        zoneStats,
-        mainPipeStats,
-
-        totalPipeLength,
-        totalMainPipeLength: mainPipeStats.totalMainPipeLength,
-        totalSubMainPipeLength,
-        totalBranchPipeLength,
-
-        totalMainPipes: mainPipeStats.totalMainPipes,
-        totalSubMainPipes,
-        totalBranchPipes,
-        totalPipeSections,
-
-        systemEfficiency,
-        waterDistributionBalance,
-        pipeOptimization,
-
-        plantVarieties,
-    };
-
-    console.log('✅ Comprehensive project statistics calculated:', comprehensiveStats);
-    return comprehensiveStats;
-};
-
-const exportMapAsImage = async (mapElement: HTMLElement): Promise<string | null> => {
-    if (!mapElement) {
-        console.error('Map element not found');
-        return null;
-    }
-
-    try {
-        console.log('🖼️ Starting enhanced map export...');
-
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-
-        const html2canvas = await import('html2canvas');
-        const html2canvasLib = html2canvas.default || html2canvas;
-
-        const canvas = await html2canvasLib(mapElement, {
-            useCORS: true,
-            allowTaint: false,
-            scale: 2,
-            logging: false,
-            backgroundColor: '#1F2937',
-            width: mapElement.offsetWidth,
-            height: mapElement.offsetHeight,
-            onclone: (clonedDoc) => {
-                try {
-                    const controls = clonedDoc.querySelectorAll('.leaflet-control-container');
-                    controls.forEach((el) => el.remove());
-
-                    const elements = clonedDoc.querySelectorAll('*');
-                    elements.forEach((el: Element) => {
-                        const htmlEl = el as HTMLElement;
-                        if (htmlEl.style.color?.includes('oklch')) {
-                            htmlEl.style.color = 'rgb(255, 255, 255)';
-                        }
-                        if (htmlEl.style.backgroundColor?.includes('oklch')) {
-                            htmlEl.style.backgroundColor = 'transparent';
-                        }
-                    });
-                } catch (error) {
-                    console.warn('Warning in onclone:', error);
-                }
-            },
-        });
-
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-        console.log('✅ Enhanced map image exported successfully');
-        return dataUrl;
-    } catch (error) {
-        console.error('❌ Error exporting map as image:', error);
-
-        try {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-
-            if (ctx) {
-                canvas.width = mapElement.offsetWidth || 800;
-                canvas.height = mapElement.offsetHeight || 600;
-
-                ctx.fillStyle = '#1F2937';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                ctx.fillStyle = '#FFFFFF';
-                ctx.font = '24px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText('แผนผังระบบน้ำสวนผลไม้', canvas.width / 2, canvas.height / 2 - 40);
-                ctx.fillText('(ไม่สามารถส่งออกแผนที่ได้)', canvas.width / 2, canvas.height / 2);
-                ctx.fillText('กรุณาใช้ screenshot แทน', canvas.width / 2, canvas.height / 2 + 40);
-
-                return canvas.toDataURL('image/jpeg', 0.8);
-            }
-        } catch (fallbackError) {
-            console.error('❌ Fallback export also failed:', fallbackError);
-        }
-
-        return null;
-    }
-};
-
-const downloadImage = (dataUrl: string, filename: string = 'horticulture-layout.jpg'): void => {
-    try {
-        const link = document.createElement('a');
-        link.download = filename;
-        link.href = dataUrl;
-
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        console.log('✅ Image downloaded successfully:', filename);
-    } catch (error) {
-        console.error('❌ Error downloading image:', error);
-        try {
-            window.open(dataUrl);
-        } catch (fallbackError) {
-            console.error('❌ Fallback also failed:', fallbackError);
-        }
-    }
-};
-
-const MapBounds = ({ positions }: { positions: Array<{ lat: number; lng: number }> }) => {
+import Navbar from '../components/Navbar';
+
+import {
+    HorticultureProjectData,
+    ProjectSummaryData,
+    calculateProjectSummary,
+    formatAreaInRai,
+    formatDistance,
+    formatWaterVolume,
+    loadProjectData,
+    navigateToPlanner,
+    isPointInPolygon,
+} from '../utils/horticultureUtils';
+
+import {
+    createAndDownloadMapImage,
+    createPDFReport,
+    downloadStatsAsJSON,
+    downloadStatsAsCSV,
+    getFormattedStats,
+} from '../utils/horticultureProjectStats';
+
+// Enhanced Map Bounds Component with better padding
+const EnhancedMapBounds = ({ positions }: { positions: Array<{ lat: number; lng: number }> }) => {
     const map = useMap();
 
     useEffect(() => {
         if (positions.length > 0) {
             try {
                 const bounds = L.latLngBounds(positions.map((p) => [p.lat, p.lng]));
+                
+                // Enhanced padding for better visualization
                 map.fitBounds(bounds, {
-                    padding: [10, 10],
-                    maxZoom: 28,
+                    padding: [50, 50], // Increased padding
+                    maxZoom: 20, // Limited max zoom for better overview
                 });
+                
+                console.log('✅ Map bounds fitted with enhanced padding');
             } catch (error) {
                 console.error('Error fitting bounds:', error);
             }
@@ -782,11 +60,51 @@ const MapBounds = ({ positions }: { positions: Array<{ lat: number; lng: number 
     return null;
 };
 
-const createPumpIcon = () =>
+// Map Rotation Component
+const MapRotationController = ({ 
+    rotation, 
+    isLocked 
+}: { 
+    rotation: number; 
+    isLocked: boolean; 
+}) => {
+    const map = useMap();
+
+    useEffect(() => {
+        const container = map.getContainer();
+        if (container) {
+            container.style.transform = `rotate(${rotation}deg)`;
+            container.style.transformOrigin = 'center center';
+            
+            // Disable zoom and interaction when locked
+            if (isLocked) {
+                map.dragging.disable();
+                map.touchZoom.disable();
+                map.doubleClickZoom.disable();
+                map.scrollWheelZoom.disable();
+                map.boxZoom.disable();
+                map.keyboard.disable();
+                map.zoomControl?.remove();
+            } else {
+                map.dragging.enable();
+                map.touchZoom.enable();
+                map.doubleClickZoom.enable();
+                map.scrollWheelZoom.enable();
+                map.boxZoom.enable();
+                map.keyboard.enable();
+            }
+        }
+    }, [rotation, isLocked, map]);
+
+    return null;
+};
+
+// Enhanced icon creators with size control
+const createEnhancedPumpIcon = (size: number = 20) =>
     L.divIcon({
         html: `<div style="
-        width: 20px;
-        height: 20px;
+        width: ${size}px;
+        height: ${size}px;
         background: linear-gradient(135deg, rgb(59, 130, 246), rgb(30, 64, 175));
         border: 2px solid rgb(255, 255, 255);
         border-radius: 50%;
@@ -796,146 +114,284 @@ const createPumpIcon = () =>
         justify-content: center;
         color: rgb(255, 255, 255);
         font-weight: bold;
-        font-size: 14px;
+        font-size: ${Math.max(8, size * 0.6)}px;
     ">P</div>`,
         className: '',
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
+        iconSize: [size + 12, size + 12],
+        iconAnchor: [(size + 12) / 2, (size + 12) / 2],
     });
 
-const createPlantIcon = () =>
+const createEnhancedPlantIcon = (size: number = 16) =>
     L.divIcon({
         html: `<div style="
-        width: 16px;
-        height: 16px;
-    "><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAABlklEQVR4nI1TW0sCQRTel/plqSlGEUTPQRqRRBSE9tJDd7tApVI+VERRWcvMbNkFDArsSsLOZV8q+yXFiZ20dtdZaeB7OXO+M+d88x1N8xwhCq0WJZ2C4Zyg+FSC4ayMiUKr1uxwTqKC4apgBJSg5N1iKKIkM4aHOSVfvuQaajmJhpe5gvxQ2YPHyr6yiEWN8O/MgpJ3Z8L+zTTMFPth4CgokS8l4ex+1VMIf0hNLGZ0OS9MU4fBQjvEDtsaoJcX3Z2YqEOTatcClOowjnqU5DpQefmvACMZjVNSrAeun/Ku5GQuAFPLIUjlgjC88xPD5RXHr+BTTVBy5uwghXohftAG4xsBWJpph42JMCR2A5I8pnd7BTXsEbJeDexOZosxmEuHYG0yDGtXIzB/HofSc96tgT2CJV2n/G9A26NwnO7z9wQnUe3lZbOFU/ymSrjcSsLJgl8BXP21tsVQRGWku4sM3CL319XwybkRdC8RI4l/W5niIeU+2Pb0G+dHNPzKTRRqupFSExN12ArX15lTvG7H7Dsv4Rsa94hVuqmogAAAAABJRU5ErkJggg==" alt="tree"></div>`,
+        width: ${size}px;
+        height: ${size}px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    "><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAABlklEQVR4nI1TW0sCQRTel/plqSlGEUTPQRqRRBSE9tJDd7tApVI+VERRWcvMbNkFDArsSsLOZV8q+yXFiZ20dtdZaeB7OXO+M+d88x1N8xwhCq0WJZ2C4Zyg+FSC4ayMiUKr1uxwTqKC4apgBJSg5N1iKKIkM4aHOSVfvuQaajmJhpe5gvxQ2YPHyr6yiEWN8O/MgpJ3Z8L+zTTMFPth4CgokS8l4ex+1VMIf0hNLGZ0OS9MU4fBQjvEDtsaoJcX3Z2YqEOTatcClOowjnqU5DpQefmvACMZjVNSrAeun/Ku5GQuAFPLIUjlgjC88xPD5RXHr+BTTVBy5uwghXohftAG4xsBWJpph42JMCR2A5I8pnd7BTXsEbJeDexOZosxmEuHYG0yDGtXIzB/HofSc96tgT2CJV2n/G9A26NwnO7z9wQnUe3lZbOFU/ymSrjcSsLJgl8BXP21tsVQRGWku4sM3CL319XwybkRdC8RI4l/W5niIeU+2Pb0G+dHNPzKTRRqupFSExN12ArX15lTvG7H7Dsv4Rsa94hVuqmogAAAAABJRU5ErkJggg==" alt="tree" style="width: 100%; height: 100%; object-fit: contain;"></div>`,
         className: '',
-        iconSize: [16, 16],
-        iconAnchor: [10, 10],
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
     });
 
-export default function ComprehensiveHorticultureResultsPage() {
+export default function EnhancedHorticultureResultsPage() {
+    const page = usePage();
+    const auth = (page.props as any).auth;
     const [projectData, setProjectData] = useState<HorticultureProjectData | null>(null);
-    const [projectStats, setProjectStats] = useState<ComprehensiveProjectStats | null>(null);
-    const [mapImageUrl, setMapImageUrl] = useState<string>('');
+    const [projectSummary, setProjectSummary] = useState<ProjectSummaryData | null>(null);
     const [loading, setLoading] = useState(true);
-    const [exportingImage, setExportingImage] = useState(false);
     const [mapLoaded, setMapLoaded] = useState(false);
     const [mapCenter, setMapCenter] = useState<[number, number]>([13.75, 100.5]);
     const [mapZoom, setMapZoom] = useState<number>(16);
-    const [activeTab, setActiveTab] = useState<'overview' | 'zones' | 'pipes' | 'detailed'>(
-        'overview'
-    );
+    
+    // Enhanced Map Control States
+    const [mapRotation, setMapRotation] = useState<number>(0);
+    const [isMapLocked, setIsMapLocked] = useState<boolean>(false);
+    const [pipeSize, setPipeSize] = useState<number>(1); // Multiplier for pipe thickness
+    const [iconSize, setIconSize] = useState<number>(1); // Multiplier for icon size
+    
+    // การจัดการสถานะการสร้างรายงาน
+    const [isCreatingImage, setIsCreatingImage] = useState(false);
+    const [isCreatingPDF, setIsCreatingPDF] = useState(false);
+    const [isCreatingExport, setIsCreatingExport] = useState(false);
+    
+    // Database save states
     const [savingToDatabase, setSavingToDatabase] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
+    
     const mapRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         try {
-            const storedData = localStorage.getItem('horticultureIrrigationData');
-            if (storedData) {
-                const data = JSON.parse(storedData);
+            const data = loadProjectData();
+            if (data) {
                 setProjectData(data);
+                const summary = calculateProjectSummary(data);
+                setProjectSummary(summary);
 
-                console.group('🔍 Loading Comprehensive Project Data');
-                console.log('📊 Raw project data:', data);
-
-                const stats = calculateComprehensiveProjectStats(data);
-                setProjectStats(stats);
-
-                console.log('📈 Comprehensive stats calculated:', stats);
-                console.groupEnd();
-
+                // Enhanced map center calculation
                 if (data.mainArea && data.mainArea.length > 0) {
-                    const centerLat =
-                        data.mainArea.reduce((sum, point) => sum + point.lat, 0) /
-                        data.mainArea.length;
-                    const centerLng =
-                        data.mainArea.reduce((sum, point) => sum + point.lng, 0) /
-                        data.mainArea.length;
+                    const centerLat = data.mainArea.reduce((sum, point) => sum + point.lat, 0) / data.mainArea.length;
+                    const centerLng = data.mainArea.reduce((sum, point) => sum + point.lng, 0) / data.mainArea.length;
                     setMapCenter([centerLat, centerLng]);
 
                     const bounds = L.latLngBounds(data.mainArea.map((p) => [p.lat, p.lng]));
                     const boundsSize = bounds.getNorthEast().distanceTo(bounds.getSouthWest());
 
+                    // Enhanced zoom calculation for better fit
                     let initialZoom;
-                    if (boundsSize < 50) initialZoom = 21;
-                    else if (boundsSize < 100) initialZoom = 20;
-                    else if (boundsSize < 200) initialZoom = 19;
-                    else if (boundsSize < 500) initialZoom = 18;
-                    else if (boundsSize < 1000) initialZoom = 17;
-                    else initialZoom = 16;
+                    if (boundsSize < 50) initialZoom = 20;
+                    else if (boundsSize < 100) initialZoom = 19;
+                    else if (boundsSize < 200) initialZoom = 18;
+                    else if (boundsSize < 500) initialZoom = 17;
+                    else if (boundsSize < 1000) initialZoom = 16;
+                    else initialZoom = 15;
 
                     setMapZoom(initialZoom);
                 }
             } else {
                 console.warn('❌ No project data found, redirecting to planner');
-                router.visit('/horticulture/planner');
+                navigateToPlanner();
             }
         } catch (error) {
             console.error('❌ Error loading project data:', error);
-            router.visit('/horticulture/planner');
+            navigateToPlanner();
         }
         setLoading(false);
     }, []);
 
-    useEffect(() => {
-        if (projectData && mapLoaded && !exportingImage && !mapImageUrl) {
-            const timer = setTimeout(() => {
-                handleExportMapImage();
-            }, 3000);
+    // Map control handlers
+    const handleRotationChange = (newRotation: number) => {
+        setMapRotation(newRotation);
+    };
 
-            return () => clearTimeout(timer);
+    const resetMapRotation = () => {
+        setMapRotation(0);
+    };
+
+    const toggleMapLock = () => {
+        setIsMapLocked(!isMapLocked);
+    };
+
+    const handlePipeSizeChange = (newSize: number) => {
+        setPipeSize(Math.max(0.5, Math.min(3, newSize))); // Limit between 0.5x and 3x
+    };
+
+    const handleIconSizeChange = (newSize: number) => {
+        setIconSize(Math.max(0.5, Math.min(3, newSize))); // Limit between 0.5x and 3x
+    };
+
+    const resetSizes = () => {
+        setPipeSize(1);
+        setIconSize(1);
+    };
+
+    // Enhanced image creation with rotation reset
+    const handleCreateMapImage = async () => {
+        if (!mapRef.current) {
+            alert('ไม่พบแผนที่');
+            return;
         }
-    }, [projectData, mapLoaded, exportingImage, mapImageUrl]);
 
-    const handleExportMapImage = async () => {
-        if (!mapRef.current || exportingImage) return;
-
-        setExportingImage(true);
-
+        setIsCreatingImage(true);
         try {
-            const imageUrl = await exportMapAsImage(mapRef.current);
-            if (imageUrl) {
-                setMapImageUrl(imageUrl);
-                console.log('✅ Map image exported successfully');
+            console.log('🖼️ เริ่มสร้างภาพแผนที่...');
+            
+            // Reset rotation temporarily for image capture
+            const currentRotation = mapRotation;
+            if (currentRotation !== 0) {
+                setMapRotation(0);
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            // แสดงการแจ้งเตือนให้ผู้ใช้รอ
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = 'image-loading';
+            loadingDiv.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(0,0,0,0.8);
+                color: white;
+                padding: 20px;
+                border-radius: 10px;
+                z-index: 10000;
+                text-align: center;
+            `;
+            loadingDiv.innerHTML = `
+                <div>🖼️ กำลังสร้างภาพแผนที่...</div>
+                <div style="margin-top: 10px; font-size: 12px;">กรุณารอสักครู่</div>
+            `;
+            document.body.appendChild(loadingDiv);
+
+            const success = await createAndDownloadMapImage(mapRef.current, {
+                quality: 0.9,
+                scale: 2,
+                filename: `${projectData?.projectName || 'horticulture-layout'}.jpg`
+            });
+
+            document.body.removeChild(loadingDiv);
+
+            // Restore rotation
+            if (currentRotation !== 0) {
+                setMapRotation(currentRotation);
+            }
+
+            if (success) {
+                alert('✅ ดาวน์โหลดภาพแผนที่สำเร็จ!\n\nหากไม่สามารถดาวน์โหลดได้ กรุณาใช้วิธี Screenshot:\n• กด F11 เพื่อ Fullscreen\n• กด Print Screen\n• หรือกด F12 > Ctrl+Shift+P > พิมพ์ "screenshot"');
+            } else {
+                alert('⚠️ ไม่สามารถสร้างภาพแผนที่ได้อัตโนมัติ\n\nกรุณาใช้วิธี Screenshot แทน:\n\n1. กด F11 เพื่อเข้าโหมด Fullscreen\n2. กด Print Screen หรือใช้ Snipping Tool\n3. หรือกด F12 > เปิด Developer Tools\n4. กด Ctrl+Shift+P > พิมพ์ "screenshot"\n5. เลือก "Capture full size screenshot"');
             }
         } catch (error) {
-            console.error('❌ Error exporting map image:', error);
-        }
-
-        setExportingImage(false);
-    };
-
-    const handleDownloadImage = () => {
-        if (mapImageUrl) {
-            downloadImage(mapImageUrl, `${projectData?.projectName || 'horticulture-layout'}.jpg`);
+            console.error('❌ Error creating map image:', error);
+            alert('❌ เกิดข้อผิดพลาดในการสร้างภาพ\n\nกรุณาใช้วิธี Screenshot แทน:\n• กด Print Screen\n• หรือใช้ Extension เช่น "Full Page Screen Capture"');
+        } finally {
+            setIsCreatingImage(false);
         }
     };
 
-    const handleDownloadStats = () => {
-        if (projectData && projectStats) {
-            const statsData = {
-                projectInfo: {
-                    name: projectData.projectName,
-                    createdAt: projectData.createdAt,
-                    totalArea: projectData.totalArea,
-                    useZones: projectData.useZones,
-                },
-                comprehensiveStats: projectStats,
-                exportedAt: new Date().toISOString(),
-            };
+    const handleCreatePDFReport = async () => {
+        if (!mapRef.current) {
+            alert('ไม่พบแผนที่');
+            return;
+        }
 
-            const blob = new Blob([JSON.stringify(statsData, null, 2)], {
-                type: 'application/json',
+        setIsCreatingPDF(true);
+        try {
+            console.log('📄 เริ่มสร้าง PDF Report...');
+            
+            // Reset rotation for PDF
+            const currentRotation = mapRotation;
+            if (currentRotation !== 0) {
+                setMapRotation(0);
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            // แสดงการแจ้งเตือนให้ผู้ใช้รอ
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = 'pdf-loading';
+            loadingDiv.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(0,0,0,0.8);
+                color: white;
+                padding: 20px;
+                border-radius: 10px;
+                z-index: 10000;
+                text-align: center;
+            `;
+            loadingDiv.innerHTML = `
+                <div>📄 กำลังสร้างรายงาน PDF...</div>
+                <div style="margin-top: 10px; font-size: 12px;">กรุณารอสักครู่</div>
+            `;
+            document.body.appendChild(loadingDiv);
+            
+            const success = await createPDFReport(true, mapRef.current);
+            
+            document.body.removeChild(loadingDiv);
+            
+            // Restore rotation
+            if (currentRotation !== 0) {
+                setMapRotation(currentRotation);
+            }
+            
+            if (success) {
+                alert('✅ สร้างรายงานสำเร็จ!\n\n• หากเป็น PDF: ไฟล์จะถูกดาวน์โหลดอัตโนมัติ\n• หากเป็น HTML: หน้าต่างใหม่จะเปิดขึ้น\n• สามารถพิมพ์หรือบันทึกเป็น PDF ได้');
+            } else {
+                alert('⚠️ ไม่สามารถสร้างรายงานอัตโนมัติได้\n\nกรุณาใช้วิธีดาวน์โหลดข้อมูล JSON/CSV แทน\nหรือคัดลอกข้อมูลจากหน้าจอ');
+            }
+        } catch (error) {
+            console.error('❌ Error creating PDF:', error);
+            alert('❌ เกิดข้อผิดพลาดในการสร้าง PDF\n\nกรุณาลองใช้:\n• ดาวน์โหลด JSON/CSV\n• Screenshot หน้าจอ\n• คัดลอกข้อมูลด้วยตนเอง');
+        } finally {
+            setIsCreatingPDF(false);
+        }
+    };
+
+    const handleDownloadJSON = async () => {
+        setIsCreatingExport(true);
+        try {
+            downloadStatsAsJSON(`${projectData?.projectName || 'horticulture'}-stats`);
+            alert('✅ ดาวน์โหลดไฟล์ JSON สำเร็จ!');
+        } catch (error) {
+            console.error('❌ Error downloading JSON:', error);
+            alert('❌ เกิดข้อผิดพลาดในการดาวน์โหลด JSON');
+        } finally {
+            setIsCreatingExport(false);
+        }
+    };
+
+    const handleDownloadCSV = async () => {
+        setIsCreatingExport(true);
+        try {
+            downloadStatsAsCSV(`${projectData?.projectName || 'horticulture'}-stats`);
+            alert('✅ ดาวน์โหลดไฟล์ CSV สำเร็จ!');
+        } catch (error) {
+            console.error('❌ Error downloading CSV:', error);
+            alert('❌ เกิดข้อผิดพลาดในการดาวน์โหลด CSV');
+        } finally {
+            setIsCreatingExport(false);
+        }
+    };
+
+    const handleCopyStats = () => {
+        const formattedStats = getFormattedStats();
+        if (formattedStats) {
+            navigator.clipboard.writeText(formattedStats).then(() => {
+                alert('✅ คัดลอกข้อมูลสถิติลงคลิปบอร์ดเรียบร้อยแล้ว!');
+            }).catch(() => {
+                // Fallback: แสดงข้อมูลในหน้าต่างใหม่
+                const newWindow = window.open('', '_blank');
+                if (newWindow) {
+                    newWindow.document.write(`<pre>${formattedStats}</pre>`);
+                    alert('เปิดข้อมูลในหน้าต่างใหม่ กรุณาคัดลอกด้วยตนเอง');
+                }
             });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${projectData.projectName}-comprehensive-stats.json`;
-            a.click();
-            URL.revokeObjectURL(url);
         }
     };
 
@@ -949,10 +405,41 @@ export default function ComprehensiveHorticultureResultsPage() {
         // Keep the saved data for editing
         // Don't clear editingFieldId so the planner knows we're editing
         router.visit('/horticulture/planner');
+        navigateToPlanner();
+    };
+
+    const handleShowScreenshotGuide = () => {
+        const guide = `
+🖼️ คู่มือการ Screenshot แผนที่
+
+📱 วิธีที่ 1: Screenshot พื้นฐาน
+• กด Print Screen (PrtSc) แล้วไปวางใน Paint
+• ใช้ Snipping Tool (Win + Shift + S)
+• Mac: กด Cmd + Shift + 4
+
+🔧 วิธีที่ 2: Developer Tools (แนะนำ)
+• กด F12 เพื่อเปิด Developer Tools
+• กด Ctrl + Shift + P (Cmd + Shift + P ใน Mac)
+• พิมพ์ "screenshot"
+• เลือก "Capture full size screenshot"
+
+🌐 วิธีที่ 3: Browser Extension
+• ติดตั้ง "Full Page Screen Capture"
+• หรือ "GoFullPage"
+• คลิกที่ Extension แล้วรอให้จับภาพ
+
+💡 เคล็ดลับ:
+• กด F11 เพื่อ Fullscreen ก่อน Screenshot
+• ปิด Developer Tools ก่อนจับภาพ
+• ใช้คุณภาพสูงสุดในการบันทึก
+• รีเซ็ตการหมุนแผนที่ก่อน Screenshot
+        `;
+        
+        alert(guide);
     };
 
     const handleSaveToDatabase = async () => {
-        if (!projectData || !projectStats) return;
+        if (!projectData || !projectSummary) return;
 
         setSavingToDatabase(true);
         setSaveError(null);
@@ -961,9 +448,17 @@ export default function ComprehensiveHorticultureResultsPage() {
         try {
             // Check if we're editing an existing field by looking for fieldId in URL or localStorage
             const urlParams = new URLSearchParams(window.location.search);
-            const fieldId = urlParams.get('fieldId') || localStorage.getItem('editingFieldId');
+            let fieldId = urlParams.get('fieldId') || localStorage.getItem('editingFieldId');
+
+            // Validate fieldId - if it's invalid, treat as new project
+            if (fieldId && (fieldId === 'null' || fieldId === 'undefined' || fieldId === '')) {
+                fieldId = null;
+                localStorage.removeItem('editingFieldId');
+            }
 
             console.log('Detected fieldId for save operation:', fieldId);
+            console.log('URL params:', window.location.search);
+            console.log('localStorage editingFieldId:', localStorage.getItem('editingFieldId'));
             // Prepare zones data
             const zonesData =
                 projectData.zones?.map((zone) => ({
@@ -1083,11 +578,13 @@ export default function ComprehensiveHorticultureResultsPage() {
 
             const requestData = {
                 field_name: projectData.projectName,
+                customer_name: projectData.customerName || '',
+                category: 'horticulture', // Set category for horticulture projects
                 area_coordinates: projectData.mainArea,
                 plant_type_id: projectData.plants?.[0]?.plantData.id || 1,
                 total_plants: projectData.plants?.length || 0,
                 total_area: projectData.totalArea,
-                total_water_need: projectStats.actualTotalWaterPerSession,
+                total_water_need: projectSummary.totalWaterNeedPerSession,
                 area_type: 'horticulture',
                 layers: layersData,
                 zones: zonesData,
@@ -1098,7 +595,23 @@ export default function ComprehensiveHorticultureResultsPage() {
             console.log('Saving horticulture project to database:', requestData);
 
             let response;
-            if (fieldId) {
+            if (fieldId && fieldId !== 'null' && fieldId !== 'undefined') {
+                // Verify field exists before updating
+                try {
+                    const fieldCheck = await axios.get(`/api/fields/${fieldId}`);
+                    if (!fieldCheck.data.success) {
+                        console.log('Field not found, creating new field instead');
+                        fieldId = null;
+                        localStorage.removeItem('editingFieldId');
+                    }
+                } catch (error) {
+                    console.log('Error checking field existence, creating new field instead');
+                    fieldId = null;
+                    localStorage.removeItem('editingFieldId');
+                }
+            }
+
+            if (fieldId && fieldId !== 'null' && fieldId !== 'undefined') {
                 // Update existing field
                 console.log('Updating existing field with ID:', fieldId);
                 response = await axios.put(`/api/fields/${fieldId}`, requestData, {
@@ -1159,13 +672,13 @@ export default function ComprehensiveHorticultureResultsPage() {
         );
     }
 
-    if (!projectData || !projectStats) {
+    if (!projectData || !projectSummary) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-gray-900 text-white">
                 <div className="text-center">
                     <h1 className="mb-4 text-2xl font-bold">ไม่พบข้อมูลโครงการ</h1>
                     <button
-                        onClick={() => router.visit('/horticulture/planner')}
+                        onClick={handleNewProject}
                         className="rounded-lg bg-blue-600 px-6 py-3 transition-colors hover:bg-blue-700"
                     >
                         กลับไปสร้างโครงการใหม่
@@ -1176,11 +689,14 @@ export default function ComprehensiveHorticultureResultsPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-900 p-6 text-white">
-            <div className="mx-auto w-full">
+        <div className="min-h-screen bg-gray-900 text-white">
+            <Navbar />
+            <div className="p-6">
+                <div className="mx-auto w-full">
+                {/* Header */}
                 <div className="mb-8 text-center">
                     <h1 className="mb-4 text-4xl font-bold text-green-400">
-                        🌱 รายงานการออกแบบระบบน้ำสวนผลไม้ - ฉบับสมบูรณ์
+                        🌱 รายงานการออกแบบระบบน้ำสวนผลไม้
                     </h1>
                     <h2 className="text-2xl text-gray-300">{projectData.projectName}</h2>
                     <p className="mt-2 text-gray-400">
@@ -1188,250 +704,311 @@ export default function ComprehensiveHorticultureResultsPage() {
                     </p>
                 </div>
 
-                <div className="mb-8 flex justify-center">
-                    <div className="flex rounded-lg bg-gray-800 p-1">
-                        {[
-                            { id: 'overview', label: '📊 ภาพรวม', icon: '📊' },
-                            { id: 'zones', label: '🏞️ รายละเอียดโซน', icon: '🏞️' },
-                            { id: 'pipes', label: '🔧 ระบบท่อ', icon: '🔧' },
-                            { id: 'detailed', label: '📋 รายงานละเอียด', icon: '📋' },
-                        ].map((tab) => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id as any)}
-                                className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                                    activeTab === tab.id
-                                        ? 'bg-blue-600 text-white'
-                                        : 'text-gray-400 hover:bg-gray-700 hover:text-white'
-                                }`}
-                            >
-                                {tab.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+                    {/* Enhanced Map Section */}
+                    <div className="rounded-lg bg-gray-800 p-6">
+                        <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-xl font-semibold">🗺️ แผนผังโครงการ</h3>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    onClick={handleCreateMapImage}
+                                    disabled={isCreatingImage}
+                                    className={`rounded px-3 py-1 text-sm transition-colors ${
+                                        isCreatingImage
+                                            ? 'cursor-not-allowed bg-gray-600 text-gray-400'
+                                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                                    }`}
+                                >
+                                    {isCreatingImage ? '⏳ สร้าง...' : '📷 ดาวน์โหลดภาพ'}
+                                </button>
 
-                <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
-                    <div className="lg:col-span-2">
-                        <div className="rounded-lg bg-gray-800 p-6">
-                            <div className="mb-4 flex items-center justify-between">
-                                <h3 className="text-xl font-semibold">🗺️ แผนผังโครงการ</h3>
-                                <div className="flex gap-2">
-                                    {exportingImage && (
-                                        <div className="flex items-center gap-2 text-blue-400">
-                                            <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-blue-400"></div>
-                                            <span className="text-sm">กำลังสร้างภาพ...</span>
-                                        </div>
-                                    )}
+                                <button
+                                    onClick={handleCreatePDFReport}
+                                    disabled={isCreatingPDF}
+                                    className={`rounded px-3 py-1 text-sm transition-colors ${
+                                        isCreatingPDF
+                                            ? 'cursor-not-allowed bg-gray-600 text-gray-400'
+                                            : 'bg-red-600 text-white hover:bg-red-700'
+                                    }`}
+                                >
+                                    {isCreatingPDF ? '⏳ สร้าง...' : '📄 สร้างรายงาน'}
+                                </button>
 
-                                    <button
-                                        onClick={handleExportMapImage}
-                                        disabled={exportingImage || !mapLoaded}
-                                        className="rounded bg-blue-600 px-3 py-1 text-sm transition-colors hover:bg-blue-700 disabled:bg-gray-600"
-                                    >
-                                        {exportingImage ? 'กำลังสร้างภาพ...' : '📷 สร้างภาพใหม่'}
-                                    </button>
+                                <button
+                                    onClick={handleShowScreenshotGuide}
+                                    className="rounded bg-yellow-600 px-3 py-1 text-sm transition-colors hover:bg-yellow-700"
+                                >
+                                    💡 คู่มือ Screenshot
+                                </button>
+                            </div>
+                        </div>
 
-                                    {mapImageUrl && (
+                        {/* Enhanced Map Controls */}
+                        <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                            {/* Rotation Controls */}
+                            <div className="rounded-lg bg-gray-700 p-4">
+                                <h4 className="mb-3 text-sm font-semibold text-blue-300">🔄 การหมุนแผนที่</h4>
+                                <div className="space-y-3">
+                                    <div className="flex items-center gap-2">
+                                        <label className="text-xs text-gray-300 w-16">หมุน:</label>
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max="360"
+                                            step="1"
+                                            value={mapRotation}
+                                            onChange={(e) => handleRotationChange(parseInt(e.target.value))}
+                                            className="flex-1 accent-blue-600"
+                                        />
+                                        <span className="text-xs text-blue-300 w-12">{mapRotation}°</span>
+                                    </div>
+                                    <div className="flex gap-2">
                                         <button
-                                            onClick={handleDownloadImage}
-                                            className="rounded bg-green-600 px-3 py-1 text-sm transition-colors hover:bg-green-700"
+                                            onClick={() => handleRotationChange(mapRotation - 15)}
+                                            className="flex-1 rounded bg-blue-600 px-2 py-1 text-xs hover:bg-blue-700"
                                         >
-                                            💾 ดาวน์โหลดภาพ
+                                            ↺ -15°
                                         </button>
-                                    )}
+                                        <button
+                                            onClick={resetMapRotation}
+                                            className="flex-1 rounded bg-gray-600 px-2 py-1 text-xs hover:bg-gray-700"
+                                        >
+                                            🔄 รีเซ็ต
+                                        </button>
+                                        <button
+                                            onClick={() => handleRotationChange(mapRotation + 15)}
+                                            className="flex-1 rounded bg-blue-600 px-2 py-1 text-xs hover:bg-blue-700"
+                                        >
+                                            ↻ +15°
+                                        </button>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            checked={isMapLocked}
+                                            onChange={toggleMapLock}
+                                            className="accent-purple-600"
+                                        />
+                                        <label className="text-xs text-gray-300">🔒 ล็อกการซูมและลาก</label>
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Compact Map */}
-                            <div
-                                ref={mapRef}
-                                className="mb-4 h-[500px] w-full overflow-hidden rounded-lg border border-gray-600"
-                                style={{ backgroundColor: 'rgb(31, 41, 55)' }}
+                            {/* Size Controls */}
+                            <div className="rounded-lg bg-gray-700 p-4">
+                                <h4 className="mb-3 text-sm font-semibold text-green-300">📏 ขนาดไอคอน</h4>
+                                <div className="space-y-3">
+                                    <div className="flex items-center gap-2">
+                                        <label className="text-xs text-gray-300 w-16">ท่อ:</label>
+                                        <input
+                                            type="range"
+                                            min="0.5"
+                                            max="3"
+                                            step="0.1"
+                                            value={pipeSize}
+                                            onChange={(e) => handlePipeSizeChange(parseFloat(e.target.value))}
+                                            className="flex-1 accent-green-600"
+                                        />
+                                        <span className="text-xs text-green-300 w-12">{pipeSize.toFixed(1)}x</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <label className="text-xs text-gray-300 w-16">ไอคอน:</label>
+                                        <input
+                                            type="range"
+                                            min="0.5"
+                                            max="3"
+                                            step="0.1"
+                                            value={iconSize}
+                                            onChange={(e) => handleIconSizeChange(parseFloat(e.target.value))}
+                                            className="flex-1 accent-yellow-600"
+                                        />
+                                        <span className="text-xs text-yellow-300 w-12">{iconSize.toFixed(1)}x</span>
+                                    </div>
+                                    <button
+                                        onClick={resetSizes}
+                                        className="w-full rounded bg-gray-600 px-3 py-1 text-xs hover:bg-gray-700"
+                                    >
+                                        🔄 รีเซ็ตขนาด
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Enhanced Map */}
+                        <div
+                            ref={mapRef}
+                            className="mb-4 h-[500px] w-full overflow-hidden rounded-lg border border-gray-600"
+                            style={{ backgroundColor: 'rgb(31, 41, 55)' }}
+                        >
+                            <MapContainer
+                                center={mapCenter}
+                                zoom={mapZoom}
+                                maxZoom={isMapLocked ? mapZoom : 64}
+                                minZoom={isMapLocked ? mapZoom : 1}
+                                style={{ height: '100%', width: '100%' }}
+                                zoomControl={!isMapLocked}
+                                attributionControl={false}
+                                dragging={!isMapLocked}
+                                scrollWheelZoom={!isMapLocked}
+                                doubleClickZoom={!isMapLocked}
+                                touchZoom={!isMapLocked}
+                                boxZoom={!isMapLocked}
+                                keyboard={!isMapLocked}
+                                whenReady={() => setMapLoaded(true)}
                             >
-                                <MapContainer
-                                    center={mapCenter}
-                                    zoom={mapZoom}
-                                    maxZoom={64}
-                                    style={{ height: '100%', width: '100%' }}
-                                    zoomControl={false}
-                                    attributionControl={false}
-                                    dragging={false}
-                                    scrollWheelZoom={false}
-                                    doubleClickZoom={false}
-                                    touchZoom={false}
-                                    boxZoom={false}
-                                    keyboard={false}
-                                    whenReady={() => setMapLoaded(true)}
-                                >
-                                    <LayersControl position="topright">
-                                        <LayersControl.BaseLayer checked name="ภาพถ่ายดาวเทียม">
-                                            <TileLayer
-                                                url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
-                                                attribution="Google Maps"
-                                                maxZoom={30}
-                                                maxNativeZoom={20}
-                                            />
-                                        </LayersControl.BaseLayer>
-                                    </LayersControl>
+                                <LayersControl position="topright">
+                                    <LayersControl.BaseLayer checked name="ภาพถ่ายดาวเทียม">
+                                        <TileLayer
+                                            url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+                                            attribution="Google Maps"
+                                            maxZoom={30}
+                                            maxNativeZoom={20}
+                                        />
+                                    </LayersControl.BaseLayer>
+                                    <LayersControl.BaseLayer name="ภาพถ่าย + ป้ายชื่อ">
+                                        <TileLayer
+                                            url="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+                                            attribution="Google Maps"
+                                            maxZoom={30}
+                                            maxNativeZoom={20}
+                                        />
+                                    </LayersControl.BaseLayer>
+                                    <LayersControl.BaseLayer name="แผนที่ถนน">
+                                        <TileLayer
+                                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                            attribution="OpenStreetMap"
+                                            maxZoom={30}
+                                            maxNativeZoom={19}
+                                        />
+                                    </LayersControl.BaseLayer>
+                                </LayersControl>
 
-                                    {projectData.mainArea.length > 0 && (
-                                        <MapBounds positions={projectData.mainArea} />
-                                    )}
+                                {/* Enhanced Map Bounds with better padding */}
+                                {projectData.mainArea.length > 0 && (
+                                    <EnhancedMapBounds positions={projectData.mainArea} />
+                                )}
 
-                                    {/* Main Area */}
-                                    {projectData.mainArea.length > 0 && (
+                                {/* Map Rotation Controller */}
+                                <MapRotationController rotation={mapRotation} isLocked={isMapLocked} />
+
+                                {/* Main Area */}
+                                {projectData.mainArea.length > 0 && (
+                                    <Polygon
+                                        positions={projectData.mainArea.map((coord) => [coord.lat, coord.lng])}
+                                        pathOptions={{
+                                            color: 'rgb(34, 197, 94)',
+                                            fillColor: 'rgb(34, 197, 94)',
+                                            fillOpacity: 0.1,
+                                            weight: 2 * pipeSize,
+                                        }}
+                                    />
+                                )}
+
+                                {/* Exclusion Areas */}
+                                {projectData.exclusionAreas &&
+                                    projectData.exclusionAreas.map((area) => (
                                         <Polygon
-                                            positions={projectData.mainArea.map((coord) => [
-                                                coord.lat,
-                                                coord.lng,
-                                            ])}
+                                            key={area.id}
+                                            positions={area.coordinates.map((coord) => [coord.lat, coord.lng])}
                                             pathOptions={{
-                                                color: 'rgb(34, 197, 94)',
-                                                fillColor: 'rgb(34, 197, 94)',
-                                                fillOpacity: 0.1,
-                                                weight: 2,
+                                                color: 'rgb(239, 68, 68)',
+                                                fillColor: 'rgb(239, 68, 68)',
+                                                fillOpacity: 0.4,
+                                                weight: 2 * pipeSize,
                                             }}
                                         />
-                                    )}
+                                    ))}
 
-                                    {/* Exclusion Areas */}
-                                    {projectData.exclusionAreas &&
-                                        projectData.exclusionAreas.map((area) => (
-                                            <Polygon
-                                                key={area.id}
-                                                positions={area.coordinates.map((coord) => [
-                                                    coord.lat,
-                                                    coord.lng,
-                                                ])}
-                                                pathOptions={{
-                                                    color: 'rgb(239, 68, 68)',
-                                                    fillColor: 'rgb(239, 68, 68)',
-                                                    fillOpacity: 0.4,
-                                                    weight: 2,
-                                                }}
-                                            />
-                                        ))}
-
-                                    {/* Zones */}
-                                    {projectData.zones &&
-                                        projectData.zones.map((zone) => (
-                                            <Polygon
-                                                key={zone.id}
-                                                positions={zone.coordinates.map((coord) => [
-                                                    coord.lat,
-                                                    coord.lng,
-                                                ])}
-                                                pathOptions={{
-                                                    color: zone.color,
-                                                    fillColor: zone.color,
-                                                    fillOpacity: 0.3,
-                                                    weight: 3,
-                                                }}
-                                            />
-                                        ))}
-
-                                    {/* Pump */}
-                                    {projectData.pump && (
-                                        <Marker
-                                            position={[
-                                                projectData.pump.position.lat,
-                                                projectData.pump.position.lng,
-                                            ]}
-                                            icon={createPumpIcon()}
+                                {/* Zones */}
+                                {projectData.zones &&
+                                    projectData.zones.map((zone) => (
+                                        <Polygon
+                                            key={zone.id}
+                                            positions={zone.coordinates.map((coord) => [coord.lat, coord.lng])}
+                                            pathOptions={{
+                                                color: zone.color,
+                                                fillColor: zone.color,
+                                                fillOpacity: 0.3,
+                                                weight: 3 * pipeSize,
+                                            }}
                                         />
-                                    )}
+                                    ))}
 
-                                    {/* Main Pipes */}
-                                    {projectData.mainPipes &&
-                                        projectData.mainPipes.map((pipe) => (
+                                {/* Enhanced Pump with size control */}
+                                {projectData.pump && (
+                                    <Marker
+                                        position={[projectData.pump.position.lat, projectData.pump.position.lng]}
+                                        icon={createEnhancedPumpIcon(20 * iconSize)}
+                                    />
+                                )}
+
+                                {/* Enhanced Main Pipes with size control */}
+                                {projectData.mainPipes &&
+                                    projectData.mainPipes.map((pipe) => (
+                                        <Polyline
+                                            key={pipe.id}
+                                            positions={pipe.coordinates.map((coord) => [coord.lat, coord.lng])}
+                                            pathOptions={{
+                                                color: 'rgb(59, 130, 246)',
+                                                weight: 6 * pipeSize,
+                                                opacity: 0.9,
+                                            }}
+                                        />
+                                    ))}
+
+                                {/* Enhanced Sub-Main Pipes and Branch Pipes with size control */}
+                                {projectData.subMainPipes &&
+                                    projectData.subMainPipes.map((pipe) => (
+                                        <React.Fragment key={pipe.id}>
                                             <Polyline
-                                                key={pipe.id}
-                                                positions={pipe.coordinates.map((coord) => [
-                                                    coord.lat,
-                                                    coord.lng,
-                                                ])}
+                                                positions={pipe.coordinates.map((coord) => [coord.lat, coord.lng])}
                                                 pathOptions={{
-                                                    color: 'rgb(59, 130, 246)',
-                                                    weight: 6,
+                                                    color: 'rgb(139, 92, 246)',
+                                                    weight: 4 * pipeSize,
                                                     opacity: 0.9,
                                                 }}
                                             />
-                                        ))}
+                                            {pipe.branchPipes &&
+                                                pipe.branchPipes.map((branchPipe) => (
+                                                    <Polyline
+                                                        key={branchPipe.id}
+                                                        positions={branchPipe.coordinates.map((coord) => [coord.lat, coord.lng])}
+                                                        pathOptions={{
+                                                            color: '#FFFF66',
+                                                            weight: 2 * pipeSize,
+                                                            opacity: 0.8,
+                                                        }}
+                                                    />
+                                                ))}
+                                        </React.Fragment>
+                                    ))}
 
-                                    {/* Sub-Main Pipes and Branch Pipes */}
-                                    {projectData.subMainPipes &&
-                                        projectData.subMainPipes.map((pipe) => (
-                                            <React.Fragment key={pipe.id}>
-                                                <Polyline
-                                                    positions={pipe.coordinates.map((coord) => [
-                                                        coord.lat,
-                                                        coord.lng,
-                                                    ])}
-                                                    pathOptions={{
-                                                        color: 'rgb(139, 92, 246)',
-                                                        weight: 4,
-                                                        opacity: 0.9,
-                                                    }}
-                                                />
-                                                {pipe.branchPipes &&
-                                                    pipe.branchPipes.map((branchPipe) => (
-                                                        <Polyline
-                                                            key={branchPipe.id}
-                                                            positions={branchPipe.coordinates.map(
-                                                                (coord) => [coord.lat, coord.lng]
-                                                            )}
-                                                            pathOptions={{
-                                                                color: 'rgb(16, 185, 129)',
-                                                                weight: 2,
-                                                                opacity: 0.8,
-                                                            }}
-                                                        />
-                                                    ))}
-                                            </React.Fragment>
-                                        ))}
-
-                                    {/* Plants */}
-                                    {projectData.plants &&
-                                        projectData.plants.map((plant) => (
-                                            <Marker
-                                                key={plant.id}
-                                                position={[plant.position.lat, plant.position.lng]}
-                                                icon={createPlantIcon()}
-                                            />
-                                        ))}
-                                </MapContainer>
-                            </div>
-
-                            {/* Map Image Preview */}
-                            {mapImageUrl && (
-                                <div>
-                                    <h4 className="mb-2 text-sm font-medium">
-                                        ภาพแผนผังที่ส่งออก (คุณภาพสูง):
-                                    </h4>
-                                    <img
-                                        src={mapImageUrl}
-                                        alt="Exported Map Layout"
-                                        className="w-full rounded border border-gray-600"
-                                    />
-                                </div>
-                            )}
+                                {/* Enhanced Plants with size control */}
+                                {projectData.plants &&
+                                    projectData.plants.map((plant) => (
+                                        <Marker
+                                            key={plant.id}
+                                            position={[plant.position.lat, plant.position.lng]}
+                                            icon={createEnhancedPlantIcon(16 * iconSize)}
+                                        />
+                                    ))}
+                            </MapContainer>
                         </div>
 
-                        {/* Legend */}
-                        <div className="mt-6 rounded-lg bg-gray-800 p-4">
-                            <h3 className="mb-3 text-lg font-semibold">🎨 คำอธิบายสัญลักษณ์</h3>
-                            <div className="space-y-2 text-sm">
+                        {/* Enhanced Map Legend */}
+                        <div className="rounded-lg bg-gray-700 p-4">
+                            <h4 className="mb-3 text-sm font-semibold">🎨 คำอธิบายสัญลักษณ์</h4>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
                                 <div className="flex items-center gap-2">
-                                    <div className="h-1 w-4 bg-blue-500"></div>
+                                    <div className="h-1 w-4 bg-blue-500" style={{ height: `${2 * pipeSize}px` }}></div>
                                     <span>ท่อเมน (จากปั๊ม)</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <div className="h-1 w-4 bg-purple-500"></div>
+                                    <div className="h-1 w-4 bg-purple-500" style={{ height: `${1.5 * pipeSize}px` }}></div>
                                     <span>ท่อเมนรอง</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <div className="h-1 w-4 bg-green-500"></div>
+                                    <div className="h-1 w-4 bg-yellow-300" style={{ height: `${1 * pipeSize}px` }}></div>
                                     <span>ท่อย่อย</span>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -1439,1029 +1016,267 @@ export default function ComprehensiveHorticultureResultsPage() {
                                     <span>พื้นที่ต้องหลีกเลี่ยง</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
-                                        P
-                                    </div>
+                                    <div 
+                                        className="flex items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white"
+                                        style={{ 
+                                            width: `18px`, 
+                                            height: `18px`,
+                                            fontSize: `10px`
+                                        }}
+                                    >P</div>
                                     <span>ปั๊มน้ำ</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <img
                                         src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAABlklEQVR4nI1TW0sCQRTel/plqSlGEUTPQRqRRBSE9tJDd7tApVI+VERRWcvMbNkFDArsSsLOZV8q+yXFiZ20dtdZaeB7OXO+M+d88x1N8xwhCq0WJZ2C4Zyg+FSC4ayMiUKr1uxwTqKC4apgBJSg5N1iKKIkM4aHOSVfvuQaajmJhpe5gvxQ2YPHyr6yiEWN8O/MgpJ3Z8L+zTTMFPth4CgokS8l4ex+1VMIf0hNLGZ0OS9MU4fBQjvEDtsaoJcX3Z2YqEOTatcClOowjnqU5DpQefmvACMZjVNSrAeun/Ku5GQuAFPLIUjlgjC88xPD5RXHr+BTTVBy5uwghXohftAG4xsBWJpph42JMCR2A5I8pnd7BTXsEbJeDexOZosxmEuHYG0yDGtXIzB/HofSc96tgT2CJV2n/G9A26NwnO7z9wQnUe3lZbOFU/ymSrjcSsLJgl8BXP21tsVQRGWku4sM3CL319XwybkRdC8RI4l/W5niIeU+2Pb0G+dHNPzKTRRqupFSExN12ArX15lTvG7H7Dsv4Rsa94hVuqmogAAAAABJRU5ErkJggg=="
                                         alt="tree"
+                                        style={{ 
+                                            width: `18px`, 
+                                            height: `18px`
+                                        }}
                                     />
-                                    <span>ต้นไม้ (แต่ละจุด)</span>
+                                    <span>ต้นไม้</span>
                                 </div>
+                            </div>
+                        </div>
+
+                        {/* Export Options */}
+                        <div className="mt-4 rounded-lg bg-gray-700 p-4">
+                            <h4 className="mb-3 text-sm font-semibold">📊 ตัวเลือกการส่งออก</h4>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                <button
+                                    onClick={handleDownloadJSON}
+                                    disabled={isCreatingExport}
+                                    className={`rounded px-3 py-2 transition-colors ${
+                                        isCreatingExport
+                                            ? 'cursor-not-allowed bg-gray-600 text-gray-400'
+                                            : 'bg-green-600 text-white hover:bg-green-700'
+                                    }`}
+                                >
+                                    📁 ดาวน์โหลด JSON
+                                </button>
+                                <button
+                                    onClick={handleDownloadCSV}
+                                    disabled={isCreatingExport}
+                                    className={`rounded px-3 py-2 transition-colors ${
+                                        isCreatingExport
+                                            ? 'cursor-not-allowed bg-gray-600 text-gray-400'
+                                            : 'bg-purple-600 text-white hover:bg-purple-700'
+                                    }`}
+                                >
+                                    📊 ดาวน์โหลด CSV
+                                </button>
+                                <button
+                                    onClick={handleCopyStats}
+                                    className="col-span-2 rounded bg-orange-600 px-3 py-2 text-white transition-colors hover:bg-orange-700"
+                                >
+                                    📋 คัดลอกข้อมูลสถิติ
+                                </button>
                             </div>
                         </div>
                     </div>
 
-                    {/* Right Column - Content based on active tab */}
-                    <div className="lg:col-span-2">
-                        {/* Overview Tab */}
-                        {activeTab === 'overview' && (
-                            <div className="space-y-6">
-                                {/* Overall Statistics */}
-                                <div className="rounded-lg bg-gray-800 p-6">
-                                    <h3 className="mb-4 text-xl font-semibold">
-                                        📈 สถิติรวมโครงการ
-                                    </h3>
-                                    <div className="grid grid-cols-2 gap-4 text-sm">
-                                        <div className="rounded bg-gray-700 p-3">
-                                            <div className="text-gray-400">พื้นที่รวม</div>
-                                            <div className="text-lg font-bold text-green-400">
-                                                {formatArea(projectStats.totalArea)}
-                                            </div>
-                                        </div>
-                                        <div className="rounded bg-gray-700 p-3">
-                                            <div className="text-gray-400">จำนวนโซน</div>
-                                            <div className="text-lg font-bold text-blue-400">
-                                                {projectStats.numberOfZones} โซน
-                                            </div>
-                                        </div>
-                                        <div className="rounded bg-gray-700 p-3">
-                                            <div className="text-gray-400">ต้นไม้รวม</div>
-                                            <div className="text-lg font-bold text-yellow-400">
-                                                {projectStats.actualTotalPlants.toLocaleString()}{' '}
-                                                ต้น
-                                            </div>
-                                        </div>
-                                        <div className="rounded bg-gray-700 p-3">
-                                            <div className="text-gray-400">น้ำต่อครั้ง</div>
-                                            <div className="text-lg font-bold text-cyan-400">
-                                                {formatWaterVolume(
-                                                    projectStats.actualTotalWaterPerSession
-                                                )}
-                                            </div>
-                                        </div>
+                    {/* Summary Data Section - keeping original content */}
+                    <div className="space-y-6">
+                        {/* Overall Summary */}
+                        <div className="rounded-lg bg-gray-800 p-6">
+                            <h3 className="mb-4 text-xl font-semibold text-green-400">📊 ข้อมูลโดยรวม</h3>
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div className="rounded bg-gray-700 p-3">
+                                    <div className="text-gray-400">พื้นที่รวมทั้งหมด</div>
+                                    <div className="text-lg font-bold text-green-400">
+                                        {formatAreaInRai(projectSummary.totalAreaInRai)}
                                     </div>
                                 </div>
-
-                                {/* Plant Varieties */}
-                                <div className="rounded-lg bg-gray-800 p-6">
-                                    <h3 className="mb-4 text-xl font-semibold">
-                                        🌿 พันธุ์พืชที่ปลูก
-                                    </h3>
-                                    <div className="space-y-3">
-                                        {Object.entries(projectStats.plantVarieties).map(
-                                            ([plantName, data]) => (
-                                                <div
-                                                    key={plantName}
-                                                    className="rounded bg-gray-700 p-3"
-                                                >
-                                                    <div className="mb-2 flex items-center justify-between">
-                                                        <span className="font-medium text-green-400">
-                                                            {plantName}
-                                                        </span>
-                                                        <span className="font-bold text-yellow-400">
-                                                            {data.totalCount.toLocaleString()} ต้น
-                                                        </span>
-                                                    </div>
-                                                    <div className="text-sm text-gray-300">
-                                                        กระจายใน:{' '}
-                                                        {data.zones
-                                                            .map((z) => z.zoneName)
-                                                            .join(', ')}
-                                                    </div>
-                                                </div>
-                                            )
-                                        )}
+                                <div className="rounded bg-gray-700 p-3">
+                                    <div className="text-gray-400">จำนวนโซน</div>
+                                    <div className="text-lg font-bold text-blue-400">
+                                        {projectSummary.totalZones} โซน
                                     </div>
                                 </div>
-
-                                {/* Pipe System Overview */}
-                                <div className="rounded-lg bg-gray-800 p-6">
-                                    <h3 className="mb-4 text-xl font-semibold">🔧 ภาพรวมระบบท่อ</h3>
-                                    <div className="grid grid-cols-2 gap-4 text-sm">
-                                        <div className="rounded bg-gray-700 p-3">
-                                            <div className="text-gray-400">ท่อเมน</div>
-                                            <div className="text-lg font-bold text-blue-400">
-                                                {projectStats.totalMainPipes} เส้น
-                                            </div>
-                                            <div className="text-xs text-gray-500">
-                                                {formatDistance(projectStats.totalMainPipeLength)}
-                                            </div>
-                                        </div>
-                                        <div className="rounded bg-gray-700 p-3">
-                                            <div className="text-gray-400">ท่อเมนรอง</div>
-                                            <div className="text-lg font-bold text-purple-400">
-                                                {projectStats.totalSubMainPipes} เส้น
-                                            </div>
-                                            <div className="text-xs text-gray-500">
-                                                {formatDistance(
-                                                    projectStats.totalSubMainPipeLength
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="rounded bg-gray-700 p-3">
-                                            <div className="text-gray-400">ท่อย่อย</div>
-                                            <div className="text-lg font-bold text-green-400">
-                                                {projectStats.totalBranchPipes} เส้น
-                                            </div>
-                                            <div className="text-xs text-gray-500">
-                                                {formatDistance(projectStats.totalBranchPipeLength)}
-                                            </div>
-                                        </div>
-                                        <div className="rounded bg-gray-700 p-3">
-                                            <div className="text-gray-400">รวมทั้งหมด</div>
-                                            <div className="text-lg font-bold text-yellow-400">
-                                                {formatDistance(projectStats.totalPipeLength)}
-                                            </div>
-                                            <div className="text-xs text-gray-500">
-                                                {projectStats.totalPipeSections} ท่อน
-                                            </div>
-                                        </div>
+                                <div className="rounded bg-gray-700 p-3">
+                                    <div className="text-gray-400">จำนวนต้นไม้ทั้งหมด</div>
+                                    <div className="text-lg font-bold text-yellow-400">
+                                        {projectSummary.totalPlants.toLocaleString()} ต้น
                                     </div>
                                 </div>
+                                <div className="rounded bg-gray-700 p-3">
+                                    <div className="text-gray-400">ปริมาณน้ำต่อครั้ง</div>
+                                    <div className="text-lg font-bold text-cyan-400">
+                                        {formatWaterVolume(projectSummary.totalWaterNeedPerSession)}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
-                                {/* Performance Analysis */}
-                                <div className="rounded-lg bg-gray-800 p-6">
-                                    <h3 className="mb-4 text-xl font-semibold">
-                                        ⚡ การวิเคราะห์ประสิทธิภาพ
-                                    </h3>
-                                    <div className="grid grid-cols-3 gap-4 text-sm">
-                                        <div className="rounded bg-gray-700 p-3 text-center">
-                                            <div className="text-gray-400">ประสิทธิภาพระบบ</div>
-                                            <div className="text-2xl font-bold text-green-400">
-                                                {projectStats.systemEfficiency.toFixed(1)}%
-                                            </div>
+                        {/* Pipe System Summary */}
+                        <div className="rounded-lg bg-gray-800 p-6">
+                            <h3 className="mb-4 text-xl font-semibold text-blue-400">🔧 ระบบท่อ</h3>
+                            
+                            {/* Main Pipes */}
+                            <div className="mb-4 rounded bg-gray-700 p-4">
+                                <h4 className="mb-2 font-semibold text-blue-300">🔵 ท่อเมน</h4>
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <span className="text-gray-400">ท่อเมนที่ยาวที่สุด:</span>
+                                        <div className="font-bold text-yellow-400">
+                                            {formatDistance(projectSummary.mainPipes.longest)}
                                         </div>
-                                        <div className="rounded bg-gray-700 p-3 text-center">
-                                            <div className="text-gray-400">ความสมดุลน้ำ</div>
-                                            <div className="text-2xl font-bold text-blue-400">
-                                                {projectStats.waterDistributionBalance.toFixed(1)}%
-                                            </div>
-                                        </div>
-                                        <div className="rounded bg-gray-700 p-3 text-center">
-                                            <div className="text-gray-400">เพิ่มประสิทธิภาพท่อ</div>
-                                            <div className="text-2xl font-bold text-purple-400">
-                                                {projectStats.pipeOptimization.toFixed(1)}%
-                                            </div>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-400">ท่อเมนยาวรวม:</span>
+                                        <div className="font-bold text-blue-400">
+                                            {formatDistance(projectSummary.mainPipes.totalLength)}
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        )}
 
-                        {/* Zones Tab - รายละเอียดแต่ละโซน */}
-                        {activeTab === 'zones' && (
-                            <div className="space-y-6">
-                                <h3 className="text-2xl font-semibold text-green-400">
+                            {/* Sub-Main Pipes */}
+                            <div className="mb-4 rounded bg-gray-700 p-4">
+                                <h4 className="mb-2 font-semibold text-purple-300">🟣 ท่อเมนรอง</h4>
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <span className="text-gray-400">ท่อเมนรองที่ยาวที่สุด:</span>
+                                        <div className="font-bold text-yellow-400">
+                                            {formatDistance(projectSummary.subMainPipes.longest)}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-400">ท่อเมนรองยาวรวม:</span>
+                                        <div className="font-bold text-purple-400">
+                                            {formatDistance(projectSummary.subMainPipes.totalLength)}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Branch Pipes */}
+                            <div className="mb-4 rounded bg-gray-700 p-4">
+                                <h4 className="mb-2 font-semibold text-green-300">🟢 ท่อย่อย</h4>
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <span className="text-gray-400">ท่อย่อยที่ยาวที่สุด:</span>
+                                        <div className="font-bold text-yellow-400">
+                                            {formatDistance(projectSummary.branchPipes.longest)}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-400">ท่อย่อยยาวรวม:</span>
+                                        <div className="font-bold text-green-400">
+                                            {formatDistance(projectSummary.branchPipes.totalLength)}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Combined Longest Pipes */}
+                            <div className="rounded bg-yellow-900/30 p-4">
+                                <h4 className="mb-2 font-semibold text-yellow-300">📏 ท่อที่ยาวที่สุดรวมกัน</h4>
+                                <div className="text-center">
+                                    <div className="text-2xl font-bold text-yellow-400">
+                                        {formatDistance(projectSummary.longestPipesCombined)}
+                                    </div>
+                                    <div className="text-xs text-gray-400">
+                                        (ท่อเมน + ท่อเมนรอง + ท่อย่อยที่ยาวที่สุด)
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Zone Details */}
+                        {projectSummary.zoneDetails.length > 0 && (
+                            <div className="rounded-lg bg-gray-800 p-6">
+                                <h3 className="mb-4 text-xl font-semibold text-green-400">
                                     🏞️ รายละเอียดแต่ละโซน
                                 </h3>
-                                {projectStats.zoneStats.map((zone) => (
-                                    <div key={zone.zoneId} className="rounded-lg bg-gray-800 p-6">
-                                        <h4 className="mb-4 flex items-center justify-between text-xl font-semibold text-green-400">
-                                            <span>{zone.zoneName}</span>
-                                            <div
-                                                className="h-6 w-6 rounded"
-                                                style={{
-                                                    backgroundColor:
-                                                        projectData.zones.find(
-                                                            (z) => z.id === zone.zoneId
-                                                        )?.color || '#4ECDC4',
-                                                }}
-                                            ></div>
-                                        </h4>
-
-                                        {/* พื้นฐานของโซน */}
-                                        <div className="mb-6 grid grid-cols-2 gap-4">
-                                            <div className="rounded bg-gray-700 p-4">
-                                                <h5 className="mb-2 font-semibold text-yellow-400">
-                                                    🌱 ข้อมูลการปลูก
-                                                </h5>
-                                                <div className="space-y-1 text-sm">
-                                                    <div>
-                                                        <strong>พืช:</strong> {zone.plantType}
-                                                    </div>
-                                                    <div>
-                                                        <strong>ระยะห่างต้น:</strong>{' '}
-                                                        {zone.plantSpacing} ม.
-                                                    </div>
-                                                    <div>
-                                                        <strong>ระยะห่างแถว:</strong>{' '}
-                                                        {zone.rowSpacing} ม.
-                                                    </div>
-                                                    <div>
-                                                        <strong>จำนวนต้นไม้:</strong>{' '}
-                                                        <span className="font-bold text-green-400">
-                                                            {zone.actualPlantCount.toLocaleString()}{' '}
-                                                            ต้น
-                                                        </span>
-                                                    </div>
-                                                    <div>
-                                                        <strong>น้ำต่อต้น:</strong>{' '}
-                                                        {zone.waterNeedPerPlant} ล./ครั้ง
-                                                    </div>
-                                                    <div>
-                                                        <strong>น้ำรวมต่อครั้ง:</strong>{' '}
-                                                        <span className="font-bold text-blue-400">
-                                                            {formatWaterVolume(
-                                                                zone.actualTotalWaterPerSession
-                                                            )}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="rounded bg-gray-700 p-4">
-                                                <h5 className="mb-2 font-semibold text-blue-400">
-                                                    📐 ข้อมูลพื้นที่
-                                                </h5>
-                                                <div className="space-y-1 text-sm">
-                                                    <div>
-                                                        <strong>พื้นที่โซน:</strong>{' '}
-                                                        {formatArea(zone.zoneArea)}
-                                                    </div>
-                                                    <div>
-                                                        <strong>ความหนาแน่น:</strong>{' '}
-                                                        {zone.plantDensityPerSquareMeter.toFixed(3)}{' '}
-                                                        ต้น/ตร.ม.
-                                                    </div>
-                                                    <div>
-                                                        <strong>ประสิทธิภาพน้ำ:</strong>{' '}
-                                                        {zone.waterEfficiencyPerSquareMeter.toFixed(
-                                                            2
-                                                        )}{' '}
-                                                        ล./ตร.ม./ครั้ง
-                                                    </div>
-                                                    <div>
-                                                        <strong>การครอบคลุม:</strong>{' '}
-                                                        {zone.coveragePercentage.toFixed(1)}%
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* ข้อมูลท่อย่อยละเอียด */}
-                                        <div className="mb-6 rounded border border-green-600/30 bg-green-900/20 p-4">
-                                            <h5 className="mb-3 font-semibold text-green-400">
-                                                🔧 ท่อย่อยในโซนนี้
-                                            </h5>
-                                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div className="space-y-4">
+                                    {projectSummary.zoneDetails.map((zone) => (
+                                        <div key={zone.zoneId} className="rounded bg-gray-700 p-4">
+                                            <h4 className="mb-3 font-semibold text-green-300">
+                                                {zone.zoneName}
+                                            </h4>
+                                            
+                                            {/* Zone Basic Info */}
+                                            <div className="mb-3 grid grid-cols-2 gap-4 text-sm">
                                                 <div>
-                                                    <div>
-                                                        <strong>จำนวนท่อย่อย:</strong>{' '}
-                                                        {zone.branchPipeCount} เส้น
-                                                    </div>
-                                                    <div>
-                                                        <strong>ท่อย่อยยาวที่สุด:</strong>{' '}
-                                                        <span className="font-bold text-yellow-400">
-                                                            {formatDistance(zone.longestBranchPipe)}
-                                                        </span>
-                                                    </div>
-                                                    <div>
-                                                        <strong>ท่อย่อยสั้นที่สุด:</strong>{' '}
-                                                        {formatDistance(zone.shortestBranchPipe)}
+                                                    <span className="text-gray-400">พื้นที่โซน:</span>
+                                                    <div className="font-bold text-green-400">
+                                                        {formatAreaInRai(zone.areaInRai)}
                                                     </div>
                                                 </div>
                                                 <div>
-                                                    <div>
-                                                        <strong>ความยาวเฉลี่ย:</strong>{' '}
-                                                        {formatDistance(
-                                                            zone.averageBranchPipeLength
-                                                        )}
+                                                    <span className="text-gray-400">จำนวนต้นไม้:</span>
+                                                    <div className="font-bold text-yellow-400">
+                                                        {zone.plantCount.toLocaleString()} ต้น
                                                     </div>
-                                                    <div>
-                                                        <strong>ท่อย่อยยาวรวม:</strong>{' '}
-                                                        <span className="font-bold text-green-400">
-                                                            {formatDistance(
-                                                                zone.totalBranchPipeLength
-                                                            )}
-                                                        </span>
+                                                </div>
+                                                <div className="col-span-2">
+                                                    <span className="text-gray-400">ปริมาณน้ำต่อครั้ง:</span>
+                                                    <div className="font-bold text-cyan-400">
+                                                        {formatWaterVolume(zone.waterNeedPerSession)}
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
 
-                                        {/* ข้อมูลท่อเมนรองละเอียด */}
-                                        <div className="mb-6 rounded border border-purple-600/30 bg-purple-900/20 p-4">
-                                            <h5 className="mb-3 font-semibold text-purple-400">
-                                                🔩 ท่อเมนรองในโซนนี้
-                                            </h5>
-                                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                                <div>
-                                                    <div>
-                                                        <strong>จำนวนท่อเมนรอง:</strong>{' '}
-                                                        {zone.subMainPipeCount} เส้น
+                                            {/* Zone Pipes */}
+                                            <div className="space-y-2 text-xs">
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div className="rounded bg-blue-900/30 p-2">
+                                                        <div className="text-blue-300">ท่อเมนในโซน</div>
+                                                        <div>ยาวที่สุด: {formatDistance(zone.mainPipesInZone.longest)}</div>
+                                                        <div>รวม: {formatDistance(zone.mainPipesInZone.totalLength)}</div>
                                                     </div>
-                                                    <div>
-                                                        <strong>ท่อเมนรองยาวที่สุด:</strong>{' '}
-                                                        <span className="font-bold text-yellow-400">
-                                                            {formatDistance(
-                                                                zone.longestSubMainPipe
-                                                            )}
-                                                        </span>
-                                                    </div>
-                                                    <div>
-                                                        <strong>ท่อเมนรองสั้นที่สุด:</strong>{' '}
-                                                        {formatDistance(zone.shortestSubMainPipe)}
+                                                    <div className="rounded bg-purple-900/30 p-2">
+                                                        <div className="text-purple-300">ท่อเมนรองในโซน</div>
+                                                        <div>ยาวที่สุด: {formatDistance(zone.subMainPipesInZone.longest)}</div>
+                                                        <div>รวม: {formatDistance(zone.subMainPipesInZone.totalLength)}</div>
                                                     </div>
                                                 </div>
-                                                <div>
-                                                    <div>
-                                                        <strong>ความยาวเฉลี่ย:</strong>{' '}
-                                                        {formatDistance(
-                                                            zone.averageSubMainPipeLength
-                                                        )}
-                                                    </div>
-                                                    <div>
-                                                        <strong>ท่อเมนรองยาวรวม:</strong>{' '}
-                                                        <span className="font-bold text-purple-400">
-                                                            {formatDistance(
-                                                                zone.totalSubMainPipeLength
-                                                            )}
-                                                        </span>
-                                                    </div>
+                                                <div className="rounded bg-green-900/30 p-2">
+                                                    <div className="text-green-300">ท่อย่อยในโซน</div>
+                                                    <div>ยาวที่สุด: {formatDistance(zone.branchPipesInZone.longest)} | รวม: {formatDistance(zone.branchPipesInZone.totalLength)}</div>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {/* Pipes Tab - ระบบท่อ */}
-                        {activeTab === 'pipes' && (
-                            <div className="space-y-6">
-                                <h3 className="text-2xl font-semibold text-blue-400">
-                                    🔧 ระบบท่อครบถ้วน
-                                </h3>
-
-                                {/* ข้อมูลท่อเมนละเอียด */}
-                                <div className="rounded-lg bg-gray-800 p-6">
-                                    <h4 className="mb-4 text-xl font-semibold text-blue-400">
-                                        🚰 ระบบท่อเมนจากปั๊มน้ำ
-                                    </h4>
-
-                                    <div className="mb-6 grid grid-cols-2 gap-4">
-                                        <div className="rounded bg-gray-700 p-4">
-                                            <h5 className="mb-2 font-semibold text-blue-300">
-                                                📊 สถิติท่อเมนรวม
-                                            </h5>
-                                            <div className="space-y-1 text-sm">
-                                                <div>
-                                                    <strong>จำนวนท่อเมน:</strong>{' '}
-                                                    {projectStats.mainPipeStats.totalMainPipes} เส้น
-                                                </div>
-                                                <div>
-                                                    <strong>ท่อเมนยาวที่สุด:</strong>{' '}
-                                                    <span className="font-bold text-yellow-400">
-                                                        {formatDistance(
-                                                            projectStats.mainPipeStats
-                                                                .longestMainPipe
-                                                        )}
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <strong>ท่อเมนสั้นที่สุด:</strong>{' '}
-                                                    {formatDistance(
-                                                        projectStats.mainPipeStats.shortestMainPipe
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <strong>ความยาวเฉลี่ย:</strong>{' '}
-                                                    {formatDistance(
-                                                        projectStats.mainPipeStats
-                                                            .averageMainPipeLength
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <strong>ความยาวรวม:</strong>{' '}
-                                                    <span className="font-bold text-blue-400">
-                                                        {formatDistance(
-                                                            projectStats.mainPipeStats
-                                                                .totalMainPipeLength
-                                                        )}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="rounded bg-gray-700 p-4">
-                                            <h5 className="mb-2 font-semibold text-yellow-300">
-                                                🎯 การวิเคราะห์ระยะทาง
-                                            </h5>
-                                            <div className="space-y-1 text-sm">
-                                                <div>
-                                                    <strong>ปลายทางไกลสุด:</strong>
-                                                </div>
-                                                <div className="ml-2 text-yellow-400">
-                                                    {
-                                                        projectStats.mainPipeStats
-                                                            .farthestDestination.zoneName
-                                                    }
-                                                </div>
-                                                <div className="ml-2">
-                                                    <span className="font-bold text-red-400">
-                                                        {formatDistance(
-                                                            projectStats.mainPipeStats
-                                                                .farthestDestination.distance
-                                                        )}
-                                                    </span>
-                                                </div>
-                                                <div className="mt-2">
-                                                    <strong>ปลายทางใกล้สุด:</strong>
-                                                </div>
-                                                <div className="ml-2 text-green-400">
-                                                    {
-                                                        projectStats.mainPipeStats
-                                                            .closestDestination.zoneName
-                                                    }
-                                                </div>
-                                                <div className="ml-2">
-                                                    <span className="font-bold text-green-400">
-                                                        {formatDistance(
-                                                            projectStats.mainPipeStats
-                                                                .closestDestination.distance
-                                                        )}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* รายละเอียดท่อเมนแต่ละเส้น */}
-                                    <div className="rounded border border-blue-600/30 bg-blue-900/20 p-4">
-                                        <h5 className="mb-3 font-semibold text-blue-300">
-                                            📋 รายละเอียดท่อเมนแต่ละเส้น
-                                        </h5>
-                                        <div className="space-y-2 text-sm">
-                                            {projectStats.mainPipeStats.allMainPipeDetails.map(
-                                                (pipe, index) => (
-                                                    <div
-                                                        key={pipe.pipeId}
-                                                        className="flex items-center justify-between rounded bg-gray-700 p-3"
-                                                    >
-                                                        <div>
-                                                            <strong>ท่อเมน {index + 1}:</strong> ไป
-                                                            {pipe.destinationName}
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <div className="font-bold text-blue-300">
-                                                                {formatDistance(pipe.length)}
-                                                            </div>
-                                                            <div className="text-xs text-gray-400">
-                                                                Ø{pipe.diameter}mm | {pipe.material}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* สรุปท่อแต่ละประเภท */}
-                                <div className="grid grid-cols-3 gap-6">
-                                    <div className="rounded-lg bg-gray-800 p-4">
-                                        <h4 className="mb-3 text-lg font-semibold text-blue-400">
-                                            🔵 ท่อเมน
-                                        </h4>
-                                        <div className="space-y-2 text-sm">
-                                            <div className="flex justify-between">
-                                                <span>จำนวน:</span>
-                                                <span className="font-bold">
-                                                    {projectStats.totalMainPipes} เส้น
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>ยาวรวม:</span>
-                                                <span className="font-bold text-blue-400">
-                                                    {formatDistance(
-                                                        projectStats.totalMainPipeLength
-                                                    )}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>เฉลี่ย:</span>
-                                                <span>
-                                                    {formatDistance(
-                                                        projectStats.mainPipeStats
-                                                            .averageMainPipeLength
-                                                    )}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="rounded-lg bg-gray-800 p-4">
-                                        <h4 className="mb-3 text-lg font-semibold text-purple-400">
-                                            🟣 ท่อเมนรอง
-                                        </h4>
-                                        <div className="space-y-2 text-sm">
-                                            <div className="flex justify-between">
-                                                <span>จำนวน:</span>
-                                                <span className="font-bold">
-                                                    {projectStats.totalSubMainPipes} เส้น
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>ยาวรวม:</span>
-                                                <span className="font-bold text-purple-400">
-                                                    {formatDistance(
-                                                        projectStats.totalSubMainPipeLength
-                                                    )}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>เฉลี่ย:</span>
-                                                <span>
-                                                    {projectStats.totalSubMainPipes > 0
-                                                        ? formatDistance(
-                                                              projectStats.totalSubMainPipeLength /
-                                                                  projectStats.totalSubMainPipes
-                                                          )
-                                                        : '0 ม.'}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="rounded-lg bg-gray-800 p-4">
-                                        <h4 className="mb-3 text-lg font-semibold text-green-400">
-                                            🟢 ท่อย่อย
-                                        </h4>
-                                        <div className="space-y-2 text-sm">
-                                            <div className="flex justify-between">
-                                                <span>จำนวน:</span>
-                                                <span className="font-bold">
-                                                    {projectStats.totalBranchPipes} เส้น
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>ยาวรวม:</span>
-                                                <span className="font-bold text-green-400">
-                                                    {formatDistance(
-                                                        projectStats.totalBranchPipeLength
-                                                    )}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>เฉลี่ย:</span>
-                                                <span>
-                                                    {projectStats.totalBranchPipes > 0
-                                                        ? formatDistance(
-                                                              projectStats.totalBranchPipeLength /
-                                                                  projectStats.totalBranchPipes
-                                                          )
-                                                        : '0 ม.'}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* สรุปรวมท่อทั้งหมด */}
-                                <div className="rounded-lg bg-gray-800 p-6">
-                                    <h4 className="mb-4 text-xl font-semibold text-yellow-400">
-                                        📊 สรุประบบท่อทั้งหมด
-                                    </h4>
-                                    <div className="grid grid-cols-2 gap-6">
-                                        <div className="space-y-3">
-                                            <div className="flex justify-between text-lg">
-                                                <span>ความยาวท่อรวมทั้งหมด:</span>
-                                                <span className="font-bold text-yellow-400">
-                                                    {formatDistance(projectStats.totalPipeLength)}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>จำนวนท่อรวมทั้งหมด:</span>
-                                                <span className="font-bold">
-                                                    {projectStats.totalPipeSections} ท่อน
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2 text-sm">
-                                            <div className="flex justify-between">
-                                                <span>• ท่อเมน:</span>
-                                                <span>
-                                                    {formatDistance(
-                                                        projectStats.totalMainPipeLength
-                                                    )}{' '}
-                                                    (
-                                                    {(
-                                                        (projectStats.totalMainPipeLength /
-                                                            projectStats.totalPipeLength) *
-                                                        100
-                                                    ).toFixed(1)}
-                                                    %)
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>• ท่อเมนรอง:</span>
-                                                <span>
-                                                    {formatDistance(
-                                                        projectStats.totalSubMainPipeLength
-                                                    )}{' '}
-                                                    (
-                                                    {(
-                                                        (projectStats.totalSubMainPipeLength /
-                                                            projectStats.totalPipeLength) *
-                                                        100
-                                                    ).toFixed(1)}
-                                                    %)
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>• ท่อย่อย:</span>
-                                                <span>
-                                                    {formatDistance(
-                                                        projectStats.totalBranchPipeLength
-                                                    )}{' '}
-                                                    (
-                                                    {(
-                                                        (projectStats.totalBranchPipeLength /
-                                                            projectStats.totalPipeLength) *
-                                                        100
-                                                    ).toFixed(1)}
-                                                    %)
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    ))}
                                 </div>
                             </div>
                         )}
 
-                        {/* Detailed Tab - รายงานละเอียด */}
-                        {activeTab === 'detailed' && (
-                            <div className="space-y-6">
-                                <h3 className="text-2xl font-semibold text-purple-400">
-                                    📋 รายงานสมบูรณ์แบบ
-                                </h3>
-
-                                {/* ส่วนหัวรายงาน */}
-                                <div className="rounded-lg border border-purple-500/30 bg-gray-800 p-6">
-                                    <h4 className="mb-4 text-center text-xl font-semibold">
-                                        🌱 รายงานการออกแบบระบบน้ำสวนผลไม้
-                                    </h4>
-                                    <div className="space-y-1 text-center text-sm text-gray-300">
-                                        <div>
-                                            โครงการ: <strong>{projectStats.projectName}</strong>
-                                        </div>
-                                        <div>
-                                            วันที่สร้าง:{' '}
-                                            {new Date(projectData.createdAt).toLocaleDateString(
-                                                'th-TH'
-                                            )}
-                                        </div>
-                                        <div>
-                                            รายงาน ณ วันที่:{' '}
-                                            {new Date().toLocaleDateString('th-TH')}
-                                        </div>
-                                    </div>
+                        {/* Enhanced Tips and Troubleshooting */}
+                        <div className="rounded-lg bg-blue-900/20 p-6">
+                            <h3 className="mb-4 text-xl font-semibold text-blue-400">💡 เคล็ดลับและแก้ปัญหา</h3>
+                            <div className="space-y-3 text-sm">
+                                <div className="rounded bg-blue-900/30 p-3">
+                                    <h4 className="font-semibold text-blue-300">🗺️ การควบคุมแผนที่:</h4>
+                                    <ul className="mt-2 space-y-1 text-xs text-gray-300">
+                                        <li>• หมุนแผนที่ได้ 360 องศา ด้วยแถบลื่น</li>
+                                        <li>• ล็อกการซูมและลาก เพื่อป้องกันการเปลี่ยนแปลง</li>
+                                        <li>• ปรับขนาดท่อและไอคอนเพื่อมองเห็นชัดขึ้น</li>
+                                        <li>• รีเซ็ตการหมุนและขนาดได้ตลอดเวลา</li>
+                                    </ul>
                                 </div>
-
-                                {/* 1. สรุปการปลูก */}
-                                <div className="rounded-lg bg-gray-800 p-6">
-                                    <h4 className="mb-4 text-lg font-bold text-green-400">
-                                        1️⃣ สรุปการปลูก
-                                    </h4>
-                                    <div className="grid grid-cols-2 gap-4 text-sm">
-                                        <div>
-                                            <div>
-                                                • พื้นที่รวม:{' '}
-                                                <strong>
-                                                    {formatArea(projectStats.totalArea)}
-                                                </strong>
-                                            </div>
-                                            <div>
-                                                • จำนวนโซน:{' '}
-                                                <strong>{projectStats.numberOfZones} โซน</strong>
-                                            </div>
-                                            <div>
-                                                • ต้นไม้ทั้งหมด:{' '}
-                                                <strong className="text-green-400">
-                                                    {projectStats.actualTotalPlants.toLocaleString()}{' '}
-                                                    ต้น
-                                                </strong>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <div>
-                                                • น้ำต่อครั้งรวม:{' '}
-                                                <strong className="text-blue-400">
-                                                    {formatWaterVolume(
-                                                        projectStats.actualTotalWaterPerSession
-                                                    )}
-                                                </strong>
-                                            </div>
-                                            <div>
-                                                • ความหนาแน่นเฉลี่ย:{' '}
-                                                <strong>
-                                                    {(
-                                                        projectStats.actualTotalPlants /
-                                                        projectStats.totalArea
-                                                    ).toFixed(3)}{' '}
-                                                    ต้น/ตร.ม.
-                                                </strong>
-                                            </div>
-                                        </div>
-                                    </div>
+                                
+                                <div className="rounded bg-green-900/30 p-3">
+                                    <h4 className="font-semibold text-green-300">📷 การบันทึกภาพแผนที่:</h4>
+                                    <ul className="mt-2 space-y-1 text-xs text-gray-300">
+                                        <li>• การหมุนจะถูกรีเซ็ตอัตโนมัติเมื่อสร้างภาพ</li>
+                                        <li>• ปรับขนาดไอคอนก่อนสร้างภาพเพื่อผลลัพธ์ที่ดี</li>
+                                        <li>• ใช้ Screenshot หากการสร้างภาพอัตโนมัติไม่สำเร็จ</li>
+                                    </ul>
                                 </div>
-
-                                {/* 2. รายละเอียดแต่ละโซน */}
-                                <div className="rounded-lg bg-gray-800 p-6">
-                                    <h4 className="mb-4 text-lg font-bold text-green-400">
-                                        2️⃣ รายละเอียดแต่ละโซน
-                                    </h4>
-                                    <div className="space-y-4">
-                                        {projectStats.zoneStats.map((zone, index) => (
-                                            <div
-                                                key={zone.zoneId}
-                                                className="rounded bg-gray-700 p-4"
-                                            >
-                                                <h5 className="mb-2 font-semibold text-yellow-400">
-                                                    โซน {index + 1}: {zone.zoneName}
-                                                </h5>
-                                                <div className="grid grid-cols-2 gap-4 text-sm">
-                                                    <div>
-                                                        <div>
-                                                            • พืช: <strong>{zone.plantType}</strong>
-                                                        </div>
-                                                        <div>
-                                                            • ระยะห่าง:{' '}
-                                                            <strong>
-                                                                {zone.plantSpacing} ×{' '}
-                                                                {zone.rowSpacing} ม.
-                                                            </strong>
-                                                        </div>
-                                                        <div>
-                                                            • จำนวนต้นไม้:{' '}
-                                                            <strong className="text-green-400">
-                                                                {zone.actualPlantCount.toLocaleString()}{' '}
-                                                                ต้น
-                                                            </strong>
-                                                        </div>
-                                                        <div>
-                                                            • น้ำต่อครั้ง:{' '}
-                                                            <strong className="text-blue-400">
-                                                                {formatWaterVolume(
-                                                                    zone.actualTotalWaterPerSession
-                                                                )}
-                                                            </strong>
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <div>
-                                                            • ท่อย่อยยาวที่สุด:{' '}
-                                                            <strong className="text-yellow-400">
-                                                                {formatDistance(
-                                                                    zone.longestBranchPipe
-                                                                )}
-                                                            </strong>
-                                                        </div>
-                                                        <div>
-                                                            • ท่อย่อยยาวรวม:{' '}
-                                                            <strong className="text-green-400">
-                                                                {formatDistance(
-                                                                    zone.totalBranchPipeLength
-                                                                )}
-                                                            </strong>
-                                                        </div>
-                                                        <div>
-                                                            • ท่อเมนรองยาวที่สุด:{' '}
-                                                            <strong className="text-yellow-400">
-                                                                {formatDistance(
-                                                                    zone.longestSubMainPipe
-                                                                )}
-                                                            </strong>
-                                                        </div>
-                                                        <div>
-                                                            • ท่อเมนรองยาวรวม:{' '}
-                                                            <strong className="text-purple-400">
-                                                                {formatDistance(
-                                                                    zone.totalSubMainPipeLength
-                                                                )}
-                                                            </strong>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* 3. ระบบท่อเมน */}
-                                <div className="rounded-lg bg-gray-800 p-6">
-                                    <h4 className="mb-4 text-lg font-bold text-blue-400">
-                                        3️⃣ ระบบท่อเมนจากปั๊มน้ำ
-                                    </h4>
-                                    <div className="space-y-2 text-sm">
-                                        <div>
-                                            • จำนวนท่อเมน:{' '}
-                                            <strong>
-                                                {projectStats.mainPipeStats.totalMainPipes} เส้น
-                                            </strong>
-                                        </div>
-                                        <div>
-                                            • ท่อเมนยาวรวม:{' '}
-                                            <strong className="text-blue-400">
-                                                {formatDistance(
-                                                    projectStats.mainPipeStats.totalMainPipeLength
-                                                )}
-                                            </strong>
-                                        </div>
-                                        <div>
-                                            • ท่อเมนยาวที่สุด:{' '}
-                                            <strong className="text-yellow-400">
-                                                {formatDistance(
-                                                    projectStats.mainPipeStats.longestMainPipe
-                                                )}
-                                            </strong>
-                                        </div>
-                                        <div>
-                                            • ปลายทางไกลสุด:{' '}
-                                            <strong className="text-red-400">
-                                                {
-                                                    projectStats.mainPipeStats.farthestDestination
-                                                        .zoneName
-                                                }{' '}
-                                                (
-                                                {formatDistance(
-                                                    projectStats.mainPipeStats.farthestDestination
-                                                        .distance
-                                                )}
-                                                )
-                                            </strong>
-                                        </div>
-                                        <div>
-                                            • ปลายทางใกล้สุด:{' '}
-                                            <strong className="text-green-400">
-                                                {
-                                                    projectStats.mainPipeStats.closestDestination
-                                                        .zoneName
-                                                }{' '}
-                                                (
-                                                {formatDistance(
-                                                    projectStats.mainPipeStats.closestDestination
-                                                        .distance
-                                                )}
-                                                )
-                                            </strong>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* 4. สรุประบบท่อ */}
-                                <div className="rounded-lg bg-gray-800 p-6">
-                                    <h4 className="mb-4 text-lg font-bold text-purple-400">
-                                        4️⃣ สรุประบบท่อทั้งหมด
-                                    </h4>
-                                    <div className="grid grid-cols-2 gap-4 text-sm">
-                                        <div>
-                                            <div>
-                                                • ท่อเมน:{' '}
-                                                <strong>
-                                                    {projectStats.totalMainPipes} เส้น (
-                                                    {formatDistance(
-                                                        projectStats.totalMainPipeLength
-                                                    )}
-                                                    )
-                                                </strong>
-                                            </div>
-                                            <div>
-                                                • ท่อเมนรอง:{' '}
-                                                <strong>
-                                                    {projectStats.totalSubMainPipes} เส้น (
-                                                    {formatDistance(
-                                                        projectStats.totalSubMainPipeLength
-                                                    )}
-                                                    )
-                                                </strong>
-                                            </div>
-                                            <div>
-                                                • ท่อย่อย:{' '}
-                                                <strong>
-                                                    {projectStats.totalBranchPipes} เส้น (
-                                                    {formatDistance(
-                                                        projectStats.totalBranchPipeLength
-                                                    )}
-                                                    )
-                                                </strong>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <div>
-                                                • ความยาวรวมทั้งหมด:{' '}
-                                                <strong className="text-yellow-400">
-                                                    {formatDistance(projectStats.totalPipeLength)}
-                                                </strong>
-                                            </div>
-                                            <div>
-                                                • จำนวนท่อรวม:{' '}
-                                                <strong>
-                                                    {projectStats.totalPipeSections} ท่อน
-                                                </strong>
-                                            </div>
-                                            <div>
-                                                • การกระจายท่อ:{' '}
-                                                <strong>
-                                                    {(
-                                                        projectStats.totalPipeLength /
-                                                        projectStats.totalArea
-                                                    ).toFixed(2)}{' '}
-                                                    ม./ตร.ม.
-                                                </strong>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* 5. การวิเคราะห์ประสิทธิภาพ */}
-                                <div className="rounded-lg bg-gray-800 p-6">
-                                    <h4 className="mb-4 text-lg font-bold text-yellow-400">
-                                        5️⃣ การวิเคราะห์ประสิทธิภาพ
-                                    </h4>
-                                    <div className="grid grid-cols-3 gap-4 text-sm">
-                                        <div className="text-center">
-                                            <div>ประสิทธิภาพระบบ</div>
-                                            <div className="text-2xl font-bold text-green-400">
-                                                {projectStats.systemEfficiency.toFixed(1)}%
-                                            </div>
-                                        </div>
-                                        <div className="text-center">
-                                            <div>ความสมดุลการกระจายน้ำ</div>
-                                            <div className="text-2xl font-bold text-blue-400">
-                                                {projectStats.waterDistributionBalance.toFixed(1)}%
-                                            </div>
-                                        </div>
-                                        <div className="text-center">
-                                            <div>การเพิ่มประสิทธิภาพท่อ</div>
-                                            <div className="text-2xl font-bold text-purple-400">
-                                                {projectStats.pipeOptimization.toFixed(1)}%
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* 6. สรุปพันธุ์พืช */}
-                                <div className="rounded-lg bg-gray-800 p-6">
-                                    <h4 className="mb-4 text-lg font-bold text-green-400">
-                                        6️⃣ สรุปพันธุ์พืชที่ปลูก
-                                    </h4>
-                                    <div className="space-y-2 text-sm">
-                                        {Object.entries(projectStats.plantVarieties).map(
-                                            ([plantName, data]) => (
-                                                <div
-                                                    key={plantName}
-                                                    className="flex justify-between"
-                                                >
-                                                    <span>• {plantName}:</span>
-                                                    <span>
-                                                        <strong className="text-green-400">
-                                                            {data.totalCount.toLocaleString()} ต้น
-                                                        </strong>{' '}
-                                                        (กระจายใน:{' '}
-                                                        {data.zones
-                                                            .map((z) => z.zoneName)
-                                                            .join(', ')}
-                                                        )
-                                                    </span>
-                                                </div>
-                                            )
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* 7. ข้อมูลอุปกรณ์ */}
-                                <div className="rounded-lg bg-gray-800 p-6">
-                                    <h4 className="mb-4 text-lg font-bold text-blue-400">
-                                        7️⃣ ข้อมูลอุปกรณ์
-                                    </h4>
-                                    <div className="text-sm">
-                                        <div>
-                                            • ปั๊มน้ำ:{' '}
-                                            <strong>
-                                                {projectData.pump ? '1 เครื่อง' : 'ไม่มี'}
-                                            </strong>
-                                        </div>
-                                        {projectData.pump && (
-                                            <>
-                                                <div className="ml-4">
-                                                    - ประเภท:{' '}
-                                                    {projectData.pump.type === 'centrifugal'
-                                                        ? 'เซนตริฟิวกัล'
-                                                        : projectData.pump.type === 'submersible'
-                                                          ? 'จมน้ำ'
-                                                          : 'เจ็ท'}
-                                                </div>
-                                                <div className="ml-4">
-                                                    - กำลังส่ง: {projectData.pump.capacity} ล./นาที
-                                                </div>
-                                                <div className="ml-4">
-                                                    - ความสูงยก: {projectData.pump.head} ม.
-                                                </div>
-                                            </>
-                                        )}
-                                        <div>
-                                            • พื้นที่หลีกเลี่ยง:{' '}
-                                            <strong>
-                                                {projectData.exclusionAreas?.length || 0} พื้นที่
-                                            </strong>
-                                        </div>
-                                    </div>
+                                
+                                <div className="rounded bg-yellow-900/30 p-3">
+                                    <h4 className="font-semibold text-yellow-300">🔧 แก้ปัญหาทั่วไป:</h4>
+                                    <ul className="mt-2 space-y-1 text-xs text-gray-300">
+                                        <li>• ปิด popup blocker ถ้ารายงานไม่เปิด</li>
+                                        <li>• รีเซ็ตการหมุนหากแผนที่ดูแปลก</li>
+                                        <li>• ใช้ขนาดไอคอนปานกลาง (1.0x) สำหรับผลลัพธ์ดีที่สุด</li>
+                                    </ul>
                                 </div>
                             </div>
-                        )}
+                        </div>
                     </div>
                 </div>
 
@@ -2483,61 +1298,48 @@ export default function ComprehensiveHorticultureResultsPage() {
                 {/* Action Buttons */}
                 <div className="mt-12 flex justify-center gap-4">
                     <button
+                        onClick={handleSaveToDatabase}
+                        disabled={savingToDatabase}
+                        className="rounded-lg bg-purple-600 px-6 py-3 font-semibold transition-colors hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {savingToDatabase ? (
+                            <>
+                                <svg className="mr-2 inline h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                กำลังบันทึก...
+                            </>
+                        ) : (
+                            '💾 บันทึกโครงการ'
+                        )}
+                    </button>
+                    <button
                         onClick={handleNewProject}
                         className="rounded-lg bg-green-600 px-6 py-3 font-semibold transition-colors hover:bg-green-700"
                     >
                         ➕ โครงการใหม่
                     </button>
                     <button
-                        onClick={handleEditProject}
+                        onClick={() => router.visit('/product')}
                         className="rounded-lg bg-blue-600 px-6 py-3 font-semibold transition-colors hover:bg-blue-700"
                     >
-                        ✏️ แก้ไขโครงการ
+                        คำนวณระบบน้ำ
                     </button>
-                    <button
-                        onClick={handleSaveToDatabase}
-                        disabled={savingToDatabase || saveSuccess}
-                        className="rounded-lg bg-yellow-600 px-6 py-3 font-semibold transition-colors hover:bg-yellow-700 disabled:cursor-not-allowed disabled:bg-gray-600"
-                    >
-                        {savingToDatabase ? (
-                            <>
-                                <div className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                                กำลังบันทึก...
-                            </>
-                        ) : (
-                            '💾 บันทึกลงฐานข้อมูล'
-                        )}
-                    </button>
-                    <button
-                        onClick={handleDownloadStats}
-                        className="rounded-lg bg-purple-600 px-6 py-3 font-semibold transition-colors hover:bg-purple-700"
-                    >
-                        📊 ดาวน์โหลดรายงาน
-                    </button>
-                    {mapImageUrl && (
-                        <button
-                            onClick={handleDownloadImage}
-                            className="rounded-lg bg-orange-600 px-6 py-3 font-semibold transition-colors hover:bg-orange-700"
-                        >
-                            🖼️ ดาวน์โหลดแผนที่
-                        </button>
-                    )}
                 </div>
 
-                {/* Footer */}
+                {/* Enhanced Footer */}
                 <div className="mt-12 text-center text-gray-400">
                     <p>
-                        ระบบออกแบบการวางระบบน้ำสวนผลไม้ - รายงานสมบูรณ์ | สร้างเมื่อ{' '}
+                        ระบบออกแบบการวางระบบน้ำสวนผลไม้ | สร้างเมื่อ{' '}
                         {new Date().toLocaleDateString('th-TH')}
                     </p>
-                    <p className="mt-2 text-sm">
-                        🌱 <strong>คุณสมบัติใหม่:</strong> รายงานครบถ้วนทุกรายละเอียด,
-                        แผนที่ความละเอียดสูง, สถิติลึกระดับโซน
-                    </p>
-                    <p className="mt-1 text-sm text-green-300">
-                        📊 ข้อมูลที่แสดงเป็นจำนวนจริงที่นับจากจุดต้นไม้บนแผนที่
-                        พร้อมการวิเคราะห์ครบถ้วนทุกระบบ
-                    </p>
+                    <div className="mt-2 text-sm text-green-300">
+                        <p>🗺️ <strong>แผนที่แบบใหม่:</strong> หมุนได้ 360° + ล็อกซูม + ปรับขนาดไอคอน</p>
+                        <p>📷 <strong>ระบบบันทึกภาพ:</strong> รีเซ็ตการหมุนอัตโนมัติ + คู่มือ Screenshot</p>
+                        <p>📄 <strong>ระบบรายงาน:</strong> PDF / HTML / JSON / CSV + แก้ปัญหาครบครัน</p>
+                    </div>
+                </div>
                 </div>
             </div>
 

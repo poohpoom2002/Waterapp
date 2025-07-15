@@ -1,17 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { MapContainer, TileLayer, Polygon, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import axios from 'axios';
 import { useLanguage } from '../contexts/LanguageContext';
-import LanguageSwitcher from '../components/LanguageSwitcher';
 import Footer from '../components/Footer';
+import Navbar from '../components/Navbar';
 
 // Types
 type Field = {
     id: string;
     name: string;
+    customerName?: string;
+    userName?: string;
+    category?: string;
     area: Array<{ lat: number; lng: number }>;
     plantType: {
         id: number;
@@ -136,38 +139,22 @@ const FieldCard = ({
     onDelete: (fieldId: string) => void;
     t: (key: string) => string;
 }) => {
-    const calculateAreaInRai = (coordinates: Array<{ lat: number; lng: number }>): number => {
-        if (coordinates.length < 3) return 0;
-
-        const toMeters = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
-            const R = 6371000;
-            const dLat = ((lat2 - lat1) * Math.PI) / 180;
-            const dLng = ((lng2 - lng1) * Math.PI) / 180;
-            const a =
-                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos((lat1 * Math.PI) / 180) *
-                    Math.cos((lat2 * Math.PI) / 180) *
-                    Math.sin(dLng / 2) *
-                    Math.sin(dLng / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c;
-        };
-
-        let area = 0;
-        for (let i = 0; i < coordinates.length; i++) {
-            const j = (i + 1) % coordinates.length;
-            area += coordinates[i].lat * coordinates[j].lng;
-            area -= coordinates[j].lat * coordinates[i].lng;
+    const getCategoryDisplay = (category: string) => {
+        switch (category) {
+            case 'horticulture':
+                return { name: 'พืชสวน', icon: '🌳', color: 'text-green-400' };
+            case 'home-garden':
+                return { name: 'สวนบ้าน', icon: '🏡', color: 'text-blue-400' };
+            case 'greenhouse':
+                return { name: 'โรงเรือน', icon: '🌱', color: 'text-purple-400' };
+            case 'field-crop':
+                return { name: 'พืชไร่', icon: '🌾', color: 'text-yellow-400' };
+            default:
+                return { name: 'พืชสวน', icon: '🌳', color: 'text-green-400' };
         }
-        area = Math.abs(area) / 2;
-
-        const areaInSquareMeters =
-            area * 111000 * 111000 * Math.cos((coordinates[0].lat * Math.PI) / 180);
-        return areaInSquareMeters / 1600;
     };
 
-    const areaInRai = calculateAreaInRai(field.area);
-    const totalWaterNeed = field.totalPlants * field.plantType.water_needed;
+    const categoryInfo = getCategoryDisplay(field.category || 'horticulture');
 
     return (
         <div
@@ -177,9 +164,17 @@ const FieldCard = ({
             <div className="mb-3 flex items-start justify-between">
                 <div className="flex-1">
                     <h3 className="text-lg font-semibold text-white">{field.name}</h3>
-                    <span className="text-xs text-gray-400">
-                        {new Date(field.createdAt).toLocaleDateString()}
-                    </span>
+                    <div className="mt-2 flex items-center gap-2">
+                        <span className={`text-sm ${categoryInfo.color}`}>
+                            {categoryInfo.icon} {categoryInfo.name}
+                        </span>
+                    </div>
+                    <div className="mt-2 text-xs text-gray-400">
+                        <div>{new Date(field.createdAt).toLocaleDateString('th-TH')}</div>
+                        {field.customerName && (
+                            <div className="text-blue-300">ลูกค้า: {field.customerName}</div>
+                        )}
+                    </div>
                 </div>
                 <button
                     onClick={(e) => {
@@ -198,25 +193,6 @@ const FieldCard = ({
                         />
                     </svg>
                 </button>
-            </div>
-
-            <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                    <span className="text-gray-400">{t('plant_type')}:</span>
-                    <span className="text-white">{field.plantType.name}</span>
-                </div>
-                <div className="flex justify-between">
-                    <span className="text-gray-400">{t('area')}:</span>
-                    <span className="text-white">{areaInRai.toFixed(2)} rai</span>
-                </div>
-                <div className="flex justify-between">
-                    <span className="text-gray-400">{t('plants')}:</span>
-                    <span className="text-white">{field.totalPlants}</span>
-                </div>
-                <div className="flex justify-between">
-                    <span className="text-gray-400">{t('water_need')}:</span>
-                    <span className="text-white">{totalWaterNeed.toFixed(2)} L/day</span>
-                </div>
             </div>
 
             <div className="mt-3 border-t border-gray-700 pt-3">
@@ -414,6 +390,8 @@ const CategorySelectionModal = ({
 
 export default function Home() {
     const { t } = useLanguage();
+    const page = usePage();
+    const auth = (page.props as any).auth;
     const [fields, setFields] = useState<Field[]>([]);
     const [loading, setLoading] = useState(true);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -449,6 +427,7 @@ export default function Home() {
         setShowCategoryModal(false);
         // Clear any saved data when starting a new project
         localStorage.removeItem('horticultureIrrigationData');
+        localStorage.removeItem('editingFieldId'); // Clear editing field ID for new projects
         router.visit(category.route);
     };
 
@@ -510,39 +489,41 @@ export default function Home() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-900 p-6">
-            <div className="mx-auto max-w-7xl">
-                {/* Header */}
-                <div className="mb-8 flex items-center justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold text-white">
-                            {t('water_management_system')}
-                        </h1>
-                        <p className="mt-2 text-gray-400">{t('manage_irrigation_fields')}</p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                        <LanguageSwitcher />
-                        <button
-                            onClick={handleAddField}
-                            className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition-colors duration-200 hover:bg-blue-700"
-                        >
-                            <svg
-                                className="h-5 w-5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
+        <div className="min-h-screen bg-gray-900">
+            <Navbar />
+            
+            <div className="p-6">
+                <div className="mx-auto max-w-7xl">
+                    {/* Main Content Header */}
+                    <div className="mb-8">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h1 className="text-3xl font-bold text-white">
+                                    {t('water_management_system')}
+                                </h1>
+                                <p className="mt-2 text-gray-400">{t('manage_irrigation_fields')}</p>
+                            </div>
+                            <button
+                                onClick={handleAddField}
+                                className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition-colors duration-200 hover:bg-blue-700"
                             >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M12 4v16m8-8H4"
-                                />
-                            </svg>
-                            {t('add_field')}
-                        </button>
+                                <svg
+                                    className="h-5 w-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M12 4v16m8-8H4"
+                                    />
+                                </svg>
+                                {t('add_field')}
+                            </button>
+                        </div>
                     </div>
-                </div>
 
                 {/* Content */}
                 {fields.length === 0 ? (
@@ -581,6 +562,7 @@ export default function Home() {
                         </div>
                     </div>
                 )}
+                </div>
             </div>
 
             {/* Footer */}

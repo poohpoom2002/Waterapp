@@ -4,6 +4,8 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\FarmController;
 use App\Http\Controllers\HomeGardenController;
+use App\Http\Controllers\ProfilePhotoController;
+use App\Http\Controllers\ProfileController;
 
 /*
 |--------------------------------------------------------------------------
@@ -18,7 +20,9 @@ use App\Http\Controllers\HomeGardenController;
 
 Route::get('/', function () {
     return Inertia::render('home');
-})->name('home');
+})->middleware(['auth', 'verified'])->name('home');
+
+Route::get('/profile', [ProfileController::class, 'show'])->middleware(['auth', 'verified'])->name('profile');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {
@@ -110,10 +114,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/api/fields', [FarmController::class, 'getFields'])->name('get-fields');
     Route::put('/api/fields/{fieldId}', [FarmController::class, 'updateField'])->name('update-field');
     Route::delete('/api/fields/{fieldId}', [FarmController::class, 'deleteField'])->name('delete-field');
+    
+    // Profile Photo Routes
+    Route::post('/api/profile-photo/upload', [ProfilePhotoController::class, 'upload'])->name('profile-photo.upload');
+    Route::delete('/api/profile-photo/delete', [ProfilePhotoController::class, 'delete'])->name('profile-photo.delete');
 });
 
 // Include other route files
 require __DIR__.'/auth.php';
+require __DIR__.'/settings.php';
 // Note: The 'api.php' file is typically loaded by the RouteServiceProvider, not here.
 // If your project requires it here, you can uncomment the line below.
 // require __DIR__.'/api.php';

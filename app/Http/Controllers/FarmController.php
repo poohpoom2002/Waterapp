@@ -3,7 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Farm;
+use App\Models\Field;
+use App\Models\FieldLayer;
+use App\Models\FieldZone;
 use App\Models\PlantType;
+use App\Models\PlantingPoint;
+use App\Models\Pipe;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -960,7 +965,8 @@ class FarmController extends Controller
     public function getFields(): JsonResponse
     {
         try {
-            $fields = \App\Models\Field::with(['plantType', 'zones', 'plantingPoints', 'pipes', 'layers'])
+            $fields = Field::with(['plantType', 'user', 'zones', 'plantingPoints', 'pipes', 'layers'])
+                ->where('user_id', auth()->id())
                 ->orderBy('created_at', 'desc')
                 ->get();
 
@@ -968,6 +974,9 @@ class FarmController extends Controller
                 return [
                     'id' => $field->id,
                     'name' => $field->name,
+                    'customerName' => $field->customer_name,
+                    'userName' => $field->user ? $field->user->name : 'Unknown',
+                    'category' => $field->category ?? 'horticulture',
                     'area' => $field->area_coordinates,
                     'plantType' => [
                         'id' => $field->plantType->id,
@@ -1009,7 +1018,7 @@ class FarmController extends Controller
     public function getField($fieldId): JsonResponse
     {
         try {
-            $field = \App\Models\Field::with(['plantType', 'zones', 'plantingPoints', 'pipes', 'layers'])->find($fieldId);
+            $field = Field::with(['plantType', 'user', 'zones', 'plantingPoints', 'pipes', 'layers'])->find((int) $fieldId);
             
             if (!$field) {
                 return response()->json([
@@ -1021,6 +1030,8 @@ class FarmController extends Controller
             $formattedField = [
                 'id' => $field->id,
                 'field_name' => $field->name,
+                'customer_name' => $field->customer_name,
+                'user_name' => $field->user ? $field->user->name : 'Unknown',
                 'area_coordinates' => $field->area_coordinates,
                 'plantType' => $field->plantType ? [
                     'id' => $field->plantType->id,
@@ -1108,7 +1119,7 @@ class FarmController extends Controller
                 throw new \Exception('Invalid field ID provided');
             }
 
-            $field = \App\Models\Field::findOrFail($fieldId);
+            $field = Field::findOrFail((int) $fieldId);
 
             // Delete related data (this will cascade due to foreign key constraints)
             $field->delete();
@@ -1140,6 +1151,7 @@ class FarmController extends Controller
         try {
             \Log::info('Starting field update with request data:', [
                 'field_id' => $fieldId,
+                'field_id_type' => gettype($fieldId),
                 'field_name' => $request->field_name,
                 'plant_type_id' => $request->plant_type_id,
                 'zones_count' => count($request->zones ?? []),
@@ -1149,6 +1161,8 @@ class FarmController extends Controller
 
             $validator = Validator::make($request->all(), [
                 'field_name' => 'required|string|max:255',
+                'customer_name' => 'nullable|string|max:255',
+                'category' => 'nullable|string|in:horticulture,home-garden,greenhouse,field-crop',
                 'area_coordinates' => 'required|array|min:3',
                 'area_coordinates.*.lat' => 'required|numeric',
                 'area_coordinates.*.lng' => 'required|numeric',
@@ -1199,12 +1213,21 @@ class FarmController extends Controller
             \DB::beginTransaction();
 
             try {
-                // Find the existing field
-                $field = \App\Models\Field::findOrFail($fieldId);
+                            // Find the existing field
+            \Log::info('Looking for field with ID:', ['field_id' => $fieldId, 'casted_id' => (int) $fieldId]);
+            
+            // Check if field exists first
+            $field = Field::find((int) $fieldId);
+            if (!$field) {
+                \Log::error('Field not found:', ['field_id' => $fieldId, 'casted_id' => (int) $fieldId]);
+                throw new \Exception("Field with ID {$fieldId} not found");
+            }
 
                 // Update the field
                 $field->update([
                     'name' => $request->field_name,
+                    'customer_name' => $request->customer_name,
+                    'category' => $request->category,
                     'area_coordinates' => $request->area_coordinates,
                     'plant_type_id' => $request->plant_type_id,
                     'total_plants' => $request->total_plants,
@@ -1222,7 +1245,7 @@ class FarmController extends Controller
                 // Save new layers
                 if (!empty($request->layers)) {
                     foreach ($request->layers as $layer) {
-                        \App\Models\FieldLayer::create([
+                        FieldLayer::create([
                             'field_id' => $field->id,
                             'type' => $layer['type'],
                             'coordinates' => $layer['coordinates'],
@@ -1235,7 +1258,7 @@ class FarmController extends Controller
                 $zoneMap = []; // Map to track zone IDs for planting points and pipes
                 if (!empty($request->zones)) {
                     foreach ($request->zones as $zone) {
-                        $fieldZone = \App\Models\FieldZone::create([
+                        $fieldZone = FieldZone::create([
                             'field_id' => $field->id,
                             'name' => $zone['name'],
                             'polygon_coordinates' => $zone['polygon_coordinates'],
@@ -1252,7 +1275,7 @@ class FarmController extends Controller
                         // Generate a unique point_id to avoid conflicts
                         $uniquePointId = 'plant-' . time() . '-' . uniqid();
                         
-                        \App\Models\PlantingPoint::create([
+                        PlantingPoint::create([
                             'field_id' => $field->id,
                             'field_zone_id' => isset($zoneMap[$point['zone_id']]) ? $zoneMap[$point['zone_id']] : null,
                             'latitude' => $point['lat'],
@@ -1265,7 +1288,7 @@ class FarmController extends Controller
                 // Save new pipes
                 if (!empty($request->pipes)) {
                     foreach ($request->pipes as $pipe) {
-                        \App\Models\Pipe::create([
+                        Pipe::create([
                             'field_id' => $field->id,
                             'field_zone_id' => isset($zoneMap[$pipe['zone_id']]) ? $zoneMap[$pipe['zone_id']] : null,
                             'type' => $pipe['type'],
@@ -1332,6 +1355,8 @@ class FarmController extends Controller
 
             $validator = Validator::make($request->all(), [
                 'field_name' => 'required|string|max:255',
+                'customer_name' => 'nullable|string|max:255',
+                'category' => 'nullable|string|in:horticulture,home-garden,greenhouse,field-crop',
                 'area_coordinates' => 'required|array|min:3',
                 'area_coordinates.*.lat' => 'required|numeric',
                 'area_coordinates.*.lng' => 'required|numeric',
@@ -1383,8 +1408,11 @@ class FarmController extends Controller
 
             try {
                 // Create the field
-                $field = \App\Models\Field::create([
+                $field = Field::create([
                     'name' => $request->field_name,
+                    'customer_name' => $request->customer_name,
+                    'category' => $request->category,
+                    'user_id' => auth()->id(),
                     'area_coordinates' => $request->area_coordinates,
                     'plant_type_id' => $request->plant_type_id,
                     'total_plants' => $request->total_plants,
@@ -1396,7 +1424,7 @@ class FarmController extends Controller
                 // Save layers
                 if (!empty($request->layers)) {
                     foreach ($request->layers as $layer) {
-                        \App\Models\FieldLayer::create([
+                        FieldLayer::create([
                             'field_id' => $field->id,
                             'type' => $layer['type'],
                             'coordinates' => $layer['coordinates'],
@@ -1409,7 +1437,7 @@ class FarmController extends Controller
                 $zoneMap = []; // Map to track zone IDs for planting points and pipes
                 if (!empty($request->zones)) {
                     foreach ($request->zones as $zone) {
-                        $fieldZone = \App\Models\FieldZone::create([
+                        $fieldZone = FieldZone::create([
                             'field_id' => $field->id,
                             'name' => $zone['name'],
                             'polygon_coordinates' => $zone['polygon_coordinates'],
@@ -1436,7 +1464,7 @@ class FarmController extends Controller
                 // Save pipes
                 if (!empty($request->pipes)) {
                     foreach ($request->pipes as $pipe) {
-                        \App\Models\Pipe::create([
+                        Pipe::create([
                             'field_id' => $field->id,
                             'field_zone_id' => isset($zoneMap[$pipe['zone_id']]) ? $zoneMap[$pipe['zone_id']] : null,
                             'type' => $pipe['type'],
