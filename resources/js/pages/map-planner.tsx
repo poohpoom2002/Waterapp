@@ -353,47 +353,71 @@ const isAreaWithinInitialMap = (newArea: LatLng[], initialMap: LatLng[]): boolea
 
 // Toast Notification Component
 const Toast: React.FC<{ message: string; onClose: () => void }> = ({ message, onClose }) => (
-  <div className="fixed top-6 right-6 z-[2000] bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg flex items-center animate-fade-in">
-    <span>{message}</span>
-    <button onClick={onClose} className="ml-4 text-white hover:text-gray-200 focus:outline-none">&times;</button>
-  </div>
+    <div className="fixed right-6 top-6 z-[2000] flex animate-fade-in items-center rounded-lg bg-green-600 px-6 py-3 text-white shadow-lg">
+        <span>{message}</span>
+        <button
+            onClick={onClose}
+            className="ml-4 text-white hover:text-gray-200 focus:outline-none"
+        >
+            &times;
+        </button>
+    </div>
 );
 
 // Area Configurator Component
 const AreaConfigurator: React.FC<{
-  layers: LayerData[];
-  activeButton: AreaType | null;
-  setActiveButton: (type: AreaType | null) => void;
-  toggleAreaType: (type: AreaType) => void;
-  AREA_DESCRIPTIONS: Record<AreaType, string>;
-  AREA_COLORS: Record<AreaType, string>;
-  canDraw: boolean;
-}> = ({ layers, activeButton, setActiveButton, toggleAreaType, AREA_DESCRIPTIONS, AREA_COLORS, canDraw }) => (
-  <div className="sticky top-6 animate-fade-in">
-    <label className="mb-1 block text-sm font-medium text-gray-300">Area Configuration</label>
-    <div className="space-y-2">
-      {Object.keys(AREA_DESCRIPTIONS).filter(type => type !== 'initial').map(type => (
-        <div key={type} className="flex items-center gap-4">
-          <span className="inline-block w-5 h-5 rounded-full border border-gray-400" style={{ background: AREA_COLORS[type as AreaType] }}></span>
-          <button
-            type="button"
-            onClick={() => canDraw && toggleAreaType(type as AreaType)}
-            className={`w-32 rounded px-4 py-2 text-white transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400
-              ${activeButton === type ? 'bg-blue-600 scale-105 shadow-lg' : 'bg-gray-700'}
-              ${!canDraw ? 'opacity-50 cursor-not-allowed' : ''}`}
-            style={{ borderColor: AREA_COLORS[type as AreaType], borderWidth: activeButton === type ? 2 : 0 }}
-            aria-pressed={activeButton === type}
-            aria-label={AREA_DESCRIPTIONS[type as AreaType]}
-            title={AREA_DESCRIPTIONS[type as AreaType]}
-            tabIndex={canDraw ? 0 : -1}
-            disabled={!canDraw}
-          >
-            {type === 'custompolygon' ? 'Other' : type.charAt(0).toUpperCase() + type.slice(1).replace('powerplant', 'Power Plant')}
-          </button>
+    layers: LayerData[];
+    activeButton: AreaType | null;
+    setActiveButton: (type: AreaType | null) => void;
+    toggleAreaType: (type: AreaType) => void;
+    AREA_DESCRIPTIONS: Record<AreaType, string>;
+    AREA_COLORS: Record<AreaType, string>;
+    canDraw: boolean;
+}> = ({
+    layers,
+    activeButton,
+    setActiveButton,
+    toggleAreaType,
+    AREA_DESCRIPTIONS,
+    AREA_COLORS,
+    canDraw,
+}) => (
+    <div className="sticky top-6 animate-fade-in">
+        <label className="mb-1 block text-sm font-medium text-gray-300">Area Configuration</label>
+        <div className="space-y-2">
+            {Object.keys(AREA_DESCRIPTIONS)
+                .filter((type) => type !== 'initial')
+                .map((type) => (
+                    <div key={type} className="flex items-center gap-4">
+                        <span
+                            className="inline-block h-5 w-5 rounded-full border border-gray-400"
+                            style={{ background: AREA_COLORS[type as AreaType] }}
+                        ></span>
+                        <button
+                            type="button"
+                            onClick={() => canDraw && toggleAreaType(type as AreaType)}
+                            className={`w-32 rounded px-4 py-2 text-white transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400
+              ${activeButton === type ? 'scale-105 bg-blue-600 shadow-lg' : 'bg-gray-700'}
+              ${!canDraw ? 'cursor-not-allowed opacity-50' : ''}`}
+                            style={{
+                                borderColor: AREA_COLORS[type as AreaType],
+                                borderWidth: activeButton === type ? 2 : 0,
+                            }}
+                            aria-pressed={activeButton === type}
+                            aria-label={AREA_DESCRIPTIONS[type as AreaType]}
+                            title={AREA_DESCRIPTIONS[type as AreaType]}
+                            tabIndex={canDraw ? 0 : -1}
+                            disabled={!canDraw}
+                        >
+                            {type === 'custompolygon'
+                                ? 'Other'
+                                : type.charAt(0).toUpperCase() +
+                                  type.slice(1).replace('powerplant', 'Power Plant')}
+                        </button>
+                    </div>
+                ))}
         </div>
-      ))}
     </div>
-  </div>
 );
 
 // Main Component
@@ -451,11 +475,15 @@ export default function MapPlanner() {
             return;
         }
         setActiveButton(type);
-        setStatus(`Draw the ${type === 'custompolygon' ? 'custom' : type.replace('powerplant', 'power plant')} area`);
+        setStatus(
+            `Draw the ${type === 'custompolygon' ? 'custom' : type.replace('powerplant', 'power plant')} area`
+        );
         // Enable polygon drawing
         const map = featureGroupRef.current?.leafletElement?._map;
         if (map) {
-            const drawControl = Object.values(map._layers).find((layer: any) => layer._drawingMode === 'polygon');
+            const drawControl = Object.values(map._layers).find(
+                (layer: any) => layer._drawingMode === 'polygon'
+            );
             if (drawControl) (drawControl as any).enable();
         }
     };
@@ -499,7 +527,11 @@ export default function MapPlanner() {
                 setCurrentZoom(currentZoom);
                 setTimeout(() => {
                     map.invalidateSize();
-                    map.setView(newCenter, currentZoom, { animate: true, duration: 1, padding: [50, 50] });
+                    map.setView(newCenter, currentZoom, {
+                        animate: true,
+                        duration: 1,
+                        padding: [50, 50],
+                    });
                 }, 100);
             }
             setStatus('Initial map area drawn. Now select an area type to continue.');
@@ -514,9 +546,17 @@ export default function MapPlanner() {
             return;
         }
         if (styleMap[currentType]) {
-            layer.setStyle({ color: styleMap[currentType].color, fillColor: styleMap[currentType].color, fillOpacity: 0.5, weight: 2 });
+            layer.setStyle({
+                color: styleMap[currentType].color,
+                fillColor: styleMap[currentType].color,
+                fillOpacity: 0.5,
+                weight: 2,
+            });
         }
-        setLayers((prevLayers) => [...prevLayers, { type: currentType, coordinates, isInitialMap: false, leafletId }]);
+        setLayers((prevLayers) => [
+            ...prevLayers,
+            { type: currentType, coordinates, isInitialMap: false, leafletId },
+        ]);
         resetModes();
         setStatus(`${currentType} area added. Select another area type to continue.`);
         setToast(`${currentType.charAt(0).toUpperCase() + currentType.slice(1)} area created!`);
@@ -525,7 +565,9 @@ export default function MapPlanner() {
 
     const onDeleted = (e: any) => {
         const deletedLayerIds = new Set();
-        e.layers.eachLayer((layer: any) => { deletedLayerIds.add(layer._leaflet_id); });
+        e.layers.eachLayer((layer: any) => {
+            deletedLayerIds.add(layer._leaflet_id);
+        });
         if (deletedLayerIds.size > 0) {
             setLayers((prevLayers) => prevLayers.filter((l) => !deletedLayerIds.has(l.leafletId)));
             setStatus('Area deleted. Select another area type to continue.');
@@ -592,9 +634,9 @@ export default function MapPlanner() {
             };
 
             // Log the final data being sent
-            console.log('Data being sent to generate-tree page:', formattedData);
+            console.log('Data being sent to horticulture planner page:', formattedData);
 
-            router.visit('/generate-tree', {
+            router.visit('/horticulture/planner', {
                 method: 'get',
                 data: formattedData,
                 preserveState: true,
@@ -688,23 +730,23 @@ export default function MapPlanner() {
 
     // Recenter handler
     const handleRecenter = () => {
-      setRecenterKey(prev => prev + 1);
-      setMapShouldRecenter(true);
+        setRecenterKey((prev) => prev + 1);
+        setMapShouldRecenter(true);
     };
 
     // Pan map to the right when sidebar appears
     useEffect(() => {
-      if (mapRef.current && layers.length > 0 && !sidebarPanned) {
-        // Estimate sidebar width (1/3 of screen on large screens)
-        const sidebarWidth = window.innerWidth >= 1024 ? window.innerWidth / 3 : 0;
-        if (sidebarWidth > 0) {
-          mapRef.current.panBy([sidebarWidth / 3, 0], { animate: true });
-          setSidebarPanned(true);
+        if (mapRef.current && layers.length > 0 && !sidebarPanned) {
+            // Estimate sidebar width (1/3 of screen on large screens)
+            const sidebarWidth = window.innerWidth >= 1024 ? window.innerWidth / 3 : 0;
+            if (sidebarWidth > 0) {
+                mapRef.current.panBy([sidebarWidth / 3, 0], { animate: true });
+                setSidebarPanned(true);
+            }
         }
-      }
-      if (layers.length === 0 && sidebarPanned) {
-        setSidebarPanned(false); // Reset if user removes all layers
-      }
+        if (layers.length === 0 && sidebarPanned) {
+            setSidebarPanned(false); // Reset if user removes all layers
+        }
     }, [layers.length, sidebarPanned]);
 
     return (
@@ -724,11 +766,11 @@ export default function MapPlanner() {
                 </div>
                 {/* Recenter Map Button */}
                 <button
-                  onClick={handleRecenter}
-                  className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  title="Recenter map to main area"
+                    onClick={handleRecenter}
+                    className="rounded bg-blue-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    title="Recenter map to main area"
                 >
-                  Recenter Map
+                    Recenter Map
                 </button>
             </div>
 
@@ -777,11 +819,7 @@ export default function MapPlanner() {
                                             return;
                                         } else if (e.target.value === 'Field Crop') {
                                             const filtered = plantTypes.filter((plant) =>
-                                                [
-                                                    'Rice',
-                                                    'Corn',
-                                                    'Sugarcane',
-                                                ].includes(plant.name)
+                                                ['Rice', 'Corn', 'Sugarcane'].includes(plant.name)
                                             );
                                             setFilteredPlants(filtered);
                                         } else {
@@ -922,13 +960,13 @@ export default function MapPlanner() {
 
                             {/* Area Configurator - only allow drawing if initial area exists */}
                             <AreaConfigurator
-                              layers={layers}
-                              activeButton={activeButton}
-                              setActiveButton={setActiveButton}
-                              toggleAreaType={toggleAreaType}
-                              AREA_DESCRIPTIONS={AREA_DESCRIPTIONS}
-                              AREA_COLORS={AREA_COLORS}
-                              canDraw={!!layers.find(l => l.isInitialMap)}
+                                layers={layers}
+                                activeButton={activeButton}
+                                setActiveButton={setActiveButton}
+                                toggleAreaType={toggleAreaType}
+                                AREA_DESCRIPTIONS={AREA_DESCRIPTIONS}
+                                AREA_COLORS={AREA_COLORS}
+                                canDraw={!!layers.find((l) => l.isInitialMap)}
                             />
                         </>
                     )}
@@ -938,7 +976,7 @@ export default function MapPlanner() {
                     className={`space-y-4 ${layers.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}`}
                 >
                     <div
-                        className={`relative ${layers.length === 0 ? 'h-[800px]' : 'h-[750px]'} w-full overflow-hidden rounded-2xl border border-gray-700 shadow-2xl bg-gradient-to-br from-gray-800 to-gray-900 ${layers.length === 0 ? 'w-full' : ''}`}
+                        className={`relative ${layers.length === 0 ? 'h-[800px]' : 'h-[750px]'} w-full overflow-hidden rounded-2xl border border-gray-700 bg-gradient-to-br from-gray-800 to-gray-900 shadow-2xl ${layers.length === 0 ? 'w-full' : ''}`}
                     >
                         <MapContainer
                             center={searchCenter || calculateMapCenter()}
@@ -998,19 +1036,20 @@ export default function MapPlanner() {
                                         polygon:
                                             layers.length === 0 || activeButton
                                                 ? {
-                                                    allowIntersection: true,
-                                                    showArea: true,
-                                                    drawError: {
-                                                        color: '#e1e4e8',
-                                                        message: '<strong>Error:</strong> Cannot draw outside the initial map area!',
-                                                    },
-                                                    shapeOptions: {
-                                                        color: '#3B82F6',
-                                                        fillOpacity: 0.3,
-                                                        weight: 2,
-                                                    },
-                                                    repeatMode: true,
-                                                }
+                                                      allowIntersection: true,
+                                                      showArea: true,
+                                                      drawError: {
+                                                          color: '#e1e4e8',
+                                                          message:
+                                                              '<strong>Error:</strong> Cannot draw outside the initial map area!',
+                                                      },
+                                                      shapeOptions: {
+                                                          color: '#3B82F6',
+                                                          fillOpacity: 0.3,
+                                                          weight: 2,
+                                                      },
+                                                      repeatMode: true,
+                                                  }
                                                 : false,
                                     }}
                                 />
@@ -1018,15 +1057,24 @@ export default function MapPlanner() {
                         </MapContainer>
                         {/* Floating Legend - only show in area config, smaller size */}
                         {layers.length > 0 && (
-                          <div className="absolute bottom-4 right-4 z-[1100] bg-white/90 rounded-lg shadow-lg p-2 flex flex-col gap-1 min-w-[120px] w-fit text-sm">
-                            <div className="font-semibold text-gray-800 mb-1 text-xs">Legend</div>
-                            {Object.entries(AREA_DESCRIPTIONS).filter(([type]) => type !== 'initial').map(([type, desc]) => (
-                              <div key={type} className="flex items-center gap-1">
-                                <span className="inline-block w-3 h-3 rounded-full border border-gray-400" style={{ background: AREA_COLORS[type as AreaType] }}></span>
-                                <span className="text-xs text-gray-700">{desc}</span>
-                              </div>
-                            ))}
-                          </div>
+                            <div className="absolute bottom-4 right-4 z-[1100] flex w-fit min-w-[120px] flex-col gap-1 rounded-lg bg-white/90 p-2 text-sm shadow-lg">
+                                <div className="mb-1 text-xs font-semibold text-gray-800">
+                                    Legend
+                                </div>
+                                {Object.entries(AREA_DESCRIPTIONS)
+                                    .filter(([type]) => type !== 'initial')
+                                    .map(([type, desc]) => (
+                                        <div key={type} className="flex items-center gap-1">
+                                            <span
+                                                className="inline-block h-3 w-3 rounded-full border border-gray-400"
+                                                style={{
+                                                    background: AREA_COLORS[type as AreaType],
+                                                }}
+                                            ></span>
+                                            <span className="text-xs text-gray-700">{desc}</span>
+                                        </div>
+                                    ))}
+                            </div>
                         )}
                     </div>
                 </div>

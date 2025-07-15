@@ -9,11 +9,9 @@ export default defineConfig({
             input: [
                 'resources/css/app.css',
                 'resources/js/app.tsx',
-                'resources/js/pages/mapplanner.tsx',
-                'resources/js/pages/generatetree.tsx',
                 'resources/js/pages/product.tsx',
-                'resources/js/pages/map-planner.tsx',
-                'resources/js/pages/generate-tree.tsx'
+                'resources/js/pages/greenhouse-planner.tsx',
+                'resources/js/pages/field-crop-planner.tsx'
             ],
             refresh: true,
         }),

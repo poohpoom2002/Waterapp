@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
+import axios from 'axios';
 import {
     MapContainer,
     TileLayer,
@@ -11,6 +12,8 @@ import {
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import Footer from '../components/Footer';
+import Navbar from '../components/Navbar';
 
 import {
     HorticultureProjectData,
@@ -21,6 +24,7 @@ import {
     formatWaterVolume,
     loadProjectData,
     navigateToPlanner,
+    isPointInPolygon,
 } from '../utils/horticultureUtils';
 
 import {
@@ -132,6 +136,8 @@ const createEnhancedPlantIcon = (size: number = 16) =>
     });
 
 export default function EnhancedHorticultureResultsPage() {
+    const page = usePage();
+    const auth = (page.props as any).auth;
     const [projectData, setProjectData] = useState<HorticultureProjectData | null>(null);
     const [projectSummary, setProjectSummary] = useState<ProjectSummaryData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -149,6 +155,11 @@ export default function EnhancedHorticultureResultsPage() {
     const [isCreatingImage, setIsCreatingImage] = useState(false);
     const [isCreatingPDF, setIsCreatingPDF] = useState(false);
     const [isCreatingExport, setIsCreatingExport] = useState(false);
+    
+    // Database save states
+    const [savingToDatabase, setSavingToDatabase] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
     
     const mapRef = useRef<HTMLDivElement>(null);
 
@@ -385,6 +396,15 @@ export default function EnhancedHorticultureResultsPage() {
     };
 
     const handleNewProject = () => {
+        localStorage.removeItem('horticultureIrrigationData');
+        localStorage.removeItem('editingFieldId');
+        router.visit('/horticulture/planner');
+    };
+
+    const handleEditProject = () => {
+        // Keep the saved data for editing
+        // Don't clear editingFieldId so the planner knows we're editing
+        router.visit('/horticulture/planner');
         navigateToPlanner();
     };
 
@@ -418,6 +438,229 @@ export default function EnhancedHorticultureResultsPage() {
         alert(guide);
     };
 
+    const handleSaveToDatabase = async () => {
+        if (!projectData || !projectSummary) return;
+
+        setSavingToDatabase(true);
+        setSaveError(null);
+        setSaveSuccess(false);
+
+        try {
+            // Check if we're editing an existing field by looking for fieldId in URL or localStorage
+            const urlParams = new URLSearchParams(window.location.search);
+            let fieldId = urlParams.get('fieldId') || localStorage.getItem('editingFieldId');
+
+            // Validate fieldId - if it's invalid, treat as new project
+            if (fieldId && (fieldId === 'null' || fieldId === 'undefined' || fieldId === '')) {
+                fieldId = null;
+                localStorage.removeItem('editingFieldId');
+            }
+
+            console.log('Detected fieldId for save operation:', fieldId);
+            console.log('URL params:', window.location.search);
+            console.log('localStorage editingFieldId:', localStorage.getItem('editingFieldId'));
+            // Prepare zones data
+            const zonesData =
+                projectData.zones?.map((zone) => ({
+                    id: zone.id,
+                    name: zone.name,
+                    polygon_coordinates: zone.coordinates.map((coord) => ({
+                        lat: coord.lat,
+                        lng: coord.lng,
+                    })),
+                    color: zone.color,
+                    pipe_direction: 'horizontal', // Default direction
+                })) || [];
+
+            // Prepare planting points data
+            const plantingPointsData =
+                projectData.plants?.map((plant) => {
+                    // Find which zone this plant belongs to
+                    let zoneId: number | null = null;
+                    if (projectData.useZones && projectData.zones) {
+                        for (const zone of projectData.zones) {
+                            if (isPointInPolygon(plant.position, zone.coordinates)) {
+                                zoneId = parseInt(zone.id);
+                                break;
+                            }
+                        }
+                    }
+
+                    return {
+                        lat: plant.position.lat,
+                        lng: plant.position.lng,
+                        point_id: plant.id, // Keep original ID for new saves, will be regenerated for updates
+                        zone_id: zoneId,
+                    };
+                }) || [];
+
+            // Prepare main pipes data
+            const mainPipesData =
+                projectData.mainPipes?.map((pipe) => ({
+                    type: 'main',
+                    direction: 'horizontal',
+                    start_lat: pipe.coordinates[0]?.lat || 0,
+                    start_lng: pipe.coordinates[0]?.lng || 0,
+                    end_lat: pipe.coordinates[pipe.coordinates.length - 1]?.lat || 0,
+                    end_lng: pipe.coordinates[pipe.coordinates.length - 1]?.lng || 0,
+                    length: pipe.length,
+                    plants_served: 0,
+                    water_flow: pipe.flowRate || 0,
+                    pipe_diameter: pipe.diameter,
+                    zone_id: null,
+                    row_index: null,
+                    col_index: null,
+                })) || [];
+
+            // Prepare sub-main pipes data
+            const subMainPipesData =
+                projectData.subMainPipes?.map((pipe) => ({
+                    type: 'submain',
+                    direction: 'horizontal',
+                    start_lat: pipe.coordinates[0]?.lat || 0,
+                    start_lng: pipe.coordinates[0]?.lng || 0,
+                    end_lat: pipe.coordinates[pipe.coordinates.length - 1]?.lat || 0,
+                    end_lng: pipe.coordinates[pipe.coordinates.length - 1]?.lng || 0,
+                    length: pipe.length,
+                    plants_served: 0,
+                    water_flow: 0,
+                    pipe_diameter: pipe.diameter || 0,
+                    zone_id: parseInt(pipe.zoneId),
+                    row_index: null,
+                    col_index: null,
+                })) || [];
+
+            // Prepare branch pipes data
+            const branchPipesData =
+                projectData.subMainPipes?.flatMap(
+                    (subMainPipe) =>
+                        subMainPipe.branchPipes?.map((branchPipe) => ({
+                            type: 'branch',
+                            direction: 'horizontal',
+                            start_lat: branchPipe.coordinates[0]?.lat || 0,
+                            start_lng: branchPipe.coordinates[0]?.lng || 0,
+                            end_lat:
+                                branchPipe.coordinates[branchPipe.coordinates.length - 1]?.lat || 0,
+                            end_lng:
+                                branchPipe.coordinates[branchPipe.coordinates.length - 1]?.lng || 0,
+                            length: branchPipe.length,
+                            plants_served: branchPipe.plants?.length || 0,
+                            water_flow: 0,
+                            pipe_diameter: branchPipe.diameter || 0,
+                            zone_id: parseInt(subMainPipe.zoneId),
+                            row_index: null,
+                            col_index: null,
+                        })) || []
+                ) || [];
+
+            // Prepare layers data (exclusion areas)
+            const layersData =
+                projectData.exclusionAreas?.map((area) => ({
+                    type: area.type,
+                    coordinates: area.coordinates.map((coord) => ({
+                        lat: coord.lat,
+                        lng: coord.lng,
+                    })),
+                    is_initial_map: false,
+                })) || [];
+
+            // Add main area as initial map layer
+            if (projectData.mainArea && projectData.mainArea.length > 0) {
+                layersData.unshift({
+                    type: 'other',
+                    coordinates: projectData.mainArea.map((coord) => ({
+                        lat: coord.lat,
+                        lng: coord.lng,
+                    })),
+                    is_initial_map: true,
+                });
+            }
+
+            const requestData = {
+                field_name: projectData.projectName,
+                customer_name: projectData.customerName || '',
+                category: 'horticulture', // Set category for horticulture projects
+                area_coordinates: projectData.mainArea,
+                plant_type_id: projectData.plants?.[0]?.plantData.id || 1,
+                total_plants: projectData.plants?.length || 0,
+                total_area: projectData.totalArea,
+                total_water_need: projectSummary.totalWaterNeedPerSession,
+                area_type: 'horticulture',
+                layers: layersData,
+                zones: zonesData,
+                planting_points: plantingPointsData,
+                pipes: [...mainPipesData, ...subMainPipesData, ...branchPipesData],
+            };
+
+            console.log('Saving horticulture project to database:', requestData);
+
+            let response;
+            if (fieldId && fieldId !== 'null' && fieldId !== 'undefined') {
+                // Verify field exists before updating
+                try {
+                    const fieldCheck = await axios.get(`/api/fields/${fieldId}`);
+                    if (!fieldCheck.data.success) {
+                        console.log('Field not found, creating new field instead');
+                        fieldId = null;
+                        localStorage.removeItem('editingFieldId');
+                    }
+                } catch (error) {
+                    console.log('Error checking field existence, creating new field instead');
+                    fieldId = null;
+                    localStorage.removeItem('editingFieldId');
+                }
+            }
+
+            if (fieldId && fieldId !== 'null' && fieldId !== 'undefined') {
+                // Update existing field
+                console.log('Updating existing field with ID:', fieldId);
+                response = await axios.put(`/api/fields/${fieldId}`, requestData, {
+                    headers: {
+                        'X-CSRF-TOKEN': document
+                            .querySelector('meta[name="csrf-token"]')
+                            ?.getAttribute('content'),
+                        'Content-Type': 'application/json',
+                    },
+                });
+            } else {
+                // Create new field
+                console.log('Creating new field');
+                response = await axios.post('/api/save-field', requestData, {
+                    headers: {
+                        'X-CSRF-TOKEN': document
+                            .querySelector('meta[name="csrf-token"]')
+                            ?.getAttribute('content'),
+                        'Content-Type': 'application/json',
+                    },
+                });
+            }
+
+            if (response.data.success) {
+                setSaveSuccess(true);
+                console.log('✅ Horticulture project saved successfully');
+
+                // Clear editing field ID after successful save
+                localStorage.removeItem('editingFieldId');
+
+                // Redirect immediately to home page
+                router.visit('/');
+            } else {
+                throw new Error('Failed to save project');
+            }
+        } catch (error) {
+            console.error('❌ Error saving horticulture project:', error);
+            const errorMessage = axios.isAxiosError(error)
+                ? error.response?.data?.message ||
+                  error.response?.data?.error ||
+                  error.message ||
+                  'Error saving project'
+                : 'An unexpected error occurred';
+            setSaveError(errorMessage);
+        } finally {
+            setSavingToDatabase(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-gray-900 text-white">
@@ -446,8 +689,10 @@ export default function EnhancedHorticultureResultsPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-900 p-6 text-white">
-            <div className="mx-auto w-full">
+        <div className="min-h-screen bg-gray-900 text-white">
+            <Navbar />
+            <div className="p-6">
+                <div className="mx-auto w-full">
                 {/* Header */}
                 <div className="mb-8 text-center">
                     <h1 className="mb-4 text-4xl font-bold text-green-400">
@@ -1035,8 +1280,40 @@ export default function EnhancedHorticultureResultsPage() {
                     </div>
                 </div>
 
+                {/* Success/Error Messages */}
+                {saveSuccess && (
+                    <div className="mt-6 flex items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/10 p-4 text-green-400">
+                        <span className="text-lg">✅</span>
+                        <span>โครงการบันทึกสำเร็จ! กำลังกลับไปหน้าหลัก</span>
+                    </div>
+                )}
+
+                {saveError && (
+                    <div className="mt-6 flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-red-400">
+                        <span className="text-lg">❌</span>
+                        <span>เกิดข้อผิดพลาด: {saveError}</span>
+                    </div>
+                )}
+
                 {/* Action Buttons */}
                 <div className="mt-12 flex justify-center gap-4">
+                    <button
+                        onClick={handleSaveToDatabase}
+                        disabled={savingToDatabase}
+                        className="rounded-lg bg-purple-600 px-6 py-3 font-semibold transition-colors hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {savingToDatabase ? (
+                            <>
+                                <svg className="mr-2 inline h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                กำลังบันทึก...
+                            </>
+                        ) : (
+                            '💾 บันทึกโครงการ'
+                        )}
+                    </button>
                     <button
                         onClick={handleNewProject}
                         className="rounded-lg bg-green-600 px-6 py-3 font-semibold transition-colors hover:bg-green-700"
@@ -1063,7 +1340,11 @@ export default function EnhancedHorticultureResultsPage() {
                         <p>📄 <strong>ระบบรายงาน:</strong> PDF / HTML / JSON / CSV + แก้ปัญหาครบครัน</p>
                     </div>
                 </div>
+                </div>
             </div>
+
+            {/* Footer */}
+            <Footer />
         </div>
     );
 }

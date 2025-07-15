@@ -14,6 +14,10 @@ import { EditControl } from 'react-leaflet-draw';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import L from 'leaflet';
+import { useLanguage } from '../contexts/LanguageContext';
+import LanguageSwitcher from '../components/LanguageSwitcher';
+import Footer from '../components/Footer';
+import Navbar from '../components/Navbar';
 
 interface Coordinate {
     lat: number;
@@ -1801,6 +1805,7 @@ export default function AdvancedGardenPlanner() {
 
     return (
         <div className="min-h-screen w-full overflow-hidden bg-gray-900">
+            <Navbar />
             <div className="container mx-auto w-full px-4 py-6">
                 <div className="mb-6 text-left">
                     <h1 className="mb-2 text-2xl font-bold text-white">
@@ -3411,6 +3416,9 @@ export default function AdvancedGardenPlanner() {
                     </div>
                 </div>
             </div>
+
+            {/* Footer */}
+            <Footer />
         </div>
     );
 }
