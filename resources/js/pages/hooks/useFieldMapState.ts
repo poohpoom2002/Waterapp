@@ -12,7 +12,7 @@ import {
     type MapTileType,
     type EquipmentType,
     type ObstacleType,
-} from '@/utils/fieldMapConstants';
+} from '@/pages/utils/fieldMapConstants';
 
 // Map State Hook
 export const useMapState = () => {

@@ -1,0 +1,459 @@
+/* Print Styles for Field Crop Summary */
+@media print {
+    /* Reset print margins and layout */
+    @page {
+        margin: 10mm;
+        size: A4;
+    }
+
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    /* Body and container adjustments */
+    body {
+        background: white !important;
+        color: black !important;
+        font-size: 11pt !important;
+        line-height: 1.3 !important;
+    }
+
+    /* Hide navigation and interactive elements */
+    .print\:hidden {
+        display: none !important;
+    }
+
+    /* Container and layout adjustments */
+    .container {
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* Grid layout for print */
+    .print\:grid-cols-1 {
+        grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+    }
+
+    .print\:grid-cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    .print\:grid-cols-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+
+    /* Spacing adjustments */
+    .print\:space-y-2 > * + * {
+        margin-top: 4pt !important;
+    }
+
+    .print\:space-y-3 > * + * {
+        margin-top: 6pt !important;
+    }
+
+    .print\:gap-2 {
+        gap: 4pt !important;
+    }
+
+    .print\:gap-4 {
+        gap: 8pt !important;
+    }
+
+    .print\:py-2 {
+        padding-top: 4pt !important;
+        padding-bottom: 4pt !important;
+    }
+
+    .print\:p-2 {
+        padding: 4pt !important;
+    }
+
+    .print\:p-3 {
+        padding: 6pt !important;
+    }
+
+    /* Background and border adjustments */
+    .print\:bg-white {
+        background-color: white !important;
+    }
+
+    .print\:bg-gray-50 {
+        background-color: #f9fafb !important;
+    }
+
+    .print\:bg-gray-100 {
+        background-color: #f3f4f6 !important;
+    }
+
+    .print\:border {
+        border: 1pt solid #d1d5db !important;
+    }
+
+    .print\:border-gray-200 {
+        border-color: #e5e7eb !important;
+    }
+
+    .print\:border-gray-300 {
+        border-color: #d1d5db !important;
+    }
+
+    .print\:border-gray-400 {
+        border-color: #9ca3af !important;
+    }
+
+    /* Text color adjustments */
+    .print\:text-black {
+        color: black !important;
+    }
+
+    .print\:text-gray-600 {
+        color: #4b5563 !important;
+    }
+
+    .print\:text-gray-700 {
+        color: #374151 !important;
+    }
+
+    /* Text size adjustments */
+    .print\:text-xs {
+        font-size: 8pt !important;
+    }
+
+    .print\:text-sm {
+        font-size: 9pt !important;
+    }
+
+    .print\:text-base {
+        font-size: 10pt !important;
+    }
+
+    .print\:text-lg {
+        font-size: 12pt !important;
+    }
+
+    .print\:text-xl {
+        font-size: 14pt !important;
+    }
+
+    .print\:text-2xl {
+        font-size: 16pt !important;
+    }
+
+    /* Map container adjustments */
+    .leaflet-container {
+        background: white !important;
+        border: 1pt solid #d1d5db !important;
+    }
+
+    /* Equipment marker adjustments for print */
+    .equipment-marker-icon {
+        background: white !important;
+        border: 1pt solid #666 !important;
+    }
+
+    /* Irrigation tooltip and marker adjustments */
+    .irrigation-marker-icon,
+    .drip-point-icon {
+        background: inherit !important;
+        border: 1pt solid #666 !important;
+    }
+
+    /* Zone color preservation */
+    .zone-color-indicator {
+        border: 1pt solid #666 !important;
+    }
+
+    /* Ensure all colors are preserved */
+    .bg-green-500,
+    .bg-blue-500,
+    .bg-red-500,
+    .bg-yellow-500,
+    .bg-cyan-500,
+    .bg-purple-500,
+    .bg-orange-500 {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    /* Page break controls */
+    .page-break-before {
+        page-break-before: always !important;
+    }
+
+    .page-break-after {
+        page-break-after: always !important;
+    }
+
+    .page-break-inside-avoid {
+        page-break-inside: avoid !important;
+    }
+
+    /* Header adjustments */
+    h1, h2, h3, h4, h5, h6 {
+        page-break-after: avoid !important;
+        color: black !important;
+    }
+
+    /* Table and grid improvements */
+    .grid {
+        display: grid !important;
+    }
+
+    /* Ensure proper spacing for print */
+    .rounded-lg {
+        border-radius: 3pt !important;
+    }
+
+    /* Map legend adjustments */
+    .legend-item {
+        display: flex !important;
+        align-items: center !important;
+        margin-bottom: 2pt !important;
+    }
+
+    .legend-color {
+        width: 8pt !important;
+        height: 8pt !important;
+        border-radius: 50% !important;
+        margin-right: 4pt !important;
+        border: 0.5pt solid #666 !important;
+    }
+
+    /* Summary statistics adjustments */
+    .stat-box {
+        border: 1pt solid #d1d5db !important;
+        background: #f9fafb !important;
+        padding: 4pt !important;
+        text-align: center !important;
+    }
+
+    .stat-value {
+        font-size: 12pt !important;
+        font-weight: bold !important;
+        color: black !important;
+    }
+
+    .stat-label {
+        font-size: 8pt !important;
+        color: #4b5563 !important;
+    }
+
+    /* Financial summary adjustments */
+    .financial-item {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        padding: 3pt 6pt !important;
+        border: 1pt solid #e5e7eb !important;
+        background: #f9fafb !important;
+        margin-bottom: 2pt !important;
+    }
+
+    .financial-value {
+        font-weight: bold !important;
+        color: black !important;
+    }
+
+    /* Zone details adjustments */
+    .zone-item {
+        border: 1pt solid #e5e7eb !important;
+        background: #f9fafb !important;
+        padding: 4pt !important;
+        margin-bottom: 2pt !important;
+        page-break-inside: avoid !important;
+    }
+
+    .zone-header {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        margin-bottom: 2pt !important;
+    }
+
+    .zone-details {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 3pt !important;
+        font-size: 9pt !important;
+    }
+
+    /* Infrastructure summary adjustments */
+    .infrastructure-grid {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr 1fr !important;
+        gap: 3pt !important;
+    }
+
+    .infrastructure-item {
+        text-align: center !important;
+        border: 1pt solid #e5e7eb !important;
+        background: #f9fafb !important;
+        padding: 3pt !important;
+    }
+
+    /* Crop information adjustments */
+    .crop-item {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        border: 1pt solid #e5e7eb !important;
+        background: #f9fafb !important;
+        padding: 4pt !important;
+        margin-bottom: 2pt !important;
+    }
+
+    .crop-info {
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    .crop-spacing {
+        text-align: right !important;
+        font-size: 8pt !important;
+    }
+
+    /* Map container for print */
+    .map-print-container {
+        height: 400pt !important;
+        border: 1pt solid #d1d5db !important;
+        page-break-inside: avoid !important;
+    }
+
+    /* Legend for print */
+    .map-legend {
+        border-top: 1pt solid #d1d5db !important;
+        background: #f9fafb !important;
+        padding: 4pt !important;
+    }
+
+    .legend-grid {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr 1fr !important;
+        gap: 2pt !important;
+        font-size: 8pt !important;
+    }
+
+    /* Equipment icons print adjustment */
+    .equipment-marker-icon img {
+        width: 16pt !important;
+        height: 16pt !important;
+    }
+
+    /* Title and header print styles */
+    .main-title {
+        font-size: 18pt !important;
+        font-weight: bold !important;
+        color: black !important;
+        margin-bottom: 6pt !important;
+    }
+
+    .section-title {
+        font-size: 14pt !important;
+        font-weight: bold !important;
+        color: black !important;
+        margin-bottom: 4pt !important;
+        border-bottom: 1pt solid #d1d5db !important;
+        padding-bottom: 2pt !important;
+    }
+
+    .subsection-title {
+        font-size: 11pt !important;
+        font-weight: bold !important;
+        color: black !important;
+        margin-bottom: 3pt !important;
+    }
+}
+
+/* Additional enhancements for screen display */
+@media screen {
+    /* Irrigation tooltip styles */
+    .irrigation-tooltip {
+        background: rgba(0, 0, 0, 0.8) !important;
+        color: white !important;
+        border-radius: 4px !important;
+        padding: 4px 8px !important;
+        font-size: 11px !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+    }
+
+    /* Plant tooltip styles */
+    .plant-tooltip {
+        background: rgba(0, 0, 0, 0.85) !important;
+        color: white !important;
+        border-radius: 6px !important;
+        padding: 6px 10px !important;
+        font-size: 12px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+        max-width: 200px !important;
+    }
+
+    /* Equipment marker hover effects */
+    .equipment-marker-icon:hover {
+        transform: scale(1.1) !important;
+        transition: transform 0.2s ease !important;
+    }
+
+    /* Irrigation marker hover effects */
+    .irrigation-marker-icon:hover {
+        transform: scale(1.2) !important;
+        transition: transform 0.2s ease !important;
+    }
+
+    /* Map controls styling */
+    .leaflet-control-zoom {
+        border-radius: 4px !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+    }
+
+    /* Enhanced equipment icons */
+    .custom-equipment-icon {
+        background: white !important;
+        border-radius: 50% !important;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+        transition: all 0.2s ease !important;
+    }
+
+    .custom-equipment-icon:hover {
+        transform: scale(1.15) !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+    }
+
+    /* Enhanced plant markers */
+    .plant-marker-icon {
+        background: white !important;
+        border-radius: 50% !important;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+        transition: all 0.2s ease !important;
+    }
+
+    .plant-marker-icon:hover {
+        transform: scale(1.1) !important;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4) !important;
+    }
+
+    /* Drip point styling */
+    .drip-point-icon {
+        transition: all 0.2s ease !important;
+    }
+
+    .drip-point-icon:hover {
+        transform: scale(1.5) !important;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .grid.lg\\:grid-cols-3 {
+            grid-template-columns: 1fr !important;
+        }
+        
+        .grid.lg\\:col-span-2 {
+            grid-column: span 1 !important;
+        }
+        
+        .map-container {
+            height: 400px !important;
+        }
+    }
+}
