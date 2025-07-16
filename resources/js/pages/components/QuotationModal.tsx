@@ -1,4 +1,4 @@
-// components/QuotationModal.tsx
+// resources\js\pages\components\QuotationModal.tsx
 import React from 'react';
 import { QuotationData, QuotationDataCustomer } from '../types/interfaces';
 

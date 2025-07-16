@@ -10,6 +10,9 @@ use App\Http\Controllers\Api\EquipmentCategoryController;
 use App\Http\Controllers\Api\EquipmentController;
 use App\Http\Controllers\Api\PumpAccessoryController;
 use App\Http\Controllers\Api\ImageUploadController;
+use App\Http\Controllers\AiChatController;
+
+
 
 /*
 |--------------------------------------------------------------------------
@@ -21,6 +24,9 @@ use App\Http\Controllers\Api\ImageUploadController;
 | be assigned to the "api" middleware group. Make something great!
 |
 */
+
+Route::get('/equipments/stats', [EquipmentController::class, 'stats']);
+Route::post('/ai-chat', [AiChatController::class, 'handleChat']);
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
@@ -45,6 +51,7 @@ Route::prefix('images')->group(function () {
     Route::delete('delete', [ImageUploadController::class, 'destroy']);
     Route::get('info', [ImageUploadController::class, 'show']);
     Route::get('/', [ImageUploadController::class, 'index']);
+    Route::get('check-storage', [ImageUploadController::class, 'checkStorage']);
 });
 
 // Equipment & Accessories API Routes
@@ -56,11 +63,9 @@ Route::apiResource('pump-accessories', PumpAccessoryController::class);
 Route::get('equipments/stats', [EquipmentController::class, 'getStats']);
 Route::post('equipments/search', [EquipmentController::class, 'search']);
 Route::get('equipments/by-category/{categoryName}', [EquipmentController::class, 'getByCategory']);
-// Add other special equipment routes here...
 
 
-// Legacy API Routes (for backward compatibility)
-Route::get('/sprinklers', [SprinklerController::class, 'index']); // Legacy
+Route::get('/sprinklers', [SprinklerController::class, 'index']); 
 Route::get('/api/sprinklers', fn() => app(EquipmentController::class)->getByCategory('sprinkler'));
 Route::get('/api/pumps', fn() => app(EquipmentController::class)->getByCategory('pump'));
 Route::get('/api/pipes', fn() => app(EquipmentController::class)->getByCategory('pipe'));

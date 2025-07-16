@@ -38,7 +38,10 @@ import {
     FaUnlink,
 } from 'react-icons/fa';
 
-const isPointInPolygon = (point: { lat: number; lng: number }, polygon: { lat: number; lng: number }[]): boolean => {
+const isPointInPolygon = (
+    point: { lat: number; lng: number },
+    polygon: { lat: number; lng: number }[]
+): boolean => {
     if (!point || !polygon || polygon.length < 3) return false;
 
     try {
@@ -76,7 +79,10 @@ const calculatePipeLength = (coordinates: { lat: number; lng: number }[]): numbe
     }
 };
 
-const calculateDistanceBetweenPoints = (point1: { lat: number; lng: number }, point2: { lat: number; lng: number }): number => {
+const calculateDistanceBetweenPoints = (
+    point1: { lat: number; lng: number },
+    point2: { lat: number; lng: number }
+): number => {
     try {
         const R = 6371000;
         const dLat = ((point2.lat - point1.lat) * Math.PI) / 180;
@@ -179,24 +185,27 @@ const findClosestPointOnPipe = (
     for (let i = 0; i < pipeCoordinates.length - 1; i++) {
         const segmentStart = pipeCoordinates[i];
         const segmentEnd = pipeCoordinates[i + 1];
-        
 
         const segmentLength = calculateDistanceBetweenPoints(segmentStart, segmentEnd);
         if (segmentLength === 0) continue;
 
-        const t = Math.max(0, Math.min(1, 
-            ((position.lat - segmentStart.lat) * (segmentEnd.lat - segmentStart.lat) +
-             (position.lng - segmentStart.lng) * (segmentEnd.lng - segmentStart.lng)) /
-            (segmentLength * segmentLength / (111000 * 111000))
-        ));
+        const t = Math.max(
+            0,
+            Math.min(
+                1,
+                ((position.lat - segmentStart.lat) * (segmentEnd.lat - segmentStart.lat) +
+                    (position.lng - segmentStart.lng) * (segmentEnd.lng - segmentStart.lng)) /
+                    ((segmentLength * segmentLength) / (111000 * 111000))
+            )
+        );
 
         const closestOnSegment = {
             lat: segmentStart.lat + t * (segmentEnd.lat - segmentStart.lat),
-            lng: segmentStart.lng + t * (segmentEnd.lng - segmentStart.lng)
+            lng: segmentStart.lng + t * (segmentEnd.lng - segmentStart.lng),
         };
 
         const distance = calculateDistanceBetweenPoints(position, closestOnSegment);
-        
+
         if (distance < minDistance) {
             minDistance = distance;
             closestPoint = closestOnSegment;
@@ -204,11 +213,13 @@ const findClosestPointOnPipe = (
         }
     }
 
-    return closestPoint ? {
-        position: closestPoint,
-        distance: minDistance,
-        segmentIndex: bestSegmentIndex
-    } : null;
+    return closestPoint
+        ? {
+              position: closestPoint,
+              distance: minDistance,
+              segmentIndex: bestSegmentIndex,
+          }
+        : null;
 };
 
 const generateEnhancedBranchPipes = (
@@ -323,8 +334,10 @@ const generateEnhancedBranchPipes = (
     return branchPipes;
 };
 
-
-const calculatePipeDirection = (coordinates: { lat: number; lng: number }[], segmentIndex: number) => {
+const calculatePipeDirection = (
+    coordinates: { lat: number; lng: number }[],
+    segmentIndex: number
+) => {
     const start = coordinates[segmentIndex];
     const end = coordinates[Math.min(segmentIndex + 1, coordinates.length - 1)];
     return { lat: end.lat - start.lat, lng: end.lng - start.lng };
@@ -333,7 +346,9 @@ const calculatePipeDirection = (coordinates: { lat: number; lng: number }[], seg
 const calculatePerpendicularDirection = (direction: { lat: number; lng: number }) => {
     const perpendicular = { lat: -direction.lng, lng: direction.lat };
     const length = Math.sqrt(perpendicular.lat ** 2 + perpendicular.lng ** 2);
-    return length > 0 ? { lat: perpendicular.lat / length, lng: perpendicular.lng / length } : { lat: 0, lng: 1 };
+    return length > 0
+        ? { lat: perpendicular.lat / length, lng: perpendicular.lng / length }
+        : { lat: 0, lng: 1 };
 };
 
 const rotatePerpendicular = (direction: { lat: number; lng: number }, angleDegrees: number) => {
@@ -375,11 +390,15 @@ const calculateOptimalDistanceToPolygonBoundary = (
 
         const startBufferFromSubMain = plantSpacing * 0.5;
         const availableLengthForPlants = maxValidDistance - startBufferFromSubMain;
-        
+
         if (availableLengthForPlants <= 0) return 0;
 
-        const numberOfPlantsOnBranch = Math.max(1, Math.floor(availableLengthForPlants / plantSpacing) + 1);
-        const optimalBranchLength = startBufferFromSubMain + (numberOfPlantsOnBranch - 1) * plantSpacing;
+        const numberOfPlantsOnBranch = Math.max(
+            1,
+            Math.floor(availableLengthForPlants / plantSpacing) + 1
+        );
+        const optimalBranchLength =
+            startBufferFromSubMain + (numberOfPlantsOnBranch - 1) * plantSpacing;
         return Math.min(optimalBranchLength, maxValidDistance);
     } catch (error) {
         console.error('Error calculating optimal distance to boundary:', error);
@@ -395,7 +414,10 @@ const calculateBranchEndPosition = (
 ) => {
     return {
         lat: startPos.lat + (direction.lat * multiplier * length) / 111000,
-        lng: startPos.lng + (direction.lng * multiplier * length) / (111000 * Math.cos((startPos.lat * Math.PI) / 180)),
+        lng:
+            startPos.lng +
+            (direction.lng * multiplier * length) /
+                (111000 * Math.cos((startPos.lat * Math.PI) / 180)),
     };
 };
 
@@ -577,8 +599,8 @@ interface BranchPipe {
     isDisabled?: boolean;
     isVisible?: boolean;
     isActive?: boolean;
-    angle?: number; 
-    connectionPoint?: number; 
+    angle?: number;
+    connectionPoint?: number;
 }
 
 interface PlantLocation {
@@ -650,8 +672,16 @@ const DEFAULT_PLANT_TYPES: PlantData[] = [
 ];
 
 const ZONE_COLORS = [
-    '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
-    '#DDA0DD', '#FFA07A', '#87CEEB', '#98FB98', '#F0E68C',
+    '#FF6B6B',
+    '#4ECDC4',
+    '#45B7D1',
+    '#96CEB4',
+    '#FFEAA7',
+    '#DDA0DD',
+    '#FFA07A',
+    '#87CEEB',
+    '#98FB98',
+    '#F0E68C',
 ];
 
 const EXCLUSION_COLORS = {
@@ -687,7 +717,11 @@ const getZoneColor = (index: number): string => {
     return ZONE_COLORS[index % ZONE_COLORS.length];
 };
 
-const calculatePlantCount = (zoneArea: number, plantSpacing: number, rowSpacing: number): number => {
+const calculatePlantCount = (
+    zoneArea: number,
+    plantSpacing: number,
+    rowSpacing: number
+): number => {
     if (zoneArea <= 0 || plantSpacing <= 0 || rowSpacing <= 0) return 0;
     try {
         const effectiveArea = zoneArea * 0.85;
@@ -721,7 +755,11 @@ const findZoneForPipe = (coordinates: Coordinate[], zones: Zone[]): Zone | null 
     return endZone;
 };
 
-const findTargetZoneForMainPipe = (coordinates: Coordinate[], zones: Zone[], useZones: boolean): string => {
+const findTargetZoneForMainPipe = (
+    coordinates: Coordinate[],
+    zones: Zone[],
+    useZones: boolean
+): string => {
     if (!useZones || zones.length === 0) {
         return 'main-area';
     }
@@ -744,8 +782,14 @@ const calculateExactSpacingStats = (subMainPipes: SubMainPipe[]) => {
                 const prevBranch = subMain.branchPipes[i - 1];
                 const currentBranch = subMain.branchPipes[i];
 
-                const distance1 = calculateDistanceAlongPipe(subMain.coordinates, prevBranch.coordinates[0]);
-                const distance2 = calculateDistanceAlongPipe(subMain.coordinates, currentBranch.coordinates[0]);
+                const distance1 = calculateDistanceAlongPipe(
+                    subMain.coordinates,
+                    prevBranch.coordinates[0]
+                );
+                const distance2 = calculateDistanceAlongPipe(
+                    subMain.coordinates,
+                    currentBranch.coordinates[0]
+                );
                 const branchSpacing = Math.abs(distance2 - distance1);
 
                 totalRowSpacings.push(branchSpacing);
@@ -758,8 +802,14 @@ const calculateExactSpacingStats = (subMainPipes: SubMainPipe[]) => {
                     const plant1 = branch.plants[i - 1];
                     const plant2 = branch.plants[i];
 
-                    const distance1 = calculateDistanceAlongPipe(branch.coordinates, plant1.position);
-                    const distance2 = calculateDistanceAlongPipe(branch.coordinates, plant2.position);
+                    const distance1 = calculateDistanceAlongPipe(
+                        branch.coordinates,
+                        plant1.position
+                    );
+                    const distance2 = calculateDistanceAlongPipe(
+                        branch.coordinates,
+                        plant2.position
+                    );
                     const plantSpacing = Math.abs(distance2 - distance1);
 
                     totalPlantSpacings.push(plantSpacing);
@@ -768,13 +818,16 @@ const calculateExactSpacingStats = (subMainPipes: SubMainPipe[]) => {
         });
     });
 
-    const averageRowSpacing = totalRowSpacings.length > 0
-        ? totalRowSpacings.reduce((sum, spacing) => sum + spacing, 0) / totalRowSpacings.length
-        : 0;
+    const averageRowSpacing =
+        totalRowSpacings.length > 0
+            ? totalRowSpacings.reduce((sum, spacing) => sum + spacing, 0) / totalRowSpacings.length
+            : 0;
 
-    const averagePlantSpacing = totalPlantSpacings.length > 0
-        ? totalPlantSpacings.reduce((sum, spacing) => sum + spacing, 0) / totalPlantSpacings.length
-        : 0;
+    const averagePlantSpacing =
+        totalPlantSpacings.length > 0
+            ? totalPlantSpacings.reduce((sum, spacing) => sum + spacing, 0) /
+              totalPlantSpacings.length
+            : 0;
 
     return {
         totalBranches,
@@ -851,7 +904,9 @@ L.Icon.Default.mergeOptions({
 });
 
 // Component definitions
-const SearchControl: React.FC<{ onSearch: (lat: number, lng: number) => void }> = ({ onSearch }) => {
+const SearchControl: React.FC<{ onSearch: (lat: number, lng: number) => void }> = ({
+    onSearch,
+}) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [suggestions, setSuggestions] = useState<any[]>([]);
     const [isSearching, setIsSearching] = useState(false);
@@ -860,7 +915,7 @@ const SearchControl: React.FC<{ onSearch: (lat: number, lng: number) => void }> 
     const handleSearchChange = useCallback(async (query: string) => {
         setSearchQuery(query);
         setSearchError('');
-        
+
         if (query.length < 3) {
             setSuggestions([]);
             return;
@@ -869,22 +924,22 @@ const SearchControl: React.FC<{ onSearch: (lat: number, lng: number) => void }> 
         setIsSearching(true);
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); 
-            
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+
             const response = await fetch(
                 `https://nominatim.openstreetmap.org/search?` +
-                `format=json&q=${encodeURIComponent(query)}&limit=8&` +
-                `countrycodes=th&addressdetails=1&dedupe=1&` +
-                `accept-language=th,en&bounded=0`,
+                    `format=json&q=${encodeURIComponent(query)}&limit=8&` +
+                    `countrycodes=th&addressdetails=1&dedupe=1&` +
+                    `accept-language=th,en&bounded=0`,
                 {
                     signal: controller.signal,
                     headers: {
                         'User-Agent': 'HorticulturePlanner/1.0',
-                        'Accept': 'application/json',
+                        Accept: 'application/json',
                     },
                 }
             );
-            
+
             clearTimeout(timeoutId);
 
             if (!response.ok) {
@@ -892,7 +947,7 @@ const SearchControl: React.FC<{ onSearch: (lat: number, lng: number) => void }> 
             }
 
             const data = await response.json();
-            
+
             if (Array.isArray(data)) {
                 setSuggestions(data);
                 if (data.length === 0) {
@@ -905,7 +960,7 @@ const SearchControl: React.FC<{ onSearch: (lat: number, lng: number) => void }> 
         } catch (error: any) {
             console.error('Search error:', error);
             setSuggestions([]);
-            
+
             if (error.name === 'AbortError') {
                 setSearchError('การค้นหาใช้เวลานานเกินไป กรุณาลองใหม่');
             } else if (error.message.includes('fetch')) {
@@ -929,37 +984,37 @@ const SearchControl: React.FC<{ onSearch: (lat: number, lng: number) => void }> 
         <div className="absolute left-[60px] top-4 z-[1000] w-80">
             <div className="relative">
                 <div className="relative">
-                    <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 transform text-gray-400" />
                     <input
                         type="text"
                         value={searchQuery}
                         onChange={(e) => handleSearchChange(e.target.value)}
                         placeholder="ค้นหาสถานที่ในประเทศไทย..."
-                        className="w-full rounded-t-lg bg-white pl-10 pr-10 py-3 text-gray-900 shadow-md focus:border-blue-500 focus:outline-none"
+                        className="w-full rounded-t-lg bg-white py-3 pl-10 pr-10 text-gray-900 shadow-md focus:border-blue-500 focus:outline-none"
                     />
                     {isSearching && (
-                        <FaSpinner className="absolute right-3 top-1/2 transform -translate-y-1/2 animate-spin text-blue-500" />
+                        <FaSpinner className="absolute right-3 top-1/2 -translate-y-1/2 transform animate-spin text-blue-500" />
                     )}
                 </div>
-                
+
                 {searchError && (
-                    <div className="w-full bg-red-100 border border-red-300 text-red-700 px-3 py-2 text-sm">
+                    <div className="w-full border border-red-300 bg-red-100 px-3 py-2 text-sm text-red-700">
                         ⚠️ {searchError}
                     </div>
                 )}
-                
+
                 {suggestions.length > 0 && (
-                    <ul className="absolute max-h-60 w-full overflow-y-auto rounded-b-lg bg-white shadow-lg border-t border-gray-200">
+                    <ul className="absolute max-h-60 w-full overflow-y-auto rounded-b-lg border-t border-gray-200 bg-white shadow-lg">
                         {suggestions.map((item) => (
                             <li
                                 key={item.place_id}
                                 onClick={() => handleSuggestionClick(item)}
-                                className="cursor-pointer p-3 text-sm text-gray-800 hover:bg-gray-100 border-b border-gray-100 last:border-b-0"
+                                className="cursor-pointer border-b border-gray-100 p-3 text-sm text-gray-800 last:border-b-0 hover:bg-gray-100"
                             >
                                 <div className="font-medium text-gray-900">
                                     {item.display_name.split(',')[0]}
                                 </div>
-                                <div className="text-xs text-gray-600 mt-1">
+                                <div className="mt-1 text-xs text-gray-600">
                                     {item.display_name}
                                 </div>
                             </li>
@@ -1011,37 +1066,39 @@ const CustomPlantModal = ({
                 <h3 className="mb-4 text-xl font-semibold">🌱 กำหนดพืชใหม่</h3>
 
                 <div className="space-y-4">
-                   <div className="grid grid-cols-2 gap-4">
-                   <div>
-                        <label className="mb-2 block text-sm font-medium">ชื่อพืช *</label>
-                        <input
-                            type="text"
-                            value={plantData.name}
-                            onChange={(e) => setPlantData({ ...plantData, name: e.target.value })}
-                            className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="เช่น มะม่วงพันธุ์ใหม่"
-                        />
-                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="mb-2 block text-sm font-medium">ชื่อพืช *</label>
+                            <input
+                                type="text"
+                                value={plantData.name}
+                                onChange={(e) =>
+                                    setPlantData({ ...plantData, name: e.target.value })
+                                }
+                                className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="เช่น มะม่วงพันธุ์ใหม่"
+                            />
+                        </div>
 
-                    <div>
-                        <label className="mb-2 block text-sm font-medium">
-                            น้ำต่อต้น (ลิตร/ครั้ง) *
-                        </label>
-                        <input
-                            type="number"
-                            step="0.1"
-                            min="0.1"
-                            value={plantData.waterNeed}
-                            onChange={(e) =>
-                                setPlantData({
-                                    ...plantData,
-                                    waterNeed: parseFloat(e.target.value) || 0,
-                                })
-                            }
-                            className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
+                        <div>
+                            <label className="mb-2 block text-sm font-medium">
+                                น้ำต่อต้น (ลิตร/ครั้ง) *
+                            </label>
+                            <input
+                                type="number"
+                                step="0.1"
+                                min="0.1"
+                                value={plantData.waterNeed}
+                                onChange={(e) =>
+                                    setPlantData({
+                                        ...plantData,
+                                        waterNeed: parseFloat(e.target.value) || 0,
+                                    })
+                                }
+                                className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
                     </div>
-                   </div>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -1253,7 +1310,10 @@ const EnhancedPlantEditModal = ({
         onClose();
     };
 
-    const adjustPosition = (direction: 'up' | 'down' | 'left' | 'right', amount: number = 0.00001) => {
+    const adjustPosition = (
+        direction: 'up' | 'down' | 'left' | 'right',
+        amount: number = 0.00001
+    ) => {
         setPosition((prev) => {
             switch (direction) {
                 case 'up':
@@ -1378,10 +1438,18 @@ const EnhancedPlantEditModal = ({
 
                     {selectedPlantData && (
                         <div className="rounded bg-green-900/30 p-3 text-sm">
-                            <div><strong>พืช:</strong> {selectedPlantData.name}</div>
-                            <div><strong>ระยะห่างต้น:</strong> {selectedPlantData.plantSpacing} ม.</div>
-                            <div><strong>ระยะห่างแถว:</strong> {selectedPlantData.rowSpacing} ม.</div>
-                            <div><strong>น้ำต่อต้น:</strong> {selectedPlantData.waterNeed} ลิตร/ครั้ง</div>
+                            <div>
+                                <strong>พืช:</strong> {selectedPlantData.name}
+                            </div>
+                            <div>
+                                <strong>ระยะห่างต้น:</strong> {selectedPlantData.plantSpacing} ม.
+                            </div>
+                            <div>
+                                <strong>ระยะห่างแถว:</strong> {selectedPlantData.rowSpacing} ม.
+                            </div>
+                            <div>
+                                <strong>น้ำต่อต้น:</strong> {selectedPlantData.waterNeed} ลิตร/ครั้ง
+                            </div>
                         </div>
                     )}
 
@@ -1392,7 +1460,8 @@ const EnhancedPlantEditModal = ({
                                 🔗 เชื่อมต่อท่อย่อย
                             </h4>
                             <p className="mb-3 text-xs text-gray-300">
-                                หลังจากบันทึกต้นไม้แล้ว คุณสามารถสร้างท่อย่อยเชื่อมต่อไปยังท่อเมนรองหรือท่อย่อยอื่นได้
+                                หลังจากบันทึกต้นไม้แล้ว
+                                คุณสามารถสร้างท่อย่อยเชื่อมต่อไปยังท่อเมนรองหรือท่อย่อยอื่นได้
                             </p>
                             <button
                                 onClick={handleCreateConnection}
@@ -1467,7 +1536,7 @@ const EnhancedPipeEditModal = ({
         if (pipe) {
             setCoordinates([...pipe.coordinates]);
             setDiameter(pipe.diameter);
-            
+
             if (type === 'branch' && 'angle' in pipe) {
                 setAngle(pipe.angle || 90);
                 setConnectionPoint(pipe.connectionPoint || 0.5);
@@ -1477,7 +1546,7 @@ const EnhancedPipeEditModal = ({
 
     const handleSave = () => {
         if (!pipe) return;
-        
+
         const updatedPipe = {
             ...pipe,
             coordinates,
@@ -1549,7 +1618,11 @@ const EnhancedPipeEditModal = ({
         }
     };
 
-    const adjustPoint = (index: number, direction: 'up' | 'down' | 'left' | 'right', amount: number = 0.00001) => {
+    const adjustPoint = (
+        index: number,
+        direction: 'up' | 'down' | 'left' | 'right',
+        amount: number = 0.00001
+    ) => {
         const newCoordinates = [...coordinates];
         switch (direction) {
             case 'up':
@@ -1571,8 +1644,10 @@ const EnhancedPipeEditModal = ({
     const rotatePipe = (angleIncrement: number) => {
         if (coordinates.length < 2) return;
 
-        const centerLat = coordinates.reduce((sum, coord) => sum + coord.lat, 0) / coordinates.length;
-        const centerLng = coordinates.reduce((sum, coord) => sum + coord.lng, 0) / coordinates.length;
+        const centerLat =
+            coordinates.reduce((sum, coord) => sum + coord.lat, 0) / coordinates.length;
+        const centerLng =
+            coordinates.reduce((sum, coord) => sum + coord.lng, 0) / coordinates.length;
 
         const angleRad = (angleIncrement * Math.PI) / 180;
         const cos = Math.cos(angleRad);
@@ -1621,22 +1696,62 @@ const EnhancedPipeEditModal = ({
 
                         <div className="rounded bg-gray-700 p-4">
                             <h4 className="mb-3 text-sm font-semibold">🔄 การหมุนท่อ (แม่นยำ)</h4>
-                            <div className="grid grid-cols-2 gap-2 mb-3">
-                                <button onClick={() => rotatePipe(1)} className="rounded bg-purple-600 px-3 py-2 text-xs transition-colors hover:bg-purple-700">↻ +1°</button>
-                                <button onClick={() => rotatePipe(-1)} className="rounded bg-purple-600 px-3 py-2 text-xs transition-colors hover:bg-purple-700">↺ -1°</button>
-                                <button onClick={() => rotatePipe(5)} className="rounded bg-purple-600 px-3 py-2 text-xs transition-colors hover:bg-purple-700">↻ +5°</button>
-                                <button onClick={() => rotatePipe(-5)} className="rounded bg-purple-600 px-3 py-2 text-xs transition-colors hover:bg-purple-700">↺ -5°</button>
-                                <button onClick={() => rotatePipe(15)} className="rounded bg-purple-600 px-3 py-2 text-xs transition-colors hover:bg-purple-700">↻ +15°</button>
-                                <button onClick={() => rotatePipe(-15)} className="rounded bg-purple-600 px-3 py-2 text-xs transition-colors hover:bg-purple-700">↺ -15°</button>
-                                <button onClick={() => rotatePipe(45)} className="rounded bg-indigo-600 px-3 py-2 text-xs transition-colors hover:bg-indigo-700">↻ +45°</button>
-                                <button onClick={() => rotatePipe(90)} className="rounded bg-indigo-600 px-3 py-2 text-xs transition-colors hover:bg-indigo-700">↻ +90°</button>
+                            <div className="mb-3 grid grid-cols-2 gap-2">
+                                <button
+                                    onClick={() => rotatePipe(1)}
+                                    className="rounded bg-purple-600 px-3 py-2 text-xs transition-colors hover:bg-purple-700"
+                                >
+                                    ↻ +1°
+                                </button>
+                                <button
+                                    onClick={() => rotatePipe(-1)}
+                                    className="rounded bg-purple-600 px-3 py-2 text-xs transition-colors hover:bg-purple-700"
+                                >
+                                    ↺ -1°
+                                </button>
+                                <button
+                                    onClick={() => rotatePipe(5)}
+                                    className="rounded bg-purple-600 px-3 py-2 text-xs transition-colors hover:bg-purple-700"
+                                >
+                                    ↻ +5°
+                                </button>
+                                <button
+                                    onClick={() => rotatePipe(-5)}
+                                    className="rounded bg-purple-600 px-3 py-2 text-xs transition-colors hover:bg-purple-700"
+                                >
+                                    ↺ -5°
+                                </button>
+                                <button
+                                    onClick={() => rotatePipe(15)}
+                                    className="rounded bg-purple-600 px-3 py-2 text-xs transition-colors hover:bg-purple-700"
+                                >
+                                    ↻ +15°
+                                </button>
+                                <button
+                                    onClick={() => rotatePipe(-15)}
+                                    className="rounded bg-purple-600 px-3 py-2 text-xs transition-colors hover:bg-purple-700"
+                                >
+                                    ↺ -15°
+                                </button>
+                                <button
+                                    onClick={() => rotatePipe(45)}
+                                    className="rounded bg-indigo-600 px-3 py-2 text-xs transition-colors hover:bg-indigo-700"
+                                >
+                                    ↻ +45°
+                                </button>
+                                <button
+                                    onClick={() => rotatePipe(90)}
+                                    className="rounded bg-indigo-600 px-3 py-2 text-xs transition-colors hover:bg-indigo-700"
+                                >
+                                    ↻ +90°
+                                </button>
                             </div>
                         </div>
 
                         {type === 'branch' && branchSettings && (
                             <div className="rounded bg-yellow-900/30 p-4">
                                 <h4 className="mb-3 text-sm font-semibold">🔧 การควบคุมท่อย่อย</h4>
-                                
+
                                 <div className="space-y-3">
                                     <div>
                                         <label className="mb-2 block text-xs font-medium">
@@ -1659,7 +1774,8 @@ const EnhancedPipeEditModal = ({
 
                                     <div>
                                         <label className="mb-2 block text-xs font-medium">
-                                            จุดต่อกับท่อเมนรอง: {(connectionPoint * 100).toFixed(1)}%
+                                            จุดต่อกับท่อเมนรอง: {(connectionPoint * 100).toFixed(1)}
+                                            %
                                         </label>
                                         <input
                                             type="range"
@@ -1667,7 +1783,9 @@ const EnhancedPipeEditModal = ({
                                             max="1"
                                             step="0.01"
                                             value={connectionPoint}
-                                            onChange={(e) => setConnectionPoint(parseFloat(e.target.value))}
+                                            onChange={(e) =>
+                                                setConnectionPoint(parseFloat(e.target.value))
+                                            }
                                             className="w-full accent-blue-600"
                                         />
                                         <div className="flex justify-between text-xs text-gray-400">
@@ -1689,7 +1807,7 @@ const EnhancedPipeEditModal = ({
                                     <FaPlus className="mr-1 inline" />
                                     เพิ่มจุด
                                 </button>
-                                
+
                                 {/* Branch pipe specific delete button */}
                                 {type === 'branch' && onDeleteBranchPipe && (
                                     <button
@@ -1710,23 +1828,79 @@ const EnhancedPipeEditModal = ({
                                 </h4>
                                 <div className="mx-auto mb-3 grid w-32 grid-cols-3 gap-2">
                                     <div></div>
-                                    <button onClick={() => adjustPoint(selectedPointIndex, 'up', 0.00001)} className="rounded bg-blue-600 px-2 py-1 text-xs hover:bg-blue-700">↑</button>
+                                    <button
+                                        onClick={() =>
+                                            adjustPoint(selectedPointIndex, 'up', 0.00001)
+                                        }
+                                        className="rounded bg-blue-600 px-2 py-1 text-xs hover:bg-blue-700"
+                                    >
+                                        ↑
+                                    </button>
                                     <div></div>
-                                    <button onClick={() => adjustPoint(selectedPointIndex, 'left', 0.00001)} className="rounded bg-blue-600 px-2 py-1 text-xs hover:bg-blue-700">←</button>
+                                    <button
+                                        onClick={() =>
+                                            adjustPoint(selectedPointIndex, 'left', 0.00001)
+                                        }
+                                        className="rounded bg-blue-600 px-2 py-1 text-xs hover:bg-blue-700"
+                                    >
+                                        ←
+                                    </button>
                                     <div className="flex items-center justify-center">
                                         <FaArrowsAlt className="text-gray-400" />
                                     </div>
-                                    <button onClick={() => adjustPoint(selectedPointIndex, 'right', 0.00001)} className="rounded bg-blue-600 px-2 py-1 text-xs hover:bg-blue-700">→</button>
+                                    <button
+                                        onClick={() =>
+                                            adjustPoint(selectedPointIndex, 'right', 0.00001)
+                                        }
+                                        className="rounded bg-blue-600 px-2 py-1 text-xs hover:bg-blue-700"
+                                    >
+                                        →
+                                    </button>
                                     <div></div>
-                                    <button onClick={() => adjustPoint(selectedPointIndex, 'down', 0.00001)} className="rounded bg-blue-600 px-2 py-1 text-xs hover:bg-blue-700">↓</button>
+                                    <button
+                                        onClick={() =>
+                                            adjustPoint(selectedPointIndex, 'down', 0.00001)
+                                        }
+                                        className="rounded bg-blue-600 px-2 py-1 text-xs hover:bg-blue-700"
+                                    >
+                                        ↓
+                                    </button>
                                     <div></div>
                                 </div>
-                                
-                                <div className="grid grid-cols-2 gap-2 mb-2">
-                                    <button onClick={() => adjustPoint(selectedPointIndex, 'up', 0.000001)} className="rounded bg-cyan-600 px-2 py-1 text-xs hover:bg-cyan-700">↑ ละเอียด</button>
-                                    <button onClick={() => adjustPoint(selectedPointIndex, 'down', 0.000001)} className="rounded bg-cyan-600 px-2 py-1 text-xs hover:bg-cyan-700">↓ ละเอียด</button>
-                                    <button onClick={() => adjustPoint(selectedPointIndex, 'left', 0.000001)} className="rounded bg-cyan-600 px-2 py-1 text-xs hover:bg-cyan-700">← ละเอียด</button>
-                                    <button onClick={() => adjustPoint(selectedPointIndex, 'right', 0.000001)} className="rounded bg-cyan-600 px-2 py-1 text-xs hover:bg-cyan-700">→ ละเอียด</button>
+
+                                <div className="mb-2 grid grid-cols-2 gap-2">
+                                    <button
+                                        onClick={() =>
+                                            adjustPoint(selectedPointIndex, 'up', 0.000001)
+                                        }
+                                        className="rounded bg-cyan-600 px-2 py-1 text-xs hover:bg-cyan-700"
+                                    >
+                                        ↑ ละเอียด
+                                    </button>
+                                    <button
+                                        onClick={() =>
+                                            adjustPoint(selectedPointIndex, 'down', 0.000001)
+                                        }
+                                        className="rounded bg-cyan-600 px-2 py-1 text-xs hover:bg-cyan-700"
+                                    >
+                                        ↓ ละเอียด
+                                    </button>
+                                    <button
+                                        onClick={() =>
+                                            adjustPoint(selectedPointIndex, 'left', 0.000001)
+                                        }
+                                        className="rounded bg-cyan-600 px-2 py-1 text-xs hover:bg-cyan-700"
+                                    >
+                                        ← ละเอียด
+                                    </button>
+                                    <button
+                                        onClick={() =>
+                                            adjustPoint(selectedPointIndex, 'right', 0.000001)
+                                        }
+                                        className="rounded bg-cyan-600 px-2 py-1 text-xs hover:bg-cyan-700"
+                                    >
+                                        → ละเอียด
+                                    </button>
                                 </div>
 
                                 <div className="flex gap-2">
@@ -1749,12 +1923,22 @@ const EnhancedPipeEditModal = ({
                         )}
 
                         <div className="rounded bg-blue-900/30 p-3 text-sm">
-                            <div><strong>ความยาวท่อ:</strong> {calculatePipeLength(coordinates).toFixed(2)} ม.</div>
-                            <div><strong>จำนวนจุด:</strong> {coordinates.length} จุด</div>
+                            <div>
+                                <strong>ความยาวท่อ:</strong>{' '}
+                                {calculatePipeLength(coordinates).toFixed(2)} ม.
+                            </div>
+                            <div>
+                                <strong>จำนวนจุด:</strong> {coordinates.length} จุด
+                            </div>
                             {type === 'branch' && (
                                 <>
-                                    <div><strong>มุม:</strong> {angle}°</div>
-                                    <div><strong>จุดต่อ:</strong> {(connectionPoint * 100).toFixed(1)}%</div>
+                                    <div>
+                                        <strong>มุม:</strong> {angle}°
+                                    </div>
+                                    <div>
+                                        <strong>จุดต่อ:</strong>{' '}
+                                        {(connectionPoint * 100).toFixed(1)}%
+                                    </div>
                                 </>
                             )}
                             <div className="text-xs text-green-300">
@@ -1854,7 +2038,6 @@ const EnhancedPipeEditModal = ({
     );
 };
 
-
 export default function EnhancedHorticulturePlannerPage() {
     const [projectName, setProjectName] = useState<string>('โครงการระบบน้ำพืชสวน จ.จันทบุรี');
     const [showCustomPlantModal, setShowCustomPlantModal] = useState(false);
@@ -1862,20 +2045,22 @@ export default function EnhancedHorticulturePlannerPage() {
     const [selectedZoneForPlant, setSelectedZoneForPlant] = useState<Zone | null>(null);
     const [editingPlant, setEditingPlant] = useState<PlantData | null>(null);
 
-
     const [editMode, setEditMode] = useState<string | null>(null);
     const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
-    const [selectedExclusionType, setSelectedExclusionType] = useState<keyof typeof EXCLUSION_COLORS>('building');
+    const [selectedExclusionType, setSelectedExclusionType] =
+        useState<keyof typeof EXCLUSION_COLORS>('building');
     const [mapCenter, setMapCenter] = useState<[number, number]>([12.609731, 102.050412]);
-    const [drawingMainPipe, setDrawingMainPipe] = useState<{ toZone: string | null }>({ toZone: null });
-
+    const [drawingMainPipe, setDrawingMainPipe] = useState<{ toZone: string | null }>({
+        toZone: null,
+    });
 
     const [showPlantEditModal, setShowPlantEditModal] = useState(false);
     const [selectedPlantForEdit, setSelectedPlantForEdit] = useState<PlantLocation | null>(null);
     const [showPipeEditModal, setShowPipeEditModal] = useState(false);
-    const [selectedPipeForEdit, setSelectedPipeForEdit] = useState<MainPipe | SubMainPipe | BranchPipe | null>(null);
+    const [selectedPipeForEdit, setSelectedPipeForEdit] = useState<
+        MainPipe | SubMainPipe | BranchPipe | null
+    >(null);
     const [selectedPipeType, setSelectedPipeType] = useState<'main' | 'subMain' | 'branch'>('main');
-
 
     const [isNewPlantMode, setIsNewPlantMode] = useState(false);
     const [isCreatingConnection, setIsCreatingConnection] = useState(false);
@@ -1919,8 +2104,14 @@ export default function EnhancedHorticulturePlannerPage() {
         future: [],
     });
 
-    const totalArea = useMemo(() => calculateAreaFromCoordinates(history.present.mainArea), [history.present.mainArea]);
-    const actualTotalPlants = useMemo(() => history.present.plants.length, [history.present.plants]);
+    const totalArea = useMemo(
+        () => calculateAreaFromCoordinates(history.present.mainArea),
+        [history.present.mainArea]
+    );
+    const actualTotalPlants = useMemo(
+        () => history.present.plants.length,
+        [history.present.plants]
+    );
     const actualTotalWaterNeed = useMemo(() => {
         return history.present.plants.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
     }, [history.present.plants]);
@@ -1934,10 +2125,13 @@ export default function EnhancedHorticulturePlannerPage() {
         );
     }, [history.present]);
 
-    const pushToHistory = useCallback((newState: Partial<ProjectState>) => {
-        const updatedState = { ...history.present, ...newState };
-        dispatchHistory({ type: 'PUSH_STATE', state: updatedState });
-    }, [history.present]);
+    const pushToHistory = useCallback(
+        (newState: Partial<ProjectState>) => {
+            const updatedState = { ...history.present, ...newState };
+            dispatchHistory({ type: 'PUSH_STATE', state: updatedState });
+        },
+        [history.present]
+    );
 
     const handleUndo = useCallback(() => {
         dispatchHistory({ type: 'UNDO' });
@@ -1976,67 +2170,87 @@ export default function EnhancedHorticulturePlannerPage() {
         }
     }, [history.present.useZones, editMode]);
 
-
     const handleCreateCustomPlant = useCallback((plantData?: PlantData) => {
         setEditingPlant(plantData || null);
         setShowCustomPlantModal(true);
     }, []);
 
-    const handleSaveCustomPlant = useCallback((plantData: PlantData) => {
-        const newPlant = { ...plantData, id: plantData.id || Date.now() };
+    const handleSaveCustomPlant = useCallback(
+        (plantData: PlantData) => {
+            const newPlant = { ...plantData, id: plantData.id || Date.now() };
 
-        const updatedAvailablePlants = history.present.availablePlants.some((p) => p.id === newPlant.id)
-            ? history.present.availablePlants.map((p) => (p.id === newPlant.id ? newPlant : p))
-            : [...history.present.availablePlants, newPlant];
+            const updatedAvailablePlants = history.present.availablePlants.some(
+                (p) => p.id === newPlant.id
+            )
+                ? history.present.availablePlants.map((p) => (p.id === newPlant.id ? newPlant : p))
+                : [...history.present.availablePlants, newPlant];
 
-        let updatedZones = history.present.zones;
-        if (editingPlant) {
-            updatedZones = history.present.zones.map((zone) =>
-                zone.plantData.id === editingPlant.id
-                    ? {
-                          ...zone,
-                          plantData: newPlant,
-                          plantCount: calculatePlantCount(zone.area, newPlant.plantSpacing, newPlant.rowSpacing),
-                          totalWaterNeed: calculatePlantCount(zone.area, newPlant.plantSpacing, newPlant.rowSpacing) * newPlant.waterNeed,
-                      }
-                    : zone
-            );
-        }
+            let updatedZones = history.present.zones;
+            if (editingPlant) {
+                updatedZones = history.present.zones.map((zone) =>
+                    zone.plantData.id === editingPlant.id
+                        ? {
+                              ...zone,
+                              plantData: newPlant,
+                              plantCount: calculatePlantCount(
+                                  zone.area,
+                                  newPlant.plantSpacing,
+                                  newPlant.rowSpacing
+                              ),
+                              totalWaterNeed:
+                                  calculatePlantCount(
+                                      zone.area,
+                                      newPlant.plantSpacing,
+                                      newPlant.rowSpacing
+                                  ) * newPlant.waterNeed,
+                          }
+                        : zone
+                );
+            }
 
-        pushToHistory({
-            availablePlants: updatedAvailablePlants,
-            zones: updatedZones,
-        });
+            pushToHistory({
+                availablePlants: updatedAvailablePlants,
+                zones: updatedZones,
+            });
 
-        console.log('✅ Custom plant saved:', newPlant);
-        setEditingPlant(null);
-    }, [editingPlant, history.present.availablePlants, history.present.zones, pushToHistory]);
+            console.log('✅ Custom plant saved:', newPlant);
+            setEditingPlant(null);
+        },
+        [editingPlant, history.present.availablePlants, history.present.zones, pushToHistory]
+    );
 
     const handleZonePlantSelection = useCallback((zone: Zone) => {
         setSelectedZoneForPlant(zone);
         setShowZonePlantModal(true);
     }, []);
 
-    const handleSaveZonePlant = useCallback((zoneId: string, plantData: PlantData) => {
-        const updatedZones = history.present.zones.map((zone) => {
-            if (zone.id === zoneId) {
-                const newPlantCount = calculatePlantCount(zone.area, plantData.plantSpacing, plantData.rowSpacing);
-                const newWaterNeed = newPlantCount * plantData.waterNeed;
+    const handleSaveZonePlant = useCallback(
+        (zoneId: string, plantData: PlantData) => {
+            const updatedZones = history.present.zones.map((zone) => {
+                if (zone.id === zoneId) {
+                    const newPlantCount = calculatePlantCount(
+                        zone.area,
+                        plantData.plantSpacing,
+                        plantData.rowSpacing
+                    );
+                    const newWaterNeed = newPlantCount * plantData.waterNeed;
 
-                return {
-                    ...zone,
-                    plantData,
-                    plantCount: newPlantCount,
-                    totalWaterNeed: newWaterNeed,
-                    isCustomPlant: plantData.id === 99,
-                };
-            }
-            return zone;
-        });
+                    return {
+                        ...zone,
+                        plantData,
+                        plantCount: newPlantCount,
+                        totalWaterNeed: newWaterNeed,
+                        isCustomPlant: plantData.id === 99,
+                    };
+                }
+                return zone;
+            });
 
-        pushToHistory({ zones: updatedZones });
-        console.log(`✅ Zone ${zoneId} plant updated to:`, plantData);
-    }, [history.present.zones, pushToHistory]);
+            pushToHistory({ zones: updatedZones });
+            console.log(`✅ Zone ${zoneId} plant updated to:`, plantData);
+        },
+        [history.present.zones, pushToHistory]
+    );
 
     const handlePlantEdit = useCallback((plant: PlantLocation) => {
         setSelectedPlantForEdit(plant);
@@ -2044,212 +2258,259 @@ export default function EnhancedHorticulturePlannerPage() {
         setShowPlantEditModal(true);
     }, []);
 
-    const handlePlantSave = useCallback((plantId: string, newPosition: Coordinate, newPlantData: PlantData) => {
-        const updatedPlants = history.present.plants.map((plant) =>
-            plant.id === plantId ? { ...plant, position: newPosition, plantData: newPlantData } : plant
-        );
-        pushToHistory({ plants: updatedPlants });
-    }, [history.present.plants, pushToHistory]);
+    const handlePlantSave = useCallback(
+        (plantId: string, newPosition: Coordinate, newPlantData: PlantData) => {
+            const updatedPlants = history.present.plants.map((plant) =>
+                plant.id === plantId
+                    ? { ...plant, position: newPosition, plantData: newPlantData }
+                    : plant
+            );
+            pushToHistory({ plants: updatedPlants });
+        },
+        [history.present.plants, pushToHistory]
+    );
 
-    const handlePlantDelete = useCallback((plantId: string) => {
-        const updatedPlants = history.present.plants.filter((plant) => plant.id !== plantId);
-        
+    const handlePlantDelete = useCallback(
+        (plantId: string) => {
+            const updatedPlants = history.present.plants.filter((plant) => plant.id !== plantId);
 
-        const updatedSubMainPipes = history.present.subMainPipes.map(subMain => ({
-            ...subMain,
-            branchPipes: subMain.branchPipes.filter(branch => {
-                const hasOtherPlants = branch.plants.some(plant => plant.id !== plantId);
-                return hasOtherPlants || branch.plants.length === 0;
-            }).map(branch => ({
-                ...branch,
-                plants: branch.plants.filter(plant => plant.id !== plantId)
-            }))
-        }));
+            const updatedSubMainPipes = history.present.subMainPipes.map((subMain) => ({
+                ...subMain,
+                branchPipes: subMain.branchPipes
+                    .filter((branch) => {
+                        const hasOtherPlants = branch.plants.some((plant) => plant.id !== plantId);
+                        return hasOtherPlants || branch.plants.length === 0;
+                    })
+                    .map((branch) => ({
+                        ...branch,
+                        plants: branch.plants.filter((plant) => plant.id !== plantId),
+                    })),
+            }));
 
-        pushToHistory({ 
-            plants: updatedPlants,
-            subMainPipes: updatedSubMainPipes
-        });
-    }, [history.present.plants, history.present.subMainPipes, pushToHistory]);
+            pushToHistory({
+                plants: updatedPlants,
+                subMainPipes: updatedSubMainPipes,
+            });
+        },
+        [history.present.plants, history.present.subMainPipes, pushToHistory]
+    );
 
-    const handleAddPlant = useCallback((position: Coordinate, plantData?: PlantData) => {
-        const newPlant: PlantLocation = {
-            id: generateUniqueId('plant'),
-            position,
-            plantData: plantData || history.present.selectedPlantType,
-            isSelected: false,
-            isEditable: true,
-            health: 'good',
-            zoneId: history.present.useZones
-                ? findZoneContainingPoint(position, history.present.zones)?.id
-                : 'main-area',
-        };
+    const handleAddPlant = useCallback(
+        (position: Coordinate, plantData?: PlantData) => {
+            const newPlant: PlantLocation = {
+                id: generateUniqueId('plant'),
+                position,
+                plantData: plantData || history.present.selectedPlantType,
+                isSelected: false,
+                isEditable: true,
+                health: 'good',
+                zoneId: history.present.useZones
+                    ? findZoneContainingPoint(position, history.present.zones)?.id
+                    : 'main-area',
+            };
 
-        const updatedPlants = [...history.present.plants, newPlant];
-        pushToHistory({ plants: updatedPlants });
+            const updatedPlants = [...history.present.plants, newPlant];
+            pushToHistory({ plants: updatedPlants });
 
-        setConnectionStartPlant(newPlant);
-        setIsCreatingConnection(true);
-        setDragMode('connecting');
-        setIsNewPlantMode(true);
-        setSelectedPlantForEdit(newPlant);
-        setShowPlantEditModal(true);
+            setConnectionStartPlant(newPlant);
+            setIsCreatingConnection(true);
+            setDragMode('connecting');
+            setIsNewPlantMode(true);
+            setSelectedPlantForEdit(newPlant);
+            setShowPlantEditModal(true);
 
-        console.log('✅ New plant added, entering connection mode');
-    }, [history.present.plants, history.present.selectedPlantType, history.present.useZones, history.present.zones, pushToHistory]);
+            console.log('✅ New plant added, entering connection mode');
+        },
+        [
+            history.present.plants,
+            history.present.selectedPlantType,
+            history.present.useZones,
+            history.present.zones,
+            pushToHistory,
+        ]
+    );
 
-    const handleCreatePlantConnection = useCallback((plantId: string) => {
-        const plant = history.present.plants.find(p => p.id === plantId);
-        if (!plant) return;
+    const handleCreatePlantConnection = useCallback(
+        (plantId: string) => {
+            const plant = history.present.plants.find((p) => p.id === plantId);
+            if (!plant) return;
 
-        setConnectionStartPlant(plant);
-        setIsCreatingConnection(true);
-        setDragMode('connecting');
-        
-        const availablePipeIds: string[] = [
-            ...history.present.subMainPipes.map(p => p.id),
-            ...history.present.subMainPipes.flatMap(sm => sm.branchPipes.map(bp => bp.id))
-        ];
-        setHighlightedPipes(availablePipeIds);
+            setConnectionStartPlant(plant);
+            setIsCreatingConnection(true);
+            setDragMode('connecting');
 
-        console.log('🔗 Connection mode activated for plant:', plant.id);
-    }, [history.present.plants, history.present.subMainPipes]);
+            const availablePipeIds: string[] = [
+                ...history.present.subMainPipes.map((p) => p.id),
+                ...history.present.subMainPipes.flatMap((sm) => sm.branchPipes.map((bp) => bp.id)),
+            ];
+            setHighlightedPipes(availablePipeIds);
 
-    const handleConnectToPipe = useCallback((clickPosition: Coordinate, pipeId: string, pipeType: 'subMain' | 'branch') => {
-        if (!connectionStartPlant || !isCreatingConnection) return;
+            console.log('🔗 Connection mode activated for plant:', plant.id);
+        },
+        [history.present.plants, history.present.subMainPipes]
+    );
 
-        let targetPipe: SubMainPipe | BranchPipe | null = null;
-        let targetSubMainId = '';
+    const handleConnectToPipe = useCallback(
+        (clickPosition: Coordinate, pipeId: string, pipeType: 'subMain' | 'branch') => {
+            if (!connectionStartPlant || !isCreatingConnection) return;
 
-        if (pipeType === 'subMain') {
-            targetPipe = history.present.subMainPipes.find(p => p.id === pipeId) || null;
-            targetSubMainId = pipeId;
-        } else {
-            for (const subMain of history.present.subMainPipes) {
-                const branch = subMain.branchPipes.find(bp => bp.id === pipeId);
-                if (branch) {
-                    targetPipe = branch;
-                    targetSubMainId = subMain.id;
-                    break;
+            let targetPipe: SubMainPipe | BranchPipe | null = null;
+            let targetSubMainId = '';
+
+            if (pipeType === 'subMain') {
+                targetPipe = history.present.subMainPipes.find((p) => p.id === pipeId) || null;
+                targetSubMainId = pipeId;
+            } else {
+                for (const subMain of history.present.subMainPipes) {
+                    const branch = subMain.branchPipes.find((bp) => bp.id === pipeId);
+                    if (branch) {
+                        targetPipe = branch;
+                        targetSubMainId = subMain.id;
+                        break;
+                    }
                 }
             }
-        }
 
-        if (!targetPipe) return;
+            if (!targetPipe) return;
 
-        const closestPoint = findClosestPointOnPipe(clickPosition, targetPipe.coordinates);
-        if (!closestPoint) return;
+            const closestPoint = findClosestPointOnPipe(clickPosition, targetPipe.coordinates);
+            if (!closestPoint) return;
 
-        const newBranchPipe: BranchPipe = {
-            id: generateUniqueId('branch'),
-            subMainPipeId: targetSubMainId,
-            coordinates: [closestPoint.position, connectionStartPlant.position],
-            length: calculateDistanceBetweenPoints(closestPoint.position, connectionStartPlant.position),
-            diameter: 20,
-            plants: [connectionStartPlant],
-            isEditable: true,
-            sprinklerType: 'standard',
-            angle: 90,
-            connectionPoint: 0.5,
-        };
+            const newBranchPipe: BranchPipe = {
+                id: generateUniqueId('branch'),
+                subMainPipeId: targetSubMainId,
+                coordinates: [closestPoint.position, connectionStartPlant.position],
+                length: calculateDistanceBetweenPoints(
+                    closestPoint.position,
+                    connectionStartPlant.position
+                ),
+                diameter: 20,
+                plants: [connectionStartPlant],
+                isEditable: true,
+                sprinklerType: 'standard',
+                angle: 90,
+                connectionPoint: 0.5,
+            };
 
-        const updatedSubMainPipes = history.present.subMainPipes.map(subMain => {
-            if (subMain.id === targetSubMainId) {
-                return {
-                    ...subMain,
-                    branchPipes: [...subMain.branchPipes, newBranchPipe]
-                };
-            }
-            return subMain;
-        });
+            const updatedSubMainPipes = history.present.subMainPipes.map((subMain) => {
+                if (subMain.id === targetSubMainId) {
+                    return {
+                        ...subMain,
+                        branchPipes: [...subMain.branchPipes, newBranchPipe],
+                    };
+                }
+                return subMain;
+            });
 
-        pushToHistory({ subMainPipes: updatedSubMainPipes });
+            pushToHistory({ subMainPipes: updatedSubMainPipes });
 
-        setIsCreatingConnection(false);
-        setConnectionStartPlant(null);
-        setHighlightedPipes([]);
-        setDragMode('none');
-        setTempConnectionLine(null);
+            setIsCreatingConnection(false);
+            setConnectionStartPlant(null);
+            setHighlightedPipes([]);
+            setDragMode('none');
+            setTempConnectionLine(null);
 
-        console.log('✅ Created new branch pipe connection to', pipeType, pipeId);
-    }, [connectionStartPlant, isCreatingConnection, history.present.subMainPipes, pushToHistory]);
+            console.log('✅ Created new branch pipe connection to', pipeType, pipeId);
+        },
+        [connectionStartPlant, isCreatingConnection, history.present.subMainPipes, pushToHistory]
+    );
 
-    const handlePipeEdit = useCallback((pipe: MainPipe | SubMainPipe | BranchPipe, type: 'main' | 'subMain' | 'branch') => {
-        setSelectedPipeForEdit(pipe);
-        setSelectedPipeType(type);
-        setShowPipeEditModal(true);
-    }, []);
+    const handlePipeEdit = useCallback(
+        (pipe: MainPipe | SubMainPipe | BranchPipe, type: 'main' | 'subMain' | 'branch') => {
+            setSelectedPipeForEdit(pipe);
+            setSelectedPipeType(type);
+            setShowPipeEditModal(true);
+        },
+        []
+    );
 
-    const handlePipeSave = useCallback((updatedPipe: MainPipe | SubMainPipe | BranchPipe) => {
-        let newState: Partial<ProjectState> = {};
+    const handlePipeSave = useCallback(
+        (updatedPipe: MainPipe | SubMainPipe | BranchPipe) => {
+            let newState: Partial<ProjectState> = {};
 
-        if (selectedPipeType === 'main') {
-            const updatedMainPipes = history.present.mainPipes.map((pipe) =>
-                pipe.id === updatedPipe.id ? (updatedPipe as MainPipe) : pipe
-            );
-            newState.mainPipes = updatedMainPipes;
-        } else if (selectedPipeType === 'subMain') {
-            const updatedSubMainPipes = history.present.subMainPipes.map((pipe) =>
-                pipe.id === updatedPipe.id ? (updatedPipe as SubMainPipe) : pipe
-            );
-            newState.subMainPipes = updatedSubMainPipes;
-        } else if (selectedPipeType === 'branch') {
-            const updatedSubMainPipes = history.present.subMainPipes.map((subMainPipe) => {
-                const updatedBranchPipes = subMainPipe.branchPipes.map((branchPipe) =>
-                    branchPipe.id === updatedPipe.id ? (updatedPipe as BranchPipe) : branchPipe
+            if (selectedPipeType === 'main') {
+                const updatedMainPipes = history.present.mainPipes.map((pipe) =>
+                    pipe.id === updatedPipe.id ? (updatedPipe as MainPipe) : pipe
                 );
-                return { ...subMainPipe, branchPipes: updatedBranchPipes };
-            });
-            newState.subMainPipes = updatedSubMainPipes;
-        }
-
-        pushToHistory(newState);
-    }, [selectedPipeType, history.present.mainPipes, history.present.subMainPipes, pushToHistory]);
-
-    const handlePipeDelete = useCallback((pipeId: string) => {
-        let newState: Partial<ProjectState> = {};
-
-        if (selectedPipeType === 'main') {
-            const updatedMainPipes = history.present.mainPipes.filter((pipe) => pipe.id !== pipeId);
-            newState.mainPipes = updatedMainPipes;
-        } else if (selectedPipeType === 'subMain') {
-            const updatedSubMainPipes = history.present.subMainPipes.filter((pipe) => pipe.id !== pipeId);
-            newState.subMainPipes = updatedSubMainPipes;
-        } else if (selectedPipeType === 'branch') {
-            const updatedSubMainPipes = history.present.subMainPipes.map((subMainPipe) => {
-                const updatedBranchPipes = subMainPipe.branchPipes.filter((branchPipe) => branchPipe.id !== pipeId);
-                return { ...subMainPipe, branchPipes: updatedBranchPipes };
-            });
-            newState.subMainPipes = updatedSubMainPipes;
-        }
-
-        pushToHistory(newState);
-    }, [selectedPipeType, history.present.mainPipes, history.present.subMainPipes, pushToHistory]);
-
-    const handleDeleteBranchPipe = useCallback((branchId: string, subMainId: string) => {
-        const updatedSubMainPipes = history.present.subMainPipes.map((subMainPipe) => {
-            if (subMainPipe.id === subMainId) {
-                const branchToDelete = subMainPipe.branchPipes.find(bp => bp.id === branchId);
-                if (branchToDelete) {
-                    const plantsToRemove = branchToDelete.plants.map(p => p.id);
-                    const updatedPlants = history.present.plants.filter(plant => 
-                        !plantsToRemove.includes(plant.id)
+                newState.mainPipes = updatedMainPipes;
+            } else if (selectedPipeType === 'subMain') {
+                const updatedSubMainPipes = history.present.subMainPipes.map((pipe) =>
+                    pipe.id === updatedPipe.id ? (updatedPipe as SubMainPipe) : pipe
+                );
+                newState.subMainPipes = updatedSubMainPipes;
+            } else if (selectedPipeType === 'branch') {
+                const updatedSubMainPipes = history.present.subMainPipes.map((subMainPipe) => {
+                    const updatedBranchPipes = subMainPipe.branchPipes.map((branchPipe) =>
+                        branchPipe.id === updatedPipe.id ? (updatedPipe as BranchPipe) : branchPipe
                     );
-                    
-                    pushToHistory({ plants: updatedPlants });
-                }
-                
-                return {
-                    ...subMainPipe,
-                    branchPipes: subMainPipe.branchPipes.filter((branchPipe) => branchPipe.id !== branchId)
-                };
+                    return { ...subMainPipe, branchPipes: updatedBranchPipes };
+                });
+                newState.subMainPipes = updatedSubMainPipes;
             }
-            return subMainPipe;
-        });
 
-        pushToHistory({ subMainPipes: updatedSubMainPipes });
-        console.log('✅ Deleted branch pipe and associated plants');
-    }, [history.present.subMainPipes, history.present.plants, pushToHistory]);
+            pushToHistory(newState);
+        },
+        [selectedPipeType, history.present.mainPipes, history.present.subMainPipes, pushToHistory]
+    );
+
+    const handlePipeDelete = useCallback(
+        (pipeId: string) => {
+            let newState: Partial<ProjectState> = {};
+
+            if (selectedPipeType === 'main') {
+                const updatedMainPipes = history.present.mainPipes.filter(
+                    (pipe) => pipe.id !== pipeId
+                );
+                newState.mainPipes = updatedMainPipes;
+            } else if (selectedPipeType === 'subMain') {
+                const updatedSubMainPipes = history.present.subMainPipes.filter(
+                    (pipe) => pipe.id !== pipeId
+                );
+                newState.subMainPipes = updatedSubMainPipes;
+            } else if (selectedPipeType === 'branch') {
+                const updatedSubMainPipes = history.present.subMainPipes.map((subMainPipe) => {
+                    const updatedBranchPipes = subMainPipe.branchPipes.filter(
+                        (branchPipe) => branchPipe.id !== pipeId
+                    );
+                    return { ...subMainPipe, branchPipes: updatedBranchPipes };
+                });
+                newState.subMainPipes = updatedSubMainPipes;
+            }
+
+            pushToHistory(newState);
+        },
+        [selectedPipeType, history.present.mainPipes, history.present.subMainPipes, pushToHistory]
+    );
+
+    const handleDeleteBranchPipe = useCallback(
+        (branchId: string, subMainId: string) => {
+            const updatedSubMainPipes = history.present.subMainPipes.map((subMainPipe) => {
+                if (subMainPipe.id === subMainId) {
+                    const branchToDelete = subMainPipe.branchPipes.find((bp) => bp.id === branchId);
+                    if (branchToDelete) {
+                        const plantsToRemove = branchToDelete.plants.map((p) => p.id);
+                        const updatedPlants = history.present.plants.filter(
+                            (plant) => !plantsToRemove.includes(plant.id)
+                        );
+
+                        pushToHistory({ plants: updatedPlants });
+                    }
+
+                    return {
+                        ...subMainPipe,
+                        branchPipes: subMainPipe.branchPipes.filter(
+                            (branchPipe) => branchPipe.id !== branchId
+                        ),
+                    };
+                }
+                return subMainPipe;
+            });
+
+            pushToHistory({ subMainPipes: updatedSubMainPipes });
+            console.log('✅ Deleted branch pipe and associated plants');
+        },
+        [history.present.subMainPipes, history.present.plants, pushToHistory]
+    );
 
     const MapClickHandler: React.FC<{
         editMode: string | null;
@@ -2257,13 +2518,25 @@ export default function EnhancedHorticulturePlannerPage() {
         onPumpPlace: (latlng: L.LatLng) => void;
         onPlantPlace: (latlng: L.LatLng) => void;
         onAddPlant: (position: Coordinate) => void;
-        onConnectToPipe?: (position: Coordinate, pipeId: string, pipeType: 'subMain' | 'branch') => void;
+        onConnectToPipe?: (
+            position: Coordinate,
+            pipeId: string,
+            pipeType: 'subMain' | 'branch'
+        ) => void;
         isCreatingConnection?: boolean;
-    }> = ({ editMode, isEditModeEnabled, onPumpPlace, onPlantPlace, onAddPlant, onConnectToPipe, isCreatingConnection }) => {
+    }> = ({
+        editMode,
+        isEditModeEnabled,
+        onPumpPlace,
+        onPlantPlace,
+        onAddPlant,
+        onConnectToPipe,
+        isCreatingConnection,
+    }) => {
         useMapEvents({
             click: (e) => {
                 if (isCreatingConnection && onConnectToPipe) {
-                        return; 
+                    return;
                 } else if (isEditModeEnabled && !editMode) {
                     e.originalEvent?.stopPropagation();
                     onAddPlant({ lat: e.latlng.lat, lng: e.latlng.lng });
@@ -2296,270 +2569,303 @@ export default function EnhancedHorticulturePlannerPage() {
         setMapCenter([lat, lng]);
     }, []);
 
-    const handlePumpPlace = useCallback((latlng: L.LatLng) => {
-        const clickPoint = { lat: latlng.lat, lng: latlng.lng };
+    const handlePumpPlace = useCallback(
+        (latlng: L.LatLng) => {
+            const clickPoint = { lat: latlng.lat, lng: latlng.lng };
 
-        if (history.present.mainArea.length > 0) {
-            const isInMainArea = isPointInPolygon(clickPoint, history.present.mainArea);
-            if (!isInMainArea) {
-                console.warn('⚠️ Pump placement outside main area');
-                return;
-            }
-        }
-
-        const newPump: Pump = {
-            id: generateUniqueId('pump'),
-            position: { lat: latlng.lat, lng: latlng.lng },
-            type: 'centrifugal',
-            capacity: 100,
-            head: 50,
-        };
-
-        pushToHistory({ pump: newPump });
-        setEditMode(null);
-        console.log('✅ Pump placed successfully');
-    }, [history.present.mainArea, pushToHistory]);
-
-    const handlePlantPlace = useCallback((latlng: L.LatLng) => {
-        const clickPoint = { lat: latlng.lat, lng: latlng.lng };
-
-        let targetZoneId = 'main-area';
-        if (history.present.useZones && history.present.zones.length > 0) {
-            const containingZone = findZoneContainingPoint(clickPoint, history.present.zones);
-            if (containingZone) {
-                targetZoneId = containingZone.id;
-            } else {
-                console.warn('⚠️ Plant placement outside any zone');
-                return;
-            }
-        }
-
-        const newPlant: PlantLocation = {
-            id: generateUniqueId('plant'),
-            position: { lat: latlng.lat, lng: latlng.lng },
-            plantData: history.present.selectedPlantType,
-            isSelected: false,
-            isEditable: true,
-            health: 'good',
-            zoneId: targetZoneId,
-        };
-
-        pushToHistory({ plants: [...history.present.plants, newPlant] });
-        console.log('✅ Plant placed successfully in zone:', targetZoneId);
-    }, [history.present.selectedPlantType, history.present.plants, history.present.useZones, history.present.zones, pushToHistory]);
-
-    const onCreated = useCallback((e: any) => {
-        const layer = e.layer;
-        const coordinates = extractCoordinatesFromLayer(layer);
-
-        if (coordinates.length === 0) {
-            console.error('❌ Failed to extract coordinates');
-            return;
-        }
-
-        const isPolyline = editMode === 'mainPipe' || editMode === 'subMainPipe';
-        const isValidForPolyline = isPolyline && coordinates.length >= 2;
-        const isValidForPolygon = !isPolyline && coordinates.length >= 3;
-
-        if (!isValidForPolyline && !isValidForPolygon) {
-            console.error('❌ Invalid coordinates for mode:', editMode);
-            return;
-        }
-
-        if (history.present.mainArea.length === 0) {
-            console.log('🎯 Creating main area');
-            const center = coordinates.reduce((acc, point) => [acc[0] + point.lat, acc[1] + point.lng], [0, 0]);
-            setMapCenter([center[0] / coordinates.length, center[1] / coordinates.length]);
-            pushToHistory({ mainArea: coordinates });
-            return;
-        }
-
-        if (editMode === 'zone') {
-            const zoneArea = calculateAreaFromCoordinates(coordinates);
-            const plantDataForZone = history.present.selectedPlantType;
-            const estimatedPlantCount = calculatePlantCount(zoneArea, plantDataForZone.plantSpacing, plantDataForZone.rowSpacing);
-            const estimatedWaterNeed = estimatedPlantCount * plantDataForZone.waterNeed;
-
-            const newZone: Zone = {
-                id: generateUniqueId('zone'),
-                name: `โซน ${history.present.zones.length + 1}`,
-                coordinates,
-                plantData: plantDataForZone,
-                plantCount: estimatedPlantCount,
-                totalWaterNeed: estimatedWaterNeed,
-                area: zoneArea,
-                color: getZoneColor(history.present.zones.length),
-                isCustomPlant: plantDataForZone.id === 99,
-            };
-
-            pushToHistory({ zones: [...history.present.zones, newZone] });
-            setEditMode(null);
-            console.log(`✅ Zone created: ${newZone.name}`);
-        } else if (editMode === 'exclusion') {
-            const newExclusion: ExclusionArea = {
-                id: generateUniqueId('exclusion'),
-                type: selectedExclusionType,
-                coordinates,
-                name: `${selectedExclusionType} ${history.present.exclusionAreas.filter((e) => e.type === selectedExclusionType).length + 1}`,
-                color: EXCLUSION_COLORS[selectedExclusionType],
-            };
-
-            pushToHistory({ exclusionAreas: [...history.present.exclusionAreas, newExclusion] });
-            setEditMode(null);
-            console.log(`✅ Exclusion area created: ${newExclusion.name}`);
-        } else if (editMode === 'mainPipe' && history.present.pump) {
-            const pipeLength = calculatePipeLength(coordinates);
-            const targetZoneId = findTargetZoneForMainPipe(coordinates, history.present.zones, history.present.useZones);
-
-            const newMainPipe: MainPipe = {
-                id: generateUniqueId('mainpipe'),
-                fromPump: history.present.pump.id,
-                toZone: targetZoneId,
-                coordinates,
-                length: pipeLength,
-                diameter: 100,
-            };
-
-            pushToHistory({ mainPipes: [...history.present.mainPipes, newMainPipe] });
-            setDrawingMainPipe({ toZone: null });
-            setEditMode(null);
-            console.log(`✅ Main pipe created: ${pipeLength.toFixed(2)}m to zone: ${targetZoneId}`);
-        } else if (editMode === 'subMainPipe') {
-            console.log('🔩 Creating enhanced sub-main pipe with optimal branch generation...');
-
-            const pipeLength = calculatePipeLength(coordinates);
-
-            let targetZone: Zone;
-            if (history.present.useZones) {
-                if (selectedZone) {
-                    targetZone = selectedZone;
-                } else {
-                    const detectedZone = findZoneForPipe(coordinates, history.present.zones);
-                    if (!detectedZone) {
-                        console.error('❌ Cannot create sub-main pipe: not in any zone');
-                        return;
-                    }
-                    targetZone = detectedZone;
+            if (history.present.mainArea.length > 0) {
+                const isInMainArea = isPointInPolygon(clickPoint, history.present.mainArea);
+                if (!isInMainArea) {
+                    console.warn('⚠️ Pump placement outside main area');
+                    return;
                 }
-            } else {
-                targetZone = {
-                    id: 'main-area',
-                    name: 'พื้นที่หลัก',
-                    coordinates: history.present.mainArea,
-                    plantData: history.present.selectedPlantType,
-                    plantCount: 0,
-                    totalWaterNeed: 0,
-                    area: calculateAreaFromCoordinates(history.present.mainArea),
-                    color: '#4ECDC4',
-                };
             }
 
-            const branchPipes = generateEnhancedBranchPipes(
-                coordinates,
-                targetZone,
-                targetZone.plantData,
-                history.present.exclusionAreas,
-                targetZone.coordinates,
-                history.present.useZones,
-                history.present.branchPipeSettings
-            );
-
-            const newSubMainPipe: SubMainPipe = {
-                id: generateUniqueId('submainpipe'),
-                zoneId: targetZone.id,
-                coordinates,
-                length: pipeLength,
-                diameter: 75,
-                branchPipes,
+            const newPump: Pump = {
+                id: generateUniqueId('pump'),
+                position: { lat: latlng.lat, lng: latlng.lng },
+                type: 'centrifugal',
+                capacity: 100,
+                head: 50,
             };
 
-            const newPlants = branchPipes.flatMap((pipe) =>
-                pipe.plants.map((plant) => ({ ...plant, zoneId: targetZone.id }))
-            );
-
-            const exactSpacingStats = calculateExactSpacingStats([...history.present.subMainPipes, newSubMainPipe]);
-
-            pushToHistory({
-                subMainPipes: [...history.present.subMainPipes, newSubMainPipe],
-                plants: [...history.present.plants, ...newPlants],
-                spacingValidationStats: exactSpacingStats,
-            });
-
-            console.log(`✅ ENHANCED: ${branchPipes.length} branches, ${newPlants.length} plants in ${targetZone.name}`);
+            pushToHistory({ pump: newPump });
             setEditMode(null);
-            setSelectedZone(null);
+            console.log('✅ Pump placed successfully');
+        },
+        [history.present.mainArea, pushToHistory]
+    );
+
+    const handlePlantPlace = useCallback(
+        (latlng: L.LatLng) => {
+            const clickPoint = { lat: latlng.lat, lng: latlng.lng };
+
+            let targetZoneId = 'main-area';
+            if (history.present.useZones && history.present.zones.length > 0) {
+                const containingZone = findZoneContainingPoint(clickPoint, history.present.zones);
+                if (containingZone) {
+                    targetZoneId = containingZone.id;
+                } else {
+                    console.warn('⚠️ Plant placement outside any zone');
+                    return;
+                }
+            }
+
+            const newPlant: PlantLocation = {
+                id: generateUniqueId('plant'),
+                position: { lat: latlng.lat, lng: latlng.lng },
+                plantData: history.present.selectedPlantType,
+                isSelected: false,
+                isEditable: true,
+                health: 'good',
+                zoneId: targetZoneId,
+            };
+
+            pushToHistory({ plants: [...history.present.plants, newPlant] });
+            console.log('✅ Plant placed successfully in zone:', targetZoneId);
+        },
+        [
+            history.present.selectedPlantType,
+            history.present.plants,
+            history.present.useZones,
+            history.present.zones,
+            pushToHistory,
+        ]
+    );
+
+    const onCreated = useCallback(
+        (e: any) => {
+            const layer = e.layer;
+            const coordinates = extractCoordinatesFromLayer(layer);
+
+            if (coordinates.length === 0) {
+                console.error('❌ Failed to extract coordinates');
+                return;
+            }
+
+            const isPolyline = editMode === 'mainPipe' || editMode === 'subMainPipe';
+            const isValidForPolyline = isPolyline && coordinates.length >= 2;
+            const isValidForPolygon = !isPolyline && coordinates.length >= 3;
+
+            if (!isValidForPolyline && !isValidForPolygon) {
+                console.error('❌ Invalid coordinates for mode:', editMode);
+                return;
+            }
+
+            if (history.present.mainArea.length === 0) {
+                console.log('🎯 Creating main area');
+                const center = coordinates.reduce(
+                    (acc, point) => [acc[0] + point.lat, acc[1] + point.lng],
+                    [0, 0]
+                );
+                setMapCenter([center[0] / coordinates.length, center[1] / coordinates.length]);
+                pushToHistory({ mainArea: coordinates });
+                return;
+            }
+
+            if (editMode === 'zone') {
+                const zoneArea = calculateAreaFromCoordinates(coordinates);
+                const plantDataForZone = history.present.selectedPlantType;
+                const estimatedPlantCount = calculatePlantCount(
+                    zoneArea,
+                    plantDataForZone.plantSpacing,
+                    plantDataForZone.rowSpacing
+                );
+                const estimatedWaterNeed = estimatedPlantCount * plantDataForZone.waterNeed;
+
+                const newZone: Zone = {
+                    id: generateUniqueId('zone'),
+                    name: `โซน ${history.present.zones.length + 1}`,
+                    coordinates,
+                    plantData: plantDataForZone,
+                    plantCount: estimatedPlantCount,
+                    totalWaterNeed: estimatedWaterNeed,
+                    area: zoneArea,
+                    color: getZoneColor(history.present.zones.length),
+                    isCustomPlant: plantDataForZone.id === 99,
+                };
+
+                pushToHistory({ zones: [...history.present.zones, newZone] });
+                setEditMode(null);
+                console.log(`✅ Zone created: ${newZone.name}`);
+            } else if (editMode === 'exclusion') {
+                const newExclusion: ExclusionArea = {
+                    id: generateUniqueId('exclusion'),
+                    type: selectedExclusionType,
+                    coordinates,
+                    name: `${selectedExclusionType} ${history.present.exclusionAreas.filter((e) => e.type === selectedExclusionType).length + 1}`,
+                    color: EXCLUSION_COLORS[selectedExclusionType],
+                };
+
+                pushToHistory({
+                    exclusionAreas: [...history.present.exclusionAreas, newExclusion],
+                });
+                setEditMode(null);
+                console.log(`✅ Exclusion area created: ${newExclusion.name}`);
+            } else if (editMode === 'mainPipe' && history.present.pump) {
+                const pipeLength = calculatePipeLength(coordinates);
+                const targetZoneId = findTargetZoneForMainPipe(
+                    coordinates,
+                    history.present.zones,
+                    history.present.useZones
+                );
+
+                const newMainPipe: MainPipe = {
+                    id: generateUniqueId('mainpipe'),
+                    fromPump: history.present.pump.id,
+                    toZone: targetZoneId,
+                    coordinates,
+                    length: pipeLength,
+                    diameter: 100,
+                };
+
+                pushToHistory({ mainPipes: [...history.present.mainPipes, newMainPipe] });
+                setDrawingMainPipe({ toZone: null });
+                setEditMode(null);
+                console.log(
+                    `✅ Main pipe created: ${pipeLength.toFixed(2)}m to zone: ${targetZoneId}`
+                );
+            } else if (editMode === 'subMainPipe') {
+                console.log('🔩 Creating enhanced sub-main pipe with optimal branch generation...');
+
+                const pipeLength = calculatePipeLength(coordinates);
+
+                let targetZone: Zone;
+                if (history.present.useZones) {
+                    if (selectedZone) {
+                        targetZone = selectedZone;
+                    } else {
+                        const detectedZone = findZoneForPipe(coordinates, history.present.zones);
+                        if (!detectedZone) {
+                            console.error('❌ Cannot create sub-main pipe: not in any zone');
+                            return;
+                        }
+                        targetZone = detectedZone;
+                    }
+                } else {
+                    targetZone = {
+                        id: 'main-area',
+                        name: 'พื้นที่หลัก',
+                        coordinates: history.present.mainArea,
+                        plantData: history.present.selectedPlantType,
+                        plantCount: 0,
+                        totalWaterNeed: 0,
+                        area: calculateAreaFromCoordinates(history.present.mainArea),
+                        color: '#4ECDC4',
+                    };
+                }
+
+                const branchPipes = generateEnhancedBranchPipes(
+                    coordinates,
+                    targetZone,
+                    targetZone.plantData,
+                    history.present.exclusionAreas,
+                    targetZone.coordinates,
+                    history.present.useZones,
+                    history.present.branchPipeSettings
+                );
+
+                const newSubMainPipe: SubMainPipe = {
+                    id: generateUniqueId('submainpipe'),
+                    zoneId: targetZone.id,
+                    coordinates,
+                    length: pipeLength,
+                    diameter: 75,
+                    branchPipes,
+                };
+
+                const newPlants = branchPipes.flatMap((pipe) =>
+                    pipe.plants.map((plant) => ({ ...plant, zoneId: targetZone.id }))
+                );
+
+                const exactSpacingStats = calculateExactSpacingStats([
+                    ...history.present.subMainPipes,
+                    newSubMainPipe,
+                ]);
+
+                pushToHistory({
+                    subMainPipes: [...history.present.subMainPipes, newSubMainPipe],
+                    plants: [...history.present.plants, ...newPlants],
+                    spacingValidationStats: exactSpacingStats,
+                });
+
+                console.log(
+                    `✅ ENHANCED: ${branchPipes.length} branches, ${newPlants.length} plants in ${targetZone.name}`
+                );
+                setEditMode(null);
+                setSelectedZone(null);
+            }
+
+            if (featureGroupRef.current) {
+                featureGroupRef.current.removeLayer(layer);
+            }
+        },
+        [
+            history.present.mainArea,
+            editMode,
+            history.present.selectedPlantType,
+            history.present.zones,
+            selectedExclusionType,
+            history.present.exclusionAreas,
+            history.present.pump,
+            drawingMainPipe,
+            selectedZone,
+            history.present.useZones,
+            history.present.subMainPipes,
+            history.present.plants,
+            history.present.branchPipeSettings,
+            pushToHistory,
+        ]
+    );
+
+    const handleSaveProject = useCallback(() => {
+        if (!history.present.pump || history.present.mainArea.length === 0) {
+            alert('กรุณาวางปั๊มและสร้างพื้นที่หลักก่อนบันทึก');
+            return;
         }
 
-        if (featureGroupRef.current) {
-            featureGroupRef.current.removeLayer(layer);
+        const projectData = {
+            projectName,
+            version: '3.2.0',
+            totalArea,
+            mainArea: history.present.mainArea,
+            pump: history.present.pump,
+            zones: history.present.zones,
+            mainPipes: history.present.mainPipes,
+            subMainPipes: history.present.subMainPipes,
+            exclusionAreas: history.present.exclusionAreas,
+            plants: history.present.plants,
+            useZones: history.present.useZones,
+            branchPipeSettings: history.present.branchPipeSettings,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        };
+
+        try {
+            // บันทึกข้อมูลลง localStorage
+            localStorage.setItem('horticultureIrrigationData', JSON.stringify(projectData));
+
+            console.log('✅ โครงการถูกบันทึกเรียบร้อยแล้ว');
+
+            // นำทางไปหน้าผลลัพธ์
+            router.visit('/horticulture/results');
+        } catch (error) {
+            console.error('❌ เกิดข้อผิดพลาดในการบันทึก:', error);
+            alert('เกิดข้อผิดพลาดในการบันทึกโครงการ กรุณาลองใหม่');
         }
     }, [
-        history.present.mainArea,
-        editMode,
-        history.present.selectedPlantType,
-        history.present.zones,
-        selectedExclusionType,
-        history.present.exclusionAreas,
         history.present.pump,
-        drawingMainPipe,
-        selectedZone,
-        history.present.useZones,
-        history.present.subMainPipes,
-        history.present.plants,
-        history.present.branchPipeSettings,
-        pushToHistory,
-    ]);
-
-
-const handleSaveProject = useCallback(() => {
-    if (!history.present.pump || history.present.mainArea.length === 0) {
-        alert('กรุณาวางปั๊มและสร้างพื้นที่หลักก่อนบันทึก');
-        return;
-    }
-
-    const projectData = {
+        history.present.mainArea,
         projectName,
-        version: '3.2.0',
         totalArea,
-        mainArea: history.present.mainArea,
-        pump: history.present.pump,
-        zones: history.present.zones,
-        mainPipes: history.present.mainPipes,
-        subMainPipes: history.present.subMainPipes,
-        exclusionAreas: history.present.exclusionAreas,
-        plants: history.present.plants,
-        useZones: history.present.useZones,
-        branchPipeSettings: history.present.branchPipeSettings,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-    };
-
-    try {
-        // บันทึกข้อมูลลง localStorage
-        localStorage.setItem('horticultureIrrigationData', JSON.stringify(projectData));
-        
-        console.log('✅ โครงการถูกบันทึกเรียบร้อยแล้ว');
-        
-        // นำทางไปหน้าผลลัพธ์
-        router.visit('/horticulture/results');
-        
-    } catch (error) {
-        console.error('❌ เกิดข้อผิดพลาดในการบันทึก:', error);
-        alert('เกิดข้อผิดพลาดในการบันทึกโครงการ กรุณาลองใหม่');
-    }
-}, [
-    history.present.pump,
-    history.present.mainArea,
-    projectName,
-    totalArea,
-    history.present.zones,
-    history.present.mainPipes,
-    history.present.subMainPipes,
-    history.present.exclusionAreas,
-    history.present.plants,
-    history.present.useZones,
-    history.present.branchPipeSettings,
-]);
+        history.present.zones,
+        history.present.mainPipes,
+        history.present.subMainPipes,
+        history.present.exclusionAreas,
+        history.present.plants,
+        history.present.useZones,
+        history.present.branchPipeSettings,
+    ]);
 
     const canSaveProject = history.present.pump && history.present.mainArea.length > 0;
 
@@ -2601,7 +2907,9 @@ const handleSaveProject = useCallback(() => {
                             <h3 className="mb-3 text-lg font-semibold">📊 ข้อมูลโครงการ</h3>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="mb-2 block text-sm font-medium">ชื่อโครงการ</label>
+                                    <label className="mb-2 block text-sm font-medium">
+                                        ชื่อโครงการ
+                                    </label>
                                     <input
                                         type="text"
                                         value={projectName}
@@ -2618,7 +2926,10 @@ const handleSaveProject = useCallback(() => {
                                     <div className="flex justify-between">
                                         <span>จำนวนโซน:</span>
                                         <span className="font-medium">
-                                            {history.present.useZones ? history.present.zones.length : 1} โซน
+                                            {history.present.useZones
+                                                ? history.present.zones.length
+                                                : 1}{' '}
+                                            โซน
                                         </span>
                                     </div>
                                     <div className="flex justify-between">
@@ -2666,7 +2977,7 @@ const handleSaveProject = useCallback(() => {
 
                                     {isCreatingConnection && (
                                         <div className="rounded bg-blue-900/50 p-3 text-sm">
-                                            <div className="text-blue-300 font-semibold mb-2">
+                                            <div className="mb-2 font-semibold text-blue-300">
                                                 🔗 โหมดเชื่อมต่อท่อ
                                             </div>
                                             <div className="text-xs text-gray-300">
@@ -2690,7 +3001,7 @@ const handleSaveProject = useCallback(() => {
                         )}
 
                         <label className="flex cursor-pointer items-center rounded-lg bg-gray-800 p-4">
-                            <div className="flex items-center justify-between w-full">
+                            <div className="flex w-full items-center justify-between">
                                 <h3 className="text-lg font-semibold text-gray-100">
                                     🏞️ แบ่งเป็นหลายโซน
                                 </h3>
@@ -2754,15 +3065,22 @@ const handleSaveProject = useCallback(() => {
                                     <div className="text-sm text-gray-300">
                                         <div className="flex justify-between">
                                             <span>ระยะห่างต้น:</span>
-                                            <span>{history.present.selectedPlantType.plantSpacing} ม.</span>
+                                            <span>
+                                                {history.present.selectedPlantType.plantSpacing} ม.
+                                            </span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span>ระยะห่างแถว:</span>
-                                            <span>{history.present.selectedPlantType.rowSpacing} ม.</span>
+                                            <span>
+                                                {history.present.selectedPlantType.rowSpacing} ม.
+                                            </span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span>น้ำต่อต้น:</span>
-                                            <span>{history.present.selectedPlantType.waterNeed} ล./ครั้ง</span>
+                                            <span>
+                                                {history.present.selectedPlantType.waterNeed}{' '}
+                                                ล./ครั้ง
+                                            </span>
                                         </div>
                                     </div>
 
@@ -2770,7 +3088,9 @@ const handleSaveProject = useCallback(() => {
                                         !history.present.isEditModeEnabled && (
                                             <button
                                                 onClick={() =>
-                                                    handleCreateCustomPlant(history.present.selectedPlantType)
+                                                    handleCreateCustomPlant(
+                                                        history.present.selectedPlantType
+                                                    )
                                                 }
                                                 className="w-full rounded bg-orange-600 px-3 py-2 text-sm transition-colors hover:bg-orange-700"
                                             >
@@ -2800,11 +3120,14 @@ const handleSaveProject = useCallback(() => {
                                                 <div className="text-sm text-gray-300">
                                                     <div className="flex items-center gap-2">
                                                         <span>
-                                                            {zone.isCustomPlant ? '🌱' : '🌱'} {zone.plantData.name}
+                                                            {zone.isCustomPlant ? '🌱' : '🌱'}{' '}
+                                                            {zone.plantData.name}
                                                         </span>
                                                         {!history.present.isEditModeEnabled && (
                                                             <button
-                                                                onClick={() => handleZonePlantSelection(zone)}
+                                                                onClick={() =>
+                                                                    handleZonePlantSelection(zone)
+                                                                }
                                                                 className="ml-auto rounded bg-blue-600 px-2 py-1 text-xs transition-colors hover:bg-blue-700"
                                                             >
                                                                 เปลี่ยน
@@ -2812,11 +3135,13 @@ const handleSaveProject = useCallback(() => {
                                                         )}
                                                     </div>
                                                     <div className="mt-1 text-xs text-gray-400">
-                                                        {zone.plantData.plantSpacing}×{zone.plantData.rowSpacing}ม. |{' '}
+                                                        {zone.plantData.plantSpacing}×
+                                                        {zone.plantData.rowSpacing}ม. |{' '}
                                                         {zone.plantData.waterNeed}ล./ครั้ง
                                                     </div>
                                                     <div className="text-xs text-gray-400">
-                                                        ประมาณ: {zone.plantCount.toLocaleString()} ต้น
+                                                        ประมาณ: {zone.plantCount.toLocaleString()}{' '}
+                                                        ต้น
                                                     </div>
                                                 </div>
                                             </div>
@@ -2831,7 +3156,8 @@ const handleSaveProject = useCallback(() => {
                             <div className="space-y-3">
                                 <div>
                                     <label className="mb-2 block text-sm font-medium">
-                                        มุมเริ่มต้น: {history.present.branchPipeSettings.defaultAngle}°
+                                        มุมเริ่มต้น:{' '}
+                                        {history.present.branchPipeSettings.defaultAngle}°
                                     </label>
                                     <input
                                         type="range"
@@ -2858,7 +3184,7 @@ const handleSaveProject = useCallback(() => {
                                         <span>180° (ย้อน)</span>
                                     </div>
                                 </div>
-                                
+
                                 <div className="text-xs text-gray-400">
                                     💡 มุมนี้จะใช้เป็นค่าเริ่มต้นเมื่อสร้างท่อย่อยใหม่
                                 </div>
@@ -2867,7 +3193,9 @@ const handleSaveProject = useCallback(() => {
 
                         {!history.present.isEditModeEnabled && (
                             <div className="rounded-lg bg-gray-800 p-4">
-                                <h3 className="mb-3 text-lg font-semibold">🚫 พื้นที่ต้องหลีกเลี่ยง</h3>
+                                <h3 className="mb-3 text-lg font-semibold">
+                                    🚫 พื้นที่ต้องหลีกเลี่ยง
+                                </h3>
                                 <div className="space-y-2">
                                     <select
                                         value={selectedExclusionType}
@@ -2886,7 +3214,9 @@ const handleSaveProject = useCallback(() => {
                                     </select>
                                     <button
                                         onClick={() =>
-                                            setEditMode(editMode === 'exclusion' ? null : 'exclusion')
+                                            setEditMode(
+                                                editMode === 'exclusion' ? null : 'exclusion'
+                                            )
                                         }
                                         className={`w-full rounded px-4 py-2 text-white transition-colors ${
                                             editMode === 'exclusion'
@@ -2906,7 +3236,9 @@ const handleSaveProject = useCallback(() => {
                             <div className="space-y-3">
                                 {history.present.useZones && (
                                     <button
-                                        onClick={() => setEditMode(editMode === 'zone' ? null : 'zone')}
+                                        onClick={() =>
+                                            setEditMode(editMode === 'zone' ? null : 'zone')
+                                        }
                                         disabled={history.present.mainArea.length === 0}
                                         className={`w-full rounded px-4 py-2 text-white transition-colors ${
                                             history.present.mainArea.length === 0
@@ -2941,14 +3273,18 @@ const handleSaveProject = useCallback(() => {
                                 </button>
 
                                 <button
-                                    onClick={() => setEditMode(editMode === 'mainPipe' ? null : 'mainPipe')}
+                                    onClick={() =>
+                                        setEditMode(editMode === 'mainPipe' ? null : 'mainPipe')
+                                    }
                                     disabled={
                                         !history.present.pump ||
-                                        (history.present.useZones && history.present.zones.length === 0)
+                                        (history.present.useZones &&
+                                            history.present.zones.length === 0)
                                     }
                                     className={`w-full rounded px-4 py-2 text-white transition-colors ${
                                         !history.present.pump ||
-                                        (history.present.useZones && history.present.zones.length === 0)
+                                        (history.present.useZones &&
+                                            history.present.zones.length === 0)
                                             ? 'cursor-not-allowed bg-gray-600'
                                             : editMode === 'mainPipe'
                                               ? 'bg-green-600'
@@ -2959,14 +3295,22 @@ const handleSaveProject = useCallback(() => {
                                 </button>
 
                                 <button
-                                    onClick={() => setEditMode(editMode === 'subMainPipe' ? null : 'subMainPipe')}
+                                    onClick={() =>
+                                        setEditMode(
+                                            editMode === 'subMainPipe' ? null : 'subMainPipe'
+                                        )
+                                    }
                                     disabled={
-                                        (history.present.useZones && history.present.zones.length === 0) ||
-                                        (!history.present.useZones && history.present.mainArea.length === 0)
+                                        (history.present.useZones &&
+                                            history.present.zones.length === 0) ||
+                                        (!history.present.useZones &&
+                                            history.present.mainArea.length === 0)
                                     }
                                     className={`w-full rounded px-4 py-2 text-white transition-colors ${
-                                        (history.present.useZones && history.present.zones.length === 0) ||
-                                        (!history.present.useZones && history.present.mainArea.length === 0)
+                                        (history.present.useZones &&
+                                            history.present.zones.length === 0) ||
+                                        (!history.present.useZones &&
+                                            history.present.mainArea.length === 0)
                                             ? 'cursor-not-allowed bg-gray-600'
                                             : editMode === 'subMainPipe'
                                               ? 'bg-purple-600'
@@ -2982,11 +3326,15 @@ const handleSaveProject = useCallback(() => {
 
                         {editMode === 'subMainPipe' && history.present.useZones && (
                             <div className="rounded-lg bg-purple-900/30 p-4">
-                                <h4 className="mb-2 text-sm font-medium">🔧 เลือกโซนสำหรับท่อเมนรอง</h4>
+                                <h4 className="mb-2 text-sm font-medium">
+                                    🔧 เลือกโซนสำหรับท่อเมนรอง
+                                </h4>
                                 <select
                                     value={selectedZone?.id || ''}
                                     onChange={(e) => {
-                                        const zone = history.present.zones.find((z) => z.id === e.target.value);
+                                        const zone = history.present.zones.find(
+                                            (z) => z.id === e.target.value
+                                        );
                                         setSelectedZone(zone || null);
                                     }}
                                     className="w-full rounded bg-gray-700 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -3000,7 +3348,8 @@ const handleSaveProject = useCallback(() => {
                                 </select>
                                 {!selectedZone && (
                                     <p className="mt-2 text-xs text-yellow-400">
-                                        ⚠️ ต้องเลือกโซนก่อนวาดท่อเมนรอง (หรือจะ AUTO-DETECT จากที่วาด)
+                                        ⚠️ ต้องเลือกโซนก่อนวาดท่อเมนรอง (หรือจะ AUTO-DETECT
+                                        จากที่วาด)
                                     </p>
                                 )}
                                 {selectedZone && (
@@ -3009,7 +3358,8 @@ const handleSaveProject = useCallback(() => {
                                         <br />
                                         พืช: {selectedZone.plantData.name}
                                         <br />
-                                        มุมเริ่มต้น: {history.present.branchPipeSettings.defaultAngle}°
+                                        มุมเริ่มต้น:{' '}
+                                        {history.present.branchPipeSettings.defaultAngle}°
                                     </div>
                                 )}
                             </div>
@@ -3019,7 +3369,8 @@ const handleSaveProject = useCallback(() => {
                             <div className="rounded-lg bg-purple-900/30 p-4">
                                 <h4 className="mb-2 text-sm font-medium">🔧 โหมดพื้นที่เดียว</h4>
                                 <p className="text-xs text-purple-300">
-                                    ✅ พร้อมวาดท่อเมนรองและสร้างท่อย่อยครอบคลุมปลายแบบเพิ่มประสิทธิภาพ
+                                    ✅
+                                    พร้อมวาดท่อเมนรองและสร้างท่อย่อยครอบคลุมปลายแบบเพิ่มประสิทธิภาพ
                                 </p>
                                 <p className="mt-1 text-xs text-gray-400">
                                     พืช: {history.present.selectedPlantType.name}(
@@ -3079,13 +3430,16 @@ const handleSaveProject = useCallback(() => {
                                         <>
                                             <div className="flex justify-between">
                                                 <span>ท่อเมนรอง:</span>
-                                                <span>{history.present.subMainPipes.length} เส้น</span>
+                                                <span>
+                                                    {history.present.subMainPipes.length} เส้น
+                                                </span>
                                             </div>
                                             <div className="flex justify-between">
                                                 <span>ท่อย่อย:</span>
                                                 <span>
                                                     {history.present.subMainPipes.reduce(
-                                                        (sum, pipe) => sum + pipe.branchPipes.length,
+                                                        (sum, pipe) =>
+                                                            sum + pipe.branchPipes.length,
                                                         0
                                                     )}{' '}
                                                     เส้น
@@ -3105,7 +3459,7 @@ const handleSaveProject = useCallback(() => {
                                             {formatWaterVolume(actualTotalWaterNeed)}
                                         </span>
                                     </div>
-                                    <div className="text-xs text-purple-300 mt-2 p-2 bg-purple-900/20 rounded">
+                                    <div className="mt-2 rounded bg-purple-900/20 p-2 text-xs text-purple-300">
                                         🆕 ปรับปรุงใหม่: ลบท่อย่อย, ลากเชื่อมต่อท่อ, แก้ไขขั้นสูง
                                     </div>
                                 </div>
@@ -3169,7 +3523,10 @@ const handleSaveProject = useCallback(() => {
                                     {/* Main Area */}
                                     {history.present.mainArea.length > 0 && (
                                         <Polygon
-                                            positions={history.present.mainArea.map((coord) => [coord.lat, coord.lng])}
+                                            positions={history.present.mainArea.map((coord) => [
+                                                coord.lat,
+                                                coord.lng,
+                                            ])}
                                             pathOptions={{
                                                 color: '#22C55E',
                                                 fillColor: '#22C55E',
@@ -3181,9 +3538,15 @@ const handleSaveProject = useCallback(() => {
                                                     if (editMode === 'pump') {
                                                         e.originalEvent?.stopPropagation();
                                                         handlePumpPlace(e.latlng);
-                                                    } else if (history.present.isEditModeEnabled && !editMode) {
+                                                    } else if (
+                                                        history.present.isEditModeEnabled &&
+                                                        !editMode
+                                                    ) {
                                                         e.originalEvent?.stopPropagation();
-                                                        handleAddPlant({ lat: e.latlng.lat, lng: e.latlng.lng });
+                                                        handleAddPlant({
+                                                            lat: e.latlng.lat,
+                                                            lng: e.latlng.lng,
+                                                        });
                                                     }
                                                 },
                                             }}
@@ -3211,7 +3574,10 @@ const handleSaveProject = useCallback(() => {
                                     {history.present.exclusionAreas.map((area) => (
                                         <Polygon
                                             key={area.id}
-                                            positions={area.coordinates.map((coord) => [coord.lat, coord.lng])}
+                                            positions={area.coordinates.map((coord) => [
+                                                coord.lat,
+                                                coord.lng,
+                                            ])}
                                             pathOptions={{
                                                 color: area.color,
                                                 fillColor: area.color,
@@ -3234,7 +3600,10 @@ const handleSaveProject = useCallback(() => {
                                         history.present.zones.map((zone) => (
                                             <Polygon
                                                 key={zone.id}
-                                                positions={zone.coordinates.map((coord) => [coord.lat, coord.lng])}
+                                                positions={zone.coordinates.map((coord) => [
+                                                    coord.lat,
+                                                    coord.lng,
+                                                ])}
                                                 pathOptions={{
                                                     color: zone.color,
                                                     fillColor: zone.color,
@@ -3246,9 +3615,15 @@ const handleSaveProject = useCallback(() => {
                                                         !history.present.isEditModeEnabled &&
                                                         handleZonePlantSelection(zone),
                                                     click: (e) => {
-                                                        if (history.present.isEditModeEnabled && !editMode) {
+                                                        if (
+                                                            history.present.isEditModeEnabled &&
+                                                            !editMode
+                                                        ) {
                                                             e.originalEvent?.stopPropagation();
-                                                            handleAddPlant({ lat: e.latlng.lat, lng: e.latlng.lng });
+                                                            handleAddPlant({
+                                                                lat: e.latlng.lat,
+                                                                lng: e.latlng.lng,
+                                                            });
                                                         }
                                                     },
                                                 }}
@@ -3257,13 +3632,16 @@ const handleSaveProject = useCallback(() => {
                                                     <div className="text-center">
                                                         <strong>{zone.name}</strong>
                                                         <br />
-                                                        พืช: {zone.isCustomPlant ? '🔧' : '🌱'} {zone.plantData.name}
+                                                        พืช: {zone.isCustomPlant ? '🔧' : '🌱'}{' '}
+                                                        {zone.plantData.name}
                                                         <br />
                                                         ขนาด: {formatArea(zone.area)}
                                                         <br />
-                                                        ประมาณ: {zone.plantCount.toLocaleString()} ต้น
+                                                        ประมาณ: {zone.plantCount.toLocaleString()}{' '}
+                                                        ต้น
                                                         <br />
-                                                        น้ำ: {formatWaterVolume(zone.totalWaterNeed)}
+                                                        น้ำ:{' '}
+                                                        {formatWaterVolume(zone.totalWaterNeed)}
                                                         <br />
                                                         <div className="text-xs text-green-600">
                                                             {history.present.isEditModeEnabled && (
@@ -3276,7 +3654,11 @@ const handleSaveProject = useCallback(() => {
                                                         {!history.present.isEditModeEnabled && (
                                                             <div className="mt-2">
                                                                 <button
-                                                                    onClick={() => handleZonePlantSelection(zone)}
+                                                                    onClick={() =>
+                                                                        handleZonePlantSelection(
+                                                                            zone
+                                                                        )
+                                                                    }
                                                                     className="rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700"
                                                                 >
                                                                     เปลี่ยนพืช
@@ -3291,7 +3673,10 @@ const handleSaveProject = useCallback(() => {
                                     {/* Pump */}
                                     {history.present.pump && (
                                         <Marker
-                                            position={[history.present.pump.position.lat, history.present.pump.position.lng]}
+                                            position={[
+                                                history.present.pump.position.lat,
+                                                history.present.pump.position.lng,
+                                            ]}
                                             icon={L.divIcon({
                                                 html: `<div style="
                                             width: 24px;
@@ -3323,7 +3708,8 @@ const handleSaveProject = useCallback(() => {
                                                     แรงดัน: {history.present.pump.head} ม.
                                                     {history.present.isEditModeEnabled && (
                                                         <div className="mt-2 text-xs text-yellow-600">
-                                                            💡 ในโหมดแก้ไข: สร้างปั๊มใหม่เพื่อเปลี่ยนตำแหน่ง
+                                                            💡 ในโหมดแก้ไข:
+                                                            สร้างปั๊มใหม่เพื่อเปลี่ยนตำแหน่ง
                                                         </div>
                                                     )}
                                                 </div>
@@ -3335,7 +3721,10 @@ const handleSaveProject = useCallback(() => {
                                     {history.present.mainPipes.map((pipe) => (
                                         <Polyline
                                             key={pipe.id}
-                                            positions={pipe.coordinates.map((coord) => [coord.lat, coord.lng])}
+                                            positions={pipe.coordinates.map((coord) => [
+                                                coord.lat,
+                                                coord.lng,
+                                            ])}
                                             pathOptions={{
                                                 color: '#3B82F6',
                                                 weight: 6,
@@ -3343,7 +3732,8 @@ const handleSaveProject = useCallback(() => {
                                             }}
                                             eventHandlers={{
                                                 dblclick: () =>
-                                                    history.present.isEditModeEnabled && handlePipeEdit(pipe, 'main'),
+                                                    history.present.isEditModeEnabled &&
+                                                    handlePipeEdit(pipe, 'main'),
                                             }}
                                         >
                                             <Popup>
@@ -3356,11 +3746,15 @@ const handleSaveProject = useCallback(() => {
                                                     <br />
                                                     ไปยังโซน: {pipe.toZone}
                                                     <br />
-                                                    <div className="text-xs text-blue-600">🎯 AUTO-DETECT โซนปลายทาง</div>
+                                                    <div className="text-xs text-blue-600">
+                                                        🎯 AUTO-DETECT โซนปลายทาง
+                                                    </div>
                                                     {history.present.isEditModeEnabled && (
                                                         <div className="mt-2">
                                                             <button
-                                                                onClick={() => handlePipeEdit(pipe, 'main')}
+                                                                onClick={() =>
+                                                                    handlePipeEdit(pipe, 'main')
+                                                                }
                                                                 className="rounded bg-orange-600 px-2 py-1 text-xs text-white hover:bg-orange-700"
                                                             >
                                                                 <FaEdit className="mr-1 inline" />
@@ -3377,20 +3771,36 @@ const handleSaveProject = useCallback(() => {
                                     {history.present.subMainPipes.map((pipe) => (
                                         <React.Fragment key={pipe.id}>
                                             <Polyline
-                                                positions={pipe.coordinates.map((coord) => [coord.lat, coord.lng])}
+                                                positions={pipe.coordinates.map((coord) => [
+                                                    coord.lat,
+                                                    coord.lng,
+                                                ])}
                                                 pathOptions={{
-                                                    color: highlightedPipes.includes(pipe.id) ? '#FFD700' : '#8B5CF6',
-                                                    weight: highlightedPipes.includes(pipe.id) ? 7 : 5,
-                                                    opacity: highlightedPipes.includes(pipe.id) ? 1 : 0.9,
+                                                    color: highlightedPipes.includes(pipe.id)
+                                                        ? '#FFD700'
+                                                        : '#8B5CF6',
+                                                    weight: highlightedPipes.includes(pipe.id)
+                                                        ? 7
+                                                        : 5,
+                                                    opacity: highlightedPipes.includes(pipe.id)
+                                                        ? 1
+                                                        : 0.9,
                                                 }}
                                                 eventHandlers={{
                                                     dblclick: () =>
-                                                        history.present.isEditModeEnabled && handlePipeEdit(pipe, 'subMain'),
+                                                        history.present.isEditModeEnabled &&
+                                                        handlePipeEdit(pipe, 'subMain'),
                                                     click: (e) => {
-                                                        if (isCreatingConnection && highlightedPipes.includes(pipe.id)) {
+                                                        if (
+                                                            isCreatingConnection &&
+                                                            highlightedPipes.includes(pipe.id)
+                                                        ) {
                                                             e.originalEvent?.stopPropagation();
                                                             handleConnectToPipe(
-                                                                { lat: e.latlng.lat, lng: e.latlng.lng },
+                                                                {
+                                                                    lat: e.latlng.lat,
+                                                                    lng: e.latlng.lng,
+                                                                },
                                                                 pipe.id,
                                                                 'subMain'
                                                             );
@@ -3408,7 +3818,13 @@ const handleSaveProject = useCallback(() => {
                                                         <br />
                                                         ท่อย่อย: {pipe.branchPipes.length} เส้น
                                                         <br />
-                                                        ต้นไม้: {pipe.branchPipes.reduce((sum, branch) => sum + branch.plants.length, 0)} ต้น
+                                                        ต้นไม้:{' '}
+                                                        {pipe.branchPipes.reduce(
+                                                            (sum, branch) =>
+                                                                sum + branch.plants.length,
+                                                            0
+                                                        )}{' '}
+                                                        ต้น
                                                         <br />
                                                         <div className="text-xs text-green-600">
                                                             ✅ ปรับปรุง: ท่อย่อยยาวถึงต้นสุดท้าย
@@ -3420,7 +3836,12 @@ const handleSaveProject = useCallback(() => {
                                                         {history.present.isEditModeEnabled && (
                                                             <div className="mt-2">
                                                                 <button
-                                                                    onClick={() => handlePipeEdit(pipe, 'subMain')}
+                                                                    onClick={() =>
+                                                                        handlePipeEdit(
+                                                                            pipe,
+                                                                            'subMain'
+                                                                        )
+                                                                    }
                                                                     className="rounded bg-orange-600 px-2 py-1 text-xs text-white hover:bg-orange-700"
                                                                 >
                                                                     <FaEdit className="mr-1 inline" />
@@ -3428,11 +3849,12 @@ const handleSaveProject = useCallback(() => {
                                                                 </button>
                                                             </div>
                                                         )}
-                                                        {isCreatingConnection && highlightedPipes.includes(pipe.id) && (
-                                                            <div className="mt-2 text-xs text-yellow-300">
-                                                                🔗 คลิกเพื่อเชื่อมต่อ
-                                                            </div>
-                                                        )}
+                                                        {isCreatingConnection &&
+                                                            highlightedPipes.includes(pipe.id) && (
+                                                                <div className="mt-2 text-xs text-yellow-300">
+                                                                    🔗 คลิกเพื่อเชื่อมต่อ
+                                                                </div>
+                                                            )}
                                                     </div>
                                                 </Popup>
                                             </Polyline>
@@ -3440,20 +3862,43 @@ const handleSaveProject = useCallback(() => {
                                             {pipe.branchPipes.map((branchPipe) => (
                                                 <Polyline
                                                     key={branchPipe.id}
-                                                    positions={branchPipe.coordinates.map((coord) => [coord.lat, coord.lng])}
+                                                    positions={branchPipe.coordinates.map(
+                                                        (coord) => [coord.lat, coord.lng]
+                                                    )}
                                                     pathOptions={{
-                                                        color: highlightedPipes.includes(branchPipe.id) ? '#FFD700' : '#FFFF66',
-                                                        weight: highlightedPipes.includes(branchPipe.id) ? 4 : 2,
-                                                        opacity: highlightedPipes.includes(branchPipe.id) ? 1 : 0.8,
+                                                        color: highlightedPipes.includes(
+                                                            branchPipe.id
+                                                        )
+                                                            ? '#FFD700'
+                                                            : '#FFFF66',
+                                                        weight: highlightedPipes.includes(
+                                                            branchPipe.id
+                                                        )
+                                                            ? 4
+                                                            : 2,
+                                                        opacity: highlightedPipes.includes(
+                                                            branchPipe.id
+                                                        )
+                                                            ? 1
+                                                            : 0.8,
                                                     }}
                                                     eventHandlers={{
                                                         dblclick: () =>
-                                                            history.present.isEditModeEnabled && handlePipeEdit(branchPipe, 'branch'),
+                                                            history.present.isEditModeEnabled &&
+                                                            handlePipeEdit(branchPipe, 'branch'),
                                                         click: (e) => {
-                                                            if (isCreatingConnection && highlightedPipes.includes(branchPipe.id)) {
+                                                            if (
+                                                                isCreatingConnection &&
+                                                                highlightedPipes.includes(
+                                                                    branchPipe.id
+                                                                )
+                                                            ) {
                                                                 e.originalEvent?.stopPropagation();
                                                                 handleConnectToPipe(
-                                                                    { lat: e.latlng.lat, lng: e.latlng.lng },
+                                                                    {
+                                                                        lat: e.latlng.lat,
+                                                                        lng: e.latlng.lng,
+                                                                    },
                                                                     branchPipe.id,
                                                                     'branch'
                                                                 );
@@ -3465,7 +3910,10 @@ const handleSaveProject = useCallback(() => {
                                                         <div className="text-center">
                                                             <strong>ท่อย่อย</strong>
                                                             <br />
-                                                            ความยาว: {branchPipe.length.toFixed(2)} ม.
+                                                            ความยาว: {branchPipe.length.toFixed(
+                                                                2
+                                                            )}{' '}
+                                                            ม.
                                                             <br />
                                                             ต้นไม้: {branchPipe.plants.length} ต้น
                                                             <br />
@@ -3477,7 +3925,12 @@ const handleSaveProject = useCallback(() => {
                                                             )}
                                                             {branchPipe.connectionPoint && (
                                                                 <>
-                                                                    จุดต่อ: {(branchPipe.connectionPoint * 100).toFixed(1)}%
+                                                                    จุดต่อ:{' '}
+                                                                    {(
+                                                                        branchPipe.connectionPoint *
+                                                                        100
+                                                                    ).toFixed(1)}
+                                                                    %
                                                                     <br />
                                                                 </>
                                                             )}
@@ -3491,14 +3944,24 @@ const handleSaveProject = useCallback(() => {
                                                             {history.present.isEditModeEnabled && (
                                                                 <div className="mt-2">
                                                                     <button
-                                                                        onClick={() => handlePipeEdit(branchPipe, 'branch')}
+                                                                        onClick={() =>
+                                                                            handlePipeEdit(
+                                                                                branchPipe,
+                                                                                'branch'
+                                                                            )
+                                                                        }
                                                                         className="mr-2 rounded bg-orange-600 px-2 py-1 text-xs text-white hover:bg-orange-700"
                                                                     >
                                                                         <FaEdit className="mr-1 inline" />
                                                                         แก้ไข
                                                                     </button>
                                                                     <button
-                                                                        onClick={() => handleDeleteBranchPipe(branchPipe.id, pipe.id)}
+                                                                        onClick={() =>
+                                                                            handleDeleteBranchPipe(
+                                                                                branchPipe.id,
+                                                                                pipe.id
+                                                                            )
+                                                                        }
                                                                         className="rounded bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700"
                                                                     >
                                                                         <FaUnlink className="mr-1 inline" />
@@ -3506,11 +3969,14 @@ const handleSaveProject = useCallback(() => {
                                                                     </button>
                                                                 </div>
                                                             )}
-                                                            {isCreatingConnection && highlightedPipes.includes(branchPipe.id) && (
-                                                                <div className="mt-2 text-xs text-yellow-300">
-                                                                    🔗 คลิกเพื่อเชื่อมต่อ
-                                                                </div>
-                                                            )}
+                                                            {isCreatingConnection &&
+                                                                highlightedPipes.includes(
+                                                                    branchPipe.id
+                                                                ) && (
+                                                                    <div className="mt-2 text-xs text-yellow-300">
+                                                                        🔗 คลิกเพื่อเชื่อมต่อ
+                                                                    </div>
+                                                                )}
                                                         </div>
                                                     </Popup>
                                                 </Polyline>
@@ -3535,9 +4001,14 @@ const handleSaveProject = useCallback(() => {
                                                 iconAnchor: [12, 12],
                                             })}
                                             eventHandlers={{
-                                                dblclick: () => history.present.isEditModeEnabled && handlePlantEdit(plant),
+                                                dblclick: () =>
+                                                    history.present.isEditModeEnabled &&
+                                                    handlePlantEdit(plant),
                                                 click: () => {
-                                                    if (history.present.isEditModeEnabled && !isCreatingConnection) {
+                                                    if (
+                                                        history.present.isEditModeEnabled &&
+                                                        !isCreatingConnection
+                                                    ) {
                                                         handleCreatePlantConnection(plant.id);
                                                     }
                                                 },
@@ -3549,7 +4020,8 @@ const handleSaveProject = useCallback(() => {
                                                     <br />
                                                     น้ำ: {plant.plantData.waterNeed} ล./ครั้ง
                                                     <br />
-                                                    ระยะปลูก: {plant.plantData.plantSpacing}×{plant.plantData.rowSpacing} ม.
+                                                    ระยะปลูก: {plant.plantData.plantSpacing}×
+                                                    {plant.plantData.rowSpacing} ม.
                                                     <br />
                                                     {plant.zoneId && (
                                                         <>
@@ -3560,14 +4032,20 @@ const handleSaveProject = useCallback(() => {
                                                     {history.present.isEditModeEnabled && (
                                                         <div className="mt-2">
                                                             <button
-                                                                onClick={() => handlePlantEdit(plant)}
+                                                                onClick={() =>
+                                                                    handlePlantEdit(plant)
+                                                                }
                                                                 className="mr-2 rounded bg-orange-600 px-2 py-1 text-xs text-white hover:bg-orange-700"
                                                             >
                                                                 <FaEdit className="mr-1 inline" />
                                                                 แก้ไข
                                                             </button>
                                                             <button
-                                                                onClick={() => handleCreatePlantConnection(plant.id)}
+                                                                onClick={() =>
+                                                                    handleCreatePlantConnection(
+                                                                        plant.id
+                                                                    )
+                                                                }
                                                                 className="rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700"
                                                             >
                                                                 <FaLink className="mr-1 inline" />
@@ -3583,12 +4061,15 @@ const handleSaveProject = useCallback(() => {
                                     {/* Temporary connection line */}
                                     {tempConnectionLine && (
                                         <Polyline
-                                            positions={tempConnectionLine.map(coord => [coord.lat, coord.lng])}
+                                            positions={tempConnectionLine.map((coord) => [
+                                                coord.lat,
+                                                coord.lng,
+                                            ])}
                                             pathOptions={{
                                                 color: '#FFD700',
                                                 weight: 3,
                                                 opacity: 0.7,
-                                                dashArray: '10, 10'
+                                                dashArray: '10, 10',
                                             }}
                                         />
                                     )}
@@ -3599,10 +4080,21 @@ const handleSaveProject = useCallback(() => {
                                                 position="topright"
                                                 onCreated={onCreated}
                                                 draw={{
-                                                    rectangle: editMode === 'zone' || editMode === 'exclusion' || !editMode,
-                                                    circle: editMode === 'zone' || editMode === 'exclusion' || !editMode,
-                                                    polygon: editMode === 'zone' || editMode === 'exclusion' || !editMode,
-                                                    polyline: editMode === 'mainPipe' || editMode === 'subMainPipe',
+                                                    rectangle:
+                                                        editMode === 'zone' ||
+                                                        editMode === 'exclusion' ||
+                                                        !editMode,
+                                                    circle:
+                                                        editMode === 'zone' ||
+                                                        editMode === 'exclusion' ||
+                                                        !editMode,
+                                                    polygon:
+                                                        editMode === 'zone' ||
+                                                        editMode === 'exclusion' ||
+                                                        !editMode,
+                                                    polyline:
+                                                        editMode === 'mainPipe' ||
+                                                        editMode === 'subMainPipe',
                                                     marker: false,
                                                     circlemarker: false,
                                                 }}
@@ -3612,7 +4104,9 @@ const handleSaveProject = useCallback(() => {
 
                                     {history.present.isEditModeEnabled && (
                                         <div className="absolute right-4 top-4 z-[1000] rounded-lg bg-black bg-opacity-70 p-4 text-white">
-                                            <h4 className="mb-2 font-semibold text-yellow-300">🎛️ โหมดแก้ไขขั้นสูง</h4>
+                                            <h4 className="mb-2 font-semibold text-yellow-300">
+                                                🎛️ โหมดแก้ไขขั้นสูง
+                                            </h4>
                                             <div className="space-y-1 text-sm">
                                                 <div>• คลิกแผนที่ = เพิ่มต้นไม้</div>
                                                 <div>• ดับเบิลคลิก = แก้ไข/ลบ</div>
@@ -3624,7 +4118,9 @@ const handleSaveProject = useCallback(() => {
                                             </div>
                                             {isCreatingConnection && (
                                                 <div className="mt-3 rounded bg-yellow-900/50 p-2 text-xs">
-                                                    <div className="text-yellow-300 font-semibold">🔗 กำลังเชื่อมต่อ</div>
+                                                    <div className="font-semibold text-yellow-300">
+                                                        🔗 กำลังเชื่อมต่อ
+                                                    </div>
                                                     <div>คลิกท่อที่ต้องการเชื่อมต่อ</div>
                                                 </div>
                                             )}
