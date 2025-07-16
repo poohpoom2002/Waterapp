@@ -58,9 +58,24 @@ export default function ChooseIrrigationMethod() {
         if (methodParam) setMethod(methodParam);
     }, []);
 
-    // ฟังก์ชันสำหรับย้อนกลับไปหน้าก่อนหน้า
+    // ฟังก์ชันสำหรับย้อนกลับไปหน้า planner
     const handleBack = () => {
-        window.history.back();
+        // บันทึกข้อมูลปัจจุบัน
+        const currentData = {
+            crops: crops,
+            shapes: shapes,
+            method: method,
+            selectedIrrigation: selectedMethod,
+            updatedAt: new Date().toISOString()
+        };
+        localStorage.setItem('choosingIrrigationData', JSON.stringify(currentData));
+        
+        // กลับไปหน้า planner พร้อมข้อมูล
+        const queryParams = new URLSearchParams();
+        if (crops) queryParams.set('crops', crops);
+        if (method) queryParams.set('method', method);
+        
+        window.location.href = `/greenhouse-planner?${queryParams.toString()}`;
     };
 
     // ฟังก์ชันสำหรับไปขั้นตอนถัดไป
@@ -70,7 +85,18 @@ export default function ChooseIrrigationMethod() {
             return;
         }
         
-        // สร้าง URL parameters สำหรับหน้า irrigation designer
+        // บันทึกข้อมูลทั้งหมดใน localStorage
+        const completeData = {
+            crops: crops,
+            shapes: shapes,
+            method: method,
+            selectedIrrigation: selectedMethod,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        localStorage.setItem('irrigationSelectionData', JSON.stringify(completeData));
+        
+        // สร้าง URL parameters สำหรับหน้า green-house-map
         const queryParams = new URLSearchParams();
         
         if (crops) queryParams.set('crops', crops);
@@ -78,7 +104,7 @@ export default function ChooseIrrigationMethod() {
         if (method) queryParams.set('method', method);
         queryParams.set('irrigation', selectedMethod);
 
-        // นำทางไปยังหน้า greenhouse map
+        // นำทางไปยังหน้า green-house-map
         window.location.href = `/greenhouse-map?${queryParams.toString()}`;
     };
 
@@ -197,14 +223,14 @@ export default function ChooseIrrigationMethod() {
 
                 {/* Action Buttons */}
                 <div className="mt-12 flex justify-between items-center">
-                     <button
+                    <button
                         onClick={handleBack}
                         className="flex items-center rounded bg-gray-600 px-6 py-3 text-white hover:bg-gray-700 transition-colors"
                     >
                         <svg className="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                         </svg>
-                        ย้อนกลับ
+                        กลับไปออกแบบพื้นที่
                     </button>
                     
                     <button

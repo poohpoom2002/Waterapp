@@ -120,6 +120,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->name('greenhouse-map');
 
+    // Greenhouse Summary Route
+    Route::get('green-house-summary', function () {
+        $crops = request()->query('crops');
+        $shapes = request()->query('shapes');
+        $method = request()->query('method');
+        $irrigation = request()->query('irrigation');
+        
+        return Inertia::render('green-house/green-house-summary', [
+            'crops' => $crops,
+            'shapes' => $shapes,
+            'method' => $method,
+            'irrigation' => $irrigation
+        ]);
+    })->name('green-house-summary');
+
     // Field Crop Summary Route
     Route::get('field-crop-summary', function () {
         return Inertia::render('field-crop-summary');

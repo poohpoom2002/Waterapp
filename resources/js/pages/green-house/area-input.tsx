@@ -32,7 +32,21 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
     };
 
     const handleBack = () => {
-        window.history.back();
+        // บันทึกข้อมูลปัจจุบัน
+        const currentData = {
+            crops: selectedCrops.join(','),
+            selectedMethod: selectedMethod,
+            updatedAt: new Date().toISOString()
+        };
+        localStorage.setItem('areaInputData', JSON.stringify(currentData));
+        
+        // กลับไปหน้าเลือกพืช พร้อมข้อมูลพืชที่เลือกไว้
+        const queryParams = new URLSearchParams();
+        if (selectedCrops.length > 0) {
+            queryParams.set('crops', selectedCrops.join(','));
+        }
+        
+        window.location.href = `/greenhouse-crop?${queryParams.toString()}`;
     };
 
     return (

@@ -1085,7 +1085,22 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
     };
 
     const handleBack = () => {
-        window.history.back();
+        // บันทึกข้อมูลปัจจุบัน
+        const currentData = {
+            crops: selectedCrops.join(','),
+            shapes: shapes,
+            method: method || 'draw',
+            updatedAt: new Date().toISOString()
+        };
+        localStorage.setItem('plannerData', JSON.stringify(currentData));
+        
+        // กลับไปหน้า area-input (planner) พร้อมข้อมูลพืช
+        const queryParams = new URLSearchParams();
+        if (selectedCrops.length > 0) {
+            queryParams.set('crops', selectedCrops.join(','));
+        }
+        
+        window.location.href = `/area-input-method?${queryParams.toString()}`;
     };
 
     return (
