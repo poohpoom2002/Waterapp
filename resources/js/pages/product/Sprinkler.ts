@@ -5,7 +5,7 @@ export const SprinklerData = [
         productCode: '1-ECO-100',
         name: 'มินิสปริงเกอร์ 1/2"',
         size_mm: 20, // ขนาดหัวน้ำหยด มิลลิเมตร
-        size_inch: 1/2, // ขนาดหัวน้ำหยด นิ้ว
+        size_inch: 1 / 2, // ขนาดหัวน้ำหยด นิ้ว
         waterVolumeLitersPerHour: [60, 120], // [ต่ำสุด, สูงสุด] ลิตรต่อชั่วโมง
         radiusMeters: [0.5, 1.5], // [ต่ำสุด, สูงสุด]
         pressureBar: [0.5, 2], // [ต่ำสุด, สูงสุด]
@@ -18,8 +18,8 @@ export const SprinklerData = [
         productCode: '1-ECO-150',
         name: 'มินิสปริงเกอร์ 3/4"',
         size_mm: 25, // ขนาดหัวน้ำหยด มิลลิเมตร
-        size_inch: 3/4, // ขนาดหัวน้ำหยด นิ้ว
-        waterVolumeLitersPerHour: [120, 240], // [ต่ำสุด, สูงสุด]    
+        size_inch: 3 / 4, // ขนาดหัวน้ำหยด นิ้ว
+        waterVolumeLitersPerHour: [120, 240], // [ต่ำสุด, สูงสุด]
         radiusMeters: [0.5, 1.5], // [ต่ำสุด, สูงสุด]
         pressureBar: [0.5, 2], // [ต่ำสุด, สูงสุด]
         price: 2,
@@ -52,7 +52,7 @@ export const SprinklerData = [
         brand: 'แชมป์',
         image: '/images/sprinkler/1-ECO-250.jpg',
     },
-    
+
     {
         id: 54,
         productCode: '300',
@@ -99,7 +99,7 @@ export const SprinklerData = [
         waterVolumeLitersPerHour: [1400, 3000], // [ต่ำสุด, สูงสุด]
         radiusMeters: [4, 5], // [ต่ำสุด, สูงสุด]
         pressureBar: [0.5, 3], // [ต่ำสุด, สูงสุด]
-            price: 21,
+        price: 21,
         brand: 'ไชโย',
         image: '/images/sprinkler/301A-V2.jpg',
     },

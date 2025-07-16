@@ -39,13 +39,13 @@ const EnhancedMapBounds = ({ positions }: { positions: Array<{ lat: number; lng:
         if (positions.length > 0) {
             try {
                 const bounds = L.latLngBounds(positions.map((p) => [p.lat, p.lng]));
-                
+
                 // Enhanced padding for better visualization
                 map.fitBounds(bounds, {
                     padding: [50, 50], // Increased padding
                     maxZoom: 20, // Limited max zoom for better overview
                 });
-                
+
                 console.log('✅ Map bounds fitted with enhanced padding');
             } catch (error) {
                 console.error('Error fitting bounds:', error);
@@ -57,13 +57,7 @@ const EnhancedMapBounds = ({ positions }: { positions: Array<{ lat: number; lng:
 };
 
 // Map Rotation Component
-const MapRotationController = ({ 
-    rotation, 
-    isLocked 
-}: { 
-    rotation: number; 
-    isLocked: boolean; 
-}) => {
+const MapRotationController = ({ rotation, isLocked }: { rotation: number; isLocked: boolean }) => {
     const map = useMap();
 
     useEffect(() => {
@@ -71,7 +65,7 @@ const MapRotationController = ({
         if (container) {
             container.style.transform = `rotate(${rotation}deg)`;
             container.style.transformOrigin = 'center center';
-            
+
             // Disable zoom and interaction when locked
             if (isLocked) {
                 map.dragging.disable();
@@ -138,18 +132,18 @@ export default function EnhancedHorticultureResultsPage() {
     const [mapLoaded, setMapLoaded] = useState(false);
     const [mapCenter, setMapCenter] = useState<[number, number]>([13.75, 100.5]);
     const [mapZoom, setMapZoom] = useState<number>(16);
-    
+
     // Enhanced Map Control States
     const [mapRotation, setMapRotation] = useState<number>(0);
     const [isMapLocked, setIsMapLocked] = useState<boolean>(false);
     const [pipeSize, setPipeSize] = useState<number>(1); // Multiplier for pipe thickness
     const [iconSize, setIconSize] = useState<number>(1); // Multiplier for icon size
-    
+
     // การจัดการสถานะการสร้างรายงาน
     const [isCreatingImage, setIsCreatingImage] = useState(false);
     const [isCreatingPDF, setIsCreatingPDF] = useState(false);
     const [isCreatingExport, setIsCreatingExport] = useState(false);
-    
+
     const mapRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -162,8 +156,12 @@ export default function EnhancedHorticultureResultsPage() {
 
                 // Enhanced map center calculation
                 if (data.mainArea && data.mainArea.length > 0) {
-                    const centerLat = data.mainArea.reduce((sum, point) => sum + point.lat, 0) / data.mainArea.length;
-                    const centerLng = data.mainArea.reduce((sum, point) => sum + point.lng, 0) / data.mainArea.length;
+                    const centerLat =
+                        data.mainArea.reduce((sum, point) => sum + point.lat, 0) /
+                        data.mainArea.length;
+                    const centerLng =
+                        data.mainArea.reduce((sum, point) => sum + point.lng, 0) /
+                        data.mainArea.length;
                     setMapCenter([centerLat, centerLng]);
 
                     const bounds = L.latLngBounds(data.mainArea.map((p) => [p.lat, p.lng]));
@@ -227,14 +225,14 @@ export default function EnhancedHorticultureResultsPage() {
         setIsCreatingImage(true);
         try {
             console.log('🖼️ เริ่มสร้างภาพแผนที่...');
-            
+
             // Reset rotation temporarily for image capture
             const currentRotation = mapRotation;
             if (currentRotation !== 0) {
                 setMapRotation(0);
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise((resolve) => setTimeout(resolve, 500));
             }
-            
+
             // แสดงการแจ้งเตือนให้ผู้ใช้รอ
             const loadingDiv = document.createElement('div');
             loadingDiv.id = 'image-loading';
@@ -259,7 +257,7 @@ export default function EnhancedHorticultureResultsPage() {
             const success = await createAndDownloadMapImage(mapRef.current, {
                 quality: 0.9,
                 scale: 2,
-                filename: `${projectData?.projectName || 'horticulture-layout'}.jpg`
+                filename: `${projectData?.projectName || 'horticulture-layout'}.jpg`,
             });
 
             document.body.removeChild(loadingDiv);
@@ -270,13 +268,19 @@ export default function EnhancedHorticultureResultsPage() {
             }
 
             if (success) {
-                alert('✅ ดาวน์โหลดภาพแผนที่สำเร็จ!\n\nหากไม่สามารถดาวน์โหลดได้ กรุณาใช้วิธี Screenshot:\n• กด F11 เพื่อ Fullscreen\n• กด Print Screen\n• หรือกด F12 > Ctrl+Shift+P > พิมพ์ "screenshot"');
+                alert(
+                    '✅ ดาวน์โหลดภาพแผนที่สำเร็จ!\n\nหากไม่สามารถดาวน์โหลดได้ กรุณาใช้วิธี Screenshot:\n• กด F11 เพื่อ Fullscreen\n• กด Print Screen\n• หรือกด F12 > Ctrl+Shift+P > พิมพ์ "screenshot"'
+                );
             } else {
-                alert('⚠️ ไม่สามารถสร้างภาพแผนที่ได้อัตโนมัติ\n\nกรุณาใช้วิธี Screenshot แทน:\n\n1. กด F11 เพื่อเข้าโหมด Fullscreen\n2. กด Print Screen หรือใช้ Snipping Tool\n3. หรือกด F12 > เปิด Developer Tools\n4. กด Ctrl+Shift+P > พิมพ์ "screenshot"\n5. เลือก "Capture full size screenshot"');
+                alert(
+                    '⚠️ ไม่สามารถสร้างภาพแผนที่ได้อัตโนมัติ\n\nกรุณาใช้วิธี Screenshot แทน:\n\n1. กด F11 เพื่อเข้าโหมด Fullscreen\n2. กด Print Screen หรือใช้ Snipping Tool\n3. หรือกด F12 > เปิด Developer Tools\n4. กด Ctrl+Shift+P > พิมพ์ "screenshot"\n5. เลือก "Capture full size screenshot"'
+                );
             }
         } catch (error) {
             console.error('❌ Error creating map image:', error);
-            alert('❌ เกิดข้อผิดพลาดในการสร้างภาพ\n\nกรุณาใช้วิธี Screenshot แทน:\n• กด Print Screen\n• หรือใช้ Extension เช่น "Full Page Screen Capture"');
+            alert(
+                '❌ เกิดข้อผิดพลาดในการสร้างภาพ\n\nกรุณาใช้วิธี Screenshot แทน:\n• กด Print Screen\n• หรือใช้ Extension เช่น "Full Page Screen Capture"'
+            );
         } finally {
             setIsCreatingImage(false);
         }
@@ -291,14 +295,14 @@ export default function EnhancedHorticultureResultsPage() {
         setIsCreatingPDF(true);
         try {
             console.log('📄 เริ่มสร้าง PDF Report...');
-            
+
             // Reset rotation for PDF
             const currentRotation = mapRotation;
             if (currentRotation !== 0) {
                 setMapRotation(0);
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise((resolve) => setTimeout(resolve, 500));
             }
-            
+
             // แสดงการแจ้งเตือนให้ผู้ใช้รอ
             const loadingDiv = document.createElement('div');
             loadingDiv.id = 'pdf-loading';
@@ -319,24 +323,30 @@ export default function EnhancedHorticultureResultsPage() {
                 <div style="margin-top: 10px; font-size: 12px;">กรุณารอสักครู่</div>
             `;
             document.body.appendChild(loadingDiv);
-            
+
             const success = await createPDFReport(true, mapRef.current);
-            
+
             document.body.removeChild(loadingDiv);
-            
+
             // Restore rotation
             if (currentRotation !== 0) {
                 setMapRotation(currentRotation);
             }
-            
+
             if (success) {
-                alert('✅ สร้างรายงานสำเร็จ!\n\n• หากเป็น PDF: ไฟล์จะถูกดาวน์โหลดอัตโนมัติ\n• หากเป็น HTML: หน้าต่างใหม่จะเปิดขึ้น\n• สามารถพิมพ์หรือบันทึกเป็น PDF ได้');
+                alert(
+                    '✅ สร้างรายงานสำเร็จ!\n\n• หากเป็น PDF: ไฟล์จะถูกดาวน์โหลดอัตโนมัติ\n• หากเป็น HTML: หน้าต่างใหม่จะเปิดขึ้น\n• สามารถพิมพ์หรือบันทึกเป็น PDF ได้'
+                );
             } else {
-                alert('⚠️ ไม่สามารถสร้างรายงานอัตโนมัติได้\n\nกรุณาใช้วิธีดาวน์โหลดข้อมูล JSON/CSV แทน\nหรือคัดลอกข้อมูลจากหน้าจอ');
+                alert(
+                    '⚠️ ไม่สามารถสร้างรายงานอัตโนมัติได้\n\nกรุณาใช้วิธีดาวน์โหลดข้อมูล JSON/CSV แทน\nหรือคัดลอกข้อมูลจากหน้าจอ'
+                );
             }
         } catch (error) {
             console.error('❌ Error creating PDF:', error);
-            alert('❌ เกิดข้อผิดพลาดในการสร้าง PDF\n\nกรุณาลองใช้:\n• ดาวน์โหลด JSON/CSV\n• Screenshot หน้าจอ\n• คัดลอกข้อมูลด้วยตนเอง');
+            alert(
+                '❌ เกิดข้อผิดพลาดในการสร้าง PDF\n\nกรุณาลองใช้:\n• ดาวน์โหลด JSON/CSV\n• Screenshot หน้าจอ\n• คัดลอกข้อมูลด้วยตนเอง'
+            );
         } finally {
             setIsCreatingPDF(false);
         }
@@ -371,16 +381,19 @@ export default function EnhancedHorticultureResultsPage() {
     const handleCopyStats = () => {
         const formattedStats = getFormattedStats();
         if (formattedStats) {
-            navigator.clipboard.writeText(formattedStats).then(() => {
-                alert('✅ คัดลอกข้อมูลสถิติลงคลิปบอร์ดเรียบร้อยแล้ว!');
-            }).catch(() => {
-                // Fallback: แสดงข้อมูลในหน้าต่างใหม่
-                const newWindow = window.open('', '_blank');
-                if (newWindow) {
-                    newWindow.document.write(`<pre>${formattedStats}</pre>`);
-                    alert('เปิดข้อมูลในหน้าต่างใหม่ กรุณาคัดลอกด้วยตนเอง');
-                }
-            });
+            navigator.clipboard
+                .writeText(formattedStats)
+                .then(() => {
+                    alert('✅ คัดลอกข้อมูลสถิติลงคลิปบอร์ดเรียบร้อยแล้ว!');
+                })
+                .catch(() => {
+                    // Fallback: แสดงข้อมูลในหน้าต่างใหม่
+                    const newWindow = window.open('', '_blank');
+                    if (newWindow) {
+                        newWindow.document.write(`<pre>${formattedStats}</pre>`);
+                        alert('เปิดข้อมูลในหน้าต่างใหม่ กรุณาคัดลอกด้วยตนเอง');
+                    }
+                });
         }
     };
 
@@ -414,7 +427,7 @@ export default function EnhancedHorticultureResultsPage() {
 • ใช้คุณภาพสูงสุดในการบันทึก
 • รีเซ็ตการหมุนแผนที่ก่อน Screenshot
         `;
-        
+
         alert(guide);
     };
 
@@ -451,7 +464,7 @@ export default function EnhancedHorticultureResultsPage() {
                 {/* Header */}
                 <div className="mb-8 text-center">
                     <h1 className="mb-4 text-4xl font-bold text-green-400">
-                        🌱 รายงานการออกแบบระบบน้ำสวนผลไม้
+                        🌱 รายงานการออกแบบระบบน้ำสำหรับพืชสวน
                     </h1>
                     <h2 className="text-2xl text-gray-300">{projectData.projectName}</h2>
                     <p className="mt-2 text-gray-400">
@@ -502,20 +515,26 @@ export default function EnhancedHorticultureResultsPage() {
                         <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
                             {/* Rotation Controls */}
                             <div className="rounded-lg bg-gray-700 p-4">
-                                <h4 className="mb-3 text-sm font-semibold text-blue-300">🔄 การหมุนแผนที่</h4>
+                                <h4 className="mb-3 text-sm font-semibold text-blue-300">
+                                    🔄 การหมุนแผนที่
+                                </h4>
                                 <div className="space-y-3">
                                     <div className="flex items-center gap-2">
-                                        <label className="text-xs text-gray-300 w-16">หมุน:</label>
+                                        <label className="w-16 text-xs text-gray-300">หมุน:</label>
                                         <input
                                             type="range"
                                             min="0"
                                             max="360"
                                             step="1"
                                             value={mapRotation}
-                                            onChange={(e) => handleRotationChange(parseInt(e.target.value))}
+                                            onChange={(e) =>
+                                                handleRotationChange(parseInt(e.target.value))
+                                            }
                                             className="flex-1 accent-blue-600"
                                         />
-                                        <span className="text-xs text-blue-300 w-12">{mapRotation}°</span>
+                                        <span className="w-12 text-xs text-blue-300">
+                                            {mapRotation}°
+                                        </span>
                                     </div>
                                     <div className="flex gap-2">
                                         <button
@@ -544,40 +563,52 @@ export default function EnhancedHorticultureResultsPage() {
                                             onChange={toggleMapLock}
                                             className="accent-purple-600"
                                         />
-                                        <label className="text-xs text-gray-300">🔒 ล็อกการซูมและลาก</label>
+                                        <label className="text-xs text-gray-300">
+                                            🔒 ล็อกการซูมและลาก
+                                        </label>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Size Controls */}
                             <div className="rounded-lg bg-gray-700 p-4">
-                                <h4 className="mb-3 text-sm font-semibold text-green-300">📏 ขนาดไอคอน</h4>
+                                <h4 className="mb-3 text-sm font-semibold text-green-300">
+                                    📏 ขนาดไอคอน
+                                </h4>
                                 <div className="space-y-3">
                                     <div className="flex items-center gap-2">
-                                        <label className="text-xs text-gray-300 w-16">ท่อ:</label>
+                                        <label className="w-16 text-xs text-gray-300">ท่อ:</label>
                                         <input
                                             type="range"
                                             min="0.5"
                                             max="3"
                                             step="0.1"
                                             value={pipeSize}
-                                            onChange={(e) => handlePipeSizeChange(parseFloat(e.target.value))}
+                                            onChange={(e) =>
+                                                handlePipeSizeChange(parseFloat(e.target.value))
+                                            }
                                             className="flex-1 accent-green-600"
                                         />
-                                        <span className="text-xs text-green-300 w-12">{pipeSize.toFixed(1)}x</span>
+                                        <span className="w-12 text-xs text-green-300">
+                                            {pipeSize.toFixed(1)}x
+                                        </span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <label className="text-xs text-gray-300 w-16">ไอคอน:</label>
+                                        <label className="w-16 text-xs text-gray-300">ไอคอน:</label>
                                         <input
                                             type="range"
                                             min="0.5"
                                             max="3"
                                             step="0.1"
                                             value={iconSize}
-                                            onChange={(e) => handleIconSizeChange(parseFloat(e.target.value))}
+                                            onChange={(e) =>
+                                                handleIconSizeChange(parseFloat(e.target.value))
+                                            }
                                             className="flex-1 accent-yellow-600"
                                         />
-                                        <span className="text-xs text-yellow-300 w-12">{iconSize.toFixed(1)}x</span>
+                                        <span className="w-12 text-xs text-yellow-300">
+                                            {iconSize.toFixed(1)}x
+                                        </span>
                                     </div>
                                     <button
                                         onClick={resetSizes}
@@ -644,12 +675,18 @@ export default function EnhancedHorticultureResultsPage() {
                                 )}
 
                                 {/* Map Rotation Controller */}
-                                <MapRotationController rotation={mapRotation} isLocked={isMapLocked} />
+                                <MapRotationController
+                                    rotation={mapRotation}
+                                    isLocked={isMapLocked}
+                                />
 
                                 {/* Main Area */}
                                 {projectData.mainArea.length > 0 && (
                                     <Polygon
-                                        positions={projectData.mainArea.map((coord) => [coord.lat, coord.lng])}
+                                        positions={projectData.mainArea.map((coord) => [
+                                            coord.lat,
+                                            coord.lng,
+                                        ])}
                                         pathOptions={{
                                             color: 'rgb(34, 197, 94)',
                                             fillColor: 'rgb(34, 197, 94)',
@@ -664,7 +701,10 @@ export default function EnhancedHorticultureResultsPage() {
                                     projectData.exclusionAreas.map((area) => (
                                         <Polygon
                                             key={area.id}
-                                            positions={area.coordinates.map((coord) => [coord.lat, coord.lng])}
+                                            positions={area.coordinates.map((coord) => [
+                                                coord.lat,
+                                                coord.lng,
+                                            ])}
                                             pathOptions={{
                                                 color: 'rgb(239, 68, 68)',
                                                 fillColor: 'rgb(239, 68, 68)',
@@ -679,7 +719,10 @@ export default function EnhancedHorticultureResultsPage() {
                                     projectData.zones.map((zone) => (
                                         <Polygon
                                             key={zone.id}
-                                            positions={zone.coordinates.map((coord) => [coord.lat, coord.lng])}
+                                            positions={zone.coordinates.map((coord) => [
+                                                coord.lat,
+                                                coord.lng,
+                                            ])}
                                             pathOptions={{
                                                 color: zone.color,
                                                 fillColor: zone.color,
@@ -692,7 +735,10 @@ export default function EnhancedHorticultureResultsPage() {
                                 {/* Enhanced Pump with size control */}
                                 {projectData.pump && (
                                     <Marker
-                                        position={[projectData.pump.position.lat, projectData.pump.position.lng]}
+                                        position={[
+                                            projectData.pump.position.lat,
+                                            projectData.pump.position.lng,
+                                        ]}
                                         icon={createEnhancedPumpIcon(20 * iconSize)}
                                     />
                                 )}
@@ -702,7 +748,10 @@ export default function EnhancedHorticultureResultsPage() {
                                     projectData.mainPipes.map((pipe) => (
                                         <Polyline
                                             key={pipe.id}
-                                            positions={pipe.coordinates.map((coord) => [coord.lat, coord.lng])}
+                                            positions={pipe.coordinates.map((coord) => [
+                                                coord.lat,
+                                                coord.lng,
+                                            ])}
                                             pathOptions={{
                                                 color: 'rgb(59, 130, 246)',
                                                 weight: 6 * pipeSize,
@@ -716,7 +765,10 @@ export default function EnhancedHorticultureResultsPage() {
                                     projectData.subMainPipes.map((pipe) => (
                                         <React.Fragment key={pipe.id}>
                                             <Polyline
-                                                positions={pipe.coordinates.map((coord) => [coord.lat, coord.lng])}
+                                                positions={pipe.coordinates.map((coord) => [
+                                                    coord.lat,
+                                                    coord.lng,
+                                                ])}
                                                 pathOptions={{
                                                     color: 'rgb(139, 92, 246)',
                                                     weight: 4 * pipeSize,
@@ -727,7 +779,9 @@ export default function EnhancedHorticultureResultsPage() {
                                                 pipe.branchPipes.map((branchPipe) => (
                                                     <Polyline
                                                         key={branchPipe.id}
-                                                        positions={branchPipe.coordinates.map((coord) => [coord.lat, coord.lng])}
+                                                        positions={branchPipe.coordinates.map(
+                                                            (coord) => [coord.lat, coord.lng]
+                                                        )}
                                                         pathOptions={{
                                                             color: '#FFFF66',
                                                             weight: 2 * pipeSize,
@@ -755,15 +809,24 @@ export default function EnhancedHorticultureResultsPage() {
                             <h4 className="mb-3 text-sm font-semibold">🎨 คำอธิบายสัญลักษณ์</h4>
                             <div className="grid grid-cols-2 gap-2 text-xs">
                                 <div className="flex items-center gap-2">
-                                    <div className="h-1 w-4 bg-blue-500" style={{ height: `${2 * pipeSize}px` }}></div>
+                                    <div
+                                        className="h-1 w-4 bg-blue-500"
+                                        style={{ height: `${2 * pipeSize}px` }}
+                                    ></div>
                                     <span>ท่อเมน (จากปั๊ม)</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <div className="h-1 w-4 bg-purple-500" style={{ height: `${1.5 * pipeSize}px` }}></div>
+                                    <div
+                                        className="h-1 w-4 bg-purple-500"
+                                        style={{ height: `${1.5 * pipeSize}px` }}
+                                    ></div>
                                     <span>ท่อเมนรอง</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <div className="h-1 w-4 bg-yellow-300" style={{ height: `${1 * pipeSize}px` }}></div>
+                                    <div
+                                        className="h-1 w-4 bg-yellow-300"
+                                        style={{ height: `${1 * pipeSize}px` }}
+                                    ></div>
                                     <span>ท่อย่อย</span>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -771,23 +834,25 @@ export default function EnhancedHorticultureResultsPage() {
                                     <span>พื้นที่ต้องหลีกเลี่ยง</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <div 
+                                    <div
                                         className="flex items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white"
-                                        style={{ 
-                                            width: `18px`, 
+                                        style={{
+                                            width: `18px`,
                                             height: `18px`,
-                                            fontSize: `10px`
+                                            fontSize: `10px`,
                                         }}
-                                    >P</div>
+                                    >
+                                        P
+                                    </div>
                                     <span>ปั๊มน้ำ</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <img
                                         src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAABlklEQVR4nI1TW0sCQRTel/plqSlGEUTPQRqRRBSE9tJDd7tApVI+VERRWcvMbNkFDArsSsLOZV8q+yXFiZ20dtdZaeB7OXO+M+d88x1N8xwhCq0WJZ2C4Zyg+FSC4ayMiUKr1uxwTqKC4apgBJSg5N1iKKIkM4aHOSVfvuQaajmJhpe5gvxQ2YPHyr6yiEWN8O/MgpJ3Z8L+zTTMFPth4CgokS8l4ex+1VMIf0hNLGZ0OS9MU4fBQjvEDtsaoJcX3Z2YqEOTatcClOowjnqU5DpQefmvACMZjVNSrAeun/Ku5GQuAFPLIUjlgjC88xPD5RXHr+BTTVBy5uwghXohftAG4xsBWJpph42JMCR2A5I8pnd7BTXsEbJeDexOZosxmEuHYG0yDGtXIzB/HofSc96tgT2CJV2n/G9A26NwnO7z9wQnUe3lZbOFU/ymSrjcSsLJgl8BXP21tsVQRGWku4sM3CL319XwybkRdC8RI4l/W5niIeU+2Pb0G+dHNPzKTRRqupFSExN12ArX15lTvG7H7Dsv4Rsa94hVuqmogAAAAABJRU5ErkJggg=="
                                         alt="tree"
-                                        style={{ 
-                                            width: `18px`, 
-                                            height: `18px`
+                                        style={{
+                                            width: `18px`,
+                                            height: `18px`,
                                         }}
                                     />
                                     <span>ต้นไม้</span>
@@ -835,7 +900,9 @@ export default function EnhancedHorticultureResultsPage() {
                     <div className="space-y-6">
                         {/* Overall Summary */}
                         <div className="rounded-lg bg-gray-800 p-6">
-                            <h3 className="mb-4 text-xl font-semibold text-green-400">📊 ข้อมูลโดยรวม</h3>
+                            <h3 className="mb-4 text-xl font-semibold text-green-400">
+                                📊 ข้อมูลโดยรวม
+                            </h3>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="rounded bg-gray-700 p-3">
                                     <div className="text-gray-400">พื้นที่รวมทั้งหมด</div>
@@ -867,14 +934,14 @@ export default function EnhancedHorticultureResultsPage() {
                         {/* Pipe System Summary */}
                         <div className="rounded-lg bg-gray-800 p-6">
                             <h3 className="mb-4 text-xl font-semibold text-blue-400">🔧 ระบบท่อ</h3>
-                            
+
                             {/* Main Pipes */}
                             <div className="mb-4 rounded bg-gray-700 p-4">
                                 <h4 className="mb-2 font-semibold text-blue-300">🔵 ท่อเมน</h4>
                                 <div className="grid grid-cols-2 gap-4 text-sm">
                                     <div>
                                         <span className="text-gray-400">ท่อเมนที่ยาวที่สุด:</span>
-                                        <div className="font-bold text-yellow-400">
+                                        <div className="font-bold text-blue-400">
                                             {formatDistance(projectSummary.mainPipes.longest)}
                                         </div>
                                     </div>
@@ -892,15 +959,19 @@ export default function EnhancedHorticultureResultsPage() {
                                 <h4 className="mb-2 font-semibold text-purple-300">🟣 ท่อเมนรอง</h4>
                                 <div className="grid grid-cols-2 gap-4 text-sm">
                                     <div>
-                                        <span className="text-gray-400">ท่อเมนรองที่ยาวที่สุด:</span>
-                                        <div className="font-bold text-yellow-400">
+                                        <span className="text-gray-400">
+                                            ท่อเมนรองที่ยาวที่สุด:
+                                        </span>
+                                        <div className="font-bold text-purple-400">
                                             {formatDistance(projectSummary.subMainPipes.longest)}
                                         </div>
                                     </div>
                                     <div>
                                         <span className="text-gray-400">ท่อเมนรองยาวรวม:</span>
                                         <div className="font-bold text-purple-400">
-                                            {formatDistance(projectSummary.subMainPipes.totalLength)}
+                                            {formatDistance(
+                                                projectSummary.subMainPipes.totalLength
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -908,7 +979,7 @@ export default function EnhancedHorticultureResultsPage() {
 
                             {/* Branch Pipes */}
                             <div className="mb-4 rounded bg-gray-700 p-4">
-                                <h4 className="mb-2 font-semibold text-green-300">🟢 ท่อย่อย</h4>
+                                <h4 className="mb-2 font-semibold text-yellow-300">🟡 ท่อย่อย</h4>
                                 <div className="grid grid-cols-2 gap-4 text-sm">
                                     <div>
                                         <span className="text-gray-400">ท่อย่อยที่ยาวที่สุด:</span>
@@ -918,7 +989,7 @@ export default function EnhancedHorticultureResultsPage() {
                                     </div>
                                     <div>
                                         <span className="text-gray-400">ท่อย่อยยาวรวม:</span>
-                                        <div className="font-bold text-green-400">
+                                        <div className="font-bold text-yellow-400">
                                             {formatDistance(projectSummary.branchPipes.totalLength)}
                                         </div>
                                     </div>
@@ -927,7 +998,9 @@ export default function EnhancedHorticultureResultsPage() {
 
                             {/* Combined Longest Pipes */}
                             <div className="rounded bg-yellow-900/30 p-4">
-                                <h4 className="mb-2 font-semibold text-yellow-300">📏 ท่อที่ยาวที่สุดรวมกัน</h4>
+                                <h4 className="mb-2 font-semibold text-yellow-300">
+                                    📏 ท่อที่ยาวที่สุดรวมกัน
+                                </h4>
                                 <div className="text-center">
                                     <div className="text-2xl font-bold text-yellow-400">
                                         {formatDistance(projectSummary.longestPipesCombined)}
@@ -946,92 +1019,177 @@ export default function EnhancedHorticultureResultsPage() {
                                     🏞️ รายละเอียดแต่ละโซน
                                 </h3>
                                 <div className="space-y-4">
-                                    {projectSummary.zoneDetails.map((zone) => (
-                                        <div key={zone.zoneId} className="rounded bg-gray-700 p-4">
-                                            <h4 className="mb-3 font-semibold text-green-300">
-                                                {zone.zoneName}
-                                            </h4>
-                                            
-                                            {/* Zone Basic Info */}
-                                            <div className="mb-3 grid grid-cols-2 gap-4 text-sm">
-                                                <div>
-                                                    <span className="text-gray-400">พื้นที่โซน:</span>
-                                                    <div className="font-bold text-green-400">
-                                                        {formatAreaInRai(zone.areaInRai)}
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <span className="text-gray-400">จำนวนต้นไม้:</span>
-                                                    <div className="font-bold text-yellow-400">
-                                                        {zone.plantCount.toLocaleString()} ต้น
-                                                    </div>
-                                                </div>
-                                                <div className="col-span-2">
-                                                    <span className="text-gray-400">ปริมาณน้ำต่อครั้ง:</span>
-                                                    <div className="font-bold text-cyan-400">
-                                                        {formatWaterVolume(zone.waterNeedPerSession)}
-                                                    </div>
-                                                </div>
-                                            </div>
+                                    {projectSummary.zoneDetails.map((zone, index) => {
+                                        // ดึงข้อมูลพืชจาก zoneDetails โดยตรง
+                                        const plantInfo = zone.plantData || null;
+                                        const plantName = plantInfo?.name || 'ไม่ระบุ';
+                                        const waterPerPlant = zone.waterPerPlant || 0;
+                                        const plantSpacing = plantInfo?.plantSpacing || 0;
+                                        const rowSpacing = plantInfo?.rowSpacing || 0;
 
-                                            {/* Zone Pipes */}
-                                            <div className="space-y-2 text-xs">
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <div className="rounded bg-blue-900/30 p-2">
-                                                        <div className="text-blue-300">ท่อเมนในโซน</div>
-                                                        <div>ยาวที่สุด: {formatDistance(zone.mainPipesInZone.longest)}</div>
-                                                        <div>รวม: {formatDistance(zone.mainPipesInZone.totalLength)}</div>
-                                                    </div>
-                                                    <div className="rounded bg-purple-900/30 p-2">
-                                                        <div className="text-purple-300">ท่อเมนรองในโซน</div>
-                                                        <div>ยาวที่สุด: {formatDistance(zone.subMainPipesInZone.longest)}</div>
-                                                        <div>รวม: {formatDistance(zone.subMainPipesInZone.totalLength)}</div>
+                                        // Debug ข้อมูลพืช
+                                        console.log(`🔍 Zone ${index} plant data:`, {
+                                            zoneId: zone.zoneId,
+                                            zoneName: zone.zoneName,
+                                            plantInfo,
+                                            plantName,
+                                            plantSpacing,
+                                            rowSpacing,
+                                        });
+
+                                        // ดึงข้อมูลสีของโซน (เฉพาะเมื่อใช้โซน)
+                                        const zoneColor = projectData.useZones
+                                            ? projectData.zones.find((z) => z.id === zone.zoneId)
+                                                  ?.color
+                                            : null;
+
+                                        return (
+                                            <div
+                                                key={zone.zoneId}
+                                                className="rounded bg-gray-700 p-4"
+                                            >
+                                                {/* Zone Header */}
+                                                <div className="mb-3 flex items-center justify-between">
+                                                    <h4 className="font-semibold text-green-300">
+                                                        {zone.zoneName}
+                                                    </h4>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm text-gray-400">
+                                                            🌱 {plantName}
+                                                        </span>
+                                                        {zoneColor && (
+                                                            <div
+                                                                className="h-4 w-4 rounded"
+                                                                style={{
+                                                                    backgroundColor: zoneColor,
+                                                                }}
+                                                            />
+                                                        )}
                                                     </div>
                                                 </div>
-                                                <div className="rounded bg-green-900/30 p-2">
-                                                    <div className="text-green-300">ท่อย่อยในโซน</div>
-                                                    <div>ยาวที่สุด: {formatDistance(zone.branchPipesInZone.longest)} | รวม: {formatDistance(zone.branchPipesInZone.totalLength)}</div>
+
+                                                {/* Zone Basic Info - แสดงข้อมูลน้ำต่อต้นด้วย */}
+                                                <div className="mb-3 grid grid-cols-2 gap-4 text-sm">
+                                                    <div>
+                                                        <span className="text-gray-400">
+                                                            พื้นที่โซน:
+                                                        </span>
+                                                        <div className="font-bold text-green-400">
+                                                            {formatAreaInRai(zone.areaInRai)}
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-gray-400">
+                                                            จำนวนต้นไม้:
+                                                        </span>
+                                                        <div className="font-bold text-yellow-400">
+                                                            {zone.plantCount.toLocaleString()} ต้น
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-gray-400">
+                                                            น้ำต่อต้นต่อครั้ง:
+                                                        </span>
+                                                        <div className="font-bold text-blue-400">
+                                                            {waterPerPlant} ลิตร/ต้น
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-gray-400">
+                                                            ปริมาณน้ำรวมต่อครั้ง:
+                                                        </span>
+                                                        <div className="font-bold text-cyan-400">
+                                                            {formatWaterVolume(
+                                                                zone.waterNeedPerSession
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Plant Spacing Info */}
+                                                <div className="mb-3 rounded bg-gray-600/50 p-2 text-xs">
+                                                    <span className="text-gray-400">ระยะปลูก:</span>
+                                                    <span className="ml-2 text-white">
+                                                        {plantSpacing} × {rowSpacing} เมตร
+                                                        (ระหว่างต้น × ระหว่างแถว)
+                                                    </span>
+                                                </div>
+
+                                                {/* Zone Pipes */}
+                                                <div className="space-y-2 text-xs">
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <div className="rounded bg-blue-900/30 p-2">
+                                                            <div className="text-blue-300">
+                                                                ท่อเมนในโซน
+                                                            </div>
+                                                            <div>
+                                                                ยาวที่สุด:{' '}
+                                                                {formatDistance(
+                                                                    zone.mainPipesInZone.longest
+                                                                )}
+                                                            </div>
+                                                            <div>
+                                                                รวม:{' '}
+                                                                {formatDistance(
+                                                                    zone.mainPipesInZone.totalLength
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div className="rounded bg-purple-900/30 p-2">
+                                                            <div className="text-purple-300">
+                                                                ท่อเมนรองในโซน
+                                                            </div>
+                                                            <div>
+                                                                ยาวที่สุด:{' '}
+                                                                {formatDistance(
+                                                                    zone.subMainPipesInZone.longest
+                                                                )}
+                                                            </div>
+                                                            <div>
+                                                                รวม:{' '}
+                                                                {formatDistance(
+                                                                    zone.subMainPipesInZone
+                                                                        .totalLength
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="rounded bg-green-900/30 p-2">
+                                                        <div className="text-green-300">
+                                                            ท่อย่อยในโซน
+                                                        </div>
+                                                        <div>
+                                                            ยาวที่สุด:{' '}
+                                                            {formatDistance(
+                                                                zone.branchPipesInZone.longest
+                                                            )}{' '}
+                                                            | รวม:{' '}
+                                                            {formatDistance(
+                                                                zone.branchPipesInZone.totalLength
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Summary Calculation */}
+                                                <div className="mt-3 rounded bg-blue-900/20 p-2 text-xs">
+                                                    <div className="text-blue-300">
+                                                        สรุปการคำนวณ:
+                                                    </div>
+                                                    <div className="mt-1 text-gray-300">
+                                                        {zone.plantCount.toLocaleString()} ต้น ×{' '}
+                                                        {waterPerPlant} ลิตร/ต้น ={' '}
+                                                        {formatWaterVolume(
+                                                            zone.waterNeedPerSession
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}
-
-                        {/* Enhanced Tips and Troubleshooting */}
-                        <div className="rounded-lg bg-blue-900/20 p-6">
-                            <h3 className="mb-4 text-xl font-semibold text-blue-400">💡 เคล็ดลับและแก้ปัญหา</h3>
-                            <div className="space-y-3 text-sm">
-                                <div className="rounded bg-blue-900/30 p-3">
-                                    <h4 className="font-semibold text-blue-300">🗺️ การควบคุมแผนที่:</h4>
-                                    <ul className="mt-2 space-y-1 text-xs text-gray-300">
-                                        <li>• หมุนแผนที่ได้ 360 องศา ด้วยแถบลื่น</li>
-                                        <li>• ล็อกการซูมและลาก เพื่อป้องกันการเปลี่ยนแปลง</li>
-                                        <li>• ปรับขนาดท่อและไอคอนเพื่อมองเห็นชัดขึ้น</li>
-                                        <li>• รีเซ็ตการหมุนและขนาดได้ตลอดเวลา</li>
-                                    </ul>
-                                </div>
-                                
-                                <div className="rounded bg-green-900/30 p-3">
-                                    <h4 className="font-semibold text-green-300">📷 การบันทึกภาพแผนที่:</h4>
-                                    <ul className="mt-2 space-y-1 text-xs text-gray-300">
-                                        <li>• การหมุนจะถูกรีเซ็ตอัตโนมัติเมื่อสร้างภาพ</li>
-                                        <li>• ปรับขนาดไอคอนก่อนสร้างภาพเพื่อผลลัพธ์ที่ดี</li>
-                                        <li>• ใช้ Screenshot หากการสร้างภาพอัตโนมัติไม่สำเร็จ</li>
-                                    </ul>
-                                </div>
-                                
-                                <div className="rounded bg-yellow-900/30 p-3">
-                                    <h4 className="font-semibold text-yellow-300">🔧 แก้ปัญหาทั่วไป:</h4>
-                                    <ul className="mt-2 space-y-1 text-xs text-gray-300">
-                                        <li>• ปิด popup blocker ถ้ารายงานไม่เปิด</li>
-                                        <li>• รีเซ็ตการหมุนหากแผนที่ดูแปลก</li>
-                                        <li>• ใช้ขนาดไอคอนปานกลาง (1.0x) สำหรับผลลัพธ์ดีที่สุด</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
@@ -1058,9 +1216,18 @@ export default function EnhancedHorticultureResultsPage() {
                         {new Date().toLocaleDateString('th-TH')}
                     </p>
                     <div className="mt-2 text-sm text-green-300">
-                        <p>🗺️ <strong>แผนที่แบบใหม่:</strong> หมุนได้ 360° + ล็อกซูม + ปรับขนาดไอคอน</p>
-                        <p>📷 <strong>ระบบบันทึกภาพ:</strong> รีเซ็ตการหมุนอัตโนมัติ + คู่มือ Screenshot</p>
-                        <p>📄 <strong>ระบบรายงาน:</strong> PDF / HTML / JSON / CSV + แก้ปัญหาครบครัน</p>
+                        <p>
+                            🗺️ <strong>แผนที่แบบใหม่:</strong> หมุนได้ 360° + ล็อกซูม +
+                            ปรับขนาดไอคอน
+                        </p>
+                        <p>
+                            📷 <strong>ระบบบันทึกภาพ:</strong> รีเซ็ตการหมุนอัตโนมัติ + คู่มือ
+                            Screenshot
+                        </p>
+                        <p>
+                            📄 <strong>ระบบรายงาน:</strong> PDF / HTML / JSON / CSV +
+                            แก้ปัญหาครบครัน
+                        </p>
                     </div>
                 </div>
             </div>
