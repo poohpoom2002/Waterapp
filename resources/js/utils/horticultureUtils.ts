@@ -107,6 +107,7 @@ export interface BranchPipeSettings {
 
 export interface HorticultureProjectData {
     projectName: string;
+    customerName?: string;
     version?: string;
     totalArea: number;
     mainArea: Coordinate[];
