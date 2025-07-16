@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { cropTypes, getCropByValue, searchCrops, type Crop } from '@/utils/cropData';
+import { cropTypes, getCropByValue, searchCrops, type Crop } from '@/pages/utils/cropData';
 
 interface FieldCropProps {
     cropType?: string;

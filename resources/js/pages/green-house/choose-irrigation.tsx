@@ -6,15 +6,11 @@ interface IrrigationOption {
     name: string;
     icon: string;
     description: string;
+    disabled?: boolean;
+    developmentMessage?: string;
 }
 
 const irrigationOptions: IrrigationOption[] = [
-    {
-        id: 'sprinkler',
-        name: 'สปริงเกลอร์',
-        icon: '💦',
-        description: 'ให้น้ำเป็นวงกว้าง เหมาะสำหรับสนามหญ้าหรือพืชที่ปลูกหนาแน่น'
-    },
     {
         id: 'mini-sprinkler',
         name: 'มินิสปริงเกลอร์',
@@ -31,7 +27,9 @@ const irrigationOptions: IrrigationOption[] = [
         id: 'mixed',
         name: 'แบบผสม',
         icon: '🔄',
-        description: 'ผสมผสานระบบต่างๆ เพื่อให้เหมาะกับพืชหลากหลายชนิด'
+        description: 'ผสมผสานระบบต่างๆ เพื่อให้เหมาะกับพืชหลากหลายชนิด',
+        disabled: true,
+        developmentMessage: 'กำลังพัฒนา'
     }
 ];
 
@@ -142,27 +140,45 @@ export default function ChooseIrrigationMethod() {
                 )}
 
                 {/* Irrigation Method Selection */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto">
                     {irrigationOptions.map((option) => (
-                        <button
-                            key={option.id}
-                            onClick={() => setSelectedMethod(option.id)}
-                            className={`p-6 rounded-lg text-center transition-all duration-200 border-2 transform hover:-translate-y-1 ${
-                                selectedMethod === option.id
-                                    ? 'bg-blue-600 border-blue-400 shadow-lg scale-105'
-                                    : 'bg-gray-800 border-gray-700 hover:border-blue-500 hover:bg-gray-700'
-                            }`}
-                        >
-                            <div className="text-5xl mb-4">{option.icon}</div>
-                            <h3 className="text-lg font-bold mb-2">{option.name}</h3>
-                            <p className="text-sm text-gray-400">{option.description}</p>
-                        </button>
+                        <div key={option.id} className="relative">
+                            <button
+                                onClick={() => {
+                                    if (!option.disabled) {
+                                        setSelectedMethod(option.id);
+                                    }
+                                }}
+                                disabled={option.disabled}
+                                className={`p-6 rounded-lg text-center transition-all duration-200 border-2 transform w-full relative ${
+                                    option.disabled
+                                        ? 'bg-gray-700 border-gray-600 cursor-not-allowed opacity-60'
+                                        : selectedMethod === option.id
+                                            ? 'bg-blue-600 border-blue-400 shadow-lg scale-105 hover:-translate-y-1'
+                                            : 'bg-gray-800 border-gray-700 hover:border-blue-500 hover:bg-gray-700 hover:-translate-y-1'
+                                }`}
+                            >
+                                <div className="text-5xl mb-4">{option.icon}</div>
+                                <h3 className="text-lg font-bold mb-2">{option.name}</h3>
+                                <p className="text-sm text-gray-400">{option.description}</p>
+                                
+                                {/* Development message overlay */}
+                                {option.disabled && option.developmentMessage && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/70 rounded-lg">
+                                        <div className="text-center">
+                                            <div className="text-yellow-400 text-sm font-medium mb-1">🚧</div>
+                                            <div className="text-yellow-300 text-xs">{option.developmentMessage}</div>
+                                        </div>
+                                    </div>
+                                )}
+                            </button>
+                        </div>
                     ))}
                 </div>
 
                 {/* Selected method info */}
                 {selectedMethod && (
-                    <div className="mt-8 p-4 bg-blue-900/30 border border-blue-600 rounded-lg">
+                    <div className="mt-8 p-4 bg-blue-900/30 border border-blue-600 rounded-lg max-w-2xl mx-auto">
                         <div className="flex items-center space-x-3">
                             <span className="text-2xl">
                                 {irrigationOptions.find(opt => opt.id === selectedMethod)?.icon}

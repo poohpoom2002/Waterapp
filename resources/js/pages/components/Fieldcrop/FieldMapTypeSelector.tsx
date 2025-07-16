@@ -1,5 +1,5 @@
 import React from 'react';
-import { MAP_TILES, type MapTileType } from '@/utils/fieldMapConstants';
+import { MAP_TILES, type MapTileType } from '@/pages/utils/fieldMapConstants';
 import Tooltip from './Tooltip';
 
 interface FieldMapTypeSelectorProps {
