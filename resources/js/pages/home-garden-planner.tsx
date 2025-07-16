@@ -5,6 +5,8 @@ import { router } from '@inertiajs/react';
 import GoogleMapDesigner from '../components/homegarden/GoogleMapDesigner';
 import CanvasDesigner from '../components/homegarden/CanvasDesigner';
 import ImageDesigner from '../components/homegarden/ImageDesigner';
+import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 
 import {
     Coordinate,
@@ -2301,6 +2303,9 @@ export default function HomeGardenPlanner() {
                     </div>
                 </div>
             </div>
+
+            {/* Footer */}
+            <Footer />
         </div>
     );
 }

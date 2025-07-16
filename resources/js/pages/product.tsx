@@ -28,8 +28,15 @@ import PipeSelector from './components/PipeSelector';
 import CostSummary from './components/CostSummary';
 import QuotationModal from './components/QuotationModal';
 import QuotationDocument from './components/QuotationDocument';
+
+import ChatBox from '@/components/ChatBox';
+import { useLanguage } from '../contexts/LanguageContext';
+import LanguageSwitcher from '../components/LanguageSwitcher';
+import { router } from '@inertiajs/react';
 // ตรวจสอบให้แน่ใจว่า path ถูกต้องตามโครงสร้างโปรเจกต์ของคุณ
 import AiChatComponent from '@/components/AiChatComponent';
+import { getFarmData } from '@/utils/farmData';
+import { getPipeLengthData } from '@/utils/pipeData';
 
 export default function Product() {
     // State for horticulture project data
@@ -39,6 +46,14 @@ export default function Product() {
     const [activeZoneId, setActiveZoneId] = useState<string>('');
     const [zoneInputs, setZoneInputs] = useState<{ [zoneId: string]: IrrigationInput }>({});
     const [zoneSprinklers, setZoneSprinklers] = useState<{ [zoneId: string]: any }>({});
+
+
+
+    const { t } = useLanguage();
+    // Load saved farm & pipe-length data with state to track changes
+    const [farmData, setFarmData] = useState(() => getFarmData());
+    const [pipeLengthData, setPipeLengthData] = useState(() => getPipeLengthData());
+
 
     // NEW: State for manual equipment selection (override auto-selection)
     const [selectedPipes, setSelectedPipes] = useState<{
@@ -439,7 +454,7 @@ export default function Product() {
                         <p className="mb-4 text-yellow-400">ไม่พบข้อมูลโครงการระบบน้ำสวนผลไม้</p>
                         <p className="text-gray-300">กรุณากลับไปทำการวางแผนการปลูกและวางท่อก่อน</p>
                         <button
-                            onClick={() => (window.location.href = '/horticulture/planner')}
+                            onClick={() => router.visit('/horticulture/planner')}
                             className="mt-4 rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700"
                         >
                             ไปหน้า Horticulture Planner
@@ -529,7 +544,8 @@ export default function Product() {
                                 </p>
                             </div>
                         </div>
-                        <div className="flex items-center justify-end">
+                        <div className="flex items-center justify-end gap-4">
+                            <LanguageSwitcher />
                             <button
                                 onClick={() => (window.location.href = '/equipment-crud')}
                                 className="rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700"

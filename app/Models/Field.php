@@ -11,6 +11,9 @@ class Field extends Model
 
     protected $fillable = [
         'name',
+        'customer_name',
+        'user_id',
+        'category',
         'area_coordinates',
         'plant_type_id',
         'total_plants',
@@ -24,6 +27,11 @@ class Field extends Model
         'total_area' => 'decimal:2',
         'total_water_need' => 'decimal:2'
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 
     public function plantType()
     {

@@ -38,6 +38,13 @@ Route::post('/generate-planting-points', [FarmController::class, 'generatePlanti
 Route::post('/generate-pipe-layout', [FarmController::class, 'generatePipeLayout']); // For main farm planner
 Route::post('/calculate-pipe-layout', [SprinklerController::class, 'calculatePipeLayout']); // Legacy or specific use
 
+// Field Management API Routes
+Route::get('/fields', [FarmController::class, 'getFields']);
+Route::get('/fields/{fieldId}', [FarmController::class, 'getField']);
+Route::post('/save-field', [FarmController::class, 'saveField']);
+Route::put('/fields/{fieldId}', [FarmController::class, 'updateField']);
+Route::delete('/fields/{fieldId}', [FarmController::class, 'deleteField']);
+
 // Home Garden API Routes
 Route::prefix('home-garden')->group(function () {
     Route::post('generate-sprinkler-layout', [HomeGardenController::class, 'generateSprinklerLayout']);

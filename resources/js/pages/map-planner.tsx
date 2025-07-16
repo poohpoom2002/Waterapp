@@ -634,9 +634,9 @@ export default function MapPlanner() {
             };
 
             // Log the final data being sent
-            console.log('Data being sent to generate-tree page:', formattedData);
+            console.log('Data being sent to horticulture planner page:', formattedData);
 
-            router.visit('/generate-tree', {
+            router.visit('/horticulture/planner', {
                 method: 'get',
                 data: formattedData,
                 preserveState: true,

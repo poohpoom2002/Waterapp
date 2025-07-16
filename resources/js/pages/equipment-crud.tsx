@@ -2033,17 +2033,9 @@ const EquipmentDetailModal: React.FC<{
 
     const getThaiDisplayName = (attributeName: string) => {
         const thaiDisplayMap: { [key: string]: string } = {
-            flow_rate: 'อัตราการไหล',
-            pressure: 'ความดัน',
-            radius: 'รัศมีการพ่น',
-            waterVolumeLitersPerHour: 'อัตราการไหล',
             pressureBar: 'ความดัน',
             radiusMeters: 'รัศมีการพ่น',
 
-            power_hp: 'กำลัง',
-            powerHP: 'กำลัง',
-            powerKW: 'กำลัง',
-            phase: 'เฟส',
             inlet_size_inch: 'ขนาดท่อดูด',
             outlet_size_inch: 'ขนาดท่อส่ง',
             flow_rate_lpm: 'อัตราการไหล',
@@ -2053,17 +2045,9 @@ const EquipmentDetailModal: React.FC<{
             suction_depth_m: 'ความลึกดูด',
             weight_kg: 'น้ำหนัก',
 
-            size_mm: 'ขนาด',
-            size_inch: 'ขนาด',
-            sizeMM: 'ขนาด',
-            sizeInch: 'ขนาด',
             lengthM: 'ความยาว',
             dimensions_cm: 'ขนาด',
             material: 'วัสดุ',
-
-            voltage: 'แรงดันไฟฟ้า',
-            current: 'กระแสไฟฟ้า',
-            frequency: 'ความถี่',
 
             brand: 'แบรนด์',
             model: 'รุ่น',
@@ -2559,12 +2543,6 @@ const ImageModal: React.FC<{
                     className="max-h-full max-w-full rounded-lg shadow-2xl"
                     onClick={(e) => e.stopPropagation()}
                 />
-
-                <div className="mt-2 text-center">
-                    <p className="inline-block rounded bg-black bg-opacity-50 px-2 py-1 text-sm text-white">
-                        {imageAlt}
-                    </p>
-                </div>
             </div>
         </div>
     );

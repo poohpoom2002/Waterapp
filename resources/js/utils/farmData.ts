@@ -28,10 +28,10 @@ export const getFarmData = (): FarmData | null => {
 export const useFarmData = () => {
     const data = getFarmData();
 
-    // If no data is found, you might want to redirect to the generate-tree page
+    // If no data is found, you might want to redirect to the horticulture planner page
     if (!data) {
-        console.warn('No farm data found. Redirecting to generate-tree page...');
-        router.visit('/generate-tree');
+        console.warn('No farm data found. Redirecting to horticulture planner page...');
+        router.visit('/horticulture/planner');
         return null;
     }
 
