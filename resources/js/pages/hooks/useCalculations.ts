@@ -1,4 +1,4 @@
-// resources\js\pages\hooks\useCalculations.ts - Complete Version
+// resources\js\pages\hooks\useCalculations.ts - Enhanced Auto Selection Version
 import { useMemo, useState, useEffect } from 'react';
 import { IrrigationInput, CalculationResults } from '../types/interfaces';
 import {
@@ -356,6 +356,105 @@ const calculateSafetyAdjustedFlow = (baseFlow: number, systemComplexity: string)
     return baseFlow * safetyFactor;
 };
 
+// Auto Equipment Selection Functions - NEW
+const autoSelectBestPipe = (analyzedPipes: any[], pipeType: string): any => {
+    if (!analyzedPipes || analyzedPipes.length === 0) return null;
+
+    console.log(`🔧 Auto selecting best ${pipeType} pipe from ${analyzedPipes.length} options`);
+
+    // หาท่อที่ดีที่สุดตามลำดับ: แนะนำ > ตัวเลือกดี > ใช้ได้
+    const recommended = analyzedPipes.filter((pipe) => pipe.isRecommended);
+    const goodChoice = analyzedPipes.filter((pipe) => pipe.isGoodChoice && !pipe.isRecommended);
+    const usable = analyzedPipes.filter(
+        (pipe) => pipe.isUsable && !pipe.isGoodChoice && !pipe.isRecommended
+    );
+
+    let selectedPipe = null;
+
+    if (recommended.length > 0) {
+        // เลือกจากท่อที่แนะนำ - ตัวที่ราคาดีที่สุดในกลุ่ม
+        selectedPipe = recommended.sort((a, b) => {
+            // เรียงตามคะแนนก่อน แล้วราคา
+            if (a.score !== b.score) return b.score - a.score;
+            return a.price - b.price; // ราคาถูกกว่า
+        })[0];
+        // console.log(`✅ Selected recommended ${pipeType} pipe: ${selectedPipe?.productCode} (Score: ${selectedPipe?.score})`);
+    } else if (goodChoice.length > 0) {
+        // เลือกจากตัวเลือกดี
+        selectedPipe = goodChoice.sort((a, b) => {
+            if (a.score !== b.score) return b.score - a.score;
+            return a.price - b.price;
+        })[0];
+        // console.log(`⚠️ Selected good choice ${pipeType} pipe: ${selectedPipe?.productCode} (Score: ${selectedPipe?.score})`);
+    } else if (usable.length > 0) {
+        // เลือกจากที่ใช้ได้
+        selectedPipe = usable.sort((a, b) => {
+            if (a.score !== b.score) return b.score - a.score;
+            return a.price - b.price;
+        })[0];
+        // console.log(`❌ Selected usable ${pipeType} pipe: ${selectedPipe?.productCode} (Score: ${selectedPipe?.score})`);
+    } else {
+        // เลือกตัวดีที่สุดที่มี
+        selectedPipe = analyzedPipes.sort((a, b) => {
+            if (a.score !== b.score) return b.score - a.score;
+            return a.price - b.price;
+        })[0];
+        // console.log(`⚠️ Selected best available ${pipeType} pipe: ${selectedPipe?.productCode} (Score: ${selectedPipe?.score})`);
+    }
+
+    return selectedPipe;
+};
+
+const autoSelectBestPump = (analyzedPumps: any[]): any => {
+    if (!analyzedPumps || analyzedPumps.length === 0) return null;
+
+    console.log(`⚡ Auto selecting best pump from ${analyzedPumps.length} options`);
+
+    // หาปั๊มที่ดีที่สุดตามลำดับ: แนะนำ > ตัวเลือกดี > ใช้ได้
+    const recommended = analyzedPumps.filter((pump) => pump.isRecommended);
+    const goodChoice = analyzedPumps.filter((pump) => pump.isGoodChoice && !pump.isRecommended);
+    const usable = analyzedPumps.filter(
+        (pump) => pump.isUsable && !pump.isGoodChoice && !pump.isRecommended
+    );
+
+    let selectedPump = null;
+
+    if (recommended.length > 0) {
+        // เลือกจากปั๊มที่แนะนำ - ตัวที่มีประสิทธิภาพดีที่สุด
+        selectedPump = recommended.sort((a, b) => {
+            // เรียงตามคะแนนก่อน แล้วประสิทธิภาพต่อราคา
+            if (a.score !== b.score) return b.score - a.score;
+            if (a.flowPerBaht !== b.flowPerBaht) return b.flowPerBaht - a.flowPerBaht;
+            return a.price - b.price; // ราคาถูกกว่า
+        })[0];
+        // console.log(`✅ Selected recommended pump: ${selectedPump?.productCode} (Score: ${selectedPump?.score})`);
+    } else if (goodChoice.length > 0) {
+        // เลือกจากตัวเลือกดี
+        selectedPump = goodChoice.sort((a, b) => {
+            if (a.score !== b.score) return b.score - a.score;
+            if (a.flowPerBaht !== b.flowPerBaht) return b.flowPerBaht - a.flowPerBaht;
+            return a.price - b.price;
+        })[0];
+        // console.log(`⚠️ Selected good choice pump: ${selectedPump?.productCode} (Score: ${selectedPump?.score})`);
+    } else if (usable.length > 0) {
+        // เลือกจากที่ใช้ได้
+        selectedPump = usable.sort((a, b) => {
+            if (a.score !== b.score) return b.score - a.score;
+            return a.price - b.price;
+        })[0];
+        // console.log(`❌ Selected usable pump: ${selectedPump?.productCode} (Score: ${selectedPump?.score})`);
+    } else {
+        // เลือกตัวดีที่สุดที่มี
+        selectedPump = analyzedPumps.sort((a, b) => {
+            if (a.score !== b.score) return b.score - a.score;
+            return a.price - b.price;
+        })[0];
+        // console.log(`⚠️ Selected best available pump: ${selectedPump?.productCode} (Score: ${selectedPump?.score})`);
+    }
+
+    return selectedPump;
+};
+
 export const useCalculations = (
     input: IrrigationInput,
     selectedSprinkler?: any
@@ -486,7 +585,7 @@ export const useCalculations = (
             return null;
         }
 
-        console.log('Starting enhanced calculations...');
+        console.log('Starting enhanced calculations with auto selection...');
 
         // Enhanced water requirement calculations
         const totalWaterRequiredPerDay = input.totalTrees * input.waterPerTreeLiters;
@@ -563,7 +662,7 @@ export const useCalculations = (
                 if (a.isUsable !== b.isUsable) {
                     return b.isUsable ? 1 : -1;
                 }
-                return b.price - a.price; // ราคาสูงไปต่ำในกลุ่มเดียวกัน
+                return b.score - a.score;
             });
 
         console.log('Analyzed sprinklers sample:', analyzedSprinklers.slice(0, 3));
@@ -593,7 +692,7 @@ export const useCalculations = (
                 if (a.isUsable !== b.isUsable) {
                     return b.isUsable ? 1 : -1;
                 }
-                return b.price - a.price;
+                return b.score - a.score;
             });
 
         const analyzedSecondaryPipes = hasValidSecondaryPipe
@@ -619,7 +718,7 @@ export const useCalculations = (
                       if (a.isUsable !== b.isUsable) {
                           return b.isUsable ? 1 : -1;
                       }
-                      return b.price - a.price;
+                      return b.score - a.score;
                   })
             : [];
 
@@ -646,59 +745,50 @@ export const useCalculations = (
                       if (a.isUsable !== b.isUsable) {
                           return b.isUsable ? 1 : -1;
                       }
-                      return b.price - a.price;
+                      return b.score - a.score;
                   })
             : [];
 
-        // Select best pipes for calculations
-        const bestBranchPipe =
-            analyzedBranchPipes.find((p) => p.isRecommended) ||
-            analyzedBranchPipes.find((p) => p.isUsable) ||
-            analyzedBranchPipes[0];
-
-        const bestSecondaryPipe = hasValidSecondaryPipe
-            ? analyzedSecondaryPipes.find((p) => p.isRecommended) ||
-              analyzedSecondaryPipes.find((p) => p.isUsable) ||
-              analyzedSecondaryPipes[0]
+        // AUTO SELECT BEST PIPES - NEW
+        const autoSelectedBranchPipe = autoSelectBestPipe(analyzedBranchPipes, 'branch');
+        const autoSelectedSecondaryPipe = hasValidSecondaryPipe
+            ? autoSelectBestPipe(analyzedSecondaryPipes, 'secondary')
+            : null;
+        const autoSelectedMainPipe = hasValidMainPipe
+            ? autoSelectBestPipe(analyzedMainPipes, 'main')
             : null;
 
-        const bestMainPipe = hasValidMainPipe
-            ? analyzedMainPipes.find((p) => p.isRecommended) ||
-              analyzedMainPipes.find((p) => p.isUsable) ||
-              analyzedMainPipes[0]
-            : null;
-
-        // Enhanced head loss calculations
-        const branchLoss = bestBranchPipe
+        // Enhanced head loss calculations with auto-selected pipes
+        const branchLoss = autoSelectedBranchPipe
             ? calculateImprovedHeadLoss(
                   adjustedFlowBranch,
-                  bestBranchPipe.sizeMM,
+                  autoSelectedBranchPipe.sizeMM,
                   input.longestBranchPipeM,
-                  bestBranchPipe.pipeType,
+                  autoSelectedBranchPipe.pipeType,
                   'branch',
                   input.pipeAgeYears || 0
               )
             : { major: 0, minor: 0, total: 0, velocity: 0, C: 135 };
 
         const secondaryLoss =
-            bestSecondaryPipe && hasValidSecondaryPipe
+            autoSelectedSecondaryPipe && hasValidSecondaryPipe
                 ? calculateImprovedHeadLoss(
                       adjustedFlowSecondary,
-                      bestSecondaryPipe.sizeMM,
+                      autoSelectedSecondaryPipe.sizeMM,
                       input.longestSecondaryPipeM,
-                      bestSecondaryPipe.pipeType,
+                      autoSelectedSecondaryPipe.pipeType,
                       'secondary',
                       input.pipeAgeYears || 0
                   )
                 : { major: 0, minor: 0, total: 0, velocity: 0, C: 140 };
 
         const mainLoss =
-            bestMainPipe && hasValidMainPipe
+            autoSelectedMainPipe && hasValidMainPipe
                 ? calculateImprovedHeadLoss(
                       adjustedFlowMain,
-                      bestMainPipe.sizeMM,
+                      autoSelectedMainPipe.sizeMM,
                       input.longestMainPipeM,
-                      bestMainPipe.pipeType,
+                      autoSelectedMainPipe.pipeType,
                       'main',
                       input.pipeAgeYears || 0
                   )
@@ -739,22 +829,25 @@ export const useCalculations = (
                 if (a.isUsable !== b.isUsable) {
                     return b.isUsable ? 1 : -1;
                 }
-                return b.price - a.price; // ราคาสูงไปต่ำในกลุ่มเดียวกัน
+                return b.score - a.score;
             });
 
         console.log('Analyzed pumps sample:', analyzedPumps.slice(0, 3));
 
-        // Calculate pipe rolls
-        const branchRolls = bestBranchPipe
-            ? calculatePipeRolls(input.totalBranchPipeM, bestBranchPipe.lengthM)
+        // AUTO SELECT BEST PUMP - NEW
+        const autoSelectedPump = autoSelectBestPump(analyzedPumps);
+
+        // Calculate pipe rolls with auto-selected pipes
+        const branchRolls = autoSelectedBranchPipe
+            ? calculatePipeRolls(input.totalBranchPipeM, autoSelectedBranchPipe.lengthM)
             : 1;
         const secondaryRolls =
-            bestSecondaryPipe && hasValidSecondaryPipe
-                ? calculatePipeRolls(input.totalSecondaryPipeM, bestSecondaryPipe.lengthM)
+            autoSelectedSecondaryPipe && hasValidSecondaryPipe
+                ? calculatePipeRolls(input.totalSecondaryPipeM, autoSelectedSecondaryPipe.lengthM)
                 : 0;
         const mainRolls =
-            bestMainPipe && hasValidMainPipe
-                ? calculatePipeRolls(input.totalMainPipeM, bestMainPipe.lengthM)
+            autoSelectedMainPipe && hasValidMainPipe
+                ? calculatePipeRolls(input.totalMainPipeM, autoSelectedMainPipe.lengthM)
                 : 0;
 
         // Enhanced velocity warnings
@@ -781,26 +874,21 @@ export const useCalculations = (
         const recommendedMainPipe = analyzedMainPipes.filter((p) => p.isRecommended);
         const recommendedPump = analyzedPumps.filter((p) => p.isRecommended);
 
-        console.log('Enhanced calculations completed successfully');
-        console.log('Recommendations:', {
-            sprinklers: recommendedSprinklers.length,
-            branchPipes: recommendedBranchPipe.length,
-            secondaryPipes: recommendedSecondaryPipe.length,
-            mainPipes: recommendedMainPipe.length,
-            pumps: recommendedPump.length,
+        console.log('Enhanced calculations completed successfully with auto-selection');
+        console.log('Auto-selected equipment:', {
+            branchPipe: autoSelectedBranchPipe?.productCode,
+            secondaryPipe: autoSelectedSecondaryPipe?.productCode,
+            mainPipe: autoSelectedMainPipe?.productCode,
+            pump: autoSelectedPump?.productCode,
         });
 
         // เพิ่มข้อมูลการเลือกที่ดีที่สุด (ราคาสูงสุดในกลุ่มแนะนำ)
         const bestSelections = {
             bestSprinkler: selectBestEquipmentByPrice(analyzedSprinklers, true),
-            bestBranchPipe: selectBestEquipmentByPrice(analyzedBranchPipes, true),
-            bestSecondaryPipe: hasValidSecondaryPipe
-                ? selectBestEquipmentByPrice(analyzedSecondaryPipes, true)
-                : null,
-            bestMainPipe: hasValidMainPipe
-                ? selectBestEquipmentByPrice(analyzedMainPipes, true)
-                : null,
-            bestPump: selectBestEquipmentByPrice(analyzedPumps, true),
+            bestBranchPipe: autoSelectedBranchPipe,
+            bestSecondaryPipe: autoSelectedSecondaryPipe,
+            bestMainPipe: autoSelectedMainPipe,
+            bestPump: autoSelectedPump,
         };
 
         return {
@@ -826,6 +914,12 @@ export const useCalculations = (
             analyzedMainPipes,
             analyzedSprinklers,
             analyzedPumps,
+
+            // AUTO-SELECTED EQUIPMENT - NEW
+            autoSelectedBranchPipe,
+            autoSelectedSecondaryPipe,
+            autoSelectedMainPipe,
+            autoSelectedPump,
 
             // เพิ่มข้อมูลการเลือกที่ดีที่สุด
             bestSelections,
@@ -905,8 +999,14 @@ export const useCalculations = (
                     sprinkler: selectedSprinkler?.name || null,
                     pressureSource: selectedSprinkler ? 'sprinkler' : 'manual',
                 },
+                autoSelectedEquipment: {
+                    branchPipe: autoSelectedBranchPipe?.productCode || null,
+                    secondaryPipe: autoSelectedSecondaryPipe?.productCode || null,
+                    mainPipe: autoSelectedMainPipe?.productCode || null,
+                    pump: autoSelectedPump?.productCode || null,
+                },
                 analysisTimestamp: new Date().toISOString(),
-                dataSource: 'database', // ระบุว่าข้อมูลมาจาก database
+                dataSource: 'database',
                 loadingErrors: error ? [error] : [],
                 systemRequirements: {
                     farmSize: input.farmSizeRai,

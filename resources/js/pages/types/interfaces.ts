@@ -18,6 +18,9 @@ export interface IrrigationInput {
     sprinklersPerBranch: number;
     branchesPerSecondary: number;
     simultaneousZones: number;
+    sprinklersPerLongestBranch: number;
+    branchesPerLongestSecondary: number;
+    secondariesPerLongestMain: number;
 }
 
 export interface AnalyzedPipe {
@@ -38,6 +41,11 @@ export interface AnalyzedPipe {
     isGoodChoice: boolean;
     isUsable: boolean;
     isTypeAllowed?: boolean; // เพิ่ม field ใหม่
+    // เพิ่ม properties ที่ขาดหายไป
+    name?: string;
+    image?: string;
+    brand?: string;
+    description?: string;
 }
 
 export interface AnalyzedSprinkler {
@@ -60,6 +68,10 @@ export interface AnalyzedSprinkler {
     maxFlow: number;
     avgRadius: number;
     pricePerFlow: number;
+    // เพิ่ม properties ที่ขาดหายไป
+    brand?: string;
+    image?: string;
+    description?: string;
 }
 
 export interface AnalyzedPump {
@@ -83,6 +95,16 @@ export interface AnalyzedPump {
     isRecommended: boolean;
     isGoodChoice: boolean;
     isUsable: boolean;
+    // เพิ่ม properties ที่ขาดหายไป
+    name?: string;
+    brand?: string;
+    image?: string;
+    description?: string;
+    suction_depth_m?: number;
+    weight_kg?: number;
+    flow_rate_lpm?: any;
+    head_m?: any;
+    pumpAccessories?: any[];
 }
 
 export interface CalculationResults {
@@ -100,12 +122,20 @@ export interface CalculationResults {
     recommendedSecondaryPipe: any[];
     recommendedMainPipe: any[];
     recommendedPump: any[];
+
     // เพิ่ม field ใหม่สำหรับข้อมูลที่วิเคราะห์
     analyzedBranchPipes?: AnalyzedPipe[];
     analyzedSecondaryPipes?: AnalyzedPipe[];
     analyzedMainPipes?: AnalyzedPipe[];
     analyzedSprinklers?: AnalyzedSprinkler[];
     analyzedPumps?: AnalyzedPump[];
+
+    // เพิ่ม AUTO-SELECTED EQUIPMENT fields
+    autoSelectedBranchPipe?: AnalyzedPipe;
+    autoSelectedSecondaryPipe?: AnalyzedPipe;
+    autoSelectedMainPipe?: AnalyzedPipe;
+    autoSelectedPump?: AnalyzedPump;
+
     branchPipeRolls: number;
     secondaryPipeRolls: number;
     mainPipeRolls: number;

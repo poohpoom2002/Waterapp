@@ -1,5 +1,5 @@
 <?php
-
+// app\Models\PlantType.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;

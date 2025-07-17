@@ -14,7 +14,7 @@ import 'leaflet-draw/dist/leaflet.draw.css';
 import { router } from '@inertiajs/react';
 import L from 'leaflet';
 
-// --- (All existing types, constants, and helper components remain the same) ---
+// --- (All existing types, con stants, and helper components remain the same) ---
 
 // Types
 type LatLng = {
@@ -634,9 +634,9 @@ export default function MapPlanner() {
             };
 
             // Log the final data being sent
-            console.log('Data being sent to generate-tree page:', formattedData);
+            console.log('Data being sent to horticulture planner page:', formattedData);
 
-            router.visit('/generate-tree', {
+            router.visit('/horticulture/planner', {
                 method: 'get',
                 data: formattedData,
                 preserveState: true,
@@ -782,6 +782,7 @@ export default function MapPlanner() {
                 <div className={`space-y-4 ${layers.length > 0 ? 'lg:col-span-1' : 'hidden'}`}>
                     {layers.length > 0 && (
                         <>
+                            {/* ==============update Home Garden ============== */}
                             <div>
                                 <label className="mb-1 block text-sm font-medium text-gray-300">
                                     Plant Category
@@ -792,35 +793,35 @@ export default function MapPlanner() {
                                         const selectedCategory = e.target.value;
                                         setSelectedPlantCategory(selectedCategory);
                                         setSelectedPlant(null);
-                                        console.log('Selected Plant Category:', selectedCategory);
+                                        console.log('Selected Plant Category:', e.target.value);
 
-                                        // Navigate to field-crop page when Field Crop is selected
-                                        if (selectedCategory === 'Field Crop') {
-                                            router.visit('/field-crop', {
-                                                preserveState: false,
-                                                preserveScroll: false,
-                                            });
+                                        // เพิ่มการจัดการ Home Garden
+                                        if (e.target.value === 'Home Garden') {
+                                            // Redirect ไปยัง Home Garden Planner แทน
+                                            if (
+                                                confirm(
+                                                    'Home Garden uses a different planning system. Do you want to continue to Home Garden Planner?'
+                                                )
+                                            ) {
+                                                router.visit('/home-garden/planner');
+                                            }
                                             return;
                                         }
 
-                                        if (selectedCategory === 'Greenhouse') {
-                                            router.visit('/greenhouse-crop', {
-                                                preserveState: false,
-                                                preserveScroll: false,
-                                            });
+                                        if (e.target.value === 'Horticultural') {
+                                            // Redirect to Horticultural Irrigation System
+                                            if (
+                                                confirm(
+                                                    'Horticultural category uses an advanced irrigation system planner. Do you want to continue to Horticultural Irrigation Planner?'
+                                                )
+                                            ) {
+                                                router.visit('/horticulture-planner');
+                                            }
                                             return;
-                                        }
-
-                                        if (selectedCategory === 'Horticultural') {
+                                        } else if (e.target.value === 'Field Crop') {
                                             const filtered = plantTypes.filter((plant) =>
-                                                [
-                                                    'Mango',
-                                                    'Durian',
-                                                    'Pineapple',
-                                                    'Longkong',
-                                                ].includes(plant.name)
+                                                ['Rice', 'Corn', 'Sugarcane'].includes(plant.name)
                                             );
-                                            console.log('Filtered Plants:', filtered);
                                             setFilteredPlants(filtered);
                                         } else {
                                             console.log(
@@ -838,7 +839,25 @@ export default function MapPlanner() {
                                     <option value="Greenhouse">Greenhouse</option>
                                     <option value="Home Garden">Home Garden</option>
                                 </select>
+
+                                {/* เพิ่ม info text สำหรับ Home Garden */}
+                                {selectedPlantCategory === 'Home Garden' && (
+                                    <div className="mt-2 rounded bg-blue-900/30 p-3">
+                                        <p className="text-sm text-blue-300">
+                                            🏡 Home Garden category uses a specialized sprinkler
+                                            system planner. Click "Continue to Home Garden Planner"
+                                            to design your automated watering system.
+                                        </p>
+                                        <button
+                                            onClick={() => router.visit('/home-garden/planner')}
+                                            className="mt-2 rounded bg-blue-600 px-4 py-2 text-sm text-white transition-colors hover:bg-blue-700"
+                                        >
+                                            Continue to Home Garden Planner
+                                        </button>
+                                    </div>
+                                )}
                             </div>
+                            {/* ==============update Home Garden ============== */}
 
                             {selectedPlantCategory && (
                                 <div>
