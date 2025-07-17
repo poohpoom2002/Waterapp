@@ -73,6 +73,7 @@ export default function ChooseIrrigationMethod() {
         // กลับไปหน้า planner พร้อมข้อมูล
         const queryParams = new URLSearchParams();
         if (crops) queryParams.set('crops', crops);
+        if (shapes) queryParams.set('shapes', shapes); // เพิ่มบรรทัดนี้
         if (method) queryParams.set('method', method);
         
         window.location.href = `/greenhouse-planner?${queryParams.toString()}`;
