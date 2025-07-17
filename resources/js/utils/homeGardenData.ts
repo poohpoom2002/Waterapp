@@ -1388,32 +1388,19 @@ export function validateGardenData(data: GardenPlannerData): string[] {
         return errors;
     }
 
-    return data;
-};
+    // Add more validation logic here if needed
+    return errors;
+}
 
-// Helper getters
-export const getSprinklerData = () => getHomeGardenData()?.sprinklers;
-export const getWaterSourceData = () => getHomeGardenData()?.waterSource;
-export const getPipeData = () => getHomeGardenData()?.pipes;
-export const getAreaData = () => getHomeGardenData()?.area;
-export const getSummaryData = () => getHomeGardenData()?.summary;
+// Helper getters - using loadGardenData instead of undefined getHomeGardenData
+export const getSprinklerData = () => loadGardenData()?.sprinklers;
+export const getWaterSourceData = () => loadGardenData()?.waterSource;
+export const getPipeData = () => loadGardenData()?.pipes;
+export const getAreaData = () => loadGardenData()?.gardenZones;
+export const getSummaryData = () => loadGardenData() ? calculateStatistics(loadGardenData()!) : null;
 
-// Formatting helpers
-export const formatArea = (area: number): string => {
-    if (area >= 10000) {
-        return `${(area / 10000).toFixed(2)} hectares`;
-    }
-    return `${area.toFixed(2)} m²`;
-};
-
+// Additional formatting helpers (avoiding duplicates with existing functions)
 export const formatWaterFlow = (flow: number): string => `${flow.toFixed(2)} L/min`;
-
-export const formatDistance = (distance: number): string => {
-    if (distance >= 1000) {
-        return `${(distance / 1000).toFixed(2)} km`;
-    }
-    return `${distance.toFixed(2)} m`;
-};
 
 export const formatCurrency = (amount: number): string => `฿${amount.toLocaleString()}`;
 
@@ -1448,7 +1435,7 @@ export const calculateAreaFromCoordinates = (
 };
 
 export const calculateSprinklerCoverage = (
-    sprinklers: SprinklerPosition[],
+    sprinklers: Sprinkler[],
     radius: number,
     totalArea: number
 ): number => {
@@ -1458,8 +1445,7 @@ export const calculateSprinklerCoverage = (
 
 export const estimateInstallationCost = (
     sprinklerCount: number,
-    pipeLength: number,
-    sprinklerInfo: SprinklerInfo
+    pipeLength: number
 ): number => {
     const sprinklerCost = sprinklerCount * 500; // 500 baht per sprinkler
     const pipeCost = pipeLength * 50; // 50 baht per meter
@@ -1482,6 +1468,6 @@ export const estimateInstallationTime = (
 
 // Clear data function
 export const clearHomeGardenData = (): void => {
-    localStorage.removeItem('homeGardenData');
+    clearGardenData();
     console.log('Home garden data cleared');
 };
