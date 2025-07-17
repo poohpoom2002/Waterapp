@@ -1,4 +1,4 @@
-// components/QuotationDocument.tsx - Enhanced with all fixes + Subtotal fixes
+// resources\js\pages\components\QuotationDocument.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { CalculationResults, QuotationData, QuotationDataCustomer } from '../types/interfaces';
 
@@ -65,37 +65,30 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     const [isLoadingEquipment, setIsLoadingEquipment] = useState(false);
     const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
-    // หน้าแรก 10 รายการ, หน้าอื่นๆ 14 รายการ
-    // แต่หน้าสุดท้ายต้องเหลือพื้นที่สำหรับ total table (ประมาณ 5 แถว)
     const getItemsPerPage = (page: number, totalPages: number, totalItems: number) => {
         if (page === 1) {
-            // หน้าแรก: ถ้าเป็นหน้าเดียวและมี total ต้องเหลือพื้นที่
             if (totalPages === 1) {
-                return Math.min(10, Math.max(0, totalItems)); // ไม่เกิน 10 รายการ
+                return Math.min(10, Math.max(0, totalItems));
             }
             return 10;
         } else if (page === totalPages) {
-            // หน้าสุดท้าย: เหลือพื้นที่สำหรับ total table (ลด 3 รายการ)
-            return Math.min(11, 14); // เหลือพื้นที่สำหรับ total
+            return Math.min(11, 14);
         } else {
             return 14;
         }
     };
 
-    // คำนวณจำนวนหน้าทั้งหมด - ปรับให้คิดถึง total table
     const calculateTotalPages = (totalItems: number) => {
         if (totalItems <= 7) return 1; // หน้าเดียว เหลือพื้นที่สำหรับ total
-
+        
         let remainingItems = totalItems - 10; // หักหน้าแรก 10 รายการ
         let additionalPages = 0;
 
         while (remainingItems > 0) {
             if (remainingItems <= 11) {
-                // หน้าสุดท้าย: สามารถใส่ได้สูงสุด 11 รายการ (เหลือพื้นที่สำหรับ total)
                 additionalPages += 1;
                 break;
             } else {
-                // หน้ากลาง: ใส่ได้ 14 รายการ
                 remainingItems -= 14;
                 additionalPages += 1;
             }
@@ -106,14 +99,12 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
     const totalPages = calculateTotalPages(items.length);
 
-    // Load equipment data when component mounts
     useEffect(() => {
         if (show) {
             loadEquipmentCategories();
         }
     }, [show]);
 
-    // Load categories
     const loadEquipmentCategories = async () => {
         try {
             const response = await fetch('/api/equipment-categories');
@@ -126,7 +117,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         }
     };
 
-    // Load equipment by category
     const loadEquipmentByCategory = async (categoryId: string) => {
         if (!categoryId) {
             setEquipmentList([]);
@@ -148,7 +138,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             const response = await fetch(`/api/equipments?${searchParams}`);
             if (response.ok) {
                 const data = await response.json();
-                // Handle both paginated and non-paginated responses
                 const equipments = data.data || data;
                 setEquipmentList(equipments);
             }
@@ -159,18 +148,16 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         }
     };
 
-    // Load equipment when category or search term changes
     useEffect(() => {
         if (selectedCategory) {
             const timeoutId = setTimeout(() => {
                 loadEquipmentByCategory(selectedCategory);
-            }, 1000); // Debounce search
+            }, 1000);
 
             return () => clearTimeout(timeoutId);
         }
     }, [selectedCategory, equipmentSearchTerm]);
 
-    // ฟังก์ชันจัดการการอัปโหลดรูปภาพ
     const handleImageUpload = (itemId: string, file: File) => {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -180,7 +167,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         reader.readAsDataURL(file);
     };
 
-    // ฟังก์ชันเปิด file dialog
     const openFileDialog = (itemId: string) => {
         const input = document.createElement('input');
         input.type = 'file';
@@ -194,7 +180,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         input.click();
     };
 
-    // ฟังก์ชันเพิ่มอุปกรณ์จากฐานข้อมูล
     const addEquipmentFromDatabase = (equipment: Equipment) => {
         const newItem: QuotationItem = {
             id: `equipment_${equipment.id}_${Date.now()}`,
@@ -212,33 +197,26 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         setItems([...items, newItem]);
         setShowEquipmentSelector(false);
 
-        // Reset selector state
         setSelectedCategory('');
         setEquipmentSearchTerm('');
         setEquipmentList([]);
     };
 
-    // ฟังก์ชันจัดเรียงลำดับ
     const moveItem = (index: number, direction: 'up' | 'down') => {
         const newItems = [...items];
         const targetIndex = direction === 'up' ? index - 1 : index + 1;
 
         if (targetIndex < 0 || targetIndex >= newItems.length) return;
 
-        // Swap items
         [newItems[index], newItems[targetIndex]] = [newItems[targetIndex], newItems[index]];
 
-        // Update sequence numbers
         const updatedItems = newItems.map((item, i) => ({ ...item, seq: i + 1 }));
         setItems(updatedItems);
     };
 
-    // Helper function สำหรับการแสดงรูปภาพ - FIXED
     const getImageUrl = (item: QuotationItem) => {
-        // ตรวจสอบ field image ทั้งหมดที่เป็นไปได้
         if (item.image) return item.image;
 
-        // ตรวจสอบจาก originalData
         if (item.originalData) {
             const data = item.originalData;
             return data.image_url || data.image || data.imageUrl;
@@ -247,7 +225,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         return null;
     };
 
-    // Initialize items from selected equipment
     useEffect(() => {
         if (!show) return;
 
@@ -355,7 +332,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 originalData: selectedPump,
             });
 
-            // เพิ่มอุปกรณ์ประกอบของปั๊ม - FIXED
             if (selectedPump.pumpAccessories && selectedPump.pumpAccessories.length > 0) {
                 console.log('Adding pump accessories:', selectedPump.pumpAccessories);
                 selectedPump.pumpAccessories
@@ -389,7 +365,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     );
             }
 
-            // ตรวจสอบ pumpAccessory field อีกครั้งเพื่อ backward compatibility
             if (
                 !selectedPump.pumpAccessories &&
                 selectedPump.pumpAccessory &&
@@ -495,7 +470,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         }
     };
 
-    // ฟังก์ชันสำหรับ render total table - ใช้ร่วมกันระหว่างหน้าจอและการพิมพ์
     const renderTotalTable = (grandTotal: number, isForPrint: boolean = false) => {
         const tableClasses = isForPrint
             ? 'w-[250px] border-collapse border-gray-400 text-sm'
@@ -537,13 +511,10 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         `;
     };
 
-    // Equipment Selector Modal Component - Fixed input issue
     const EquipmentSelector = React.memo(() => {
-        // Local state เพื่อหลีกเลี่ยง re-render จาก parent
         const [localSearchTerm, setLocalSearchTerm] = useState(equipmentSearchTerm);
         const [localSelectedCategory, setLocalSelectedCategory] = useState(selectedCategory);
 
-        // Debounced search effect
         useEffect(() => {
             const timeoutId = setTimeout(() => {
                 setEquipmentSearchTerm(localSearchTerm);
@@ -551,12 +522,10 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             return () => clearTimeout(timeoutId);
         }, [localSearchTerm]);
 
-        // Category change effect
         useEffect(() => {
             setSelectedCategory(localSelectedCategory);
         }, [localSelectedCategory]);
 
-        // Reset search when category changes
         useEffect(() => {
             if (localSelectedCategory !== selectedCategory) {
                 setLocalSearchTerm('');
@@ -574,7 +543,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         <button
                             onClick={() => {
                                 setShowEquipmentSelector(false);
-                                // Reset states when closing
                                 setLocalSearchTerm('');
                                 setLocalSelectedCategory('');
                             }}
@@ -584,7 +552,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         </button>
                     </div>
 
-                    {/* Category Selection */}
                     <div className="mb-4">
                         <label className="mb-2 block text-sm font-medium text-gray-700">
                             เลือกประเภทอุปกรณ์
@@ -603,14 +570,13 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         </select>
                     </div>
 
-                    {/* Search */}
                     {localSelectedCategory && (
                         <div className="mb-4">
                             <label className="mb-2 block text-sm font-medium text-gray-700">
                                 ค้นหาอุปกรณ์
                             </label>
                             <input
-                                key={`search-${localSelectedCategory}`} // Force re-mount when category changes
+                                key={`search-${localSelectedCategory}`}
                                 type="text"
                                 value={localSearchTerm}
                                 onChange={(e) => setLocalSearchTerm(e.target.value)}
@@ -621,7 +587,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         </div>
                     )}
 
-                    {/* Equipment List */}
                     {isLoadingEquipment ? (
                         <div className="flex items-center justify-center py-8">
                             <div className="text-gray-500">กำลังโหลด...</div>
@@ -679,7 +644,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                             <button
                                                 onClick={() => {
                                                     addEquipmentFromDatabase(equipment);
-                                                    // Reset states after adding
                                                     setLocalSearchTerm('');
                                                     setLocalSelectedCategory('');
                                                 }}
@@ -702,7 +666,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         const currentItems = items;
         const currentTotalPages = calculateTotalPages(currentItems.length);
 
-        // สร้าง print container
         const printContainer = document.createElement('div');
         printContainer.className = 'print-document-container';
         printContainer.style.display = 'none';
@@ -720,7 +683,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 pageItems = currentItems.slice(startIndex, endIndex);
             }
 
-            // สร้าง HTML structure เหมือนกับหน้าจอทุกประการ
             const headerHTML = `
                 <div class="print-header mb-2 flex items-center justify-between">
                     <div class="flex items-center">
@@ -858,7 +820,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 </div>
             `;
 
-            // สร้างหน้าใหม่พร้อม page break และใช้ class structure เดียวกันกับหน้าจอ
             const pageBreak = page < currentTotalPages ? 'page-break-after: always;' : '';
             allPagesHTML += `
                 <div class="mx-auto flex h-[1123px] w-[794px] flex-col bg-white p-8 text-black shadow-lg" style="${pageBreak}">
@@ -877,12 +838,10 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         printContainer.innerHTML = allPagesHTML;
         document.body.appendChild(printContainer);
 
-        // รอให้ DOM โหลดเสร็จก่อนพิมพ์
         setTimeout(() => {
             printContainer.style.display = 'block';
             window.print();
 
-            // ลบ container หลังพิมพ์เสร็จ
             setTimeout(() => {
                 if (document.body.contains(printContainer)) {
                     document.body.removeChild(printContainer);
@@ -1117,7 +1076,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 {isEditing && (
                     <td className="no-print border border-gray-400 p-1 text-center align-top">
                         <div className="flex flex-col space-y-1">
-                            {/* Move Up/Down buttons */}
                             <div className="flex space-x-1">
                                 <button
                                     onClick={() => moveItem(absoluteIndex, 'up')}
@@ -1136,7 +1094,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                     ↓
                                 </button>
                             </div>
-                            {/* Delete button */}
                             <button
                                 onClick={() => removeItem(item.id)}
                                 className="rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50 hover:text-red-700"
@@ -1154,7 +1111,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
     return (
         <div className="fixed inset-0 z-50 overflow-auto bg-gray-800">
-            {/* Enhanced Print Styles - ปรับให้ตรงกับ Tailwind structure */}
             <style
                 dangerouslySetInnerHTML={{
                     __html: `
@@ -1185,7 +1141,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif !important;
                         }
                         
-                        /* ใช้ class structure เดียวกันกับหน้าจอ */
                         .mx-auto { margin-left: auto !important; margin-right: auto !important; }
                         .flex { display: flex !important; }
                         .h-\\[1123px\\] { height: 1123px !important; }
@@ -1266,7 +1221,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             />
 
             <div className="mx-auto my-8 max-w-4xl p-4">
-                {/* Debug Information */}
                 <div className="no-print fixed bottom-4 left-4 rounded bg-gray-900 p-2 text-xs text-white">
                     <div>Items: {items.length}</div>
                     <div>
@@ -1276,7 +1230,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     <div>Editing: {isEditing ? 'Yes' : 'No'}</div>
                 </div>
 
-                {/* Warning message about data persistence */}
                 {isEditing && (
                     <div className="no-print fixed left-1/2 top-16 z-50 max-w-md -translate-x-1/2 transform rounded border border-yellow-400 bg-yellow-100 px-4 py-3 text-yellow-700 shadow-lg">
                         <div className="flex">
@@ -1300,7 +1253,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     </div>
                 )}
 
-                {/* Control buttons */}
                 <div className="no-print fixed left-0 right-0 top-0 z-50 flex justify-between bg-gray-900 px-8 py-4">
                     <div className="flex space-x-2">
                         <button
@@ -1373,10 +1325,8 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     </div>
                 </div>
 
-                {/* Equipment Selector Modal */}
                 {showEquipmentSelector && <EquipmentSelector />}
 
-                {/* Document Content for Display - Current Page Only */}
                 <div className="mx-auto flex h-[1123px] w-[794px] flex-col bg-white p-8 text-black shadow-lg">
                     <div className="print-page flex min-h-full flex-col">
                         {renderHeader()}
@@ -1388,7 +1338,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             </>
                         )}
 
-                        {/* Table */}
                         <table className="print-table w-full border-collapse border border-gray-400 text-xs">
                             {renderTableHeader()}
                             <tbody>
@@ -1398,7 +1347,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             </tbody>
                         </table>
 
-                        {/* Total - แสดงเฉพาะหน้าสุดท้าย */}
                         <div className="mt-4 flex justify-end">
                             {currentPage === totalPages && (
                                 <table className="w-[250px] border-collapse border-gray-400 text-sm">
@@ -1457,6 +1405,8 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 };
 
 export default QuotationDocument;
+
+
 
 // // components/QuotationDocument.tsx - Enhanced with all fixes + Subtotal fixes
 // import React, { useState, useEffect, useRef } from 'react';
@@ -1549,15 +1499,15 @@ export default QuotationDocument;
 //     // คำนวณจำนวนหน้าทั้งหมด - ปรับให้คิดถึง total table แบบกลุ่ม
 //     const calculateTotalPages = (totalItems: number) => {
 //         if (totalItems === 0) return 1;
-
+        
 //         if (totalItems <= 5) {
 //             // รายการน้อย สามารถใส่ total ในหน้าเดียวได้
 //             return 1;
 //         }
-
+        
 //         let remainingItems = totalItems - 10; // หักหน้าแรก 10 รายการ
 //         let additionalPages = 0;
-
+        
 //         while (remainingItems > 0) {
 //             if (remainingItems <= 9) {
 //                 // หน้าสุดท้าย: ถ้าเหลือ 9 รายการหรือน้อยกว่า สามารถใส่ total ได้
@@ -1569,25 +1519,25 @@ export default QuotationDocument;
 //                 additionalPages += 1;
 //             }
 //         }
-
+        
 //         // ตรวจสอบว่าหน้าสุดท้ายมีพื้นที่พอสำหรับ total table หรือไม่
 //         const lastPageItems = totalItems - 10 - (additionalPages - 1) * 14;
 //         if (lastPageItems > 9) {
 //             // ถ้าหน้าสุดท้ายมีรายการมากกว่า 9 รายการ ต้องสร้างหน้าใหม่สำหรับ total
 //             additionalPages += 1;
 //         }
-
+        
 //         return 1 + additionalPages;
 //     };
 
 //     // ตรวจสอบว่าหน้าไหนมี total table
 //     const shouldShowTotal = (page: number) => {
 //         if (items.length === 0) return page === 1;
-
+        
 //         if (items.length <= 5) {
 //             return page === 1; // หน้าเดียว
 //         }
-
+        
 //         const itemsInLastPage = items.length - 10 - (totalPages - 2) * 14;
 //         if (totalPages > 1 && itemsInLastPage <= 9 && itemsInLastPage > 0) {
 //             return page === totalPages; // total อยู่ในหน้าสุดท้ายที่มีรายการ
@@ -1977,7 +1927,7 @@ export default QuotationDocument;
 
 //     const getItemsForPage = (page: number) => {
 //         if (items.length === 0) return [];
-
+        
 //         if (page === 1) {
 //             if (totalPages === 1) {
 //                 // หน้าเดียว: แสดงรายการทั้งหมด
@@ -1986,7 +1936,7 @@ export default QuotationDocument;
 //             return items.slice(0, 10);
 //         } else {
 //             const startIndex = 10 + (page - 2) * 14;
-
+            
 //             // ตรวจสอบว่าเป็นหน้าสุดท้ายหรือไม่
 //             if (page === totalPages) {
 //                 const remainingItems = items.length - startIndex;
@@ -2009,14 +1959,14 @@ export default QuotationDocument;
 
 //     // ฟังก์ชันสำหรับ render total table - ใช้ร่วมกันระหว่างหน้าจอและการพิมพ์
 //     const renderTotalTable = (grandTotal: number, isForPrint: boolean = false) => {
-//         const tableClasses = isForPrint ?
-//             "w-[250px] border-collapse border-gray-400 text-sm" :
+//         const tableClasses = isForPrint ? 
+//             "w-[250px] border-collapse border-gray-400 text-sm" : 
 //             "w-[250px] border-collapse border-gray-400 text-sm";
-
+        
 //         const cellClasses = isForPrint ?
 //             "border border-x-0 border-gray-400 p-1 text-left align-top font-bold" :
 //             "border border-x-0 border-gray-400 p-1 text-left align-top font-bold";
-
+            
 //         const valueCellClasses = isForPrint ?
 //             "w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top" :
 //             "w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top";
@@ -2224,7 +2174,7 @@ export default QuotationDocument;
 //             // ใช้ function เดียวกันกับการแสดงบนหน้าจอ
 //             const pageItems = (() => {
 //                 if (currentItems.length === 0) return [];
-
+                
 //                 if (page === 1) {
 //                     if (currentTotalPages === 1) {
 //                         return currentItems;
@@ -2232,7 +2182,7 @@ export default QuotationDocument;
 //                     return currentItems.slice(0, 10);
 //                 } else {
 //                     const startIndex = 10 + (page - 2) * 14;
-
+                    
 //                     if (page === currentTotalPages) {
 //                         const remainingItems = currentItems.length - startIndex;
 //                         if (remainingItems <= 9 && remainingItems > 0) {
@@ -2251,11 +2201,11 @@ export default QuotationDocument;
 //             // ตรวจสอบว่าหน้านี้มี total หรือไม่
 //             const shouldShowTotalOnThisPage = (() => {
 //                 if (currentItems.length === 0) return page === 1;
-
+                
 //                 if (currentItems.length <= 5) {
 //                     return page === 1;
 //                 }
-
+                
 //                 const itemsInLastPage = currentItems.length - 10 - (currentTotalPages - 2) * 14;
 //                 if (currentTotalPages > 1 && itemsInLastPage <= 9 && itemsInLastPage > 0) {
 //                     return page === currentTotalPages;
@@ -2707,17 +2657,17 @@ export default QuotationDocument;
 //                             size: A4 portrait;
 //                             margin: 0;
 //                         }
-
+                        
 //                         * {
 //                             -webkit-print-color-adjust: exact !important;
 //                             color-adjust: exact !important;
 //                             box-sizing: border-box !important;
 //                         }
-
+                        
 //                         body > *:not(.print-document-container) {
 //                             display: none !important;
 //                         }
-
+                        
 //                         .print-document-container {
 //                             display: block !important;
 //                             position: static !important;
@@ -2728,7 +2678,7 @@ export default QuotationDocument;
 //                             background: white !important;
 //                             font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif !important;
 //                         }
-
+                        
 //                         /* ใช้ class structure เดียวกันกับหน้าจอ */
 //                         .mx-auto { margin-left: auto !important; margin-right: auto !important; }
 //                         .flex { display: flex !important; }
@@ -2739,52 +2689,52 @@ export default QuotationDocument;
 //                         .p-8 { padding: 2rem !important; }
 //                         .text-black { color: black !important; }
 //                         .shadow-lg { box-shadow: none !important; }
-
-//                         .print-page {
-//                             display: flex !important;
-//                             min-height: 100% !important;
-//                             flex-direction: column !important;
+                        
+//                         .print-page { 
+//                             display: flex !important; 
+//                             min-height: 100% !important; 
+//                             flex-direction: column !important; 
 //                         }
-
+                        
 //                         .mb-2 { margin-bottom: 0.5rem !important; }
 //                         .mb-4 { margin-bottom: 1rem !important; }
 //                         .mb-6 { margin-bottom: 1.5rem !important; }
 //                         .mt-auto { margin-top: auto !important; }
 //                         .mt-4 { margin-top: 1rem !important; }
-
+                        
 //                         .items-center { align-items: center !important; }
 //                         .justify-between { justify-content: space-between !important; }
 //                         .justify-end { justify-content: flex-end !important; }
 //                         .self-start { align-self: flex-start !important; }
 //                         .self-end { align-self: flex-end !important; }
-
+                        
 //                         .h-10 { height: 2.5rem !important; }
 //                         .w-10 { width: 2.5rem !important; }
-
+                        
 //                         .border-gray-800 { border-color: rgb(31, 41, 55) !important; }
 //                         .border-gray-400 { border-color: rgb(156, 163, 175) !important; }
 //                         .bg-gray-100 { background-color: rgb(243, 244, 246) !important; }
-
+                        
 //                         .text-sm { font-size: 0.875rem !important; line-height: 1.25rem !important; }
 //                         .text-xs { font-size: 0.75rem !important; line-height: 1rem !important; }
 //                         .text-xl { font-size: 1.25rem !important; line-height: 1.75rem !important; }
 //                         .text-lg { font-size: 1.125rem !important; line-height: 1.75rem !important; }
-
+                        
 //                         .font-semibold { font-weight: 600 !important; }
 //                         .font-bold { font-weight: 700 !important; }
-
+                        
 //                         .text-left { text-align: left !important; }
 //                         .text-right { text-align: right !important; }
 //                         .text-center { text-align: center !important; }
-
+                        
 //                         .flex-row { flex-direction: row !important; }
 //                         .gap-9 { gap: 2.25rem !important; }
-
+                        
 //                         .w-full { width: 100% !important; }
 //                         .border-collapse { border-collapse: collapse !important; }
 //                         .border { border-width: 1px !important; }
 //                         .border-x-0 { border-left-width: 0 !important; border-right-width: 0 !important; }
-
+                        
 //                         .w-\\[50px\\] { width: 50px !important; }
 //                         .w-\\[60px\\] { width: 60px !important; }
 //                         .w-\\[80px\\] { width: 80px !important; }
@@ -2795,14 +2745,14 @@ export default QuotationDocument;
 //                         .p-1 { padding: 0.25rem !important; }
 //                         .p-2 { padding: 0.5rem !important; }
 //                         .align-top { vertical-align: top !important; }
-
+                        
 //                         .no-print { display: none !important; }
-
+                        
 //                         strong { font-weight: bold !important; }
-
-//                         hr {
-//                             border: none !important;
-//                             border-top: 1px solid !important;
+                        
+//                         hr { 
+//                             border: none !important; 
+//                             border-top: 1px solid !important; 
 //                         }
 //                     }
 //                 `,

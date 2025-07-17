@@ -1,18 +1,23 @@
 // C:\webchaiyo\Waterapp\resources\js\pages\components\SprinklerSelector.tsx
 import React, { useState } from 'react';
 import { CalculationResults } from '../types/interfaces';
+import { Zone } from '../../utils/horticultureUtils';
 import { formatWaterFlow, formatRadius } from '../utils/calculations';
 
 interface SprinklerSelectorProps {
     selectedSprinkler: any;
     onSprinklerChange: (sprinkler: any) => void;
     results: CalculationResults;
+    activeZone?: Zone;
+    allZoneSprinklers: { [zoneId: string]: any };
 }
 
 const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
     selectedSprinkler,
     onSprinklerChange,
     results,
+    activeZone,
+    allZoneSprinklers,
 }) => {
     // State สำหรับ Modal รูปภาพ
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
@@ -36,33 +41,11 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
     // ใช้ข้อมูลที่ได้จาก database และผ่านการวิเคราะห์แล้วใน useCalculations
     const analyzedSprinklers = results.analyzedSprinklers || [];
 
-    // เรียงลำดับตามคะแนน
+    // เรียงลำดับตามคะแนน (ไม่ต้องแสดงป้ายกำกับ)
     const sortedSprinklers = analyzedSprinklers.sort((a, b) => {
-        if (a.isRecommended !== b.isRecommended) {
-            return b.isRecommended ? 1 : -1;
-        }
-        if (a.isGoodChoice !== b.isGoodChoice) {
-            return b.isGoodChoice ? 1 : -1;
-        }
-        if (a.isUsable !== b.isUsable) {
-            return b.isUsable ? 1 : -1;
-        }
+        // เรียงตามคะแนนเท่านั้น
         return b.score - a.score;
     });
-
-    const getRecommendationIcon = (sprinkler: any) => {
-        if (sprinkler.isRecommended) return '(แนะนำที่สุด)';
-        if (sprinkler.isGoodChoice) return '(ตัวเลือกดี)';
-        if (sprinkler.isUsable) return '(ใช้ได้)';
-        return '(ควรพิจารณา)';
-    };
-
-    const getRecommendationColor = (sprinkler: any) => {
-        if (sprinkler.isRecommended) return 'text-green-300';
-        if (sprinkler.isGoodChoice) return 'text-blue-300';
-        if (sprinkler.isUsable) return 'text-yellow-300';
-        return 'text-red-300';
-    };
 
     const selectedAnalyzed = selectedSprinkler
         ? analyzedSprinklers.find((s) => s.id === selectedSprinkler.id)
@@ -84,13 +67,98 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
         return parseFloat(String(value)) || 0;
     };
 
+    // NEW: Get unique sprinklers across all zones
+    const getUniqueSprinklers = () => {
+        const sprinklerMap = new Map();
+        Object.values(allZoneSprinklers).forEach((sprinkler) => {
+            if (sprinkler) {
+                sprinklerMap.set(sprinkler.id, sprinkler);
+            }
+        });
+        return Array.from(sprinklerMap.values());
+    };
+
+    // NEW: Get zones using specific sprinkler
+    const getZonesUsingSprinkler = (sprinklerId: number) => {
+        const zones: string[] = [];
+        Object.entries(allZoneSprinklers).forEach(([zoneId, sprinkler]) => {
+            if (sprinkler && sprinkler.id === sprinklerId) {
+                zones.push(zoneId);
+            }
+        });
+        return zones;
+    };
+
+    const uniqueSprinklers = getUniqueSprinklers();
+
     return (
         <div className="rounded-lg bg-gray-700 p-6">
-            <h3 className="mb-4 text-lg font-semibold text-green-400">เลือกสปริงเกอร์</h3>
+            <h3 className="mb-4 text-lg font-semibold text-green-400">
+                เลือกสปริงเกอร์
+                {activeZone && (
+                    <span className="ml-2 text-sm font-normal text-gray-400">
+                        - {activeZone.name}
+                    </span>
+                )}
+            </h3>
+
+            {/* Multi-zone summary */}
+            {Object.keys(allZoneSprinklers).length > 1 && (
+                <div className="mb-4 rounded bg-purple-900 p-3">
+                    <h4 className="mb-2 text-sm font-semibold text-purple-300">
+                        📋 สรุปสปริงเกอร์ทั้งหมด ({uniqueSprinklers.length} ชนิด):
+                    </h4>
+                    <div className="space-y-2">
+                        {uniqueSprinklers.map((sprinkler) => {
+                            const zonesUsing = getZonesUsingSprinkler(sprinkler.id);
+                            return (
+                                <div
+                                    key={sprinkler.id}
+                                    className="flex items-center justify-between rounded bg-purple-800 p-2"
+                                >
+                                    <div className="flex items-center space-x-3">
+                                        <div className="flex h-8 w-8 items-center justify-center rounded bg-purple-600 text-xs">
+                                            💧
+                                        </div>
+                                        <div className="text-sm">
+                                            <p className="font-medium text-white">
+                                                {sprinkler.name}
+                                            </p>
+                                            <p className="text-purple-200">
+                                                {formatRangeValue(
+                                                    sprinkler.waterVolumeLitersPerHour
+                                                )}{' '}
+                                                L/H |{sprinkler.price} บาท
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right text-sm">
+                                        <p className="text-purple-200">
+                                            ใช้ใน {zonesUsing.length} โซน
+                                        </p>
+                                        <p className="text-xs text-purple-300">
+                                            {zonesUsing
+                                                .map((zoneId) => {
+                                                    // Find zone name from zoneId if possible
+                                                    return zoneId === 'main-area'
+                                                        ? 'พื้นที่หลัก'
+                                                        : `Zone ${zoneId}`;
+                                                })
+                                                .join(', ')}
+                                        </p>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* ข้อมูลความต้องการ */}
             <div className="mb-4 rounded bg-gray-600 p-3">
-                <h4 className="mb-2 text-sm font-medium text-green-300">💧 ความต้องการ:</h4>
+                <h4 className="mb-2 text-sm font-medium text-green-300">
+                    💧 ความต้องการ{activeZone ? ` (${activeZone.name})` : ''}:
+                </h4>
                 <div className="text-xs text-gray-300">
                     <p>
                         อัตราการไหลต่อหัว:{' '}
@@ -103,14 +171,10 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         <span className="font-bold text-yellow-300">
                             {results.totalSprinklers} หัว
                         </span>
+                        {activeZone && <span className="ml-1 text-gray-400">(ในโซนนี้)</span>}
                     </p>
                 </div>
             </div>
-
-            {/* แสดงสถานะการโหลดข้อมูล */}
-            {/* <div className="mb-3 text-xs text-green-400">
-                🔗 ข้อมูลจากฐานข้อมูล: {analyzedSprinklers.length} รายการ
-            </div> */}
 
             <select
                 value={selectedSprinkler?.id || ''}
@@ -122,11 +186,13 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 }}
                 className="mb-4 w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
             >
-                <option value="">-- เลือกสปริงเกอร์ --</option>
+                <option value="">
+                    -- เลือกสปริงเกอร์{activeZone ? ` สำหรับ ${activeZone.name}` : ''} --
+                </option>
                 {sortedSprinklers.map((sprinkler) => (
                     <option key={sprinkler.id} value={sprinkler.id}>
-                        {sprinkler.name} - {sprinkler.price} บาท | {sprinkler.brand_name || '-'} |{' '}
-                        {getRecommendationIcon(sprinkler)}
+                        {sprinkler.name} - {sprinkler.price} บาท | {sprinkler.brand_name || '-'} |
+                        คะแนน: {sprinkler.score}
                     </option>
                 ))}
             </select>
@@ -136,11 +202,14 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                     <div className="mb-3 flex items-center justify-between">
                         <h4 className="font-medium text-white">
                             <strong> {selectedSprinkler.name}</strong>
+                            {activeZone && (
+                                <span className="ml-2 text-sm font-normal text-gray-400">
+                                    (สำหรับ {activeZone.name})
+                                </span>
+                            )}
                         </h4>
-                        <span
-                            className={`text-sm font-bold ${getRecommendationColor(selectedAnalyzed)}`}
-                        >
-                            {getRecommendationIcon(selectedAnalyzed)}
+                        <span className="text-sm font-bold text-blue-300">
+                            คะแนน: {selectedAnalyzed.score}/100
                         </span>
                     </div>
 
@@ -196,6 +265,9 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                             </p>
                             <p>
                                 <strong>จำนวนที่ต้องใช้:</strong> {results.totalSprinklers} หัว
+                                {activeZone && (
+                                    <span className="ml-1 text-xs text-gray-400">(โซนนี้)</span>
+                                )}
                             </p>
                             <p>
                                 <strong>ราคารวม:</strong>{' '}
@@ -235,10 +307,6 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                                           : '❌ ไม่เหมาะสม'}
                                 </span>
                             </p>
-                            {/* <p>
-                                จากฐานข้อมูล:{' '}
-                                <span className="font-bold text-green-400">✓</span>
-                            </p> */}
                         </div>
                     </div>
 
@@ -275,6 +343,25 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                             </div>
                         </div>
                     </div>
+
+                    {/* Zone-specific info */}
+                    {activeZone && (
+                        <div className="mt-3 rounded bg-green-900 p-2">
+                            <h5 className="text-xs font-medium text-green-300">ข้อมูลโซน:</h5>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div>
+                                    <p>พื้นที่โซน: {(activeZone.area / 1600).toFixed(2)} ไร่</p>
+                                    <p>จำนวนต้นไม้: {activeZone.plantCount} ต้น</p>
+                                </div>
+                                <div>
+                                    <p>พืชที่ปลูก: {activeZone.plantData?.name || 'ไม่ระบุ'}</p>
+                                    <p>
+                                        น้ำต่อต้น: {activeZone.plantData?.waterNeed || 0} ลิตร/วัน
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -311,21 +398,6 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                     </div>
                 </div>
             )}
-
-            {/* แสดงสถิติจากฐานข้อมูล */}
-            {/* <div className="mt-4 text-xs text-gray-400">
-                <div className="grid grid-cols-3 gap-2">
-                    <div>
-                        แนะนำ: <span className="text-green-400">{analyzedSprinklers.filter(s => s.isRecommended).length}</span>
-                    </div>
-                    <div>
-                        ตัวเลือกดี: <span className="text-blue-400">{analyzedSprinklers.filter(s => s.isGoodChoice).length}</span>
-                    </div>
-                    <div>
-                        ใช้ได้: <span className="text-yellow-400">{analyzedSprinklers.filter(s => s.isUsable).length}</span>
-                    </div>
-                </div>
-            </div> */}
         </div>
     );
 };

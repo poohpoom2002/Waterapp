@@ -1,6 +1,4 @@
-// resources\js\pages\equipment-crud.tsx - แก้ไขตามที่ขอ
-// ต้องเพิ่ม SweetAlert2 ใน HTML head ก่อน:
-// <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+// resources\js\pages\equipment-crud.tsx
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
@@ -33,14 +31,12 @@ import {
     ChevronLast,
 } from 'lucide-react';
 
-// เพิ่ม SweetAlert2
 declare global {
     interface Window {
         Swal: any;
     }
 }
 
-// SweetAlert2 wrapper - แก้ไขให้ทำงานได้
 const showAlert = {
     success: (title: string, text = '') => {
         if (typeof window !== 'undefined' && window.Swal) {
@@ -52,7 +48,6 @@ const showAlert = {
                 confirmButtonColor: '#10b981',
             });
         } else {
-            // Fallback ถ้า SweetAlert2 ไม่ load
             alert(`${title}${text ? '\n' + text : ''}`);
             return Promise.resolve({ isConfirmed: true });
         }
@@ -118,7 +113,6 @@ const showAlert = {
     },
 };
 
-// Enhanced API helper functions
 const apiRequest = async (url: string, options: RequestInit = {}) => {
     console.log('🔄 API Request:', {
         url: `/api${url}`,
@@ -194,7 +188,6 @@ const getAllEquipments = async (params?: any): Promise<Equipment[]> => {
     }
 };
 
-// Enhanced Types
 interface EquipmentCategory {
     id: number;
     name: string;
@@ -264,9 +257,7 @@ interface FilterOptions {
     sortOrder: 'asc' | 'desc';
 }
 
-// Enhanced API Functions
 const api = {
-    // Categories
     getCategories: async (): Promise<EquipmentCategory[]> => {
         try {
             return await apiRequest('/equipment-categories');
@@ -299,7 +290,6 @@ const api = {
         });
     },
 
-    // Equipments
     getAllEquipments: async (params?: any): Promise<Equipment[]> => {
         try {
             const queryString = params ? '?' + new URLSearchParams(params).toString() : '';
@@ -341,7 +331,6 @@ const api = {
         });
     },
 
-    // Enhanced search
     searchEquipments: async (filters: Partial<FilterOptions>): Promise<Equipment[]> => {
         try {
             const params = new URLSearchParams();
@@ -359,7 +348,6 @@ const api = {
         }
     },
 
-    // Bulk operations
     bulkUpdate: async (ids: number[], updates: any): Promise<void> => {
         await apiRequest('/equipments/bulk-update', {
             method: 'POST',
@@ -374,7 +362,6 @@ const api = {
         });
     },
 
-    // Image Upload
     uploadImage: async (file: File): Promise<{ url: string; path: string }> => {
         const formData = new FormData();
         formData.append('image', file);
@@ -391,7 +378,6 @@ const api = {
         return response.json();
     },
 
-    // Statistics
     getStats: async (): Promise<any> => {
         try {
             return await apiRequest('/equipments/stats');
@@ -402,7 +388,6 @@ const api = {
     },
 };
 
-// Pagination Component
 const Pagination: React.FC<{
     currentPage: number;
     totalPages: number;
@@ -418,8 +403,8 @@ const Pagination: React.FC<{
         const maxVisiblePages = 5;
 
         let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-        const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-
+        let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+        
         if (endPage - startPage + 1 < maxVisiblePages) {
             startPage = Math.max(1, endPage - maxVisiblePages + 1);
         }
@@ -492,7 +477,6 @@ const Pagination: React.FC<{
     );
 };
 
-// Enhanced Category Form Modal
 const CategoryForm: React.FC<{
     category?: EquipmentCategory;
     onSave: (category: Partial<EquipmentCategory>) => void;
@@ -604,7 +588,6 @@ const CategoryForm: React.FC<{
                     </h2>
 
                     <div className="space-y-6">
-                        {/* Basic Information */}
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                             <div>
                                 <label className="mb-2 block text-sm font-medium">
@@ -687,11 +670,9 @@ const CategoryForm: React.FC<{
                             </div>
                         </div>
 
-                        {/* Attributes Management */}
                         <div className="border-t border-gray-600 pt-6">
                             <h3 className="mb-4 text-lg font-semibold">คุณสมบัติเฉพาะ</h3>
 
-                            {/* Add New Attribute */}
                             <div className="mb-4 rounded-lg bg-gray-700 p-4">
                                 <h4 className="mb-3 font-medium">เพิ่มคุณสมบัติใหม่</h4>
                                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3 lg:grid-cols-5">
@@ -770,7 +751,6 @@ const CategoryForm: React.FC<{
                                 </div>
                             </div>
 
-                            {/* Existing Attributes */}
                             {formData.attributes.length > 0 && (
                                 <div className="space-y-2">
                                     {formData.attributes.map((attr, index) => (
@@ -812,7 +792,6 @@ const CategoryForm: React.FC<{
                             )}
                         </div>
 
-                        {/* Action Buttons */}
                         <div className="flex justify-end space-x-4 border-t border-gray-600 pt-6">
                             <button
                                 type="button"
@@ -837,7 +816,6 @@ const CategoryForm: React.FC<{
     );
 };
 
-// Pump Accessory Form Component
 const PumpAccessoryForm: React.FC<{
     accessories: PumpAccessory[];
     onChange: (accessories: PumpAccessory[]) => void;
@@ -952,7 +930,6 @@ const PumpAccessoryForm: React.FC<{
             <div className="space-y-4">
                 {accessories.map((accessory, index) => (
                     <div key={index} className="rounded-lg border border-gray-600 bg-gray-700 p-4">
-                        {/* Header with controls */}
                         <div className="mb-4 flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <span className="rounded bg-orange-600 px-2 py-1 text-xs text-white">
@@ -995,7 +972,6 @@ const PumpAccessoryForm: React.FC<{
                             </div>
                         </div>
 
-                        {/* Basic Fields */}
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                             <div>
                                 <label className="mb-1 block text-sm font-medium">ประเภท *</label>
@@ -1091,7 +1067,6 @@ const PumpAccessoryForm: React.FC<{
                             </div>
                         </div>
 
-                        {/* รูปภาพ */}
                         <div className="mt-4">
                             <label className="mb-2 block text-sm font-medium">รูปภาพ</label>
                             <div className="flex items-center gap-4">
@@ -1131,7 +1106,6 @@ const PumpAccessoryForm: React.FC<{
                             </div>
                         </div>
 
-                        {/* Specifications */}
                         <div className="mt-4">
                             <label className="mb-2 block text-sm font-medium">ข้อมูลจำเพาะ</label>
                             <div className="space-y-2">
@@ -1197,7 +1171,6 @@ const PumpAccessoryForm: React.FC<{
     );
 };
 
-// Enhanced Equipment Form Component
 const EquipmentForm: React.FC<{
     equipment?: Equipment;
     categories: EquipmentCategory[];
@@ -1223,7 +1196,6 @@ const EquipmentForm: React.FC<{
     const [imageUploading, setImageUploading] = useState(false);
     const [validationErrors, setValidationErrors] = useState<any>({});
 
-    // ปรับปรุงการ populate initial data
     useEffect(() => {
         if (equipment) {
             console.log('=== POPULATING INITIAL DATA ===');
@@ -1305,7 +1277,6 @@ const EquipmentForm: React.FC<{
         }
     }, [equipment, categories]);
 
-    // ปรับปรุงการโหลด attributes เมื่อ category เปลี่ยน
     useEffect(() => {
         console.log('=== CATEGORY CHANGE ===');
         console.log('Current category_id:', formData.category_id);
@@ -1340,11 +1311,9 @@ const EquipmentForm: React.FC<{
         }
     }, [formData.category_id]);
 
-    // Validation
     const validateForm = () => {
         const newErrors: any = {};
 
-        // Basic validation
         if (!formData.product_code?.trim()) {
             newErrors.product_code = 'กรุณากรอกรหัสสินค้า';
         }
@@ -1358,7 +1327,7 @@ const EquipmentForm: React.FC<{
         }
 
         // Attribute validation
-        attributes.forEach((attr) => {
+        attributes.forEach(attr => {
             if (attr.is_required) {
                 const value = formData.attributes?.[attr.attribute_name];
                 if (!value || (Array.isArray(value) && value.length === 0) || value === '') {
@@ -1372,7 +1341,6 @@ const EquipmentForm: React.FC<{
         return Object.keys(newErrors).length === 0;
     };
 
-    // Image Upload Handler
     const handleImageUpload = async (file: File) => {
         if (!file) return;
 
@@ -1392,7 +1360,6 @@ const EquipmentForm: React.FC<{
         }
     };
 
-    // ปรับปรุง handleAttributeChange
     const handleAttributeChange = (attributeName: string, value: any) => {
         console.log('=== handleAttributeChange ===');
         console.log('Attribute name:', attributeName);
@@ -1411,7 +1378,6 @@ const EquipmentForm: React.FC<{
             };
         });
 
-        // Clear validation error for this field
         if (validationErrors[`attributes.${attributeName}`]) {
             setValidationErrors((prev: any) => {
                 const newErrors = { ...prev };
@@ -1421,7 +1387,6 @@ const EquipmentForm: React.FC<{
         }
     };
 
-    // ปรับปรุง handleSubmit
     const handleSubmit = async () => {
         if (!validateForm()) {
             showAlert.error('ข้อมูลไม่ถูกต้อง', 'กรุณาตรวจสอบข้อมูลที่กรอกใหม่อีกครั้ง');
@@ -1497,7 +1462,6 @@ const EquipmentForm: React.FC<{
         }
     };
 
-    // ปรับปรุงการ render attribute inputs
     const renderAttributeInput = (attr: EquipmentAttribute) => {
         const currentValue = formData.attributes?.[attr.attribute_name];
         const hasError = validationErrors[`attributes.${attr.attribute_name}`];
@@ -1674,7 +1638,6 @@ const EquipmentForm: React.FC<{
                     )}
 
                     <div className="space-y-6">
-                        {/* Basic Information */}
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                             <div>
                                 <label className="mb-2 block text-sm font-medium">หมวดหมู่ *</label>
@@ -1886,7 +1849,6 @@ const EquipmentForm: React.FC<{
                             </div>
                         </div>
 
-                        {/* Dynamic Attributes */}
                         {attributes.length > 0 && !loading && (
                             <div className="border-t border-gray-600 pt-6">
                                 <h3 className="mb-4 text-lg font-semibold text-purple-400">
@@ -1902,7 +1864,6 @@ const EquipmentForm: React.FC<{
                             </div>
                         )}
 
-                        {/* Pump Accessories */}
                         {isPump && (
                             <div className="border-t border-gray-600 pt-6">
                                 <PumpAccessoryForm
@@ -1913,7 +1874,6 @@ const EquipmentForm: React.FC<{
                             </div>
                         )}
 
-                        {/* Action Buttons */}
                         <div className="flex justify-end space-x-4 border-t border-gray-600 pt-6">
                             <button
                                 type="button"
@@ -1949,7 +1909,6 @@ const EquipmentForm: React.FC<{
     );
 };
 
-// Equipment Detail Modal - ปรับปรุงแล้ว
 const EquipmentDetailModal: React.FC<{
     equipment: Equipment;
     onClose: () => void;
@@ -1958,18 +1917,15 @@ const EquipmentDetailModal: React.FC<{
 }> = ({ equipment, onClose, onEdit, onImageClick }) => {
     console.log('Equipment in detail modal:', equipment);
 
-    // ฟังก์ชันสำหรับ format attribute value ให้แสดงผลสวย
     const formatAttributeValue = (value: any, attribute?: any) => {
         if (value === null || value === undefined || value === '') {
             return '-';
         }
 
-        // ถ้ามี formatted_value แล้วให้ใช้
         if (attribute && attribute.formatted_value) {
             return attribute.formatted_value;
         }
 
-        // ถ้าเป็น array (range values)
         if (Array.isArray(value)) {
             if (
                 value.length === 2 &&
@@ -1981,17 +1937,14 @@ const EquipmentDetailModal: React.FC<{
             return value.join(', ');
         }
 
-        // ถ้าเป็น number
         if (typeof value === 'number') {
             return value.toLocaleString();
         }
 
-        // ถ้าเป็น boolean
         if (typeof value === 'boolean') {
             return value ? 'ใช่' : 'ไม่ใช่';
         }
 
-        // ถ้าเป็น object
         if (typeof value === 'object') {
             return JSON.stringify(value, null, 2);
         }
@@ -1999,7 +1952,6 @@ const EquipmentDetailModal: React.FC<{
         return String(value);
     };
 
-    // ฟังก์ชันสำหรับรวม attributes จากทุก source - แก้ไขให้แสดงภาษาไทย
     const getAllAttributes = () => {
         const attributes: {
             attribute_name: string;
@@ -2011,20 +1963,17 @@ const EquipmentDetailModal: React.FC<{
             sort_order: number;
         }[] = [];
 
-        // ใช้ formatted_attributes ถ้ามี (จาก detailed format)
         if (equipment.formatted_attributes && Array.isArray(equipment.formatted_attributes)) {
             return equipment.formatted_attributes.sort((a, b) => a.sort_order - b.sort_order);
         }
 
-        // ใช้ structured attributes ถ้ามี
         if (equipment.attributes && Array.isArray(equipment.attributes)) {
             return equipment.attributes.sort((a, b) => a.sort_order - b.sort_order);
         }
 
-        // ใช้ attributes_raw ถ้ามี - แก้ไขให้แสดงภาษาไทย
         if (equipment.attributes_raw && typeof equipment.attributes_raw === 'object') {
             Object.entries(equipment.attributes_raw).forEach(([key, value]) => {
-                const displayName = getThaiDisplayName(key); // ใช้ฟังก์ชันแปลงภาษาไทย
+                const displayName = getThaiDisplayName(key);
                 attributes.push({
                     attribute_name: key,
                     display_name: displayName,
@@ -2038,7 +1987,6 @@ const EquipmentDetailModal: React.FC<{
             return attributes;
         }
 
-        // ถ้าไม่มี formatted attributes ให้ดึงจาก root level - แก้ไขให้แสดงภาษาไทย
         const rootAttributes = {};
         const skipFields = [
             'id',
@@ -2069,7 +2017,7 @@ const EquipmentDetailModal: React.FC<{
         });
 
         Object.entries(rootAttributes).forEach(([key, value]) => {
-            const displayName = getThaiDisplayName(key); // ใช้ฟังก์ชันแปลงภาษาไทย
+            const displayName = getThaiDisplayName(key);
             attributes.push({
                 attribute_name: key,
                 display_name: displayName,
@@ -2084,76 +2032,72 @@ const EquipmentDetailModal: React.FC<{
         return attributes;
     };
 
-    // ฟังก์ชันแปลง attribute name เป็นภาษาไทย
     const getThaiDisplayName = (attributeName: string) => {
         const thaiDisplayMap: { [key: string]: string } = {
             // สปริงเกอร์
-            flow_rate: 'อัตราการไหล',
-            pressure: 'ความดัน',
-            radius: 'รัศมีการพ่น',
-            waterVolumeLitersPerHour: 'อัตราการไหล',
-            pressureBar: 'ความดัน',
-            radiusMeters: 'รัศมีการพ่น',
-
+            'flow_rate': 'อัตราการไหล',
+            'pressure': 'ความดัน', 
+            'radius': 'รัศมีการพ่น',
+            'waterVolumeLitersPerHour': 'อัตราการไหล',
+            'pressureBar': 'ความดัน',
+            'radiusMeters': 'รัศมีการพ่น',
+            
             // ปั๊มน้ำ
-            power_hp: 'กำลัง',
-            powerHP: 'กำลัง',
-            powerKW: 'กำลัง',
-            phase: 'เฟส',
-            inlet_size_inch: 'ขนาดท่อดูด',
-            outlet_size_inch: 'ขนาดท่อส่ง',
-            flow_rate_lpm: 'อัตราการไหล',
-            head_m: 'หัวดัน',
-            max_head_m: 'หัวดันสูงสุด',
-            max_flow_rate_lpm: 'อัตราการไหลสูงสุด',
-            suction_depth_m: 'ความลึกดูด',
-            weight_kg: 'น้ำหนัก',
-
+            'power_hp': 'กำลัง',
+            'powerHP': 'กำลัง',
+            'powerKW': 'กำลัง',
+            'phase': 'เฟส',
+            'inlet_size_inch': 'ขนาดท่อดูด',
+            'outlet_size_inch': 'ขนาดท่อส่ง',
+            'flow_rate_lpm': 'อัตราการไหล',
+            'head_m': 'หัวดัน',
+            'max_head_m': 'หัวดันสูงสุด',
+            'max_flow_rate_lpm': 'อัตราการไหลสูงสุด',
+            'suction_depth_m': 'ความลึกดูด',
+            'weight_kg': 'น้ำหนัก',
+            
             // ท่อ
-            size_mm: 'ขนาด',
-            size_inch: 'ขนาด',
-            sizeMM: 'ขนาด',
-            sizeInch: 'ขนาด',
-            lengthM: 'ความยาว',
-            dimensions_cm: 'ขนาด',
-            material: 'วัสดุ',
-
+            'size_mm': 'ขนาด',
+            'size_inch': 'ขนาด',
+            'sizeMM': 'ขนาด',
+            'sizeInch': 'ขนาด',
+            'lengthM': 'ความยาว',
+            'dimensions_cm': 'ขนาด',
+            'material': 'วัสดุ',
+            
             // ไฟฟ้า
-            voltage: 'แรงดันไฟฟ้า',
-            current: 'กระแสไฟฟ้า',
-            frequency: 'ความถี่',
-
+            'voltage': 'แรงดันไฟฟ้า',
+            'current': 'กระแสไฟฟ้า',
+            'frequency': 'ความถี่',
+            
             // ทั่วไป
-            brand: 'แบรนด์',
-            model: 'รุ่น',
-            color: 'สี',
-            weight: 'น้ำหนัก',
-            height: 'ความสูง',
-            width: 'ความกว้าง',
-            length: 'ความยาว',
-            diameter: 'เส้นผ่านศูนย์กลาง',
-            thickness: 'ความหนา',
-            capacity: 'ความจุ',
-            efficiency: 'ประสิทธิภาพ',
-            temperature_range: 'ช่วงอุณหภูมิ',
-            operating_pressure: 'ความดันใช้งาน',
-            max_pressure: 'ความดันสูงสุด',
-            connection_type: 'ประเภทการต่อ',
-            thread_size: 'ขนาดเกลียว',
+            'brand': 'แบรนด์',
+            'model': 'รุ่น',
+            'color': 'สี',
+            'weight': 'น้ำหนัก',
+            'height': 'ความสูง',
+            'width': 'ความกว้าง',
+            'length': 'ความยาว',
+            'diameter': 'เส้นผ่านศูนย์กลาง',
+            'thickness': 'ความหนา',
+            'capacity': 'ความจุ',
+            'efficiency': 'ประสิทธิภาพ',
+            'temperature_range': 'ช่วงอุณหภูมิ',
+            'operating_pressure': 'ความดันใช้งาน',
+            'max_pressure': 'ความดันสูงสุด',
+            'connection_type': 'ประเภทการต่อ',
+            'thread_size': 'ขนาดเกลียว',
         };
 
-        // ถ้าพบใน mapping ให้ใช้ภาษาไทย
         if (thaiDisplayMap[attributeName]) {
             return thaiDisplayMap[attributeName];
         }
 
-        // ถ้าไม่พบ ให้แปลงจาก camelCase เป็น readable format และพยายามแปลเป็นไทย
         const readable = attributeName
             .replace(/([A-Z])/g, ' $1')
             .replace(/^./, (str) => str.toUpperCase())
             .trim();
 
-        // Basic translation for common words
         const translatedReadable = readable
             .replace(/Power/gi, 'กำลัง')
             .replace(/Flow Rate/gi, 'อัตราการไหล')
@@ -2173,7 +2117,6 @@ const EquipmentDetailModal: React.FC<{
         return translatedReadable || attributeName;
     };
 
-    // ฟังก์ชันสำหรับดึง unit ของ attribute
     const getUnitForAttribute = (attributeName: string) => {
         const unitMap = {
             powerHP: 'HP',
@@ -2227,7 +2170,6 @@ const EquipmentDetailModal: React.FC<{
                     </div>
 
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                        {/* Image and Basic Info */}
                         <div className="lg:col-span-1">
                             {equipment.image ? (
                                 <img
@@ -2247,14 +2189,12 @@ const EquipmentDetailModal: React.FC<{
                                 />
                             ) : null}
 
-                            {/* Fallback for no image */}
                             <div
                                 className={`flex h-64 w-full items-center justify-center rounded-lg border border-gray-600 bg-gray-700 ${equipment.image ? 'hidden' : ''}`}
                             >
                                 <Package className="h-16 w-16 text-gray-500" />
                             </div>
 
-                            {/* Status Badge */}
                             <div className="mt-4">
                                 <span
                                     className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${
@@ -2275,7 +2215,6 @@ const EquipmentDetailModal: React.FC<{
                                 </span>
                             </div>
 
-                            {/* Quick Stats */}
                             <div className="mt-4 space-y-2 rounded-lg bg-gray-700 p-4">
                                 <h4 className="font-semibold text-blue-400">ข้อมูลสรุป</h4>
                                 <div className="text-sm">
@@ -2301,7 +2240,6 @@ const EquipmentDetailModal: React.FC<{
                                     )}
                                 </div>
                             </div>
-                            {/* Pump Accessories */}
                             {pumpAccessories.length > 0 && (
                                 <div>
                                     <h3 className="mb-3 mt-6 flex items-center overflow-hidden text-lg font-semibold text-orange-400">
@@ -2320,7 +2258,6 @@ const EquipmentDetailModal: React.FC<{
                                                 >
                                                     <div className="mb-2 flex items-start justify-between">
                                                         <div className="flex gap-4">
-                                                            {/* รูปภาพอุปกรณ์ */}
                                                             <div className="flex-shrink-0">
                                                                 {accessory.image ? (
                                                                     <img
@@ -2549,7 +2486,6 @@ const EquipmentDetailModal: React.FC<{
     );
 };
 
-// Enhanced Statistics Dashboard
 const StatsDashboard: React.FC<{ stats: any; categories: EquipmentCategory[] }> = ({
     stats,
     categories,
@@ -2601,7 +2537,6 @@ const StatsDashboard: React.FC<{ stats: any; categories: EquipmentCategory[] }> 
     );
 };
 
-// Image Modal Component
 const ImageModal: React.FC<{
     isOpen: boolean;
     imageSrc: string;
@@ -2616,7 +2551,6 @@ const ImageModal: React.FC<{
             onClick={onClose}
         >
             <div className="relative max-h-[90vh] max-w-[90vw] p-4">
-                {/* ปุ่มปิด */}
                 <button
                     onClick={onClose}
                     className="absolute -right-2 -top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white shadow-lg transition-colors hover:bg-red-700"
@@ -2624,7 +2558,7 @@ const ImageModal: React.FC<{
                 >
                     <X className="h-4 w-4" />
                 </button>
-
+                
                 {/* รูปภาพ */}
                 <img
                     src={imageSrc}
@@ -2632,10 +2566,10 @@ const ImageModal: React.FC<{
                     className="max-h-full max-w-full rounded-lg shadow-2xl"
                     onClick={(e) => e.stopPropagation()}
                 />
-
+                
                 {/* ชื่อรูป */}
                 <div className="mt-2 text-center">
-                    <p className="inline-block rounded bg-black bg-opacity-50 px-2 py-1 text-sm text-white">
+                    <p className="text-white text-sm bg-black bg-opacity-50 rounded px-2 py-1 inline-block">
                         {imageAlt}
                     </p>
                 </div>
@@ -2644,14 +2578,13 @@ const ImageModal: React.FC<{
     );
 };
 
-// Enhanced Main Component - เพิ่มการโหลด SweetAlert2
 const EnhancedEquipmentCRUD: React.FC = () => {
     const [categories, setCategories] = useState<EquipmentCategory[]>([]);
     const [equipments, setEquipments] = useState<Equipment[]>([]);
     const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10); // 10 รายการต่อหน้า
-
+    
     const [filters, setFilters] = useState<FilterOptions>({
         search: '',
         categoryId: null,
@@ -2661,7 +2594,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
         sortOrder: 'asc',
     });
 
-    // UI States
     const [showEquipmentForm, setShowEquipmentForm] = useState(false);
     const [showCategoryForm, setShowCategoryForm] = useState(false);
     const [showEquipmentDetail, setShowEquipmentDetail] = useState(false);
@@ -2674,14 +2606,12 @@ const EnhancedEquipmentCRUD: React.FC = () => {
     const [selectedItems, setSelectedItems] = useState<number[]>([]);
     const [stats, setStats] = useState<any>({});
 
-    // Image Modal States
     const [imageModal, setImageModal] = useState({
         isOpen: false,
         imageSrc: '',
         imageAlt: '',
     });
 
-    // Load SweetAlert2 if not already loaded
     useEffect(() => {
         if (typeof window !== 'undefined' && !window.Swal) {
             const script = document.createElement('script');
@@ -2697,7 +2627,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
         }
     }, []);
 
-    // ฟังก์ชันเปิด Image Modal
     const openImageModal = (src: string, alt: string) => {
         setImageModal({
             isOpen: true,
@@ -2706,7 +2635,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
         });
     };
 
-    // ฟังก์ชันปิด Image Modal
     const closeImageModal = () => {
         setImageModal({
             isOpen: false,
@@ -2715,7 +2643,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
         });
     };
 
-    // Load initial data
     useEffect(() => {
         const loadData = async () => {
             try {
@@ -2754,7 +2681,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
         loadData();
     }, []);
 
-    // Filter and sort equipments
     const filteredAndSortedEquipments = useMemo(() => {
         const result = equipments.filter((equipment) => {
             const searchFields = [
@@ -2787,19 +2713,16 @@ const EnhancedEquipmentCRUD: React.FC = () => {
             return matchesSearch && matchesCategory && matchesStatus && matchesPrice;
         });
 
-        // Sort - ปรับปรุงให้ทำงานได้จริง
         result.sort((a, b) => {
             let aValue: any = a[filters.sortBy];
             let bValue: any = b[filters.sortBy];
 
-            // Handle product_code vs productCode
             if (filters.sortBy === 'productCode') {
                 aValue = a.product_code || a.productCode;
                 bValue = b.product_code || b.productCode;
             }
 
             if (filters.sortBy === 'name') {
-                // Thai sorting - แก้ไขให้รองรับภาษาไทย
                 if (filters.sortOrder === 'asc') {
                     return aValue.localeCompare(bValue, 'th', { numeric: true });
                 } else {
@@ -2827,19 +2750,16 @@ const EnhancedEquipmentCRUD: React.FC = () => {
         return result;
     }, [equipments, filters, selectedCategoryId]);
 
-    // Pagination
     const totalPages = Math.ceil(filteredAndSortedEquipments.length / itemsPerPage);
     const paginatedEquipments = filteredAndSortedEquipments.slice(
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage
     );
 
-    // Reset page when filters change
     useEffect(() => {
         setCurrentPage(1);
     }, [filters, selectedCategoryId]);
 
-    // Equipment CRUD handlers
     const handleSaveEquipment = async (equipmentData: Partial<Equipment>) => {
         setSaving(true);
         try {
@@ -2853,7 +2773,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                 console.log('Equipment created');
             }
 
-            // Reload data
             const [equipmentsData, statsData] = await Promise.all([
                 api.getAllEquipments(),
                 api.getStats(),
@@ -2865,7 +2784,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
             setEditingEquipment(undefined);
         } catch (error) {
             console.error('Failed to save equipment:', error);
-            throw error; // Re-throw เพื่อให้ EquipmentForm จัดการ
+            throw error;
         } finally {
             setSaving(false);
         }
@@ -2888,7 +2807,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                 );
             }
 
-            // Reload categories
             const categoriesData = await api.getCategories();
             setCategories(categoriesData);
 
@@ -2937,7 +2855,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                 const categoriesData = await api.getCategories();
                 setCategories(categoriesData);
 
-                // Reset selected category if deleted
                 if (selectedCategoryId === category.id) {
                     setSelectedCategoryId(categoriesData[0]?.id || null);
                 }
@@ -3030,7 +2947,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
         <div className="min-h-screen bg-gray-800">
             <div className="container mx-auto px-4 py-8">
                 <div className="rounded-lg bg-gray-700 shadow-xl">
-                    {/* Header */}
                     <div className="border-b border-gray-600 p-6">
                         <div className="mb-6 flex items-center justify-between">
                             <div className="flex items-center gap-4">
@@ -3075,14 +2991,10 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Statistics Dashboard */}
                         <StatsDashboard stats={stats} categories={categories} />
 
-                        {/* Advanced Controls */}
                         <div className="space-y-4">
-                            {/* Search and Filters Row */}
                             <div className="flex flex-col gap-4 md:flex-row">
-                                {/* Search */}
                                 <div className="flex flex-1 items-center gap-2">
                                     <Search className="h-5 w-5 text-gray-400" />
                                     <input
@@ -3099,7 +3011,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                     />
                                 </div>
 
-                                {/* Category Filter */}
                                 <div className="flex items-center gap-2">
                                     <Filter className="h-5 w-5 text-gray-400" />
                                     <select
@@ -3122,7 +3033,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                     </select>
                                 </div>
 
-                                {/* Status Filter */}
                                 <select
                                     value={filters.status}
                                     onChange={(e) =>
@@ -3138,7 +3048,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                     <option value="inactive">ปิดใช้งาน</option>
                                 </select>
 
-                                {/* Sort - แก้ไขให้ทำงานได้จริง */}
                                 <select
                                     value={`${filters.sortBy}-${filters.sortOrder}`}
                                     onChange={(e) => {
@@ -3159,7 +3068,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                     <option value="created_at-asc">เก่าสุด</option>
                                 </select>
 
-                                {/* View Mode */}
                                 <div className="flex items-center overflow-hidden rounded-lg border border-gray-500 shadow-sm">
                                     <button
                                         onClick={() => setViewMode('table')}
@@ -3176,7 +3084,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Bulk Actions */}
                             {selectedItems.length > 0 && (
                                 <div className="flex items-center gap-4 rounded-lg bg-blue-900 p-4 shadow-lg">
                                     <span className="text-blue-200">
@@ -3209,7 +3116,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* Results Summary */}
                             <div className="flex items-center justify-between text-sm text-gray-300">
                                 <div>
                                     แสดง {paginatedEquipments.length} จาก{' '}
@@ -3246,14 +3152,12 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Category Management */}
                     <div className="border-b border-gray-600 p-6">
                         <h3 className="mb-4 flex items-center text-lg font-semibold text-gray-50">
                             <Tag className="mr-2 h-5 w-5" />
                             หมวดหมู่สินค้า
                         </h3>
                         <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
-                            {/* ปุ่มแสดงทุกหมวดหมู่ */}
                             <div
                                 className={`cursor-pointer rounded-lg border-2 p-4 shadow-lg transition-all hover:scale-105 ${
                                     selectedCategoryId === null
@@ -3273,7 +3177,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                         {equipments.length} รายการ
                                     </div>
                                     <div className="flex justify-center gap-1">
-                                        {/* ไม่มีปุ่มแก้ไข/ลบสำหรับ "ทุกหมวดหมู่" */}
                                         <div className="h-6 w-6"></div>
                                     </div>
                                 </div>
@@ -3338,7 +3241,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Equipment List */}
                     <div className="p-6">
                         {filteredAndSortedEquipments.length === 0 ? (
                             <div className="py-12 text-center">
@@ -3473,7 +3375,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                     </p>
                                                 )}
 
-                                                {/* Attributes Preview */}
                                                 {equipment.attributes &&
                                                     Object.keys(equipment.attributes).length >
                                                         0 && (
@@ -3487,7 +3388,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                                 )
                                                                     .slice(0, 2)
                                                                     .map(([key, value]) => {
-                                                                        // Format the value for display
                                                                         let displayValue = '';
                                                                         if (Array.isArray(value)) {
                                                                             if (
@@ -3550,7 +3450,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                         </div>
                                                     )}
 
-                                                {/* Pump Accessories Indicator */}
                                                 {(equipment.pumpAccessories ||
                                                     equipment.pumpAccessory) &&
                                                     (equipment.pumpAccessories ||
@@ -3579,7 +3478,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                 />
                             </>
                         ) : (
-                            // Table View
                             <>
                                 <div className="overflow-x-auto rounded-lg shadow-lg">
                                     <table className="w-full text-left text-sm text-gray-300">
@@ -3789,7 +3687,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                 </div>
             </div>
 
-            {/* Modals */}
             {showCategoryForm && (
                 <CategoryForm
                     category={editingCategory}
@@ -3831,7 +3728,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                 />
             )}
 
-            {/* Image Modal */}
             <ImageModal
                 isOpen={imageModal.isOpen}
                 imageSrc={imageModal.imageSrc}

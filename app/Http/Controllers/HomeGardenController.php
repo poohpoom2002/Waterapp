@@ -1,6 +1,5 @@
 <?php
-
-// **[ตรวจสอบ Step 1]** - Namespace ต้องเป็น 'App\Http\Controllers'
+// app\Http\Controllers\HomeGardenController.php
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;

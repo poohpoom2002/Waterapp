@@ -1,14 +1,24 @@
-// resources\js\pages\product.tsx
+// resources/js/pages/product.tsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { IrrigationInput, QuotationData, QuotationDataCustomer } from './types/interfaces';
 import { useCalculations } from './hooks/useCalculations';
 import { calculatePipeRolls, formatNumber } from './utils/calculations';
 
-// Helpers for loading saved data
-import { getFarmData } from '../utils/farmData';
-import { getPipeLengthData } from '../utils/pipeData';
+// Import from horticulture modules instead of farmData/pipeData
+import {
+    getProjectStats,
+    getLongestBranchPipeStats,
+    getSubMainPipeBranchCount,
+    getDetailedBranchPipeStats,
+} from '../utils/horticultureProjectStats';
+import {
+    loadProjectData,
+    HorticultureProjectData,
+    Zone,
+    MainPipe,
+    SubMainPipe,
+} from '../utils/horticultureUtils';
 
-// Components
 import InputForm from './components/InputForm';
 import CalculationSummary from './components/CalculationSummary';
 import SprinklerSelector from './components/SprinklerSelector';
@@ -17,98 +27,135 @@ import PipeSelector from './components/PipeSelector';
 import CostSummary from './components/CostSummary';
 import QuotationModal from './components/QuotationModal';
 import QuotationDocument from './components/QuotationDocument';
+
 import ChatBox from '@/components/ChatBox';
+import { useLanguage } from '../contexts/LanguageContext';
+import LanguageSwitcher from '../components/LanguageSwitcher';
+import { router } from '@inertiajs/react';
+// ตรวจสอบให้แน่ใจว่า path ถูกต้องตามโครงสร้างโปรเจกต์ของคุณ
+import AiChatComponent from '@/components/AiChatComponent';
+import { getFarmData } from '@/utils/farmData';
+import { getPipeLengthData } from '@/utils/pipeData';
 
 export default function Product() {
+    // State for horticulture project data
+    const [projectData, setProjectData] = useState<HorticultureProjectData | null>(null);
+    const [projectStats, setProjectStats] = useState<any>(null);
+    const [selectedZones, setSelectedZones] = useState<string[]>([]);
+    const [activeZoneId, setActiveZoneId] = useState<string>('');
+    const [zoneInputs, setZoneInputs] = useState<{ [zoneId: string]: IrrigationInput }>({});
+    const [zoneSprinklers, setZoneSprinklers] = useState<{ [zoneId: string]: any }>({});
+
+    const { t } = useLanguage();
     // Load saved farm & pipe-length data with state to track changes
     const [farmData, setFarmData] = useState(() => getFarmData());
     const [pipeLengthData, setPipeLengthData] = useState(() => getPipeLengthData());
 
-    // Debug logging
-    useEffect(() => {
-        console.log('=== Farm & Pipe Data Status ===');
-        console.log('Farm Data:', farmData);
-        console.log('Pipe Length Data:', pipeLengthData);
+    // NEW: State for manual equipment selection (override auto-selection)
+    const [selectedPipes, setSelectedPipes] = useState<{
+        [zoneId: string]: {
+            branch?: any;
+            secondary?: any;
+            main?: any;
+        };
+    }>({});
+    const [selectedPump, setSelectedPump] = useState<any>(null);
 
-        if (pipeLengthData) {
-            console.log('Main Pipes Valid:', isValidPipeData(pipeLengthData, 'main'));
-            console.log('Submain Pipes Valid:', isValidPipeData(pipeLengthData, 'submain'));
+    const [projectImage, setProjectImage] = useState<string | null>(null);
 
-            const main = pipeLengthData.mainPipes;
-            const submain = pipeLengthData.submainPipes;
-
-            if (main) {
-                console.log('Main Pipes - Longest:', main.longest, 'Total:', main.total);
-            }
-            if (submain) {
-                console.log('Submain Pipes - Longest:', submain.longest, 'Total:', submain.total);
-            }
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const url = URL.createObjectURL(file);
+            setProjectImage(url);
         }
-        console.log('================================');
-    }, [farmData, pipeLengthData]);
-
-    // Refresh data when component mounts or when navigating back
-    useEffect(() => {
-        const handleFocus = () => {
-            console.log('Refreshing data...');
-            const newFarmData = getFarmData();
-            const newPipeData = getPipeLengthData();
-
-            console.log('New farmData from localStorage:', newFarmData);
-            console.log('New pipeData from localStorage:', newPipeData);
-
-            if (newFarmData) {
-                setFarmData(newFarmData);
-            }
-            if (newPipeData) {
-                setPipeLengthData(newPipeData);
-            }
-        };
-
-        // Check data when component mounts
-        handleFocus();
-
-        // Listen for when user comes back to this page
-        window.addEventListener('focus', handleFocus);
-
-        // Also listen for custom event that we can trigger when needed
-        window.addEventListener('storage', handleFocus);
-
-        return () => {
-            window.removeEventListener('focus', handleFocus);
-            window.removeEventListener('storage', handleFocus);
-        };
-    }, []);
-
-    // Helper functions to check if pipe data is valid and not zero
-    const isValidPipeData = (pipeData: any, type: 'main' | 'submain'): boolean => {
-        if (!pipeData) return false;
-
-        const data = type === 'main' ? pipeData.mainPipes : pipeData.submainPipes;
-        if (!data) return false;
-
-        // Check that both longest and total exist and are greater than 0
-        return (
-            typeof data.longest === 'number' &&
-            data.longest > 0 &&
-            typeof data.total === 'number' &&
-            data.total > 0
-        );
     };
 
-    // Prepare initial irrigation input, recalculated when data changes
-    const initialInput: IrrigationInput = useMemo(() => {
-        console.log('Recalculating initialInput with:', { farmData, pipeLengthData });
+    const handleImageDelete = () => {
+        if (projectImage) {
+            URL.revokeObjectURL(projectImage);
+            setProjectImage(null);
+        }
+    };
 
-        const totalFarm = farmData?.total;
-        const zones = farmData?.zones ?? [];
-        const main = pipeLengthData?.mainPipes;
-        const submain = pipeLengthData?.submainPipes;
-        const branches = pipeLengthData?.zones ?? [];
+    // Load horticulture project data
+    useEffect(() => {
+        console.log('Loading horticulture project data...');
+        const data = loadProjectData();
+        const stats = getProjectStats();
 
-        const area = totalFarm?.area ?? 10;
-        const plants = totalFarm?.plants ?? 100;
-        const totalWater = totalFarm?.waterNeed ?? plants * 50;
+        if (data && stats) {
+            setProjectData(data);
+            setProjectStats(stats);
+
+            // Initialize zone inputs for each zone
+            if (data.useZones && data.zones.length > 0) {
+                const initialZoneInputs: { [zoneId: string]: IrrigationInput } = {};
+                const initialSelectedPipes: {
+                    [zoneId: string]: { branch?: any; secondary?: any; main?: any };
+                } = {};
+
+                data.zones.forEach((zone) => {
+                    const zoneStats = stats.zoneDetails.find((z: any) => z.zoneId === zone.id);
+                    const zoneMainPipes = data.mainPipes.filter((p) => p.toZone === zone.id);
+                    const zoneSubMainPipes = data.subMainPipes.filter((p) => p.zoneId === zone.id);
+                    const zoneBranchPipes = zoneSubMainPipes.flatMap((s) => s.branchPipes || []);
+
+                    initialZoneInputs[zone.id] = createZoneInput(
+                        zone,
+                        zoneStats,
+                        zoneMainPipes,
+                        zoneSubMainPipes,
+                        zoneBranchPipes,
+                        data.zones.length
+                    );
+
+                    // Initialize pipe selection for each zone
+                    initialSelectedPipes[zone.id] = {
+                        branch: null,
+                        secondary: null,
+                        main: null,
+                    };
+                });
+
+                setZoneInputs(initialZoneInputs);
+                setSelectedPipes(initialSelectedPipes);
+                setActiveZoneId(data.zones[0].id);
+                setSelectedZones([data.zones[0].id]); // Default select first zone
+            } else {
+                // Single zone mode
+                const singleInput = createSingleZoneInput(data, stats);
+                setZoneInputs({ 'main-area': singleInput });
+                setSelectedPipes({ 'main-area': { branch: null, secondary: null, main: null } });
+                setActiveZoneId('main-area');
+                setSelectedZones(['main-area']);
+            }
+        }
+    }, []);
+
+    // Helper function to create zone input
+    const createZoneInput = (
+        zone: Zone,
+        zoneStats: any,
+        mainPipes: MainPipe[],
+        subMainPipes: SubMainPipe[],
+        branchPipes: any[],
+        totalZones: number
+    ): IrrigationInput => {
+        const longestBranch =
+            branchPipes.length > 0 ? Math.max(...branchPipes.map((b) => b.length)) : 30;
+        const totalBranchLength = branchPipes.reduce((sum, b) => sum + b.length, 0) || 500;
+
+        const longestSubMain =
+            subMainPipes.length > 0 ? Math.max(...subMainPipes.map((s) => s.length)) : 0;
+        const totalSubMainLength = subMainPipes.reduce((sum, s) => sum + s.length, 0) || 0;
+
+        const longestMain = mainPipes.length > 0 ? Math.max(...mainPipes.map((m) => m.length)) : 0;
+        const totalMainLength = mainPipes.reduce((sum, m) => sum + m.length, 0) || 0;
+
+        // Calculate sprinklers configuration
+        const totalTrees = zone.plantCount || 100;
+        const waterPerTree = zone.totalWaterNeed / totalTrees || 50;
 
         // Check if we have valid pipe data
         const hasValidMainPipe = isValidPipeData(pipeLengthData, 'main');
@@ -133,37 +180,24 @@ export default function Product() {
         // คำนวณค่าเริ่มต้นสำหรับฟิลด์ใหม่โดยใช้ข้อมูลจากฟาร์ม
         const totalTrees = Math.round(plants);
         const numberOfZones = zones.length || 1;
-
+        
         // คำนวณจำนวนสปริงเกอร์ต่อท่อย่อยโดยประมาณ
-        const estimatedSprinklersPerBranch = Math.max(
-            1,
-            Math.ceil(totalTrees / (numberOfZones * 10))
-        ); // ประมาณ 10 ท่อย่อยต่อโซน
-
+        const estimatedSprinklersPerBranch = Math.max(1, Math.ceil(totalTrees / (numberOfZones * 10))); // ประมาณ 10 ท่อย่อยต่อโซน
+        
         // สำหรับท่อย่อยเส้นที่ยาวที่สุด อาจมีสปริงเกอร์มากกว่าเฉลี่ย 20-50%
-        const sprinklersPerLongestBranch = Math.max(
-            estimatedSprinklersPerBranch,
-            Math.ceil(estimatedSprinklersPerBranch * 1.3)
-        );
-
+        const sprinklersPerLongestBranch = Math.max(estimatedSprinklersPerBranch, Math.ceil(estimatedSprinklersPerBranch * 1.3));
+        
         // คำนวณจำนวนท่อย่อยต่อท่อรอง
-        const estimatedBranchesPerSecondary = hasValidSubmainPipe
-            ? Math.max(1, Math.ceil(totalTrees / (numberOfZones * sprinklersPerLongestBranch)))
-            : 1;
-        const branchesPerLongestSecondary = hasValidSubmainPipe
-            ? Math.max(
-                  estimatedBranchesPerSecondary,
-                  Math.ceil(estimatedBranchesPerSecondary * 1.2)
-              )
-            : 1;
-
+        const estimatedBranchesPerSecondary = hasValidSubmainPipe ? 
+            Math.max(1, Math.ceil(totalTrees / (numberOfZones * sprinklersPerLongestBranch))) : 1;
+        const branchesPerLongestSecondary = hasValidSubmainPipe ? 
+            Math.max(estimatedBranchesPerSecondary, Math.ceil(estimatedBranchesPerSecondary * 1.2)) : 1;
+        
         // คำนวณจำนวนท่อรองต่อท่อเมน
-        const estimatedSecondariesPerMain = hasValidMainPipe
-            ? Math.max(1, Math.ceil(estimatedBranchesPerSecondary / 2))
-            : 1;
-        const secondariesPerLongestMain = hasValidMainPipe
-            ? Math.max(estimatedSecondariesPerMain, Math.ceil(estimatedSecondariesPerMain * 1.1))
-            : 1;
+        const estimatedSecondariesPerMain = hasValidMainPipe ? 
+            Math.max(1, Math.ceil(estimatedBranchesPerSecondary / 2)) : 1;
+        const secondariesPerLongestMain = hasValidMainPipe ? 
+            Math.max(estimatedSecondariesPerMain, Math.ceil(estimatedSecondariesPerMain * 1.1)) : 1;
 
         const result = {
             farmSizeRai: formatNumber(area, 3),
@@ -173,19 +207,19 @@ export default function Product() {
             sprinklersPerTree: 1,
             irrigationTimeMinutes: 20,
             staticHeadM: 0,
-            pressureHeadM: 20, // ค่าเริ่มต้น จะถูกเปลี่ยนจากสปริงเกอร์ที่เลือกในภายหลัง
+            pressureHeadM: 20,
             pipeAgeYears: 0,
-
+            
             // ฟิลด์เดิม
             sprinklersPerBranch: estimatedSprinklersPerBranch,
             branchesPerSecondary: estimatedBranchesPerSecondary,
             simultaneousZones: 1,
-
+            
             // ฟิลด์ใหม่สำหรับการคำนวณแบบละเอียด
             sprinklersPerLongestBranch: sprinklersPerLongestBranch,
             branchesPerLongestSecondary: branchesPerLongestSecondary,
             secondariesPerLongestMain: secondariesPerLongestMain,
-
+            
             // ข้อมูลท่อ
             longestBranchPipeM: formatNumber(longestBranchPipeM, 3),
             totalBranchPipeM: formatNumber(totalBranchPipeM, 3),
@@ -194,47 +228,127 @@ export default function Product() {
             longestMainPipeM: formatNumber(longestMainPipeM, 3),
             totalMainPipeM: formatNumber(totalMainPipeM, 3),
         };
+    };
 
-        console.log('Calculated initialInput with detailed fields:', result);
-        console.log('Pipe data validity:', {
-            hasValidMainPipe,
-            hasValidSubmainPipe,
-            hasBranchData: branches.length > 0,
-        });
-        console.log('Calculated system design:', {
-            estimatedSprinklersPerBranch,
-            sprinklersPerLongestBranch,
-            branchesPerLongestSecondary,
-            secondariesPerLongestMain,
-        });
+    // Get current input based on active zone
+    const currentInput = useMemo(() => {
+        if (!activeZoneId || !zoneInputs[activeZoneId]) {
+            return null;
+        }
 
-        return result;
-    }, [farmData, pipeLengthData]);
+        // If multiple zones selected, calculate combined input
+        if (selectedZones.length > 1) {
+            // Calculate combined input for pump sizing
+            let combinedInput = { ...zoneInputs[activeZoneId] };
 
-    // State for irrigation inputs
-    const [input, setInput] = useState<IrrigationInput>(initialInput);
+            // Sum up total trees and water requirements
+            let totalTrees = 0;
+            let totalWater = 0;
+            let maxLongestBranch = 0;
+            let maxLongestSecondary = 0;
+            let maxLongestMain = 0;
 
-    // Equipment selections - เก็บเป็น database format
-    const [selectedSprinkler, setSelectedSprinkler] = useState<any>(null);
-    const [selectedBranchPipe, setSelectedBranchPipe] = useState<any>(null);
-    const [selectedSecondaryPipe, setSelectedSecondaryPipe] = useState<any>(null);
-    const [selectedMainPipe, setSelectedMainPipe] = useState<any>(null);
-    const [selectedPump, setSelectedPump] = useState<any>(null);
+            selectedZones.forEach((zoneId) => {
+                const zoneInput = zoneInputs[zoneId];
+                if (zoneInput) {
+                    totalTrees += zoneInput.totalTrees;
+                    totalWater += zoneInput.totalTrees * zoneInput.waterPerTreeLiters;
+                    maxLongestBranch = Math.max(maxLongestBranch, zoneInput.longestBranchPipeM);
+                    maxLongestSecondary = Math.max(
+                        maxLongestSecondary,
+                        zoneInput.longestSecondaryPipeM
+                    );
+                    maxLongestMain = Math.max(maxLongestMain, zoneInput.longestMainPipeM);
+                }
+            });
 
-    // Update input when initialInput changes
-    useEffect(() => {
-        console.log('InitialInput changed, updating input state');
-        setInput(initialInput);
-    }, [initialInput]);
+            // Get actual branch pipe statistics for combined zones
+            const branchStats = getLongestBranchPipeStats();
+            const subMainStats = getSubMainPipeBranchCount();
 
-    // Perform calculations - ส่ง selectedSprinkler ไปด้วย (ใช้ข้อมูลจาก database)
-    const results = useCalculations(input, selectedSprinkler);
+            let maxSprinklersPerLongestBranch = 4; // default
+            let maxBranchesPerLongestSecondary = 5; // default
 
-    // ตรวจสอบว่ามีข้อมูลท่อหรือไม่
+            if (branchStats) {
+                // Find the maximum plant count across all selected zones
+                selectedZones.forEach((zoneId) => {
+                    const zoneBranchStats = branchStats.find((stat) => stat.zoneId === zoneId);
+                    if (zoneBranchStats) {
+                        maxSprinklersPerLongestBranch = Math.max(
+                            maxSprinklersPerLongestBranch,
+                            zoneBranchStats.longestBranchPipe.plantCount
+                        );
+                    }
+                });
+            }
+
+            if (subMainStats) {
+                // Find the maximum branch count across all selected zones
+                selectedZones.forEach((zoneId) => {
+                    const zoneSubMainStats = subMainStats.find((stat) => stat.zoneId === zoneId);
+                    if (zoneSubMainStats && zoneSubMainStats.subMainPipes.length > 0) {
+                        const maxBranchSubMain = zoneSubMainStats.subMainPipes.reduce(
+                            (max, current) =>
+                                current.branchCount > max.branchCount ? current : max
+                        );
+                        maxBranchesPerLongestSecondary = Math.max(
+                            maxBranchesPerLongestSecondary,
+                            maxBranchSubMain.branchCount
+                        );
+                    }
+                });
+            }
+
+            combinedInput.simultaneousZones = selectedZones.length;
+            combinedInput.longestBranchPipeM = maxLongestBranch;
+            combinedInput.longestSecondaryPipeM = maxLongestSecondary;
+            combinedInput.longestMainPipeM = maxLongestMain;
+            combinedInput.sprinklersPerLongestBranch = maxSprinklersPerLongestBranch;
+            combinedInput.branchesPerLongestSecondary = maxBranchesPerLongestSecondary;
+
+            return combinedInput;
+        }
+
+        return zoneInputs[activeZoneId];
+    }, [activeZoneId, zoneInputs, selectedZones]);
+
+    // Get current sprinkler for active zone
+    const currentSprinkler = zoneSprinklers[activeZoneId] || null;
+
+    // Handle sprinkler selection per zone
+    const handleSprinklerChange = (sprinkler: any) => {
+        if (activeZoneId && sprinkler) {
+            setZoneSprinklers((prev) => ({
+                ...prev,
+                [activeZoneId]: sprinkler,
+            }));
+        }
+    };
+
+    // NEW: Handle pipe selection per zone
+    const handlePipeChange = (pipeType: 'branch' | 'secondary' | 'main', pipe: any) => {
+        if (activeZoneId) {
+            setSelectedPipes((prev) => ({
+                ...prev,
+                [activeZoneId]: {
+                    ...prev[activeZoneId],
+                    [pipeType]: pipe,
+                },
+            }));
+        }
+    };
+
+    // NEW: Handle pump selection
+    const handlePumpChange = (pump: any) => {
+        setSelectedPump(pump);
+    };
+
+    // Calculate results based on selected sprinkler and zone
+    const results = useCalculations(currentInput as IrrigationInput, currentSprinkler);
+
     const hasValidMainPipeData = results?.hasValidMainPipe ?? false;
     const hasValidSubmainPipeData = results?.hasValidSecondaryPipe ?? false;
 
-    // Quotation states
     const [showQuotationModal, setShowQuotationModal] = useState(false);
     const [showQuotation, setShowQuotation] = useState(false);
     const [quotationData, setQuotationData] = useState<QuotationData>({
@@ -253,40 +367,42 @@ export default function Product() {
     // Default selections when results update (ใช้ข้อมูลจาก database)
     useEffect(() => {
         if (!results) return;
-
+    
         console.log('Setting default equipment selections from database');
-
+    
         // ฟังก์ชันเลือกอุปกรณ์ที่ดีที่สุด (ราคาสูงสุดในกลุ่มแนะนำ)
-        const selectBestEquipment = (recommended: any[], analyzed: any[], currentSelected: any) => {
+        const selectBestEquipment = (
+            recommended: any[], 
+            analyzed: any[], 
+            currentSelected: any
+        ) => {
             // ถ้ามีอุปกรณ์ปัจจุบันและยังอยู่ในกลุ่มแนะนำ ให้ใช้ต่อ
             if (currentSelected) {
-                const currentInRecommended = recommended.find(
-                    (item) => item.id === currentSelected.id
-                );
+                const currentInRecommended = recommended.find(item => item.id === currentSelected.id);
                 if (currentInRecommended && currentInRecommended.isRecommended) {
                     return currentSelected;
                 }
             }
-
+    
             // เลือกจากกลุ่มแนะนำ (ราคาสูงสุด)
             if (recommended.length > 0) {
                 return recommended.sort((a, b) => b.price - a.price)[0];
             }
-
+    
             // เลือกจากกลุ่มที่ใช้ได้ (ราคาสูงสุด)
-            const usableItems = analyzed?.filter((item) => item.isUsable) || [];
+            const usableItems = analyzed?.filter(item => item.isUsable) || [];
             if (usableItems.length > 0) {
                 return usableItems.sort((a, b) => b.price - a.price)[0];
             }
-
+    
             // เลือกจากทั้งหมด (คะแนนสูงสุด)
             if (analyzed && analyzed.length > 0) {
                 return analyzed.sort((a, b) => b.score - a.score)[0];
             }
-
+    
             return null;
         };
-
+    
         // Sprinkler - เลือกราคาสูงสุดในกลุ่มแนะนำ
         const newSelectedSprinkler = selectBestEquipment(
             results.recommendedSprinklers || [],
@@ -296,7 +412,7 @@ export default function Product() {
         if (newSelectedSprinkler && newSelectedSprinkler.id !== selectedSprinkler?.id) {
             setSelectedSprinkler(newSelectedSprinkler);
         }
-
+    
         // Branch pipe - เลือกราคาสูงสุดในกลุ่มแนะนำ
         const newSelectedBranchPipe = selectBestEquipment(
             results.recommendedBranchPipe || [],
@@ -306,7 +422,7 @@ export default function Product() {
         if (newSelectedBranchPipe && newSelectedBranchPipe.id !== selectedBranchPipe?.id) {
             setSelectedBranchPipe(newSelectedBranchPipe);
         }
-
+    
         // Secondary pipe - เฉพาะเมื่อมีข้อมูล
         if (hasValidSubmainPipeData) {
             const newSelectedSecondaryPipe = selectBestEquipment(
@@ -314,16 +430,13 @@ export default function Product() {
                 results.analyzedSecondaryPipes || [],
                 selectedSecondaryPipe
             );
-            if (
-                newSelectedSecondaryPipe &&
-                newSelectedSecondaryPipe.id !== selectedSecondaryPipe?.id
-            ) {
+            if (newSelectedSecondaryPipe && newSelectedSecondaryPipe.id !== selectedSecondaryPipe?.id) {
                 setSelectedSecondaryPipe(newSelectedSecondaryPipe);
             }
         } else if (selectedSecondaryPipe) {
             setSelectedSecondaryPipe(null);
         }
-
+    
         // Main pipe - เฉพาะเมื่อมีข้อมูล
         if (hasValidMainPipeData) {
             const newSelectedMainPipe = selectBestEquipment(
@@ -337,7 +450,7 @@ export default function Product() {
         } else if (selectedMainPipe) {
             setSelectedMainPipe(null);
         }
-
+    
         // Pump - เลือกราคาสูงสุดในกลุ่มแนะนำ
         const newSelectedPump = selectBestEquipment(
             results.recommendedPump || [],
@@ -347,23 +460,22 @@ export default function Product() {
         if (newSelectedPump && newSelectedPump.id !== selectedPump?.id) {
             setSelectedPump(newSelectedPump);
         }
+    
     }, [results, hasValidMainPipeData, hasValidSubmainPipeData, input]);
 
     useEffect(() => {
         if (!results) return;
-
+    
         // ตรวจสอบว่า input เปลี่ยนแปลงมากพอที่จะต้อง reset
-        const shouldReset =
+        const shouldReset = (
             // เปลี่ยนจำนวนโซน
             input.numberOfZones !== (input.numberOfZones || 1) ||
             // เปลี่ยนจำนวนต้นไม้มากกว่า 20%
-            Math.abs((input.totalTrees || 0) - (input.totalTrees || 0)) / (input.totalTrees || 1) >
-                0.2 ||
+            Math.abs((input.totalTrees || 0) - (input.totalTrees || 0)) / (input.totalTrees || 1) > 0.2 ||
             // เปลี่ยนความต้องการน้ำมากกว่า 20%
-            Math.abs((input.waterPerTreeLiters || 0) - (input.waterPerTreeLiters || 0)) /
-                (input.waterPerTreeLiters || 1) >
-                0.2;
-
+            Math.abs((input.waterPerTreeLiters || 0) - (input.waterPerTreeLiters || 0)) / (input.waterPerTreeLiters || 1) > 0.2
+        );
+    
         if (shouldReset) {
             console.log('Major input change detected, resetting equipment selections');
             setSelectedSprinkler(null);
@@ -388,32 +500,42 @@ export default function Product() {
         if (selectedMainPipe) {
             calculatePipeRolls(input.totalMainPipeM, selectedMainPipe.lengthM);
         }
-    }, [selectedBranchPipe, selectedSecondaryPipe, selectedMainPipe, input, results]);
+    };
 
     const handleQuotationModalConfirm = () => {
         setShowQuotationModal(false);
         setShowQuotation(true);
     };
 
-    // Check if we have essential data for calculations
-    const hasEssentialData = farmData && farmData.total;
+    // NEW: Get effective equipment (manual selection takes priority over auto-selection)
+    const getEffectiveEquipment = () => {
+        const currentZonePipes = selectedPipes[activeZoneId] || {};
 
-    // Show loading state if no essential data
+        return {
+            branchPipe: currentZonePipes.branch || results?.autoSelectedBranchPipe,
+            secondaryPipe: currentZonePipes.secondary || results?.autoSelectedSecondaryPipe,
+            mainPipe: currentZonePipes.main || results?.autoSelectedMainPipe,
+            pump: selectedPump || results?.autoSelectedPump,
+        };
+    };
+
+    const hasEssentialData = projectData && projectStats;
+
     if (!hasEssentialData) {
         return (
-            <div className="min-h-screen bg-gray-800 p-6 text-white">
+            <div className="flex min-h-screen items-center justify-center bg-gray-800 p-6 text-white">
                 <div className="mx-auto max-w-7xl">
                     <h1 className="mb-8 text-center text-3xl font-bold text-blue-400">
                         Irrigation Layout Planning Application
                     </h1>
                     <div className="text-center">
-                        <p className="mb-4 text-yellow-400">ไม่พบข้อมูลจากหน้า Generate Tree</p>
+                        <p className="mb-4 text-yellow-400">ไม่พบข้อมูลโครงการระบบน้ำสวนผลไม้</p>
                         <p className="text-gray-300">กรุณากลับไปทำการวางแผนการปลูกและวางท่อก่อน</p>
                         <button
-                            onClick={() => (window.location.href = '/generate-tree')}
+                            onClick={() => router.visit('/horticulture/planner')}
                             className="mt-4 rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700"
                         >
-                            ไปหน้า Generate Tree
+                            ไปหน้า Horticulture Planner
                         </button>
                     </div>
                 </div>
@@ -421,276 +543,267 @@ export default function Product() {
         );
     }
 
-    if (!results) {
+    if (!results || !currentInput) {
         return (
-            <div className="min-h-screen bg-gray-800 p-6 text-white">
+            <div className="flex min-h-screen items-center justify-center bg-gray-800 p-6 text-white">
                 <div className="mx-auto max-w-7xl">
                     <h1 className="mb-8 text-center text-3xl font-bold text-blue-400">
                         Irrigation Layout Planning Application
                     </h1>
-                    <InputForm input={input} onInputChange={setInput} />
                     <div className="text-center">
                         <div className="inline-block h-8 w-8 animate-spin rounded-full border-b-2 border-white"></div>
                         <p className="mt-2">กำลังโหลดข้อมูลอุปกรณ์จากฐานข้อมูล...</p>
-                        <div className="mt-4 text-sm text-gray-400">
-                            <p>🔄 กำลังดึงข้อมูลสปริงเกอร์, ปั๊ม, และท่อจากระบบ</p>
-                            <p>⚙️ กำลังประมวลผลการคำนวณ</p>
-                            <p className="mt-2 text-xs text-blue-400">
-                                💡 หากโหลดนานเกินไป ลองรีเฟรชหน้าเว็บหรือตรวจสอบการเชื่อมต่อ
-                            </p>
-                        </div>
                     </div>
                 </div>
             </div>
         );
     }
 
-    // Check for calculation errors or missing data
-    if (
-        results.calculationMetadata?.loadingErrors?.length > 0 ||
-        (!results.analyzedSprinklers?.length &&
-            !results.analyzedPumps?.length &&
-            !results.analyzedBranchPipes?.length)
-    ) {
-        return (
-            <div className="min-h-screen bg-gray-800 p-6 text-white">
-                <div className="mx-auto max-w-7xl">
-                    <h1 className="mb-8 text-center text-3xl font-bold text-blue-400">
-                        Irrigation Layout Planning Application
-                    </h1>
-                    <InputForm input={input} onInputChange={setInput} />
-                    <div className="text-center">
-                        <div className="rounded-lg bg-yellow-900 p-6 text-center">
-                            <h2 className="mb-4 text-xl font-bold text-yellow-300">
-                                ไม่พบข้อมูลอุปกรณ์
-                            </h2>
-                            <div className="space-y-2 text-yellow-200">
-                                {results.calculationMetadata?.loadingErrors?.length > 0 ? (
-                                    results.calculationMetadata.loadingErrors.map(
-                                        (
-                                            error:
-                                                | string
-                                                | number
-                                                | boolean
-                                                | React.ReactElement<
-                                                      any,
-                                                      string | React.JSXElementConstructor<any>
-                                                  >
-                                                | Iterable<React.ReactNode>
-                                                | React.ReactPortal
-                                                | null
-                                                | undefined,
-                                            index: React.Key | null | undefined
-                                        ) => <p key={index}>{error}</p>
-                                    )
-                                ) : (
-                                    <div>
-                                        <p>📊 สถานะข้อมูล:</p>
-                                        <p>
-                                            • สปริงเกอร์: {results.analyzedSprinklers?.length || 0}{' '}
-                                            รายการ
-                                        </p>
-                                        <p>
-                                            • ปั๊มน้ำ: {results.analyzedPumps?.length || 0} รายการ
-                                        </p>
-                                        <p>
-                                            • ท่อ: {results.analyzedBranchPipes?.length || 0} รายการ
-                                        </p>
-                                        <p className="mt-2 text-sm">
-                                            กรุณาตรวจสอบข้อมูลในฐานข้อมูล
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="mt-4 space-x-4">
-                                <button
-                                    onClick={() => window.location.reload()}
-                                    className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-                                >
-                                    รีเฟรชหน้า
-                                </button>
-                                <button
-                                    onClick={() =>
-                                        window.open(
-                                            '/equipment-crud',
-                                            '_blank',
-                                            'noopener,noreferrer'
-                                        )
-                                    }
-                                    className="rounded bg-green-600 px-4 py-2 text-white hover:bg-green-700"
-                                >
-                                    จัดการข้อมูลอุปกรณ์
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        console.log('🔍 Debug Info:', results);
-                                        alert('ตรวจสอบ Console เพื่อดูข้อมูล debug');
-                                    }}
-                                    className="rounded bg-purple-600 px-4 py-2 text-white hover:bg-purple-700"
-                                >
-                                    Debug Info
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    const effectiveEquipment = getEffectiveEquipment();
 
     return (
         <div className="min-h-screen bg-gray-800 p-6 text-white">
-            <div className="mx-auto max-w-7xl">
-                <div className="mb-6 flex items-center justify-between">
-                    <div className="flex items-center justify-start gap-4">
-                        <img
-                            src="https://f.btwcdn.com/store-50036/store/e4c1b5ae-cf8e-5017-536b-66ecd994018d.jpg"
-                            alt="logo"
-                            className="h-[80px] w-[80px] rounded-xl"
-                        />
-                        <div>
-                            <h1 className="text-left text-3xl font-bold text-blue-400">
-                                Irrigation Layout Planning
-                            </h1>
-                            <p className="mt-2 text-left text-lg text-blue-400">
-                                แอปพลิเคชันวางแผนผังชลประทานน้ำ บจก.กนกโปรดักส์ จำกัด
-                            </p>
-                            <p className="mt-1 text-sm text-green-400">
-                                🔗 ระบบเชื่อมต่อกับฐานข้อมูลอุปกรณ์แบบเรียลไทม์
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex items-center justify-end">
-                        <button
-                            onClick={() => (window.location.href = '/equipment-crud')}
-                            className="rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700"
-                        >
-                            จัดการอุปกรณ์
-                        </button>
-                    </div>
-                </div>
+            <div className="flex w-full items-start justify-start gap-4">
+                {/* Left Fixed Panel */}
+                <div className="fixed left-2 top-6 z-40 ml-4 flex w-[570px] flex-col items-center justify-center gap-3">
+                    <div className="w-full">
+                        <h1 className="mb-2 text-center text-xl font-bold text-blue-400">
+                            แผนผังโครงการ
+                        </h1>
 
-                <InputForm
-                    input={input}
-                    onInputChange={setInput}
-                    selectedSprinkler={selectedSprinkler}
-                />
-                <CalculationSummary
-                    results={results}
-                    input={input}
-                    selectedSprinkler={selectedSprinkler}
-                    selectedPump={selectedPump}
-                    selectedBranchPipe={selectedBranchPipe}
-                    selectedSecondaryPipe={selectedSecondaryPipe}
-                    selectedMainPipe={selectedMainPipe}
-                />
-                <div className="mb-6 space-y-6">
-                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                        <SprinklerSelector
-                            selectedSprinkler={selectedSprinkler}
-                            onSprinklerChange={setSelectedSprinkler}
-                            results={results}
-                        />
-
-                        {/* ท่อย่อย - แสดงเสมอ */}
-                        <PipeSelector
-                            pipeType="branch"
-                            selectedPipe={selectedBranchPipe}
-                            onPipeChange={setSelectedBranchPipe}
-                            results={{
-                                ...results,
-                                branchPipeRolls: selectedBranchPipe
-                                    ? calculatePipeRolls(
-                                          input.totalBranchPipeM,
-                                          selectedBranchPipe.lengthM
-                                      )
-                                    : results.branchPipeRolls,
-                            }}
-                            input={input}
-                        />
-
-                        {/* ท่อเมนรอง - แสดงเฉพาะเมื่อมีข้อมูล */}
-                        {hasValidSubmainPipeData ? (
-                            <PipeSelector
-                                pipeType="secondary"
-                                selectedPipe={selectedSecondaryPipe}
-                                onPipeChange={setSelectedSecondaryPipe}
-                                results={{
-                                    ...results,
-                                    secondaryPipeRolls: selectedSecondaryPipe
-                                        ? calculatePipeRolls(
-                                              input.totalSecondaryPipeM,
-                                              selectedSecondaryPipe.lengthM
-                                          )
-                                        : results.secondaryPipeRolls,
-                                }}
-                                input={input}
-                            />
-                        ) : (
-                            <div className="rounded bg-gray-900 p-3">
-                                <div className="mb-3 flex h-full items-center justify-center text-center text-white">
-                                    <h4 className="text-2xl font-bold text-gray-500">
-                                        ไม่ได้ใช้ท่อเมนรอง
-                                    </h4>
-                                </div>
+                        {projectImage ? (
+                            <div className="relative">
+                                <img
+                                    src={projectImage}
+                                    alt="Project preview"
+                                    className="h-[350px] w-full rounded-lg bg-gray-700 object-contain shadow-lg"
+                                />
+                                <button
+                                    onClick={handleImageDelete}
+                                    className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-lg font-bold text-white shadow-lg transition-colors duration-200 hover:bg-red-700"
+                                    title="ลบรูปภาพ"
+                                >
+                                    ×
+                                </button>
                             </div>
-                        )}
-
-                        {/* ท่อเมนหลัก - แสดงเฉพาะเมื่อมีข้อมูล */}
-                        {hasValidMainPipeData && (
-                            <div>
-                                <PipeSelector
-                                    pipeType="main"
-                                    selectedPipe={selectedMainPipe}
-                                    onPipeChange={setSelectedMainPipe}
-                                    results={{
-                                        ...results,
-                                        mainPipeRolls: selectedMainPipe
-                                            ? calculatePipeRolls(
-                                                  input.totalMainPipeM,
-                                                  selectedMainPipe.lengthM
-                                              )
-                                            : results.mainPipeRolls,
-                                    }}
-                                    input={input}
+                        ) : (
+                            <div className="flex h-[350px] w-full flex-col items-center justify-center rounded-lg bg-gray-700 text-gray-400">
+                                ยังไม่ได้เลือกรูปภาพ
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleImageUpload}
+                                    className="mt-2 w-1/3 text-sm text-white file:mr-4 file:rounded file:border-0 file:bg-blue-600 file:bg-none file:px-4 file:py-2 file:text-sm file:font-semibold hover:file:bg-blue-700"
                                 />
                             </div>
                         )}
                     </div>
-
-                    <PumpSelector
-                        selectedPump={selectedPump}
-                        onPumpChange={setSelectedPump}
-                        results={results}
-                    />
                 </div>
-                <CostSummary
-                    results={{
-                        ...results,
-                        branchPipeRolls: selectedBranchPipe
-                            ? calculatePipeRolls(input.totalBranchPipeM, selectedBranchPipe.lengthM)
-                            : results.branchPipeRolls,
-                        secondaryPipeRolls: selectedSecondaryPipe
-                            ? calculatePipeRolls(
-                                  input.totalSecondaryPipeM,
-                                  selectedSecondaryPipe.lengthM
-                              )
-                            : results.secondaryPipeRolls,
-                        mainPipeRolls: selectedMainPipe
-                            ? calculatePipeRolls(input.totalMainPipeM, selectedMainPipe.lengthM)
-                            : results.mainPipeRolls,
-                    }}
-                    selectedSprinkler={selectedSprinkler}
-                    selectedPump={selectedPump}
-                    selectedBranchPipe={selectedBranchPipe}
-                    selectedSecondaryPipe={selectedSecondaryPipe}
-                    selectedMainPipe={selectedMainPipe}
-                    onQuotationClick={() => setShowQuotationModal(true)}
-                />
+
+                {/* Main Content Area */}
+                <div className="ml-[600px] w-full max-w-full">
+                    <div className="mb-6 flex items-center justify-between">
+                        <div className="flex items-center justify-start gap-4">
+                            <img
+                                src="https://f.btwcdn.com/store-50036/store/e4c1b5ae-cf8e-5017-536b-66ecd994018d.jpg"
+                                alt="logo"
+                                className="h-[80px] w-[80px] rounded-xl"
+                            />
+                            <div>
+                                <h1 className="text-left text-3xl font-bold text-blue-400">
+                                    Irrigation Layout Planning
+                                </h1>
+                                <p className="mt-2 text-left text-lg text-blue-400">
+                                    แอปพลิเคชันวางแผนผังชลประทานน้ำ บจก.กนกโปรดักส์ จำกัด
+                                </p>
+                                <p className="mt-1 text-sm text-green-400">
+                                    🔗 ระบบเชื่อมต่อกับข้อมูลโครงการ Horticulture | 🤖
+                                    เลือกอุปกรณ์อัตโนมัติ | 🎛️ ปรับแต่งได้
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-end gap-4">
+                            <LanguageSwitcher />
+                            <button
+                                onClick={() => (window.location.href = '/equipment-crud')}
+                                className="rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700"
+                            >
+                                จัดการอุปกรณ์
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Zone Selection */}
+                    {projectData?.useZones && projectData.zones.length > 1 && (
+                        <div className="mb-6 rounded-lg bg-gray-700 p-4">
+                            <h3 className="mb-3 text-lg font-semibold text-yellow-400">
+                                เลือกโซนสำหรับการคำนวณ
+                            </h3>
+                            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                                {projectData.zones.map((zone) => (
+                                    <div key={zone.id} className="flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            id={`zone-${zone.id}`}
+                                            checked={selectedZones.includes(zone.id)}
+                                            onChange={(e) =>
+                                                handleZoneSelection(zone.id, e.target.checked)
+                                            }
+                                            className="mr-2"
+                                        />
+                                        <label htmlFor={`zone-${zone.id}`} className="text-sm">
+                                            {zone.name} ({(zone.area / 1600).toFixed(2)} ไร่)
+                                        </label>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="mt-3 text-sm text-gray-300">
+                                <p>โซนที่เลือก: {selectedZones.length} โซน</p>
+                                <p>
+                                    การคำนวณปั๊มจะใช้ข้อมูลจากโซนที่เลือกพร้อมกัน (ท่อแยกแต่ละโซน)
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Active Zone Tabs */}
+                    {projectData?.useZones && projectData.zones.length > 1 && (
+                        <div className="mb-4 flex space-x-2">
+                            {projectData.zones.map((zone) => (
+                                <button
+                                    key={zone.id}
+                                    onClick={() => setActiveZoneId(zone.id)}
+                                    className={`rounded px-4 py-2 text-sm ${
+                                        activeZoneId === zone.id
+                                            ? 'bg-blue-600 text-white'
+                                            : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                                    }`}
+                                >
+                                    {zone.name}
+                                    {/* Show if zone has sprinkler selected */}
+                                    {zoneSprinklers[zone.id] && (
+                                        <span className="ml-1 text-green-300">✓</span>
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    <InputForm
+                        input={currentInput}
+                        onInputChange={handleInputChange}
+                        selectedSprinkler={currentSprinkler}
+                        activeZone={projectData?.zones.find((z) => z.id === activeZoneId)}
+                    />
+
+                    {/* Sprinkler must be selected first */}
+                    <div className="mb-6">
+                        <div className="mb-4 rounded-lg bg-yellow-900 p-4">
+                            <p className="text-yellow-300">
+                                ⚡ กรุณาเลือกสปริงเกอร์ก่อน
+                                เพื่อคำนวณความต้องการน้ำและขนาดท่อที่เหมาะสม
+                                {projectData?.useZones && projectData.zones.length > 1 && (
+                                    <span className="mt-1 block text-sm">
+                                        แต่ละโซนสามารถเลือกสปริงเกอร์ที่แตกต่างกันได้
+                                    </span>
+                                )}
+                            </p>
+                            <p className="mt-2 text-sm text-yellow-200">
+                                🤖 ระบบจะเลือกท่อและปั๊มอัตโนมัติหลังจากเลือกสปริงเกอร์แล้ว
+                                (ปรับแต่งได้)
+                            </p>
+                        </div>
+
+                        <SprinklerSelector
+                            selectedSprinkler={currentSprinkler}
+                            onSprinklerChange={handleSprinklerChange}
+                            results={results}
+                            activeZone={projectData?.zones.find((z) => z.id === activeZoneId)}
+                            allZoneSprinklers={zoneSprinklers}
+                        />
+                    </div>
+
+                    {currentSprinkler && (
+                        <>
+                            <CalculationSummary
+                                results={results}
+                                input={currentInput}
+                                selectedSprinkler={currentSprinkler}
+                                selectedPump={effectiveEquipment.pump}
+                                selectedBranchPipe={effectiveEquipment.branchPipe}
+                                selectedSecondaryPipe={effectiveEquipment.secondaryPipe}
+                                selectedMainPipe={effectiveEquipment.mainPipe}
+                                activeZone={projectData?.zones.find((z) => z.id === activeZoneId)}
+                                selectedZones={selectedZones}
+                                allZoneSprinklers={zoneSprinklers}
+                            />
+
+                            <div className="mb-6 space-y-6">
+                                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                                    <PipeSelector
+                                        pipeType="branch"
+                                        results={results}
+                                        input={currentInput}
+                                        selectedPipe={effectiveEquipment.branchPipe}
+                                        onPipeChange={(pipe) => handlePipeChange('branch', pipe)}
+                                    />
+
+                                    {hasValidSubmainPipeData ? (
+                                        <PipeSelector
+                                            pipeType="secondary"
+                                            results={results}
+                                            input={currentInput}
+                                            selectedPipe={effectiveEquipment.secondaryPipe}
+                                            onPipeChange={(pipe) =>
+                                                handlePipeChange('secondary', pipe)
+                                            }
+                                        />
+                                    ) : (
+                                        <div className="rounded bg-gray-900 p-3">
+                                            <div className="mb-3 flex h-full items-center justify-center text-center text-white">
+                                                <h4 className="text-2xl font-bold text-gray-500">
+                                                    ไม่ได้ใช้ท่อเมนรอง
+                                                </h4>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {hasValidMainPipeData && (
+                                        <div>
+                                            <PipeSelector
+                                                pipeType="main"
+                                                results={results}
+                                                input={currentInput}
+                                                selectedPipe={effectiveEquipment.mainPipe}
+                                                onPipeChange={(pipe) =>
+                                                    handlePipeChange('main', pipe)
+                                                }
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
+                                <PumpSelector
+                                    results={results}
+                                    selectedPump={effectiveEquipment.pump}
+                                    onPumpChange={handlePumpChange}
+                                />
+                            </div>
+
+                            <CostSummary
+                                results={results}
+                                zoneSprinklers={zoneSprinklers}
+                                selectedPipes={selectedPipes}
+                                selectedPump={effectiveEquipment.pump}
+                                activeZoneId={activeZoneId}
+                                projectData={projectData}
+                                onQuotationClick={() => setShowQuotationModal(true)}
+                            />
+                        </>
+                    )}
+                </div>
             </div>
-            <div className="no-print">
-                <ChatBox />
-            </div>
+
             <QuotationModal
                 show={showQuotationModal}
                 quotationData={quotationData}
@@ -700,45 +813,24 @@ export default function Product() {
                 onClose={() => setShowQuotationModal(false)}
                 onConfirm={handleQuotationModalConfirm}
             />
+
             <QuotationDocument
                 show={showQuotation}
-                results={{
-                    ...results,
-                    branchPipeRolls: selectedBranchPipe
-                        ? calculatePipeRolls(input.totalBranchPipeM, selectedBranchPipe.lengthM)
-                        : results.branchPipeRolls,
-                    secondaryPipeRolls: selectedSecondaryPipe
-                        ? calculatePipeRolls(
-                              input.totalSecondaryPipeM,
-                              selectedSecondaryPipe.lengthM
-                          )
-                        : results.secondaryPipeRolls,
-                    mainPipeRolls: selectedMainPipe
-                        ? calculatePipeRolls(input.totalMainPipeM, selectedMainPipe.lengthM)
-                        : results.mainPipeRolls,
-                }}
+                results={results}
                 quotationData={quotationData}
                 quotationDataCustomer={quotationDataCustomer}
-                selectedSprinkler={selectedSprinkler}
-                selectedPump={selectedPump}
-                selectedBranchPipe={selectedBranchPipe}
-                selectedSecondaryPipe={selectedSecondaryPipe}
-                selectedMainPipe={selectedMainPipe}
+                selectedSprinkler={null}
+                selectedPump={effectiveEquipment.pump}
+                selectedBranchPipe={selectedPipes.branch}
+                selectedSecondaryPipe={selectedPipes.secondary}
+                selectedMainPipe={selectedPipes.main}
                 onClose={() => setShowQuotation(false)}
             />
-            <div className="mt-4 text-center text-sm">
-                <div className="flex justify-center gap-4">
-                    <button
-                        onClick={() => (location.href = '/planner')}
-                        className="rounded-md bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
-                    >
-                        เริ่มต้นใหม่
-                    </button>
-                    {/* <div className="text-green-400 text-xs flex items-center">
-                        <span className="inline-block w-2 h-2 bg-green-400 rounded-full mr-1"></span>
-                        ข้อมูลจากฐานข้อมูล: {results?.analyzedSprinklers?.length || 0} สปริงเกอร์, {results?.analyzedPumps?.length || 0} ปั๊ม, {results?.analyzedBranchPipes?.length || 0} ท่อ
-                    </div> */}
-                </div>
+
+            {/* --- AI Chat Component --- */}
+            {/* วางไว้ที่นี่เพื่อให้เป็น Floating Component ที่แสดงผลทับ UI ทั้งหมด */}
+            <div className="no-print">
+                <AiChatComponent />
             </div>
         </div>
     );

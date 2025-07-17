@@ -1,5 +1,4 @@
-// resources\js\pages\utils\calculations.ts - Complete Version
-// import { IrrigationInput } from '../types/interfaces';
+// resources\js\pages\utils\calculations.ts
 
 export const calculatePipeRolls = (totalLength: number, rollLength: number): number => {
     return Math.ceil(totalLength / rollLength);
@@ -875,7 +874,7 @@ export const selectBestEquipmentByPrice = (
     );
 
     // เลือกจากกลุ่มที่ดีที่สุดที่มี
-    const targetGroup =
+    let targetGroup =
         recommended.length > 0
             ? recommended
             : goodChoice.length > 0
