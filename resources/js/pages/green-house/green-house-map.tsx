@@ -63,8 +63,8 @@ const irrigationMethods = {
     'drip': { name: 'น้ำหยด', radius: 0, spacing: 20 }
 };
 
-const GRID_SIZE = 20;
-const CANVAS_SIZE = { width: 1200, height: 800 };
+const GRID_SIZE = 25;
+const CANVAS_SIZE = { width: 2400, height: 1600 };
 
 export default function GreenhouseMap() {
     // Canvas and interaction states
@@ -132,6 +132,19 @@ export default function GreenhouseMap() {
                 setShapes(parsedShapes);
             } catch (error) {
                 console.error('Error parsing shapes:', error);
+            }
+        }
+
+        // โหลดข้อมูล irrigation elements จาก localStorage
+        const savedData = localStorage.getItem('greenhousePlanningData');
+        if (savedData) {
+            try {
+                const parsedData = JSON.parse(savedData);
+                if (parsedData.irrigationElements) {
+                    setIrrigationElements(parsedData.irrigationElements);
+                }
+            } catch (error) {
+                console.error('Error loading irrigation data:', error);
             }
         }
     }, []);
@@ -502,6 +515,24 @@ export default function GreenhouseMap() {
             ctx.lineTo(CANVAS_SIZE.width, y);
             ctx.stroke();
         }
+
+        // Major grid lines every 100px
+        ctx.strokeStyle = '#4B5563';
+        ctx.lineWidth = 1;
+        
+        for (let x = 0; x <= CANVAS_SIZE.width; x += GRID_SIZE * 4) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, CANVAS_SIZE.height);
+            ctx.stroke();
+        }
+        
+        for (let y = 0; y <= CANVAS_SIZE.height; y += GRID_SIZE * 4) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(CANVAS_SIZE.width, y);
+            ctx.stroke();
+        }
     }, [showGrid]);
 
     const drawShapes = useCallback((ctx: CanvasRenderingContext2D) => {
@@ -543,7 +574,7 @@ export default function GreenhouseMap() {
             if (shape.points.length < 1) return;
 
             let strokeColor = shape.color;
-            let fillColor = shape.fillColor;
+            const fillColor = shape.fillColor;
             let lineWidth = 2;
             
             if (isSelected) {
@@ -802,14 +833,23 @@ export default function GreenhouseMap() {
         };
     }, [draw]);
 
-    // Event handlers
+    // Event handlers - FIXED MOUSE DOWN
     const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
         const point = getMousePos(e);
+        
+        // Handle panning with middle mouse or Ctrl+click (ตรวจสอบก่อนทุกอย่าง)
+        if (e.button === 1 || (e.button === 0 && e.ctrlKey)) {
+            e.preventDefault();
+            setIsPanning(true);
+            setLastPanPoint(getRawMousePos(e));
+            return;
+        }
         
         if (selectedTool === 'select') {
             const clickedElement = findElementAtPoint(point);
             
-            if (clickedElement) {
+            if (clickedElement && !e.ctrlKey) {
+                // Select and start dragging (เฉพาะเมื่อไม่กด Ctrl)
                 if (clickedElement.type === 'shape' && clickedElement.element.type === 'plot') {
                     if (selectedCrops.length === 0) {
                         alert('ไม่พบพืชที่เลือกไว้ กรุณากลับไปเลือกพืชในขั้นตอนแรก');
@@ -825,19 +865,15 @@ export default function GreenhouseMap() {
                     const centerY = clickedElement.element.points.reduce((sum, p) => sum + p.y, 0) / clickedElement.element.points.length;
                     setDragOffset({ x: point.x - centerX, y: point.y - centerY });
                 }
-            } else {
+            } else if (!clickedElement) {
+                // Click on empty space - deselect and start panning
                 setSelectedElement(null);
                 setIsPanning(true);
                 setLastPanPoint(getRawMousePos(e));
+            } else {
+                // คลิกที่องค์ประกอบขณะกด Ctrl - เฉพาะเลือกองค์ประกอบ ไม่ลาก
+                setSelectedElement(clickedElement.element.id);
             }
-            return;
-        }
-
-        // Check for pan/zoom modifiers BEFORE drawing tools
-        if (e.button === 1 || (e.button === 0 && e.ctrlKey)) {
-            e.preventDefault();
-            setIsPanning(true);
-            setLastPanPoint(getRawMousePos(e));
             return;
         }
 
@@ -994,7 +1030,7 @@ export default function GreenhouseMap() {
 
         canvas.addEventListener('wheel', handleWheelEvent, { passive: false });
         return () => canvas.removeEventListener('wheel', handleWheelEvent);
-    }, [isMouseOverCanvas]); // Reduced dependencies
+    }, [isMouseOverCanvas]);
 
     const handleMouseEnter = useCallback(() => {
         setIsMouseOverCanvas(true);
@@ -1088,7 +1124,7 @@ export default function GreenhouseMap() {
 
         window.addEventListener('keydown', handleKeyPress);
         return () => window.removeEventListener('keydown', handleKeyPress);
-    }, [isDrawing, selectedElement, selectedTool, finishDrawing]); // Reduced dependencies
+    }, [isDrawing, selectedElement, selectedTool, finishDrawing]);
 
     // Utility functions
     const deleteElement = useCallback(() => {
@@ -1124,7 +1160,7 @@ export default function GreenhouseMap() {
         
         if (firstLength === 0 || lastLength === 0) return false;
         
-        const firstNorm = { x: firstDirection.x / firstLength, y: firstDirection.y / firstLength }; // Fixed bug here
+        const firstNorm = { x: firstDirection.x / firstLength, y: firstDirection.y / firstLength };
         const lastNorm = { x: lastDirection.x / lastLength, y: lastDirection.y / lastLength };
         
         const dotProduct = Math.abs(firstNorm.x * lastNorm.x + firstNorm.y * lastNorm.y);
@@ -1149,11 +1185,59 @@ export default function GreenhouseMap() {
         }
 
         const subPipes = irrigationElements.filter(el => el.type === 'sub-pipe');
+        const existingSprinklers = irrigationElements.filter(el => el.type === 'sprinkler');
         const newSprinklers: IrrigationElement[] = [];
         const spacing = 50;
         const radius = globalRadius * 20;
 
+        // ฟังก์ชันตรวจสอบว่าท่อย่อยมีสปริงเกลอร์อยู่แล้วหรือไม่
+        const pipeHasSprinklers = (pipe: IrrigationElement): boolean => {
+            return existingSprinklers.some(sprinkler => {
+                const sprinklerPoint = sprinkler.points[0];
+                // ตรวจสอบว่าสปริงเกลอร์อยู่ใกล้กับท่อย่อยหรือไม่ (ระยะห่างน้อยกว่า 30 pixels)
+                for (let i = 0; i < pipe.points.length - 1; i++) {
+                    const p1 = pipe.points[i];
+                    const p2 = pipe.points[i + 1];
+                    
+                    // คำนวณระยะห่างจากจุดสปริงเกลอร์ไปยังส่วนของท่อ
+                    const A = sprinklerPoint.x - p1.x;
+                    const B = sprinklerPoint.y - p1.y;
+                    const C = p2.x - p1.x;
+                    const D = p2.y - p1.y;
+                    
+                    const dot = A * C + B * D;
+                    const lenSq = C * C + D * D;
+                    let param = -1;
+                    if (lenSq !== 0) param = dot / lenSq;
+                    
+                    let xx, yy;
+                    if (param < 0) {
+                        xx = p1.x;
+                        yy = p1.y;
+                    } else if (param > 1) {
+                        xx = p2.x;
+                        yy = p2.y;
+                    } else {
+                        xx = p1.x + param * C;
+                        yy = p1.y + param * D;
+                    }
+                    
+                    const distanceToLine = Math.sqrt(Math.pow(sprinklerPoint.x - xx, 2) + Math.pow(sprinklerPoint.y - yy, 2));
+                    
+                    if (distanceToLine < 30) {
+                        return true;
+                    }
+                }
+                return false;
+            });
+        };
+
         subPipes.forEach((pipe, pipeIndex) => {
+            // ข้ามท่อที่มีสปริงเกลอร์อยู่แล้ว
+            if (pipeHasSprinklers(pipe)) {
+                return;
+            }
+
             for (let i = 0; i < pipe.points.length - 1; i++) {
                 const p1 = pipe.points[i];
                 const p2 = pipe.points[i + 1];
@@ -1168,7 +1252,7 @@ export default function GreenhouseMap() {
                 const actualSpacing = sprinklerCount > 0 ? distance / (sprinklerCount + 1) : spacing;
                 
                 for (let j = 1; j <= sprinklerCount; j++) {
-                    let point = {
+                    const point = {
                         x: p1.x + direction.x * (actualSpacing * j),
                         y: p1.y + direction.y * (actualSpacing * j)
                     };
@@ -1187,7 +1271,7 @@ export default function GreenhouseMap() {
                     const sprinkler: IrrigationElement = {
                         id: `sprinkler-${Date.now()}-${Math.random()}-${j}`,
                         type: 'sprinkler',
-                        points: [point], // ไม่ใช้ snapToGrid เพื่อให้ระยะห่างเท่ากัน
+                        points: [point],
                         color: '#3B82F6',
                         radius: radius,
                         angle: globalAngle
@@ -1197,8 +1281,12 @@ export default function GreenhouseMap() {
             }
         });
 
-        setIrrigationElements(prev => [...prev, ...newSprinklers]);
-        alert(`สร้างมินิสปริงเกลอร์ ${newSprinklers.length} ตัวตามแนวท่อย่อยเรียบร้อยแล้ว`);
+        if (newSprinklers.length > 0) {
+            setIrrigationElements(prev => [...prev, ...newSprinklers]);
+            alert(`สร้างมินิสปริงเกลอร์ ${newSprinklers.length} ตัวตามแนวท่อย่อยใหม่เรียบร้อยแล้ว`);
+        } else {
+            alert('ท่อย่อยทั้งหมดมีมินิสปริงเกลอร์อยู่แล้ว');
+        }
     }, [canAutoGenerate, selectedIrrigationMethod, sprinklerPattern, canUseZigzagPattern, irrigationElements, globalRadius, globalAngle]);
 
     const autoGenerateDripLines = useCallback(() => {
@@ -1213,9 +1301,38 @@ export default function GreenhouseMap() {
         }
 
         const subPipes = irrigationElements.filter(el => el.type === 'sub-pipe');
+        const existingDripLines = irrigationElements.filter(el => el.type === 'drip-line');
         const newDripLines: IrrigationElement[] = [];
 
+        // ฟังก์ชันตรวจสอบว่าท่อย่อยมีเทปน้ำหยดอยู่แล้วหรือไม่
+        const pipeHasDripLine = (pipe: IrrigationElement): boolean => {
+            return existingDripLines.some(dripLine => {
+                // ตรวจสอบว่าเทปน้ำหยดมีจุดที่ตรงหรือใกล้เคียงกับท่อย่อยหรือไม่
+                if (dripLine.points.length !== pipe.points.length) return false;
+                
+                // ตรวจสอบว่าจุดแต่ละจุดใกล้เคียงกันหรือไม่ (ระยะห่างน้อยกว่า 30 pixels)
+                for (let i = 0; i < pipe.points.length; i++) {
+                    const pipePoint = pipe.points[i];
+                    const dripPoint = dripLine.points[i];
+                    
+                    const distance = Math.sqrt(
+                        Math.pow(pipePoint.x - dripPoint.x, 2) + 
+                        Math.pow(pipePoint.y - dripPoint.y, 2)
+                    );
+                    
+                    if (distance > 30) return false;
+                }
+                
+                return true;
+            });
+        };
+
         subPipes.forEach(pipe => {
+            // ข้ามท่อที่มีเทปน้ำหยดอยู่แล้ว
+            if (pipeHasDripLine(pipe)) {
+                return;
+            }
+
             if (pipe.points.length >= 2) {
                 const dripLine: IrrigationElement = {
                     id: `drip-line-${Date.now()}-${Math.random()}`,
@@ -1229,8 +1346,12 @@ export default function GreenhouseMap() {
             }
         });
 
-        setIrrigationElements(prev => [...prev, ...newDripLines]);
-        alert(`สร้างสายน้ำหยด ${newDripLines.length} เส้นตามแนวท่อย่อยเรียบร้อยแล้ว`);
+        if (newDripLines.length > 0) {
+            setIrrigationElements(prev => [...prev, ...newDripLines]);
+            alert(`สร้างสายน้ำหยด ${newDripLines.length} เส้นตามแนวท่อย่อยใหม่เรียบร้อยแล้ว`);
+        } else {
+            alert('ท่อย่อยทั้งหมดมีสายน้ำหยดอยู่แล้ว');
+        }
     }, [canAutoGenerate, selectedIrrigationMethod, irrigationElements, globalDripSpacing]);
 
     const assignCropToPlot = useCallback((cropValue: string) => {
@@ -1380,9 +1501,9 @@ export default function GreenhouseMap() {
             <div className="border-b border-gray-700 bg-gray-800 px-6 py-3 flex-shrink-0">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-xl font-bold">💧 ออกแบบระบบน้ำในโรงเรือน</h1>
+                        <h1 className="text-xl font-bold">💧 ออกแบบระบบน้ำในโรงเรือน (ขนาดใหญ่)</h1>
                         <p className="text-sm text-gray-400">
-                            ออกแบบระบบการให้น้ำแบบ: {irrigationMethods[selectedIrrigationMethod as keyof typeof irrigationMethods]?.name}
+                            ออกแบบระบบการให้น้ำแบบ: {irrigationMethods[selectedIrrigationMethod as keyof typeof irrigationMethods]?.name} - พื้นที่ 2400x1600 pixels
                         </p>
                     </div>
                     <div className="flex items-center space-x-2 text-sm text-gray-400">
@@ -1446,6 +1567,11 @@ export default function GreenhouseMap() {
                                             <span className="text-sm">{tool.icon}</span>
                                             <span className="text-xs">{tool.name}</span>
                                         </div>
+                                        {tool.id === 'select' && (
+                                            <div className="text-xs text-gray-400 mt-1">
+                                                Ctrl+คลิก = เลื่อนมุมมอง
+                                            </div>
+                                        )}
                                     </button>
                                 ))}
                             </div>
@@ -1467,6 +1593,17 @@ export default function GreenhouseMap() {
                                     <span>{irrigationElements.some(el => el.type === 'sub-pipe') ? '✓' : '✗'}</span>
                                     <span>ท่อย่อย</span>
                                 </div>
+                            </div>
+                        </div>
+
+                        {/* Canvas Info */}
+                        <div className="mb-4">
+                            <h3 className="text-sm font-medium text-gray-300 mb-2">ข้อมูล Canvas</h3>
+                            <div className="text-xs text-gray-400 space-y-1">
+                                <p>📏 ขนาด: {CANVAS_SIZE.width} × {CANVAS_SIZE.height} px</p>
+                                <p>📐 Grid: {GRID_SIZE} px</p>
+                                <p>🔍 Zoom: {(zoom * 100).toFixed(0)}%</p>
+                                <p>📍 Pan: ({pan.x.toFixed(0)}, {pan.y.toFixed(0)})</p>
                             </div>
                         </div>
 
@@ -1666,7 +1803,7 @@ export default function GreenhouseMap() {
                                         showGrid ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                     }`}
                                 >
-                                    📐 แสดงกริด
+                                    📐 แสดงกริด ({GRID_SIZE}px)
                                 </button>
                                 <button
                                     onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
@@ -1755,13 +1892,6 @@ export default function GreenhouseMap() {
                         }}
                     />
 
-                    {/* Debug info - remove in production */}
-                    {isDrawing && (
-                        <div className="absolute top-16 left-4 rounded bg-orange-600 px-3 py-1 text-sm text-white">
-                            Debug: Drawing {selectedTool} | Points: {currentPath.length} | isDrawing: {isDrawing.toString()}
-                        </div>
-                    )}
-
                     {/* Coordinates Display */}
                     <div className="absolute bottom-4 left-4 rounded bg-black/50 px-3 py-1 text-sm text-white">
                         X: {mousePos.x.toFixed(0)}, Y: {mousePos.y.toFixed(0)} | Zoom: {(zoom * 100).toFixed(0)}%
@@ -1776,13 +1906,13 @@ export default function GreenhouseMap() {
 
                     {isDragging && (
                         <div className="absolute top-4 left-4 rounded bg-yellow-600 px-3 py-1 text-sm text-white">
-                            🤏 กำลังขยับองค์ประกอบ...
+                            🤏 กำลังขยับองค์ประกอบ... (ไม่กด Ctrl)
                         </div>
                     )}
 
                     {isPanning && (
                         <div className="absolute top-4 left-4 rounded bg-purple-600 px-3 py-1 text-sm text-white">
-                            🤏 กำลังเลื่อนมุมมอง...
+                            🤏 กำลังเลื่อนมุมมอง... (Ctrl+Drag หรือ คลิกพื้นที่ว่าง)
                         </div>
                     )}
 
@@ -1983,21 +2113,19 @@ export default function GreenhouseMap() {
             {/* Bottom Bar */}
             <div className="border-t border-gray-700 bg-gray-800 px-6 py-3 flex-shrink-0">
                 <div className="flex justify-between">
-                    {/* ✅ ปุ่มกลับใหม่ */}
                     <button
                         onClick={() => {
-                            // บันทึกข้อมูลก่อนย้อนกลับ
+                            // บันทึกข้อมูลระบบน้ำ
                             const summaryData = {
                                 selectedCrops: selectedCrops,
-                                planningMethod: 'draw', // Removed method variable
+                                planningMethod: 'draw',
                                 shapes: shapes,
-                                irrigationElements: irrigationElements,
+                                irrigationElements: irrigationElements, // เพิ่มบรรทัดนี้
                                 irrigationMethod: selectedIrrigationMethod,
                                 updatedAt: new Date().toISOString()
                             };
                             localStorage.setItem('greenhousePlanningData', JSON.stringify(summaryData));
                             
-                            // ไปหน้า choose-irrigation พร้อมข้อมูล
                             const queryParams = new URLSearchParams();
                             if (selectedCrops && selectedCrops.length > 0) {
                                 queryParams.set('crops', selectedCrops.join(','));
@@ -2005,26 +2133,25 @@ export default function GreenhouseMap() {
                             if (shapes && shapes.length > 0) {
                                 queryParams.set('shapes', encodeURIComponent(JSON.stringify(shapes)));
                             }
-                            // Removed method variable usage
+                            if (selectedIrrigationMethod) {
+                                queryParams.set('irrigation', selectedIrrigationMethod); // เพิ่มบรรทัดนี้
+                            }
                             
-                            // ไปหน้า choose-irrigation (ไม่ใช่ history.back())
                             window.location.href = `/choose-irrigation?${queryParams.toString()}`;
                         }}
                         className="flex items-center rounded bg-gray-600 px-4 py-2 text-white hover:bg-gray-700 transition-colors"
-                    >
+                        >
                         <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                         </svg>
                         กลับ
                     </button>
                     
-                    {/* ✅ ปุ่มดูสรุป - ปรับปรุง */}
                     <button
                         onClick={() => {
-                            // Save complete data to localStorage
                             const summaryData = {
                                 selectedCrops: selectedCrops,
-                                planningMethod: 'draw', // Removed method variable
+                                planningMethod: 'draw',
                                 shapes: shapes,
                                 irrigationElements: irrigationElements,
                                 irrigationMethod: selectedIrrigationMethod,
@@ -2034,7 +2161,6 @@ export default function GreenhouseMap() {
                             
                             localStorage.setItem('greenhousePlanningData', JSON.stringify(summaryData));
                             
-                            // Navigate to summary page
                             window.location.href = '/green-house-summary';
                         }}
                         className="flex items-center rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 transition-colors"

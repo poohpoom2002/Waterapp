@@ -75,8 +75,8 @@ export default function GreenhouseCrop({ cropType, crops }) {
                     {/* Header */}
                     <div className="border-b border-gray-700 p-6">
                         <div className="mb-4 flex items-center justify-between">
-                            <button
-                                onClick={() => window.history.back()}
+                            <a
+                                href="/planner"
                                 className="flex items-center text-sm text-blue-400 hover:text-blue-300"
                             >
                                 <svg
@@ -93,7 +93,7 @@ export default function GreenhouseCrop({ cropType, crops }) {
                                     />
                                 </svg>
                                 กลับ
-                            </button>
+                            </a>
                         </div>
                         <h1 className="mb-2 text-2xl font-bold">🏠 โรงเรือน</h1>
                         <p className="text-sm text-gray-400">เลือกพืชสำหรับโรงเรือนของคุณ</p>

@@ -42,7 +42,8 @@ const tools: Tool[] = [
         description: 'เลือกและแก้ไขออบเจ็ค',
         instructions: [
             'คลิกเพื่อเลือกออบเจ็ค',
-            'ลากเพื่อขยับออบเจ็ค', 
+            'ลากเพื่อขยับออบเจ็ค (ห้ามกด Ctrl)', 
+            'กด Ctrl+คลิก เพื่อเลื่อนมุมมอง',
             'คลิกพื้นที่ว่างเพื่อเลื่อนมุมมอง',
             'กด Delete เพื่อลบออบเจ็คที่เลือก',
             'กด Escape เพื่อยกเลิกการเลือก'
@@ -109,12 +110,12 @@ const tools: Tool[] = [
         name: 'วัดระยะ', 
         icon: '📏', 
         cursor: 'crosshair', 
-        description: 'วัดระยะทางระหว่างจุด',
+        description: 'วัดระยะทางระหว่างจุด (1 grid = 1 เมตร)',
         instructions: [
             'คลิกจุดแรกเพื่อเริ่มวัด',
             'คลิกจุดที่สองเพื่อวัดระยะ',
-            'ใส่ระยะทางจริงในหน้าต่างที่แสดง',
-            'ระบบจะคำนวณมาตราส่วนให้อัตโนมัติ',
+            'ระยะทางจะแสดงเป็นเมตรอัตโนมัติ',
+            '1 ช่อง grid = 1 เมตร',
             'กด Escape เพื่อยกเลิกการวัด'
         ]
     }
@@ -122,7 +123,7 @@ const tools: Tool[] = [
 
 const generalInstructions = [
     { icon: '🖱️', text: 'ซูม: ล้อเมาส์ (เมื่อเมาส์อยู่บน Canvas)' },
-    { icon: '✋', text: 'แพน: ลากด้วยเมาส์ในโหมดเลือก' },
+    { icon: '✋', text: 'แพน: ลากด้วยเมาส์ในโหมดเลือก หรือ Ctrl+ลาก' },
     { icon: '🔄', text: 'รีเซ็ตมุมมอง: กด Spacebar' },
     { icon: '⚡', text: 'จบการวาดทันที: ดับเบิลคลิก' },
     { icon: '🚫', text: 'ยกเลิก: กด Escape' },
@@ -130,8 +131,8 @@ const generalInstructions = [
     { icon: '↷', text: 'ทำซ้ำ: Ctrl+Y หรือ Ctrl+Shift+Z' }
 ];
 
-const GRID_SIZE = 20;
-const CANVAS_SIZE = { width: 1200, height: 800 };
+const GRID_SIZE = 25;
+const CANVAS_SIZE = { width: 2400, height: 1600 };
 
 export default function GreenhousePlanner({ crops, method, irrigation }: GreenhousePlannerProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -149,9 +150,6 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
     const [measuringMode, setMeasuringMode] = useState(false);
     const [measureStart, setMeasureStart] = useState<Point | null>(null);
     const [measureEnd, setMeasureEnd] = useState<Point | null>(null);
-    const [showMeasureDialog, setShowMeasureDialog] = useState(false);
-    const [measureDistanceInMeters, setMeasureDistanceInMeters] = useState<string>('');
-    const [showMeasureInput, setShowMeasureInput] = useState(false);
     const [isPanning, setIsPanning] = useState(false);
     const [lastPanPoint, setLastPanPoint] = useState<Point | null>(null);
     const [isMouseOverCanvas, setIsMouseOverCanvas] = useState(false);
@@ -202,6 +200,20 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
         if (crops) {
             const cropArray = crops.split(',').filter(Boolean);
             setSelectedCrops(cropArray);
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const shapesParam = urlParams.get('shapes');
+        
+        if (shapesParam) {
+            try {
+                const parsedShapes = JSON.parse(decodeURIComponent(shapesParam));
+                setShapes(parsedShapes);
+                addToHistory([[], ...parsedShapes]);
+                setHistoryIndex(1);
+            } catch (error) {
+                console.error('Error parsing shapes:', error);
+            }
         }
     }, [crops]);
 
@@ -295,14 +307,14 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
         ctx.strokeStyle = '#4B5563';
         ctx.lineWidth = 1;
         
-        for (let x = 0; x <= CANVAS_SIZE.width; x += GRID_SIZE * 5) {
+        for (let x = 0; x <= CANVAS_SIZE.width; x += GRID_SIZE * 4) {
             ctx.beginPath();
             ctx.moveTo(x, 0);
             ctx.lineTo(x, CANVAS_SIZE.height);
             ctx.stroke();
         }
         
-        for (let y = 0; y <= CANVAS_SIZE.height; y += GRID_SIZE * 5) {
+        for (let y = 0; y <= CANVAS_SIZE.height; y += GRID_SIZE * 4) {
             ctx.beginPath();
             ctx.moveTo(0, y);
             ctx.lineTo(CANVAS_SIZE.width, y);
@@ -373,7 +385,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
 
             // Determine colors based on state
             let strokeColor = shape.color;
-            let fillColor = shape.fillColor;
+            const fillColor = shape.fillColor;
             let lineWidth = 2;
             
             if (isSelected) {
@@ -551,23 +563,36 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
         ctx.arc(endPoint.x, endPoint.y, 5, 0, 2 * Math.PI);
         ctx.fill();
 
-        // Calculate pixel distance
+        // Calculate distance in meters (1 grid = 25 pixels = 1 meter)
         const pixelDistance = Math.sqrt(
             Math.pow(endPoint.x - measureStart.x, 2) + 
             Math.pow(endPoint.y - measureStart.y, 2)
         );
+        const distanceInMeters = pixelDistance / GRID_SIZE; // GRID_SIZE = 25 pixels = 1 meter
 
-        // Show pixel distance temporarily
+        // Show distance in meters
         const midX = (measureStart.x + endPoint.x) / 2;
         const midY = (measureStart.y + endPoint.y) / 2;
         
-        ctx.fillStyle = '#FFFFFF';
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 1;
+        // Calculate text position offset to avoid overlapping with line
+        const angle = Math.atan2(endPoint.y - measureStart.y, endPoint.x - measureStart.x);
+        const textOffsetX = Math.sin(angle) * 20;
+        const textOffsetY = -Math.cos(angle) * 20;
+        
+        const textX = midX + textOffsetX;
+        const textY = midY + textOffsetY;
+
+        // Background for text
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        const text = `${distanceInMeters.toFixed(2)}m`;
         ctx.font = 'bold 14px Inter, sans-serif';
         ctx.textAlign = 'center';
-        ctx.strokeText(`${pixelDistance.toFixed(0)} px`, midX, midY - 10);
-        ctx.fillText(`${pixelDistance.toFixed(0)} px`, midX, midY - 10);
+        const textWidth = ctx.measureText(text).width;
+        ctx.fillRect(textX - textWidth/2 - 5, textY - 18, textWidth + 10, 20);
+        
+        // Text
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(text, textX, textY - 5);
 
         ctx.setLineDash([]);
     }, [measuringMode, measureStart, measureEnd, mousePos]);
@@ -676,12 +701,20 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
     const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
         const point = getMousePos(e);
         
+        // Handle panning with middle mouse or Ctrl+click (ตรวจสอบก่อนทุกอย่าง)
+        if (e.button === 1 || (e.button === 0 && e.ctrlKey)) {
+            e.preventDefault();
+            setIsPanning(true);
+            setLastPanPoint(getRawMousePos(e));
+            return;
+        }
+        
         // Handle selection tool
         if (selectedTool === 'select') {
             const clickedShape = findShapeAtPoint(point);
             
-            if (clickedShape) {
-                // Select and start dragging
+            if (clickedShape && !e.ctrlKey) {
+                // Select and start dragging (เฉพาะเมื่อไม่กด Ctrl)
                 setSelectedShape(clickedShape.id);
                 setIsDragging(true);
                 
@@ -692,20 +725,15 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                     x: point.x - centerX,
                     y: point.y - centerY
                 });
-            } else {
+            } else if (!clickedShape) {
                 // Click on empty space - deselect and start panning
                 setSelectedShape(null);
                 setIsPanning(true);
                 setLastPanPoint(getRawMousePos(e));
+            } else {
+                // คลิกที่องค์ประกอบขณะกด Ctrl - เฉพาะเลือกองค์ประกอบ ไม่ลาก
+                setSelectedShape(clickedShape.id);
             }
-            return;
-        }
-
-        // Handle panning with middle mouse or Ctrl+click
-        if (e.button === 1 || (e.button === 0 && e.ctrlKey)) {
-            e.preventDefault();
-            setIsPanning(true);
-            setLastPanPoint(getRawMousePos(e));
             return;
         }
 
@@ -740,7 +768,33 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 setMeasureEnd(null);
             } else if (measureStart && !measureEnd) {
                 setMeasureEnd(point);
-                setShowMeasureInput(true);
+                // Auto-confirm measurement without popup
+                const pixelDistance = Math.sqrt(
+                    Math.pow(point.x - measureStart.x, 2) + 
+                    Math.pow(point.y - measureStart.y, 2)
+                );
+                const distanceInMeters = pixelDistance / GRID_SIZE; // 1 grid = 1 meter
+
+                const measurementShape: Shape = {
+                    id: `measurement-${Date.now()}`,
+                    type: 'measurement',
+                    points: [measureStart, point],
+                    color: '#FF6B6B',
+                    fillColor: 'transparent',
+                    name: `📏 ${distanceInMeters.toFixed(2)}m`,
+                    measurement: {
+                        distance: parseFloat(distanceInMeters.toFixed(2)),
+                        unit: 'm'
+                    }
+                };
+
+                setShapes(prev => [...prev, measurementShape]);
+                addToHistory([...shapes, measurementShape]);
+
+                // Reset measuring mode
+                setMeasuringMode(false);
+                setMeasureStart(null);
+                setMeasureEnd(null);
             }
             return;
         }
@@ -917,13 +971,6 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
     // Handle key press
     useEffect(() => {
         const handleKeyPress = (e: KeyboardEvent) => {
-            // Handle measurement input
-            if (showMeasureInput && e.key === 'Enter') {
-                e.preventDefault();
-                handleMeasureSubmit();
-                return;
-            }
-
             // Prevent default if we're handling the key
             if (['Enter', 'Escape', ' ', 'Delete', 'z', 'y'].includes(e.key)) {
                 if (e.key === 'Enter' && isDrawing) {
@@ -934,11 +981,6 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 
                 if (e.key === 'Escape') {
                     e.preventDefault();
-                    // Cancel measurement input if open
-                    if (showMeasureInput) {
-                        handleMeasureCancel();
-                        return;
-                    }
                     setIsDrawing(false);
                     setCurrentPath([]);
                     setMeasuringMode(false);
@@ -952,7 +994,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                     return;
                 }
                 
-                if (e.key === ' ' && !isDrawing && !showMeasureInput) {
+                if (e.key === ' ' && !isDrawing) {
                     e.preventDefault();
                     setZoom(1);
                     setPan({ x: 0, y: 0 });
@@ -960,14 +1002,14 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 }
                 
                 // Delete selected shape with Delete key
-                if (e.key === 'Delete' && selectedShape && selectedTool === 'select' && !showMeasureInput) {
+                if (e.key === 'Delete' && selectedShape && selectedTool === 'select') {
                     e.preventDefault();
                     deleteShape();
                     return;
                 }
 
                 // Undo with Ctrl+Z
-                if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey && !showMeasureInput) {
+                if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
                     e.preventDefault();
                     undo();
                     return;
@@ -975,7 +1017,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
 
                 // Redo with Ctrl+Y or Ctrl+Shift+Z
                 if (((e.key === 'y' && (e.ctrlKey || e.metaKey)) || 
-                    (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey)) && !showMeasureInput) {
+                    (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey))) {
                     e.preventDefault();
                     redo();
                     return;
@@ -985,7 +1027,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
 
         window.addEventListener('keydown', handleKeyPress);
         return () => window.removeEventListener('keydown', handleKeyPress);
-    }, [isDrawing, selectedShape, selectedTool, undo, redo, showMeasureInput]);
+    }, [isDrawing, selectedShape, selectedTool, undo, redo]);
 
     // Delete selected shape
     const deleteShape = () => {
@@ -1009,55 +1051,6 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
         setMeasureEnd(null);
         setZoom(1);
         setPan({ x: 0, y: 0 });
-    };
-
-    // Handle measure distance input
-    const handleMeasureSubmit = () => {
-        if (!measureStart || !measureEnd || !measureDistanceInMeters) return;
-
-        const distance = parseFloat(measureDistanceInMeters);
-        if (isNaN(distance) || distance <= 0) {
-            alert('กรุณาใส่ระยะทางที่ถูกต้อง');
-            return;
-        }
-
-        const pixelDistance = Math.sqrt(
-            Math.pow(measureEnd.x - measureStart.x, 2) + 
-            Math.pow(measureEnd.y - measureStart.y, 2)
-        );
-        const scale = pixelDistance / distance;
-
-        const measurementShape: Shape = {
-            id: `measurement-${Date.now()}`,
-            type: 'measurement',
-            points: [measureStart, measureEnd],
-            color: '#FF6B6B',
-            fillColor: 'transparent',
-            name: `📏 ${distance}m`,
-            measurement: {
-                distance: distance,
-                unit: 'm'
-            }
-        };
-
-        setShapes(prev => [...prev, measurementShape]);
-        addToHistory([...shapes, measurementShape]);
-
-        alert(`Scale factor: ${scale.toFixed(2)} pixels/meter\nMeasured line: ${distance}m = ${pixelDistance.toFixed(0)}px`);
-
-        setMeasuringMode(false);
-        setMeasureStart(null);
-        setMeasureEnd(null);
-        setShowMeasureInput(false);
-        setMeasureDistanceInMeters('');
-    };
-
-    const handleMeasureCancel = () => {
-        setMeasuringMode(false);
-        setMeasureStart(null);
-        setMeasureEnd(null);
-        setShowMeasureInput(false);
-        setMeasureDistanceInMeters('');
     };
 
     const handleProceed = () => {
@@ -1110,8 +1103,8 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                         <div>
-                            <h1 className="text-xl font-bold">🏗️ ออกแบบพื้นที่โรงเรือน</h1>
-                            <p className="text-sm text-gray-400">วาดโครงสร้างโรงเรือนและแปลงปลูกของคุณ</p>
+                            <h1 className="text-xl font-bold">🏗️ ออกแบบพื้นที่โรงเรือน (ขนาดใหญ่)</h1>
+                            <p className="text-sm text-gray-400">วาดโครงสร้างโรงเรือนและแปลงปลูกของคุณ - พื้นที่ 2400x1600 pixels (1 grid = 1 เมตร)</p>
                         </div>
                     </div>
 
@@ -1211,7 +1204,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                         showGrid ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                     }`}
                                 >
-                                    📐 แสดงกริด
+                                    📐 แสดงกริด (1 ช่อง = 1m)
                                 </button>
                                 <button
                                     onClick={() => setShowCoordinates(!showCoordinates)}
@@ -1227,6 +1220,17 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                 >
                                     🔄 รีเซ็ตมุมมอง
                                 </button>
+                            </div>
+                        </div>
+
+                        {/* Canvas Info */}
+                        <div className="mb-4">
+                            <h3 className="text-sm font-medium text-gray-300 mb-2">ข้อมูล Canvas</h3>
+                            <div className="text-xs text-gray-400 space-y-1">
+                                <p>📏 ขนาด: {CANVAS_SIZE.width} × {CANVAS_SIZE.height} px</p>
+                                <p>📐 Grid: {GRID_SIZE} px = 1 เมตร</p>
+                                <p>🔍 Zoom: {(zoom * 100).toFixed(0)}%</p>
+                                <p>📍 Pan: ({pan.x.toFixed(0)}, {pan.y.toFixed(0)})</p>
                             </div>
                         </div>
                     </div>
@@ -1258,14 +1262,14 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                         }}
                     />
 
-                    {/* Coordinates Display - ย้ายไปล่างซ้าย */}
+                    {/* Coordinates Display - ล่างซ้าย */}
                     {showCoordinates && (
                         <div className="absolute bottom-4 left-4 rounded bg-black/50 px-3 py-1 text-sm text-white">
                             X: {mousePos.x.toFixed(0)}, Y: {mousePos.y.toFixed(0)} | Zoom: {(zoom * 100).toFixed(0)}%
                         </div>
                     )}
 
-                    {/* Undo/Redo Controls - ย้ายไปบนซ้าย */}
+                    {/* Undo/Redo Controls - บนซ้าย */}
                     <div className="absolute top-4 left-4 flex space-x-2">
                         <button
                             onClick={undo}
@@ -1302,67 +1306,19 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
 
                     {measuringMode && !measureEnd && (
                         <div className="absolute top-20 left-4 rounded bg-red-600 px-3 py-1 text-sm text-white">
-                            📏 คลิกจุดที่สองเพื่อวัดระยะ (Escape เพื่อยกเลิก)
-                        </div>
-                    )}
-
-                    {/* Measure Input - แสดงที่ตำแหน่งเส้นวัด */}
-                    {showMeasureInput && measureStart && measureEnd && (
-                        <div 
-                            className="absolute bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-xl z-50"
-                            style={{
-                                left: Math.min(measureStart.x, measureEnd.x) + pan.x,
-                                top: Math.min(measureStart.y, measureEnd.y) + pan.y - 80,
-                                transform: `scale(${zoom})`
-                            }}
-                        >
-                            <div className="text-sm text-white mb-2">📏 ระบุระยะทางจริง</div>
-                            <div className="flex items-center space-x-2">
-                                <input
-                                    type="number"
-                                    value={measureDistanceInMeters}
-                                    onChange={(e) => setMeasureDistanceInMeters(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            handleMeasureSubmit();
-                                        } else if (e.key === 'Escape') {
-                                            e.preventDefault();
-                                            handleMeasureCancel();
-                                        }
-                                    }}
-                                    placeholder="เมตร"
-                                    className="w-20 px-2 py-1 text-sm rounded bg-gray-700 text-white border border-gray-600 focus:border-blue-500 focus:outline-none"
-                                    min="0"
-                                    step="0.1"
-                                    autoFocus
-                                />
-                                <button
-                                    onClick={handleMeasureSubmit}
-                                    className="px-2 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-                                >
-                                    ✓
-                                </button>
-                                <button
-                                    onClick={handleMeasureCancel}
-                                    className="px-2 py-1 text-xs rounded bg-gray-600 text-white hover:bg-gray-700 transition-colors"
-                                >
-                                    ✕
-                                </button>
-                            </div>
-                            <div className="text-xs text-gray-400 mt-1">Enter = ยืนยัน | Escape = ยกเลิก</div>
+                            📏 คลิกจุดที่สองเพื่อวัดระยะ (1 grid = 1m, Escape เพื่อยกเลิก)
                         </div>
                     )}
 
                     {isDragging && (
                         <div className="absolute top-20 left-4 rounded bg-yellow-600 px-3 py-1 text-sm text-white">
-                            🤏 กำลังขยับออบเจ็ค...
+                            🤏 กำลังขยับออบเจ็ค... (ไม่กด Ctrl)
                         </div>
                     )}
 
                     {isPanning && (
                         <div className="absolute top-20 left-4 rounded bg-purple-600 px-3 py-1 text-sm text-white">
-                            🤏 กำลังเลื่อนมุมมอง...
+                            🤏 กำลังเลื่อนมุมมอง... (Ctrl+Drag หรือ คลิกพื้นที่ว่าง)
                         </div>
                     )}
 
@@ -1459,9 +1415,9 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                             <p><strong>ประเภท:</strong> {shape.type}</p>
                                             <p><strong>จำนวนจุด:</strong> {shape.points.length}</p>
                                             <div className="mt-2 text-xs text-yellow-300">
-                                                <p>• ลากเพื่อขยับ</p>
+                                                <p>• ลากเพื่อขยับ (ไม่กด Ctrl)</p>
+                                                <p>• Ctrl+คลิก เพื่อเลื่อนมุมมอง</p>
                                                 <p>• กด Delete เพื่อลบ</p>
-                                                <p>• คลิกปุ่ม 🗑️ เพื่อลบ</p>
                                             </div>
                                         </div>
                                     );
@@ -1474,12 +1430,28 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                             <h4 className="mb-2 text-sm font-medium text-gray-300">สถิติ</h4>
                             <div className="space-y-2">
                                 <div className="flex justify-between text-sm">
+                                    <span className="text-gray-400">โรงเรือน:</span>
+                                    <span>{shapes.filter(s => s.type === 'greenhouse').length}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-400">แปลงปลูก:</span>
+                                    <span>{shapes.filter(s => s.type === 'plot').length}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-400">ทางเดิน:</span>
+                                    <span>{shapes.filter(s => s.type === 'walkway').length}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
                                     <span className="text-gray-400">แหล่งน้ำ:</span>
                                     <span>{shapes.filter(s => s.type === 'water-source').length}</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
                                     <span className="text-gray-400">การวัด:</span>
                                     <span>{shapes.filter(s => s.type === 'measurement').length}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-400">รวม:</span>
+                                    <span className="font-bold">{shapes.length}</span>
                                 </div>
                             </div>
                         </div>
@@ -1511,8 +1483,6 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                     </button>
                 </div>
             </div>
-
-            {/* Measure Distance Dialog - ลบออก */}
 
             {/* Instruction Tooltip */}
             {hoveredInstruction && (
