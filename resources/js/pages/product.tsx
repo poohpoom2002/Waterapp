@@ -47,13 +47,10 @@ export default function Product() {
     const [zoneInputs, setZoneInputs] = useState<{ [zoneId: string]: IrrigationInput }>({});
     const [zoneSprinklers, setZoneSprinklers] = useState<{ [zoneId: string]: any }>({});
 
-
-
     const { t } = useLanguage();
     // Load saved farm & pipe-length data with state to track changes
     const [farmData, setFarmData] = useState(() => getFarmData());
     const [pipeLengthData, setPipeLengthData] = useState(() => getPipeLengthData());
-
 
     // NEW: State for manual equipment selection (override auto-selection)
     const [selectedPipes, setSelectedPipes] = useState<{
@@ -748,7 +745,7 @@ export default function Product() {
                 selectedMainPipe={selectedPipes.main}
                 onClose={() => setShowQuotation(false)}
             />
-            
+
             {/* --- AI Chat Component --- */}
             {/* วางไว้ที่นี่เพื่อให้เป็น Floating Component ที่แสดงผลทับ UI ทั้งหมด */}
             <div className="no-print">

@@ -47,7 +47,8 @@ const ChatBox = () => {
                         className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
                         <div
-                            className={`prose max-w-[70%] rounded-2xl px-4 py-2 text-sm ${ // ⬅️ 2. เพิ่มคลาส 'prose' (แนะนำ)
+                            className={`prose max-w-[70%] rounded-2xl px-4 py-2 text-sm ${
+                                // ⬅️ 2. เพิ่มคลาส 'prose' (แนะนำ)
                                 msg.role === 'user'
                                     ? 'rounded-br-none bg-blue-500 text-white'
                                     : 'rounded-bl-none bg-gray-200 text-black'
