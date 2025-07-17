@@ -2432,15 +2432,19 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                     ) : editMode === 'connect-sprinklers' || pipeEditMode ? (
                         <div>
                             <div className="mb-1 font-semibold text-purple-400">
-                                🔧 {pipeEditMode === 'add' ? 'เพิ่มท่อ' : pipeEditMode === 'remove' ? 'ลบท่อ' : 'แก้ไขท่อ'}
+                                🔧{' '}
+                                {pipeEditMode === 'add'
+                                    ? 'เพิ่มท่อ'
+                                    : pipeEditMode === 'remove'
+                                      ? 'ลบท่อ'
+                                      : 'แก้ไขท่อ'}
                             </div>
                             <div>
-                                {pipeEditMode === 'add' 
+                                {pipeEditMode === 'add'
                                     ? `เลือกหัวฉีด 2 ตัวเพื่อเชื่อมต่อ (${selectedSprinklersForPipe.length}/2)`
                                     : pipeEditMode === 'remove'
-                                    ? `เลือกหัวฉีด 2 ตัวเพื่อลบท่อ (${selectedSprinklersForPipe.length}/2)`
-                                    : 'คลิกหัวฉีดเพื่อเลือก หรือคลิกท่อเพื่อลบ'
-                                }
+                                      ? `เลือกหัวฉีด 2 ตัวเพื่อลบท่อ (${selectedSprinklersForPipe.length}/2)`
+                                      : 'คลิกหัวฉีดเพื่อเลือก หรือคลิกท่อเพื่อลบ'}
                             </div>
                         </div>
                     ) : (
@@ -2518,16 +2522,19 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                             <div className="mb-2 flex items-center gap-2">
                                 <span className="text-purple-400">🔧</span>
                                 <span className="font-semibold">
-                                    {pipeEditMode === 'add' ? 'เพิ่มท่อ' : pipeEditMode === 'remove' ? 'ลบท่อ' : 'แก้ไขท่อ'}
+                                    {pipeEditMode === 'add'
+                                        ? 'เพิ่มท่อ'
+                                        : pipeEditMode === 'remove'
+                                          ? 'ลบท่อ'
+                                          : 'แก้ไขท่อ'}
                                 </span>
                             </div>
                             <div>
-                                {pipeEditMode === 'add' 
+                                {pipeEditMode === 'add'
                                     ? `🎯 เลือกหัวฉีด 2 ตัวเพื่อเชื่อมต่อ (${selectedSprinklersForPipe.length}/2)`
                                     : pipeEditMode === 'remove'
-                                    ? `🎯 เลือกหัวฉีด 2 ตัวเพื่อลบท่อ (${selectedSprinklersForPipe.length}/2)`
-                                    : '🎯 คลิกหัวฉีดเพื่อเลือก หรือคลิกท่อเพื่อลบ'
-                                }
+                                      ? `🎯 เลือกหัวฉีด 2 ตัวเพื่อลบท่อ (${selectedSprinklersForPipe.length}/2)`
+                                      : '🎯 คลิกหัวฉีดเพื่อเลือก หรือคลิกท่อเพื่อลบ'}
                             </div>
                             <div className="text-xs text-gray-300">🔍 ใช้ล้อเมาส์เพื่อซูม</div>
                         </div>

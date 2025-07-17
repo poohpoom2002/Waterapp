@@ -172,7 +172,7 @@
 //     // ===== UTILITY FUNCTIONS =====
 //     const pixelsToMeters = useCallback((pixels: number) => pixels / enhancedScale, [enhancedScale]);
 //     const metersToPixels = useCallback((meters: number) => meters * enhancedScale, [enhancedScale]);
-    
+
 //     const formatEnhancedDistance = useCallback((pixels: number) => {
 //         const meters = pixelsToMeters(pixels);
 //         if (meters >= 1) {
@@ -181,7 +181,7 @@
 //             return `${(meters * 100).toFixed(1)} ซม.`;
 //         }
 //     }, [pixelsToMeters]);
-    
+
 //     const formatEnhancedArea = useCallback((pixels: number) => {
 //         const sqMeters = pixels / (enhancedScale * enhancedScale);
 //         if (sqMeters >= 1) {
@@ -194,7 +194,7 @@
 //     // ===== SNAP FUNCTIONS =====
 //     const getSnapPoints = useCallback((): SnapPoint[] => {
 //         const snapPoints: SnapPoint[] = [];
-        
+
 //         if (snapToGrid && showGrid) {
 //             for (let x = 0; x <= canvasData.width; x += CANVAS_GRID_SIZE) {
 //                 for (let y = 0; y <= canvasData.height; y += CANVAS_GRID_SIZE) {
@@ -202,7 +202,7 @@
 //                 }
 //             }
 //         }
-        
+
 //         if (snapToVertex) {
 //             // Snap to existing garden zones
 //             gardenZones.forEach(zone => {
@@ -215,7 +215,7 @@
 //                             sourceId: zone.id
 //                         });
 //                     });
-                    
+
 //                     // Add midpoints for zone edges
 //                     for (let i = 0; i < zone.canvasCoordinates.length; i++) {
 //                         const current = zone.canvasCoordinates[i];
@@ -231,7 +231,7 @@
 //                     }
 //                 }
 //             });
-            
+
 //             // Snap to sprinklers
 //             sprinklers.forEach(sprinkler => {
 //                 if (sprinkler.canvasPosition) {
@@ -244,15 +244,15 @@
 //                 }
 //             });
 //         }
-        
+
 //         return snapPoints;
 //     }, [snapToGrid, snapToVertex, showGrid, gardenZones, sprinklers, canvasData]);
-    
+
 //     const findNearestSnapPoint = useCallback((x: number, y: number): SnapPoint | null => {
 //         const snapPoints = getSnapPoints();
 //         let nearest: SnapPoint | null = null;
 //         let minDistance = snapDistance;
-        
+
 //         snapPoints.forEach(point => {
 //             const distance = Math.sqrt((point.x - x) ** 2 + (point.y - y) ** 2);
 //             if (distance < minDistance) {
@@ -260,7 +260,7 @@
 //                 nearest = point;
 //             }
 //         });
-        
+
 //         return nearest;
 //     }, [getSnapPoints, snapDistance]);
 
@@ -361,10 +361,10 @@
 //             zoneType: zoneType,
 //         });
 //     }, [
-//         currentDrawingTool, 
-//         enhancedMode, 
-//         enhancedScale, 
-//         canvasData.scale, 
+//         currentDrawingTool,
+//         enhancedMode,
+//         enhancedScale,
+//         canvasData.scale,
 //         gardenZones,
 //         onEnhancedZoneCreated,
 //         onZoneCreated
@@ -397,7 +397,7 @@
 //             // Update preview for enhanced tools
 //             if (enhancedMode && drawingState.isDrawing) {
 //                 const newPreviewPoints = [...drawingState.currentPoints];
-                
+
 //                 switch (currentDrawingTool) {
 //                     case 'rectangle':
 //                         if (drawingState.currentPoints.length === 1) {
@@ -405,7 +405,7 @@
 //                             newPreviewPoints.push(...rectPoints.slice(1));
 //                         }
 //                         break;
-                        
+
 //                     case 'circle':
 //                         if (drawingState.currentPoints.length === 1) {
 //                             const radius = calculateDistance(drawingState.currentPoints[0], { x, y });
@@ -413,7 +413,7 @@
 //                             newPreviewPoints.push(...circlePoints.slice(1));
 //                         }
 //                         break;
-                        
+
 //                     case 'regular-polygon':
 //                         if (drawingState.currentPoints.length === 1) {
 //                             const radius = calculateDistance(drawingState.currentPoints[0], { x, y });
@@ -421,7 +421,7 @@
 //                             newPreviewPoints.push(...polygonPoints.slice(1));
 //                         }
 //                         break;
-                        
+
 //                     case 'freehand':
 //                         // For freehand, just add the current mouse position as preview
 //                         if (drawingState.currentPoints.length > 0) {
@@ -429,7 +429,7 @@
 //                         }
 //                         break;
 //                 }
-                
+
 //                 setDrawingState(prev => ({ ...prev, previewPoints: newPreviewPoints }));
 //             }
 
@@ -519,7 +519,7 @@
 //                             }));
 //                         }
 //                         break;
-                        
+
 //                     case 'rectangle':
 //                     case 'circle':
 //                     case 'regular-polygon':
@@ -534,7 +534,7 @@
 //                         } else {
 //                             // Complete the shape
 //                             let finalPoints: CanvasCoordinate[] = [];
-                            
+
 //                             switch (currentDrawingTool) {
 //                                 case 'rectangle':
 //                                     finalPoints = createRectangleZone(drawingState.currentPoints[0], point);
@@ -548,7 +548,7 @@
 //                                     finalPoints = createRegularPolygon(drawingState.currentPoints[0], polyRadius, 6);
 //                                     break;
 //                             }
-                            
+
 //                             finalizeZone(finalPoints, selectedZoneType);
 //                         }
 //                         break;
@@ -703,7 +703,7 @@
 
 //     // Rest of the component implementation would continue here...
 //     // Including draw functions, render functions, and JSX return
-    
+
 //     return (
 //         <div className="relative">
 //             {/* Implementation continues... */}

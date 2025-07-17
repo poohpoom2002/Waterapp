@@ -21,19 +21,22 @@ const Footer: React.FC = () => {
                                 className="flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 text-white transition-colors hover:bg-green-600"
                             >
                                 {/* Line Logo - Replace with your actual Line logo image */}
-                                <img 
-                                    src="/images/line-logo.png" 
-                                    alt="Line" 
+                                <img
+                                    src="/images/line-logo.png"
+                                    alt="Line"
                                     className="h-5 w-5"
                                     onError={(e) => {
                                         // Fallback to emoji if image fails to load
                                         const target = e.target as HTMLImageElement;
                                         target.style.display = 'none';
-                                        const emojiSpan = target.nextElementSibling as HTMLSpanElement;
+                                        const emojiSpan =
+                                            target.nextElementSibling as HTMLSpanElement;
                                         if (emojiSpan) emojiSpan.style.display = 'inline';
                                     }}
                                 />
-                                <span className="text-lg" style={{ display: 'none' }}>💬</span>
+                                <span className="text-lg" style={{ display: 'none' }}>
+                                    💬
+                                </span>
                                 <span className="text-sm font-medium">Line</span>
                             </a>
 
@@ -45,19 +48,22 @@ const Footer: React.FC = () => {
                                 className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
                             >
                                 {/* Facebook Logo - Replace with your actual Facebook logo image */}
-                                <img 
-                                    src="/images/facebook-logo.png" 
-                                    alt="Facebook" 
+                                <img
+                                    src="/images/facebook-logo.png"
+                                    alt="Facebook"
                                     className="h-5 w-5"
                                     onError={(e) => {
                                         // Fallback to emoji if image fails to load
                                         const target = e.target as HTMLImageElement;
                                         target.style.display = 'none';
-                                        const emojiSpan = target.nextElementSibling as HTMLSpanElement;
+                                        const emojiSpan =
+                                            target.nextElementSibling as HTMLSpanElement;
                                         if (emojiSpan) emojiSpan.style.display = 'inline';
                                     }}
                                 />
-                                <span className="text-lg" style={{ display: 'none' }}>📘</span>
+                                <span className="text-lg" style={{ display: 'none' }}>
+                                    📘
+                                </span>
                                 <span className="text-sm font-medium">Facebook</span>
                             </a>
 
