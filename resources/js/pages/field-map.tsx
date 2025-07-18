@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { Wrapper, Status } from '@googlemaps/react-wrapper';
 import * as turf from '@turf/turf';
 import { getCropByValue } from '@/pages/utils/cropData';
@@ -665,6 +665,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         irrigationCircles: google.maps.Circle[];
         irrigationLines: google.maps.Polyline[];
         plantMarkers: google.maps.Marker[];
+        zoneLabels: google.maps.Marker[];
     }>({
         zones: [],
         pipes: [],
@@ -674,6 +675,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         irrigationCircles: [],
         irrigationLines: [],
         plantMarkers: [],
+        zoneLabels: [],
     });
 
     // Parse URL parameters
@@ -987,6 +989,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             irrigationCircles: [],
             irrigationLines: [],
             plantMarkers: [],
+            zoneLabels: [],
         });
     }, [mapObjects, setMapObjects]);
 
@@ -1040,15 +1043,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         }
     }, [currentStep, zones.length, pipes.length, setCanDrawZone, setUsedColors, setCurrentZoneColor, setDrawingMode, setCanDrawPipe, setCurrentPipeType]);
 
-    // Equipment functions
-    const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
-        if (isPlacingEquipment && selectedEquipmentType && e.latLng) {
-            const lat = e.latLng.lat();
-            const lng = e.latLng.lng();
-            placeEquipmentAtPosition(lat, lng);
-        }
-    }, [isPlacingEquipment, selectedEquipmentType]);
-
+    // Move startPlacingEquipment and cancelPlacingEquipment above placeEquipmentAtPosition
     const startPlacingEquipment = useCallback((equipmentType: EquipmentType) => {
         setSelectedEquipmentType(equipmentType);
         setIsPlacingEquipment(true);
@@ -1084,7 +1079,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             };
 
             // Create Google Maps marker
-            let iconHtml = '';
+            let markerIcon;
             if (
                 selectedEquipmentType === 'pump' ||
                 selectedEquipmentType === 'ballvalve' ||
@@ -1094,29 +1089,32 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 if (selectedEquipmentType === 'pump') imgSrc = '/generateTree/wtpump.png';
                 if (selectedEquipmentType === 'ballvalve') imgSrc = '/generateTree/ballv.png';
                 if (selectedEquipmentType === 'solenoid') imgSrc = '/generateTree/solv.png';
-                iconHtml = `<img src="${imgSrc}" alt="${equipmentConfig.name}" style="width:32px;height:32px;object-fit:contain;display:block;margin:auto;" />`;
+                
+                // Use direct PNG image for equipment
+                markerIcon = {
+                    url: imgSrc,
+                    scaledSize: new google.maps.Size(40, 40),
+                    anchor: new google.maps.Point(20, 20)
+                };
             } else {
-                iconHtml = equipmentConfig.icon;
+                // For other equipment types, use SVG with icon
+                markerIcon = {
+                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                        <svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="20" cy="20" r="18" fill="white" stroke="${equipmentConfig.color}" stroke-width="2"/>
+                            <text x="20" y="26" text-anchor="middle" font-size="20">${equipmentConfig.icon}</text>
+                        </svg>
+                    `)}`,
+                    scaledSize: new google.maps.Size(40, 40),
+                    anchor: new google.maps.Point(20, 20)
+                };
             }
 
             const marker = new google.maps.Marker({
                 position: { lat, lng },
                 map: map,
                 title: equipmentConfig.name,
-                icon: {
-                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                        <svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="20" cy="20" r="18" fill="white" stroke="${equipmentConfig.color}" stroke-width="2"/>
-                            <foreignObject x="6" y="6" width="28" height="28">
-                                <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; font-size: 16px;">
-                                    ${iconHtml}
-                                </div>
-                            </foreignObject>
-                        </svg>
-                    `)}`,
-                    scaledSize: new google.maps.Size(40, 40),
-                    anchor: new google.maps.Point(20, 20),
-                }
+                icon: markerIcon
             });
 
             const infoWindow = new google.maps.InfoWindow({
@@ -1148,6 +1146,15 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             handleError('เกิดข้อผิดพลาดในการวางอุปกรณ์');
         }
     }, [selectedEquipmentType, map, equipmentIcons, setEquipmentIcons, setMapObjects, cancelPlacingEquipment, handleError]);
+
+    // Handle map click for equipment placement
+    const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
+        if (isPlacingEquipment && selectedEquipmentType && e.latLng) {
+            const lat = e.latLng.lat();
+            const lng = e.latLng.lng();
+            placeEquipmentAtPosition(lat, lng);
+        }
+    }, [isPlacingEquipment, selectedEquipmentType, placeEquipmentAtPosition]);
 
     // Clear all equipment
     const clearAllEquipment = useCallback(() => {
@@ -1437,14 +1444,70 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         }
     }, [zones.length, usedColors, setCurrentZoneColor, setCanDrawZone, setDrawingMode, handleError]);
 
+    // Update zone label with crop icon
+    const updateZoneLabel = useCallback((zoneId: string, cropValue: string | null) => {
+        const zone = zones.find(z => z.id.toString() === zoneId);
+        if (!zone || !zone.polygon || !map) return;
+
+        // Remove existing label for this zone
+        const existingLabel = mapObjects.zoneLabels.find((marker: any) => marker.zoneId === zoneId);
+        if (existingLabel) {
+            existingLabel.setMap(null);
+            setMapObjects(prev => ({
+                ...prev,
+                zoneLabels: prev.zoneLabels.filter((m: any) => m.zoneId !== zoneId)
+            }));
+        }
+
+        // Add new label if crop is selected
+        if (cropValue) {
+            const crop = getCropByValue(cropValue);
+            if (crop) {
+                // Calculate polygon center
+                const bounds = new google.maps.LatLngBounds();
+                zone.coordinates.forEach((coord: Coordinate) => {
+                    bounds.extend(new google.maps.LatLng(coord.lat, coord.lng));
+                });
+                const center = bounds.getCenter();
+
+                // Create marker with crop icon
+                const marker = new google.maps.Marker({
+                    position: center,
+                    map: map,
+                    title: `${zone.name} - ${crop.name}`,
+                    icon: {
+                        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                            <svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="20" cy="20" r="18" fill="white" stroke="${zone.color}" stroke-width="2"/>
+                                <text x="20" y="26" text-anchor="middle" font-size="20">${crop.icon}</text>
+                            </svg>
+                        `)}`,
+                        scaledSize: new google.maps.Size(40, 40),
+                        anchor: new google.maps.Point(20, 20)
+                    },
+                    zIndex: 10
+                });
+
+                // Add zone id to marker for tracking
+                (marker as any).zoneId = zoneId;
+
+                setMapObjects(prev => ({
+                    ...prev,
+                    zoneLabels: [...prev.zoneLabels, marker]
+                }));
+            }
+        }
+    }, [zones, map, mapObjects.zoneLabels, setMapObjects]);
+
     const assignPlantToZone = useCallback((zoneId: string, cropValue: string) => {
         setZoneAssignments(prev => ({
             ...prev,
             [zoneId]: cropValue
         }));
+        updateZoneLabel(zoneId, cropValue);
         setShowPlantSelector(false);
         setSelectedZone(null);
-    }, [setZoneAssignments, setShowPlantSelector, setSelectedZone]);
+    }, [setZoneAssignments, updateZoneLabel, setShowPlantSelector, setSelectedZone]);
 
     const removePlantFromZone = useCallback((zoneId: string) => {
         setZoneAssignments(prev => {
@@ -1452,7 +1515,8 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             delete newAssignments[zoneId];
             return newAssignments;
         });
-    }, [setZoneAssignments]);
+        updateZoneLabel(zoneId, null);
+    }, [setZoneAssignments, updateZoneLabel]);
 
     const deleteZone = useCallback((zoneId: string) => {
         const zoneToDelete = zones.find(zone => zone.id.toString() === zoneId);
@@ -1463,6 +1527,9 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             if (zoneToDelete.polygon) {
                 zoneToDelete.polygon.setMap(null);
             }
+
+            // Remove zone label
+            updateZoneLabel(zoneId, null);
 
             // Remove from state
             setZones(prev => prev.filter(zone => zone.id.toString() !== zoneId));
@@ -1475,7 +1542,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             // Update used colors
             setUsedColors(prev => prev.filter(color => color !== zoneToDelete.color));
         }
-    }, [zones, setZones, setZoneAssignments, setUsedColors]);
+    }, [zones, setZones, setZoneAssignments, setUsedColors, updateZoneLabel]);
 
     // Generate lateral pipes for all zones
     const generateLateralPipes = useCallback(() => {
@@ -1595,6 +1662,32 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
 
         try {
             const zoneId = zone.id.toString();
+            
+            // Check if irrigation already exists for this zone and clear it
+            const existingIrrigationPoints = irrigationPoints.filter(point => point.zoneId.toString() === zoneId);
+            if (existingIrrigationPoints.length > 0) {
+                // Clear existing irrigation first without confirmation
+                // Remove markers and circles from map
+                existingIrrigationPoints.forEach(point => {
+                    if (point.marker) point.marker.setMap(null);
+                    if (point.circle) point.circle.setMap(null);
+                });
+
+                // Remove from state
+                setIrrigationPoints(prev => prev.filter(point => point.zoneId.toString() !== zoneId));
+                setMapObjects(prev => ({
+                    ...prev,
+                    irrigation: prev.irrigation.filter(marker => {
+                        return !existingIrrigationPoints.some(point => point.marker === marker);
+                    }),
+                    irrigationCircles: prev.irrigationCircles.filter(circle => {
+                        return !existingIrrigationPoints.some(point => point.circle === circle);
+                    })
+                }));
+                
+                console.log(`Cleared existing ${existingIrrigationPoints.length} irrigation points for zone ${zone.name}`);
+            }
+            
             const radius = irrigationRadius[zoneId] || 10; // Default 10m radius
             const overlap = sprinklerOverlap[zoneId] || false;
 
@@ -1631,20 +1724,18 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                             zoneId: zone.id
                         };
 
-                        // Create marker for irrigation point
+                        // Create marker for irrigation point - simple dot
                         const marker = new google.maps.Marker({
                             position: point,
                             map: map,
                             title: `${irrigationType} - ${zone.name}`,
                             icon: {
-                                url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                                    <svg width="20" height="20" xmlns="http://www.w3.org/2000/svg">
-                                        <circle cx="10" cy="10" r="8" fill="blue" stroke="white" stroke-width="2"/>
-                                        <text x="10" y="14" text-anchor="middle" fill="white" font-size="12">💧</text>
-                                    </svg>
-                                `),
-                                scaledSize: new google.maps.Size(20, 20),
-                                anchor: new google.maps.Point(10, 10)
+                                path: google.maps.SymbolPath.CIRCLE,
+                                scale: 4,
+                                fillColor: '#0099ff',
+                                fillOpacity: 1,
+                                strokeColor: 'white',
+                                strokeWeight: 1
                             }
                         });
 
@@ -1688,7 +1779,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             console.error('Error generating irrigation for zone:', error);
             handleError(`Error generating ${irrigationType} for ${zone.name}`);
         }
-    }, [map, irrigationRadius, sprinklerOverlap, setIrrigationPoints, setMapObjects, setIrrigationAssignments, handleError]);
+    }, [map, irrigationRadius, sprinklerOverlap, irrigationPoints, setIrrigationPoints, setMapObjects, setIrrigationAssignments, handleError]);
 
     // Clear irrigation for a specific zone
     const clearIrrigationForZone = useCallback((zoneId: string) => {
@@ -1821,8 +1912,13 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 zones: zones.map(zone => ({
                     name: zone.name,
                     color: zone.color,
-                    assignedCrop: zoneAssignments[zone.id] ? getCropByValue(zoneAssignments[zone.id])?.name : 'Unassigned',
-                    irrigationType: irrigationAssignments[zone.id] || 'Not set'
+                    assignedCrop: zoneAssignments[zone.id] ? {
+                        value: zoneAssignments[zone.id],
+                        name: getCropByValue(zoneAssignments[zone.id])?.name ?? null,
+                        icon: getCropByValue(zoneAssignments[zone.id])?.icon ?? null
+                    } : null,
+                    irrigationType: irrigationAssignments[zone.id] || null,
+                    coordinates: zone.coordinates
                 })),
                 pipes: pipes.map(pipe => ({
                     name: pipe.name,
@@ -1842,17 +1938,61 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             // Log summary
             console.log('Map and summary captured:', summary);
 
-            // You could also implement map screenshot functionality here
-            // For example, using html2canvas or similar library
-
-            // Show success message
-            alert('Map summary captured successfully! Check the console for details.');
+            // Navigate to field-crop-summary page with summary data
+            router.visit('/field-crop-summary', {
+                method: 'post',
+                data: {
+                    summary: summary,
+                    zones: zones.map(zone => ({
+                        id: zone.id,
+                        name: zone.name,
+                        color: zone.color,
+                        assignedCrop: zoneAssignments[zone.id] ? {
+                            value: zoneAssignments[zone.id],
+                            name: getCropByValue(zoneAssignments[zone.id])?.name ?? null,
+                            icon: getCropByValue(zoneAssignments[zone.id])?.icon ?? null
+                        } : null,
+                        irrigationType: irrigationAssignments[zone.id] || null,
+                        coordinates: zone.coordinates
+                    })),
+                    equipment: equipmentIcons.map(eq => ({
+                        id: eq.id,
+                        type: eq.type,
+                        name: eq.name,
+                        lat: eq.lat,
+                        lng: eq.lng,
+                        config: eq.config
+                    })),
+                    irrigationPoints: irrigationPoints.map(point => ({
+                        id: point.id,
+                        lat: point.lat,
+                        lng: point.lng,
+                        type: point.type,
+                        radius: point.radius,
+                        zoneId: point.zoneId
+                    }))
+                }
+            });
 
         } catch (error) {
             console.error('Error capturing map and summary:', error);
             handleError('Failed to capture map summary');
         }
     }, [map, zones, zoneAssignments, pipes, equipmentIcons, irrigationPoints, irrigationAssignments, fieldAreaSize, setZoneSummaries, handleError]);
+
+    // Load existing zone labels when map is ready
+    useEffect(() => {
+        if (map && zones.length > 0) {
+            // Clear existing labels first
+            mapObjects.zoneLabels.forEach(marker => marker.setMap(null));
+            setMapObjects(prev => ({ ...prev, zoneLabels: [] }));
+
+            // Add labels for zones with assigned crops
+            Object.entries(zoneAssignments).forEach(([zoneId, cropValue]) => {
+                updateZoneLabel(zoneId, cropValue);
+            });
+        }
+    }, [map, zones.length]); // Don't include zoneAssignments to avoid infinite loop
 
     // Cleanup
     useEffect(() => {
@@ -2288,6 +2428,66 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                                     🎯
                                                 </button>
                                             </Tooltip>
+                                            
+                                            {/* Equipment Placement Buttons - Only show in Step 3 */}
+                                            {currentStep === 3 && (
+                                                <>
+                                                    <Tooltip content="Place Water Pump">
+                                                        <button
+                                                            onClick={() => startPlacingEquipment('pump')}
+                                                            className={`rounded bg-white px-3 py-2 text-sm text-gray-700 shadow-md transition-colors hover:bg-gray-50 ${
+                                                                isPlacingEquipment && selectedEquipmentType === 'pump' ? 'ring-2 ring-blue-500' : ''
+                                                            }`}
+                                                        >
+                                                            <img 
+                                                                src="/generateTree/wtpump.png" 
+                                                                alt="Pump" 
+                                                                className="h-6 w-6 object-contain"
+                                                            />
+                                                        </button>
+                                                    </Tooltip>
+                                                    <Tooltip content="Place Solenoid Valve">
+                                                        <button
+                                                            onClick={() => startPlacingEquipment('solenoid')}
+                                                            className={`rounded bg-white px-3 py-2 text-sm text-gray-700 shadow-md transition-colors hover:bg-gray-50 ${
+                                                                isPlacingEquipment && selectedEquipmentType === 'solenoid' ? 'ring-2 ring-blue-500' : ''
+                                                            }`}
+                                                        >
+                                                            <img 
+                                                                src="/generateTree/solv.png" 
+                                                                alt="Solenoid Valve" 
+                                                                className="h-6 w-6 object-contain"
+                                                            />
+                                                        </button>
+                                                    </Tooltip>
+                                                    <Tooltip content="Place Ball Valve">
+                                                        <button
+                                                            onClick={() => startPlacingEquipment('ballvalve')}
+                                                            className={`rounded bg-white px-3 py-2 text-sm text-gray-700 shadow-md transition-colors hover:bg-gray-50 ${
+                                                                isPlacingEquipment && selectedEquipmentType === 'ballvalve' ? 'ring-2 ring-blue-500' : ''
+                                                            }`}
+                                                        >
+                                                            <img 
+                                                                src="/generateTree/ballv.png" 
+                                                                alt="Ball Valve" 
+                                                                className="h-6 w-6 object-contain"
+                                                            />
+                                                        </button>
+                                                    </Tooltip>
+                                                    
+                                                    {/* Cancel Equipment Placement Button */}
+                                                    {isPlacingEquipment && (
+                                                        <Tooltip content="Cancel Equipment Placement">
+                                                            <button
+                                                                onClick={cancelPlacingEquipment}
+                                                                className="rounded bg-red-500 px-3 py-2 text-sm text-white shadow-md transition-colors hover:bg-red-600"
+                                                            >
+                                                                ❌
+                                                            </button>
+                                                        </Tooltip>
+                                                    )}
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

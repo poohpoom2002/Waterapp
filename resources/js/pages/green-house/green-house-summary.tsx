@@ -67,10 +67,44 @@ interface GreenhouseSummaryData {
 export default function GreenhouseSummary() {
     const [summaryData, setSummaryData] = useState<GreenhouseSummaryData | null>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    
+    // Image cache for component icons
+    const [componentImages, setComponentImages] = useState<{[key: string]: HTMLImageElement}>({});
+
+    // Load component images
+    useEffect(() => {
+        const imageConfigs = {
+            pump: '/generateTree/wtpump.png',
+            'solenoid-valve': '/generateTree/solv.png',
+            'ball-valve': '/generateTree/ballv.png'
+        };
+
+        const loadImages = async () => {
+            const images: {[key: string]: HTMLImageElement} = {};
+            
+            for (const [type, src] of Object.entries(imageConfigs)) {
+                try {
+                    const img = new Image();
+                    img.src = src;
+                    await new Promise((resolve, reject) => {
+                        img.onload = resolve;
+                        img.onerror = reject;
+                    });
+                    images[type] = img;
+                } catch (error) {
+                    console.warn(`Failed to load image for ${type}:`, error);
+                }
+            }
+            
+            setComponentImages(images);
+        };
+
+        loadImages().catch(console.error);
+    }, []);
 
     const handleEditProject = () => {
         if (summaryData) {
-            // บันทึกข้อมูลใน localStorage ก่อนย้อนกลับ
+            // บันทึกข้อมูลใน localStorage ก่อนย้อนกลับ รวมทั้ง irrigationElements
             const dataToSave = {
                 ...summaryData,
                 updatedAt: new Date().toISOString(),
@@ -91,6 +125,8 @@ export default function GreenhouseSummary() {
             if (summaryData.irrigationMethod) {
                 queryParams.set('irrigation', summaryData.irrigationMethod);
             }
+            // เพิ่ม flag เพื่อบอกว่าต้องโหลด irrigation elements
+            queryParams.set('loadIrrigation', 'true');
 
             // นำทางไปยัง green-house-map พร้อมข้อมูล
             window.location.href = `/greenhouse-map?${queryParams.toString()}`;
@@ -151,7 +187,7 @@ export default function GreenhouseSummary() {
         }
     }, []);
 
-    // Helper function to draw component shapes (irrigation equipment)
+    // Helper function to draw component shapes (irrigation equipment) - ปรับปรุงใหม่
     const drawComponentShape = (
         ctx: CanvasRenderingContext2D,
         type: string,
@@ -159,6 +195,38 @@ export default function GreenhouseSummary() {
         color: string,
         scale: number = 1
     ) => {
+        // Try to use image first
+        if (componentImages[type]) {
+            const img = componentImages[type];
+            
+            // Different sizes for different components
+            let imgSize, containerSize;
+            if (type === 'pump') {
+                imgSize = 18 * scale;
+                containerSize = 24 * scale;
+            } else { // valves
+                imgSize = 12 * scale;
+                containerSize = 18 * scale;
+            }
+            
+            ctx.save();
+            
+            // Draw circular container background
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.strokeStyle = '#666666';
+            ctx.lineWidth = 1.5 * scale;
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, containerSize/2, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.stroke();
+            
+            // Draw the component image
+            ctx.drawImage(img, point.x - imgSize/2, point.y - imgSize/2, imgSize, imgSize);
+            ctx.restore();
+            return;
+        }
+
+        // Fallback to original drawing if image not loaded
         const size = 8 * scale;
 
         ctx.fillStyle = color;
@@ -693,7 +761,7 @@ export default function GreenhouseSummary() {
                 }
             }
         }
-    }, [summaryData]);
+    }, [summaryData, componentImages]); // เพิ่ม componentImages เป็น dependency
 
     // Show loading or no data message
     if (!summaryData) {
@@ -1246,4 +1314,4 @@ export default function GreenhouseSummary() {
             </div>
         </div>
     );
-}
+};

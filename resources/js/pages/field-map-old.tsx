@@ -1,12 +1,17 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Head, Link } from '@inertiajs/react';
-import { Wrapper, Status } from '@googlemaps/react-wrapper';
+import { MapContainer, TileLayer, FeatureGroup } from 'react-leaflet';
+import { EditControl } from 'react-leaflet-draw';
+import 'leaflet/dist/leaflet.css';
+import 'leaflet-draw/dist/leaflet.draw.css';
+import L from 'leaflet';
 import * as turf from '@turf/turf';
 import { getCropByValue } from '@/pages/utils/cropData';
 import {
     ZONE_COLORS,
     OBSTACLE_TYPES,
     PIPE_TYPES,
+    MAP_TILES,
     EQUIPMENT_TYPES,
     type PipeType,
     type EquipmentType,
@@ -22,339 +27,23 @@ import {
 } from '@/pages/hooks/useFieldMapState';
 import Tooltip from '@/pages/components/Fieldcrop/Tooltip';
 import LocationSearchOverlay from '@/pages/components/Fieldcrop/LocationSearchOverlay';
+import MapControls from '@/pages/components/Fieldcrop/MapControls';
+import MapClickHandler from '@/pages/components/Fieldcrop/MapClickHandler';
 import FieldMapToolsPanel from '@/pages/components/Fieldcrop/FieldMapToolsPanel';
 import FieldMapSmartControls from '@/pages/components/Fieldcrop/FieldMapSmartControls';
+import FieldMapTypeSelector from '@/pages/components/Fieldcrop/FieldMapTypeSelector';
+
 import ErrorBoundary from '@/pages/components/ErrorBoundary';
 import ErrorMessage from '@/pages/components/ErrorMessage';
 import LoadingSpinner from '@/pages/components/LoadingSpinner';
 
-const getGoogleMapsConfig = () => ({
-    apiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
-    libraries: ['drawing', 'geometry', 'places'] as const,
-    defaultZoom: 15,
+// Fix leaflet icon issue
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
-
-interface GoogleMapComponentProps {
-    center: google.maps.LatLngLiteral;
-    zoom: number;
-    onLoad: (map: google.maps.Map) => void;
-    onDrawCreated: (overlay: google.maps.MVCObject, type: string) => void;
-    drawingStage: string;
-    currentZoneColor: string;
-    drawingMode?: string;
-    canDrawZone?: boolean;
-    canDrawPipe?: boolean;
-    currentObstacleType?: string;
-    currentPipeType?: string;
-    isPlacingEquipment?: boolean;
-    selectedEquipmentType?: EquipmentType | null;
-    zones?: any[];
-    pipes?: any[];
-    obstacles?: any[];
-    equipmentIcons?: any[];
-    mainField?: any;
-    onMapClick?: (e: google.maps.MapMouseEvent) => void;
-    onEquipmentPlace?: (equipmentType: EquipmentType, position: { lat: number; lng: number }) => void;
-    onZoneClick?: (zone: any) => void;
-    mapType: string;
-    // Add sync props
-    setDrawingMode?: (mode: 'zone' | 'obstacle') => void;
-    setCurrentZoneColor?: (color: string) => void;
-    setCurrentObstacleType?: (type: ObstacleType) => void;
-    setCurrentPipeType?: (type: PipeType) => void;
-}
-
-const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({ 
-    center, 
-    zoom, 
-    onLoad, 
-    onDrawCreated, 
-    drawingStage, 
-    currentZoneColor,
-    drawingMode,
-    canDrawZone,
-    canDrawPipe,
-    currentObstacleType,
-    currentPipeType,
-    isPlacingEquipment,
-    selectedEquipmentType,
-    zones,
-    pipes,
-    obstacles,
-    equipmentIcons,
-    mainField,
-    onMapClick,
-    onEquipmentPlace,
-    onZoneClick,
-    mapType
-}) => {
-    const ref = useRef<HTMLDivElement>(null);
-    const [map, setMap] = useState<google.maps.Map>();
-    const [drawingManager, setDrawingManager] = useState<google.maps.drawing.DrawingManager>();
-    const [currentDrawingMode, setCurrentDrawingMode] = useState<google.maps.drawing.OverlayType | null>(null);
-
-    useEffect(() => {
-        if (ref.current && !map) {
-            const newMap = new google.maps.Map(ref.current, {
-                center,
-                zoom,
-                mapTypeId: mapType as google.maps.MapTypeId,
-                mapTypeControl: false,
-                streetViewControl: false,
-                fullscreenControl: false,
-                zoomControl: false,
-            });
-
-            // Initialize Drawing Manager
-            const drawingMgr = new google.maps.drawing.DrawingManager({
-                drawingMode: null,
-                drawingControl: false, // We'll handle this manually
-                polygonOptions: {
-                    fillColor: currentZoneColor,
-                    fillOpacity: 0.3,
-                    strokeColor: currentZoneColor,
-                    strokeWeight: 2,
-                    clickable: true,
-                    editable: true,
-                    zIndex: 1
-                },
-                polylineOptions: {
-                    strokeColor: PIPE_TYPES[currentPipeType as keyof typeof PIPE_TYPES]?.color || '#3388ff',
-                    strokeWeight: 4,
-                    clickable: true,
-                    editable: true,
-                    zIndex: 1
-                }
-            });
-
-            drawingMgr.setMap(newMap);
-
-            // Add drawing event listeners
-            google.maps.event.addListener(drawingMgr, 'overlaycomplete', (event: any) => {
-                const overlay = event.overlay;
-                const type = event.type;
-                
-                // Stop drawing after completion
-                drawingMgr.setDrawingMode(null);
-                setCurrentDrawingMode(null);
-                
-                onDrawCreated(overlay, type);
-            });
-
-            // Add map click listener
-            newMap.addListener('click', (e: google.maps.MapMouseEvent) => {
-                if (onMapClick) {
-                    onMapClick(e);
-                }
-            });
-
-            setMap(newMap);
-            setDrawingManager(drawingMgr);
-            onLoad(newMap);
-        }
-    }, []);
-
-    // Function to start drawing
-    const startDrawing = (type: 'polygon' | 'polyline') => {
-        if (drawingManager) {
-            const mode = type === 'polygon' ? 
-                google.maps.drawing.OverlayType.POLYGON : 
-                google.maps.drawing.OverlayType.POLYLINE;
-            
-            drawingManager.setDrawingMode(mode);
-            setCurrentDrawingMode(mode);
-        }
-    };
-
-    // Function to stop drawing
-    const stopDrawing = () => {
-        if (drawingManager) {
-            drawingManager.setDrawingMode(null);
-            setCurrentDrawingMode(null);
-        }
-    };
-
-    // Update map type when changed
-    useEffect(() => {
-        if (map) {
-            map.setMapTypeId(mapType as google.maps.MapTypeId);
-        }
-    }, [map, mapType]);
-
-    // Update drawing options based on current stage
-    useEffect(() => {
-        if (drawingManager) {
-            // Update polygon options for zones
-            if (drawingStage === 'zones' && drawingMode === 'zone') {
-                drawingManager.setOptions({
-                    polygonOptions: {
-                        fillColor: currentZoneColor,
-                        fillOpacity: 0.3,
-                        strokeColor: currentZoneColor,
-                        strokeWeight: 2,
-                        clickable: true,
-                        editable: true,
-                        zIndex: 1
-                    }
-                });
-            }
-
-            // Update obstacle options
-            if (drawingStage === 'zones' && drawingMode === 'obstacle') {
-                const obstacleConfig = OBSTACLE_TYPES[currentObstacleType as keyof typeof OBSTACLE_TYPES];
-                drawingManager.setOptions({
-                    polygonOptions: {
-                        fillColor: obstacleConfig?.color || '#FF0000',
-                        fillOpacity: 0.4,
-                        strokeColor: obstacleConfig?.color || '#FF0000',
-                        strokeWeight: 2,
-                        clickable: true,
-                        editable: true,
-                        zIndex: 2
-                    }
-                });
-            }
-
-            // Update polyline options for pipes
-            if (drawingStage === 'pipes') {
-                drawingManager.setOptions({
-                    polylineOptions: {
-                        strokeColor: PIPE_TYPES[currentPipeType as keyof typeof PIPE_TYPES]?.color || '#3388ff',
-                        strokeWeight: PIPE_TYPES[currentPipeType as keyof typeof PIPE_TYPES]?.weight || 4,
-                        strokeOpacity: PIPE_TYPES[currentPipeType as keyof typeof PIPE_TYPES]?.opacity || 1,
-                        clickable: true,
-                        editable: true,
-                        zIndex: 1
-                    }
-                });
-            }
-        }
-    }, [drawingManager, drawingStage, drawingMode, currentZoneColor, currentPipeType, currentObstacleType]);
-
-    // Update center and zoom
-    useEffect(() => {
-        if (map) {
-            map.setCenter(center);
-            map.setZoom(zoom);
-        }
-    }, [map, center, zoom]);
-
-    return (
-        <>
-            <div ref={ref} style={{ width: '100%', height: '100%' }} />
-            
-            {/* Drawing Controls Overlay - Top Left, Smaller */}
-            <div className="absolute top-2 left-2 z-10 bg-white rounded-md shadow-md p-2 max-w-xs">
-                {/* Step 1: Field Drawing */}
-                {drawingStage === 'field' && (
-                    <div className="flex flex-col space-y-1">
-                        <div className="text-xs font-semibold text-gray-700">Step 1: Draw Field</div>
-                        <button
-                            onClick={() => startDrawing('polygon')}
-                            disabled={currentDrawingMode !== null}
-                            className={`px-2 py-1 text-xs rounded ${
-                                currentDrawingMode === google.maps.drawing.OverlayType.POLYGON
-                                    ? 'bg-green-600 text-white'
-                                    : 'bg-green-500 text-white hover:bg-green-600'
-                            } disabled:opacity-50`}
-                        >
-                            🏔️ {currentDrawingMode === google.maps.drawing.OverlayType.POLYGON ? 'Drawing...' : 'Draw Field'}
-                        </button>
-                        {currentDrawingMode && (
-                            <button
-                                onClick={stopDrawing}
-                                className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
-                            >
-                                ❌ Cancel
-                            </button>
-                        )}
-                    </div>
-                )}
-
-                {/* Step 2: Zones & Obstacles */}
-                {drawingStage === 'zones' && (
-                    <div className="flex flex-col space-y-1">
-                        <div className="text-xs font-semibold text-gray-700">Step 2: Zones & Obstacles</div>
-                        
-                        {drawingMode === 'zone' && canDrawZone && (
-                            <button
-                                onClick={() => startDrawing('polygon')}
-                                disabled={currentDrawingMode !== null}
-                                className={`px-2 py-1 text-xs rounded ${
-                                    currentDrawingMode === google.maps.drawing.OverlayType.POLYGON
-                                        ? 'bg-blue-600 text-white'
-                                        : 'bg-blue-500 text-white hover:bg-blue-600'
-                                } disabled:opacity-50`}
-                                style={{ borderLeft: `4px solid ${currentZoneColor}` }}
-                            >
-                                🎨 {currentDrawingMode === google.maps.drawing.OverlayType.POLYGON ? 'Drawing...' : 'Draw Zone'}
-                            </button>
-                        )}
-
-                        {drawingMode === 'obstacle' && (
-                            <button
-                                onClick={() => startDrawing('polygon')}
-                                disabled={currentDrawingMode !== null}
-                                className={`px-2 py-1 text-xs rounded ${
-                                    currentDrawingMode === google.maps.drawing.OverlayType.POLYGON
-                                        ? 'bg-red-600 text-white'
-                                        : 'bg-red-500 text-white hover:bg-red-600'
-                                } disabled:opacity-50`}
-                            >
-                                🚫 {currentDrawingMode === google.maps.drawing.OverlayType.POLYGON ? 'Drawing...' : 'Draw Obstacle'}
-                            </button>
-                        )}
-
-                        {currentDrawingMode && (
-                            <button
-                                onClick={stopDrawing}
-                                className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
-                            >
-                                ❌ Cancel
-                            </button>
-                        )}
-                    </div>
-                )}
-
-                {/* Step 3: Pipes */}
-                {drawingStage === 'pipes' && canDrawPipe && (
-                    <div className="flex flex-col space-y-1">
-                        <div className="text-xs font-semibold text-gray-700">Step 3: Pipe System</div>
-                        <button
-                            onClick={() => startDrawing('polyline')}
-                            disabled={currentDrawingMode !== null}
-                            className={`px-2 py-1 text-xs rounded ${
-                                currentDrawingMode === google.maps.drawing.OverlayType.POLYLINE
-                                    ? 'bg-purple-600 text-white'
-                                    : 'bg-purple-500 text-white hover:bg-purple-600'
-                            } disabled:opacity-50`}
-                        >
-                            🔧 {currentDrawingMode === google.maps.drawing.OverlayType.POLYLINE ? 'Drawing...' : `Draw ${PIPE_TYPES[currentPipeType as keyof typeof PIPE_TYPES]?.name || 'Pipe'}`}
-                        </button>
-                        {currentDrawingMode && (
-                            <button
-                                onClick={stopDrawing}
-                                className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
-                            >
-                                ❌ Cancel
-                            </button>
-                        )}
-                    </div>
-                )}
-
-                {/* Equipment Placement Mode */}
-                {isPlacingEquipment && selectedEquipmentType && (
-                    <div className="flex flex-col space-y-1">
-                        <div className="text-xs font-semibold text-gray-700">Equipment Placement</div>
-                        <div className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">
-                            {EQUIPMENT_TYPES[selectedEquipmentType].icon} Click to place {EQUIPMENT_TYPES[selectedEquipmentType].name}
-                        </div>
-                    </div>
-                )}
-            </div>
-        </>
-    );
-};
 
 interface FieldMapProps {
     crops?: string;
@@ -388,6 +77,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         setIsLocationSelected,
         showDropdown,
         setShowDropdown,
+        mapRef,
         blurTimeoutRef,
     } = mapState;
 
@@ -441,6 +131,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         setTempPlantSpacing,
         editingPlantSpacingForCrop,
         setEditingPlantSpacingForCrop,
+        featureGroupRef,
     } = fieldZoneState;
 
     const {
@@ -454,6 +145,8 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         setPipeSnapEnabled,
         pipeSnapDistance,
         setPipeSnapDistance,
+        pipeSnapIndicators,
+        setPipeSnapIndicators,
         isGeneratingPipes,
         setIsGeneratingPipes,
         snapEnabled,
@@ -498,43 +191,6 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
     // New states for error handling and loading
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
-
-    // Map state
-    const [map, setMap] = useState<google.maps.Map | null>(null);
-
-    // Store Google Maps objects
-    const [mapObjects, setMapObjects] = useState<{
-        zones: google.maps.Polygon[];
-        pipes: google.maps.Polyline[];
-        obstacles: google.maps.Polygon[];
-        equipment: google.maps.Marker[];
-        irrigation: google.maps.Marker[];
-        irrigationCircles: google.maps.Circle[];
-        irrigationLines: google.maps.Polyline[];
-        plantMarkers: google.maps.Marker[];
-    }>({
-        zones: [],
-        pipes: [],
-        obstacles: [],
-        equipment: [],
-        irrigation: [],
-        irrigationCircles: [],
-        irrigationLines: [],
-        plantMarkers: [],
-    });
-
-    // Missing handler functions
-    const handleMapClick = (e: google.maps.MapMouseEvent) => {
-        if (isPlacingEquipment && selectedEquipmentType && e.latLng) {
-            const lat = e.latLng.lat();
-            const lng = e.latLng.lng();
-            placeEquipmentAtPosition(lat, lng);
-        }
-    };
-
-    const handleEquipmentPlace = (equipmentType: EquipmentType, position: { lat: number; lng: number }) => {
-        placeEquipmentAtPosition(position.lat, position.lng);
-    };
 
     // Parse URL parameters
     useEffect(() => {
@@ -603,8 +259,22 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
 
     const resetAll = () => {
         if (confirm('⚠️ คุณต้องการรีเซ็ตทั้งหมดหรือไม่? ข้อมูลที่วาดไว้จะหายทั้งหมด')) {
-            // Clear all Google Maps objects
-            clearAllMapObjects();
+            // Clean up markers
+            zones.forEach((zone) => {
+                if (zone.plantMarker && mapRef.current) {
+                    mapRef.current.removeLayer(zone.plantMarker);
+                }
+            });
+
+            equipmentIcons.forEach((equipment) => {
+                if (equipment.marker && mapRef.current) {
+                    mapRef.current.removeLayer(equipment.marker);
+                }
+            });
+
+            if (featureGroupRef.current) {
+                featureGroupRef.current.clearLayers();
+            }
 
             // Reset all state
             setMainField(null);
@@ -633,48 +303,22 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             setIrrigationSettings({});
             setIrrigationRadius({});
             setSprinklerOverlap({});
+            hidePipeSnapIndicators();
             setZoneSummaries({});
+
+            // Clear planting points (no markers to remove since we don't display them)
             setPlantingPoints([]);
         }
     };
 
-    // Clear all Google Maps objects
-    const clearAllMapObjects = () => {
-        // Clear zones
-        mapObjects.zones.forEach(zone => zone.setMap(null));
-        // Clear pipes
-        mapObjects.pipes.forEach(pipe => pipe.setMap(null));
-        // Clear obstacles
-        mapObjects.obstacles.forEach(obstacle => obstacle.setMap(null));
-        // Clear equipment
-        mapObjects.equipment.forEach(equipment => equipment.setMap(null));
-        // Clear irrigation
-        mapObjects.irrigation.forEach(irrigation => irrigation.setMap(null));
-        mapObjects.irrigationCircles.forEach(circle => circle.setMap(null));
-        mapObjects.irrigationLines.forEach(line => line.setMap(null));
-        // Clear plant markers
-        mapObjects.plantMarkers.forEach(marker => marker.setMap(null));
-
-        // Reset the objects state
-        setMapObjects({
-            zones: [],
-            pipes: [],
-            obstacles: [],
-            equipment: [],
-            irrigation: [],
-            irrigationCircles: [],
-            irrigationLines: [],
-            plantMarkers: [],
-        });
-    };
-
     // Equipment functions
     const startPlacingEquipment = (equipmentType: EquipmentType) => {
+        const equipmentConfig = EQUIPMENT_TYPES[equipmentType];
         setSelectedEquipmentType(equipmentType);
         setIsPlacingEquipment(true);
 
-        if (map) {
-            map.setOptions({ draggableCursor: 'crosshair' });
+        if (mapRef.current) {
+            mapRef.current.getContainer().style.cursor = 'crosshair';
         }
     };
 
@@ -682,13 +326,13 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         setIsPlacingEquipment(false);
         setSelectedEquipmentType(null);
 
-        if (map) {
-            map.setOptions({ draggableCursor: null });
+        if (mapRef.current) {
+            mapRef.current.getContainer().style.cursor = '';
         }
     };
 
     const placeEquipmentAtPosition = (lat: number, lng: number) => {
-        if (!selectedEquipmentType || !map) return;
+        if (!selectedEquipmentType) return;
 
         const equipmentConfig = EQUIPMENT_TYPES[selectedEquipmentType];
         const equipmentId = Date.now().toString();
@@ -702,7 +346,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             config: equipmentConfig,
         };
 
-        // Create Google Maps marker
+        // Use image for pump, ballvalve, solenoid; fallback to icon for others
         let iconHtml = '';
         if (
             selectedEquipmentType === 'pump' ||
@@ -718,79 +362,46 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             iconHtml = equipmentConfig.icon;
         }
 
-        const marker = new google.maps.Marker({
-            position: { lat, lng },
-            map: map,
-            title: equipmentConfig.name,
-            icon: {
-                url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                    <svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="20" cy="20" r="18" fill="white" stroke="${equipmentConfig.color}" stroke-width="2"/>
-                        <foreignObject x="6" y="6" width="28" height="28">
-                            <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; font-size: 16px;">
-                                ${iconHtml}
-                            </div>
-                        </foreignObject>
-                    </svg>
-                `)}`,
-                scaledSize: new google.maps.Size(40, 40),
-                anchor: new google.maps.Point(20, 20),
-            }
+        const customIcon = L.divIcon({
+            html: `<div style="background: white; border: 2px solid ${equipmentConfig.color}; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); cursor: pointer;" title="${equipmentConfig.name}">${iconHtml}</div>`,
+            iconSize: [40, 40],
+            iconAnchor: [20, 20],
+            popupAnchor: [0, -20],
+            className: 'custom-equipment-icon',
         });
 
-        const infoWindow = new google.maps.InfoWindow({
-            content: `
-                <div style="text-align: center;">
-                    <h3>${equipmentConfig.name}</h3>
-                    <p>${equipmentConfig.description}</p>
-                    <button onclick="window.removeEquipment('${equipmentId}')" style="background: #dc2626; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-top: 5px;">ลบ</button>
-                </div>
-            `
-        });
+        const marker = L.marker([lat, lng], { icon: customIcon }).bindPopup(
+            `<div style="text-align: center;"><h3>${equipmentConfig.name}</h3><p>${equipmentConfig.description}</p><button onclick="removeEquipment('${equipmentId}')" style="background: #dc2626; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-top: 5px;">ลบ</button></div>`
+        );
 
-        marker.addListener('click', () => {
-            infoWindow.open(map, marker);
-        });
+        if (mapRef.current) {
+            marker.addTo(mapRef.current);
+        }
 
         (newEquipment as any).marker = marker;
 
         const newEquipmentState = [...equipmentIcons, newEquipment];
         setEquipmentIcons(newEquipmentState);
-        setMapObjects(prev => ({
-            ...prev,
-            equipment: [...prev.equipment, marker]
-        }));
         saveEquipmentToHistory(newEquipmentState);
         cancelPlacingEquipment();
     };
 
-    // Make removeEquipment available globally for InfoWindow buttons
-    useEffect(() => {
-        (window as any).removeEquipment = (equipmentId: string) => {
-            const equipmentToRemove = equipmentIcons.find((e) => e.id === equipmentId);
-            if (!equipmentToRemove) return;
+    const removeEquipment = (equipmentId: string) => {
+        const equipmentToRemove = equipmentIcons.find((e) => e.id === equipmentId);
+        if (!equipmentToRemove) return;
 
-            const equipmentConfig = EQUIPMENT_TYPES[equipmentToRemove.type];
+        const equipmentConfig = EQUIPMENT_TYPES[equipmentToRemove.type];
 
-            if (confirm(`ต้องการลบ ${equipmentConfig.name} หรือไม่?`)) {
-                const newEquipmentState = equipmentIcons.filter((e) => e.id !== equipmentId);
-                setEquipmentIcons(newEquipmentState);
-                saveEquipmentToHistory(newEquipmentState);
+        if (confirm(`ต้องการลบ ${equipmentConfig.name} หรือไม่?`)) {
+            const newEquipmentState = equipmentIcons.filter((e) => e.id !== equipmentId);
+            setEquipmentIcons(newEquipmentState);
+            saveEquipmentToHistory(newEquipmentState);
 
-                if (equipmentToRemove.marker) {
-                    equipmentToRemove.marker.setMap(null);
-                    setMapObjects(prev => ({
-                        ...prev,
-                        equipment: prev.equipment.filter(marker => marker !== equipmentToRemove.marker)
-                    }));
-                }
+            if (equipmentToRemove.marker && mapRef.current) {
+                mapRef.current.removeLayer(equipmentToRemove.marker);
             }
-        };
-
-        return () => {
-            delete (window as any).removeEquipment;
-        };
-    }, [equipmentIcons]);
+        }
+    };
 
     const clearAllEquipment = () => {
         if (equipmentIcons.length === 0) {
@@ -798,8 +409,12 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         }
 
         if (confirm('ต้องการลบอุปกรณ์ทั้งหมดหรือไม่?')) {
-            mapObjects.equipment.forEach(marker => marker.setMap(null));
-            setMapObjects(prev => ({ ...prev, equipment: [] }));
+            equipmentIcons.forEach((equipment) => {
+                if (equipment.marker && mapRef.current) {
+                    mapRef.current.removeLayer(equipment.marker);
+                }
+            });
+
             setEquipmentIcons([]);
             saveEquipmentToHistory([]);
         }
@@ -814,19 +429,21 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
 
     const undoEquipment = () => {
         if (equipmentHistoryIndex > 0) {
-            // Clear current equipment
-            mapObjects.equipment.forEach(marker => marker.setMap(null));
+            equipmentIcons.forEach((equipment) => {
+                if (equipment.marker && mapRef.current) {
+                    mapRef.current.removeLayer(equipment.marker);
+                }
+            });
 
             const newIndex = equipmentHistoryIndex - 1;
             const restoredEquipment = equipmentHistory[newIndex];
             setEquipmentIcons([...restoredEquipment]);
             setEquipmentHistoryIndex(newIndex);
 
-            // Recreate markers
-            const newMarkers: google.maps.Marker[] = [];
             restoredEquipment.forEach((equipment: any) => {
                 const equipmentConfig = EQUIPMENT_TYPES[equipment.type];
-                
+
+                // Use image for pump, ballvalve, solenoid; fallback to icon for others
                 let iconHtml = '';
                 if (
                     equipment.type === 'pump' ||
@@ -842,63 +459,45 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     iconHtml = equipmentConfig.icon;
                 }
 
-                const marker = new google.maps.Marker({
-                    position: { lat: equipment.lat, lng: equipment.lng },
-                    map: map,
-                    title: equipmentConfig.name,
-                    icon: {
-                        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                            <svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="20" cy="20" r="18" fill="white" stroke="${equipmentConfig.color}" stroke-width="2"/>
-                                <foreignObject x="6" y="6" width="28" height="28">
-                                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; font-size: 16px;">
-                                        ${iconHtml}
-                                    </div>
-                                </foreignObject>
-                            </svg>
-                        `)}`,
-                        scaledSize: new google.maps.Size(40, 40),
-                        anchor: new google.maps.Point(20, 20),
-                    }
+                const customIcon = L.divIcon({
+                    html: `<div style="background: white; border: 2px solid ${equipmentConfig.color}; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); cursor: pointer;" title="${equipmentConfig.name}">${iconHtml}</div>`,
+                    iconSize: [40, 40],
+                    iconAnchor: [20, 20],
+                    popupAnchor: [0, -20],
+                    className: 'custom-equipment-icon',
                 });
 
-                const infoWindow = new google.maps.InfoWindow({
-                    content: `
-                        <div style="text-align: center;">
-                            <h3>${equipmentConfig.name}</h3>
-                            <p>${equipmentConfig.description}</p>
-                            <button onclick="window.removeEquipment('${equipment.id}')" style="background: #dc2626; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-top: 5px;">ลบ</button>
-                        </div>
-                    `
-                });
+                const marker = L.marker([equipment.lat, equipment.lng], {
+                    icon: customIcon,
+                }).bindPopup(
+                    `<div style="text-align: center;"><h3>${equipmentConfig.name}</h3><p>${equipmentConfig.description}</p><button onclick="removeEquipment('${equipment.id}')" style="background: #dc2626; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-top: 5px;">ลบ</button></div>`
+                );
 
-                marker.addListener('click', () => {
-                    infoWindow.open(map, marker);
-                });
-
+                if (mapRef.current) {
+                    marker.addTo(mapRef.current);
+                }
                 equipment.marker = marker;
-                newMarkers.push(marker);
             });
-
-            setMapObjects(prev => ({ ...prev, equipment: newMarkers }));
         }
     };
 
     const redoEquipment = () => {
         if (equipmentHistoryIndex < equipmentHistory.length - 1) {
-            // Clear current equipment
-            mapObjects.equipment.forEach(marker => marker.setMap(null));
+            equipmentIcons.forEach((equipment) => {
+                if (equipment.marker && mapRef.current) {
+                    mapRef.current.removeLayer(equipment.marker);
+                }
+            });
 
             const newIndex = equipmentHistoryIndex + 1;
             const restoredEquipment = equipmentHistory[newIndex];
             setEquipmentIcons([...restoredEquipment]);
             setEquipmentHistoryIndex(newIndex);
 
-            // Recreate markers
-            const newMarkers: google.maps.Marker[] = [];
             restoredEquipment.forEach((equipment: any) => {
                 const equipmentConfig = EQUIPMENT_TYPES[equipment.type];
-                
+
+                // Use image for pump, ballvalve, solenoid; fallback to icon for others
                 let iconHtml = '';
                 if (
                     equipment.type === 'pump' ||
@@ -914,49 +513,29 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     iconHtml = equipmentConfig.icon;
                 }
 
-                const marker = new google.maps.Marker({
-                    position: { lat: equipment.lat, lng: equipment.lng },
-                    map: map,
-                    title: equipmentConfig.name,
-                    icon: {
-                        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                            <svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="20" cy="20" r="18" fill="white" stroke="${equipmentConfig.color}" stroke-width="2"/>
-                                <foreignObject x="6" y="6" width="28" height="28">
-                                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; font-size: 16px;">
-                                        ${iconHtml}
-                                    </div>
-                                </foreignObject>
-                            </svg>
-                        `)}`,
-                        scaledSize: new google.maps.Size(40, 40),
-                        anchor: new google.maps.Point(20, 20),
-                    }
+                const customIcon = L.divIcon({
+                    html: `<div style="background: white; border: 2px solid ${equipmentConfig.color}; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); cursor: pointer;" title="${equipmentConfig.name}">${iconHtml}</div>`,
+                    iconSize: [40, 40],
+                    iconAnchor: [20, 20],
+                    popupAnchor: [0, -20],
+                    className: 'custom-equipment-icon',
                 });
 
-                const infoWindow = new google.maps.InfoWindow({
-                    content: `
-                        <div style="text-align: center;">
-                            <h3>${equipmentConfig.name}</h3>
-                            <p>${equipmentConfig.description}</p>
-                            <button onclick="window.removeEquipment('${equipment.id}')" style="background: #dc2626; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-top: 5px;">ลบ</button>
-                        </div>
-                    `
-                });
+                const marker = L.marker([equipment.lat, equipment.lng], {
+                    icon: customIcon,
+                }).bindPopup(
+                    `<div style="text-align: center;"><h3>${equipmentConfig.name}</h3><p>${equipmentConfig.description}</p><button onclick="removeEquipment('${equipment.id}')" style="background: #dc2626; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-top: 5px;">ลบ</button></div>`
+                );
 
-                marker.addListener('click', () => {
-                    infoWindow.open(map, marker);
-                });
-
+                if (mapRef.current) {
+                    marker.addTo(mapRef.current);
+                }
                 equipment.marker = marker;
-                newMarkers.push(marker);
             });
-
-            setMapObjects(prev => ({ ...prev, equipment: newMarkers }));
         }
     };
 
-    // Irrigation system types
+    // Irrigation system types - UPDATED WITH DRIP POINTS
     const irrigationTypes = [
         {
             category: 'sprinkler',
@@ -1038,27 +617,69 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         return R * c;
     };
 
-    const isPointInPolygon = (point: { lat: number; lng: number }, polygon: google.maps.Polygon): boolean => {
-        if (!polygon) return false;
-        
-        const path = polygon.getPath();
-        return google.maps.geometry.poly.containsLocation(
-            new google.maps.LatLng(point.lat, point.lng),
-            polygon
-        );
+    const getLineIntersection = (p1: any, p2: any, p3: any, p4: any) => {
+        const x1 = p1.lng,
+            y1 = p1.lat;
+        const x2 = p2.lng,
+            y2 = p2.lat;
+        const x3 = p3.lng,
+            y3 = p3.lat;
+        const x4 = p4.lng,
+            y4 = p4.lat;
+
+        const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+        if (Math.abs(denom) < 0.0000001) return null;
+
+        const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+        const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
+
+        if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+            return {
+                lat: y1 + t * (y2 - y1),
+                lng: x1 + t * (x2 - x1),
+            };
+        }
+        return null;
     };
 
-    const isPointInObstacle = (point: { lat: number; lng: number }): boolean => {
-        return obstacles.some((obstacle) => obstacle.polygon && isPointInPolygon(point, obstacle.polygon));
+    const isPointInPolygon = (point: any, polygon: any) => {
+        if (!polygon || !polygon.getLatLngs) return false;
+
+        try {
+            const coords = polygon.getLatLngs()[0];
+            if (!coords || !Array.isArray(coords)) return false;
+
+            let inside = false;
+            const x = point.lng,
+                y = point.lat;
+
+            for (let i = 0, j = coords.length - 1; i < coords.length; j = i++) {
+                const xi = coords[i].lng,
+                    yi = coords[i].lat;
+                const xj = coords[j].lng,
+                    yj = coords[j].lat;
+
+                if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
+                    inside = !inside;
+                }
+            }
+            return inside;
+        } catch (error) {
+            return false;
+        }
     };
 
-    const isPointInZone = (point: { lat: number; lng: number }, zone: any): boolean => {
-        return zone.polygon && isPointInPolygon(point, zone.polygon);
+    const isPointInObstacle = (point: any): boolean => {
+        return obstacles.some((obstacle) => isPointInPolygon(point, obstacle.layer));
     };
 
-    // Google Places search functionality using new Places API
+    const isPointInZone = (point: any, zone: any): boolean => {
+        return isPointInPolygon(point, zone.layer);
+    };
+
+    // Search functionality
     const handleSearch = useCallback(async (query: string) => {
-        if (!query.trim() || !map) {
+        if (!query.trim()) {
             setSearchResults([]);
             setShowDropdown(false);
             return;
@@ -1067,85 +688,33 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         setIsSearching(true);
         setShowDropdown(true);
         try {
-            // Use the new Places API
-            const { Place } = await google.maps.importLibrary("places") as google.maps.PlacesLibrary;
-            
-            // Create a search request using Place.searchByText
-            const request = {
-                textQuery: query,
-                fields: ['displayName', 'location', 'formattedAddress', 'viewport'],
-                locationBias: map.getBounds() || undefined,
-                maxResultCount: 5,
-            };
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=5&countrycodes=th&addressdetails=1`
+            );
+            const data = await response.json();
 
-            const { places } = await Place.searchByText(request);
+            const results = data.map((item: any) => ({
+                x: item.lon,
+                y: item.lat,
+                label: item.display_name,
+                bounds: item.boundingbox
+                    ? [
+                          [parseFloat(item.boundingbox[0]), parseFloat(item.boundingbox[2])],
+                          [parseFloat(item.boundingbox[1]), parseFloat(item.boundingbox[3])],
+                      ]
+                    : null,
+                raw: item,
+            }));
 
-            if (places && places.length > 0) {
-                const searchResults = places.map((place) => ({
-                    x: place.location?.lng() || 0,
-                    y: place.location?.lat() || 0,
-                    label: place.displayName || '',
-                    address: place.formattedAddress || '',
-                    place_id: place.id,
-                    bounds: place.viewport ? {
-                        north: place.viewport.getNorthEast().lat(),
-                        south: place.viewport.getSouthWest().lat(),
-                        east: place.viewport.getNorthEast().lng(),
-                        west: place.viewport.getSouthWest().lng(),
-                    } : null,
-                    raw: place,
-                }));
-
-                setSearchResults(searchResults);
-                setShowDropdown(searchResults.length > 0);
-            } else {
-                setSearchResults([]);
-                setShowDropdown(false);
-            }
-            setIsSearching(false);
+            setSearchResults(results);
+            setShowDropdown(results.length > 0);
         } catch (error) {
-            console.error('Places search error:', error);
-            // Fallback to old API if new API fails
-            try {
-                const service = new google.maps.places.PlacesService(map);
-                const request = {
-                    query: query,
-                    locationBias: map.getBounds() || undefined,
-                };
-
-                service.textSearch(request, (results, status) => {
-                    if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-                        const searchResults = results.slice(0, 5).map((place) => ({
-                            x: place.geometry?.location?.lng() || 0,
-                            y: place.geometry?.location?.lat() || 0,
-                            label: place.name || '',
-                            address: place.formatted_address || '',
-                            place_id: place.place_id,
-                            bounds: place.geometry?.viewport ? {
-                                north: place.geometry.viewport.getNorthEast().lat(),
-                                south: place.geometry.viewport.getSouthWest().lat(),
-                                east: place.geometry.viewport.getNorthEast().lng(),
-                                west: place.geometry.viewport.getSouthWest().lng(),
-                            } : null,
-                            raw: place,
-                        }));
-
-                        setSearchResults(searchResults);
-                        setShowDropdown(searchResults.length > 0);
-                    } else {
-                        setSearchResults([]);
-                        setShowDropdown(false);
-                    }
-                    setIsSearching(false);
-                });
-            } catch (fallbackError) {
-                console.error('Fallback search error:', fallbackError);
-                setSearchResults([]);
-                setShowDropdown(false);
-                setIsSearching(false);
-            }
+            setSearchResults([]);
+            setShowDropdown(false);
+        } finally {
+            setIsSearching(false);
         }
-    }, [map]);
+    }, []);
 
     // Search input with debounce
     useEffect(() => {
@@ -1170,29 +739,22 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         };
     }, []);
 
-    // Debug: Expose state to window for debugging
+    // Show/hide snap indicators
     useEffect(() => {
-        (window as any).debugState = {
-            zones: zones.length,
-            obstacles: obstacles.length,
-            drawingMode,
-            canDrawZone,
-            currentStep,
-            drawingStage,
-            currentZoneColor,
-            usedColors
-        };
-    }, [zones.length, obstacles.length, drawingMode, canDrawZone, currentStep, drawingStage, currentZoneColor, usedColors]);
+        if (currentStep === 3 && pipeSnapEnabled) {
+            showPipeSnapIndicators();
+        } else {
+            hidePipeSnapIndicators();
+        }
+    }, [currentStep, pipeSnapEnabled]);
 
     // Auto-update zone configuration
     useEffect(() => {
         if (currentStep === 2) {
             if (zones.length === 0) {
-                console.log('Resetting zone settings for step 2');
                 setCanDrawZone(true);
                 setUsedColors([]);
                 setCurrentZoneColor(ZONE_COLORS[0]);
-                setDrawingMode('zone'); // Default to zone mode
             }
         } else if (currentStep === 3) {
             if (pipes.length === 0) {
@@ -1209,50 +771,37 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             blurTimeoutRef.current = null;
         }
 
-        // Clear dropdown immediately
         setShowDropdown(false);
-        setSearchResults([]);
-        
         setMapCenter([parseFloat(result.y), parseFloat(result.x)]);
-        setMapZoom(16);
+        setMapZoom(15);
         setIsLocationSelected(true);
-        setSearchQuery(result.label || result.address);
-
-        // If bounds are available, fit the map to bounds
-        if (result.bounds && map) {
-            const bounds = new google.maps.LatLngBounds();
-            bounds.extend(new google.maps.LatLng(result.bounds.south, result.bounds.west));
-            bounds.extend(new google.maps.LatLng(result.bounds.north, result.bounds.east));
-            map.fitBounds(bounds);
-        } else if (map) {
-            map.setCenter({ lat: parseFloat(result.y), lng: parseFloat(result.x) });
-            map.setZoom(16);
-        }
+        setSearchQuery(result.label.split(',')[0] || result.label);
+        setSearchResults([]);
     };
 
-    // Convert Google Maps path to coordinates array
-    const pathToCoordinates = (path: google.maps.MVCArray<google.maps.LatLng>): Array<{ lat: number; lng: number }> => {
-        const coordinates: Array<{ lat: number; lng: number }> = [];
-        for (let i = 0; i < path.getLength(); i++) {
-            const latLng = path.getAt(i);
-            coordinates.push({ lat: latLng.lat(), lng: latLng.lng() });
-        }
-        return coordinates;
-    };
+    // Drawing event handlers
+    const handleDrawCreated = (e: any) => {
+        const { layer } = e;
 
-    // Handle drawing created
-    const handleDrawCreated = (overlay: google.maps.MVCObject, type: string) => {
-        console.log('Drawing created:', { type, drawingStage, drawingMode });
-        
-        if (type === 'polygon') {
-            const polygon = overlay as google.maps.Polygon;
-            const path = polygon.getPath();
-            const coordinates = pathToCoordinates(path);
+        if (drawingStage === 'field') {
+            if (mainField && featureGroupRef.current) {
+                featureGroupRef.current.removeLayer(mainField);
+            }
 
-            if (drawingStage === 'field') {
-                // Calculate area
-                try {
-                    const polygonCoords = coordinates.map((coord: any) => [coord.lng, coord.lat]);
+            layer.setStyle({
+                color: '#22C55E',
+                fillColor: '#22C55E',
+                fillOpacity: 0.2,
+                weight: 2,
+                dashArray: undefined,
+            });
+
+            // Calculate field area
+            try {
+                const coords = layer.getLatLngs();
+                if (coords && coords[0] && Array.isArray(coords[0])) {
+                    const polygonCoords = coords[0].map((coord: any) => [coord.lng, coord.lat]);
+
                     const firstPoint = polygonCoords[0];
                     const lastPoint = polygonCoords[polygonCoords.length - 1];
 
@@ -1260,165 +809,519 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                         polygonCoords.push(firstPoint);
                     }
 
-                    const turfPolygon = turf.polygon([polygonCoords]);
-                    const area = turf.area(turfPolygon);
+                    const polygon = turf.polygon([polygonCoords]);
+                    const area = turf.area(polygon);
                     setFieldAreaSize(area);
-
-                    // Set polygon style
-                    polygon.setOptions({
-                        fillColor: '#22C55E',
-                        fillOpacity: 0.2,
-                        strokeColor: '#22C55E',
-                        strokeWeight: 3,
-                        clickable: true,
-                        editable: true,
-                        zIndex: 1
-                    });
-
-                    setMainField({
-                        polygon: polygon,
-                        coordinates: coordinates,
-                        area: area,
-                    });
-
-                    setMapObjects(prev => ({ ...prev, zones: [...prev.zones, polygon] }));
-                    console.log('Field created successfully');
-                } catch (error) {
-                    console.error('Field creation error:', error);
-                    setFieldAreaSize(0);
                 }
-
-            } else if (drawingStage === 'zones') {
-                if (drawingMode === 'zone' && canDrawZone) {
-                    console.log('Creating zone with color:', currentZoneColor);
-                    
-                    const newZone = {
-                        id: Date.now(),
-                        polygon: polygon,
-                        coordinates: coordinates,
-                        color: currentZoneColor,
-                        name: `Zone ${zones.length + 1}`,
-                    };
-
-                    // Set polygon style with current zone color
-                    polygon.setOptions({
-                        fillColor: currentZoneColor,
-                        fillOpacity: 0.3,
-                        strokeColor: currentZoneColor,
-                        strokeWeight: 2,
-                        clickable: true,
-                        editable: true,
-                        zIndex: 1
-                    });
-
-                    // Add click listener
-                    polygon.addListener('click', () => {
-                        setSelectedZone(newZone);
-                        setShowPlantSelector(true);
-                    });
-
-                    setZones((prev) => {
-                        const newZones = [...prev, newZone];
-                        console.log('Zones updated:', newZones);
-                        return newZones;
-                    });
-                    
-                    setUsedColors((prev) => {
-                        const newUsedColors = [...prev, currentZoneColor];
-                        console.log('Used colors updated:', newUsedColors);
-                        return newUsedColors;
-                    });
-
-                    // Find next available color
-                    const newUsedColors = [...usedColors, currentZoneColor];
-                    const availableColors = ZONE_COLORS.filter((color) => 
-                        !newUsedColors.includes(color)
-                    );
-                    
-                    console.log('Color management:', {
-                        currentColor: currentZoneColor,
-                        usedColors: usedColors,
-                        newUsedColors: newUsedColors,
-                        availableColors: availableColors
-                    });
-                    
-                    if (availableColors.length > 0) {
-                        const nextColor = availableColors[0];
-                        console.log('Setting next zone color:', nextColor);
-                        setCurrentZoneColor(nextColor);
-                    } else {
-                        console.log('No more colors available, disabling zone drawing');
-                        setCanDrawZone(false);
-                    }
-
-                    setMapObjects(prev => ({ ...prev, zones: [...prev.zones, polygon] }));
-
-                } else if (drawingMode === 'obstacle') {
-                    console.log('Creating obstacle of type:', currentObstacleType);
-                    
-                    const obstacleConfig = OBSTACLE_TYPES[currentObstacleType as keyof typeof OBSTACLE_TYPES];
-                    const newObstacle = {
-                        id: Date.now(),
-                        polygon: polygon,
-                        coordinates: coordinates,
-                        type: currentObstacleType,
-                        name: `${obstacleConfig?.name || 'Obstacle'} ${obstacles.length + 1}`,
-                    };
-
-                    // Set obstacle style
-                    polygon.setOptions({
-                        fillColor: obstacleConfig?.color || '#FF0000',
-                        fillOpacity: 0.4,
-                        strokeColor: obstacleConfig?.color || '#FF0000',
-                        strokeWeight: 2,
-                        clickable: true,
-                        editable: true,
-                        zIndex: 2
-                    });
-
-                    setObstacles((prev) => {
-                        const newObstacles = [...prev, newObstacle];
-                        console.log('Obstacles updated:', newObstacles);
-                        return newObstacles;
-                    });
-                    setMapObjects(prev => ({ ...prev, obstacles: [...prev.obstacles, polygon] }));
-                }
+            } catch (error) {
+                setFieldAreaSize(0);
             }
-        } else if (type === 'polyline') {
-            const polyline = overlay as google.maps.Polyline;
-            const path = polyline.getPath();
-            const coordinates = pathToCoordinates(path);
 
-            if (drawingStage === 'pipes' && canDrawPipe) {
-                console.log('Creating pipe of type:', currentPipeType);
-                
-                const pipeConfig = PIPE_TYPES[currentPipeType as keyof typeof PIPE_TYPES];
-                const newPipe = {
+            setMainField(layer);
+            if (featureGroupRef.current) {
+                featureGroupRef.current.addLayer(layer);
+            }
+        } else if (drawingStage === 'zones') {
+            if (drawingMode === 'zone' && canDrawZone) {
+                layer.setStyle({
+                    color: currentZoneColor,
+                    fillColor: currentZoneColor,
+                    fillOpacity: 0.3,
+                    weight: 2,
+                    dashArray: undefined,
+                });
+
+                const newZone = {
                     id: Date.now(),
-                    polyline: polyline,
-                    coordinates: coordinates,
-                    type: currentPipeType,
-                    name: `${pipeConfig?.name || 'Pipe'} ${pipes.filter((p) => p.type === currentPipeType).length + 1}`,
-                    color: pipeConfig?.color || '#3388ff',
+                    layer: layer,
+                    color: currentZoneColor,
+                    name: `Zone ${zones.length + 1}`,
+                    plantMarker: null,
                 };
 
-                // Set pipe style
-                polyline.setOptions({
-                    strokeColor: pipeConfig?.color || '#3388ff',
-                    strokeWeight: pipeConfig?.weight || 4,
-                    strokeOpacity: pipeConfig?.opacity || 1,
-                    clickable: true,
-                    editable: true,
-                    zIndex: 1
+                layer.on('click', () => {
+                    setSelectedZone(newZone);
+                    setShowPlantSelector(true);
                 });
 
-                setPipes((prev) => {
-                    const newPipes = [...prev, newPipe];
-                    console.log('Pipes updated:', newPipes);
-                    return newPipes;
+                // Try to snap zone to field boundary
+                const wasSnapped = snapPolygonToField(layer);
+
+                setZones((prev) => [...prev, newZone]);
+                if (featureGroupRef.current) {
+                    featureGroupRef.current.addLayer(layer);
+                }
+
+                setUsedColors((prev) => [...prev, currentZoneColor]);
+
+                const availableColors = ZONE_COLORS.filter(
+                    (color) => ![...usedColors, currentZoneColor].includes(color)
+                );
+                if (availableColors.length > 0) {
+                    setCurrentZoneColor(availableColors[0]);
+                    setCanDrawZone(true);
+                } else {
+                    setCurrentZoneColor(ZONE_COLORS[0]);
+                    setUsedColors([]);
+                    setCanDrawZone(true);
+                }
+            } else if (drawingMode === 'obstacle') {
+                const obstacleConfig = OBSTACLE_TYPES[currentObstacleType];
+
+                layer.setStyle({
+                    color: obstacleConfig.color,
+                    fillColor: obstacleConfig.fillColor,
+                    fillOpacity: obstacleConfig.fillOpacity,
+                    weight: 2,
                 });
-                setMapObjects(prev => ({ ...prev, pipes: [...prev.pipes, polyline] }));
+
+                layer.options.obstacleType = currentObstacleType;
+                layer.options.obstacleId = Date.now().toString();
+
+                const newObstacle = {
+                    id: layer.options.obstacleId,
+                    type: currentObstacleType,
+                    layer: layer,
+                    geometry: layer.toGeoJSON().geometry,
+                    config: obstacleConfig,
+                };
+
+                setObstacles((prev) => [...prev, newObstacle]);
             }
+        } else if (drawingStage === 'pipes' && canDrawPipe && PIPE_TYPES[currentPipeType].manual) {
+            const pipeConfig = PIPE_TYPES[currentPipeType];
+
+            layer.setStyle({
+                color: pipeConfig.color,
+                weight: pipeConfig.weight,
+                opacity: pipeConfig.opacity,
+                dashArray: undefined,
+                fillOpacity: 0,
+            });
+
+            const newPipe = {
+                id: Date.now(),
+                layer: layer,
+                type: currentPipeType,
+                name: `${pipeConfig.name} ${pipes.filter((p) => p.type === currentPipeType).length + 1}`,
+                color: pipeConfig.color,
+                coordinates: layer.getLatLngs ? layer.getLatLngs() : [],
+            };
+
+            if (currentPipeType === 'main' || currentPipeType === 'submain') {
+                snapPipeToOtherPipes(layer, currentPipeType);
+            }
+
+            setPipes((prev) => [...prev, newPipe]);
+            if (featureGroupRef.current) {
+                featureGroupRef.current.addLayer(layer);
+            }
+        }
+    };
+
+    const handleDrawDeleted = (e: any) => {
+        const { layers } = e;
+        layers.eachLayer((layer: any) => {
+            if (layer === mainField) {
+                setMainField(null);
+                setDrawingStage('field');
+                setZones([]);
+                setObstacles([]);
+                setUsedColors([]);
+                setCanDrawZone(true);
+                setPipes([]);
+            } else {
+                const zoneToRemove = zones.find((zone) => zone.layer === layer);
+                if (zoneToRemove) {
+                    if (zoneToRemove.plantMarker && mapRef.current) {
+                        mapRef.current.removeLayer(zoneToRemove.plantMarker);
+                    }
+                    setZoneAssignments((prev) => {
+                        const newAssignments = { ...prev };
+                        delete newAssignments[zoneToRemove.id];
+                        return newAssignments;
+                    });
+
+                    setUsedColors((prev) => prev.filter((color) => color !== zoneToRemove.color));
+
+                    if (zoneToRemove.color === currentZoneColor) {
+                        setCanDrawZone(true);
+                    }
+                }
+
+                const obstacleToRemove = obstacles.find((obstacle) => obstacle.layer === layer);
+                if (obstacleToRemove) {
+                    setObstacles((prev) => prev.filter((obstacle) => obstacle.layer !== layer));
+                }
+
+                const pipeToRemove = pipes.find((pipe) => pipe.layer === layer);
+                if (pipeToRemove) {
+                    setPipes((prev) => prev.filter((pipe) => pipe.layer !== layer));
+                }
+
+                setZones((prev) => prev.filter((zone) => zone.layer !== layer));
+            }
+        });
+    };
+
+    // Snap functions (simplified)
+    const getPolygonSnapPoints = () => {
+        const snapPoints: any[] = [];
+
+        if (mainField && mainField.getLatLngs) {
+            try {
+                const coords = mainField.getLatLngs()[0];
+                if (coords && Array.isArray(coords)) {
+                    coords.forEach((coord: any, index: number) => {
+                        snapPoints.push({
+                            latlng: coord,
+                            type: 'vertex',
+                            source: 'field',
+                        });
+
+                        const nextCoord = coords[(index + 1) % coords.length];
+                        const midLat = (coord.lat + nextCoord.lat) / 2;
+                        const midLng = (coord.lng + nextCoord.lng) / 2;
+                        snapPoints.push({
+                            latlng: { lat: midLat, lng: midLng },
+                            type: 'edge-midpoint',
+                            source: 'field',
+                        });
+                    });
+                }
+            } catch (error) {
+                // Silent fail
+            }
+        }
+
+        zones.forEach((zone) => {
+            if (zone.layer && zone.layer.getLatLngs) {
+                try {
+                    const coords = zone.layer.getLatLngs()[0];
+                    if (coords && Array.isArray(coords)) {
+                        coords.forEach((coord: any, index: number) => {
+                            snapPoints.push({
+                                latlng: coord,
+                                type: 'vertex',
+                                source: 'zone',
+                                zoneId: zone.id,
+                            });
+
+                            const nextCoord = coords[(index + 1) % coords.length];
+                            const midLat = (coord.lat + nextCoord.lat) / 2;
+                            const midLng = (coord.lng + nextCoord.lng) / 2;
+                            snapPoints.push({
+                                latlng: { lat: midLat, lng: midLng },
+                                type: 'edge-midpoint',
+                                source: 'zone',
+                                zoneId: zone.id,
+                            });
+                        });
+                    }
+                } catch (error) {
+                    // Silent fail
+                }
+            }
+        });
+
+        return snapPoints;
+    };
+
+    const getClosestPointOnLine = (point: any, lineStart: any, lineEnd: any) => {
+        const A = point.lng - lineStart.lng;
+        const B = point.lat - lineStart.lat;
+        const C = lineEnd.lng - lineStart.lng;
+        const D = lineEnd.lat - lineStart.lat;
+
+        const dot = A * C + B * D;
+        const lenSq = C * C + D * D;
+
+        if (lenSq === 0) return lineStart;
+
+        let param = dot / lenSq;
+
+        if (param < 0) param = 0;
+        if (param > 1) param = 1;
+
+        return {
+            lat: lineStart.lat + param * D,
+            lng: lineStart.lng + param * C,
+        };
+    };
+
+    const snapPipeToOtherPipes = (pipeLayer: any, pipeType: string) => {
+        if (!pipeSnapEnabled) return;
+
+        try {
+            const coords = pipeLayer.getLatLngs();
+            if (!coords || !Array.isArray(coords) || coords.length < 2) return;
+
+            const baseSnapDistance = pipeSnapDistance / 10000;
+            const snapDistance = pipeType === 'submain' ? baseSnapDistance * 1.5 : baseSnapDistance;
+
+            let hasSnapped = false;
+            const newCoords = [...coords];
+            const snappedPoints: string[] = [];
+
+            const targetPipes =
+                pipeType === 'submain'
+                    ? pipes.filter((p) => p.type === 'main' && p.layer && p.layer.getLatLngs)
+                    : pipes.filter(
+                          (p) => p.layer && p.layer.getLatLngs && p.id !== pipeLayer._leaflet_id
+                      );
+
+            if (targetPipes.length === 0) return;
+
+            // Enhanced snapping for submain pipes
+            if (pipeType === 'submain') {
+                let bestSnapConnection: any = null;
+                let bestSnapDistance = Infinity;
+
+                const originalStart = coords[0];
+                const originalEnd = coords[coords.length - 1];
+
+                const mainPipeSnapPoints: any[] = [];
+
+                targetPipes.forEach((targetPipe) => {
+                    try {
+                        const targetCoords = targetPipe.layer.getLatLngs();
+                        if (!targetCoords || !Array.isArray(targetCoords)) return;
+
+                        for (let j = 0; j < targetCoords.length - 1; j++) {
+                            const segmentStart = targetCoords[j];
+                            const segmentEnd = targetCoords[j + 1];
+
+                            mainPipeSnapPoints.push({
+                                point: segmentStart,
+                                targetPipe: targetPipe,
+                                segmentIndex: j,
+                                position: 'vertex',
+                            });
+
+                            const numIntermediatePoints = 20;
+                            for (let k = 1; k < numIntermediatePoints; k++) {
+                                const ratio = k / numIntermediatePoints;
+                                const intermediatePoint = {
+                                    lat:
+                                        segmentStart.lat +
+                                        (segmentEnd.lat - segmentStart.lat) * ratio,
+                                    lng:
+                                        segmentStart.lng +
+                                        (segmentEnd.lng - segmentStart.lng) * ratio,
+                                };
+
+                                mainPipeSnapPoints.push({
+                                    point: intermediatePoint,
+                                    targetPipe: targetPipe,
+                                    segmentIndex: j,
+                                    position: 'intermediate',
+                                    ratio: ratio,
+                                });
+                            }
+                        }
+
+                        if (targetCoords.length > 0) {
+                            mainPipeSnapPoints.push({
+                                point: targetCoords[targetCoords.length - 1],
+                                targetPipe: targetPipe,
+                                segmentIndex: targetCoords.length - 1,
+                                position: 'vertex',
+                            });
+                        }
+                    } catch (error) {
+                        // Silent fail
+                    }
+                });
+
+                // L-junction: Check if either endpoint can connect
+                const submainEndpoints = [
+                    { point: originalStart, index: 0, type: 'start' },
+                    { point: originalEnd, index: coords.length - 1, type: 'end' },
+                ];
+
+                submainEndpoints.forEach((endpoint) => {
+                    mainPipeSnapPoints.forEach((snapPoint) => {
+                        const distance = Math.sqrt(
+                            Math.pow(endpoint.point.lat - snapPoint.point.lat, 2) +
+                                Math.pow(endpoint.point.lng - snapPoint.point.lng, 2)
+                        );
+
+                        if (distance < snapDistance && distance < bestSnapDistance) {
+                            bestSnapDistance = distance;
+                            bestSnapConnection = {
+                                type: 'L-junction',
+                                connectionPoint: snapPoint.point,
+                                endpointIndex: endpoint.index,
+                                endpointType: endpoint.type,
+                                targetPipe: snapPoint.targetPipe,
+                                actualDistance: distance,
+                            };
+                        }
+                    });
+                });
+
+                // T-junction: Check perpendicular connection
+                if (!bestSnapConnection || bestSnapDistance > snapDistance * 0.5) {
+                    targetPipes.forEach((targetPipe) => {
+                        try {
+                            const targetCoords = targetPipe.layer.getLatLngs();
+                            if (!targetCoords || !Array.isArray(targetCoords)) return;
+
+                            for (let j = 0; j < targetCoords.length - 1; j++) {
+                                const segmentStart = targetCoords[j];
+                                const segmentEnd = targetCoords[j + 1];
+
+                                const submainMidpoint = {
+                                    lat: (originalStart.lat + originalEnd.lat) / 2,
+                                    lng: (originalStart.lng + originalEnd.lng) / 2,
+                                };
+
+                                const projectionPoint = getClosestPointOnLine(
+                                    submainMidpoint,
+                                    segmentStart,
+                                    segmentEnd
+                                );
+                                const distance = Math.sqrt(
+                                    Math.pow(submainMidpoint.lat - projectionPoint.lat, 2) +
+                                        Math.pow(submainMidpoint.lng - projectionPoint.lng, 2)
+                                );
+
+                                if (distance < snapDistance && distance < bestSnapDistance) {
+                                    const mainDx = segmentEnd.lng - segmentStart.lng;
+                                    const mainDy = segmentEnd.lat - segmentStart.lat;
+                                    const mainLength = Math.sqrt(mainDx * mainDx + mainDy * mainDy);
+
+                                    if (mainLength > 0) {
+                                        const mainUnitX = mainDx / mainLength;
+                                        const mainUnitY = mainDy / mainLength;
+
+                                        bestSnapDistance = distance;
+                                        bestSnapConnection = {
+                                            type: 'T-junction',
+                                            connectionPoint: projectionPoint,
+                                            targetPipe: targetPipe,
+                                            mainUnitX: mainUnitX,
+                                            mainUnitY: mainUnitY,
+                                            originalLength: Math.sqrt(
+                                                Math.pow(originalEnd.lat - originalStart.lat, 2) +
+                                                    Math.pow(originalEnd.lng - originalStart.lng, 2)
+                                            ),
+                                            actualDistance: distance,
+                                        };
+                                    }
+                                }
+                            }
+                        } catch (error) {
+                            // Silent fail
+                        }
+                    });
+                }
+
+                // Apply the best connection
+                if (bestSnapConnection) {
+                    if (bestSnapConnection.type === 'L-junction') {
+                        newCoords[bestSnapConnection.endpointIndex] = L.latLng(
+                            bestSnapConnection.connectionPoint.lat,
+                            bestSnapConnection.connectionPoint.lng
+                        );
+
+                        hasSnapped = true;
+                        snappedPoints.push(
+                            `ท่อเมนย่อย (${bestSnapConnection.endpointType === 'start' ? 'จุดเริ่มต้น' : 'จุดสิ้นสุด'}) → ${bestSnapConnection.targetPipe.name} (L-junction)`
+                        );
+                    } else if (bestSnapConnection.type === 'T-junction') {
+                        const { connectionPoint, mainUnitX, mainUnitY, originalLength } =
+                            bestSnapConnection;
+
+                        const perpUnitX = -mainUnitY;
+                        const perpUnitY = mainUnitX;
+
+                        const adjustedLength = Math.max(originalLength * 1.1, 0.001);
+                        const halfLength = adjustedLength / 2;
+
+                        const newStart = L.latLng(
+                            connectionPoint.lat - perpUnitY * halfLength,
+                            connectionPoint.lng - perpUnitX * halfLength
+                        );
+                        const newEnd = L.latLng(
+                            connectionPoint.lat + perpUnitY * halfLength,
+                            connectionPoint.lng + perpUnitX * halfLength
+                        );
+                        const connectionPointLatLng = L.latLng(
+                            connectionPoint.lat,
+                            connectionPoint.lng
+                        );
+
+                        newCoords.splice(0, newCoords.length);
+                        newCoords.push(newStart, connectionPointLatLng, newEnd);
+
+                        hasSnapped = true;
+                        snappedPoints.push(
+                            `ท่อเมนย่อย → ${bestSnapConnection.targetPipe.name} (T-junction)`
+                        );
+                    }
+                }
+            }
+
+            // Regular point-to-line snapping
+            if (!hasSnapped) {
+                for (let i = 0; i < coords.length; i++) {
+                    const currentPoint = coords[i];
+                    let closestSnapPoint: any = null;
+                    let minDistance = Infinity;
+                    let closestPipe: any = null;
+
+                    targetPipes.forEach((targetPipe) => {
+                        try {
+                            const targetCoords = targetPipe.layer.getLatLngs();
+                            if (!targetCoords || !Array.isArray(targetCoords)) return;
+
+                            for (let j = 0; j < targetCoords.length - 1; j++) {
+                                const segmentStart = targetCoords[j];
+                                const segmentEnd = targetCoords[j + 1];
+
+                                const closestPoint = getClosestPointOnLine(
+                                    currentPoint,
+                                    segmentStart,
+                                    segmentEnd
+                                );
+                                const distance = Math.sqrt(
+                                    Math.pow(currentPoint.lat - closestPoint.lat, 2) +
+                                        Math.pow(currentPoint.lng - closestPoint.lng, 2)
+                                );
+
+                                if (distance < snapDistance && distance < minDistance) {
+                                    minDistance = distance;
+                                    closestSnapPoint = closestPoint;
+                                    closestPipe = targetPipe;
+                                }
+                            }
+                        } catch (error) {
+                            // Silent fail
+                        }
+                    });
+
+                    if (closestSnapPoint && closestPipe) {
+                        newCoords[i] = L.latLng(closestSnapPoint.lat, closestSnapPoint.lng);
+                        hasSnapped = true;
+
+                        const pointType =
+                            i === 0
+                                ? 'จุดเริ่มต้น'
+                                : i === coords.length - 1
+                                  ? 'จุดสิ้นสุด'
+                                  : `จุดที่ ${i + 1}`;
+                        snappedPoints.push(`${pointType} → ${closestPipe.name}`);
+                    }
+                }
+            }
+
+            // Apply snapped coordinates
+            if (hasSnapped) {
+                pipeLayer.setLatLngs(newCoords);
+            }
+        } catch (error) {
+            // Silent fail
         }
     };
 
@@ -1450,33 +1353,140 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 return;
             }
 
-            // Generate lateral pipes logic here
-            // This is a simplified version - you'll need to implement the full logic
+            // Filter submain pipes that pass through this zone
+            const zoneSubmainPipes = submainPipes.filter((pipe) => {
+                if (!pipe.layer || !pipe.layer.getLatLngs) return false;
+
+                const pipeCoords = pipe.layer.getLatLngs();
+
+                const hasPointInZone = pipeCoords.some((coord: any) => {
+                    return isPointInZone(coord, targetZone);
+                });
+
+                return hasPointInZone;
+            });
+
+            if (zoneSubmainPipes.length === 0) {
+                // Check intersections with zone boundaries
+                const pipesIntersectingZone = submainPipes.filter((pipe) => {
+                    if (!pipe.layer || !pipe.layer.getLatLngs) return false;
+
+                    const pipeCoords = pipe.layer.getLatLngs();
+                    if (pipeCoords.length < 2) return false;
+
+                    try {
+                        const zoneCoords = targetZone.layer.getLatLngs()[0];
+                        for (let i = 0; i < pipeCoords.length - 1; i++) {
+                            for (let j = 0; j < zoneCoords.length; j++) {
+                                const zoneLine = {
+                                    start: zoneCoords[j],
+                                    end: zoneCoords[(j + 1) % zoneCoords.length],
+                                };
+
+                                const intersection = getLineIntersection(
+                                    pipeCoords[i],
+                                    pipeCoords[i + 1],
+                                    zoneLine.start,
+                                    zoneLine.end
+                                );
+
+                                if (intersection) {
+                                    return true;
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        // Silent fail
+                    }
+
+                    return false;
+                });
+
+                if (pipesIntersectingZone.length > 0) {
+                    zoneSubmainPipes.push(...pipesIntersectingZone);
+                } else {
+                    setIsGeneratingPipes(false);
+                    return;
+                }
+            }
 
             const lateralPipes: any[] = [];
 
-            submainPipes.forEach((submainPipe) => {
-                if (submainPipe.polyline && map) {
-                    const path = submainPipe.polyline.getPath();
-                    const coords = pathToCoordinates(path);
+            // Helper: find zone boundary intersection
+            const findZoneBoundaryIntersection = (
+                start: any,
+                end: any,
+                zone: any
+            ): { point: any; distance: number } | null => {
+                try {
+                    const zoneCoords = zone.layer.getLatLngs()[0];
+                    let closestIntersection: any = null;
+                    let minDistance = Infinity;
+
+                    for (let i = 0; i < zoneCoords.length; i++) {
+                        const p1 = zoneCoords[i];
+                        const p2 = zoneCoords[(i + 1) % zoneCoords.length];
+
+                        const intersection = getLineIntersection(start, end, p1, p2);
+                        if (intersection) {
+                            const distance = calculateDistance(
+                                start.lat,
+                                start.lng,
+                                intersection.lat,
+                                intersection.lng
+                            );
+
+                            if (distance > 1 && distance < minDistance) {
+                                minDistance = distance;
+                                closestIntersection = intersection;
+                            }
+                        }
+                    }
+
+                    return closestIntersection && minDistance >= 1
+                        ? { point: closestIntersection, distance: minDistance }
+                        : null;
+                } catch (error) {
+                    return null;
+                }
+            };
+
+            // Process each submain pipe
+            zoneSubmainPipes.forEach((submainPipe, pipeIndex) => {
+                try {
+                    const submainCoords = submainPipe.layer.getLatLngs();
+
+                    // Calculate pipe length
+                    let totalLength = 0;
+                    for (let i = 0; i < submainCoords.length - 1; i++) {
+                        totalLength += calculateDistance(
+                            submainCoords[i].lat,
+                            submainCoords[i].lng,
+                            submainCoords[i + 1].lat,
+                            submainCoords[i + 1].lng
+                        );
+                    }
 
                     // Get spacing based on assigned crop
                     const assignedCrop = zoneAssignments[targetZone.id];
                     const optimalSpacing = assignedCrop ? rowSpacing[assignedCrop] || 1.5 : 1.5;
-
-                    // Calculate total length
-                    let totalLength = 0;
-                    for (let i = 0; i < coords.length - 1; i++) {
-                        totalLength += calculateDistance(
-                            coords[i].lat,
-                            coords[i].lng,
-                            coords[i + 1].lat,
-                            coords[i + 1].lng
-                        );
-                    }
-
                     const numLaterals = Math.floor(totalLength / optimalSpacing);
 
+                    if (numLaterals === 0) return;
+
+                    // Calculate perpendicular direction
+                    const start = submainCoords[0];
+                    const end = submainCoords[submainCoords.length - 1];
+                    const deltaLat = end.lat - start.lat;
+                    const deltaLng = end.lng - start.lng;
+                    const length = Math.sqrt(deltaLat * deltaLat + deltaLng * deltaLng);
+
+                    if (length === 0) return;
+
+                    const perpLat = -deltaLng / length;
+                    const perpLng = deltaLat / length;
+
+                    // Generate lateral pipes
                     for (let i = 0; i <= numLaterals; i++) {
                         const distance = i * optimalSpacing;
 
@@ -1484,9 +1494,9 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                         let lateralStart: any;
                         let accumulatedDistance = 0;
 
-                        for (let j = 0; j < coords.length - 1; j++) {
-                            const segmentStart = coords[j];
-                            const segmentEnd = coords[j + 1];
+                        for (let j = 0; j < submainCoords.length - 1; j++) {
+                            const segmentStart = submainCoords[j];
+                            const segmentEnd = submainCoords[j + 1];
                             const segmentLength = calculateDistance(
                                 segmentStart.lat,
                                 segmentStart.lng,
@@ -1499,8 +1509,12 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                 const ratio = remainingDistance / segmentLength;
 
                                 lateralStart = {
-                                    lat: segmentStart.lat + (segmentEnd.lat - segmentStart.lat) * ratio,
-                                    lng: segmentStart.lng + (segmentEnd.lng - segmentStart.lng) * ratio,
+                                    lat:
+                                        segmentStart.lat +
+                                        (segmentEnd.lat - segmentStart.lat) * ratio,
+                                    lng:
+                                        segmentStart.lng +
+                                        (segmentEnd.lng - segmentStart.lng) * ratio,
                                 };
                                 break;
                             }
@@ -1509,53 +1523,71 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                         }
 
                         if (!lateralStart) {
-                            lateralStart = coords[coords.length - 1];
+                            lateralStart = submainCoords[submainCoords.length - 1];
                         }
 
                         if (!isPointInZone(lateralStart, targetZone)) continue;
 
-                        // Create lateral pipes (simplified)
-                        const lateralEnd = {
-                            lat: lateralStart.lat + 0.001,
-                            lng: lateralStart.lng + 0.001,
-                        };
+                        // Create lateral pipes on both sides
+                        for (const side of [-1, 1]) {
+                            const maxLengthDegrees = 0.003;
 
-                        const lateralPath = [
-                            new google.maps.LatLng(lateralStart.lat, lateralStart.lng),
-                            new google.maps.LatLng(lateralEnd.lat, lateralEnd.lng),
-                        ];
+                            const lateralEnd = {
+                                lat: lateralStart.lat + side * perpLat * maxLengthDegrees,
+                                lng: lateralStart.lng + side * perpLng * maxLengthDegrees,
+                            };
 
-                        const lateralPolyline = new google.maps.Polyline({
-                            path: lateralPath,
-                            strokeColor: PIPE_TYPES.lateral.color,
-                            strokeWeight: PIPE_TYPES.lateral.weight,
-                            strokeOpacity: PIPE_TYPES.lateral.opacity,
-                            map: map,
-                            clickable: true,
-                            editable: true,
-                            zIndex: 1
-                        });
+                            const intersection = findZoneBoundaryIntersection(
+                                lateralStart,
+                                lateralEnd,
+                                targetZone
+                            );
 
-                        const lateralPipe = {
-                            id: Date.now() + lateralPipes.length + Math.random(),
-                            polyline: lateralPolyline,
-                            type: 'lateral',
-                            name: `Lateral ${pipes.filter(p => p.type === 'lateral').length + lateralPipes.length + 1}`,
-                            submainId: submainPipe.id,
-                            zoneId: targetZone.id,
-                            coordinates: [lateralStart, lateralEnd],
-                        };
+                            if (intersection && intersection.distance >= 1.5) {
+                                const pipeStart = lateralStart;
+                                const pipeEnd = intersection.point;
 
-                        lateralPipes.push(lateralPipe);
+                                // Check for obstacles
+                                const startInObstacle = isPointInObstacle(pipeStart);
+                                const endInObstacle = isPointInObstacle(pipeEnd);
+
+                                if (!startInObstacle && !endInObstacle) {
+                                    const lateralCoords = [
+                                        [lateralStart.lat, lateralStart.lng],
+                                        [intersection.point.lat, intersection.point.lng],
+                                    ];
+
+                                    const lateralLine = L.polyline(lateralCoords, {
+                                        color: PIPE_TYPES.lateral.color,
+                                        weight: PIPE_TYPES.lateral.weight,
+                                        opacity: PIPE_TYPES.lateral.opacity,
+                                    });
+
+                                    const lateralPipe = {
+                                        id: Date.now() + lateralPipes.length + Math.random(),
+                                        layer: lateralLine,
+                                        type: 'lateral',
+                                        name: `Lateral ${pipeIndex}-${i}-${side > 0 ? 'R' : 'L'}`,
+                                        submainId: submainPipe.id,
+                                        zoneId: targetZone.id,
+                                        length: intersection.distance,
+                                        avoidsObstacles: true,
+                                    };
+
+                                    lateralPipes.push(lateralPipe);
+                                    if (featureGroupRef.current) {
+                                        featureGroupRef.current.addLayer(lateralLine);
+                                    }
+                                }
+                            }
+                        }
                     }
+                } catch (error) {
+                    // Silent fail
                 }
             });
 
             setPipes((prev) => [...prev, ...lateralPipes]);
-            setMapObjects(prev => ({
-                ...prev,
-                pipes: [...prev.pipes, ...lateralPipes.map(pipe => pipe.polyline)]
-            }));
             setIsGeneratingPipes(false);
         } catch (error) {
             handleError('เกิดข้อผิดพลาดในการสร้างท่อย่อย');
@@ -1584,27 +1616,108 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         }
     };
 
+    // Show/hide pipe snap indicators
+    const showPipeSnapIndicators = () => {
+        if (!pipeSnapEnabled || drawingStage !== 'pipes') return;
+
+        const snapPoints = getPolygonSnapPoints();
+        const indicators = snapPoints.map((point) => {
+            return L.circleMarker([point.latlng.lat, point.latlng.lng], {
+                radius: 4,
+                color: point.type === 'vertex' ? '#ef4444' : '#f59e0b',
+                fillColor: point.type === 'vertex' ? '#ef4444' : '#f59e0b',
+                fillOpacity: 0.8,
+                weight: 2,
+            });
+        });
+
+        setPipeSnapIndicators(indicators);
+
+        indicators.forEach((indicator) => {
+            if (featureGroupRef.current) {
+                featureGroupRef.current.addLayer(indicator);
+            }
+        });
+    };
+
+    const hidePipeSnapIndicators = () => {
+        pipeSnapIndicators.forEach((indicator) => {
+            if (featureGroupRef.current) {
+                featureGroupRef.current.removeLayer(indicator);
+            }
+        });
+        setPipeSnapIndicators([]);
+    };
+
+    // Snap polygon to field edges (vertex only, reliable)
+    const snapPolygonToField = (polygonLayer: any) => {
+        if (!snapEnabled || !mainField || !mainField.getLatLngs) return false;
+
+        try {
+            const polygonCoords = polygonLayer.getLatLngs()[0];
+            const fieldCoords = mainField.getLatLngs()[0];
+
+            if (!polygonCoords || !fieldCoords) return false;
+
+            const snapDistance = 0.0005; // ระยะ snap ในหน่วย degrees
+            let hasSnapped = false;
+            const newCoords: any[] = [];
+
+            // Snap each vertex to the nearest field edge or vertex
+            polygonCoords.forEach((vertex: any) => {
+                let snappedVertex = vertex;
+                let minDistance = Infinity;
+
+                fieldCoords.forEach((edgeStart: any, j: number) => {
+                    const edgeEnd = fieldCoords[(j + 1) % fieldCoords.length];
+                    // Snap to edge
+                    const closestOnEdge = getClosestPointOnLine(vertex, edgeStart, edgeEnd);
+                    const edgeDistance = Math.sqrt(
+                        Math.pow(vertex.lat - closestOnEdge.lat, 2) +
+                            Math.pow(vertex.lng - closestOnEdge.lng, 2)
+                    );
+                    if (edgeDistance < snapDistance && edgeDistance < minDistance) {
+                        minDistance = edgeDistance;
+                        snappedVertex = L.latLng(closestOnEdge.lat, closestOnEdge.lng);
+                        hasSnapped = true;
+                    }
+                    // Snap to vertex
+                    const vertexDistance = Math.sqrt(
+                        Math.pow(vertex.lat - edgeStart.lat, 2) +
+                            Math.pow(vertex.lng - edgeStart.lng, 2)
+                    );
+                    if (vertexDistance < snapDistance && vertexDistance < minDistance) {
+                        minDistance = vertexDistance;
+                        snappedVertex = L.latLng(edgeStart.lat, edgeStart.lng);
+                        hasSnapped = true;
+                    }
+                });
+                newCoords.push(snappedVertex);
+            });
+
+            if (hasSnapped) {
+                polygonLayer.setLatLngs([newCoords]);
+                return true;
+            }
+        } catch (error) {
+            console.warn('Error in polygon snapping:', error);
+        }
+        return false;
+    };
+
     const clearLateralPipes = () => {
         const lateralPipes = pipes.filter((pipe) => pipe.type === 'lateral');
         lateralPipes.forEach((pipe) => {
-            if (pipe.polyline) {
-                pipe.polyline.setMap(null);
+            if (pipe.layer && featureGroupRef.current) {
+                featureGroupRef.current.removeLayer(pipe.layer);
             }
         });
         setPipes((prev) => prev.filter((pipe) => pipe.type !== 'lateral'));
-        
-        // Update map objects
-        setMapObjects(prev => ({
-            ...prev,
-            pipes: prev.pipes.filter(polyline => 
-                !lateralPipes.some(pipe => pipe.polyline === polyline)
-            )
-        }));
     };
 
-    // Generate irrigation for zone
+    // UPDATED IRRIGATION GENERATION FUNCTION - Main enhancement
     const generateIrrigationForZone = (zone: any, irrigationType: string) => {
-        if (!zone || !irrigationType || !map) return;
+        if (!zone || !irrigationType) return;
 
         setIsLoading(true);
         try {
@@ -1629,97 +1742,112 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             const newIrrigationPoints: any[] = [];
             const newIrrigationLines: any[] = [];
 
-            // Get current radius setting
+            // Get current radius and overlap settings for this zone
+            // Always preserve user-set radius unless explicitly changing irrigation type
             const currentSettings = irrigationSettings[zone.id];
             const isChangingType = currentSettings && currentSettings.type !== irrigationType;
 
             let radius;
+
+            console.log(`🔧 [${zone.name}] Debug irrigation generation:`, {
+                currentType: currentSettings?.type,
+                newType: irrigationType,
+                isChangingType,
+                currentRadius: irrigationRadius[zone.id],
+                defaultRadius: irrigationSystem.defaultRadius,
+            });
+
+            // Case 1: Changing irrigation type - use new system's default
             if (isChangingType) {
                 radius = irrigationSystem.defaultRadius;
                 setIrrigationRadius((prev) => ({
                     ...prev,
                     [zone.id]: irrigationSystem.defaultRadius,
                 }));
-            } else {
+                console.log(`🔄 [${zone.name}] Type changed: setting radius to default ${radius}m`);
+            }
+            // Case 2: Same irrigation type or no previous settings - use current user setting
+            else {
                 radius = irrigationRadius[zone.id];
+                // If no user setting exists, set to default
                 if (radius === undefined || radius === null) {
                     radius = irrigationSystem.defaultRadius;
                     setIrrigationRadius((prev) => ({
                         ...prev,
                         [zone.id]: irrigationSystem.defaultRadius,
                     }));
+                    console.log(`🆕 [${zone.name}] No radius set: using default ${radius}m`);
+                } else {
+                    console.log(`✅ [${zone.name}] Using user-set radius: ${radius}m`);
                 }
             }
 
             const overlap = sprinklerOverlap[zone.id] || false;
 
             if (irrigationSystem.isLinear) {
-                // Drip tape logic
-                const dripHoleSpacing = radius;
+                // UPDATED DRIP TAPE LOGIC - Create overlay lines with calculated info
+                // Use the current radius value as spacing for drip holes calculation
+                const dripHoleSpacing = radius; // This will use the actual current setting
+
+                let totalPipeLength = 0;
+                let totalDripHoles = 0;
+                let pipeCount = 0;
 
                 zoneLateralPipes.forEach((pipe) => {
-                    if (pipe.polyline) {
-                        const path = pipe.polyline.getPath();
-                        const coords = pathToCoordinates(path);
+                    if (pipe.layer && pipe.layer.getLatLngs) {
+                        const coords = pipe.layer.getLatLngs();
 
                         // Calculate pipe length
                         let pipeLength = 0;
                         for (let i = 0; i < coords.length - 1; i++) {
-                            pipeLength += calculateDistance(
-                                coords[i].lat,
-                                coords[i].lng,
-                                coords[i + 1].lat,
-                                coords[i + 1].lng
-                            );
+                            pipeLength += mapRef.current?.distance(coords[i], coords[i + 1]) || 0;
                         }
 
                         if (pipeLength === 0) return;
 
+                        // Calculate number of drip holes for this pipe
                         const holesInThisPipe = Math.floor(pipeLength / dripHoleSpacing);
+                        totalPipeLength += pipeLength;
+                        totalDripHoles += holesInThisPipe;
+                        pipeCount += 1;
 
-                        // Create line overlay on lateral pipe
-                        const dripPolyline = new google.maps.Polyline({
-                            path: coords.map(coord => new google.maps.LatLng(coord.lat, coord.lng)),
-                            strokeColor: irrigationSystem.color,
-                            strokeWeight: 6,
-                            strokeOpacity: 0.8,
-                            map: map,
-                            clickable: true,
-                            zIndex: 2
+                        // Create solid line overlay on lateral pipe
+                        const dripLine = L.polyline(coords, {
+                            color: irrigationSystem.color,
+                            weight: 6, // Slightly thicker to show it's a drip tape
+                            opacity: 0.8,
+                            dashArray: undefined, // Solid line
                         });
 
-                        const infoWindow = new google.maps.InfoWindow({
-                            content: `
-                                <div style="text-align: center; padding: 8px; min-width: 200px;">
-                                    <h4 style="margin: 0 0 8px 0; color: #333; font-size: 14px;">
-                                        ${irrigationSystem.name}
-                                    </h4>
-                                    <div style="background: #f5f5f5; padding: 8px; border-radius: 4px; margin-bottom: 8px;">
-                                        <div style="font-size: 12px; color: #666; margin-bottom: 4px;">ท่อเส้นนี้:</div>
-                                        <div style="font-size: 13px; color: #333; font-weight: bold;">
-                                            ความยาว: ${pipeLength.toFixed(1)} เมตร
-                                        </div>
-                                        <div style="font-size: 13px; color: #333; font-weight: bold;">
-                                            รู: ${holesInThisPipe} รู
-                                        </div>
-                                        <div style="font-size: 11px; color: #888;">
-                                            ระยะห่างรู: ${dripHoleSpacing.toFixed(1)}m
-                                        </div>
+                        // Add popup with detailed info for this specific pipe
+                        const pipeInfo = `
+                            <div style="text-align: center; padding: 8px; min-width: 200px;">
+                                <h4 style="margin: 0 0 8px 0; color: #333; font-size: 14px;">
+                                    ${irrigationSystem.name}
+                                </h4>
+                                <div style="background: #f5f5f5; padding: 8px; border-radius: 4px; margin-bottom: 8px;">
+                                    <div style="font-size: 12px; color: #666; margin-bottom: 4px;">ท่อเส้นนี้:</div>
+                                    <div style="font-size: 13px; color: #333; font-weight: bold;">
+                                        ความยาว: ${pipeLength.toFixed(1)} เมตร
                                     </div>
-                                    <div style="font-size: 11px; color: #666;">
-                                        โซน: ${zone.name}
+                                    <div style="font-size: 13px; color: #333; font-weight: bold;">
+                                        รู: ${holesInThisPipe} รู
+                                    </div>
+                                    <div style="font-size: 11px; color: #888;">
+                                        ระยะห่างรู: ${dripHoleSpacing.toFixed(1)}m
                                     </div>
                                 </div>
-                            `
-                        });
+                                <div style="font-size: 11px; color: #666;">
+                                    โซน: ${zone.name}
+                                </div>
+                            </div>
+                        `;
 
-                        dripPolyline.addListener('click', () => {
-                            infoWindow.open(map, dripPolyline);
-                        });
+                        dripLine.bindPopup(pipeInfo);
 
                         const irrigationLine = {
                             id: `irrigation_line_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                            polyline: dripPolyline,
+                            layer: dripLine,
                             type: irrigationType,
                             zoneId: zone.id,
                             zoneName: zone.name,
@@ -1730,32 +1858,85 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                         };
 
                         newIrrigationLines.push(irrigationLine);
+                        if (featureGroupRef.current) {
+                            featureGroupRef.current.addLayer(dripLine);
+                        }
                     }
                 });
+
+                // Create summary irrigation point for statistics (no visual marker)
+                if (pipeCount > 0) {
+                    const averageHolesPerPipe = Math.round(totalDripHoles / pipeCount);
+                    const averagePipeLength = totalPipeLength / pipeCount;
+
+                    const irrigationSummary = {
+                        id: `irrigation_summary_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                        type: irrigationType,
+                        zoneId: zone.id,
+                        zoneName: zone.name,
+                        // Summary statistics
+                        totalPipes: pipeCount,
+                        totalLength: totalPipeLength,
+                        totalHoles: totalDripHoles,
+                        averageHolesPerPipe: averageHolesPerPipe,
+                        averagePipeLength: averagePipeLength,
+                        holeSpacing: dripHoleSpacing,
+                        // Store as position for compatibility but no marker
+                        position: null,
+                        radius: dripHoleSpacing,
+                        spacing: dripHoleSpacing,
+                        // Visual info
+                        summary: `${pipeCount} เส้น, ${totalDripHoles} รู, ระยะ ${dripHoleSpacing.toFixed(1)}m`,
+                    };
+
+                    newIrrigationPoints.push(irrigationSummary);
+
+                    console.log(`💧 [${zone.name}] Drip tape summary:`, {
+                        pipes: pipeCount,
+                        totalHoles: totalDripHoles,
+                        avgHolesPerPipe: averageHolesPerPipe,
+                        holeSpacing: dripHoleSpacing,
+                        totalLength: totalPipeLength.toFixed(1),
+                    });
+                }
             } else {
-                // Point-based systems
+                // Point-based systems with grid layout (unchanged logic)
                 const spacingHorizontal = overlap ? radius * 1.4 : radius * 2;
 
-                zoneLateralPipes.forEach((pipe) => {
-                    if (pipe.polyline) {
-                        const path = pipe.polyline.getPath();
-                        const coords = pathToCoordinates(path);
+                // Sort laterals by their average Y position to ensure consistent pipeIndex
+                const getAverageY = (coords: any[]) => {
+                    if (!coords || coords.length === 0) return 0;
+                    const sumY = coords.reduce((sum, coord) => sum + coord.lat, 0);
+                    return sumY / coords.length;
+                };
+
+                const sortedLateralPipes = [...zoneLateralPipes].sort((pipeA, pipeB) => {
+                    const avgYA = getAverageY(pipeA.layer?.getLatLngs());
+                    const avgYB = getAverageY(pipeB.layer?.getLatLngs());
+                    return avgYB - avgYA; // Sort from top to bottom (higher lat to lower lat)
+                });
+
+                // Point-based systems with grid layout
+                sortedLateralPipes.forEach((pipe, pipeIndex) => {
+                    if (pipe.layer && pipe.layer.getLatLngs) {
+                        const coords = pipe.layer.getLatLngs();
 
                         let totalLength = 0;
                         for (let i = 0; i < coords.length - 1; i++) {
-                            totalLength += calculateDistance(
-                                coords[i].lat,
-                                coords[i].lng,
-                                coords[i + 1].lat,
-                                coords[i + 1].lng
-                            );
+                            const distance =
+                                mapRef.current?.distance(coords[i], coords[i + 1]) || 0;
+                            totalLength += distance;
                         }
 
                         if (totalLength === 0) return;
 
+                        // The first sprinkler is placed at a distance of one radius from the submain.
                         const startOffset = radius;
-                        const numPoints = Math.floor((totalLength - startOffset) / spacingHorizontal);
-                        if (numPoints < 0) return;
+
+                        const numPoints = Math.floor(
+                            (totalLength - startOffset) / spacingHorizontal
+                        );
+                        if (numPoints < 0) return; // Not enough length for even one sprinkler
 
                         for (let i = 0; i <= numPoints; i++) {
                             const distance = startOffset + i * spacingHorizontal;
@@ -1768,20 +1949,21 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                             for (let j = 0; j < coords.length - 1; j++) {
                                 const segmentStart = coords[j];
                                 const segmentEnd = coords[j + 1];
-                                const segmentLength = calculateDistance(
-                                    segmentStart.lat,
-                                    segmentStart.lng,
-                                    segmentEnd.lat,
-                                    segmentEnd.lng
-                                );
+                                const segmentLength =
+                                    mapRef.current?.distance(segmentStart, segmentEnd) || 0;
 
                                 if (accumulatedDistance + segmentLength >= distance) {
                                     const remainingDistance = distance - accumulatedDistance;
-                                    const ratio = segmentLength > 0 ? remainingDistance / segmentLength : 0;
+                                    const ratio =
+                                        segmentLength > 0 ? remainingDistance / segmentLength : 0;
 
                                     pointPosition = {
-                                        lat: segmentStart.lat + (segmentEnd.lat - segmentStart.lat) * ratio,
-                                        lng: segmentStart.lng + (segmentEnd.lng - segmentStart.lng) * ratio,
+                                        lat:
+                                            segmentStart.lat +
+                                            (segmentEnd.lat - segmentStart.lat) * ratio,
+                                        lng:
+                                            segmentStart.lng +
+                                            (segmentEnd.lng - segmentStart.lng) * ratio,
                                     };
                                     break;
                                 }
@@ -1793,59 +1975,83 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                 pointPosition = coords[coords.length - 1];
                             }
 
-                            if (!isPointInZone(pointPosition, zone) || isPointInObstacle(pointPosition)) continue;
+                            if (
+                                !isPointInZone(pointPosition, zone) ||
+                                isPointInObstacle(pointPosition)
+                            )
+                                continue;
 
-                            // Create marker
-                            const dotSize = irrigationType === 'sprinkler' ? 16 : irrigationType === 'micro_spray' ? 14 : 12;
-                            
-                            const marker = new google.maps.Marker({
-                                position: pointPosition,
-                                map: map,
-                                title: irrigationSystem.name,
-                                icon: {
-                                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                                        <svg width="${dotSize}" height="${dotSize}" xmlns="http://www.w3.org/2000/svg">
-                                            <circle cx="${dotSize/2}" cy="${dotSize/2}" r="${dotSize/2-2}" fill="${irrigationSystem.color}" stroke="white" stroke-width="2"/>
-                                        </svg>
-                                    `)}`,
-                                    scaledSize: new google.maps.Size(dotSize, dotSize),
-                                    anchor: new google.maps.Point(dotSize / 2, dotSize / 2),
-                                }
-                            });
-
-                            // Create coverage circle
-                            const coverageCircle = new google.maps.Circle({
-                                center: pointPosition,
-                                radius: radius,
-                                strokeColor: irrigationSystem.color,
-                                strokeOpacity: 0.6,
-                                strokeWeight: irrigationType === 'sprinkler' ? 2 : 1,
-                                fillColor: irrigationSystem.color,
-                                fillOpacity: irrigationType === 'sprinkler' ? (overlap ? 0.2 : 0.12) : irrigationType === 'micro_spray' ? 0.15 : 0.1,
-                                map: map,
-                                clickable: false,
-                                zIndex: 0
-                            });
-
-                            const infoWindow = new google.maps.InfoWindow({
-                                content: `
-                                    <div style="text-align: center; padding: 4px;">
-                                        <div style="font-size: 14px; font-weight: bold; margin-bottom: 2px;">
-                                            ${irrigationSystem.name}
-                                        </div>
-                                        <div style="font-size: 12px; color: #666;">
-                                            รัศมี: ${radius}m | โซน: ${zone.name}
-                                        </div>
-                                        <div style="font-size: 10px; color: #888;">
-                                            ระยะห่าง: ${spacingHorizontal.toFixed(1)}m
-                                        </div>
-                                        ${irrigationSystem.supportsOverlap ? `<div style="font-size: 10px; color: #999;">รูปแบบ: ${overlap ? 'ทับซ้อน (Grid)' : 'มาตรฐาน (Grid)'}</div>` : ''}
+                            const dotSize =
+                                irrigationType === 'sprinkler'
+                                    ? 16
+                                    : irrigationType === 'micro_spray'
+                                      ? 14
+                                      : 12;
+                            const marker = L.marker([pointPosition.lat, pointPosition.lng], {
+                                icon: L.divIcon({
+                                    className: 'irrigation-marker-icon',
+                                    html: `
+                                    <div style="
+                                        position: relative;
+                                        width: ${dotSize}px;
+                                        height: ${dotSize}px;
+                                        border-radius: 50%;
+                                        background: ${irrigationSystem.color};
+                                        border: 2px solid white;
+                                        box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+                                        cursor: pointer;
+                                        transition: all 0.2s ease;
+                                    " 
+                                    onmouseover="this.style.transform='scale(1.3)'" 
+                                    onmouseout="this.style.transform='scale(1)'">
                                     </div>
-                                `
+                                `,
+                                    iconSize: [dotSize, dotSize],
+                                    iconAnchor: [dotSize / 2, dotSize / 2],
+                                }),
                             });
 
-                            marker.addListener('click', () => {
-                                infoWindow.open(map, marker);
+                            const circleOpacity =
+                                irrigationType === 'sprinkler'
+                                    ? overlap
+                                        ? 0.2
+                                        : 0.12
+                                    : irrigationType === 'micro_spray'
+                                      ? 0.15
+                                      : 0.1;
+                            const circleWeight = irrigationType === 'sprinkler' ? 2 : 1;
+
+                            const coverageCircle = L.circle(
+                                [pointPosition.lat, pointPosition.lng],
+                                {
+                                    color: irrigationSystem.color,
+                                    fillColor: irrigationSystem.color,
+                                    fillOpacity: circleOpacity,
+                                    weight: circleWeight,
+                                    opacity: 0.6,
+                                    radius: radius,
+                                }
+                            );
+
+                            const tooltipContent = `
+                            <div style="text-align: center; padding: 4px;">
+                                <div style="font-size: 14px; font-weight: bold; margin-bottom: 2px;">
+                                    ${irrigationSystem.name}
+                                </div>
+                                <div style="font-size: 12px; color: #666;">
+                                    รัศมี: ${radius}m | โซน: ${zone.name}
+                                </div>
+                                <div style="font-size: 10px; color: #888;">
+                                    ระยะห่าง: ${spacingHorizontal.toFixed(1)}m
+                                </div>
+                                ${irrigationSystem.supportsOverlap ? `<div style="font-size: 10px; color: #999;">รูปแบบ: ${overlap ? 'ทับซ้อน (Grid)' : 'มาตรฐาน (Grid)'}</div>` : ''}
+                            </div>
+                        `;
+
+                            marker.bindTooltip(tooltipContent, {
+                                direction: 'top',
+                                offset: [0, -10],
+                                className: 'irrigation-tooltip',
                             });
 
                             const irrigationPoint = {
@@ -1861,12 +2067,17 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                             };
 
                             newIrrigationPoints.push(irrigationPoint);
+
+                            if (featureGroupRef.current) {
+                                featureGroupRef.current.addLayer(marker);
+                                featureGroupRef.current.addLayer(coverageCircle);
+                            }
                         }
                     }
                 });
             }
 
-            // Update state
+            // Update state with the actual radius value used
             setIrrigationPoints((prev) => [...prev, ...newIrrigationPoints]);
             setIrrigationLines((prev) => [...prev, ...newIrrigationLines]);
             setIrrigationAssignments((prev) => ({ ...prev, [zone.id]: irrigationType }));
@@ -1874,21 +2085,117 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 ...prev,
                 [zone.id]: {
                     type: irrigationType,
-                    radius: radius,
+                    radius: radius, // Use the actual radius value that was used for generation
                     overlap: overlap,
                     pointsCount: newIrrigationPoints.length,
                     linesCount: newIrrigationLines.length,
                 },
             }));
 
-            // Update map objects
-            setMapObjects(prev => ({
-                ...prev,
-                irrigation: [...prev.irrigation, ...newIrrigationPoints.map(point => point.marker)],
-                irrigationCircles: [...prev.irrigationCircles, ...newIrrigationPoints.map(point => point.coverageCircle)],
-                irrigationLines: [...prev.irrigationLines, ...newIrrigationLines.map(line => line.polyline)]
-            }));
+            // Generate planting points (unchanged)
+            const assignedCropValue = zoneAssignments[zone.id];
+            const assignedCrop = assignedCropValue ? getCropByValue(assignedCropValue) : null;
 
+            if (assignedCrop) {
+                const currentPlantSpacing = plantSpacing[assignedCrop.value] || 1.0;
+                const newPlantingPointsForZone: any[] = [];
+                const plantingPointsByRow: { row: number; count: number }[] = [];
+
+                const sortedLaterals = [...zoneLateralPipes].sort((a, b) => {
+                    const aCenter = a.layer.getBounds().getCenter();
+                    const bCenter = b.layer.getBounds().getCenter();
+                    return bCenter.lat - aCenter.lat; // Sort top to bottom
+                });
+
+                sortedLaterals.forEach((pipe, index) => {
+                    let pipeLength = 0;
+                    const coords = pipe.layer.getLatLngs();
+                    for (let i = 0; i < coords.length - 1; i++) {
+                        pipeLength += mapRef.current?.distance(coords[i], coords[i + 1]) || 0;
+                    }
+
+                    if (pipeLength === 0) {
+                        plantingPointsByRow.push({ row: index + 1, count: 0 });
+                        return;
+                    }
+
+                    const numPoints = Math.floor(pipeLength / currentPlantSpacing);
+                    plantingPointsByRow.push({ row: index + 1, count: numPoints });
+
+                    for (let i = 1; i <= numPoints; i++) {
+                        const distance = i * currentPlantSpacing;
+
+                        let accumulatedDistance = 0;
+                        let pointPosition: any = null;
+
+                        for (let j = 0; j < coords.length - 1; j++) {
+                            const segmentStart = coords[j];
+                            const segmentEnd = coords[j + 1];
+                            const segmentLength =
+                                mapRef.current?.distance(segmentStart, segmentEnd) || 0;
+
+                            if (accumulatedDistance + segmentLength >= distance) {
+                                const remainingDistance = distance - accumulatedDistance;
+                                const ratio =
+                                    segmentLength > 0 ? remainingDistance / segmentLength : 0;
+                                pointPosition = {
+                                    lat:
+                                        segmentStart.lat +
+                                        (segmentEnd.lat - segmentStart.lat) * ratio,
+                                    lng:
+                                        segmentStart.lng +
+                                        (segmentEnd.lng - segmentStart.lng) * ratio,
+                                };
+                                break;
+                            }
+                            accumulatedDistance += segmentLength;
+                        }
+
+                        if (pointPosition && !isPointInObstacle(pointPosition)) {
+                            newPlantingPointsForZone.push({
+                                id: `plant_${zone.id}_${pipe.id}_${i}`,
+                                marker: null, // ไม่สร้าง marker
+                                zoneId: zone.id,
+                                position: pointPosition, // เก็บตำแหน่งไว้
+                            });
+                        }
+                    }
+                });
+
+                setPlantingPoints((prev) => [
+                    ...prev.filter((p) => p.zoneId !== zone.id),
+                    ...newPlantingPointsForZone,
+                ]);
+
+                const totalPointsInZone = plantingPointsByRow.reduce((sum, r) => sum + r.count, 0);
+
+                let estimatedYield = 0;
+                let estimatedPrice = 0;
+                if (assignedCrop && assignedCrop.yield && assignedCrop.price) {
+                    const rowSpacingValue = rowSpacing[assignedCrop.value] || assignedCrop.spacing;
+                    const plantSpacingValue =
+                        plantSpacing[assignedCrop.value] || assignedCrop.defaultPlantSpacing;
+                    const plantsPerRai = 1600 / (rowSpacingValue * plantSpacingValue);
+                    const raiEquivalent = totalPointsInZone / plantsPerRai;
+
+                    estimatedYield = raiEquivalent * assignedCrop.yield;
+                    estimatedPrice = estimatedYield * assignedCrop.price;
+                }
+
+                setZoneSummaries((prev: any) => ({
+                    ...prev,
+                    [zone.id]: {
+                        id: zone.id,
+                        cropName: assignedCrop.name,
+                        area: 0,
+                        totalPlantingPoints: totalPointsInZone,
+                        plantCount: totalPointsInZone,
+                        estimatedYield: estimatedYield,
+                        estimatedPrice: estimatedPrice,
+                        plantingPointsByRow: plantingPointsByRow,
+                    },
+                }));
+            }
         } catch (error) {
             handleError('เกิดข้อผิดพลาดในการสร้างระบบการให้น้ำ');
         } finally {
@@ -1900,23 +2207,25 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
     const clearIrrigationForZone = (zoneId: string) => {
         const zoneIrrigationPoints = irrigationPoints.filter((point) => point.zoneId === zoneId);
         zoneIrrigationPoints.forEach((point) => {
-            if (point.marker) {
-                point.marker.setMap(null);
+            if (point.marker && featureGroupRef.current) {
+                featureGroupRef.current.removeLayer(point.marker);
             }
-            if (point.coverageCircle) {
-                point.coverageCircle.setMap(null);
+            if (point.coverageCircle && featureGroupRef.current) {
+                featureGroupRef.current.removeLayer(point.coverageCircle);
             }
         });
 
         const zoneIrrigationLines = irrigationLines.filter((line) => line.zoneId === zoneId);
         zoneIrrigationLines.forEach((line) => {
-            if (line.polyline) {
-                line.polyline.setMap(null);
+            if (line.layer && featureGroupRef.current) {
+                featureGroupRef.current.removeLayer(line.layer);
             }
         });
 
         setIrrigationPoints((prev) => prev.filter((point) => point.zoneId !== zoneId));
         setIrrigationLines((prev) => prev.filter((line) => line.zoneId !== zoneId));
+
+        // Clear planting points for the zone (no markers to remove since we don't display them)
         setPlantingPoints((prev) => prev.filter((p) => p.zoneId !== zoneId));
 
         setIrrigationAssignments((prev) => {
@@ -1936,20 +2245,6 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             delete newSummaries[zoneId];
             return newSummaries;
         });
-
-        // Update map objects
-        setMapObjects(prev => ({
-            ...prev,
-            irrigation: prev.irrigation.filter(marker => 
-                !zoneIrrigationPoints.some(point => point.marker === marker)
-            ),
-            irrigationCircles: prev.irrigationCircles.filter(circle => 
-                !zoneIrrigationPoints.some(point => point.coverageCircle === circle)
-            ),
-            irrigationLines: prev.irrigationLines.filter(line => 
-                !zoneIrrigationLines.some(lineObj => lineObj.polyline === line)
-            )
-        }));
     };
 
     const addNewZone = () => {
@@ -1966,16 +2261,27 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         }
     };
 
+    const getPolygonCenter = (layer: any) => {
+        return layer.getBounds ? layer.getBounds().getCenter() : null;
+    };
+
     // Calculate center from field coordinates
     const getFieldCenter = (field: any) => {
-        if (field && field.polygon) {
-            const bounds = new google.maps.LatLngBounds();
-            const path = field.polygon.getPath();
-            for (let i = 0; i < path.getLength(); i++) {
-                bounds.extend(path.getAt(i));
+        if (field && field.getLatLngs) {
+            try {
+                const coords = field.getLatLngs()[0];
+                if (coords && coords.length > 0) {
+                    const centerLat =
+                        coords.reduce((sum: number, coord: any) => sum + coord.lat, 0) /
+                        coords.length;
+                    const centerLng =
+                        coords.reduce((sum: number, coord: any) => sum + coord.lng, 0) /
+                        coords.length;
+                    return [centerLat, centerLng];
+                }
+            } catch (error) {
+                console.error('Error getting field center:', error);
             }
-            const center = bounds.getCenter();
-            return [center.lat(), center.lng()];
         }
         return mapCenter;
     };
@@ -1988,7 +2294,11 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         const targetZone = zones.find((z) => z.id.toString() === zoneId);
         const selectedPlant = getCropByValue(plantValue);
 
-        if (!targetZone || !selectedPlant || !map) {
+        if (!targetZone) {
+            return;
+        }
+
+        if (!selectedPlant) {
             return;
         }
 
@@ -1998,70 +2308,69 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             setSelectedZone(null);
 
             const zone = zones.find((z) => z.id.toString() === zoneId);
-            if (zone && zone.polygon) {
-                // Calculate center of the polygon
-                const bounds = new google.maps.LatLngBounds();
-                const path = zone.polygon.getPath();
-                for (let i = 0; i < path.getLength(); i++) {
-                    bounds.extend(path.getAt(i));
-                }
-                const center = bounds.getCenter();
+            if (zone && zone.layer && mapRef.current) {
+                const center = getPolygonCenter(zone.layer);
+                if (center) {
+                    const plant = getCropByValue(plantValue);
+                    if (plant) {
+                        if (zone.plantMarker) {
+                            try {
+                                mapRef.current.removeLayer(zone.plantMarker);
+                            } catch (error) {
+                                // Silent fail
+                            }
+                        }
 
-                // Remove existing marker if any
-                if (zone.plantMarker) {
-                    zone.plantMarker.setMap(null);
-                    setMapObjects(prev => ({
-                        ...prev,
-                        plantMarkers: prev.plantMarkers.filter(marker => marker !== zone.plantMarker)
-                    }));
-                }
+                        const marker = L.marker([center.lat, center.lng], {
+                            icon: L.divIcon({
+                                className: 'plant-marker-icon',
+                                html: `<div style="
+                                    background: white;
+                                    border: 2px solid ${zone.color};
+                                    border-radius: 50%;
+                                    width: 40px;
+                                    height: 40px;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    font-size: 20px;
+                                    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                                    cursor: pointer;
+                                ">${plant.icon}</div>`,
+                                iconSize: [40, 40],
+                                iconAnchor: [20, 20],
+                            }),
+                        });
 
-                // Create new marker
-                const marker = new google.maps.Marker({
-                    position: center,
-                    map: map,
-                    title: selectedPlant.name,
-                    icon: {
-                        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                            <svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="20" cy="20" r="18" fill="white" stroke="${zone.color}" stroke-width="2"/>
-                                <text x="20" y="28" font-family="Arial" font-size="20" text-anchor="middle" fill="black">${selectedPlant.icon}</text>
-                            </svg>
-                        `)}`,
-                        scaledSize: new google.maps.Size(40, 40),
-                        anchor: new google.maps.Point(20, 20),
-                    }
-                });
-
-                const infoWindow = new google.maps.InfoWindow({
-                    content: `
-                        <div style="text-align: center;">
-                            <div style="font-size: 16px; margin-bottom: 4px;">${selectedPlant.icon}</div>
-                            <div style="font-weight: bold; margin-bottom: 2px; color: #333;">${selectedPlant.name}</div>
-                            <div style="font-size: 10px; opacity: 0.8; margin-bottom: 4px; line-height: 1.2;">${selectedPlant.description}</div>
-                            <div style="font-size: 9px; opacity: 0.6; border-top: 1px solid rgba(0,0,0,0.2); padding-top: 4px; margin-top: 4px;">
-                                <div style="color: ${zone.color};">● ${zone.name}</div>
+                        const tooltipContent = `
+                            <div style="text-align: center;">
+                                <div style="font-size: 16px; margin-bottom: 4px;">${plant.icon}</div>
+                                <div style="font-weight: bold; margin-bottom: 2px; color: #ffffff;">${plant.name}</div>
+                                <div style="font-size: 10px; opacity: 0.8; margin-bottom: 4px; line-height: 1.2;">${plant.description}</div>
+                                <div style="font-size: 9px; opacity: 0.6; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 4px; margin-top: 4px;">
+                                    <div style="color: ${zone.color};">● ${zone.name}</div>
+                                </div>
                             </div>
-                        </div>
-                    `
-                });
+                        `;
 
-                marker.addListener('click', () => {
-                    infoWindow.open(map, marker);
-                });
+                        marker.bindTooltip(tooltipContent, {
+                            permanent: false,
+                            direction: 'top',
+                            offset: [0, -25],
+                            className: 'plant-tooltip',
+                            opacity: 0.9,
+                        });
 
-                zone.plantMarker = marker;
-                setZones((prev) =>
-                    prev.map((z) => (z.id === zone.id ? { ...z, plantMarker: marker } : z))
-                );
-
-                setMapObjects(prev => ({
-                    ...prev,
-                    plantMarkers: [...prev.plantMarkers, marker]
-                }));
+                        marker.addTo(mapRef.current);
+                        zone.plantMarker = marker;
+                        setZones((prev) =>
+                            prev.map((z) => (z.id === zone.id ? { ...z, plantMarker: marker } : z))
+                        );
+                    }
+                }
             }
         } catch (error) {
-            handleError('เกิดข้อผิดพลาดในการกำหนดพืช');
+            // Silent fail
         }
     };
 
@@ -2073,12 +2382,8 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         });
 
         const zone = zones.find((z) => z.id.toString() === zoneId);
-        if (zone && zone.plantMarker) {
-            zone.plantMarker.setMap(null);
-            setMapObjects(prev => ({
-                ...prev,
-                plantMarkers: prev.plantMarkers.filter(marker => marker !== zone.plantMarker)
-            }));
+        if (zone && zone.plantMarker && mapRef.current) {
+            mapRef.current.removeLayer(zone.plantMarker);
         }
         setZones((prev) => prev.map((z) => (z.id === zone.id ? { ...z, plantMarker: null } : z)));
     };
@@ -2098,20 +2403,12 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             return;
         }
 
-        if (zone.plantMarker) {
-            zone.plantMarker.setMap(null);
-            setMapObjects(prev => ({
-                ...prev,
-                plantMarkers: prev.plantMarkers.filter(marker => marker !== zone.plantMarker)
-            }));
+        if (zone.plantMarker && mapRef.current) {
+            mapRef.current.removeLayer(zone.plantMarker);
         }
 
-        if (zone.polygon) {
-            zone.polygon.setMap(null);
-            setMapObjects(prev => ({
-                ...prev,
-                zones: prev.zones.filter(polygon => polygon !== zone.polygon)
-            }));
+        if (zone.layer && featureGroupRef.current) {
+            featureGroupRef.current.removeLayer(zone.layer);
         }
 
         setZoneAssignments((prev) => {
@@ -2139,7 +2436,6 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         setSearchResults([]);
         setIsLocationSelected(false);
         setShowDropdown(false);
-        setIsSearching(false);
     };
 
     // Crop spacing management
@@ -2186,7 +2482,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
     // Error handling functions
     const handleError = (errorMessage: string) => {
         setError(errorMessage);
-        setTimeout(() => setError(null), 5000);
+        setTimeout(() => setError(null), 5000); // Auto clear after 5 seconds
     };
 
     const clearError = () => {
@@ -2203,66 +2499,88 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     setMapZoom(15);
                 },
                 () => {
-                    handleError('ไม่สามารถรับตำแหน่งปัจจุบันได้');
+                    // Silent fail
                 }
             );
         }
     };
 
-    // Enhanced capture function
+    // ENHANCED CAPTURE FUNCTION WITH COMPLETE DATA
     const handleCaptureMapAndSummary = async () => {
+        // คำนวณ optimal center และ zoom จาก field boundary
         let optimalCenter = mapCenter;
         let optimalZoom = mapZoom;
 
-        if (mainField && mainField.polygon) {
+        if (mainField && mainField.getLatLngs) {
             try {
-                const bounds = new google.maps.LatLngBounds();
-                const path = mainField.polygon.getPath();
-                for (let i = 0; i < path.getLength(); i++) {
-                    bounds.extend(path.getAt(i));
-                }
-                const center = bounds.getCenter();
-                optimalCenter = [center.lat(), center.lng()];
+                const coords = mainField.getLatLngs()[0];
+                if (coords && coords.length > 0) {
+                    // แปลง [lat, lng] → [lng, lat] สำหรับ turf
+                    const turfCoords = coords.map((coord: any) => [coord.lng, coord.lat]);
+                    const closedCoords = [...turfCoords, turfCoords[0]];
+                    const polygon = turf.polygon([closedCoords]);
+                    const centroid = turf.centroid(polygon);
+                    const [centerLng, centerLat] = centroid.geometry.coordinates;
 
-                if (fieldAreaSize > 10000) {
-                    optimalZoom = 16;
-                } else if (fieldAreaSize > 5000) {
-                    optimalZoom = 17;
-                } else {
-                    optimalZoom = 18;
+                    optimalCenter = [centerLat, centerLng];
+
+                    // คำนวณ zoom ตามขนาดพื้นที่
+                    if (fieldAreaSize > 10000) {
+                        optimalZoom = 16;
+                    } else if (fieldAreaSize > 5000) {
+                        optimalZoom = 17;
+                    } else {
+                        optimalZoom = 18;
+                    }
                 }
             } catch (error) {
                 console.error('Error calculating optimal center:', error);
             }
         }
 
+        // สร้าง summaryData ครบถ้วน
         const summaryData = {
+            // Field information
             mainField: mainField
                 ? {
-                      id: Date.now(),
+                      id: mainField._leaflet_id || Date.now(),
                       name: 'Main Field',
-                      coordinates: pathToCoordinates(mainField.polygon.getPath()),
+                      coordinates: mainField.getLatLngs
+                          ? mainField.getLatLngs()[0].map((coord: any) => [coord.lat, coord.lng])
+                          : [],
                       area: fieldAreaSize,
                   }
                 : null,
             fieldAreaSize,
             selectedCrops: [...selectedCrops],
+
+            // Zone information
             zones: zones.map((zone) => ({
                 id: zone.id,
                 name: zone.name,
                 color: zone.color,
-                coordinates: zone.polygon ? pathToCoordinates(zone.polygon.getPath()) : [],
-                area: 0,
+                coordinates:
+                    zone.layer && zone.layer.getLatLngs
+                        ? zone.layer.getLatLngs()[0].map((coord: any) => [coord.lat, coord.lng])
+                        : [],
+                area: 0, // Can be calculated if needed
             })),
             zoneAssignments: { ...zoneAssignments },
             zoneSummaries: { ...zoneSummaries },
+
+            // Pipe information
             pipes: pipes.map((pipe) => ({
                 id: pipe.id,
                 type: pipe.type,
                 name: pipe.name,
-                coordinates: pipe.polyline ? pathToCoordinates(pipe.polyline.getPath()) : [],
-                length: 0,
+                coordinates:
+                    pipe.layer && pipe.layer.getLatLngs
+                        ? pipe.layer.getLatLngs().map((coord: any) => [coord.lat, coord.lng])
+                        : [],
+                length: 0, // Can be calculated if needed
             })),
+
+            // Equipment information
             equipmentIcons: equipmentIcons.map((equipment) => ({
                 id: equipment.id,
                 type: equipment.type,
@@ -2271,6 +2589,8 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 lng: equipment.lng,
                 config: equipment.config,
             })),
+
+            // Irrigation information
             irrigationPoints: irrigationPoints.map((point) => ({
                 id: point.id,
                 type: point.type,
@@ -2279,37 +2599,52 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 position: point.position ? [point.position.lat, point.position.lng] : null,
                 radius: point.radius,
                 overlap: point.overlap,
-                spacing: point.spacing,
+                spacing: point.spacing, // For drip tape
             })),
             irrigationLines: irrigationLines.map((line) => ({
                 id: line.id,
                 type: line.type,
                 zoneId: line.zoneId,
                 zoneName: line.zoneName,
-                coordinates: line.polyline ? pathToCoordinates(line.polyline.getPath()) : [],
+                coordinates:
+                    line.layer && line.layer.getLatLngs
+                        ? line.layer.getLatLngs().map((coord: any) => [coord.lat, coord.lng])
+                        : [],
             })),
             irrigationAssignments: { ...irrigationAssignments },
             irrigationSettings: { ...irrigationSettings },
+
+            // Spacing information
             rowSpacing: { ...rowSpacing },
             plantSpacing: { ...plantSpacing },
+
+            // Map settings
             mapCenter: optimalCenter,
             mapZoom: optimalZoom,
             mapType,
+
+            // Planting points (for calculations)
             plantingPoints: plantingPoints.map((point) => ({
                 id: point.id,
                 zoneId: point.zoneId,
                 position: point.position ? [point.position.lat, point.position.lng] : null,
             })),
+
+            // Additional data
             obstacles: obstacles.map((obstacle) => ({
                 id: obstacle.id,
                 type: obstacle.type,
-                coordinates: obstacle.polygon ? pathToCoordinates(obstacle.polygon.getPath()) : [],
+                geometry: obstacle.geometry,
             })),
+
+            // Timestamp
             timestamp: new Date().toISOString(),
         };
 
         try {
             localStorage.setItem('fieldMapData', JSON.stringify(summaryData));
+
+            // Navigate to summary page
             window.location.href = '/field-crop-summary';
         } catch (error) {
             console.error('Error saving data:', error);
@@ -2373,45 +2708,100 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                             {/* Step Wizard Navigation */}
                             <div className="rounded-lg bg-gray-700 p-4">
                                 <h3 className="mb-3 text-lg font-semibold">🎨 Planning Wizard</h3>
-                                <div className="grid grid-cols-4 gap-4">
-                                    {[
-                                        { step: 1, title: 'Field & Crops', subtitle: 'Draw field + set spacing', icon: '1️⃣', color: 'green' },
-                                        { step: 2, title: 'Zones & Obstacles', subtitle: 'Zones + assign crops', icon: '2️⃣', color: 'blue' },
-                                        { step: 3, title: 'Pipe System', subtitle: 'Main + sub + laterals', icon: '3️⃣', color: 'purple' },
-                                        { step: 4, title: 'Irrigation System', subtitle: 'Sprinklers + drip + micro', icon: '4️⃣', color: 'cyan' }
-                                    ].map((stepInfo) => (
-                                        <button
-                                            key={stepInfo.step}
-                                            onClick={() => goToStep(stepInfo.step)}
-                                            className={`flex flex-col items-center rounded-lg border-2 p-3 transition-all ${
-                                                currentStep === stepInfo.step
-                                                    ? stepInfo.color === 'green'
-                                                        ? 'border-green-500 bg-green-500/20 text-green-300'
-                                                        : stepInfo.color === 'blue'
-                                                          ? 'border-blue-500 bg-blue-500/20 text-blue-300'
-                                                          : stepInfo.color === 'purple'
-                                                            ? 'border-purple-500 bg-purple-500/20 text-purple-300'
-                                                            : 'border-cyan-500 bg-cyan-500/20 text-cyan-300'
-                                                    : stepCompleted[stepInfo.step]
-                                                      ? stepInfo.color === 'green'
-                                                        ? 'border-green-500/50 bg-green-500/10 text-green-400 hover:bg-green-500/20'
-                                                        : stepInfo.color === 'blue'
-                                                          ? 'border-blue-500/50 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20'
-                                                          : stepInfo.color === 'purple'
-                                                            ? 'border-purple-500/50 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20'
-                                                            : 'border-cyan-500/50 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20'
-                                                      : 'border-gray-600 bg-gray-700 text-gray-400 hover:border-gray-500'
-                                            }`}
-                                        >
-                                            <span className="mb-1 text-lg">
-                                                {stepCompleted[stepInfo.step] ? '✅' : stepInfo.icon}
-                                            </span>
-                                            <div className="text-center">
-                                                <div className="text-sm font-medium">{stepInfo.title}</div>
-                                                <div className="text-xs opacity-75">{stepInfo.subtitle}</div>
+                                <div className="flex items-center space-x-2">
+                                    <button
+                                        onClick={() => goToStep(1)}
+                                        className={`flex cursor-pointer items-center rounded-lg border-2 px-3 py-2 transition-all ${
+                                            currentStep === 1
+                                                ? 'border-green-500 bg-green-500/20 text-green-300'
+                                                : stepCompleted[1]
+                                                  ? 'border-green-500/50 bg-green-500/10 text-green-400 hover:bg-green-500/20'
+                                                  : 'border-gray-600 bg-gray-700 text-gray-400 hover:border-gray-500'
+                                        }`}
+                                    >
+                                        <span className="mr-2 text-lg">
+                                            {stepCompleted[1] ? '✅' : '1️⃣'}
+                                        </span>
+                                        <div className="text-left">
+                                            <div className="text-sm font-medium">Field & Crops</div>
+                                            <div className="text-xs opacity-75">
+                                                Draw field + set spacing
                                             </div>
-                                        </button>
-                                    ))}
+                                        </div>
+                                    </button>
+
+                                    <div className="h-0.5 flex-1 bg-gray-600"></div>
+
+                                    <button
+                                        onClick={() => goToStep(2)}
+                                        className={`flex cursor-pointer items-center rounded-lg border-2 px-3 py-2 transition-all ${
+                                            currentStep === 2
+                                                ? 'border-blue-500 bg-blue-500/20 text-blue-300'
+                                                : stepCompleted[2]
+                                                  ? 'border-blue-500/50 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20'
+                                                  : 'border-gray-600 bg-gray-700 text-gray-400 hover:border-gray-500'
+                                        }`}
+                                    >
+                                        <span className="mr-2 text-lg">
+                                            {stepCompleted[2] ? '✅' : '2️⃣'}
+                                        </span>
+                                        <div className="text-left">
+                                            <div className="text-sm font-medium">
+                                                Zones & Obstacles
+                                            </div>
+                                            <div className="text-xs opacity-75">
+                                                Zones + assign crops
+                                            </div>
+                                        </div>
+                                    </button>
+
+                                    <div className="h-0.5 flex-1 bg-gray-600"></div>
+
+                                    <button
+                                        onClick={() => goToStep(3)}
+                                        className={`flex cursor-pointer items-center rounded-lg border-2 px-3 py-2 transition-all ${
+                                            currentStep === 3
+                                                ? 'border-purple-500 bg-purple-500/20 text-purple-300'
+                                                : stepCompleted[3]
+                                                  ? 'border-purple-500/50 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20'
+                                                  : 'border-gray-600 bg-gray-700 text-gray-400 hover:border-gray-500'
+                                        }`}
+                                    >
+                                        <span className="mr-2 text-lg">
+                                            {stepCompleted[3] ? '✅' : '3️⃣'}
+                                        </span>
+                                        <div className="text-left">
+                                            <div className="text-sm font-medium">Pipe System</div>
+                                            <div className="text-xs opacity-75">
+                                                Main + sub + laterals
+                                            </div>
+                                        </div>
+                                    </button>
+
+                                    <div className="h-0.5 flex-1 bg-gray-600"></div>
+
+                                    <button
+                                        onClick={() => goToStep(4)}
+                                        className={`flex cursor-pointer items-center rounded-lg border-2 px-3 py-2 transition-all ${
+                                            currentStep === 4
+                                                ? 'border-cyan-500 bg-cyan-500/20 text-cyan-300'
+                                                : stepCompleted[4]
+                                                  ? 'border-cyan-500/50 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20'
+                                                  : 'border-gray-600 bg-gray-700 text-gray-400 hover:border-gray-500'
+                                        }`}
+                                    >
+                                        <span className="mr-2 text-lg">
+                                            {stepCompleted[4] ? '✅' : '4️⃣'}
+                                        </span>
+                                        <div className="text-left">
+                                            <div className="text-sm font-medium">
+                                                Irrigation System
+                                            </div>
+                                            <div className="text-xs opacity-75">
+                                                Sprinklers + drip + micro
+                                            </div>
+                                        </div>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -2499,7 +2889,9 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                                 generateLateralPipes={generateLateralPipes}
                                                 clearLateralPipes={clearLateralPipes}
                                                 isGeneratingPipes={isGeneratingPipes}
-                                                generateLateralPipesForZone={generateLateralPipesForZone}
+                                                generateLateralPipesForZone={
+                                                    generateLateralPipesForZone
+                                                }
                                                 irrigationAssignments={irrigationAssignments}
                                                 setIrrigationAssignments={setIrrigationAssignments}
                                                 irrigationPoints={irrigationPoints}
@@ -2508,7 +2900,9 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                                 setIrrigationRadius={setIrrigationRadius}
                                                 sprinklerOverlap={sprinklerOverlap}
                                                 setSprinklerOverlap={setSprinklerOverlap}
-                                                generateIrrigationForZone={generateIrrigationForZone}
+                                                generateIrrigationForZone={
+                                                    generateIrrigationForZone
+                                                }
                                                 clearIrrigationForZone={clearIrrigationForZone}
                                                 zoneSummaries={zoneSummaries}
                                                 plantingPoints={plantingPoints}
@@ -2517,21 +2911,29 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                                 tempRowSpacing={tempRowSpacing}
                                                 setTempRowSpacing={setTempRowSpacing}
                                                 editingRowSpacingForCrop={editingRowSpacingForCrop}
-                                                setEditingRowSpacingForCrop={setEditingRowSpacingForCrop}
+                                                setEditingRowSpacingForCrop={
+                                                    setEditingRowSpacingForCrop
+                                                }
                                                 handleRowSpacingConfirm={handleRowSpacingConfirm}
                                                 handleRowSpacingCancel={handleRowSpacingCancel}
                                                 plantSpacing={plantSpacing}
                                                 tempPlantSpacing={tempPlantSpacing}
                                                 setTempPlantSpacing={setTempPlantSpacing}
-                                                editingPlantSpacingForCrop={editingPlantSpacingForCrop}
-                                                setEditingPlantSpacingForCrop={setEditingPlantSpacingForCrop}
-                                                handlePlantSpacingConfirm={handlePlantSpacingConfirm}
+                                                editingPlantSpacingForCrop={
+                                                    editingPlantSpacingForCrop
+                                                }
+                                                setEditingPlantSpacingForCrop={
+                                                    setEditingPlantSpacingForCrop
+                                                }
+                                                handlePlantSpacingConfirm={
+                                                    handlePlantSpacingConfirm
+                                                }
                                                 handlePlantSpacingCancel={handlePlantSpacingCancel}
-                                                handleCaptureMapAndSummary={handleCaptureMapAndSummary}
+                                                handleCaptureMapAndSummary={
+                                                    handleCaptureMapAndSummary
+                                                }
                                                 irrigationSettings={irrigationSettings}
                                                 setIrrigationSettings={setIrrigationSettings}
-                                                // Add force update key
-                                                key={`tools-panel-${zones.length}-${obstacles.length}-${pipes.length}`}
                                             />
                                         </div>
                                     </div>
@@ -2548,168 +2950,156 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                                 📍 Interactive Map
                                             </h3>
 
-                                            <div className="flex space-x-2">
-                                                {[
-                                                    { id: 'roadmap', name: '🗺️ Road' },
-                                                    { id: 'satellite', name: '🛰️ Satellite' },
-                                                    { id: 'hybrid', name: '🔄 Hybrid' },
-                                                    { id: 'terrain', name: '🏔️ Terrain' }
-                                                ].map(type => (
-                                                    <button
-                                                        key={type.id}
-                                                        onClick={() => {
-                                                            setMapType(type.id as "satellite" | "street" | "hybrid");
-                                                        }}
-                                                        className={`rounded px-3 py-1 text-xs transition-colors ${
-                                                            mapType === type.id
-                                                                ? 'bg-blue-600 text-white'
-                                                                : 'bg-gray-600 text-white hover:bg-gray-500'
-                                                        }`}
-                                                    >
-                                                        {type.name}
-                                                    </button>
-                                                ))}
-                                            </div>
+                                            {/* Map Type Selector */}
+                                            <FieldMapTypeSelector
+                                                mapType={mapType}
+                                                setMapType={setMapType}
+                                            />
                                         </div>
                                     </div>
 
                                     {/* Map Container */}
                                     <div className="relative flex-1">
-                                        <Wrapper
-                                            apiKey={getGoogleMapsConfig().apiKey}
-                                            render={(status: Status) => {
-                                                if (status === Status.LOADING) return <div>Loading...</div>;
-                                                if (status === Status.FAILURE) return <div>Error loading maps</div>;
-                                                return <div style={{ width: '100%', height: '100%' }} />;
-                                            }}
-                                            libraries={['drawing', 'geometry', 'places']}
+                                        <MapContainer
+                                            center={mapCenter}
+                                            zoom={mapZoom}
+                                            maxZoom={20}
+                                            minZoom={3}
+                                            className={`h-full w-full ${isPlacingEquipment ? 'cursor-crosshair' : ''}`}
                                         >
-                                            <GoogleMapComponent
-                                                center={{ lat: mapCenter[0], lng: mapCenter[1] }}
-                                                zoom={mapZoom}
-                                                onLoad={setMap}
-                                                onDrawCreated={handleDrawCreated}
-                                                drawingStage={drawingStage}
-                                                currentZoneColor={currentZoneColor}
-                                                drawingMode={drawingMode}
-                                                canDrawZone={canDrawZone}
-                                                canDrawPipe={canDrawPipe}
-                                                currentObstacleType={currentObstacleType}
-                                                currentPipeType={currentPipeType}
-                                                isPlacingEquipment={isPlacingEquipment}
-                                                selectedEquipmentType={selectedEquipmentType}
-                                                zones={zones}
-                                                pipes={pipes}
-                                                obstacles={obstacles}
-                                                equipmentIcons={equipmentIcons}
-                                                mainField={mainField}
-                                                onMapClick={handleMapClick}
-                                                onEquipmentPlace={handleEquipmentPlace}
-                                                onZoneClick={(zone) => {
-                                                    setSelectedZone(zone);
-                                                    setShowPlantSelector(true);
-                                                }}
-                                                mapType={mapType}
-                                                // Add these props for sync
-                                                setDrawingMode={setDrawingMode}
-                                                setCurrentZoneColor={setCurrentZoneColor}
-                                                setCurrentObstacleType={setCurrentObstacleType}
-                                                setCurrentPipeType={setCurrentPipeType}
+                                            <TileLayer
+                                                key={mapType}
+                                                attribution={MAP_TILES[mapType].attribution}
+                                                url={MAP_TILES[mapType].url}
+                                                maxZoom={20}
+                                                maxNativeZoom={18}
+                                                keepBuffer={4}
                                             />
-                                        </Wrapper>
 
-                                        {/* Location Search Overlay - Top Right, Smaller */}
-                                        <div className="absolute right-2 top-2 z-10 w-80">
-                                            <div className="relative">
-                                                <div className="relative">
-                                                    <input
-                                                        type="text"
-                                                        placeholder="🔍 Search places..."
-                                                        value={searchQuery}
-                                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                                        onFocus={() => {
-                                                            if (searchResults.length > 0) {
-                                                                setShowDropdown(true);
-                                                            }
-                                                        }}
-                                                        onBlur={() => {
-                                                            blurTimeoutRef.current = setTimeout(() => {
-                                                                setShowDropdown(false);
-                                                            }, 150);
-                                                        }}
-                                                        className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 pr-10 text-sm text-gray-900 shadow-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                                                    />
-                                                    {searchQuery && (
-                                                        <button
-                                                            onClick={clearSearch}
-                                                            className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                                        >
-                                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                            </svg>
-                                                        </button>
-                                                    )}
-                                                    {isSearching && (
-                                                        <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                                                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                            <FeatureGroup ref={featureGroupRef}>
+                                                <EditControl
+                                                    position="topright"
+                                                    onCreated={handleDrawCreated}
+                                                    onDeleted={handleDrawDeleted}
+                                                    draw={{
+                                                        rectangle: false,
+                                                        polygon:
+                                                            drawingStage === 'field' ||
+                                                            (drawingStage === 'zones' &&
+                                                                drawingMode === 'zone' &&
+                                                                canDrawZone) ||
+                                                            (drawingStage === 'zones' &&
+                                                                drawingMode === 'obstacle')
+                                                                ? {
+                                                                      shapeOptions:
+                                                                          drawingStage === 'field'
+                                                                              ? {
+                                                                                    color: '#22C55E',
+                                                                                    fillColor:
+                                                                                        '#22C55E',
+                                                                                    fillOpacity: 0.2,
+                                                                                }
+                                                                              : drawingStage ===
+                                                                                      'zones' &&
+                                                                                  drawingMode ===
+                                                                                      'zone'
+                                                                                ? {
+                                                                                      color: currentZoneColor,
+                                                                                      fillColor:
+                                                                                          currentZoneColor,
+                                                                                      fillOpacity: 0.3,
+                                                                                  }
+                                                                                : drawingStage ===
+                                                                                        'zones' &&
+                                                                                    drawingMode ===
+                                                                                        'obstacle'
+                                                                                  ? {
+                                                                                        color: OBSTACLE_TYPES[
+                                                                                            currentObstacleType
+                                                                                        ].color,
+                                                                                        fillColor:
+                                                                                            OBSTACLE_TYPES[
+                                                                                                currentObstacleType
+                                                                                            ]
+                                                                                                .fillColor,
+                                                                                        fillOpacity:
+                                                                                            OBSTACLE_TYPES[
+                                                                                                currentObstacleType
+                                                                                            ]
+                                                                                                .fillOpacity,
+                                                                                    }
+                                                                                  : {},
+                                                                  }
+                                                                : false,
+                                                        circle: false,
+                                                        polyline:
+                                                            drawingStage === 'pipes' &&
+                                                            canDrawPipe &&
+                                                            PIPE_TYPES[currentPipeType].manual
+                                                                ? {
+                                                                      shapeOptions: {
+                                                                          color: PIPE_TYPES[
+                                                                              currentPipeType
+                                                                          ].color,
+                                                                          weight: PIPE_TYPES[
+                                                                              currentPipeType
+                                                                          ].weight,
+                                                                          opacity:
+                                                                              PIPE_TYPES[
+                                                                                  currentPipeType
+                                                                              ].opacity,
+                                                                      },
+                                                                  }
+                                                                : false,
+                                                        marker: false,
+                                                        circlemarker: false,
+                                                    }}
+                                                />
+                                            </FeatureGroup>
 
-                                                {/* Search Results Dropdown */}
-                                                {showDropdown && searchResults.length > 0 && (
-                                                    <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
-                                                        {searchResults.map((result, index) => (
-                                                            <button
-                                                                key={index}
-                                                                onMouseDown={(e) => {
-                                                                    // Prevent input blur
-                                                                    e.preventDefault();
-                                                                    goToLocation(result);
-                                                                }}
-                                                                className="w-full border-b border-gray-100 px-3 py-2 text-left text-sm text-gray-900 hover:bg-blue-50 last:border-b-0"
-                                                            >
-                                                                <div className="flex items-start space-x-2">
-                                                                    <div className="mt-0.5 text-blue-500">
-                                                                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                                        </svg>
-                                                                    </div>
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <div className="font-medium text-gray-900 truncate text-xs">
-                                                                            {result.label}
-                                                                        </div>
-                                                                        {result.address && result.address !== result.label && (
-                                                                            <div className="text-xs text-gray-500 truncate mt-0.5">
-                                                                                {result.address}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                )}
+                                            <MapControls
+                                                mapCenter={mapCenter}
+                                                mapZoom={mapZoom}
+                                                mapRef={mapRef}
+                                            />
 
-                                                {/* No Results Message */}
-                                                {showDropdown && searchResults.length === 0 && !isSearching && searchQuery.trim() && (
-                                                    <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-md border border-gray-200 bg-white p-3 text-center text-xs text-gray-500 shadow-lg">
-                                                        No places found for "{searchQuery}"
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
+                                            <MapClickHandler
+                                                isPlacingEquipment={isPlacingEquipment}
+                                                onMapClick={placeEquipmentAtPosition}
+                                            />
+                                        </MapContainer>
+
+                                        {/* Location Search Overlay */}
+                                        <LocationSearchOverlay
+                                            searchQuery={searchQuery}
+                                            setSearchQuery={setSearchQuery}
+                                            searchResults={searchResults}
+                                            isSearching={isSearching}
+                                            showDropdown={showDropdown}
+                                            setShowDropdown={setShowDropdown}
+                                            isLocationSelected={isLocationSelected}
+                                            setIsLocationSelected={setIsLocationSelected}
+                                            goToLocation={goToLocation}
+                                            clearSearch={clearSearch}
+                                            blurTimeoutRef={blurTimeoutRef}
+                                        />
 
                                         {/* Equipment Placement Overlay */}
                                         {isPlacingEquipment && selectedEquipmentType && (
                                             <div className="pointer-events-none absolute left-1/2 top-4 z-[1000] -translate-x-1/2 transform rounded-lg bg-black bg-opacity-75 px-4 py-2 text-sm text-white">
                                                 <div className="flex items-center space-x-2">
                                                     <span className="text-lg">
-                                                        {EQUIPMENT_TYPES[selectedEquipmentType].icon}
+                                                        {
+                                                            EQUIPMENT_TYPES[selectedEquipmentType]
+                                                                .icon
+                                                        }
                                                     </span>
                                                     <span>
-                                                        คลิกบนแผนที่เพื่อวาง {EQUIPMENT_TYPES[selectedEquipmentType].name}
+                                                        คลิกบนแผนที่เพื่อวาง{' '}
+                                                        {
+                                                            EQUIPMENT_TYPES[selectedEquipmentType]
+                                                                .name
+                                                        }
                                                     </span>
                                                 </div>
                                             </div>
@@ -2744,21 +3134,37 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                                 {currentStep === 3 && (
                                                     <>
                                                         <div className="h-6 w-px bg-gray-500"></div>
-                                                        {Object.entries(EQUIPMENT_TYPES).map(([key, config]) => (
-                                                            <Tooltip key={key} content={`วาง ${config.name}`}>
-                                                                <button
-                                                                    onClick={() => startPlacingEquipment(key as EquipmentType)}
-                                                                    className={`rounded px-3 py-1 text-xs transition-colors ${
-                                                                        selectedEquipmentType === key && isPlacingEquipment
-                                                                            ? 'bg-yellow-600 text-white'
-                                                                            : 'bg-gray-600 text-white hover:bg-gray-500'
-                                                                    }`}
-                                                                    disabled={isPlacingEquipment && selectedEquipmentType !== key}
+                                                        {Object.entries(EQUIPMENT_TYPES).map(
+                                                            ([key, config]) => (
+                                                                <Tooltip
+                                                                    key={key}
+                                                                    content={`วาง ${config.name}`}
                                                                 >
-                                                                    {config.icon} {config.name.split(' ')[0]}
-                                                                </button>
-                                                            </Tooltip>
-                                                        ))}
+                                                                    <button
+                                                                        onClick={() =>
+                                                                            startPlacingEquipment(
+                                                                                key as EquipmentType
+                                                                            )
+                                                                        }
+                                                                        className={`rounded px-3 py-1 text-xs transition-colors ${
+                                                                            selectedEquipmentType ===
+                                                                                key &&
+                                                                            isPlacingEquipment
+                                                                                ? 'bg-yellow-600 text-white'
+                                                                                : 'bg-gray-600 text-white hover:bg-gray-500'
+                                                                        }`}
+                                                                        disabled={
+                                                                            isPlacingEquipment &&
+                                                                            selectedEquipmentType !==
+                                                                                key
+                                                                        }
+                                                                    >
+                                                                        {config.icon}{' '}
+                                                                        {config.name.split(' ')[0]}
+                                                                    </button>
+                                                                </Tooltip>
+                                                            )
+                                                        )}
 
                                                         {isPlacingEquipment && (
                                                             <Tooltip content="ยกเลิกการวางอุปกรณ์">
@@ -2780,7 +3186,9 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                                         >
                                                             <button
                                                                 onClick={clearAllEquipment}
-                                                                disabled={equipmentIcons.length === 0}
+                                                                disabled={
+                                                                    equipmentIcons.length === 0
+                                                                }
                                                                 className={`rounded px-3 py-1 text-xs transition-colors ${
                                                                     equipmentIcons.length === 0
                                                                         ? 'cursor-not-allowed bg-gray-500 text-gray-300'
@@ -2793,10 +3201,14 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
 
                                                         {/* Undo/Redo buttons */}
                                                         <div className="h-6 w-px bg-gray-500"></div>
-                                                        <Tooltip content={`Undo (${equipmentHistoryIndex > 0 ? 'มีให้ย้อนกลับ' : 'ไม่มีให้ย้อนกลับ'})`}>
+                                                        <Tooltip
+                                                            content={`Undo (${equipmentHistoryIndex > 0 ? 'มีให้ย้อนกลับ' : 'ไม่มีให้ย้อนกลับ'})`}
+                                                        >
                                                             <button
                                                                 onClick={undoEquipment}
-                                                                disabled={equipmentHistoryIndex <= 0}
+                                                                disabled={
+                                                                    equipmentHistoryIndex <= 0
+                                                                }
                                                                 className={`rounded px-3 py-1 text-xs transition-colors ${
                                                                     equipmentHistoryIndex > 0
                                                                         ? 'bg-purple-600 text-white hover:bg-purple-700'
@@ -2806,12 +3218,18 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                                                 ↶ Undo
                                                             </button>
                                                         </Tooltip>
-                                                        <Tooltip content={`Redo (${equipmentHistoryIndex < equipmentHistory.length - 1 ? 'มีให้ทำซ้ำ' : 'ไม่มีให้ทำซ้ำ'})`}>
+                                                        <Tooltip
+                                                            content={`Redo (${equipmentHistoryIndex < equipmentHistory.length - 1 ? 'มีให้ทำซ้ำ' : 'ไม่มีให้ทำซ้ำ'})`}
+                                                        >
                                                             <button
                                                                 onClick={redoEquipment}
-                                                                disabled={equipmentHistoryIndex >= equipmentHistory.length - 1}
+                                                                disabled={
+                                                                    equipmentHistoryIndex >=
+                                                                    equipmentHistory.length - 1
+                                                                }
                                                                 className={`rounded px-3 py-1 text-xs transition-colors ${
-                                                                    equipmentHistoryIndex < equipmentHistory.length - 1
+                                                                    equipmentHistoryIndex <
+                                                                    equipmentHistory.length - 1
                                                                         ? 'bg-purple-600 text-white hover:bg-purple-700'
                                                                         : 'cursor-not-allowed bg-gray-500 text-gray-300'
                                                                 }`}
@@ -2824,24 +3242,22 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                             </div>
 
                                             <div className="flex items-center space-x-3">
-                                                <span className="text-xs text-gray-400">Zoom: {mapZoom}</span>
+                                                <span className="text-xs text-gray-400">
+                                                    Zoom: {mapZoom}
+                                                </span>
                                                 <div className="flex space-x-1">
                                                     <button
-                                                        onClick={() => {
-                                                            const newZoom = Math.max(mapZoom - 1, 3);
-                                                            setMapZoom(newZoom);
-                                                            if (map) map.setZoom(newZoom);
-                                                        }}
+                                                        onClick={() =>
+                                                            setMapZoom(Math.max(mapZoom - 1, 3))
+                                                        }
                                                         className="rounded bg-gray-600 px-2 py-1 text-xs text-white hover:bg-gray-500"
                                                     >
                                                         −
                                                     </button>
                                                     <button
-                                                        onClick={() => {
-                                                            const newZoom = Math.min(mapZoom + 1, 20);
-                                                            setMapZoom(newZoom);
-                                                            if (map) map.setZoom(newZoom);
-                                                        }}
+                                                        onClick={() =>
+                                                            setMapZoom(Math.min(mapZoom + 1, 20))
+                                                        }
                                                         className="rounded bg-gray-600 px-2 py-1 text-xs text-white hover:bg-gray-500"
                                                     >
                                                         +
@@ -2871,8 +3287,18 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                     }}
                                     className="text-gray-400 hover:text-white"
                                 >
-                                    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    <svg
+                                        className="h-6 w-6"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M6 18L18 6M6 6l12 12"
+                                        />
                                     </svg>
                                 </button>
                             </div>
@@ -2896,7 +3322,12 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                         crop && (
                                             <button
                                                 key={crop.value}
-                                                onClick={() => assignPlantToZone(selectedZone.id.toString(), crop.value)}
+                                                onClick={() =>
+                                                    assignPlantToZone(
+                                                        selectedZone.id.toString(),
+                                                        crop.value
+                                                    )
+                                                }
                                                 className={`rounded-lg border-2 p-4 text-left transition-all ${
                                                     zoneAssignments[selectedZone.id] === crop.value
                                                         ? 'border-blue-500 bg-blue-500/20 text-blue-300'
@@ -2904,10 +3335,16 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                                 }`}
                                             >
                                                 <div className="flex items-center">
-                                                    <span className="mr-3 text-3xl">{crop.icon}</span>
+                                                    <span className="mr-3 text-3xl">
+                                                        {crop.icon}
+                                                    </span>
                                                     <div>
-                                                        <h4 className="font-semibold">{crop.name}</h4>
-                                                        <p className="text-sm opacity-80">{crop.description}</p>
+                                                        <h4 className="font-semibold">
+                                                            {crop.name}
+                                                        </h4>
+                                                        <p className="text-sm opacity-80">
+                                                            {crop.description}
+                                                        </p>
                                                     </div>
                                                 </div>
                                             </button>
@@ -2917,7 +3354,10 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
 
                             {selectedCropObjects.length === 0 && (
                                 <div className="py-8 text-center text-gray-400">
-                                    <p>No crops selected. Please go back to the crop selection page to choose crops.</p>
+                                    <p>
+                                        No crops selected. Please go back to the crop selection page
+                                        to choose crops.
+                                    </p>
                                 </div>
                             )}
 
