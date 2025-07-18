@@ -12,6 +12,7 @@
 ## ฟังก์ชันที่ให้บริการ
 
 ### `captureElementAsImage(element, options)`
+
 แปลง element เป็น image data URL พร้อมจัดการ oklch compatibility
 
 ```typescript
@@ -19,11 +20,12 @@ import { captureElementAsImage } from '@/utils/html2canvasHelper';
 
 const dataUrl = await captureElementAsImage(element, {
     scale: 2,
-    backgroundColor: '#ffffff'
+    backgroundColor: '#ffffff',
 });
 ```
 
 ### `enhancedHtml2Canvas(element, options)`
+
 ฟังก์ชัน html2canvas ที่ปรับปรุงแล้วพร้อม error handling
 
 ```typescript
@@ -31,11 +33,12 @@ import { enhancedHtml2Canvas } from '@/utils/html2canvasHelper';
 
 const canvas = await enhancedHtml2Canvas(element, {
     scale: 2,
-    useCORS: true
+    useCORS: true,
 });
 ```
 
 ### `convertToPDF(element, filename, options)`
+
 แปลง element เป็น PDF พร้อมจัดการ image handling
 
 ```typescript
@@ -43,11 +46,12 @@ import { convertToPDF } from '@/utils/html2canvasHelper';
 
 await convertToPDF(element, 'document.pdf', {
     orientation: 'portrait',
-    format: 'a4'
+    format: 'a4',
 });
 ```
 
 ### `downloadImage(element, filename, format)`
+
 ดาวน์โหลด element เป็น image file
 
 ```typescript
@@ -111,6 +115,7 @@ const captureScreenshot = async () => {
 ## การตั้งค่า Options
 
 ### Default Options
+
 ```typescript
 {
     scale: 2,
@@ -125,6 +130,7 @@ const captureScreenshot = async () => {
 ```
 
 ### Fallback Options (เมื่อเกิด error)
+
 ```typescript
 {
     scale: 1,
@@ -144,10 +150,13 @@ const captureScreenshot = async () => {
 ## การแก้ไขปัญหา
 
 ### ปัญหา: สีไม่แสดงผลถูกต้อง
+
 **วิธีแก้:** ใช้ class `html2canvas-compatible` และตรวจสอบว่าไม่มี oklch colors
 
 ### ปัญหา: Element ไม่แสดงในผลลัพธ์
+
 **วิธีแก้:** ใช้ class `html2canvas-force-visible` สำหรับ elements ที่ซ่อนอยู่
 
 ### ปัญหา: Error เกี่ยวกับ CORS
-**วิธีแก้:** ใช้ `useCORS: true` และ `allowTaint: true` สำหรับ external images 
+
+**วิธีแก้:** ใช้ `useCORS: true` และ `allowTaint: true` สำหรับ external images

@@ -242,25 +242,19 @@ export const calculatePlantingPoints = (
     plantSpacing: number
 ): number => {
     if (rowSpacing <= 0 || plantSpacing <= 0) return 0;
-    
+
     // Calculate number of rows and plants per row
     const rows = Math.floor(Math.sqrt(zoneArea) / rowSpacing);
     const plantsPerRow = Math.floor(Math.sqrt(zoneArea) / plantSpacing);
-    
+
     return rows * plantsPerRow;
 };
 
-export const calculateEstimatedYield = (
-    plantingPoints: number,
-    yieldPerPlant: number
-): number => {
+export const calculateEstimatedYield = (plantingPoints: number, yieldPerPlant: number): number => {
     return plantingPoints * yieldPerPlant;
 };
 
-export const calculateEstimatedIncome = (
-    estimatedYield: number,
-    pricePerKg: number
-): number => {
+export const calculateEstimatedIncome = (estimatedYield: number, pricePerKg: number): number => {
     return estimatedYield * pricePerKg;
 };
 
@@ -275,9 +269,9 @@ export const estimateInstallationCost = (
         sprinkler: 800,
         mini_sprinkler: 600,
         micro_spray: 400,
-        drip_tape: 200
+        drip_tape: 200,
     };
-    
+
     const irrigationCost = irrigationCount * (irrigationCosts[irrigationInfo.type] || 500);
     const pipeCost = pipeLength * 60; // 60 baht per meter
     const equipmentCost = equipmentCount * 1500; // average equipment cost
@@ -288,7 +282,7 @@ export const estimateInstallationCost = (
 };
 
 export const estimateInstallationTime = (
-    irrigationCount: number, 
+    irrigationCount: number,
     pipeLength: number,
     zoneCount: number
 ): number => {
@@ -310,28 +304,28 @@ export const clearFieldCropData = (): void => {
 export const migrateFromFieldMapData = (): FieldCropData | null => {
     const oldData = localStorage.getItem('fieldMapData');
     if (!oldData) return null;
-    
+
     try {
         const parsed = JSON.parse(oldData);
-        
+
         // Create new structure based on old data
         const migrated: FieldCropData = {
             area: {
                 size: parsed.fieldAreaSize || 0,
-                coordinates: parsed.mainField?.coordinates || []
+                coordinates: parsed.mainField?.coordinates || [],
             },
             zones: {
                 info: parsed.zones || [],
                 totalCount: parsed.zones?.length || 0,
-                totalArea: parsed.fieldAreaSize || 0
+                totalArea: parsed.fieldAreaSize || 0,
             },
             crops: {
                 selectedCrops: parsed.selectedCrops || [],
                 zoneAssignments: parsed.zoneAssignments || {},
                 spacing: {
                     rowSpacing: parsed.rowSpacing || {},
-                    plantSpacing: parsed.plantSpacing || {}
-                }
+                    plantSpacing: parsed.plantSpacing || {},
+                },
             },
             irrigation: {
                 info: {
@@ -339,53 +333,61 @@ export const migrateFromFieldMapData = (): FieldCropData | null => {
                     name: 'Field Irrigation System',
                     radius: 5,
                     water_flow: 10,
-                    type: 'sprinkler'
+                    type: 'sprinkler',
                 },
                 positions: parsed.irrigationPoints || [],
                 totalCount: parsed.irrigationPoints?.length || 0,
                 coverage: 0,
-                assignments: parsed.irrigationAssignments || {}
+                assignments: parsed.irrigationAssignments || {},
             },
             waterSource: {
                 lat: 0,
                 lng: 0,
-                type: 'pump'
+                type: 'pump',
             },
             pipes: {
                 totalLength: 0,
                 longestPipe: 0,
                 connections: parsed.pipes?.length || 0,
-                pipeConnections: parsed.pipes || []
+                pipeConnections: parsed.pipes || [],
             },
             equipment: {
                 totalCount: parsed.equipmentIcons?.length || 0,
                 types: {
                     pumps: 0,
                     valves: 0,
-                    solenoids: 0
+                    solenoids: 0,
                 },
-                positions: parsed.equipmentIcons || []
+                positions: parsed.equipmentIcons || [],
             },
             summary: {
                 totalWaterFlow: 0,
                 estimatedCost: 0,
                 installationTime: 0,
-                totalPlantingPoints: Object.values(parsed.zoneSummaries || {}).reduce((sum: number, summary: any) => {
-                    return sum + (summary.totalPlantingPoints || 0);
-                }, 0),
-                estimatedYield: Object.values(parsed.zoneSummaries || {}).reduce((sum: number, summary: any) => {
-                    return sum + (summary.estimatedYield || 0);
-                }, 0),
-                estimatedIncome: Object.values(parsed.zoneSummaries || {}).reduce((sum: number, summary: any) => {
-                    return sum + (summary.estimatedPrice || 0);
-                }, 0)
-            }
+                totalPlantingPoints: Object.values(parsed.zoneSummaries || {}).reduce(
+                    (sum: number, summary: any) => {
+                        return sum + (summary.totalPlantingPoints || 0);
+                    },
+                    0
+                ),
+                estimatedYield: Object.values(parsed.zoneSummaries || {}).reduce(
+                    (sum: number, summary: any) => {
+                        return sum + (summary.estimatedYield || 0);
+                    },
+                    0
+                ),
+                estimatedIncome: Object.values(parsed.zoneSummaries || {}).reduce(
+                    (sum: number, summary: any) => {
+                        return sum + (summary.estimatedPrice || 0);
+                    },
+                    0
+                ),
+            },
         };
-        
+
         // Save migrated data
         saveFieldCropData(migrated);
         return migrated;
-        
     } catch (e) {
         console.error('Error migrating field map data:', e);
         return null;

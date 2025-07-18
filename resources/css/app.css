@@ -82,7 +82,13 @@
 
     body {
         @apply bg-background text-foreground;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        font-family:
+            'Inter',
+            -apple-system,
+            BlinkMacSystemFont,
+            'Segoe UI',
+            'Roboto',
+            sans-serif;
     }
 
     html {
@@ -107,7 +113,6 @@
     position: relative !important;
     z-index: 9999 !important;
 }
-
 
 /* Plant marker styles */
 .plant-marker-icon {
@@ -236,7 +241,9 @@
     .card {
         background-color: #ffffff;
         border-radius: 0.5rem;
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        box-shadow:
+            0 10px 15px -3px rgba(0, 0, 0, 0.1),
+            0 4px 6px -2px rgba(0, 0, 0, 0.05);
         border: 1px solid #e5e7eb;
         padding: 1.5rem;
     }
@@ -589,7 +596,8 @@
 }
 
 @keyframes pulseGentle {
-    0%, 100% {
+    0%,
+    100% {
         opacity: 1;
     }
     50% {

@@ -15,13 +15,13 @@ const irrigationOptions: IrrigationOption[] = [
         id: 'mini-sprinkler',
         name: 'มินิสปริงเกลอร์',
         icon: '💧',
-        description: 'ให้น้ำเป็นวงแคบลงมา เหมาะสำหรับแปลงผักหรือไม้พุ่ม'
+        description: 'ให้น้ำเป็นวงแคบลงมา เหมาะสำหรับแปลงผักหรือไม้พุ่ม',
     },
     {
         id: 'drip',
         name: 'น้ำหยด',
         icon: '💧🌱',
-        description: 'ประหยัดน้ำสูงสุด โดยให้น้ำโดยตรงที่โคนต้นพืช'
+        description: 'ประหยัดน้ำสูงสุด โดยให้น้ำโดยตรงที่โคนต้นพืช',
     },
     {
         id: 'mixed',
@@ -29,8 +29,8 @@ const irrigationOptions: IrrigationOption[] = [
         icon: '🔄',
         description: 'ผสมผสานระบบต่างๆ เพื่อให้เหมาะกับพืชหลากหลายชนิด',
         disabled: true,
-        developmentMessage: 'กำลังพัฒนา'
-    }
+        developmentMessage: 'กำลังพัฒนา',
+    },
 ];
 
 // --- คอมโพเนนต์ React ---
@@ -49,8 +49,10 @@ export default function ChooseIrrigationMethod() {
 
         console.log('Choose-irrigation received:', {
             crops: cropsParam,
-            shapes: shapesParam ? `มีข้อมูล shapes (${shapesParam.length} characters)` : 'ไม่มีข้อมูล shapes',
-            method: methodParam
+            shapes: shapesParam
+                ? `มีข้อมูล shapes (${shapesParam.length} characters)`
+                : 'ไม่มีข้อมูล shapes',
+            method: methodParam,
         });
 
         if (cropsParam) setCrops(cropsParam);
@@ -66,16 +68,16 @@ export default function ChooseIrrigationMethod() {
             shapes: shapes,
             method: method,
             selectedIrrigation: selectedMethod,
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
         };
         localStorage.setItem('choosingIrrigationData', JSON.stringify(currentData));
-        
+
         // กลับไปหน้า planner พร้อมข้อมูล
         const queryParams = new URLSearchParams();
         if (crops) queryParams.set('crops', crops);
         if (shapes) queryParams.set('shapes', shapes); // เพิ่มบรรทัดนี้
         if (method) queryParams.set('method', method);
-        
+
         window.location.href = `/greenhouse-planner?${queryParams.toString()}`;
     };
 
@@ -85,7 +87,7 @@ export default function ChooseIrrigationMethod() {
             alert('กรุณาเลือกระบบน้ำที่ต้องการ');
             return;
         }
-        
+
         // บันทึกข้อมูลทั้งหมดใน localStorage
         const completeData = {
             crops: crops,
@@ -93,13 +95,13 @@ export default function ChooseIrrigationMethod() {
             method: method,
             selectedIrrigation: selectedMethod,
             createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
         };
         localStorage.setItem('irrigationSelectionData', JSON.stringify(completeData));
-        
+
         // สร้าง URL parameters สำหรับหน้า green-house-map
         const queryParams = new URLSearchParams();
-        
+
         if (crops) queryParams.set('crops', crops);
         if (shapes) queryParams.set('shapes', shapes);
         if (method) queryParams.set('method', method);
@@ -110,22 +112,24 @@ export default function ChooseIrrigationMethod() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4">
+        <div className="flex min-h-screen flex-col items-center justify-center bg-gray-900 p-4 text-white">
             <div className="w-full max-w-4xl">
                 {/* Header */}
-                <div className="text-center mb-10">
+                <div className="mb-10 text-center">
                     <h1 className="text-3xl font-bold text-white">เลือกระบบการให้น้ำ</h1>
-                    <p className="text-md text-gray-400 mt-2">โปรดเลือกวิธีการให้น้ำที่เหมาะสมกับความต้องการของคุณ</p>
-                    
+                    <p className="text-md mt-2 text-gray-400">
+                        โปรดเลือกวิธีการให้น้ำที่เหมาะสมกับความต้องการของคุณ
+                    </p>
+
                     {/* Progress indicator */}
-                    <div className="flex items-center justify-center space-x-2 mt-4 text-sm text-gray-400">
+                    <div className="mt-4 flex items-center justify-center space-x-2 text-sm text-gray-400">
                         <span className="text-green-400">✓ เลือกพืช</span>
                         <span>→</span>
                         <span className="text-green-400">✓ วิธีการวางแผน</span>
                         <span>→</span>
                         <span className="text-green-400">✓ ออกแบบพื้นที่</span>
                         <span>→</span>
-                        <span className="text-blue-400 font-medium">เลือกระบบน้ำ</span>
+                        <span className="font-medium text-blue-400">เลือกระบบน้ำ</span>
                         <span>→</span>
                         <span>ออกแบบระบบน้ำ</span>
                     </div>
@@ -133,14 +137,19 @@ export default function ChooseIrrigationMethod() {
 
                 {/* Show selected data summary */}
                 {(crops || shapes) && (
-                    <div className="mb-8 p-4 bg-gray-800 rounded-lg border border-gray-700">
-                        <h3 className="text-lg font-medium text-green-400 mb-2">ข้อมูลที่เลือกไว้</h3>
+                    <div className="mb-8 rounded-lg border border-gray-700 bg-gray-800 p-4">
+                        <h3 className="mb-2 text-lg font-medium text-green-400">
+                            ข้อมูลที่เลือกไว้
+                        </h3>
                         {crops && (
                             <div className="mb-2">
                                 <span className="text-sm text-gray-400">พืชที่เลือก: </span>
-                                <div className="flex flex-wrap gap-1 mt-1">
+                                <div className="mt-1 flex flex-wrap gap-1">
                                     {crops.split(',').map((crop, index) => (
-                                        <span key={index} className="bg-green-600 px-2 py-1 rounded text-xs">
+                                        <span
+                                            key={index}
+                                            className="rounded bg-green-600 px-2 py-1 text-xs"
+                                        >
                                             {crop}
                                         </span>
                                     ))}
@@ -149,25 +158,25 @@ export default function ChooseIrrigationMethod() {
                         )}
                         {shapes && (
                             <div className="text-sm text-gray-400">
-                                ✓ มีแบบโรงเรือนที่วาดไว้แล้ว ({(() => {
+                                ✓ มีแบบโรงเรือนที่วาดไว้แล้ว (
+                                {(() => {
                                     try {
                                         return JSON.parse(decodeURIComponent(shapes)).length;
                                     } catch {
                                         return 'ข้อมูลผิดพลาด';
                                     }
-                                })()} องค์ประกอบ)
+                                })()}{' '}
+                                องค์ประกอบ)
                             </div>
                         )}
                         {method && (
-                            <div className="text-sm text-gray-400">
-                                วิธีการวางแผน: {method}
-                            </div>
+                            <div className="text-sm text-gray-400">วิธีการวางแผน: {method}</div>
                         )}
                     </div>
                 )}
 
                 {/* Irrigation Method Selection */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto">
+                <div className="mx-auto grid max-w-3xl grid-cols-1 gap-6 md:grid-cols-3">
                     {irrigationOptions.map((option) => (
                         <div key={option.id} className="relative">
                             <button
@@ -177,24 +186,28 @@ export default function ChooseIrrigationMethod() {
                                     }
                                 }}
                                 disabled={option.disabled}
-                                className={`p-6 rounded-lg text-center transition-all duration-200 border-2 transform w-full relative ${
+                                className={`relative w-full transform rounded-lg border-2 p-6 text-center transition-all duration-200 ${
                                     option.disabled
-                                        ? 'bg-gray-700 border-gray-600 cursor-not-allowed opacity-60'
+                                        ? 'cursor-not-allowed border-gray-600 bg-gray-700 opacity-60'
                                         : selectedMethod === option.id
-                                            ? 'bg-blue-600 border-blue-400 shadow-lg scale-105 hover:-translate-y-1'
-                                            : 'bg-gray-800 border-gray-700 hover:border-blue-500 hover:bg-gray-700 hover:-translate-y-1'
+                                          ? 'scale-105 border-blue-400 bg-blue-600 shadow-lg hover:-translate-y-1'
+                                          : 'border-gray-700 bg-gray-800 hover:-translate-y-1 hover:border-blue-500 hover:bg-gray-700'
                                 }`}
                             >
-                                <div className="text-5xl mb-4">{option.icon}</div>
-                                <h3 className="text-lg font-bold mb-2">{option.name}</h3>
+                                <div className="mb-4 text-5xl">{option.icon}</div>
+                                <h3 className="mb-2 text-lg font-bold">{option.name}</h3>
                                 <p className="text-sm text-gray-400">{option.description}</p>
-                                
+
                                 {/* Development message overlay */}
                                 {option.disabled && option.developmentMessage && (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-black/70 rounded-lg">
+                                    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/70">
                                         <div className="text-center">
-                                            <div className="text-yellow-400 text-sm font-medium mb-1">🚧</div>
-                                            <div className="text-yellow-300 text-xs">{option.developmentMessage}</div>
+                                            <div className="mb-1 text-sm font-medium text-yellow-400">
+                                                🚧
+                                            </div>
+                                            <div className="text-xs text-yellow-300">
+                                                {option.developmentMessage}
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -205,17 +218,24 @@ export default function ChooseIrrigationMethod() {
 
                 {/* Selected method info */}
                 {selectedMethod && (
-                    <div className="mt-8 p-4 bg-blue-900/30 border border-blue-600 rounded-lg max-w-2xl mx-auto">
+                    <div className="mx-auto mt-8 max-w-2xl rounded-lg border border-blue-600 bg-blue-900/30 p-4">
                         <div className="flex items-center space-x-3">
                             <span className="text-2xl">
-                                {irrigationOptions.find(opt => opt.id === selectedMethod)?.icon}
+                                {irrigationOptions.find((opt) => opt.id === selectedMethod)?.icon}
                             </span>
                             <div>
-                                <h4 className="text-blue-300 font-medium">
-                                    เลือก: {irrigationOptions.find(opt => opt.id === selectedMethod)?.name}
+                                <h4 className="font-medium text-blue-300">
+                                    เลือก:{' '}
+                                    {
+                                        irrigationOptions.find((opt) => opt.id === selectedMethod)
+                                            ?.name
+                                    }
                                 </h4>
                                 <p className="text-sm text-blue-200">
-                                    {irrigationOptions.find(opt => opt.id === selectedMethod)?.description}
+                                    {
+                                        irrigationOptions.find((opt) => opt.id === selectedMethod)
+                                            ?.description
+                                    }
                                 </p>
                             </div>
                         </div>
@@ -223,29 +243,49 @@ export default function ChooseIrrigationMethod() {
                 )}
 
                 {/* Action Buttons */}
-                <div className="mt-12 flex justify-between items-center">
+                <div className="mt-12 flex items-center justify-between">
                     <button
                         onClick={handleBack}
-                        className="flex items-center rounded bg-gray-600 px-6 py-3 text-white hover:bg-gray-700 transition-colors"
+                        className="flex items-center rounded bg-gray-600 px-6 py-3 text-white transition-colors hover:bg-gray-700"
                     >
-                        <svg className="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                        <svg
+                            className="mr-2 h-5 w-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                            />
                         </svg>
                         กลับไปออกแบบพื้นที่
                     </button>
-                    
+
                     <button
                         onClick={handleProceed}
                         disabled={!selectedMethod}
-                        className={`flex items-center rounded px-8 py-3 text-white font-bold transition-colors ${
-                            !selectedMethod 
-                                ? 'bg-gray-500 cursor-not-allowed' 
+                        className={`flex items-center rounded px-8 py-3 font-bold text-white transition-colors ${
+                            !selectedMethod
+                                ? 'cursor-not-allowed bg-gray-500'
                                 : 'bg-green-600 hover:bg-green-700'
                         }`}
                     >
                         ไปออกแบบระบบน้ำ
-                        <svg className="ml-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                        <svg
+                            className="ml-2 h-5 w-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M14 5l7 7m0 0l-7 7m7-7H3"
+                            />
                         </svg>
                     </button>
                 </div>

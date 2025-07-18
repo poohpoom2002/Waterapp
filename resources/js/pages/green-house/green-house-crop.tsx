@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { 
-    greenhouseCrops, 
-    getCropByValue, 
-    searchCrops, 
+import {
+    greenhouseCrops,
+    getCropByValue,
+    searchCrops,
     categories,
-    type Crop 
+    type Crop,
 } from '../components/Greenhouse/CropData';
 
 export default function GreenhouseCrop({ cropType, crops }) {
@@ -34,7 +34,7 @@ export default function GreenhouseCrop({ cropType, crops }) {
 
         // Filter by category
         if (selectedCategory !== 'all') {
-            filtered = filtered.filter(crop => crop.category === selectedCategory);
+            filtered = filtered.filter((crop) => crop.category === selectedCategory);
         }
 
         // Filter by search term
@@ -42,7 +42,7 @@ export default function GreenhouseCrop({ cropType, crops }) {
             filtered = searchCrops(searchTerm);
             // Apply category filter to search results if needed
             if (selectedCategory !== 'all') {
-                filtered = filtered.filter(crop => crop.category === selectedCategory);
+                filtered = filtered.filter((crop) => crop.category === selectedCategory);
             }
         }
 
@@ -52,14 +52,14 @@ export default function GreenhouseCrop({ cropType, crops }) {
     // Update selected crop objects when selectedCrops changes
     useEffect(() => {
         const cropObjects = selectedCrops
-            .map(cropValue => getCropByValue(cropValue))
+            .map((cropValue) => getCropByValue(cropValue))
             .filter((crop): crop is Crop => crop !== undefined);
         setSelectedCropObjects(cropObjects);
     }, [selectedCrops]);
 
     const handleCropToggle = (cropValue: string) => {
         if (selectedCrops.includes(cropValue)) {
-            setSelectedCrops(selectedCrops.filter(crop => crop !== cropValue));
+            setSelectedCrops(selectedCrops.filter((crop) => crop !== cropValue));
         } else {
             setSelectedCrops([...selectedCrops, cropValue]);
         }
@@ -158,9 +158,14 @@ export default function GreenhouseCrop({ cropType, crops }) {
                             </h3>
                             <div className="space-y-2">
                                 {Object.entries(categories).map(([key, category]) => {
-                                    const count = selectedCropObjects.filter(crop => crop.category === key).length;
+                                    const count = selectedCropObjects.filter(
+                                        (crop) => crop.category === key
+                                    ).length;
                                     return (
-                                        <div key={key} className="flex items-center justify-between text-sm">
+                                        <div
+                                            key={key}
+                                            className="flex items-center justify-between text-sm"
+                                        >
                                             <span className="flex items-center text-gray-400">
                                                 <span className="mr-2">{category.icon}</span>
                                                 {category.name}
@@ -293,9 +298,7 @@ export default function GreenhouseCrop({ cropType, crops }) {
                                 <h3 className="mb-2 text-xl font-semibold text-gray-400">
                                     ไม่พบพืชที่ค้นหา
                                 </h3>
-                                <p className="text-gray-500">
-                                    ลองปรับเปลี่ยนคำค้นหาหรือตัวกรอง
-                                </p>
+                                <p className="text-gray-500">ลองปรับเปลี่ยนคำค้นหาหรือตัวกรอง</p>
                             </div>
                         )}
 
@@ -308,7 +311,7 @@ export default function GreenhouseCrop({ cropType, crops }) {
                                             พร้อมเลือกวิธีการวางแผนแล้วใช่ไหม?
                                         </h3>
                                         <p className="text-sm text-gray-400">
-                                            คุณได้เลือกพืช {selectedCrops.length} ชนิดแล้ว 
+                                            คุณได้เลือกพืช {selectedCrops.length} ชนิดแล้ว
                                             ไปเลือกวิธีการวางแผนพื้นที่
                                         </p>
                                     </div>

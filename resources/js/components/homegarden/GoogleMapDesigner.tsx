@@ -9,12 +9,8 @@ import {
     WaterSource,
     Pipe,
     ZONE_TYPES,
-    SPRINKLER_TYPES,
     clipCircleToPolygon,
-    isCornerSprinkler,
-    calculateDistance,
     calculatePolygonArea,
-    formatArea,
 } from '../../utils/homeGardenData';
 
 const getGoogleMapsConfig = () => {
@@ -62,7 +58,7 @@ interface SearchResult {
     };
     types: string[];
     rating?: number;
-    photos?: any[];
+    photos?: unknown[];
 }
 
 interface GoogleMapDesignerProps {
@@ -78,17 +74,17 @@ interface GoogleMapDesignerProps {
     selectedPipes: Set<string>;
     selectedSprinklersForPipe: string[];
     mainPipeDrawing: Coordinate[];
-    onZoneCreated: (e: any) => void;
-    onZoneDeleted: (e: any) => void;
+    onZoneCreated: (e: unknown) => void;
+    onZoneDeleted: (e: unknown) => void;
     onSprinklerPlaced: (position: Coordinate) => void;
     onWaterSourcePlaced: (position: Coordinate) => void;
-    onMainPipeClick: (e: any) => void;
+    onMainPipeClick: (e: unknown) => void;
     onSprinklerClick: (sprinklerId: string) => void;
     onSprinklerDelete: (sprinklerId: string) => void;
     onSprinklerDragged: (sprinklerId: string, position: Coordinate) => void;
     onWaterSourceDelete: () => void;
     onPipeClick: (pipeId: string) => void;
-    onMapClick: (e: any) => void;
+    onMapClick: (e: unknown) => void;
     mapCenter: [number, number];
     pipeEditMode?: string;
 }
@@ -97,7 +93,7 @@ class GoogleMapErrorBoundary extends React.Component<
     { children: React.ReactNode; onFallback?: () => void },
     { hasError: boolean; error?: Error }
 > {
-    constructor(props: any) {
+    constructor(props: { children: React.ReactNode; onFallback?: () => void }) {
         super(props);
         this.state = { hasError: false };
     }
@@ -276,6 +272,7 @@ const MapComponent: React.FC<{
                 if (React.isValidElement(child)) {
                     return React.cloneElement(child, { map } as any);
                 }
+                return child;
             })}
         </>
     );
@@ -286,7 +283,7 @@ const DrawingManager: React.FC<{
     editMode: string;
     selectedZoneType: string;
     onZoneCreated: (coordinates: Coordinate[]) => void;
-    onMapClick: (e: any) => void;
+    onMapClick: (e: unknown) => void;
 }> = ({ map, editMode, selectedZoneType, onZoneCreated, onMapClick }) => {
     const drawingManagerRef = useRef<google.maps.drawing.DrawingManager>();
 
@@ -729,10 +726,14 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
     }, [props.gardenZones, props.sprinklers]);
 
     const createSprinklerIcon = useCallback(
-        (sprinkler: any, isSelected: boolean = false, orientation?: number): google.maps.Symbol => {
+        (
+            sprinkler: Sprinkler,
+            isSelected: boolean = false,
+            orientation?: number
+        ): google.maps.Symbol => {
             return {
                 path: google.maps.SymbolPath.CIRCLE,
-                fillColor: isSelected ? '#FFD700' : sprinkler.color || '#33CCFF',
+                fillColor: isSelected ? '#FFD700' : sprinkler.type.color || '#33CCFF',
                 fillOpacity: 0.9,
                 strokeColor: '#FFFFFF',
                 strokeWeight: isSelected ? 3 : 2,
@@ -883,7 +884,7 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                                     lng: sprinkler.position.lng,
                                 },
                                 icon: createSprinklerIcon(
-                                    sprinkler.type,
+                                    sprinkler,
                                     isSelected,
                                     sprinkler.orientation
                                 ),

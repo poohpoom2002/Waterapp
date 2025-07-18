@@ -22,7 +22,14 @@ export interface Shape {
 // Irrigation element interface for irrigation system components
 export interface IrrigationElement {
     id: string;
-    type: 'main-pipe' | 'sub-pipe' | 'pump' | 'solenoid-valve' | 'ball-valve' | 'sprinkler' | 'drip-line';
+    type:
+        | 'main-pipe'
+        | 'sub-pipe'
+        | 'pump'
+        | 'solenoid-valve'
+        | 'ball-valve'
+        | 'sprinkler'
+        | 'drip-line';
     points: Point[];
     color: string;
     width?: number;
@@ -106,34 +113,34 @@ export interface GreenhousePlanningData {
         createdAt: string;
         updatedAt: string;
     };
-    
+
     // Crop selection and assignments
     crops: {
         selectedCrops: string[];
         assignments: CropAssignment[];
         totalCropTypes: number;
     };
-    
+
     // Greenhouse structures
     structures: {
         shapes: Shape[];
         area: AreaInfo;
         totalStructures: number;
     };
-    
+
     // Irrigation system
     irrigation: {
         systemInfo: IrrigationSystemInfo;
         elements: IrrigationElement[];
         equipment: EquipmentSummary;
     };
-    
+
     // Financial analysis
     financial: FinancialSummary;
-    
+
     // Production analysis
     production: ProductionSummary;
-    
+
     // Canvas data for visualization
     visualization: {
         canvasData?: string; // Base64 image
@@ -189,7 +196,9 @@ export const useGreenhousePlanningData = () => {
     const data = getGreenhousePlanningData();
 
     if (!data) {
-        console.warn('No greenhouse planning data found. Redirecting to greenhouse crop selection...');
+        console.warn(
+            'No greenhouse planning data found. Redirecting to greenhouse crop selection...'
+        );
         router.visit('/greenhouse-crop');
         return null;
     }
@@ -251,7 +260,7 @@ export const formatPercentage = (percentage: number): string => `${percentage.to
 // Calculation helpers
 export const calculatePolygonArea = (points: Point[]): number => {
     if (points.length < 3) return 0;
-    
+
     let area = 0;
     for (let i = 0; i < points.length; i++) {
         const j = (i + 1) % points.length;
@@ -263,12 +272,12 @@ export const calculatePolygonArea = (points: Point[]): number => {
 
 export const calculateShapeArea = (shape: Shape): number => {
     if (shape.type === 'measurement') return 0;
-    
+
     if (shape.type === 'water-source' && shape.points.length === 1) {
         // Circle area for point water source
         return Math.PI * Math.pow(15, 2); // 15px radius
     }
-    
+
     return calculatePolygonArea(shape.points);
 };
 
@@ -278,7 +287,7 @@ export const calculateTotalArea = (shapes: Shape[]): number => {
 
 export const calculateAreaByType = (shapes: Shape[], type: string): number => {
     return shapes
-        .filter(shape => shape.type === type)
+        .filter((shape) => shape.type === type)
         .reduce((total, shape) => total + calculateShapeArea(shape), 0);
 };
 
@@ -286,33 +295,33 @@ export const calculateIrrigationCoverage = (
     irrigationElements: IrrigationElement[],
     totalArea: number
 ): number => {
-    const sprinklers = irrigationElements.filter(el => el.type === 'sprinkler');
+    const sprinklers = irrigationElements.filter((el) => el.type === 'sprinkler');
     const totalCoverageArea = sprinklers.reduce((total, sprinkler) => {
         const radius = sprinkler.radius || 30; // Default 30px radius
         return total + Math.PI * Math.pow(radius, 2);
     }, 0);
-    
+
     return Math.min((totalCoverageArea / totalArea) * 100, 100);
 };
 
 export const calculatePlantingDensity = (
     cropType: string,
-    plantingMethod: string = 'standard'
+    _plantingMethod = 'standard'
 ): number => {
     // Default planting densities (plants per square meter)
     const densities: Record<string, number> = {
-        'tomato': 2.5,
+        tomato: 2.5,
         'bell-pepper': 3.0,
-        'cucumber': 2.0,
-        'lettuce': 16.0,
-        'kale': 12.0,
-        'strawberry': 6.0,
-        'broccoli': 4.0,
-        'cabbage': 4.0,
+        cucumber: 2.0,
+        lettuce: 16.0,
+        kale: 12.0,
+        strawberry: 6.0,
+        broccoli: 4.0,
+        cabbage: 4.0,
         'pak-choi': 20.0,
-        'chinese-kale': 16.0
+        'chinese-kale': 16.0,
     };
-    
+
     return densities[cropType] || 4.0; // Default density
 };
 
@@ -323,39 +332,39 @@ export const calculateExpectedYield = (
 ): number => {
     // Expected yield per plant (kg)
     const yieldPerPlant: Record<string, number> = {
-        'tomato': 3.5,
+        tomato: 3.5,
         'bell-pepper': 2.0,
-        'cucumber': 4.0,
-        'lettuce': 0.3,
-        'kale': 0.5,
-        'strawberry': 0.8,
-        'broccoli': 0.8,
-        'cabbage': 1.2,
+        cucumber: 4.0,
+        lettuce: 0.3,
+        kale: 0.5,
+        strawberry: 0.8,
+        broccoli: 0.8,
+        cabbage: 1.2,
         'pak-choi': 0.2,
-        'chinese-kale': 0.3
+        'chinese-kale': 0.3,
     };
-    
+
     const totalPlants = plantingArea * plantingDensity;
     const yieldPerUnit = yieldPerPlant[cropType] || 1.0;
-    
+
     return totalPlants * yieldPerUnit;
 };
 
 export const calculateCropPrice = (cropType: string): number => {
     // Market prices (baht per kg)
     const prices: Record<string, number> = {
-        'tomato': 40,
+        tomato: 40,
         'bell-pepper': 80,
-        'cucumber': 30,
-        'lettuce': 120,
-        'kale': 60,
-        'strawberry': 200,
-        'broccoli': 70,
-        'cabbage': 25,
+        cucumber: 30,
+        lettuce: 120,
+        kale: 60,
+        strawberry: 200,
+        broccoli: 70,
+        cabbage: 25,
         'pak-choi': 50,
-        'chinese-kale': 40
+        'chinese-kale': 40,
     };
-    
+
     return prices[cropType] || 50; // Default price
 };
 
@@ -367,19 +376,23 @@ export const estimateInstallationCost = (
     const componentCosts = {
         'main-pipe': 80, // per meter
         'sub-pipe': 60, // per meter
-        'pump': 3000, // per unit
+        pump: 3000, // per unit
         'solenoid-valve': 1500, // per unit
         'ball-valve': 800, // per unit
-        'sprinkler': 600, // per unit
-        'drip-line': 40 // per meter
+        sprinkler: 600, // per unit
+        'drip-line': 40, // per meter
     };
-    
+
     let totalCost = 0;
-    
-    irrigationElements.forEach(element => {
+
+    irrigationElements.forEach((element) => {
         const cost = componentCosts[element.type] || 500;
-        
-        if (element.type === 'main-pipe' || element.type === 'sub-pipe' || element.type === 'drip-line') {
+
+        if (
+            element.type === 'main-pipe' ||
+            element.type === 'sub-pipe' ||
+            element.type === 'drip-line'
+        ) {
             // Calculate pipe length
             let length = 0;
             for (let i = 0; i < element.points.length - 1; i++) {
@@ -394,14 +407,14 @@ export const estimateInstallationCost = (
             totalCost += cost;
         }
     });
-    
+
     // Labor cost (30% of material cost)
     const laborCost = totalCost * 0.3;
-    
+
     // Greenhouse structure cost (simplified)
     const greenhouseArea = calculateAreaByType(structures, 'greenhouse');
     const structureCost = (greenhouseArea / 400) * 50000; // 50,000 baht per 400 sq pixels
-    
+
     return totalCost + laborCost + structureCost;
 };
 
@@ -412,56 +425,54 @@ export const estimateInstallationTime = (
     const baseTime = 8; // hours for setup
     const irrigationTime = irrigationElements.length * 1.5; // 1.5 hours per component
     const structureTime = structures.length * 2; // 2 hours per structure
-    
+
     return baseTime + irrigationTime + structureTime;
 };
 
-export const calculatePaybackPeriod = (
-    totalCost: number,
-    annualProfit: number
-): number => {
+export const calculatePaybackPeriod = (totalCost: number, annualProfit: number): number => {
     if (annualProfit <= 0) return 0;
     return (totalCost / annualProfit) * 12; // months
 };
 
 // Data migration and conversion helpers
-export const convertLegacyData = (legacyData: any): GreenhousePlanningData => {
+export const convertLegacyData = (legacyData: unknown): GreenhousePlanningData => {
     const now = new Date().toISOString();
-    
+    const data = legacyData as Record<string, unknown>;
+
     return {
         projectInfo: {
-            name: legacyData.projectName || 'Greenhouse Project',
-            description: legacyData.description || 'Greenhouse planning project',
-            planningMethod: legacyData.planningMethod || 'draw',
-            createdAt: legacyData.createdAt || now,
-            updatedAt: now
+            name: (data.projectName as string) || 'Greenhouse Project',
+            description: (data.description as string) || 'Greenhouse planning project',
+            planningMethod: (data.planningMethod as string) || 'draw',
+            createdAt: (data.createdAt as string) || now,
+            updatedAt: now,
         },
         crops: {
-            selectedCrops: legacyData.selectedCrops || [],
-            assignments: legacyData.assignments || [],
-            totalCropTypes: legacyData.selectedCrops?.length || 0
+            selectedCrops: (data.selectedCrops as unknown[]) || [],
+            assignments: (data.assignments as unknown[]) || [],
+            totalCropTypes: (data.selectedCrops as unknown[])?.length || 0,
         },
         structures: {
-            shapes: legacyData.shapes || [],
+            shapes: (data.shapes as unknown[]) || [],
             area: {
-                totalArea: legacyData.totalArea || 0,
-                greenhouseArea: legacyData.greenhouseArea || 0,
-                plotArea: legacyData.plotArea || 0,
-                walkwayArea: legacyData.walkwayArea || 0,
-                waterSourceArea: legacyData.waterSourceArea || 0,
-                utilizationRate: legacyData.utilizationRate || 0
+                totalArea: (data.totalArea as number) || 0,
+                greenhouseArea: (data.greenhouseArea as number) || 0,
+                plotArea: (data.plotArea as number) || 0,
+                walkwayArea: (data.walkwayArea as number) || 0,
+                waterSourceArea: (data.waterSourceArea as number) || 0,
+                utilizationRate: (data.utilizationRate as number) || 0,
             },
-            totalStructures: legacyData.shapes?.length || 0
+            totalStructures: (data.shapes as unknown[])?.length || 0,
         },
         irrigation: {
             systemInfo: {
-                method: legacyData.irrigationMethod || 'mini-sprinkler',
-                totalWaterFlow: legacyData.totalWaterFlow || 0,
-                operatingPressure: legacyData.operatingPressure || 2.0,
-                coverage: legacyData.coverage || 0,
-                efficiency: legacyData.efficiency || 85
+                method: (data.irrigationMethod as string) || 'mini-sprinkler',
+                totalWaterFlow: (data.totalWaterFlow as number) || 0,
+                operatingPressure: (data.operatingPressure as number) || 2.0,
+                coverage: (data.coverage as number) || 0,
+                efficiency: (data.efficiency as number) || 85,
             },
-            elements: legacyData.irrigationElements || [],
+            elements: (data.irrigationElements as unknown[]) || [],
             equipment: {
                 mainPipes: 0,
                 subPipes: 0,
@@ -471,8 +482,8 @@ export const convertLegacyData = (legacyData: any): GreenhousePlanningData => {
                 sprinklers: 0,
                 dripLines: 0,
                 totalComponents: 0,
-                totalPipeLength: 0
-            }
+                totalPipeLength: 0,
+            },
         },
         financial: {
             materialCost: legacyData.materialCost || 0,
@@ -482,19 +493,19 @@ export const convertLegacyData = (legacyData: any): GreenhousePlanningData => {
             totalCost: legacyData.totalCost || 0,
             estimatedRevenue: legacyData.estimatedRevenue || 0,
             estimatedProfit: legacyData.estimatedProfit || 0,
-            paybackPeriod: legacyData.paybackPeriod || 0
+            paybackPeriod: legacyData.paybackPeriod || 0,
         },
         production: {
             totalPlants: legacyData.totalPlants || 0,
             estimatedYield: legacyData.estimatedYield || 0,
             harvestsPerYear: legacyData.harvestsPerYear || 1,
             annualProduction: legacyData.annualProduction || 0,
-            productionValue: legacyData.productionValue || 0
+            productionValue: legacyData.productionValue || 0,
         },
         visualization: {
             canvasData: legacyData.canvasData,
-            irrigationCanvasData: legacyData.irrigationCanvasData
-        }
+            irrigationCanvasData: legacyData.irrigationCanvasData,
+        },
     };
 };
 
@@ -509,11 +520,11 @@ export const validateGreenhousePlanningData = (data: GreenhousePlanningData): bo
     if (!data.projectInfo || !data.crops || !data.structures || !data.irrigation) {
         return false;
     }
-    
+
     if (!data.projectInfo.name || !data.projectInfo.planningMethod) {
         return false;
     }
-    
+
     return true;
 };
 

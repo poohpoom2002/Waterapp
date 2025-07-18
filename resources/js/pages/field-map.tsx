@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import L from 'leaflet';
 import * as turf from '@turf/turf';
+import { Wrapper, Status } from '@googlemaps/react-wrapper';
 import { getCropByValue } from '@/pages/utils/cropData';
 import {
     ZONE_COLORS,
@@ -36,6 +37,12 @@ import FieldMapTypeSelector from '@/pages/components/Fieldcrop/FieldMapTypeSelec
 import ErrorBoundary from '@/pages/components/ErrorBoundary';
 import ErrorMessage from '@/pages/components/ErrorMessage';
 import LoadingSpinner from '@/pages/components/LoadingSpinner';
+
+const getGoogleMapsConfig = () => ({
+    apiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
+    libraries: ['drawing', 'geometry', 'places'] as const,
+    defaultZoom: 15,
+});
 
 // Fix leaflet icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -1746,21 +1753,24 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             // Always preserve user-set radius unless explicitly changing irrigation type
             const currentSettings = irrigationSettings[zone.id];
             const isChangingType = currentSettings && currentSettings.type !== irrigationType;
-            
+
             let radius;
-            
+
             console.log(`🔧 [${zone.name}] Debug irrigation generation:`, {
                 currentType: currentSettings?.type,
                 newType: irrigationType,
                 isChangingType,
                 currentRadius: irrigationRadius[zone.id],
-                defaultRadius: irrigationSystem.defaultRadius
+                defaultRadius: irrigationSystem.defaultRadius,
             });
-            
+
             // Case 1: Changing irrigation type - use new system's default
             if (isChangingType) {
                 radius = irrigationSystem.defaultRadius;
-                setIrrigationRadius(prev => ({ ...prev, [zone.id]: irrigationSystem.defaultRadius }));
+                setIrrigationRadius((prev) => ({
+                    ...prev,
+                    [zone.id]: irrigationSystem.defaultRadius,
+                }));
                 console.log(`🔄 [${zone.name}] Type changed: setting radius to default ${radius}m`);
             }
             // Case 2: Same irrigation type or no previous settings - use current user setting
@@ -1769,24 +1779,27 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 // If no user setting exists, set to default
                 if (radius === undefined || radius === null) {
                     radius = irrigationSystem.defaultRadius;
-                    setIrrigationRadius(prev => ({ ...prev, [zone.id]: irrigationSystem.defaultRadius }));
+                    setIrrigationRadius((prev) => ({
+                        ...prev,
+                        [zone.id]: irrigationSystem.defaultRadius,
+                    }));
                     console.log(`🆕 [${zone.name}] No radius set: using default ${radius}m`);
                 } else {
                     console.log(`✅ [${zone.name}] Using user-set radius: ${radius}m`);
                 }
             }
-            
+
             const overlap = sprinklerOverlap[zone.id] || false;
 
             if (irrigationSystem.isLinear) {
                 // UPDATED DRIP TAPE LOGIC - Create overlay lines with calculated info
                 // Use the current radius value as spacing for drip holes calculation
                 const dripHoleSpacing = radius; // This will use the actual current setting
-                
+
                 let totalPipeLength = 0;
                 let totalDripHoles = 0;
                 let pipeCount = 0;
-                
+
                 zoneLateralPipes.forEach((pipe) => {
                     if (pipe.layer && pipe.layer.getLatLngs) {
                         const coords = pipe.layer.getLatLngs();
@@ -1862,7 +1875,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 if (pipeCount > 0) {
                     const averageHolesPerPipe = Math.round(totalDripHoles / pipeCount);
                     const averagePipeLength = totalPipeLength / pipeCount;
-                    
+
                     const irrigationSummary = {
                         id: `irrigation_summary_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                         type: irrigationType,
@@ -1884,13 +1897,13 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     };
 
                     newIrrigationPoints.push(irrigationSummary);
-                    
+
                     console.log(`💧 [${zone.name}] Drip tape summary:`, {
                         pipes: pipeCount,
                         totalHoles: totalDripHoles,
                         avgHolesPerPipe: averageHolesPerPipe,
                         holeSpacing: dripHoleSpacing,
-                        totalLength: totalPipeLength.toFixed(1)
+                        totalLength: totalPipeLength.toFixed(1),
                     });
                 }
             } else {
@@ -1917,7 +1930,8 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
 
                         let totalLength = 0;
                         for (let i = 0; i < coords.length - 1; i++) {
-                            const distance = mapRef.current?.distance(coords[i], coords[i + 1]) || 0;
+                            const distance =
+                                mapRef.current?.distance(coords[i], coords[i + 1]) || 0;
                             totalLength += distance;
                         }
 
@@ -1926,7 +1940,9 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                         // The first sprinkler is placed at a distance of one radius from the submain.
                         const startOffset = radius;
 
-                        const numPoints = Math.floor((totalLength - startOffset) / spacingHorizontal);
+                        const numPoints = Math.floor(
+                            (totalLength - startOffset) / spacingHorizontal
+                        );
                         if (numPoints < 0) return; // Not enough length for even one sprinkler
 
                         for (let i = 0; i <= numPoints; i++) {
@@ -1940,15 +1956,21 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                             for (let j = 0; j < coords.length - 1; j++) {
                                 const segmentStart = coords[j];
                                 const segmentEnd = coords[j + 1];
-                                const segmentLength = mapRef.current?.distance(segmentStart, segmentEnd) || 0;
+                                const segmentLength =
+                                    mapRef.current?.distance(segmentStart, segmentEnd) || 0;
 
                                 if (accumulatedDistance + segmentLength >= distance) {
                                     const remainingDistance = distance - accumulatedDistance;
-                                    const ratio = segmentLength > 0 ? remainingDistance / segmentLength : 0;
+                                    const ratio =
+                                        segmentLength > 0 ? remainingDistance / segmentLength : 0;
 
                                     pointPosition = {
-                                        lat: segmentStart.lat + (segmentEnd.lat - segmentStart.lat) * ratio,
-                                        lng: segmentStart.lng + (segmentEnd.lng - segmentStart.lng) * ratio,
+                                        lat:
+                                            segmentStart.lat +
+                                            (segmentEnd.lat - segmentStart.lat) * ratio,
+                                        lng:
+                                            segmentStart.lng +
+                                            (segmentEnd.lng - segmentStart.lng) * ratio,
                                     };
                                     break;
                                 }
@@ -1960,10 +1982,18 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                 pointPosition = coords[coords.length - 1];
                             }
 
-                            if (!isPointInZone(pointPosition, zone) || isPointInObstacle(pointPosition))
+                            if (
+                                !isPointInZone(pointPosition, zone) ||
+                                isPointInObstacle(pointPosition)
+                            )
                                 continue;
 
-                            const dotSize = irrigationType === 'sprinkler' ? 16 : irrigationType === 'micro_spray' ? 14 : 12;
+                            const dotSize =
+                                irrigationType === 'sprinkler'
+                                    ? 16
+                                    : irrigationType === 'micro_spray'
+                                      ? 14
+                                      : 12;
                             const marker = L.marker([pointPosition.lat, pointPosition.lng], {
                                 icon: L.divIcon({
                                     className: 'irrigation-marker-icon',
@@ -1988,19 +2018,27 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                 }),
                             });
 
-                            const circleOpacity = irrigationType === 'sprinkler'
-                                    ? overlap ? 0.2 : 0.12
-                                    : irrigationType === 'micro_spray' ? 0.15 : 0.1;
+                            const circleOpacity =
+                                irrigationType === 'sprinkler'
+                                    ? overlap
+                                        ? 0.2
+                                        : 0.12
+                                    : irrigationType === 'micro_spray'
+                                      ? 0.15
+                                      : 0.1;
                             const circleWeight = irrigationType === 'sprinkler' ? 2 : 1;
 
-                            const coverageCircle = L.circle([pointPosition.lat, pointPosition.lng], {
-                                color: irrigationSystem.color,
-                                fillColor: irrigationSystem.color,
-                                fillOpacity: circleOpacity,
-                                weight: circleWeight,
-                                opacity: 0.6,
-                                radius: radius,
-                            });
+                            const coverageCircle = L.circle(
+                                [pointPosition.lat, pointPosition.lng],
+                                {
+                                    color: irrigationSystem.color,
+                                    fillColor: irrigationSystem.color,
+                                    fillOpacity: circleOpacity,
+                                    weight: circleWeight,
+                                    opacity: 0.6,
+                                    radius: radius,
+                                }
+                            );
 
                             const tooltipContent = `
                             <div style="text-align: center; padding: 4px;">
@@ -2100,14 +2138,20 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                         for (let j = 0; j < coords.length - 1; j++) {
                             const segmentStart = coords[j];
                             const segmentEnd = coords[j + 1];
-                            const segmentLength = mapRef.current?.distance(segmentStart, segmentEnd) || 0;
+                            const segmentLength =
+                                mapRef.current?.distance(segmentStart, segmentEnd) || 0;
 
                             if (accumulatedDistance + segmentLength >= distance) {
                                 const remainingDistance = distance - accumulatedDistance;
-                                const ratio = segmentLength > 0 ? remainingDistance / segmentLength : 0;
+                                const ratio =
+                                    segmentLength > 0 ? remainingDistance / segmentLength : 0;
                                 pointPosition = {
-                                    lat: segmentStart.lat + (segmentEnd.lat - segmentStart.lat) * ratio,
-                                    lng: segmentStart.lng + (segmentEnd.lng - segmentStart.lng) * ratio,
+                                    lat:
+                                        segmentStart.lat +
+                                        (segmentEnd.lat - segmentStart.lat) * ratio,
+                                    lng:
+                                        segmentStart.lng +
+                                        (segmentEnd.lng - segmentStart.lng) * ratio,
                                 };
                                 break;
                             }
@@ -2136,7 +2180,8 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 let estimatedPrice = 0;
                 if (assignedCrop && assignedCrop.yield && assignedCrop.price) {
                     const rowSpacingValue = rowSpacing[assignedCrop.value] || assignedCrop.spacing;
-                    const plantSpacingValue = plantSpacing[assignedCrop.value] || assignedCrop.defaultPlantSpacing;
+                    const plantSpacingValue =
+                        plantSpacing[assignedCrop.value] || assignedCrop.defaultPlantSpacing;
                     const plantsPerRai = 1600 / (rowSpacingValue * plantSpacingValue);
                     const raiEquivalent = totalPointsInZone / plantsPerRai;
 
@@ -2233,8 +2278,12 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             try {
                 const coords = field.getLatLngs()[0];
                 if (coords && coords.length > 0) {
-                    const centerLat = coords.reduce((sum: number, coord: any) => sum + coord.lat, 0) / coords.length;
-                    const centerLng = coords.reduce((sum: number, coord: any) => sum + coord.lng, 0) / coords.length;
+                    const centerLat =
+                        coords.reduce((sum: number, coord: any) => sum + coord.lat, 0) /
+                        coords.length;
+                    const centerLng =
+                        coords.reduce((sum: number, coord: any) => sum + coord.lng, 0) /
+                        coords.length;
                     return [centerLat, centerLng];
                 }
             } catch (error) {
@@ -2479,9 +2528,9 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     const polygon = turf.polygon([closedCoords]);
                     const centroid = turf.centroid(polygon);
                     const [centerLng, centerLat] = centroid.geometry.coordinates;
-                    
+
                     optimalCenter = [centerLat, centerLng];
-                    
+
                     // คำนวณ zoom ตามขนาดพื้นที่
                     if (fieldAreaSize > 10000) {
                         optimalZoom = 16;
@@ -2503,7 +2552,9 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 ? {
                       id: mainField._leaflet_id || Date.now(),
                       name: 'Main Field',
-                      coordinates: mainField.getLatLngs ? mainField.getLatLngs()[0].map((coord: any) => [coord.lat, coord.lng]) : [],
+                      coordinates: mainField.getLatLngs
+                          ? mainField.getLatLngs()[0].map((coord: any) => [coord.lat, coord.lng])
+                          : [],
                       area: fieldAreaSize,
                   }
                 : null,
@@ -2515,7 +2566,10 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 id: zone.id,
                 name: zone.name,
                 color: zone.color,
-                coordinates: zone.layer && zone.layer.getLatLngs ? zone.layer.getLatLngs()[0].map((coord: any) => [coord.lat, coord.lng]) : [],
+                coordinates:
+                    zone.layer && zone.layer.getLatLngs
+                        ? zone.layer.getLatLngs()[0].map((coord: any) => [coord.lat, coord.lng])
+                        : [],
                 area: 0, // Can be calculated if needed
             })),
             zoneAssignments: { ...zoneAssignments },
@@ -2526,7 +2580,10 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 id: pipe.id,
                 type: pipe.type,
                 name: pipe.name,
-                coordinates: pipe.layer && pipe.layer.getLatLngs ? pipe.layer.getLatLngs().map((coord: any) => [coord.lat, coord.lng]) : [],
+                coordinates:
+                    pipe.layer && pipe.layer.getLatLngs
+                        ? pipe.layer.getLatLngs().map((coord: any) => [coord.lat, coord.lng])
+                        : [],
                 length: 0, // Can be calculated if needed
             })),
 
@@ -2556,7 +2613,10 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 type: line.type,
                 zoneId: line.zoneId,
                 zoneName: line.zoneName,
-                coordinates: line.layer && line.layer.getLatLngs ? line.layer.getLatLngs().map((coord: any) => [coord.lat, coord.lng]) : [],
+                coordinates:
+                    line.layer && line.layer.getLatLngs
+                        ? line.layer.getLatLngs().map((coord: any) => [coord.lat, coord.lng])
+                        : [],
             })),
             irrigationAssignments: { ...irrigationAssignments },
             irrigationSettings: { ...irrigationSettings },
@@ -2590,7 +2650,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
 
         try {
             localStorage.setItem('fieldMapData', JSON.stringify(summaryData));
-            
+
             // Navigate to summary page
             window.location.href = '/field-crop-summary';
         } catch (error) {

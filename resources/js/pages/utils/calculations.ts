@@ -874,7 +874,7 @@ export const selectBestEquipmentByPrice = (
     );
 
     // เลือกจากกลุ่มที่ดีที่สุดที่มี
-    let targetGroup =
+    const targetGroup =
         recommended.length > 0
             ? recommended
             : goodChoice.length > 0

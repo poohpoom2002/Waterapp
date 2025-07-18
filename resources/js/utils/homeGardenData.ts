@@ -315,9 +315,15 @@ export function formatArea(sqMeters: number): string {
     return `${(sqMeters * 10000).toFixed(0)} ตร.ซม.`;
 }
 
+interface CanvasData {
+    width: number;
+    height: number;
+    scale?: number;
+}
+
 export function canvasToGPS(
     canvasPoint: CanvasCoordinate,
-    canvasData: any,
+    canvasData: CanvasData | unknown,
     centerPoint?: Coordinate
 ): Coordinate {
     if (!canvasPoint || !canvasData) {
@@ -328,10 +334,11 @@ export function canvasToGPS(
     const defaultCenter: Coordinate = { lat: DEFAULT_CENTER[0], lng: DEFAULT_CENTER[1] };
     const center = centerPoint || defaultCenter;
 
-    const centerX = canvasData.width / 2;
-    const centerY = canvasData.height / 2;
+    const canvasDataTyped = canvasData as CanvasData;
+    const centerX = canvasDataTyped.width / 2;
+    const centerY = canvasDataTyped.height / 2;
 
-    const scale = canvasData.scale || CANVAS_DEFAULT_SCALE;
+    const scale = canvasDataTyped.scale || CANVAS_DEFAULT_SCALE;
     if (!validateScale(scale, 'canvas')) {
         console.warn('Invalid scale in canvasToGPS, using default');
     }
@@ -768,8 +775,8 @@ export interface SmartPipeNetworkOptions {
     sprinklers: Sprinkler[];
     gardenZones: GardenZone[];
     designMode?: 'map' | 'canvas' | 'image' | null;
-    canvasData?: any;
-    imageData?: any;
+    canvasData?: unknown;
+    imageData?: unknown;
 }
 
 export function generateSmartPipeNetwork(options: SmartPipeNetworkOptions): Pipe[] {
@@ -788,7 +795,9 @@ export function generateSmartPipeNetwork(options: SmartPipeNetworkOptions): Pipe
     const isCanvasMode = designMode === 'canvas' || designMode === 'image';
     let scale: number = 20;
     if (isCanvasMode) {
-        scale = canvasData?.scale || imageData?.scale || 20;
+        const canvasDataTyped = canvasData as CanvasData;
+        const imageDataTyped = imageData as CanvasData;
+        scale = canvasDataTyped?.scale || imageDataTyped?.scale || 20;
     }
 
     try {
@@ -820,8 +829,8 @@ function createUniformPipeNetwork(
     gardenZones: GardenZone[],
     isCanvasMode: boolean,
     scale: number,
-    canvasData?: any,
-    imageData?: any
+    canvasData?: unknown,
+    imageData?: unknown
 ): Pipe[] {
     console.log('🔧 Creating uniform pipe network (no branch classification)...');
 
@@ -856,8 +865,8 @@ function createDirectConnections(
     sprinklers: Sprinkler[],
     isCanvasMode: boolean,
     scale: number,
-    canvasData?: any,
-    imageData?: any
+    canvasData?: unknown,
+    imageData?: unknown
 ): Pipe[] {
     const pipes: Pipe[] = [];
 
@@ -891,8 +900,8 @@ function createMSTNetwork(
     sprinklers: Sprinkler[],
     isCanvasMode: boolean,
     scale: number,
-    canvasData?: any,
-    imageData?: any
+    canvasData?: unknown,
+    imageData?: unknown
 ): Pipe[] {
     console.log('Creating MST-based uniform pipe network');
 
@@ -997,8 +1006,8 @@ function createUniformPipe(
     end: Coordinate | CanvasCoordinate,
     isCanvasMode: boolean,
     scale: number,
-    canvasData?: any,
-    imageData?: any,
+    canvasData?: unknown,
+    imageData?: unknown,
     zoneId?: string
 ): Pipe {
     const length = calculateDistance(start, end, isCanvasMode ? scale : undefined);
@@ -1042,8 +1051,8 @@ export function addCustomPipe(
     sprinklers: Sprinkler[],
     isCanvasMode: boolean,
     scale: number,
-    canvasData?: any,
-    imageData?: any
+    canvasData?: unknown,
+    imageData?: unknown
 ): Pipe | null {
     const fromSprinkler = sprinklers.find((s) => s.id === fromSprinklerId);
     const toSprinkler = sprinklers.find((s) => s.id === toSprinklerId);
@@ -1168,7 +1177,7 @@ export function saveGardenData(data: GardenPlannerData): boolean {
         if (typeof window !== 'undefined' && window.localStorage) {
             try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-            } catch (e) {
+            } catch {
                 console.warn('localStorage not available, using in-memory storage only');
             }
         }
@@ -1232,8 +1241,10 @@ function validateAndFixLoadedData(data: GardenPlannerData): GardenPlannerData {
     // Remove isBranch property from existing pipes (backward compatibility)
     if (fixedData.pipes) {
         fixedData.pipes = fixedData.pipes.map((pipe) => {
-            const { isBranch, ...cleanPipe } = pipe as any;
-            return cleanPipe;
+            // Type assertion to handle legacy pipes with isBranch property
+            const pipeWithLegacyProps = pipe as Pipe & { isBranch?: boolean };
+            const { isBranch: _isBranch, ...cleanPipe } = pipeWithLegacyProps;
+            return cleanPipe as Pipe;
         });
     }
 
@@ -1247,7 +1258,9 @@ export function clearGardenData(): boolean {
         if (typeof window !== 'undefined' && window.localStorage) {
             try {
                 localStorage.removeItem(STORAGE_KEY);
-            } catch (e) {}
+            } catch {
+                // Ignore errors when removing from localStorage
+            }
         }
         return true;
     } catch (error) {
@@ -1397,7 +1410,8 @@ export const getSprinklerData = () => loadGardenData()?.sprinklers;
 export const getWaterSourceData = () => loadGardenData()?.waterSource;
 export const getPipeData = () => loadGardenData()?.pipes;
 export const getAreaData = () => loadGardenData()?.gardenZones;
-export const getSummaryData = () => loadGardenData() ? calculateStatistics(loadGardenData()!) : null;
+export const getSummaryData = () =>
+    loadGardenData() ? calculateStatistics(loadGardenData()!) : null;
 
 // Additional formatting helpers (avoiding duplicates with existing functions)
 export const formatWaterFlow = (flow: number): string => `${flow.toFixed(2)} L/min`;
@@ -1429,8 +1443,7 @@ export const calculateAreaFromCoordinates = (
 
     // Convert to square meters (approximate)
     const areaInSquareMeters =
-        area * 111000 * 111000 *
-        Math.cos((coordinates[0].lat * Math.PI) / 180);
+        area * 111000 * 111000 * Math.cos((coordinates[0].lat * Math.PI) / 180);
     return areaInSquareMeters;
 };
 
@@ -1443,10 +1456,7 @@ export const calculateSprinklerCoverage = (
     return Math.min((totalCoverageArea / totalArea) * 100, 100);
 };
 
-export const estimateInstallationCost = (
-    sprinklerCount: number,
-    pipeLength: number
-): number => {
+export const estimateInstallationCost = (sprinklerCount: number, pipeLength: number): number => {
     const sprinklerCost = sprinklerCount * 500; // 500 baht per sprinkler
     const pipeCost = pipeLength * 50; // 50 baht per meter
     const laborCost = sprinklerCount * 200 + pipeLength * 30;
@@ -1455,10 +1465,7 @@ export const estimateInstallationCost = (
     return sprinklerCost + pipeCost + laborCost + miscCost;
 };
 
-export const estimateInstallationTime = (
-    sprinklerCount: number,
-    pipeLength: number
-): number => {
+export const estimateInstallationTime = (sprinklerCount: number, pipeLength: number): number => {
     const sprinklerTime = sprinklerCount * 0.5; // 30 minutes per sprinkler
     const pipeTime = pipeLength * 0.1; // 6 minutes per meter
     const setupTime = 2;
