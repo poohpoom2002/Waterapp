@@ -36,12 +36,11 @@ export interface AnalyzedPipe {
     score: number;
     velocity: number;
     headLoss: number;
-    optimalSize?: number; // เพิ่ม field ใหม่
+    optimalSize?: number;
     isRecommended: boolean;
     isGoodChoice: boolean;
     isUsable: boolean;
-    isTypeAllowed?: boolean; // เพิ่ม field ใหม่
-    // เพิ่ม properties ที่ขาดหายไป
+    isTypeAllowed?: boolean;
     name?: string;
     image?: string;
     brand?: string;
@@ -68,7 +67,6 @@ export interface AnalyzedSprinkler {
     maxFlow: number;
     avgRadius: number;
     pricePerFlow: number;
-    // เพิ่ม properties ที่ขาดหายไป
     brand?: string;
     image?: string;
     description?: string;
@@ -95,7 +93,6 @@ export interface AnalyzedPump {
     isRecommended: boolean;
     isGoodChoice: boolean;
     isUsable: boolean;
-    // เพิ่ม properties ที่ขาดหายไป
     name?: string;
     brand?: string;
     image?: string;
@@ -123,14 +120,12 @@ export interface CalculationResults {
     recommendedMainPipe: any[];
     recommendedPump: any[];
 
-    // เพิ่ม field ใหม่สำหรับข้อมูลที่วิเคราะห์
     analyzedBranchPipes?: AnalyzedPipe[];
     analyzedSecondaryPipes?: AnalyzedPipe[];
     analyzedMainPipes?: AnalyzedPipe[];
     analyzedSprinklers?: AnalyzedSprinkler[];
     analyzedPumps?: AnalyzedPump[];
 
-    // เพิ่ม AUTO-SELECTED EQUIPMENT fields
     autoSelectedBranchPipe?: AnalyzedPipe;
     autoSelectedSecondaryPipe?: AnalyzedPipe;
     autoSelectedMainPipe?: AnalyzedPipe;
@@ -175,12 +170,12 @@ export interface CalculationResults {
         main: number;
     };
     pumpHeadRequired: number;
-    pressureFromSprinkler?: number; // เพิ่ม field ใหม่ - แรงดันจากสปริงเกอร์
+    pressureFromSprinkler?: number;
     safetyFactor: number;
     adjustedFlow: number;
     velocityWarnings: string[];
-    hasValidSecondaryPipe?: boolean; // เพิ่ม field ใหม่ - สถานะท่อรอง
-    hasValidMainPipe?: boolean; // เพิ่ม field ใหม่ - สถานะท่อหลัก
+    hasValidSecondaryPipe?: boolean;
+    hasValidMainPipe?: boolean;
 }
 
 export interface QuotationData {
@@ -191,7 +186,6 @@ export interface QuotationData {
 }
 
 export interface QuotationDataCustomer {
-    // code: string;
     name: string;
     address1: string;
     address2: string;

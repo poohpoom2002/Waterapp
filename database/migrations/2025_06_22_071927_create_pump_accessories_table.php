@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('pump_accessories', function (Blueprint $table) {
             $table->id();
             $table->foreignId('pump_id')->constrained('equipments')->onDelete('cascade');
-            $table->enum('accessory_type', ['foot_valve', 'check_valve', 'ball_valve', 'pressure_gauge', 'other']);
+            $table->enum('accessory_type', ['foot_valve', 'check_valve', 'ball_valve', 'pressure_gauge', 'float_switch', 'other']);
             $table->string('name');
             $table->string('image')->nullable(); 
             $table->string('size', 50)->nullable();

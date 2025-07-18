@@ -42,7 +42,7 @@ const getGoogleMapsConfig = () => {
             mapTypeControlOptions: {
                 position: 'LEFT_BOTTOM' as any,
                 style: 'HORIZONTAL_BAR' as any,
-                mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain']
+                mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain'],
             },
             gestureHandling: 'none',
             draggable: false,
@@ -153,18 +153,18 @@ const SummaryMapComponent: React.FC<{
         if (ref.current && !map && window.google?.maps) {
             try {
                 const config = getGoogleMapsConfig();
-                
+
                 const summaryMapOptions = {
                     ...config.summaryMapOptions,
                     mapTypeId: google.maps.MapTypeId.SATELLITE,
                     mapTypeControlOptions: {
                         position: google.maps.ControlPosition.LEFT_BOTTOM,
                         style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-                        mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain']
+                        mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain'],
                     },
                     minZoom: 1,
                 };
-                
+
                 const newMap = new window.google.maps.Map(ref.current, {
                     center,
                     zoom: zoom,
@@ -186,7 +186,7 @@ const SummaryMapComponent: React.FC<{
                     minZoom: summaryMapOptions.minZoom,
                     maxZoom: 120,
                     mapTypeControl: 'LEFT_BOTTOM',
-                    gestureHandling: summaryMapOptions.gestureHandling
+                    gestureHandling: summaryMapOptions.gestureHandling,
                 });
             } catch (error) {
                 console.error('Error creating summary map:', error);
@@ -376,7 +376,7 @@ const createCircleZoneIntersection = (
     zoneCoordinates: Coordinate[]
 ): Coordinate[] => {
     const intersectionPoints: Coordinate[] = [];
-    const numCirclePoints = 64; 
+    const numCirclePoints = 64;
 
     for (let i = 0; i < numCirclePoints; i++) {
         const angle = (i * 2 * Math.PI) / numCirclePoints;
@@ -515,24 +515,26 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
                 }
             });
 
-                                                // Render uniform pipes (no branch classification)
-            gardenData.pipes?.filter((p) => p.type === 'pipe').forEach((pipe) => {
-                try {
-                    const polyline = new google.maps.Polyline({
-                        path: [
-                            { lat: pipe.start.lat, lng: pipe.start.lng },
-                            { lat: pipe.end.lat, lng: pipe.end.lng },
-                        ],
-                        strokeColor: '#FFFF00', // Uniform yellow color for all pipes
-                        strokeWeight: 4, // Uniform size for all pipes
-                        strokeOpacity: 0.9,
-                        map: map,
-                    });
-                    overlaysRef.current.set(`pipe-${pipe.id}`, polyline);
-                } catch (error) {
-                    console.error(`Error rendering pipe ${pipe.id}:`, error);
-                }
-            });
+            // Render uniform pipes (no branch classification)
+            gardenData.pipes
+                ?.filter((p) => p.type === 'pipe')
+                .forEach((pipe) => {
+                    try {
+                        const polyline = new google.maps.Polyline({
+                            path: [
+                                { lat: pipe.start.lat, lng: pipe.start.lng },
+                                { lat: pipe.end.lat, lng: pipe.end.lng },
+                            ],
+                            strokeColor: '#FFFF00', // Uniform yellow color for all pipes
+                            strokeWeight: 4, // Uniform size for all pipes
+                            strokeOpacity: 0.9,
+                            map: map,
+                        });
+                        overlaysRef.current.set(`pipe-${pipe.id}`, polyline);
+                    } catch (error) {
+                        console.error(`Error rendering pipe ${pipe.id}:`, error);
+                    }
+                });
 
             // Render sprinklers
             gardenData.sprinklers?.forEach((sprinkler) => {
@@ -560,7 +562,7 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
                     const marker = new google.maps.Marker({
                         position: { lat: sprinkler.position.lat, lng: sprinkler.position.lng },
                         icon: createSprinklerIcon(sprinkler.type, sprinkler.orientation),
-                        title: `หัวฉีด: ${sprinkler.type.name} (รัศมี ${sprinkler.type.radius}ม.)`,
+                        title: `หัวฉีด: ${sprinkler.type.nameEN} (รัศมี ${sprinkler.type.radius}ม.)`,
                         map: map,
                     });
                     overlaysRef.current.set(`sprinkler-${sprinkler.id}`, marker);
@@ -624,7 +626,6 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
     );
 };
 
-
 const renderSummaryMap = (status: Status): React.ReactElement => {
     switch (status) {
         case Status.LOADING:
@@ -638,12 +639,10 @@ const renderSummaryMap = (status: Status): React.ReactElement => {
     }
 };
 
-
 const GoogleMapSummary: React.FC<GoogleMapSummaryProps> = (props) => {
     const { mapCenter, calculateZoomLevel } = props;
     const config = getGoogleMapsConfig();
 
-    
     useEffect(() => {
         if (!config.apiKey) {
             console.error('❌ Google Maps API Key is missing for summary');
@@ -655,11 +654,10 @@ const GoogleMapSummary: React.FC<GoogleMapSummaryProps> = (props) => {
                 maxZoom: 'UNLIMITED ♾️',
                 gestureHandling: 'none',
                 note: 'Zoom restrictions removed completely',
-                pipeSystem: 'Uniform yellow pipes (no branch classification)'
+                pipeSystem: 'Uniform yellow pipes (no branch classification)',
             });
         }
     }, [config.apiKey]);
-
 
     if (!config.apiKey) {
         return <SummaryErrorComponent onRetry={() => window.location.reload()} />;

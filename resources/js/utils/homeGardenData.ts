@@ -25,7 +25,8 @@ export interface GardenZone {
 
 export interface SprinklerType {
     id: string;
-    name: string;
+    nameEN: string;
+    nameTH: string;
     icon: string;
     radius: number;
     suitableFor: string[];
@@ -105,35 +106,84 @@ export const ZONE_TYPES = [
 
 export const SPRINKLER_TYPES: SprinklerType[] = [
     {
-        id: 'popup',
-        name: 'Pop-up Sprinkler',
-        icon: '🟢',
-        radius: 4,
-        suitableFor: ['grass'],
+        id: 'pop-up-sprinkler',
+        nameEN: 'Pop-up Sprinkler',
+        nameTH: 'หัว Pop‑Up ยก–หดได้',
+        icon: '🟤',
+        radius: 5,
+        suitableFor: ['grass', 'flowers'],
         color: '#33CCFF',
     },
     {
-        id: 'spray',
-        name: 'Spray Sprinkler',
-        icon: '🔴',
-        radius: 3,
-        suitableFor: ['flowers'],
-        color: '#33CCFF',
-    },
-    {
-        id: 'drip',
-        name: 'Drip Irrigation',
+        id: 'mini-sprinkler',
+        nameEN: 'Mini‑sprinkler',
+        nameTH: 'มินิสปริงเกอร์',
         icon: '🟤',
         radius: 2,
-        suitableFor: ['trees', 'flowers'],
+        suitableFor: ['flowers', 'trees'],
         color: '#33CCFF',
     },
     {
-        id: 'rotary',
-        name: 'Rotary Sprinkler',
-        icon: '🟢',
-        radius: 8,
-        suitableFor: ['grass', 'trees'],
+        id: 'sprinkler',
+        nameEN: 'Sprinkler',
+        nameTH: 'สปริงเกอร์แบบหมุน/ยิงไกล',
+        icon: '🟤',
+        radius: 12,
+        suitableFor: ['trees', 'grass'],
+        color: '#33CCFF',
+    },
+    {
+        id: 'single-side',
+        nameEN: 'Single‑side Sprinkler',
+        nameTH: 'หัวฉีดด้านเดียวปรับมุม',
+        icon: '🟤',
+        radius: 4,
+        suitableFor: ['grass', 'flowers'], // เหมาะสำหรับพื้นที่แคบ แปลงดอกไม้ หรือสนามหญ้าริมทางเดิน
+        color: '#33CCFF',
+    },
+    {
+        id: 'butterfly',
+        nameEN: 'Butterfly Sprinkler',
+        nameTH: 'หัวฉีดผีเสื้อ',
+        icon: '🟤',
+        radius: 1,
+        suitableFor: ['flowers'], // เหมาะสำหรับแปลงดอกไม้ขนาดเล็ก หรือกระถางที่ต้องการน้ำแบบฝอยละเอียด
+        color: '#33CCFF',
+    },
+    {
+        id: 'mist-nozzle',
+        nameEN: 'Mist nozzle',
+        nameTH: 'หัวพ่นหมอก – แบบเสียบท่อ PE',
+        icon: '🟤',
+        radius: 1,
+        suitableFor: ['flowers'], // เหมาะสำหรับดอกไม้ที่ต้องการความชื้นสูง หรือไม้ประดับในเรือนเพาะชำ
+        color: '#33CCFF',
+    },
+    {
+        id: 'impact-sprinkler',
+        nameEN: 'Impact Sprinkler',
+        nameTH: 'สปริงเกอร์ชนิดกระแทก',
+        icon: '🟤',
+        radius: 15,
+        suitableFor: ['trees', 'grass'], // เหมาะสำหรับไม้ผล ไม้ยืนต้น หรือพื้นที่สนามหญ้ากว้างขนาดใหญ่
+        color: '#33CCFF',
+    },
+    {
+        id: 'gear-drive-nozzle',
+        nameEN: 'Gear‑Drive nozzle',
+        nameTH: 'หัวฉีดเกียร์ไดร์ฟ ปรับแรงและมุม',
+        icon: '🟤',
+        radius: 10,
+        suitableFor: ['grass', 'trees'], // เหมาะกับพื้นที่สนามหญ้า และไม้ผลขนาดกลางที่ต้องการการกระจายน้ำแม่นยำ
+        color: '#33CCFF',
+    },
+    {
+        id: 'drip-spray-tape',
+        nameEN: 'Drip/Spray tape',
+        nameTH: 'เทปน้ำหยดหรือสเปรย์ แบบม้วน',
+        icon: '🟤',
+        radius: 0.3,
+        suitableFor: ['flowers', 'trees'], // เหมาะกับไม้ผล พืชผัก ดอกไม้ขนาดเล็กที่ต้องการน้ำตรงโคนต้นแบบประหยัดน้ำ
         color: '#33CCFF',
     },
 ];
@@ -774,9 +824,11 @@ export interface SmartPipeNetworkOptions {
 
 export function generateSmartPipeNetwork(options: SmartPipeNetworkOptions): Pipe[] {
     const { waterSource, sprinklers, gardenZones, designMode, canvasData, imageData } = options;
-    
+
     console.log('🚀 Generating SIMPLIFIED pipe network (uniform pipe type)...');
-    console.log(`Source: ${waterSource.id}, Sprinklers: ${sprinklers.length}, Zones: ${gardenZones.length}`);
+    console.log(
+        `Source: ${waterSource.id}, Sprinklers: ${sprinklers.length}, Zones: ${gardenZones.length}`
+    );
 
     if (!waterSource || sprinklers.length === 0) {
         console.warn('Cannot generate pipes: missing water source or sprinklers');
@@ -801,7 +853,7 @@ export function generateSmartPipeNetwork(options: SmartPipeNetworkOptions): Pipe
         );
 
         console.log(`✅ Generated ${pipes.length} uniform pipe segments successfully`);
-        
+
         const totalLength = pipes.reduce((sum, pipe) => sum + pipe.length, 0);
         console.log(`📏 Total pipe length: ${formatDistance(totalLength)}`);
 
@@ -825,7 +877,7 @@ function createUniformPipeNetwork(
 
     const pipes: Pipe[] = [];
     const sourcePos = isCanvasMode ? waterSource.canvasPosition! : waterSource.position;
-    
+
     if (sprinklers.length === 0) {
         console.log('No sprinklers to connect');
         return pipes;
@@ -834,7 +886,14 @@ function createUniformPipeNetwork(
     // Strategy 1: Direct connections for small networks (≤ 3 sprinklers)
     if (sprinklers.length <= 3) {
         console.log('Using direct connection strategy for small network');
-        return createDirectConnections(sourcePos, sprinklers, isCanvasMode, scale, canvasData, imageData);
+        return createDirectConnections(
+            sourcePos,
+            sprinklers,
+            isCanvasMode,
+            scale,
+            canvasData,
+            imageData
+        );
     }
 
     // Strategy 2: Minimum Spanning Tree for larger networks
@@ -851,10 +910,10 @@ function createDirectConnections(
     imageData?: any
 ): Pipe[] {
     const pipes: Pipe[] = [];
-    
+
     sprinklers.forEach((sprinkler, index) => {
         const sprinklerPos = isCanvasMode ? sprinkler.canvasPosition! : sprinkler.position;
-        
+
         if (!sprinklerPos) {
             console.warn(`Sprinkler ${sprinkler.id} has no position`);
             return;
@@ -870,7 +929,7 @@ function createDirectConnections(
             imageData,
             sprinkler.zoneId
         );
-        
+
         pipes.push(pipe);
     });
 
@@ -886,22 +945,25 @@ function createMSTNetwork(
     imageData?: any
 ): Pipe[] {
     console.log('Creating MST-based uniform pipe network');
-    
+
     const pipes: Pipe[] = [];
-    
+
     // Create list of all points (source + sprinklers)
-    const allPoints: { pos: Coordinate | CanvasCoordinate; id: string; type: 'source' | 'sprinkler'; sprinkler?: Sprinkler }[] = [
-        { pos: sourcePos, id: 'source', type: 'source' }
-    ];
-    
-    sprinklers.forEach(sprinkler => {
+    const allPoints: {
+        pos: Coordinate | CanvasCoordinate;
+        id: string;
+        type: 'source' | 'sprinkler';
+        sprinkler?: Sprinkler;
+    }[] = [{ pos: sourcePos, id: 'source', type: 'source' }];
+
+    sprinklers.forEach((sprinkler) => {
         const pos = isCanvasMode ? sprinkler.canvasPosition : sprinkler.position;
         if (pos) {
             allPoints.push({
                 pos,
                 id: sprinkler.id,
                 type: 'sprinkler',
-                sprinkler
+                sprinkler,
             });
         }
     });
@@ -932,9 +994,9 @@ function createMSTNetwork(
     const inMST = new Array(allPoints.length).fill(false);
     const key = new Array(allPoints.length).fill(Infinity);
     const parent = new Array(allPoints.length).fill(-1);
-    
+
     key[0] = 0; // Start from source
-    
+
     for (let count = 0; count < allPoints.length - 1; count++) {
         // Find minimum key vertex not yet in MST
         let u = -1;
@@ -943,9 +1005,9 @@ function createMSTNetwork(
                 u = v;
             }
         }
-        
+
         inMST[u] = true;
-        
+
         // Update key values of adjacent vertices
         for (let v = 0; v < allPoints.length; v++) {
             if (!inMST[v] && distances[u][v] < key[v]) {
@@ -954,13 +1016,13 @@ function createMSTNetwork(
             }
         }
     }
-    
+
     // Create uniform pipes from MST
     for (let i = 1; i < allPoints.length; i++) {
         if (parent[i] !== -1) {
             const fromPoint = allPoints[parent[i]];
             const toPoint = allPoints[i];
-            
+
             const pipe = createUniformPipe(
                 `mst_${i}`,
                 fromPoint.pos,
@@ -971,7 +1033,7 @@ function createMSTNetwork(
                 imageData,
                 toPoint.sprinkler?.zoneId || 'unknown'
             );
-            
+
             pipes.push(pipe);
         }
     }
@@ -990,15 +1052,15 @@ function createUniformPipe(
     zoneId?: string
 ): Pipe {
     const length = calculateDistance(start, end, isCanvasMode ? scale : undefined);
-    
+
     if (isCanvasMode) {
         const canvasStart = start as CanvasCoordinate;
         const canvasEnd = end as CanvasCoordinate;
-        
+
         // Convert to GPS coordinates
         const gpsStart = canvasToGPS(canvasStart, canvasData || imageData);
         const gpsEnd = canvasToGPS(canvasEnd, canvasData || imageData);
-        
+
         return {
             id,
             start: gpsStart,
@@ -1007,7 +1069,7 @@ function createUniformPipe(
             canvasEnd,
             type: 'pipe',
             length,
-            zoneId
+            zoneId,
             // Removed isBranch - all pipes are uniform
         };
     } else {
@@ -1017,7 +1079,7 @@ function createUniformPipe(
             end: end as Coordinate,
             type: 'pipe',
             length,
-            zoneId
+            zoneId,
             // Removed isBranch - all pipes are uniform
         };
     }
@@ -1033,22 +1095,22 @@ export function addCustomPipe(
     canvasData?: any,
     imageData?: any
 ): Pipe | null {
-    const fromSprinkler = sprinklers.find(s => s.id === fromSprinklerId);
-    const toSprinkler = sprinklers.find(s => s.id === toSprinklerId);
-    
+    const fromSprinkler = sprinklers.find((s) => s.id === fromSprinklerId);
+    const toSprinkler = sprinklers.find((s) => s.id === toSprinklerId);
+
     if (!fromSprinkler || !toSprinkler) {
         console.warn('Cannot create pipe: sprinkler not found');
         return null;
     }
-    
+
     const fromPos = isCanvasMode ? fromSprinkler.canvasPosition! : fromSprinkler.position;
     const toPos = isCanvasMode ? toSprinkler.canvasPosition! : toSprinkler.position;
-    
+
     if (!fromPos || !toPos) {
         console.warn('Cannot create pipe: sprinkler position missing');
         return null;
     }
-    
+
     return createUniformPipe(
         `custom_${Date.now()}`,
         fromPos,
@@ -1062,7 +1124,7 @@ export function addCustomPipe(
 }
 
 export function removePipeById(pipeId: string, pipes: Pipe[]): Pipe[] {
-    return pipes.filter(pipe => pipe.id !== pipeId);
+    return pipes.filter((pipe) => pipe.id !== pipeId);
 }
 
 export function findPipesBetweenSprinklers(
@@ -1071,32 +1133,36 @@ export function findPipesBetweenSprinklers(
     pipes: Pipe[],
     sprinklers: Sprinkler[]
 ): Pipe[] {
-    const sprinkler1 = sprinklers.find(s => s.id === sprinkler1Id);
-    const sprinkler2 = sprinklers.find(s => s.id === sprinkler2Id);
-    
+    const sprinkler1 = sprinklers.find((s) => s.id === sprinkler1Id);
+    const sprinkler2 = sprinklers.find((s) => s.id === sprinkler2Id);
+
     if (!sprinkler1 || !sprinkler2) return [];
-    
+
     const pos1 = sprinkler1.canvasPosition || sprinkler1.position;
     const pos2 = sprinkler2.canvasPosition || sprinkler2.position;
-    
+
     if (!pos1 || !pos2) return [];
-    
-    return pipes.filter(pipe => {
+
+    return pipes.filter((pipe) => {
         const pipeStart = pipe.canvasStart || pipe.start;
         const pipeEnd = pipe.canvasEnd || pipe.end;
-        
+
         const tolerance = 0.1; // Small tolerance for floating point comparison
-        
-        const startMatchesPos1 = Math.abs(getCoordValue(pipeStart, 'x') - getCoordValue(pos1, 'x')) < tolerance &&
-                                Math.abs(getCoordValue(pipeStart, 'y') - getCoordValue(pos1, 'y')) < tolerance;
-        const endMatchesPos2 = Math.abs(getCoordValue(pipeEnd, 'x') - getCoordValue(pos2, 'x')) < tolerance &&
-                              Math.abs(getCoordValue(pipeEnd, 'y') - getCoordValue(pos2, 'y')) < tolerance;
-        
-        const startMatchesPos2 = Math.abs(getCoordValue(pipeStart, 'x') - getCoordValue(pos2, 'x')) < tolerance &&
-                                Math.abs(getCoordValue(pipeStart, 'y') - getCoordValue(pos2, 'y')) < tolerance;
-        const endMatchesPos1 = Math.abs(getCoordValue(pipeEnd, 'x') - getCoordValue(pos1, 'x')) < tolerance &&
-                              Math.abs(getCoordValue(pipeEnd, 'y') - getCoordValue(pos1, 'y')) < tolerance;
-        
+
+        const startMatchesPos1 =
+            Math.abs(getCoordValue(pipeStart, 'x') - getCoordValue(pos1, 'x')) < tolerance &&
+            Math.abs(getCoordValue(pipeStart, 'y') - getCoordValue(pos1, 'y')) < tolerance;
+        const endMatchesPos2 =
+            Math.abs(getCoordValue(pipeEnd, 'x') - getCoordValue(pos2, 'x')) < tolerance &&
+            Math.abs(getCoordValue(pipeEnd, 'y') - getCoordValue(pos2, 'y')) < tolerance;
+
+        const startMatchesPos2 =
+            Math.abs(getCoordValue(pipeStart, 'x') - getCoordValue(pos2, 'x')) < tolerance &&
+            Math.abs(getCoordValue(pipeStart, 'y') - getCoordValue(pos2, 'y')) < tolerance;
+        const endMatchesPos1 =
+            Math.abs(getCoordValue(pipeEnd, 'x') - getCoordValue(pos1, 'x')) < tolerance &&
+            Math.abs(getCoordValue(pipeEnd, 'y') - getCoordValue(pos1, 'y')) < tolerance;
+
         return (startMatchesPos1 && endMatchesPos2) || (startMatchesPos2 && endMatchesPos1);
     });
 }
@@ -1215,7 +1281,7 @@ function validateAndFixLoadedData(data: GardenPlannerData): GardenPlannerData {
 
     // Remove isBranch property from existing pipes (backward compatibility)
     if (fixedData.pipes) {
-        fixedData.pipes = fixedData.pipes.map(pipe => {
+        fixedData.pipes = fixedData.pipes.map((pipe) => {
             const { isBranch, ...cleanPipe } = pipe as any;
             return cleanPipe;
         });
@@ -1260,6 +1326,29 @@ export interface GardenStatistics {
     zoneStatistics: ZoneStatistics[];
 }
 
+// แก้ไข interface ZoneStatistics ใน homeGardenData.ts
+export interface ZoneStatistics {
+    zoneId: string;
+    zoneName: string;
+    zoneType: string;
+    area: number;
+    sprinklerCount: number;
+    sprinklerTypes: string[]; 
+    sprinklerRadius: number; 
+    pipeLength: number;
+    longestPipe: number;
+}
+
+export interface GardenStatistics {
+    totalArea: number;
+    totalZones: number;
+    totalSprinklers: number;
+    totalPipeLength: number;
+    longestPipe: number;
+    zoneStatistics: ZoneStatistics[];
+}
+
+// แก้ไขฟังก์ชัน calculateStatistics ใน homeGardenData.ts
 export function calculateStatistics(data: GardenPlannerData): GardenStatistics {
     const { gardenZones = [], sprinklers = [], pipes = [] } = data || {};
     const mainZones = gardenZones.filter((z) => z.type !== 'forbidden' && !z.parentZoneId);
@@ -1278,7 +1367,7 @@ export function calculateStatistics(data: GardenPlannerData): GardenStatistics {
         }, 0);
 
     const totalPipeLength = pipes.reduce((sum, p) => sum + p.length, 0);
-    const longestPipe = pipes.length > 0 ? Math.max(...pipes.map(p => p.length)) : 0;
+    const longestPipe = pipes.length > 0 ? Math.max(...pipes.map((p) => p.length)) : 0;
 
     const zoneStatistics: ZoneStatistics[] = mainZones.map((zone) => {
         const coords = zone.canvasCoordinates || zone.coordinates;
@@ -1291,9 +1380,15 @@ export function calculateStatistics(data: GardenPlannerData): GardenStatistics {
         const zonePipes = pipes.filter((p) => p.zoneId === zone.id);
 
         const zonePipeLength = zonePipes.reduce((sum, p) => sum + p.length, 0);
-        const zoneLongestPipe = zonePipes.length > 0 ? Math.max(...zonePipes.map(p => p.length)) : 0;
+        const zoneLongestPipe =
+            zonePipes.length > 0 ? Math.max(...zonePipes.map((p) => p.length)) : 0;
 
         const zoneType = ZONE_TYPES.find((t) => t.id === zone.type);
+
+        const sprinklerTypes = [...new Set(zoneSprinklers.map(s => s.type.nameEN))];
+        const sprinklerRadius = zoneSprinklers.length > 0 
+            ? zoneSprinklers.reduce((sum, s) => sum + s.type.radius, 0) / zoneSprinklers.length
+            : 0;
 
         return {
             zoneId: zone.id,
@@ -1301,6 +1396,8 @@ export function calculateStatistics(data: GardenPlannerData): GardenStatistics {
             zoneType: zoneType?.name || zone.type,
             area: zoneArea,
             sprinklerCount: zoneSprinklers.length,
+            sprinklerTypes, // เพิ่ม
+            sprinklerRadius: sprinklerRadius, 
             pipeLength: zonePipeLength,
             longestPipe: zoneLongestPipe,
         };
