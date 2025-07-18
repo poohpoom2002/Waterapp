@@ -40,10 +40,10 @@ export const GOOGLE_MAPS_CONFIG = {
         mapTypeControlOptions: {
             position: 'LEFT_BOTTOM' as any, // ใช้ string แทน google.maps.ControlPosition.LEFT_BOTTOM
             style: 'HORIZONTAL_BAR' as any, // ใช้ string แทน google.maps.MapTypeControlStyle.HORIZONTAL_BAR
-            mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain']
+            mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain'],
         },
         // ✅ แก้ไข 2: ปรับการซูมให้ใกล้มากๆ จนเห็นบ้านหลังเดียว
-        minZoom: 1,   // ซูมออกได้มากที่สุด
+        minZoom: 1, // ซูมออกได้มากที่สุด
         gestureHandling: 'greedy' as const,
         clickableIcons: false,
         // เพิ่มการควบคุมการซูม
@@ -70,7 +70,6 @@ export const GOOGLE_MAPS_CONFIG = {
 
         language: 'en',
         region: 'US',
-
     },
 
     defaultCenter: { lat: 13.7563, lng: 100.5018 },
@@ -82,10 +81,10 @@ export const GOOGLE_MAPS_CONFIG = {
         country: 6,
         city: 12,
         area: 15,
-        building: 30,  // เพิ่มจาก 25 เป็น 30
-        detail: 45,    // เพิ่มจาก 35 เป็น 45
-        extreme: 60,   // เพิ่มจาก 45 เป็น 60
-        house: 80,     // เพิ่มใหม่ - ซูมระดับบ้านหลังเดียว
+        building: 30, // เพิ่มจาก 25 เป็น 30
+        detail: 45, // เพิ่มจาก 35 เป็น 45
+        extreme: 60, // เพิ่มจาก 45 เป็น 60
+        house: 80, // เพิ่มใหม่ - ซูมระดับบ้านหลังเดียว
     },
 };
 
@@ -319,7 +318,7 @@ export class PlacesServiceWrapper {
     private getStatusErrorMessage(status: google.maps.places.PlacesServiceStatus): string {
         // ✅ ใช้ string comparison แทน google.maps constants
         const statusString = status.toString();
-        
+
         switch (statusString) {
             case 'ZERO_RESULTS':
                 return 'ไม่พบผลการค้นหา';

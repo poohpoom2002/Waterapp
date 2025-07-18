@@ -13,7 +13,13 @@ interface UserAvatarProps {
     clickable?: boolean;
 }
 
-const UserAvatar: React.FC<UserAvatarProps> = ({ user, size = 'md', className = '', onClick, clickable = false }) => {
+const UserAvatar: React.FC<UserAvatarProps> = ({
+    user,
+    size = 'md',
+    className = '',
+    onClick,
+    clickable = false,
+}) => {
     // Extract initials from user name
     const getInitials = (name: string): string => {
         const names = name.trim().split(' ');
@@ -46,7 +52,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({ user, size = 'md', className = 
             return (
                 <button
                     onClick={onClick}
-                    className="cursor-pointer hover:opacity-80 transition-opacity"
+                    className="cursor-pointer transition-opacity hover:opacity-80"
                     title="Click to change profile photo"
                 >
                     {avatarContent}
@@ -60,7 +66,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({ user, size = 'md', className = 
     // Show initials if no profile photo
     const avatarContent = (
         <div
-            className={`inline-flex items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 ${sizeClasses[size]} ${className}`}
+            className={`inline-flex items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 font-semibold text-white shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl ${sizeClasses[size]} ${className}`}
             title={`${user.name} (${user.email})`}
         >
             {initials}
@@ -71,7 +77,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({ user, size = 'md', className = 
         return (
             <button
                 onClick={onClick}
-                className="cursor-pointer hover:opacity-80 transition-opacity"
+                className="cursor-pointer transition-opacity hover:opacity-80"
                 title="Click to upload profile photo"
             >
                 {avatarContent}
@@ -80,13 +86,10 @@ const UserAvatar: React.FC<UserAvatarProps> = ({ user, size = 'md', className = 
     }
 
     return (
-        <Link
-            href="/profile"
-            className="block"
-        >
+        <Link href="/profile" className="block">
             {avatarContent}
         </Link>
     );
 };
 
-export default UserAvatar; 
+export default UserAvatar;

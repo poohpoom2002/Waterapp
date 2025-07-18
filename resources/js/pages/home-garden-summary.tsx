@@ -104,27 +104,27 @@ const CanvasRenderer: React.FC<{
         const allPoints: CanvasCoordinate[] = [];
 
         // Collect all points from zones
-        gardenData.gardenZones?.forEach(zone => {
+        gardenData.gardenZones?.forEach((zone) => {
             if (zone.canvasCoordinates) {
                 allPoints.push(...zone.canvasCoordinates);
             }
         });
 
         // Collect all points from sprinklers
-        gardenData.sprinklers?.forEach(sprinkler => {
+        gardenData.sprinklers?.forEach((sprinkler) => {
             if (sprinkler.canvasPosition) {
                 allPoints.push(sprinkler.canvasPosition);
             }
         });
 
         // Collect all points from pipes
-        gardenData.pipes?.forEach(pipe => {
+        gardenData.pipes?.forEach((pipe) => {
             if (pipe.canvasStart) allPoints.push(pipe.canvasStart);
             if (pipe.canvasEnd) allPoints.push(pipe.canvasEnd);
         });
 
         // Collect all points from dimension lines
-        dimensionLines.forEach(dim => {
+        dimensionLines.forEach((dim) => {
             allPoints.push(dim.start, dim.end);
         });
 
@@ -135,17 +135,21 @@ const CanvasRenderer: React.FC<{
 
         if (allPoints.length === 0) {
             return {
-                minX: 0, maxX: 800,
-                minY: 0, maxY: 600,
-                width: 800, height: 600,
-                centerX: 400, centerY: 300
+                minX: 0,
+                maxX: 800,
+                minY: 0,
+                maxY: 600,
+                width: 800,
+                height: 600,
+                centerX: 400,
+                centerY: 300,
             };
         }
 
-        const minX = Math.min(...allPoints.map(p => p.x));
-        const maxX = Math.max(...allPoints.map(p => p.x));
-        const minY = Math.min(...allPoints.map(p => p.y));
-        const maxY = Math.max(...allPoints.map(p => p.y));
+        const minX = Math.min(...allPoints.map((p) => p.x));
+        const maxX = Math.max(...allPoints.map((p) => p.x));
+        const minY = Math.min(...allPoints.map((p) => p.y));
+        const maxY = Math.max(...allPoints.map((p) => p.y));
 
         const width = maxX - minX;
         const height = maxY - minY;
@@ -179,148 +183,154 @@ const CanvasRenderer: React.FC<{
     }, [canvasBounds, activeCanvasRef]);
 
     // Transform function
-    const transformPoint = useCallback((point: CanvasCoordinate) => {
-        return {
-            x: point.x * transform.scale + transform.offsetX,
-            y: point.y * transform.scale + transform.offsetY
-        };
-    }, [transform]);
+    const transformPoint = useCallback(
+        (point: CanvasCoordinate) => {
+            return {
+                x: point.x * transform.scale + transform.offsetX,
+                y: point.y * transform.scale + transform.offsetY,
+            };
+        },
+        [transform]
+    );
 
     // Draw dimension lines
-    const drawDimensionLines = useCallback((ctx: CanvasRenderingContext2D) => {
-        if (dimensionLines.length === 0) return;
+    const drawDimensionLines = useCallback(
+        (ctx: CanvasRenderingContext2D) => {
+            if (dimensionLines.length === 0) return;
 
-        ctx.save();
-        
-        dimensionLines.forEach(dimension => {
-            const startScreen = transformPoint(dimension.start);
-            const endScreen = transformPoint(dimension.end);
-            
-            // Calculate line direction
-            const dx = endScreen.x - startScreen.x;
-            const dy = endScreen.y - startScreen.y;
-            const length = Math.sqrt(dx * dx + dy * dy);
-            
-            if (length < 1) return;
-            
-            const unitX = dx / length;
-            const unitY = dy / length;
-            const offsetDistance = 30 * transform.scale;
-            
-            // Determine offset direction based on dimension.direction
-            let offsetX = 0;
-            let offsetY = 0;
-            
-            if (dimension.direction === 'auto') {
-                // Auto direction - perpendicular to line
-                offsetX = -unitY * offsetDistance;
-                offsetY = unitX * offsetDistance;
-            } else if (dimension.direction === 'left') {
-                offsetX = -offsetDistance;
-                offsetY = 0;
-            } else if (dimension.direction === 'right') {
-                offsetX = offsetDistance;
-                offsetY = 0;
-            } else if (dimension.direction === 'top') {
-                offsetX = 0;
-                offsetY = -offsetDistance;
-            } else if (dimension.direction === 'bottom') {
-                offsetX = 0;
-                offsetY = offsetDistance;
-            }
-            
-            const dimStart = {
-                x: startScreen.x + offsetX,
-                y: startScreen.y + offsetY
-            };
-            const dimEnd = {
-                x: endScreen.x + offsetX,
-                y: endScreen.y + offsetY
-            };
-            
-            // Draw dimension line
-            ctx.strokeStyle = '#FFD700';
-            ctx.lineWidth = 2 * transform.scale;
-            ctx.beginPath();
-            ctx.moveTo(dimStart.x, dimStart.y);
-            ctx.lineTo(dimEnd.x, dimEnd.y);
-            ctx.stroke();
-            
-            // Draw extension lines
-            ctx.strokeStyle = '#FFD700';
-            ctx.lineWidth = 1 * transform.scale;
-            ctx.setLineDash([3 * transform.scale, 3 * transform.scale]);
-            
-            ctx.beginPath();
-            ctx.moveTo(startScreen.x, startScreen.y);
-            ctx.lineTo(dimStart.x, dimStart.y);
-            ctx.stroke();
-            
-            ctx.beginPath();
-            ctx.moveTo(endScreen.x, endScreen.y);
-            ctx.lineTo(dimEnd.x, dimEnd.y);
-            ctx.stroke();
-            
-            ctx.setLineDash([]);
-            
-            // Draw arrows
-            const arrowSize = 8 * transform.scale;
-            const angle1 = Math.atan2(dimEnd.y - dimStart.y, dimEnd.x - dimStart.x);
-            const angle2 = angle1 + Math.PI;
-            
-            // Arrow at start
-            ctx.beginPath();
-            ctx.moveTo(dimStart.x, dimStart.y);
-            ctx.lineTo(
-                dimStart.x + Math.cos(angle1 + 0.3) * arrowSize,
-                dimStart.y + Math.sin(angle1 + 0.3) * arrowSize
-            );
-            ctx.moveTo(dimStart.x, dimStart.y);
-            ctx.lineTo(
-                dimStart.x + Math.cos(angle1 - 0.3) * arrowSize,
-                dimStart.y + Math.sin(angle1 - 0.3) * arrowSize
-            );
-            ctx.stroke();
-            
-            // Arrow at end
-            ctx.beginPath();
-            ctx.moveTo(dimEnd.x, dimEnd.y);
-            ctx.lineTo(
-                dimEnd.x + Math.cos(angle2 + 0.3) * arrowSize,
-                dimEnd.y + Math.sin(angle2 + 0.3) * arrowSize
-            );
-            ctx.moveTo(dimEnd.x, dimEnd.y);
-            ctx.lineTo(
-                dimEnd.x + Math.cos(angle2 - 0.3) * arrowSize,
-                dimEnd.y + Math.sin(angle2 - 0.3) * arrowSize
-            );
-            ctx.stroke();
-            
-            // Draw label
-            const midX = (dimStart.x + dimEnd.x) / 2;
-            const midY = (dimStart.y + dimEnd.y) / 2;
-            
-            ctx.fillStyle = 'rgba(0,0,0,0.8)';
-            ctx.font = `bold ${12 * transform.scale}px Arial`;
-            const textMetrics = ctx.measureText(dimension.label);
-            const textWidth = textMetrics.width;
-            const textHeight = 16 * transform.scale;
-            
-            ctx.fillRect(
-                midX - textWidth / 2 - 4 * transform.scale,
-                midY - textHeight / 2,
-                textWidth + 8 * transform.scale,
-                textHeight
-            );
-            
-            ctx.fillStyle = '#FFD700';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(dimension.label, midX, midY);
-        });
-        
-        ctx.restore();
-    }, [dimensionLines, transformPoint, transform]);
+            ctx.save();
+
+            dimensionLines.forEach((dimension) => {
+                const startScreen = transformPoint(dimension.start);
+                const endScreen = transformPoint(dimension.end);
+
+                // Calculate line direction
+                const dx = endScreen.x - startScreen.x;
+                const dy = endScreen.y - startScreen.y;
+                const length = Math.sqrt(dx * dx + dy * dy);
+
+                if (length < 1) return;
+
+                const unitX = dx / length;
+                const unitY = dy / length;
+                const offsetDistance = 30 * transform.scale;
+
+                // Determine offset direction based on dimension.direction
+                let offsetX = 0;
+                let offsetY = 0;
+
+                if (dimension.direction === 'auto') {
+                    // Auto direction - perpendicular to line
+                    offsetX = -unitY * offsetDistance;
+                    offsetY = unitX * offsetDistance;
+                } else if (dimension.direction === 'left') {
+                    offsetX = -offsetDistance;
+                    offsetY = 0;
+                } else if (dimension.direction === 'right') {
+                    offsetX = offsetDistance;
+                    offsetY = 0;
+                } else if (dimension.direction === 'top') {
+                    offsetX = 0;
+                    offsetY = -offsetDistance;
+                } else if (dimension.direction === 'bottom') {
+                    offsetX = 0;
+                    offsetY = offsetDistance;
+                }
+
+                const dimStart = {
+                    x: startScreen.x + offsetX,
+                    y: startScreen.y + offsetY,
+                };
+                const dimEnd = {
+                    x: endScreen.x + offsetX,
+                    y: endScreen.y + offsetY,
+                };
+
+                // Draw dimension line
+                ctx.strokeStyle = '#FFD700';
+                ctx.lineWidth = 2 * transform.scale;
+                ctx.beginPath();
+                ctx.moveTo(dimStart.x, dimStart.y);
+                ctx.lineTo(dimEnd.x, dimEnd.y);
+                ctx.stroke();
+
+                // Draw extension lines
+                ctx.strokeStyle = '#FFD700';
+                ctx.lineWidth = 1 * transform.scale;
+                ctx.setLineDash([3 * transform.scale, 3 * transform.scale]);
+
+                ctx.beginPath();
+                ctx.moveTo(startScreen.x, startScreen.y);
+                ctx.lineTo(dimStart.x, dimStart.y);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(endScreen.x, endScreen.y);
+                ctx.lineTo(dimEnd.x, dimEnd.y);
+                ctx.stroke();
+
+                ctx.setLineDash([]);
+
+                // Draw arrows
+                const arrowSize = 8 * transform.scale;
+                const angle1 = Math.atan2(dimEnd.y - dimStart.y, dimEnd.x - dimStart.x);
+                const angle2 = angle1 + Math.PI;
+
+                // Arrow at start
+                ctx.beginPath();
+                ctx.moveTo(dimStart.x, dimStart.y);
+                ctx.lineTo(
+                    dimStart.x + Math.cos(angle1 + 0.3) * arrowSize,
+                    dimStart.y + Math.sin(angle1 + 0.3) * arrowSize
+                );
+                ctx.moveTo(dimStart.x, dimStart.y);
+                ctx.lineTo(
+                    dimStart.x + Math.cos(angle1 - 0.3) * arrowSize,
+                    dimStart.y + Math.sin(angle1 - 0.3) * arrowSize
+                );
+                ctx.stroke();
+
+                // Arrow at end
+                ctx.beginPath();
+                ctx.moveTo(dimEnd.x, dimEnd.y);
+                ctx.lineTo(
+                    dimEnd.x + Math.cos(angle2 + 0.3) * arrowSize,
+                    dimEnd.y + Math.sin(angle2 + 0.3) * arrowSize
+                );
+                ctx.moveTo(dimEnd.x, dimEnd.y);
+                ctx.lineTo(
+                    dimEnd.x + Math.cos(angle2 - 0.3) * arrowSize,
+                    dimEnd.y + Math.sin(angle2 - 0.3) * arrowSize
+                );
+                ctx.stroke();
+
+                // Draw label
+                const midX = (dimStart.x + dimEnd.x) / 2;
+                const midY = (dimStart.y + dimEnd.y) / 2;
+
+                ctx.fillStyle = 'rgba(0,0,0,0.8)';
+                ctx.font = `bold ${12 * transform.scale}px Arial`;
+                const textMetrics = ctx.measureText(dimension.label);
+                const textWidth = textMetrics.width;
+                const textHeight = 16 * transform.scale;
+
+                ctx.fillRect(
+                    midX - textWidth / 2 - 4 * transform.scale,
+                    midY - textHeight / 2,
+                    textWidth + 8 * transform.scale,
+                    textHeight
+                );
+
+                ctx.fillStyle = '#FFD700';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(dimension.label, midX, midY);
+            });
+
+            ctx.restore();
+        },
+        [dimensionLines, transformPoint, transform]
+    );
 
     const draw = useCallback(() => {
         const canvas = activeCanvasRef.current;
@@ -364,8 +374,17 @@ const CanvasRenderer: React.FC<{
                     try {
                         ctx.save();
                         ctx.scale(transform.scale, transform.scale);
-                        ctx.translate(transform.offsetX / transform.scale, transform.offsetY / transform.scale);
-                        ctx.drawImage(img, 0, 0, canvas.width / transform.scale, canvas.height / transform.scale);
+                        ctx.translate(
+                            transform.offsetX / transform.scale,
+                            transform.offsetY / transform.scale
+                        );
+                        ctx.drawImage(
+                            img,
+                            0,
+                            0,
+                            canvas.width / transform.scale,
+                            canvas.height / transform.scale
+                        );
                         ctx.restore();
                         drawElements(ctx, scale);
                     } catch (error) {
@@ -416,9 +435,13 @@ const CanvasRenderer: React.FC<{
                         ctx.setLineDash([]);
 
                         // Zone label
-                        const centerX = zone.canvasCoordinates.reduce((sum, c) => sum + c.x, 0) / zone.canvasCoordinates.length;
-                        const centerY = zone.canvasCoordinates.reduce((sum, c) => sum + c.y, 0) / zone.canvasCoordinates.length;
-                        const centerPoint = transformPoint({x: centerX, y: centerY});
+                        const centerX =
+                            zone.canvasCoordinates.reduce((sum, c) => sum + c.x, 0) /
+                            zone.canvasCoordinates.length;
+                        const centerY =
+                            zone.canvasCoordinates.reduce((sum, c) => sum + c.y, 0) /
+                            zone.canvasCoordinates.length;
+                        const centerPoint = transformPoint({ x: centerX, y: centerY });
 
                         ctx.fillStyle = '#fff';
                         ctx.font = `bold ${12 * transform.scale}px Arial`;
@@ -428,15 +451,27 @@ const CanvasRenderer: React.FC<{
 
                         // Area label
                         try {
-                            const area = gardenData.canvasData && zone.canvasCoordinates ? 
-                                (zone.canvasCoordinates.reduce((sum, coord, i) => {
-                                    const nextCoord = zone.canvasCoordinates![(i + 1) % zone.canvasCoordinates!.length];
-                                    return sum + (coord.x * nextCoord.y - nextCoord.x * coord.y);
-                                }, 0) / 2 / (scale * scale)) :
-                                0;
+                            const area =
+                                gardenData.canvasData && zone.canvasCoordinates
+                                    ? zone.canvasCoordinates.reduce((sum, coord, i) => {
+                                          const nextCoord =
+                                              zone.canvasCoordinates![
+                                                  (i + 1) % zone.canvasCoordinates!.length
+                                              ];
+                                          return (
+                                              sum + (coord.x * nextCoord.y - nextCoord.x * coord.y)
+                                          );
+                                      }, 0) /
+                                      2 /
+                                      (scale * scale)
+                                    : 0;
                             ctx.font = `${10 * transform.scale}px Arial`;
                             ctx.fillStyle = '#ddd';
-                            ctx.fillText(formatArea(Math.abs(area)), centerPoint.x, centerPoint.y + 15 * transform.scale);
+                            ctx.fillText(
+                                formatArea(Math.abs(area)),
+                                centerPoint.x,
+                                centerPoint.y + 15 * transform.scale
+                            );
                         } catch (error) {
                             console.error('Error drawing zone area:', error);
                         }
@@ -489,7 +524,8 @@ const CanvasRenderer: React.FC<{
                                     scale
                                 );
 
-                                const radiusPixels = sprinkler.type.radius * scale * transform.scale;
+                                const radiusPixels =
+                                    sprinkler.type.radius * scale * transform.scale;
                                 console.log(
                                     `Drawing full circle with radius: ${radiusPixels}px (${sprinkler.type.radius}m * ${scale} * ${transform.scale})`
                                 );
@@ -511,12 +547,16 @@ const CanvasRenderer: React.FC<{
                                     ctx.fill();
                                     ctx.stroke();
                                 } else if (clipResult === 'MASKED_CIRCLE') {
-                                    console.log(`Drawing masked circle with radius: ${radiusPixels}px`);
+                                    console.log(
+                                        `Drawing masked circle with radius: ${radiusPixels}px`
+                                    );
 
                                     // Create clipping path for zone
                                     ctx.save();
                                     ctx.beginPath();
-                                    const firstZonePoint = transformPoint(zone.canvasCoordinates[0]);
+                                    const firstZonePoint = transformPoint(
+                                        zone.canvasCoordinates[0]
+                                    );
                                     ctx.moveTo(firstZonePoint.x, firstZonePoint.y);
                                     for (let i = 1; i < zone.canvasCoordinates.length; i++) {
                                         const zonePoint = transformPoint(zone.canvasCoordinates[i]);
@@ -577,7 +617,8 @@ const CanvasRenderer: React.FC<{
                             } catch (error) {
                                 console.error('Error drawing sprinkler radius:', error);
                                 // Fallback - simple circle
-                                const radiusPixels = sprinkler.type.radius * scale * transform.scale;
+                                const radiusPixels =
+                                    sprinkler.type.radius * scale * transform.scale;
                                 ctx.fillStyle = sprinkler.type.color + '26';
                                 ctx.strokeStyle = sprinkler.type.color + '80';
                                 ctx.lineWidth = 1 * transform.scale;
@@ -642,18 +683,16 @@ const CanvasRenderer: React.FC<{
                             ctx.fillText(sprinkler.type.icon, 0, 0);
                             ctx.restore();
                         } else {
-                            ctx.fillText(
-                                sprinkler.type.icon,
-                                sprinklerPoint.x,
-                                sprinklerPoint.y
-                            );
+                            ctx.fillText(sprinkler.type.icon, sprinklerPoint.x, sprinklerPoint.y);
                             ctx.restore();
                         }
                     });
 
                     // Draw water source with enhanced styling
                     if (gardenData.waterSource?.canvasPosition) {
-                        const waterSourcePoint = transformPoint(gardenData.waterSource.canvasPosition);
+                        const waterSourcePoint = transformPoint(
+                            gardenData.waterSource.canvasPosition
+                        );
 
                         ctx.save();
 
@@ -710,16 +749,16 @@ const CanvasRenderer: React.FC<{
     const height = gardenData.imageData?.height || gardenData.canvasData?.height || 600;
 
     return (
-        <div className="flex items-center justify-center w-full h-full bg-gray-900 p-4">
+        <div className="flex h-full w-full items-center justify-center bg-gray-900 p-4">
             <canvas
                 ref={activeCanvasRef}
                 width={width}
                 height={height}
-                className="bg-gray-900 border border-gray-600 rounded-lg shadow-xl"
+                className="rounded-lg border border-gray-600 bg-gray-900 shadow-xl"
                 style={{
                     maxWidth: '100%',
                     maxHeight: '100%',
-                    objectFit: 'contain'
+                    objectFit: 'contain',
                 }}
                 id="canvas-container"
             />
@@ -910,7 +949,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                     useCORS: true,
                     logging: false,
                     allowTaint: true,
-                    backgroundColor: '#1a1a1a'
+                    backgroundColor: '#1a1a1a',
                 });
 
                 // Create download link
@@ -934,7 +973,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
             // Get the specific container
             let elementId = gardenData?.designMode === 'map' ? 'map-container' : 'canvas-container';
             const element = document.getElementById(elementId);
-            
+
             if (element) {
                 // Create a new window for printing
                 const printWindow = window.open('', '_blank');
@@ -1086,6 +1125,14 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                             >
                                 🖨️ พิมพ์รูปภาพ
                             </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => router.visit('/product')}
+                                    className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-white transition-colors hover:bg-purple-700"
+                                >
+                                    💰 คำนวณอุปกรณ์
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <div className="text-right text-sm text-gray-400">
@@ -1113,10 +1160,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
 
                                 {(gardenData.designMode === 'canvas' ||
                                     gardenData.designMode === 'image') && (
-                                    <CanvasRenderer
-                                        gardenData={gardenData}
-                                        canvasRef={canvasRef}
-                                    />
+                                    <CanvasRenderer gardenData={gardenData} canvasRef={canvasRef} />
                                 )}
                             </div>
                         </div>
@@ -1155,7 +1199,9 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                     <div className="mb-1 text-gray-400">ระบบท่อ</div>
                                     <div className="mt-1 grid grid-cols-2 gap-2">
                                         <div>
-                                            <div className="text-xs text-gray-500">ท่อที่ยาวที่สุด</div>
+                                            <div className="text-xs text-gray-500">
+                                                ท่อที่ยาวที่สุด
+                                            </div>
                                             <div className="font-bold text-yellow-400">
                                                 {formatDistance(statistics.longestPipe)}
                                             </div>
@@ -1214,6 +1260,36 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                                 {zone.sprinklerCount} ตัว
                                             </span>
                                         </div>
+                                        {zone.sprinklerCount > 0 && (
+                            <>
+                                <div className="flex justify-between">
+                                    <span className="text-gray-400">ประเภทหัวฉีด:</span>
+                                    <div className="text-right">
+                                        {zone.sprinklerTypes.length > 0 ? (
+                                            <div className="text-xs">
+                                                {zone.sprinklerTypes.map((type, idx) => (
+                                                    <div key={idx} className="font-medium text-cyan-400">
+                                                        {type}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <span className="font-medium text-gray-500">-</span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-between">
+                                    <span className="text-gray-400">รัศมี:</span>
+                                    <span className="font-medium text-cyan-400">
+                                        {zone.sprinklerRadius > 0 
+                                            ? `${zone.sprinklerRadius.toFixed(1)} ม.`
+                                            : '-'
+                                        }
+                                    </span>
+                                </div>
+                            </>
+                        )}
 
                                         {zone.pipeLength > 0 && (
                                             <div className="border-t border-gray-600 pt-2">

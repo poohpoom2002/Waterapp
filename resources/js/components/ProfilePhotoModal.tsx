@@ -9,11 +9,11 @@ interface ProfilePhotoModalProps {
     currentPhotoUrl?: string;
 }
 
-export default function ProfilePhotoModal({ 
-    isOpen, 
-    onClose, 
-    onPhotoUploaded, 
-    currentPhotoUrl 
+export default function ProfilePhotoModal({
+    isOpen,
+    onClose,
+    onPhotoUploaded,
+    currentPhotoUrl,
 }: ProfilePhotoModalProps) {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string>('');
@@ -35,7 +35,7 @@ export default function ProfilePhotoModal({
             const file = e.target.files[0];
             setSelectedFile(file);
             setError('');
-            
+
             // Create preview URL
             const reader = new FileReader();
             reader.onload = () => {
@@ -57,45 +57,46 @@ export default function ProfilePhotoModal({
         setCrop(crop);
     }, []);
 
-    const getCroppedImg = useCallback(
-        (image: HTMLImageElement, crop: PixelCrop): Promise<Blob> => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
+    const getCroppedImg = useCallback((image: HTMLImageElement, crop: PixelCrop): Promise<Blob> => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
 
-            if (!ctx) {
-                throw new Error('No 2d context');
-            }
+        if (!ctx) {
+            throw new Error('No 2d context');
+        }
 
-            const scaleX = image.naturalWidth / image.width;
-            const scaleY = image.naturalHeight / image.height;
+        const scaleX = image.naturalWidth / image.width;
+        const scaleY = image.naturalHeight / image.height;
 
-            canvas.width = crop.width;
-            canvas.height = crop.height;
+        canvas.width = crop.width;
+        canvas.height = crop.height;
 
-            ctx.imageSmoothingQuality = 'high';
+        ctx.imageSmoothingQuality = 'high';
 
-            ctx.drawImage(
-                image,
-                crop.x * scaleX,
-                crop.y * scaleY,
-                crop.width * scaleX,
-                crop.height * scaleY,
-                0,
-                0,
-                crop.width,
-                crop.height
-            );
+        ctx.drawImage(
+            image,
+            crop.x * scaleX,
+            crop.y * scaleY,
+            crop.width * scaleX,
+            crop.height * scaleY,
+            0,
+            0,
+            crop.width,
+            crop.height
+        );
 
-            return new Promise((resolve) => {
-                canvas.toBlob((blob) => {
+        return new Promise((resolve) => {
+            canvas.toBlob(
+                (blob) => {
                     if (blob) {
                         resolve(blob);
                     }
-                }, 'image/jpeg', 0.9);
-            });
-        },
-        []
-    );
+                },
+                'image/jpeg',
+                0.9
+            );
+        });
+    }, []);
 
     const handleUpload = async () => {
         if (!selectedFile || !completedCrop || !imgRef.current) {
@@ -108,10 +109,10 @@ export default function ProfilePhotoModal({
 
         try {
             const croppedImageBlob = await getCroppedImg(imgRef.current, completedCrop);
-            
+
             const formData = new FormData();
             formData.append('photo', croppedImageBlob, 'profile-photo.jpg');
-            
+
             if (completedCrop) {
                 formData.append('crop_data[x]', completedCrop.x.toString());
                 formData.append('crop_data[y]', completedCrop.y.toString());
@@ -123,7 +124,10 @@ export default function ProfilePhotoModal({
                 method: 'POST',
                 body: formData,
                 headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    'X-CSRF-TOKEN':
+                        document
+                            .querySelector('meta[name="csrf-token"]')
+                            ?.getAttribute('content') || '',
                 },
             });
 
@@ -156,7 +160,10 @@ export default function ProfilePhotoModal({
             const response = await fetch('/api/profile-photo/delete', {
                 method: 'DELETE',
                 headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    'X-CSRF-TOKEN':
+                        document
+                            .querySelector('meta[name="csrf-token"]')
+                            ?.getAttribute('content') || '',
                     'Content-Type': 'application/json',
                 },
             });
@@ -187,14 +194,24 @@ export default function ProfilePhotoModal({
                         onClick={onClose}
                         className="rounded-lg bg-gray-700 p-2 text-gray-400 transition-colors hover:bg-gray-600 hover:text-white"
                     >
-                        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        <svg
+                            className="h-6 w-6"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                            />
                         </svg>
                     </button>
                 </div>
 
                 {error && (
-                    <div className="mb-4 rounded-lg bg-red-900/30 border border-red-500 p-3 text-red-400">
+                    <div className="mb-4 rounded-lg border border-red-500 bg-red-900/30 p-3 text-red-400">
                         {error}
                     </div>
                 )}
@@ -202,21 +219,23 @@ export default function ProfilePhotoModal({
                 <div className="space-y-6">
                     {/* File Upload */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="mb-2 block text-sm font-medium text-gray-300">
                             Choose Photo
                         </label>
                         <input
                             type="file"
                             accept="image/*"
                             onChange={onSelectFile}
-                            className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+                            className="block w-full text-sm text-gray-400 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-blue-700"
                         />
                     </div>
 
                     {/* Image Preview and Crop */}
                     {previewUrl && (
                         <div className="space-y-4">
-                            <div className="text-sm text-gray-300">Crop your photo (drag to move, resize corners)</div>
+                            <div className="text-sm text-gray-300">
+                                Crop your photo (drag to move, resize corners)
+                            </div>
                             <div className="max-h-96 overflow-auto rounded-lg border border-gray-600">
                                 <ReactCrop
                                     crop={crop}
@@ -263,9 +282,9 @@ export default function ProfilePhotoModal({
                     {isUploading && (
                         <div className="space-y-2">
                             <div className="text-sm text-gray-300">Uploading...</div>
-                            <div className="w-full bg-gray-700 rounded-full h-2">
-                                <div 
-                                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            <div className="h-2 w-full rounded-full bg-gray-700">
+                                <div
+                                    className="h-2 rounded-full bg-blue-600 transition-all duration-300"
                                     style={{ width: `${uploadProgress}%` }}
                                 ></div>
                             </div>
@@ -294,4 +313,4 @@ export default function ProfilePhotoModal({
             </div>
         </div>
     );
-} 
+}

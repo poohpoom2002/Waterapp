@@ -1,7 +1,12 @@
 export interface SprinklerLayoutData {
     area: Array<{ lat: number; lng: number }>;
     sprinklerPositions: Array<{ id: string; lat: number; lng: number }>;
-    pipeConnections: Array<{ id: string; start: { lat: number; lng: number }; end: { lat: number; lng: number }; length: number }>;
+    pipeConnections: Array<{
+        id: string;
+        start: { lat: number; lng: number };
+        end: { lat: number; lng: number };
+        length: number;
+    }>;
     waterSource: { lat: number; lng: number; type: 'tap' | 'pump' } | null;
     sprinklerInfo: {
         radius: number;
@@ -30,4 +35,4 @@ export const saveSprinklerLayoutData = (data: SprinklerLayoutData): void => {
     } catch (error) {
         console.error('Error saving sprinkler layout data:', error);
     }
-}; 
+};

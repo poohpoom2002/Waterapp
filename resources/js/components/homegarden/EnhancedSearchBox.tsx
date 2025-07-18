@@ -47,7 +47,6 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
     const [selectedIndex, setSelectedIndex] = useState(-1);
     const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
 
-    
     useEffect(() => {
         const checkGoogleMapsReady = () => {
             if (window.google?.maps?.places?.PlacesService) {
@@ -76,17 +75,14 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
         }
     }, [isGoogleMapsReady]);
 
-    
     useEffect(() => {
         if (!isGoogleMapsReady || !inputRef.current) return;
 
         try {
             console.log('🔄 Initializing Google Places...');
 
-            
             placesServiceRef.current = new PlacesServiceWrapper();
 
-            
             autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
                 fields: [
                     'place_id',
@@ -103,7 +99,6 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
                 strictBounds: false,
             });
 
-            
             autocompleteRef.current.addListener('place_changed', () => {
                 const place = autocompleteRef.current?.getPlace();
                 console.log('📍 Place selected:', place);
@@ -147,9 +142,7 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
         };
     }, [isGoogleMapsReady, onPlaceSelect]);
 
-    
     const searchWithPlacesAPI = useCallback(async (query: string) => {
-        
         if (!placesServiceRef.current || !query.trim() || query.length < 1) {
             setSuggestions([]);
             setShowSuggestions(false);
@@ -163,7 +156,7 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
             console.log('🔍 Searching globally:', query);
 
             const searchResult = await placesServiceRef.current.textSearch(query, {
-                maxResults: 6, 
+                maxResults: 6,
             });
 
             if (searchResult.error) {
@@ -201,7 +194,6 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
         }
     }, []);
 
-    
     const handleInputChange = useCallback(
         (e: React.ChangeEvent<HTMLInputElement>) => {
             const value = e.target.value;
@@ -211,7 +203,6 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
                 clearTimeout(debounceTimeoutRef.current);
             }
 
-            
             if (value.length < 1) {
                 setSuggestions([]);
                 setShowSuggestions(false);
@@ -219,7 +210,6 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
                 return;
             }
 
-            
             debounceTimeoutRef.current = setTimeout(() => {
                 searchWithPlacesAPI(value);
             }, 300);
@@ -227,7 +217,6 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
         [searchWithPlacesAPI]
     );
 
-    
     const handleSuggestionClick = useCallback(
         (suggestion: SearchResult) => {
             setSearchQuery(suggestion.name || suggestion.formatted_address);
@@ -238,7 +227,6 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
         },
         [onPlaceSelect]
     );
-
 
     const handleKeyDown = useCallback(
         (e: React.KeyboardEvent) => {
@@ -282,7 +270,6 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
         }
     }, [onClear]);
 
-    
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             const target = event.target as Element;
@@ -296,7 +283,6 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    
     const getPlaceIcon = (types: string[]) => {
         const iconMap: { [key: string]: string } = {
             country: '🌍',
@@ -322,7 +308,6 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
         return '📍';
     };
 
-    
     if (!isGoogleMapsReady) {
         return (
             <div className="search-container absolute left-4 top-4 z-[1000] w-[420px] max-w-[calc(100vw-2rem)]">
@@ -354,14 +339,12 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
                     className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 pr-24 text-sm text-gray-900 placeholder-gray-500 shadow-xl backdrop-blur transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-50"
                 />
 
-                
                 {isLoading && (
                     <div className="absolute right-16 top-1/2 -translate-y-1/2">
                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
                     </div>
                 )}
 
-                
                 {searchQuery && !disabled && (
                     <button
                         onClick={handleClear}
@@ -372,11 +355,9 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
                     </button>
                 )}
 
-                
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">🔍</div>
             </div>
 
-                
             {error && (
                 <div className="mt-2 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 shadow-xl">
                     <div className="flex items-center gap-2">
@@ -391,7 +372,6 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
                     </div>
                 </div>
             )}
-
         </div>
     );
 };

@@ -1,4 +1,4 @@
-// C:\webchaiyo\Waterapp\resources\js\pages\components\SystemSummary.tsx
+// resources\js\pages\components\SystemSummary.tsx
 import React from 'react';
 import { HorticultureProjectData } from '../../utils/horticultureUtils';
 
@@ -17,11 +17,10 @@ const SystemSummary: React.FC<SystemSummaryProps> = ({
     selectedPump,
     results,
 }) => {
-    // Calculate system-wide statistics
     const calculateSystemStats = () => {
         const stats = {
             totalZones: projectData.useZones ? projectData.zones.length : 1,
-            totalArea: projectData.totalArea / 1600, // Convert to rai
+            totalArea: projectData.totalArea / 1600,
             totalTrees: 0,
             uniqueSprinklers: new Set(),
             uniqueBranchPipes: new Set(),
@@ -33,7 +32,6 @@ const SystemSummary: React.FC<SystemSummaryProps> = ({
         };
 
         if (projectData.useZones && projectData.zones.length > 1) {
-            // Multi-zone calculation
             projectData.zones.forEach((zone) => {
                 stats.totalTrees += zone.plantCount;
 
@@ -58,7 +56,6 @@ const SystemSummary: React.FC<SystemSummaryProps> = ({
                 }
             });
         } else {
-            // Single zone
             stats.totalTrees = projectData.plants?.length || 0;
             const sprinkler = zoneSprinklers['main-area'];
             if (sprinkler) {
@@ -68,13 +65,11 @@ const SystemSummary: React.FC<SystemSummaryProps> = ({
             }
         }
 
-        // Add pump cost
         const pump = selectedPump || results?.autoSelectedPump;
         if (pump) {
             stats.totalEstimatedCost += pump.price;
         }
 
-        // Determine complexity
         if (stats.uniqueMainPipes.size > 0 && stats.uniqueSecondaryPipes.size > 0) {
             stats.systemComplexity = 'complex';
         } else if (stats.uniqueSecondaryPipes.size > 0 || stats.totalZones > 1) {
@@ -92,7 +87,6 @@ const SystemSummary: React.FC<SystemSummaryProps> = ({
 
     const stats = calculateSystemStats();
 
-    // Get completion percentage
     const completionPercentage =
         projectData.useZones && projectData.zones.length > 1
             ? Math.round((stats.zonesWithSprinklers / stats.totalZones) * 100)
@@ -100,7 +94,6 @@ const SystemSummary: React.FC<SystemSummaryProps> = ({
               ? 100
               : 0;
 
-    // Get system status
     const getSystemStatus = () => {
         if (completionPercentage === 100) {
             return { status: 'complete', color: 'text-green-400', icon: '✅' };
@@ -117,7 +110,6 @@ const SystemSummary: React.FC<SystemSummaryProps> = ({
         <div className="rounded-lg border border-gray-600 bg-gradient-to-r from-gray-800 to-gray-700 p-6">
             <h2 className="mb-4 text-xl font-semibold text-blue-400">🏗️ สรุปภาพรวมระบบ</h2>
 
-            {/* System Status */}
             <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="rounded bg-gray-600 p-4 text-center">
                     <div className={`text-2xl font-bold ${systemStatus.color}`}>
@@ -151,7 +143,6 @@ const SystemSummary: React.FC<SystemSummaryProps> = ({
                 </div>
             </div>
 
-            {/* Project Info */}
             <div className="mb-4 rounded bg-blue-900 p-4">
                 <h3 className="mb-2 text-lg font-semibold text-blue-300">📊 ข้อมูลโครงการ</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
@@ -176,7 +167,6 @@ const SystemSummary: React.FC<SystemSummaryProps> = ({
                 </div>
             </div>
 
-            {/* Equipment Summary */}
             <div className="mb-4 rounded bg-purple-900 p-4">
                 <h3 className="mb-2 text-lg font-semibold text-purple-300">🔧 สรุปอุปกรณ์</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-5">
@@ -211,7 +201,6 @@ const SystemSummary: React.FC<SystemSummaryProps> = ({
                 </div>
             </div>
 
-            {/* Zone Status (for multi-zone) */}
             {projectData.useZones && projectData.zones.length > 1 && (
                 <div className="mb-4 rounded bg-green-900 p-4">
                     <h3 className="mb-2 text-lg font-semibold text-green-300">🌱 สถานะแต่ละโซน</h3>
@@ -259,7 +248,6 @@ const SystemSummary: React.FC<SystemSummaryProps> = ({
                 </div>
             )}
 
-            {/* System Recommendations */}
             <div className="rounded bg-yellow-900 p-4">
                 <h3 className="mb-2 text-lg font-semibold text-yellow-300">💡 คำแนะนำ</h3>
                 <div className="space-y-2 text-sm text-yellow-100">

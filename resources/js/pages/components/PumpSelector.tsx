@@ -1,77 +1,55 @@
-// resources\js\pages\components\PumpSelector.tsx - Interactive Version
+// resources\js\pages\components\PumpSelector.tsx
 import React, { useState } from 'react';
 import { CalculationResults } from '../types/interfaces';
 
 interface PumpSelectorProps {
     results: CalculationResults;
-    selectedPump?: any; // Current selected pump (manual or auto)
-    onPumpChange: (pump: any) => void; // Callback when pump changes
+    selectedPump?: any;
+    onPumpChange: (pump: any) => void;
 }
 
 const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPumpChange }) => {
-    // State สำหรับ Modal รูปภาพ
-    const [isImageModalOpen, setIsImageModalOpen] = useState(false);
-    const [modalImageSrc, setModalImageSrc] = useState('');
-    const [modalImageAlt, setModalImageAlt] = useState('');
+    const [showImageModal, setShowImageModal] = useState(false);
+    const [modalImage, setModalImage] = useState({ src: '', alt: '' });
 
-    // ฟังก์ชันเปิด Modal รูปภาพ
     const openImageModal = (src: string, alt: string) => {
-        setModalImageSrc(src);
-        setModalImageAlt(alt);
-        setIsImageModalOpen(true);
+        setModalImage({ src, alt });
+        setShowImageModal(true);
     };
 
-    // ฟังก์ชันปิด Modal รูปภาพ
     const closeImageModal = () => {
-        setIsImageModalOpen(false);
-        setModalImageSrc('');
-        setModalImageAlt('');
+        setShowImageModal(false);
+        setModalImage({ src: '', alt: '' });
     };
 
     const requiredFlow = results.flows.main;
     const requiredHead = results.pumpHeadRequired;
 
-    // Use selectedPump if provided, otherwise use auto-selected
     const currentPump = selectedPump || results.autoSelectedPump;
     const autoSelectedPump = results.autoSelectedPump;
     const analyzedPumps = results.analyzedPumps || [];
 
-    // Sort pumps for dropdown (recommended first, then by score)
     const sortedPumps = analyzedPumps.sort((a, b) => {
-        if (a.isRecommended !== b.isRecommended) {
-            return b.isRecommended ? 1 : -1;
-        }
-        if (a.isGoodChoice !== b.isGoodChoice) {
-            return b.isGoodChoice ? 1 : -1;
-        }
-        if (a.isUsable !== b.isUsable) {
-            return b.isUsable ? 1 : -1;
-        }
+        if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
+        if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
+        if (a.isUsable !== b.isUsable) return b.isUsable ? 1 : -1;
         return b.score - a.score;
     });
 
-    // ฟังก์ชันแสดงสถานะการเลือก
     const getSelectionStatus = (pump: any) => {
         if (!pump) return null;
-
         const isAutoSelected = pump.id === autoSelectedPump?.id;
 
         if (isAutoSelected) {
-            if (pump.isRecommended) {
-                return '🤖⭐ เลือกอัตโนมัติ (แนะนำ)';
-            } else if (pump.isGoodChoice) {
-                return '🤖✅ เลือกอัตโนมัติ (ดี)';
-            } else if (pump.isUsable) {
-                return '🤖⚡ เลือกอัตโนมัติ (ใช้ได้)';
-            } else {
-                return '🤖⚠️ เลือกอัตโนมัติ (ตัวดีที่สุดที่มี)';
-            }
+            if (pump.isRecommended) return '🤖⭐ เลือกอัตโนมัติ (แนะนำ)';
+            if (pump.isGoodChoice) return '🤖✅ เลือกอัตโนมัติ (ดี)';
+            if (pump.isUsable) return '🤖⚡ เลือกอัตโนมัติ (ใช้ได้)';
+            return '🤖⚠️ เลือกอัตโนมัติ (ตัวดีที่สุดที่มี)';
         } else {
             return '👤 เลือกเอง';
         }
     };
 
-    // ฟังก์ชันสำหรับจัดกลุ่มปั๊ม
     const getPumpGrouping = (pump: any) => {
         if (pump.isRecommended) return 'แนะนำ';
         if (pump.isGoodChoice) return 'ตัวเลือกดี';
@@ -79,17 +57,12 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
         return 'อื่นๆ';
     };
 
-    // Helper function สำหรับแสดงค่า range
     const formatRangeValue = (value: any) => {
-        if (Array.isArray(value)) {
-            return `${value[0]}-${value[1]}`;
-        }
+        if (Array.isArray(value)) return `${value[0]}-${value[1]}`;
         return String(value);
     };
 
-    // Helper function สำหรับแสดงรูปภาพปั๊ม - UPDATED with modal
     const renderPumpImage = (pump: any) => {
-        // ตรวจสอบ field image ทั้งหมดที่เป็นไปได้
         const imageUrl = pump.image_url || pump.image || pump.imageUrl;
 
         if (imageUrl) {
@@ -99,13 +72,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                     alt={pump.name || 'Pump'}
                     className="h-auto max-h-[100px] w-[100px] cursor-pointer rounded border border-gray-500 object-contain transition-opacity hover:border-blue-400 hover:opacity-80"
                     onError={(e) => {
-                        console.log('Failed to load pump image:', imageUrl);
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = 'none';
-                        const fallback = target.nextElementSibling as HTMLElement;
-                        if (fallback) {
-                            fallback.style.display = 'flex';
-                        }
+                        (e.target as HTMLImageElement).style.display = 'none';
                     }}
                     onClick={() => openImageModal(imageUrl, pump.name || 'ปั๊มน้ำ')}
                     title="คลิกเพื่อดูรูปขนาดใหญ่"
@@ -113,26 +80,14 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
             );
         }
 
-        return null;
-    };
-
-    // Helper function สำหรับ fallback image ปั๊ม
-    const renderPumpImageFallback = (pump: any) => {
-        const imageUrl = pump.image_url || pump.image || pump.imageUrl;
-
         return (
-            <div
-                className="flex h-[60px] w-[85px] items-center justify-center rounded border border-gray-600 bg-gray-500 text-xs text-gray-300"
-                style={{ display: imageUrl ? 'none' : 'flex' }}
-            >
+            <div className="flex h-[60px] w-[85px] items-center justify-center rounded border border-gray-600 bg-gray-500 text-xs text-gray-300">
                 🚰 ปั๊ม
             </div>
         );
     };
 
-    // Helper function สำหรับแสดงรูปภาพ accessory - UPDATED with modal
     const renderAccessoryImage = (accessory: any) => {
-        // ตรวจสอบว่ามีรูปภาพหรือไม่ (รองรับทั้ง image_url, image, และ imageUrl)
         const imageUrl = accessory.image_url || accessory.image || accessory.imageUrl;
 
         if (imageUrl) {
@@ -142,14 +97,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                     alt={accessory.name}
                     className="h-10 w-10 cursor-pointer rounded border border-gray-600 object-cover transition-opacity hover:border-blue-400 hover:opacity-80"
                     onError={(e) => {
-                        console.log('Failed to load accessory image:', imageUrl);
-                        // ถ้าโหลดรูปไม่ได้ ให้แสดง fallback
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = 'none';
-                        const fallback = target.nextElementSibling as HTMLElement;
-                        if (fallback) {
-                            fallback.style.display = 'flex';
-                        }
+                        (e.target as HTMLImageElement).style.display = 'none';
                     }}
                     onClick={() => openImageModal(imageUrl, accessory.name)}
                     title="คลิกเพื่อดูรูปขนาดใหญ่"
@@ -157,34 +105,18 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
             );
         }
 
-        return null; // ถ้าไม่มีรูปจะแสดง fallback
-    };
-
-    // Helper function สำหรับ fallback icon
-    const renderAccessoryFallback = (accessory: any) => {
-        // Icon ตามประเภทอุปกรณ์
         const getIconForType = (type: string) => {
-            switch (type) {
-                case 'foot_valve':
-                    return '🔧';
-                case 'check_valve':
-                    return '⚙️';
-                case 'ball_valve':
-                    return '🔩';
-                case 'pressure_gauge':
-                    return '📊';
-                default:
-                    return '🔧';
-            }
+            const icons = {
+                foot_valve: '🔧',
+                check_valve: '⚙️',
+                ball_valve: '🔩',
+                pressure_gauge: '📊',
+            };
+            return icons[type as keyof typeof icons] || '🔧';
         };
 
-        const imageUrl = accessory.image_url || accessory.image || accessory.imageUrl;
-
         return (
-            <div
-                className="flex h-10 w-10 items-center justify-center rounded border border-gray-600 bg-gray-600 text-sm"
-                style={{ display: imageUrl ? 'none' : 'flex' }}
-            >
+            <div className="flex h-10 w-10 items-center justify-center rounded border border-gray-600 bg-gray-600 text-sm">
                 {getIconForType(accessory.accessory_type)}
             </div>
         );
@@ -199,7 +131,6 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                 </span>
             </h3>
 
-            {/* ข้อมูลความต้องการ */}
             <div className="mb-4 rounded bg-gray-600 p-3">
                 <h4 className="mb-2 text-sm font-medium text-red-300">⚡ ความต้องการ:</h4>
                 <div className="text-xs text-gray-300">
@@ -218,7 +149,6 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                 </div>
             </div>
 
-            {/* Pump Selection Dropdown */}
             <div className="mb-4">
                 <label className="mb-2 block text-sm font-medium text-gray-300">
                     เลือกปั๊มน้ำ:
@@ -241,7 +171,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                         return (
                             <option key={pump.id} value={pump.id} disabled={!isAdequate}>
                                 {isAuto ? '🤖 ' : ''}
-                                {pump.name || pump.productCode} - {pump.powerHP}HP -
+                                {pump.name || pump.productCode} - {pump.powerHP}HP -{' '}
                                 {pump.price?.toLocaleString()} บาท | {group} | คะแนน: {pump.score}
                                 {!isAdequate ? ' (ไม่เพียงพอ)' : ''}
                             </option>
@@ -262,19 +192,15 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                         </span>
                     </div>
 
-                    {/* แสดงสถานะการเลือก */}
                     <div className="mb-3 rounded bg-blue-900 p-2">
                         <p className="text-sm text-blue-300">{getSelectionStatus(currentPump)}</p>
                     </div>
 
                     <div className="grid grid-cols-3 items-center justify-between gap-3 text-sm">
                         <div className="flex items-center justify-center">
-                            {/* Container สำหรับรูปปั๊มและ fallback - WITH MODAL */}
-                            <div className="relative">
-                                {renderPumpImage(currentPump)}
-                                {renderPumpImageFallback(currentPump)}
-                            </div>
+                            {renderPumpImage(currentPump)}
                         </div>
+
                         <div>
                             <p>
                                 <strong>รุ่น:</strong> {currentPump.productCode}
@@ -306,6 +232,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                                 </p>
                             )}
                         </div>
+
                         <div>
                             <p>
                                 <strong>Flow Max:</strong> {currentPump.maxFlow || 'N/A'} LPM
@@ -328,14 +255,11 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                         </div>
                     </div>
 
-                    {/* การตรวจสอบความเพียงพอ */}
                     <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
                         <p>
                             <strong>Flow:</strong>{' '}
                             <span
-                                className={`font-bold ${
-                                    currentPump.isFlowAdequate ? 'text-green-300' : 'text-red-300'
-                                }`}
+                                className={`font-bold ${currentPump.isFlowAdequate ? 'text-green-300' : 'text-red-300'}`}
                             >
                                 {currentPump.isFlowAdequate ? '✅ เพียงพอ' : '❌ ไม่เพียงพอ'}
                             </span>
@@ -343,12 +267,11 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                                 ({currentPump.flowRatio.toFixed(1)}x)
                             </span>
                         </p>
+
                         <p>
                             <strong>Head:</strong>{' '}
                             <span
-                                className={`font-bold ${
-                                    currentPump.isHeadAdequate ? 'text-green-300' : 'text-red-300'
-                                }`}
+                                className={`font-bold ${currentPump.isHeadAdequate ? 'text-green-300' : 'text-red-300'}`}
                             >
                                 {currentPump.isHeadAdequate ? '✅ เพียงพอ' : '❌ ไม่เพียงพอ'}
                             </span>
@@ -358,7 +281,6 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                         </p>
                     </div>
 
-                    {/* การวิเคราะห์ความเหมาะสม */}
                     <div className="mt-3 rounded bg-gray-500 p-2">
                         <h5 className="text-xs font-medium text-yellow-300">การวิเคราะห์:</h5>
                         <div className="grid grid-cols-3 gap-2 text-xs">
@@ -405,7 +327,6 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                         </div>
                     </div>
 
-                    {/* แสดงข้อมูลเพิ่มเติมจากฐานข้อมูล */}
                     {currentPump.description && (
                         <div className="mt-3 rounded bg-gray-800 p-2">
                             <p className="text-xs text-gray-300">
@@ -414,7 +335,6 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                         </div>
                     )}
 
-                    {/* แสดงช่วงการทำงาน */}
                     <div className="mt-3 rounded bg-blue-900 p-2">
                         <h5 className="text-xs font-medium text-blue-300">ช่วงการทำงาน:</h5>
                         <div className="grid grid-cols-2 gap-2 text-xs">
@@ -431,7 +351,6 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                         </div>
                     </div>
 
-                    {/* แสดงความแตกต่างจากการเลือกอัตโนมัติ */}
                     {selectedPump &&
                         selectedPump.id !== autoSelectedPump?.id &&
                         autoSelectedPump && (
@@ -471,11 +390,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                                     <p className="text-yellow-200">
                                         ส่วนต่างคะแนน:
                                         <span
-                                            className={`ml-1 font-bold ${
-                                                selectedPump.score >= autoSelectedPump.score
-                                                    ? 'text-green-300'
-                                                    : 'text-red-300'
-                                            }`}
+                                            className={`ml-1 font-bold ${selectedPump.score >= autoSelectedPump.score ? 'text-green-300' : 'text-red-300'}`}
                                         >
                                             {selectedPump.score >= autoSelectedPump.score
                                                 ? '+'
@@ -489,11 +404,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                                     <p className="text-yellow-200">
                                         ส่วนต่างราคา:
                                         <span
-                                            className={`ml-1 font-bold ${
-                                                selectedPump.price <= autoSelectedPump.price
-                                                    ? 'text-green-300'
-                                                    : 'text-red-300'
-                                            }`}
+                                            className={`ml-1 font-bold ${selectedPump.price <= autoSelectedPump.price ? 'text-green-300' : 'text-red-300'}`}
                                         >
                                             {selectedPump.price <= autoSelectedPump.price
                                                 ? '-'
@@ -508,7 +419,6 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                             </div>
                         )}
 
-                    {/* แสดง Pump Accessories (ถ้ามี) - UPDATED WITH MODAL */}
                     {currentPump.pumpAccessories && currentPump.pumpAccessories.length > 0 && (
                         <div className="mt-3 rounded bg-purple-900 p-2">
                             <h5 className="mb-2 text-xs font-medium text-purple-300">
@@ -525,15 +435,8 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                                             key={accessory.id || index}
                                             className="flex items-center justify-between rounded bg-purple-800 p-2"
                                         >
-                                            {/* รูปภาพและข้อมูลอุปกรณ์ */}
                                             <div className="flex items-center space-x-3">
-                                                {/* Container สำหรับรูปและ fallback - WITH MODAL */}
-                                                <div className="relative">
-                                                    {renderAccessoryImage(accessory)}
-                                                    {renderAccessoryFallback(accessory)}
-                                                </div>
-
-                                                {/* ข้อมูลอุปกรณ์ */}
+                                                {renderAccessoryImage(accessory)}
                                                 <div className="text-xs">
                                                     <p className="font-medium text-white">
                                                         {accessory.name}
@@ -552,7 +455,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                                                                 {Object.entries(
                                                                     accessory.specifications
                                                                 )
-                                                                    .slice(0, 1) // แสดงแค่ 1 spec แรก
+                                                                    .slice(0, 1)
                                                                     .map(
                                                                         ([key, value]) =>
                                                                             `${key}: ${value}`
@@ -565,15 +468,9 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                                                         )}
                                                 </div>
                                             </div>
-
-                                            {/* ราคาและสถานะ */}
                                             <div className="text-right text-xs">
                                                 <div
-                                                    className={`font-medium ${
-                                                        accessory.is_included
-                                                            ? 'text-green-300'
-                                                            : 'text-yellow-300'
-                                                    }`}
+                                                    className={`font-medium ${accessory.is_included ? 'text-green-300' : 'text-yellow-300'}`}
                                                 >
                                                     {accessory.is_included ? (
                                                         <span>✅ รวมในชุด</span>
@@ -595,7 +492,6 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                                     ))}
                             </div>
 
-                            {/* สรุปราคาอุปกรณ์เสริม */}
                             {currentPump.pumpAccessories.some((acc: any) => !acc.is_included) && (
                                 <div className="mt-2 rounded bg-purple-800 p-2 text-xs">
                                     <div className="flex justify-between text-purple-200">
@@ -618,7 +514,6 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                         </div>
                     )}
 
-                    {/* เตือนความไม่เพียงพอ */}
                     {(!currentPump.isFlowAdequate || !currentPump.isHeadAdequate) && (
                         <div className="mt-3 rounded bg-red-900 p-2">
                             <p className="text-sm text-red-300">
@@ -633,7 +528,6 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                         </div>
                     )}
 
-                    {/* คำแนะนำการประหยัดพลังงาน */}
                     {(currentPump.flowRatio > 3 || currentPump.headRatio > 3) && (
                         <div className="mt-3 rounded bg-yellow-900 p-2">
                             <p className="text-sm text-yellow-300">
@@ -650,34 +544,30 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                 </div>
             )}
 
-            {/* Modal สำหรับแสดงรูปขนาดใหญ่ */}
-            {isImageModalOpen && (
+            {showImageModal && (
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
                     onClick={closeImageModal}
                 >
-                    <div className="relative max-h-[90vh] max-w-[90vw] p-4">
-                        {/* ปุ่มปิด */}
+                    <div
+                        className="relative max-h-[90vh] max-w-[90vw] p-4"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <button
                             onClick={closeImageModal}
-                            className="absolute -right-2 -top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white transition-colors hover:bg-red-700"
+                            className="absolute -right-2 -top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700"
                             title="ปิด"
                         >
                             ✕
                         </button>
-
-                        {/* รูปภาพ */}
                         <img
-                            src={modalImageSrc}
-                            alt={modalImageAlt}
+                            src={modalImage.src}
+                            alt={modalImage.alt}
                             className="max-h-full max-w-full rounded-lg shadow-2xl"
-                            onClick={(e) => e.stopPropagation()} // ป้องกันไม่ให้ปิด modal เมื่อคลิกที่รูป
                         />
-
-                        {/* ชื่อรูป */}
                         <div className="mt-2 text-center">
                             <p className="inline-block rounded bg-black bg-opacity-50 px-2 py-1 text-sm text-white">
-                                {modalImageAlt}
+                                {modalImage.alt}
                             </p>
                         </div>
                     </div>

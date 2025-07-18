@@ -129,14 +129,7 @@ export default function HomeGardenPlanner() {
     const [selectedZoneType, setSelectedZoneType] = useState<string>('grass');
     const [selectedZoneForConfig, setSelectedZoneForConfig] = useState<string | null>(null);
     const [editMode, setEditMode] = useState<
-        | 'draw'
-        | 'place'
-        | 'edit'
-        | 'auto-place'
-        | 'drag-sprinkler'
-        | 'view'
-        | 'edit-pipe'
-        | ''
+        'draw' | 'place' | 'edit' | 'auto-place' | 'drag-sprinkler' | 'view' | 'edit-pipe' | ''
     >('view');
 
     const [gardenZones, setGardenZones] = useState<GardenZone[]>([]);
@@ -150,7 +143,7 @@ export default function HomeGardenPlanner() {
     const [pipeEditMode, setPipeEditMode] = useState<'add' | 'remove' | 'view'>('view');
     const [selectedSprinklersForPipe, setSelectedSprinklersForPipe] = useState<string[]>([]);
 
-    const [manualSprinklerType, setManualSprinklerType] = useState<string>('popup');
+    const [manualSprinklerType, setManualSprinklerType] = useState<string>('pop-up-sprinkler');
     const [manualSprinklerRadius, setManualSprinklerRadius] = useState<number>(4);
 
     const [showValidationErrors, setShowValidationErrors] = useState<boolean>(false);
@@ -915,11 +908,11 @@ export default function HomeGardenPlanner() {
             setPipes(pipeNetwork);
         } catch (error) {
             let errorMessage = 'เกิดข้อผิดพลาดในการสร้างระบบท่อ';
-            
+
             if (error instanceof Error) {
                 errorMessage = error.message;
             }
-            
+
             setPipeGenerationError(errorMessage);
         } finally {
             setIsGeneratingPipes(false);
@@ -935,31 +928,34 @@ export default function HomeGardenPlanner() {
     }, []);
 
     // ===== PIPE EDITING FUNCTIONS =====
-    const handleSprinklerClickForPipe = useCallback((sprinklerId: string) => {
-        if (pipeEditMode === 'add') {
-            setSelectedSprinklersForPipe(prev => {
-                if (prev.includes(sprinklerId)) {
-                    return prev.filter(id => id !== sprinklerId);
-                } else if (prev.length < 2) {
-                    return [...prev, sprinklerId];
-                } else {
-                    // Replace second sprinkler if already 2 selected
-                    return [prev[0], sprinklerId];
-                }
-            });
-        } else if (pipeEditMode === 'remove') {
-            setSelectedSprinklersForPipe(prev => {
-                if (prev.includes(sprinklerId)) {
-                    return prev.filter(id => id !== sprinklerId);
-                } else {
-                    return [...prev, sprinklerId];
-                }
-            });
-        } else {
-            // Normal sprinkler selection
-            setSelectedSprinkler(prev => prev === sprinklerId ? null : sprinklerId);
-        }
-    }, [pipeEditMode]);
+    const handleSprinklerClickForPipe = useCallback(
+        (sprinklerId: string) => {
+            if (pipeEditMode === 'add') {
+                setSelectedSprinklersForPipe((prev) => {
+                    if (prev.includes(sprinklerId)) {
+                        return prev.filter((id) => id !== sprinklerId);
+                    } else if (prev.length < 2) {
+                        return [...prev, sprinklerId];
+                    } else {
+                        // Replace second sprinkler if already 2 selected
+                        return [prev[0], sprinklerId];
+                    }
+                });
+            } else if (pipeEditMode === 'remove') {
+                setSelectedSprinklersForPipe((prev) => {
+                    if (prev.includes(sprinklerId)) {
+                        return prev.filter((id) => id !== sprinklerId);
+                    } else {
+                        return [...prev, sprinklerId];
+                    }
+                });
+            } else {
+                // Normal sprinkler selection
+                setSelectedSprinkler((prev) => (prev === sprinklerId ? null : sprinklerId));
+            }
+        },
+        [pipeEditMode]
+    );
 
     const addPipeBetweenSprinklers = useCallback(() => {
         if (selectedSprinklersForPipe.length !== 2) {
@@ -968,7 +964,7 @@ export default function HomeGardenPlanner() {
 
         const [sprinkler1Id, sprinkler2Id] = selectedSprinklersForPipe;
         const isCanvasMode = designMode === 'canvas' || designMode === 'image';
-        const scale = isCanvasMode ? (canvasData?.scale || imageData?.scale || 20) : 20;
+        const scale = isCanvasMode ? canvasData?.scale || imageData?.scale || 20 : 20;
 
         const newPipe = addCustomPipe(
             sprinkler1Id,
@@ -981,7 +977,7 @@ export default function HomeGardenPlanner() {
         );
 
         if (newPipe) {
-            setPipes(prev => [...prev, newPipe]);
+            setPipes((prev) => [...prev, newPipe]);
             setSelectedSprinklersForPipe([]);
         }
     }, [selectedSprinklersForPipe, sprinklers, designMode, canvasData, imageData]);
@@ -1000,15 +996,15 @@ export default function HomeGardenPlanner() {
         );
 
         if (pipesToRemove.length > 0) {
-            const pipeIdsToRemove = pipesToRemove.map(p => p.id);
-            setPipes(prev => prev.filter(p => !pipeIdsToRemove.includes(p.id)));
+            const pipeIdsToRemove = pipesToRemove.map((p) => p.id);
+            setPipes((prev) => prev.filter((p) => !pipeIdsToRemove.includes(p.id)));
         }
 
         setSelectedSprinklersForPipe([]);
     }, [selectedSprinklersForPipe, pipes, sprinklers]);
 
     const handlePipeClick = useCallback((pipeId: string) => {
-        setSelectedPipes(prev => {
+        setSelectedPipes((prev) => {
             const newSet = new Set(prev);
             if (newSet.has(pipeId)) {
                 newSet.delete(pipeId);
@@ -1024,7 +1020,7 @@ export default function HomeGardenPlanner() {
             return;
         }
 
-        setPipes(prev => prev.filter(p => !selectedPipes.has(p.id)));
+        setPipes((prev) => prev.filter((p) => !selectedPipes.has(p.id)));
         setSelectedPipes(new Set());
     }, [selectedPipes, pipes]);
 
@@ -1149,9 +1145,12 @@ export default function HomeGardenPlanner() {
         [canvasData]
     );
 
-    const handleCanvasSprinklerClick = useCallback((sprinklerId: string) => {
-        handleSprinklerClickForPipe(sprinklerId);
-    }, [handleSprinklerClickForPipe]);
+    const handleCanvasSprinklerClick = useCallback(
+        (sprinklerId: string) => {
+            handleSprinklerClickForPipe(sprinklerId);
+        },
+        [handleSprinklerClickForPipe]
+    );
 
     const handleCanvasWaterSourcePlaced = useCallback(
         (position: CanvasCoordinate) => {
@@ -1517,7 +1516,7 @@ export default function HomeGardenPlanner() {
                                                                                         zone
                                                                                             .sprinklerConfig!
                                                                                             .type
-                                                                                )?.name
+                                                                                )?.nameEN
                                                                             }
                                                                             • รัศมี{' '}
                                                                             {
@@ -1635,7 +1634,7 @@ export default function HomeGardenPlanner() {
                                                                                         </span>
                                                                                         <span className="font-medium text-gray-100">
                                                                                             {
-                                                                                                sprinkler.name
+                                                                                                sprinkler.nameEN
                                                                                             }
                                                                                         </span>
                                                                                     </div>
@@ -1760,7 +1759,7 @@ export default function HomeGardenPlanner() {
                                                                 <div className="flex items-center space-x-2">
                                                                     <span>{sprinkler.icon}</span>
                                                                     <span className="font-medium text-gray-100">
-                                                                        {sprinkler.name}
+                                                                        {sprinkler.nameEN}
                                                                     </span>
                                                                 </div>
                                                             </button>
@@ -1894,7 +1893,7 @@ export default function HomeGardenPlanner() {
                                                                                             zone
                                                                                                 .sprinklerConfig!
                                                                                                 .type
-                                                                                    )?.name
+                                                                                    )?.nameEN
                                                                                 }
                                                                             </div>
                                                                         )}
@@ -1986,7 +1985,11 @@ export default function HomeGardenPlanner() {
 
                                             <button
                                                 onClick={generatePipeNetwork}
-                                                disabled={!waterSource || sprinklers.length === 0 || isGeneratingPipes}
+                                                disabled={
+                                                    !waterSource ||
+                                                    sprinklers.length === 0 ||
+                                                    isGeneratingPipes
+                                                }
                                                 className="w-full rounded-lg bg-blue-600 py-4 text-lg font-bold text-white transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-600"
                                             >
                                                 {isGeneratingPipes ? (
@@ -2003,7 +2006,9 @@ export default function HomeGardenPlanner() {
                                                 <div className="rounded-lg border border-red-500 bg-red-900/30 p-3 text-red-200">
                                                     <div className="mb-1 flex items-center gap-2">
                                                         <span className="text-lg">❌</span>
-                                                        <span className="font-semibold">เกิดข้อผิดพลาด</span>
+                                                        <span className="font-semibold">
+                                                            เกิดข้อผิดพลาด
+                                                        </span>
                                                     </div>
                                                     <p className="text-sm">{pipeGenerationError}</p>
                                                 </div>
@@ -2034,12 +2039,18 @@ export default function HomeGardenPlanner() {
                                                         <div className="mb-2 text-sm font-medium text-blue-300">
                                                             🔧 แก้ไขระบบท่อ:
                                                         </div>
-                                                        
+
                                                         <div className="mb-3 flex gap-2">
                                                             <button
                                                                 onClick={() => {
-                                                                    setPipeEditMode(pipeEditMode === 'add' ? 'view' : 'add');
-                                                                    setSelectedSprinklersForPipe([]);
+                                                                    setPipeEditMode(
+                                                                        pipeEditMode === 'add'
+                                                                            ? 'view'
+                                                                            : 'add'
+                                                                    );
+                                                                    setSelectedSprinklersForPipe(
+                                                                        []
+                                                                    );
                                                                 }}
                                                                 className={`flex-1 rounded py-2 text-xs font-medium transition-all ${
                                                                     pipeEditMode === 'add'
@@ -2051,8 +2062,14 @@ export default function HomeGardenPlanner() {
                                                             </button>
                                                             <button
                                                                 onClick={() => {
-                                                                    setPipeEditMode(pipeEditMode === 'remove' ? 'view' : 'remove');
-                                                                    setSelectedSprinklersForPipe([]);
+                                                                    setPipeEditMode(
+                                                                        pipeEditMode === 'remove'
+                                                                            ? 'view'
+                                                                            : 'remove'
+                                                                    );
+                                                                    setSelectedSprinklersForPipe(
+                                                                        []
+                                                                    );
                                                                 }}
                                                                 className={`flex-1 rounded py-2 text-xs font-medium transition-all ${
                                                                     pipeEditMode === 'remove'
@@ -2067,11 +2084,19 @@ export default function HomeGardenPlanner() {
                                                         {pipeEditMode === 'add' && (
                                                             <div className="space-y-2">
                                                                 <div className="text-xs text-blue-200">
-                                                                    เลือกหัวฉีด 2 ตัวเพื่อเชื่อมต่อท่อ ({selectedSprinklersForPipe.length}/2)
+                                                                    เลือกหัวฉีด 2
+                                                                    ตัวเพื่อเชื่อมต่อท่อ (
+                                                                    {
+                                                                        selectedSprinklersForPipe.length
+                                                                    }
+                                                                    /2)
                                                                 </div>
-                                                                {selectedSprinklersForPipe.length === 2 && (
+                                                                {selectedSprinklersForPipe.length ===
+                                                                    2 && (
                                                                     <button
-                                                                        onClick={addPipeBetweenSprinklers}
+                                                                        onClick={
+                                                                            addPipeBetweenSprinklers
+                                                                        }
                                                                         className="w-full rounded bg-green-700 py-2 text-xs font-medium text-white hover:bg-green-600"
                                                                     >
                                                                         ✅ เชื่อมต่อท่อ
@@ -2083,14 +2108,23 @@ export default function HomeGardenPlanner() {
                                                         {pipeEditMode === 'remove' && (
                                                             <div className="space-y-2">
                                                                 <div className="text-xs text-red-200">
-                                                                    เลือกหัวฉีด 2 ตัวเพื่อลบท่อระหว่างกัน ({selectedSprinklersForPipe.length}/2)
+                                                                    เลือกหัวฉีด 2
+                                                                    ตัวเพื่อลบท่อระหว่างกัน (
+                                                                    {
+                                                                        selectedSprinklersForPipe.length
+                                                                    }
+                                                                    /2)
                                                                 </div>
-                                                                {selectedSprinklersForPipe.length === 2 && (
+                                                                {selectedSprinklersForPipe.length ===
+                                                                    2 && (
                                                                     <button
-                                                                        onClick={removePipesBetweenSprinklers}
+                                                                        onClick={
+                                                                            removePipesBetweenSprinklers
+                                                                        }
                                                                         className="w-full rounded bg-red-700 py-2 text-xs font-medium text-white hover:bg-red-600"
                                                                     >
-                                                                        🗑️ ลบท่อระหว่างหัวฉีดที่เลือก
+                                                                        🗑️
+                                                                        ลบท่อระหว่างหัวฉีดที่เลือก
                                                                     </button>
                                                                 )}
                                                             </div>
@@ -2099,7 +2133,8 @@ export default function HomeGardenPlanner() {
                                                         {selectedPipes.size > 0 && (
                                                             <div className="mt-2 space-y-2">
                                                                 <div className="text-xs text-yellow-200">
-                                                                    เลือกแล้ว: {selectedPipes.size} ท่อ
+                                                                    เลือกแล้ว: {selectedPipes.size}{' '}
+                                                                    ท่อ
                                                                 </div>
                                                                 <button
                                                                     onClick={deleteSelectedPipes}
@@ -2141,7 +2176,9 @@ export default function HomeGardenPlanner() {
                                             </div>
                                             <div className="flex items-start gap-2">
                                                 <span className="text-blue-400">4.</span>
-                                                <span>ท่อทุกเส้นมีขนาดเดียวกัน (ไม่แบ่งหลัก/สาขา)</span>
+                                                <span>
+                                                    ท่อทุกเส้นมีขนาดเดียวกัน (ไม่แบ่งหลัก/สาขา)
+                                                </span>
                                             </div>
                                             <div className="flex items-start gap-2">
                                                 <span className="text-green-400">5.</span>
@@ -2192,8 +2229,8 @@ export default function HomeGardenPlanner() {
                                         if (selectedSprinkler === sprinklerId) {
                                             setSelectedSprinkler(null);
                                         }
-                                        setSelectedSprinklersForPipe(prev => 
-                                            prev.filter(id => id !== sprinklerId)
+                                        setSelectedSprinklersForPipe((prev) =>
+                                            prev.filter((id) => id !== sprinklerId)
                                         );
                                     }}
                                     onSprinklerDragged={(sprinklerId, position) => {
@@ -2240,8 +2277,8 @@ export default function HomeGardenPlanner() {
                                             if (selectedSprinkler === id) {
                                                 setSelectedSprinkler(null);
                                             }
-                                            setSelectedSprinklersForPipe(prev => 
-                                                prev.filter(sprinklerId => sprinklerId !== id)
+                                            setSelectedSprinklersForPipe((prev) =>
+                                                prev.filter((sprinklerId) => sprinklerId !== id)
                                             );
                                         }}
                                         onWaterSourceDelete={handleWaterSourceDelete}
@@ -2282,8 +2319,8 @@ export default function HomeGardenPlanner() {
                                             if (selectedSprinkler === id) {
                                                 setSelectedSprinkler(null);
                                             }
-                                            setSelectedSprinklersForPipe(prev => 
-                                                prev.filter(sprinklerId => sprinklerId !== id)
+                                            setSelectedSprinklersForPipe((prev) =>
+                                                prev.filter((sprinklerId) => sprinklerId !== id)
                                             );
                                         }}
                                         onWaterSourceDelete={handleWaterSourceDelete}

@@ -1012,8 +1012,8 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
 
             const radiusPixels = sprinkler.type.radius * currentScale;
             const zone = gardenZones.find((z) => z.id === sprinkler.zoneId);
-            const isSelected = 
-                selectedSprinkler === sprinkler.id || 
+            const isSelected =
+                selectedSprinkler === sprinkler.id ||
                 selectedSprinklersForPipe.includes(sprinkler.id);
 
             try {
@@ -1140,10 +1140,16 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
     const getCursor = useCallback(() => {
         if (measurementMode) return 'crosshair';
         if (dimensionMode) return 'crosshair';
-        if (editMode === 'draw' || editMode === 'place' || editMode === 'edit' || editMode === 'main-pipe')
+        if (
+            editMode === 'draw' ||
+            editMode === 'place' ||
+            editMode === 'edit' ||
+            editMode === 'main-pipe'
+        )
             return 'crosshair';
         if (editMode === 'drag-sprinkler') return 'move';
-        if (editMode === 'select-pipes' || editMode === 'connect-sprinklers' || pipeEditMode) return 'pointer';
+        if (editMode === 'select-pipes' || editMode === 'connect-sprinklers' || pipeEditMode)
+            return 'pointer';
         if (isPanning) return 'grabbing';
         return 'grab';
     }, [measurementMode, dimensionMode, editMode, isPanning, pipeEditMode]);
@@ -1437,17 +1443,13 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                 <h4 className="mb-3 text-lg font-semibold text-purple-400">
                                     🔧 แก้ไขระบบท่อ
                                 </h4>
-                                
+
                                 <div className="space-y-3">
                                     {/* Pipe statistics */}
                                     {pipes.length > 0 && (
                                         <div className="rounded-lg bg-purple-900/30 p-3 text-sm text-purple-300">
-                                            <div className="mb-1 font-medium">
-                                                📊 สถิติระบบท่อ:
-                                            </div>
-                                            <div>
-                                                จำนวนท่อ: {pipes.length} เส้น
-                                            </div>
+                                            <div className="mb-1 font-medium">📊 สถิติระบบท่อ:</div>
+                                            <div>จำนวนท่อ: {pipes.length} เส้น</div>
                                             <div>
                                                 ความยาวรวม:{' '}
                                                 {formatDistance(
@@ -1461,13 +1463,14 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                     {pipeEditMode && (
                                         <div className="rounded-lg bg-blue-900/30 p-3 text-sm text-blue-300">
                                             <div className="mb-1 font-medium">
-                                                {pipeEditMode === 'add' ? '➕ เพิ่มท่อ' : '➖ ลบท่อ'}
+                                                {pipeEditMode === 'add'
+                                                    ? '➕ เพิ่มท่อ'
+                                                    : '➖ ลบท่อ'}
                                             </div>
                                             <div className="text-xs">
-                                                {pipeEditMode === 'add' 
+                                                {pipeEditMode === 'add'
                                                     ? `เลือกหัวฉีด 2 ตัวเพื่อเชื่อมต่อ (${selectedSprinklersForPipe.length}/2)`
-                                                    : `เลือกหัวฉีด 2 ตัวเพื่อลบท่อ (${selectedSprinklersForPipe.length}/2)`
-                                                }
+                                                    : `เลือกหัวฉีด 2 ตัวเพื่อลบท่อ (${selectedSprinklersForPipe.length}/2)`}
                                             </div>
                                         </div>
                                     )}
@@ -2353,7 +2356,9 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                         cursor:
                                                             editMode === 'drag-sprinkler'
                                                                 ? 'move'
-                                                                : editMode === 'connect-sprinklers' || pipeEditMode
+                                                                : editMode ===
+                                                                        'connect-sprinklers' ||
+                                                                    pipeEditMode
                                                                   ? 'pointer'
                                                                   : 'default',
                                                         transform: sprinkler.orientation

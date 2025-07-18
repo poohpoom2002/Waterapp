@@ -33,9 +33,9 @@ const getGoogleMapsConfig = () => {
             mapTypeControlOptions: {
                 position: 'LEFT_BOTTOM' as any,
                 style: 'HORIZONTAL_BAR' as any,
-                mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain']
+                mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain'],
             },
-            minZoom: 1,   
+            minZoom: 1,
             restriction: {
                 strictBounds: false,
             },
@@ -230,13 +230,13 @@ const MapComponent: React.FC<{
         if (ref.current && !map && window.google?.maps) {
             try {
                 const config = getGoogleMapsConfig();
-                
+
                 const mapOptions = {
                     ...config.defaultMapOptions,
                     mapTypeControlOptions: {
                         position: google.maps.ControlPosition.LEFT_BOTTOM,
                         style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-                        mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain']
+                        mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain'],
                     },
                     minZoom: 1,
                     restriction: {
@@ -249,7 +249,7 @@ const MapComponent: React.FC<{
                     rotateControl: true,
                     scaleControl: true,
                 };
-                
+
                 const newMap = new window.google.maps.Map(ref.current, {
                     center,
                     zoom,
@@ -549,7 +549,9 @@ const ClippedSprinklerCoverage: React.FC<{
                     overlayRef.current.push(circle);
                 }
             } else if (Array.isArray(result) && result.length >= 3) {
-                console.log(`🎨 ${sprinklerId}: Created clipped polygon with ${result.length} points`);
+                console.log(
+                    `🎨 ${sprinklerId}: Created clipped polygon with ${result.length} points`
+                );
                 const coordinates = result as Coordinate[];
                 const polygon = new google.maps.Polygon({
                     paths: coordinates.map((p) => ({ lat: p.lat, lng: p.lng })),
@@ -655,8 +657,7 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
         [props.map]
     );
 
-    const handleSearchClear = useCallback(() => {
-    }, []);
+    const handleSearchClear = useCallback(() => {}, []);
 
     const coverageStats = React.useMemo(() => {
         let totalCoveredArea = 0;
@@ -768,201 +769,220 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
         if (!props.map || !window.google?.maps || !isMapStable) return;
 
         // Throttle the rendering to prevent flickering
-        const timer = setTimeout(() => {
-            clearOverlays();
+        const timer = setTimeout(
+            () => {
+                clearOverlays();
 
-            try {
-                console.log('🎨 Rendering map overlays...');
-                
-                // Render zones
-                props.gardenZones?.forEach((zone) => {
-                    if (!zone.coordinates || zone.coordinates.length < 3) return;
+                try {
+                    console.log('🎨 Rendering map overlays...');
 
-                    try {
-                        const zoneType = ZONE_TYPES.find((z) => z.id === zone.type);
-                        const isNestedZone = !!zone.parentZoneId;
+                    // Render zones
+                    props.gardenZones?.forEach((zone) => {
+                        if (!zone.coordinates || zone.coordinates.length < 3) return;
 
-                        const polygon = new google.maps.Polygon({
-                            paths: zone.coordinates.map((c) => ({ lat: c.lat, lng: c.lng })),
-                            fillColor: zoneType?.color || '#666',
-                            fillOpacity: zone.type === 'forbidden' ? 0.5 : isNestedZone ? 0.6 : 0.25,
-                            strokeColor: zoneType?.color || '#666',
-                            strokeOpacity: 1,
-                            strokeWeight: isNestedZone ? 3 : 2,
-                            map: props.map,
-                            clickable: false,
-                        });
+                        try {
+                            const zoneType = ZONE_TYPES.find((z) => z.id === zone.type);
+                            const isNestedZone = !!zone.parentZoneId;
 
-                        overlaysRef.current.set(`zone-${zone.id}`, polygon);
-                    } catch (error) {
-                        console.error(`Error rendering zone ${zone.id}:`, error);
+                            const polygon = new google.maps.Polygon({
+                                paths: zone.coordinates.map((c) => ({ lat: c.lat, lng: c.lng })),
+                                fillColor: zoneType?.color || '#666',
+                                fillOpacity:
+                                    zone.type === 'forbidden' ? 0.5 : isNestedZone ? 0.6 : 0.25,
+                                strokeColor: zoneType?.color || '#666',
+                                strokeOpacity: 1,
+                                strokeWeight: isNestedZone ? 3 : 2,
+                                map: props.map,
+                                clickable: false,
+                            });
+
+                            overlaysRef.current.set(`zone-${zone.id}`, polygon);
+                        } catch (error) {
+                            console.error(`Error rendering zone ${zone.id}:`, error);
+                        }
+                    });
+
+                    // Render main pipe drawing
+                    if (props.mainPipeDrawing.length > 0) {
+                        try {
+                            const polyline = new google.maps.Polyline({
+                                path: props.mainPipeDrawing.map((p) => ({
+                                    lat: p.lat,
+                                    lng: p.lng,
+                                })),
+                                strokeColor: '#60A5FA',
+                                strokeWeight: 8,
+                                strokeOpacity: 0.8,
+                                map: props.map,
+                                clickable: false,
+                            });
+                            overlaysRef.current.set('main-pipe-drawing', polyline);
+                        } catch (error) {
+                            console.error('Error rendering main pipe drawing:', error);
+                        }
                     }
-                });
 
-                // Render main pipe drawing
-                if (props.mainPipeDrawing.length > 0) {
-                    try {
-                        const polyline = new google.maps.Polyline({
-                            path: props.mainPipeDrawing.map((p) => ({ lat: p.lat, lng: p.lng })),
-                            strokeColor: '#60A5FA',
-                            strokeWeight: 8,
-                            strokeOpacity: 0.8,
-                            map: props.map,
-                            clickable: false,
-                        });
-                        overlaysRef.current.set('main-pipe-drawing', polyline);
-                    } catch (error) {
-                        console.error('Error rendering main pipe drawing:', error);
+                    // Render main pipe
+                    if (props.mainPipeDrawing.length >= 2) {
+                        try {
+                            const polyline = new google.maps.Polyline({
+                                path: props.mainPipeDrawing.map((p) => ({
+                                    lat: p.lat,
+                                    lng: p.lng,
+                                })),
+                                strokeColor: '#3B82F6',
+                                strokeWeight: 10,
+                                strokeOpacity: 0.9,
+                                map: props.map,
+                                clickable: false,
+                            });
+                            overlaysRef.current.set('main-pipe', polyline);
+                        } catch (error) {
+                            console.error('Error rendering main pipe:', error);
+                        }
                     }
-                }
 
-                // Render main pipe
-                if (props.mainPipeDrawing.length >= 2) {
-                    try {
-                        const polyline = new google.maps.Polyline({
-                            path: props.mainPipeDrawing.map((p) => ({ lat: p.lat, lng: p.lng })),
-                            strokeColor: '#3B82F6',
-                            strokeWeight: 10,
-                            strokeOpacity: 0.9,
-                            map: props.map,
-                            clickable: false,
-                        });
-                        overlaysRef.current.set('main-pipe', polyline);
-                    } catch (error) {
-                        console.error('Error rendering main pipe:', error);
-                    }
-                }
+                    // Render pipes
+                    props.pipes
+                        ?.filter((p) => p.type === 'pipe')
+                        .forEach((pipe) => {
+                            try {
+                                const isSelected = props.selectedPipes.has(pipe.id);
+                                const polyline = new google.maps.Polyline({
+                                    path: [
+                                        { lat: pipe.start.lat, lng: pipe.start.lng },
+                                        { lat: pipe.end.lat, lng: pipe.end.lng },
+                                    ],
+                                    strokeColor: isSelected ? '#FBBF24' : '#8B5CF6',
+                                    strokeWeight: isSelected ? 8 : 6,
+                                    strokeOpacity: 0.9,
+                                    map: props.map,
+                                    clickable: true,
+                                });
 
-                // Render pipes
-                props.pipes?.filter((p) => p.type === 'pipe').forEach((pipe) => {
-                    try {
-                        const isSelected = props.selectedPipes.has(pipe.id);
-                        const polyline = new google.maps.Polyline({
-                            path: [
-                                { lat: pipe.start.lat, lng: pipe.start.lng },
-                                { lat: pipe.end.lat, lng: pipe.end.lng },
-                            ],
-                            strokeColor: isSelected ? '#FBBF24' : '#8B5CF6',
-                            strokeWeight: isSelected ? 8 : 6,
-                            strokeOpacity: 0.9,
-                            map: props.map,
-                            clickable: true,
-                        });
-                        
-                        polyline.addListener('click', () => {
-                            props.onPipeClick(pipe.id);
-                        });
-                        overlaysRef.current.set(`pipe-${pipe.id}`, polyline);
-                    } catch (error) {
-                        console.error(`Error rendering pipe ${pipe.id}:`, error);
-                    }
-                });
-
-                // Render sprinklers with improved dragging
-                props.sprinklers?.forEach((sprinkler) => {
-                    if (!sprinkler.position) return;
-                    try {
-                        const isSelected =
-                            props.selectedSprinkler === sprinkler.id ||
-                            props.selectedSprinklersForPipe.includes(sprinkler.id);
-                        
-                        const marker = new google.maps.Marker({
-                            position: { lat: sprinkler.position.lat, lng: sprinkler.position.lng },
-                            icon: createSprinklerIcon(
-                                sprinkler.type,
-                                isSelected,
-                                sprinkler.orientation
-                            ),
-                            title: `หัวฉีด: ${sprinkler.type.name} (รัศมี ${sprinkler.type.radius}ม.)`,
-                            draggable: props.editMode === 'drag-sprinkler',
-                            map: props.map,
-                        });
-
-                        // Enhanced click handling
-                        marker.addListener('click', () => {
-                            if (props.pipeEditMode === 'add' || props.pipeEditMode === 'remove') {
-                                props.onSprinklerClick(sprinkler.id);
-                            } else {
-                                props.onSprinklerClick(sprinkler.id);
+                                polyline.addListener('click', () => {
+                                    props.onPipeClick(pipe.id);
+                                });
+                                overlaysRef.current.set(`pipe-${pipe.id}`, polyline);
+                            } catch (error) {
+                                console.error(`Error rendering pipe ${pipe.id}:`, error);
                             }
                         });
 
-                        // Enhanced right-click handling
-                        marker.addListener('rightclick', () => {
-                            props.onSprinklerDelete(sprinkler.id);
-                        });
+                    // Render sprinklers with improved dragging
+                    props.sprinklers?.forEach((sprinkler) => {
+                        if (!sprinkler.position) return;
+                        try {
+                            const isSelected =
+                                props.selectedSprinkler === sprinkler.id ||
+                                props.selectedSprinklersForPipe.includes(sprinkler.id);
 
-                        // Enhanced drag handling
-                        if (props.editMode === 'drag-sprinkler') {
-                            marker.addListener('dragstart', () => {
-                                setIsDragging(true);
+                            const marker = new google.maps.Marker({
+                                position: {
+                                    lat: sprinkler.position.lat,
+                                    lng: sprinkler.position.lng,
+                                },
+                                icon: createSprinklerIcon(
+                                    sprinkler.type,
+                                    isSelected,
+                                    sprinkler.orientation
+                                ),
+                                title: `หัวฉีด: ${sprinkler.type.nameEN} (รัศมี ${sprinkler.type.radius}ม.)`,
+                                draggable: props.editMode === 'drag-sprinkler',
+                                map: props.map,
                             });
 
-                            marker.addListener('drag', (e: google.maps.MapMouseEvent) => {
-                                if (e.latLng) {
-                                    // Optional: Real-time position update during drag
-                                    // Can be removed if causing performance issues
+                            // Enhanced click handling
+                            marker.addListener('click', () => {
+                                if (
+                                    props.pipeEditMode === 'add' ||
+                                    props.pipeEditMode === 'remove'
+                                ) {
+                                    props.onSprinklerClick(sprinkler.id);
+                                } else {
+                                    props.onSprinklerClick(sprinkler.id);
                                 }
                             });
 
-                            marker.addListener('dragend', (e: google.maps.MapMouseEvent) => {
-                                setIsDragging(false);
-                                if (e.latLng) {
-                                    const newPosition = {
-                                        lat: e.latLng.lat(),
-                                        lng: e.latLng.lng(),
-                                    };
-                                    props.onSprinklerDragged(sprinkler.id, newPosition);
-                                }
+                            // Enhanced right-click handling
+                            marker.addListener('rightclick', () => {
+                                props.onSprinklerDelete(sprinkler.id);
                             });
+
+                            // Enhanced drag handling
+                            if (props.editMode === 'drag-sprinkler') {
+                                marker.addListener('dragstart', () => {
+                                    setIsDragging(true);
+                                });
+
+                                marker.addListener('drag', (e: google.maps.MapMouseEvent) => {
+                                    if (e.latLng) {
+                                        // Optional: Real-time position update during drag
+                                        // Can be removed if causing performance issues
+                                    }
+                                });
+
+                                marker.addListener('dragend', (e: google.maps.MapMouseEvent) => {
+                                    setIsDragging(false);
+                                    if (e.latLng) {
+                                        const newPosition = {
+                                            lat: e.latLng.lat(),
+                                            lng: e.latLng.lng(),
+                                        };
+                                        props.onSprinklerDragged(sprinkler.id, newPosition);
+                                    }
+                                });
+                            }
+
+                            overlaysRef.current.set(`sprinkler-${sprinkler.id}`, marker);
+                        } catch (error) {
+                            console.error(`Error rendering sprinkler ${sprinkler.id}:`, error);
                         }
+                    });
 
-                        overlaysRef.current.set(`sprinkler-${sprinkler.id}`, marker);
-                    } catch (error) {
-                        console.error(`Error rendering sprinkler ${sprinkler.id}:`, error);
+                    // Render water source
+                    if (props.waterSource?.position) {
+                        try {
+                            const marker = new google.maps.Marker({
+                                position: {
+                                    lat: props.waterSource.position.lat,
+                                    lng: props.waterSource.position.lng,
+                                },
+                                icon: {
+                                    path: google.maps.SymbolPath.CIRCLE,
+                                    fillColor:
+                                        props.waterSource.type === 'pump' ? '#EF4444' : '#3B82F6',
+                                    fillOpacity: 1,
+                                    strokeColor: '#FFFFFF',
+                                    strokeWeight: 3,
+                                    scale: 8,
+                                    labelOrigin: new google.maps.Point(0, 0),
+                                },
+                                label: {
+                                    text: props.waterSource.type === 'pump' ? '⚡' : '🚰',
+                                    fontSize: '20px',
+                                    fontWeight: 'bold',
+                                },
+                                title: `แหล่งน้ำ: ${props.waterSource.type === 'pump' ? 'ปั๊มน้ำ' : 'ท่อเมน'}`,
+                                draggable: false,
+                                map: props.map,
+                            });
+                            marker.addListener('rightclick', () => {
+                                props.onWaterSourceDelete();
+                            });
+                            overlaysRef.current.set('water-source', marker);
+                        } catch (error) {
+                            console.error('Error rendering water source:', error);
+                        }
                     }
-                });
 
-                // Render water source
-                if (props.waterSource?.position) {
-                    try {
-                        const marker = new google.maps.Marker({
-                            position: {
-                                lat: props.waterSource.position.lat,
-                                lng: props.waterSource.position.lng,
-                            },
-                            icon: {
-                                path: google.maps.SymbolPath.CIRCLE,
-                                fillColor: props.waterSource.type === 'pump' ? '#EF4444' : '#3B82F6',
-                                fillOpacity: 1,
-                                strokeColor: '#FFFFFF',
-                                strokeWeight: 3,
-                                scale: 8,
-                                labelOrigin: new google.maps.Point(0, 0),
-                            },
-                            label: {
-                                text: props.waterSource.type === 'pump' ? '⚡' : '🚰',
-                                fontSize: '20px',
-                                fontWeight: 'bold',
-                            },
-                            title: `แหล่งน้ำ: ${props.waterSource.type === 'pump' ? 'ปั๊มน้ำ' : 'ท่อเมน'}`,
-                            draggable: false,
-                            map: props.map,
-                        });
-                        marker.addListener('rightclick', () => {
-                            props.onWaterSourceDelete();
-                        });
-                        overlaysRef.current.set('water-source', marker);
-                    } catch (error) {
-                        console.error('Error rendering water source:', error);
-                    }
+                    console.log('✅ Map overlays rendered successfully');
+                } catch (error) {
+                    console.error('Error rendering map overlays:', error);
                 }
-
-                console.log('✅ Map overlays rendered successfully');
-            } catch (error) {
-                console.error('Error rendering map overlays:', error);
-            }
-        }, isDragging ? 100 : 50); // Longer delay when dragging
+            },
+            isDragging ? 100 : 50
+        ); // Longer delay when dragging
 
         return () => {
             clearTimeout(timer);
@@ -1017,30 +1037,32 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
             />
 
             {/* Render sprinkler radius coverage with stability check */}
-            {isMapStable && !isDragging && props.sprinklers?.map((sprinkler) => {
-                if (!sprinkler.position) return null;
+            {isMapStable &&
+                !isDragging &&
+                props.sprinklers?.map((sprinkler) => {
+                    if (!sprinkler.position) return null;
 
-                const zone = props.gardenZones?.find((z) => z.id === sprinkler.zoneId);
-                if (!zone || !zone.coordinates || zone.coordinates.length < 3) return null;
+                    const zone = props.gardenZones?.find((z) => z.id === sprinkler.zoneId);
+                    if (!zone || !zone.coordinates || zone.coordinates.length < 3) return null;
 
-                const isSelected =
-                    props.selectedSprinkler === sprinkler.id ||
-                    props.selectedSprinklersForPipe.includes(sprinkler.id);
+                    const isSelected =
+                        props.selectedSprinkler === sprinkler.id ||
+                        props.selectedSprinklersForPipe.includes(sprinkler.id);
 
-                return (
-                    <ClippedSprinklerCoverage
-                        key={`${sprinkler.id}-coverage`}
-                        map={props.map}
-                        center={sprinkler.position}
-                        radius={sprinkler.type.radius}
-                        zoneCoordinates={zone.coordinates}
-                        color={sprinkler.type.color}
-                        isSelected={isSelected}
-                        sprinklerId={sprinkler.id}
-                        zoneType={zone.type}
-                    />
-                );
-            })}
+                    return (
+                        <ClippedSprinklerCoverage
+                            key={`${sprinkler.id}-coverage`}
+                            map={props.map}
+                            center={sprinkler.position}
+                            radius={sprinkler.type.radius}
+                            zoneCoordinates={zone.coordinates}
+                            color={sprinkler.type.color}
+                            isSelected={isSelected}
+                            sprinklerId={sprinkler.id}
+                            zoneType={zone.type}
+                        />
+                    );
+                })}
         </>
     );
 };
@@ -1081,7 +1103,7 @@ const GoogleMapDesigner: React.FC<GoogleMapDesignerProps> = (props) => {
                 minZoom: 1,
                 maxZoom: 'UNLIMITED ♾️',
                 mapTypeControlPosition: 'LEFT_BOTTOM',
-                note: '💡 ปลดล็อคแล้ว: ซูมได้ไม่จำกัด!'
+                note: '💡 ปลดล็อคแล้ว: ซูมได้ไม่จำกัด!',
             });
         }
     }, [config.apiKey]);

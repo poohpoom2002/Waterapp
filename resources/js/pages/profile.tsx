@@ -67,7 +67,7 @@ export default function Profile() {
         <div className="min-h-screen bg-gray-900">
             <Head title="Profile" />
             <Navbar />
-            
+
             <div className="p-6">
                 <div className="mx-auto max-w-4xl">
                     {/* Header */}
@@ -75,7 +75,9 @@ export default function Profile() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <h1 className="text-3xl font-bold text-white">👤 User Profile</h1>
-                                <p className="mt-2 text-gray-400">Manage your account information</p>
+                                <p className="mt-2 text-gray-400">
+                                    Manage your account information
+                                </p>
                             </div>
                             <button
                                 onClick={() => router.visit('/')}
@@ -86,156 +88,187 @@ export default function Profile() {
                         </div>
                     </div>
 
-                <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-                    {/* Profile Card */}
-                    <div className="lg:col-span-2">
-                        <div className="rounded-lg bg-gray-800 p-6">
-                            <div className="mb-6 flex items-center gap-4">
-                                <UserAvatar 
-                                    user={user} 
-                                    size="lg" 
-                                    clickable={true}
-                                    onClick={() => setShowPhotoModal(true)}
-                                />
-                                <div>
-                                    <h2 className="text-2xl font-bold text-white">{user.name}</h2>
-                                    <p className="text-gray-400">{user.email}</p>
-                                    {user.email_verified_at && (
-                                        <span className="inline-flex items-center gap-1 rounded-full bg-green-900/30 px-2 py-1 text-xs text-green-400">
-                                            ✓ Verified Email
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-
-                            <form onSubmit={handleSubmit} className="space-y-6" noValidate>
-                                <div>
-                                    <label htmlFor="name" className="block text-sm font-medium text-gray-300">
-                                        Full Name
-                                    </label>
-                                    <input
-                                        type="text"
-                                        id="name"
-                                        value={data.name}
-                                        onChange={(e) => setData('name', e.target.value)}
-                                        disabled={!isEditing}
-                                        className={`mt-1 block w-full rounded-md border px-3 py-2 text-white ${
-                                            isEditing
-                                                ? 'border-gray-600 bg-gray-700 focus:border-blue-500 focus:ring-blue-500'
-                                                : 'border-gray-700 bg-gray-900 text-gray-400'
-                                        }`}
+                    <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+                        {/* Profile Card */}
+                        <div className="lg:col-span-2">
+                            <div className="rounded-lg bg-gray-800 p-6">
+                                <div className="mb-6 flex items-center gap-4">
+                                    <UserAvatar
+                                        user={user}
+                                        size="lg"
+                                        clickable={true}
+                                        onClick={() => setShowPhotoModal(true)}
                                     />
-                                    {errors.name && <p className="mt-1 text-sm text-red-400">{errors.name}</p>}
+                                    <div>
+                                        <h2 className="text-2xl font-bold text-white">
+                                            {user.name}
+                                        </h2>
+                                        <p className="text-gray-400">{user.email}</p>
+                                        {user.email_verified_at && (
+                                            <span className="inline-flex items-center gap-1 rounded-full bg-green-900/30 px-2 py-1 text-xs text-green-400">
+                                                ✓ Verified Email
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
 
-                                <div>
-                                    <label htmlFor="email" className="block text-sm font-medium text-gray-300">
-                                        Email Address
-                                    </label>
-                                    <input
-                                        type="email"
-                                        id="email"
-                                        value={data.email}
-                                        onChange={(e) => setData('email', e.target.value)}
-                                        disabled={!isEditing}
-                                        className={`mt-1 block w-full rounded-md border px-3 py-2 text-white ${
-                                            isEditing
-                                                ? 'border-gray-600 bg-gray-700 focus:border-blue-500 focus:ring-blue-500'
-                                                : 'border-gray-700 bg-gray-900 text-gray-400'
-                                        }`}
-                                    />
-                                    {errors.email && <p className="mt-1 text-sm text-red-400">{errors.email}</p>}
-                                </div>
+                                <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+                                    <div>
+                                        <label
+                                            htmlFor="name"
+                                            className="block text-sm font-medium text-gray-300"
+                                        >
+                                            Full Name
+                                        </label>
+                                        <input
+                                            type="text"
+                                            id="name"
+                                            value={data.name}
+                                            onChange={(e) => setData('name', e.target.value)}
+                                            disabled={!isEditing}
+                                            className={`mt-1 block w-full rounded-md border px-3 py-2 text-white ${
+                                                isEditing
+                                                    ? 'border-gray-600 bg-gray-700 focus:border-blue-500 focus:ring-blue-500'
+                                                    : 'border-gray-700 bg-gray-900 text-gray-400'
+                                            }`}
+                                        />
+                                        {errors.name && (
+                                            <p className="mt-1 text-sm text-red-400">
+                                                {errors.name}
+                                            </p>
+                                        )}
+                                    </div>
 
-                                <div className="flex gap-4">
-                                    {isEditing ? (
-                                        <>
-                                            <button
-                                                type="submit"
-                                                disabled={processing}
-                                                className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
-                                            >
-                                                {processing ? 'Saving...' : 'Save Changes'}
-                                            </button>
+                                    <div>
+                                        <label
+                                            htmlFor="email"
+                                            className="block text-sm font-medium text-gray-300"
+                                        >
+                                            Email Address
+                                        </label>
+                                        <input
+                                            type="email"
+                                            id="email"
+                                            value={data.email}
+                                            onChange={(e) => setData('email', e.target.value)}
+                                            disabled={!isEditing}
+                                            className={`mt-1 block w-full rounded-md border px-3 py-2 text-white ${
+                                                isEditing
+                                                    ? 'border-gray-600 bg-gray-700 focus:border-blue-500 focus:ring-blue-500'
+                                                    : 'border-gray-700 bg-gray-900 text-gray-400'
+                                            }`}
+                                        />
+                                        {errors.email && (
+                                            <p className="mt-1 text-sm text-red-400">
+                                                {errors.email}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div className="flex gap-4">
+                                        {isEditing ? (
+                                            <>
+                                                <button
+                                                    type="submit"
+                                                    disabled={processing}
+                                                    className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                                                >
+                                                    {processing ? 'Saving...' : 'Save Changes'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setIsEditing(false);
+                                                        setData({
+                                                            name: user.name,
+                                                            email: user.email,
+                                                        });
+                                                    }}
+                                                    className="rounded-lg bg-gray-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-gray-700"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </>
+                                        ) : (
                                             <button
                                                 type="button"
-                                                onClick={() => {
-                                                    setIsEditing(false);
-                                                    setData({ name: user.name, email: user.email });
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    console.log('Edit Profile clicked');
+                                                    setIsEditing(true);
                                                 }}
-                                                className="rounded-lg bg-gray-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-gray-700"
+                                                className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-blue-700"
                                             >
-                                                Cancel
+                                                Edit Profile
                                             </button>
-                                        </>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                console.log('Edit Profile clicked');
-                                                setIsEditing(true);
-                                            }}
-                                            className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-blue-700"
+                                        )}
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        {/* Sidebar */}
+                        <div className="space-y-6">
+                            {/* Account Stats */}
+                            <div className="rounded-lg bg-gray-800 p-6">
+                                <h3 className="mb-4 text-lg font-semibold text-white">
+                                    📊 Account Statistics
+                                </h3>
+                                <div className="space-y-3">
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-400">Member since:</span>
+                                        <span className="text-white">
+                                            {new Date(
+                                                user.created_at || Date.now()
+                                            ).toLocaleDateString()}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-400">Email status:</span>
+                                        <span
+                                            className={
+                                                user.email_verified_at
+                                                    ? 'text-green-400'
+                                                    : 'text-yellow-400'
+                                            }
                                         >
-                                            Edit Profile
+                                            {user.email_verified_at ? 'Verified' : 'Unverified'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Account Security */}
+                            <div className="rounded-lg bg-gray-800 p-6">
+                                <h3 className="mb-4 text-lg font-semibold text-white">
+                                    🔒 Account Security
+                                </h3>
+                                <div className="space-y-3">
+                                    <button
+                                        onClick={() => router.visit('/forgot-password')}
+                                        className="w-full rounded-lg bg-yellow-600 px-4 py-2 text-left font-semibold text-white transition-colors hover:bg-yellow-700"
+                                    >
+                                        🔑 Change Password
+                                    </button>
+                                    {!user.email_verified_at && (
+                                        <button
+                                            onClick={() => router.visit('/verify-email')}
+                                            className="w-full rounded-lg bg-purple-600 px-4 py-2 text-left font-semibold text-white transition-colors hover:bg-purple-700"
+                                        >
+                                            ✉️ Verify Email
                                         </button>
                                     )}
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-
-                    {/* Sidebar */}
-                    <div className="space-y-6">
-                        {/* Account Stats */}
-                        <div className="rounded-lg bg-gray-800 p-6">
-                            <h3 className="mb-4 text-lg font-semibold text-white">📊 Account Statistics</h3>
-                            <div className="space-y-3">
-                                <div className="flex justify-between">
-                                    <span className="text-gray-400">Member since:</span>
-                                    <span className="text-white">
-                                        {new Date(user.created_at || Date.now()).toLocaleDateString()}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-gray-400">Email status:</span>
-                                    <span className={user.email_verified_at ? 'text-green-400' : 'text-yellow-400'}>
-                                        {user.email_verified_at ? 'Verified' : 'Unverified'}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Account Security */}
-                        <div className="rounded-lg bg-gray-800 p-6">
-                            <h3 className="mb-4 text-lg font-semibold text-white">🔒 Account Security</h3>
-                            <div className="space-y-3">
-                                <button
-                                    onClick={() => router.visit('/forgot-password')}
-                                    className="w-full rounded-lg bg-yellow-600 px-4 py-2 text-left font-semibold text-white transition-colors hover:bg-yellow-700"
-                                >
-                                    🔑 Change Password
-                                </button>
-                                {!user.email_verified_at && (
                                     <button
-                                        onClick={() => router.visit('/verify-email')}
-                                        className="w-full rounded-lg bg-purple-600 px-4 py-2 text-left font-semibold text-white transition-colors hover:bg-purple-700"
+                                        onClick={() => setShowLogoutConfirm(true)}
+                                        className="w-full rounded-lg bg-red-600 px-4 py-2 text-left font-semibold text-white transition-colors hover:bg-red-700"
                                     >
-                                        ✉️ Verify Email
+                                        🚪 Logout
                                     </button>
-                                )}
-                                <button
-                                    onClick={() => setShowLogoutConfirm(true)}
-                                    className="w-full rounded-lg bg-red-600 px-4 py-2 text-left font-semibold text-white transition-colors hover:bg-red-700"
-                                >
-                                    🚪 Logout
-                                </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
                 </div>
             </div>
 
@@ -276,7 +309,8 @@ export default function Profile() {
                         </div>
                         <div className="mb-6">
                             <p className="text-gray-300">
-                                Are you sure you want to logout? You will need to login again to access your account.
+                                Are you sure you want to logout? You will need to login again to
+                                access your account.
                             </p>
                         </div>
                         <div className="flex justify-end space-x-3">
@@ -298,4 +332,4 @@ export default function Profile() {
             )}
         </div>
     );
-} 
+}

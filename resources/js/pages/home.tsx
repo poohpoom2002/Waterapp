@@ -491,7 +491,7 @@ export default function Home() {
     return (
         <div className="min-h-screen bg-gray-900">
             <Navbar />
-            
+
             <div className="p-6">
                 <div className="mx-auto max-w-7xl">
                     {/* Main Content Header */}
@@ -501,7 +501,9 @@ export default function Home() {
                                 <h1 className="text-3xl font-bold text-white">
                                     {t('water_management_system')}
                                 </h1>
-                                <p className="mt-2 text-gray-400">{t('manage_irrigation_fields')}</p>
+                                <p className="mt-2 text-gray-400">
+                                    {t('manage_irrigation_fields')}
+                                </p>
                             </div>
                             <button
                                 onClick={handleAddField}
@@ -525,43 +527,45 @@ export default function Home() {
                         </div>
                     </div>
 
-                {/* Content */}
-                {fields.length === 0 ? (
-                    <div className="py-16 text-center">
-                        <div className="mb-4 text-6xl">🌾</div>
-                        <h2 className="mb-2 text-2xl font-semibold text-white">
-                            {t('no_fields_yet')}
-                        </h2>
-                        <p className="mb-6 text-gray-400">{t('start_first_field')}</p>
-                        <button
-                            onClick={handleAddField}
-                            className="rounded-lg bg-blue-600 px-8 py-3 font-semibold text-white transition-colors duration-200 hover:bg-blue-700"
-                        >
-                            {t('create_first_field')}
-                        </button>
-                    </div>
-                ) : (
-                    <div>
-                        <div className="mb-6 flex items-center justify-between">
-                            <h2 className="text-xl font-semibold text-white">
-                                {t('your_fields')} ({fields.length})
+                    {/* Content */}
+                    {fields.length === 0 ? (
+                        <div className="py-16 text-center">
+                            <div className="mb-4 text-6xl">🌾</div>
+                            <h2 className="mb-2 text-2xl font-semibold text-white">
+                                {t('no_fields_yet')}
                             </h2>
-                            <div className="text-sm text-gray-400">{t('click_field_manage')}</div>
+                            <p className="mb-6 text-gray-400">{t('start_first_field')}</p>
+                            <button
+                                onClick={handleAddField}
+                                className="rounded-lg bg-blue-600 px-8 py-3 font-semibold text-white transition-colors duration-200 hover:bg-blue-700"
+                            >
+                                {t('create_first_field')}
+                            </button>
                         </div>
+                    ) : (
+                        <div>
+                            <div className="mb-6 flex items-center justify-between">
+                                <h2 className="text-xl font-semibold text-white">
+                                    {t('your_fields')} ({fields.length})
+                                </h2>
+                                <div className="text-sm text-gray-400">
+                                    {t('click_field_manage')}
+                                </div>
+                            </div>
 
-                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                            {fields.map((field) => (
-                                <FieldCard
-                                    key={field.id}
-                                    field={field}
-                                    onSelect={handleFieldSelect}
-                                    onDelete={handleFieldDelete}
-                                    t={t}
-                                />
-                            ))}
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                                {fields.map((field) => (
+                                    <FieldCard
+                                        key={field.id}
+                                        field={field}
+                                        onSelect={handleFieldSelect}
+                                        onDelete={handleFieldDelete}
+                                        t={t}
+                                    />
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
                 </div>
             </div>
 
