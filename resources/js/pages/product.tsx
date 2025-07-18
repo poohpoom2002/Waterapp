@@ -61,6 +61,12 @@ export default function Product() {
     }>({});
     const [selectedPump, setSelectedPump] = useState<any>(null);
 
+    // Additional state for equipment selection
+    const [selectedSprinkler, setSelectedSprinkler] = useState<any>(null);
+    const [selectedBranchPipe, setSelectedBranchPipe] = useState<any>(null);
+    const [selectedSecondaryPipe, setSelectedSecondaryPipe] = useState<any>(null);
+    const [selectedMainPipe, setSelectedMainPipe] = useState<any>(null);
+
     const [projectImage, setProjectImage] = useState<string | null>(null);
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -76,6 +82,42 @@ export default function Product() {
             URL.revokeObjectURL(projectImage);
             setProjectImage(null);
         }
+    };
+
+    // Helper function to check if pipe data is valid
+    const isValidPipeData = (data: any, type: string) => {
+        return data && data[`${type}Pipes`] && data[`${type}Pipes`].total > 0;
+    };
+
+    // Helper function to create single zone input
+    const createSingleZoneInput = (data: HorticultureProjectData, stats: any): IrrigationInput => {
+        const totalArea = data.zones.reduce((sum, zone) => sum + zone.area, 0);
+        const totalPlants = data.zones.reduce((sum, zone) => sum + (zone.plantCount || 0), 0);
+        const totalWater = data.zones.reduce((sum, zone) => sum + zone.totalWaterNeed, 0);
+
+        return {
+            farmSizeRai: formatNumber(totalArea / 1600, 3),
+            totalTrees: totalPlants,
+            waterPerTreeLiters: formatNumber(totalPlants ? totalWater / totalPlants : 50, 3),
+            numberOfZones: 1,
+            sprinklersPerTree: 1,
+            irrigationTimeMinutes: 20,
+            staticHeadM: 0,
+            pressureHeadM: 20,
+            pipeAgeYears: 0,
+            sprinklersPerBranch: 4,
+            branchesPerSecondary: 5,
+            simultaneousZones: 1,
+            sprinklersPerLongestBranch: 6,
+            branchesPerLongestSecondary: 6,
+            secondariesPerLongestMain: 3,
+            longestBranchPipeM: formatNumber(30, 3),
+            totalBranchPipeM: formatNumber(500, 3),
+            longestSecondaryPipeM: formatNumber(0, 3),
+            totalSecondaryPipeM: formatNumber(0, 3),
+            longestMainPipeM: formatNumber(0, 3),
+            totalMainPipeM: formatNumber(0, 3),
+        };
     };
 
     // Load horticulture project data
@@ -154,72 +196,90 @@ export default function Product() {
         const totalMainLength = mainPipes.reduce((sum, m) => sum + m.length, 0) || 0;
 
         // Calculate sprinklers configuration
-        const totalTrees = zone.plantCount || 100;
-        const waterPerTree = zone.totalWaterNeed / totalTrees || 50;
+        const zoneTotalTrees = zone.plantCount || 100;
+        const waterPerTree = zone.totalWaterNeed / zoneTotalTrees || 50;
 
         // Check if we have valid pipe data
         const hasValidMainPipe = isValidPipeData(pipeLengthData, 'main');
         const hasValidSubmainPipe = isValidPipeData(pipeLengthData, 'submain');
 
         // Use pipe data only if it's valid, otherwise use default values
-        const longestBranchPipeM =
-            branches.length && branches.some((z) => z.longestBranch > 0)
-                ? Math.max(...branches.map((z) => z.longestBranch))
-                : 30; // ค่าเริ่มต้นสำหรับท่อย่อย
+        const longestBranchPipeM = longestBranch;
+        const totalBranchPipeM = totalBranchLength;
 
-        const totalBranchPipeM =
-            branches.length && branches.some((z) => z.totalBranchLength > 0)
-                ? branches.reduce((sum, z) => sum + z.totalBranchLength, 0)
-                : 500; // ค่าเริ่มต้นสำหรับท่อย่อย
-
-        const longestSecondaryPipeM = hasValidSubmainPipe && submain?.longest ? submain.longest : 0;
-        const totalSecondaryPipeM = hasValidSubmainPipe && submain?.total ? submain.total : 0;
-        const longestMainPipeM = hasValidMainPipe && main?.longest ? main.longest : 0;
-        const totalMainPipeM = hasValidMainPipe && main?.total ? main.total : 0;
+        const longestSecondaryPipeM =
+            hasValidSubmainPipe && pipeLengthData?.submainPipes?.longest
+                ? pipeLengthData.submainPipes.longest
+                : longestSubMain;
+        const totalSecondaryPipeM =
+            hasValidSubmainPipe && pipeLengthData?.submainPipes?.total
+                ? pipeLengthData.submainPipes.total
+                : totalSubMainLength;
+        const longestMainPipeM =
+            hasValidMainPipe && pipeLengthData?.mainPipes?.longest
+                ? pipeLengthData.mainPipes.longest
+                : longestMain;
+        const totalMainPipeM =
+            hasValidMainPipe && pipeLengthData?.mainPipes?.total
+                ? pipeLengthData.mainPipes.total
+                : totalMainLength;
 
         // คำนวณค่าเริ่มต้นสำหรับฟิลด์ใหม่โดยใช้ข้อมูลจากฟาร์ม
-        const totalTrees = Math.round(plants);
-        const numberOfZones = zones.length || 1;
-        
-        // คำนวณจำนวนสปริงเกอร์ต่อท่อย่อยโดยประมาณ
-        const estimatedSprinklersPerBranch = Math.max(1, Math.ceil(totalTrees / (numberOfZones * 10))); // ประมาณ 10 ท่อย่อยต่อโซน
-        
-        // สำหรับท่อย่อยเส้นที่ยาวที่สุด อาจมีสปริงเกอร์มากกว่าเฉลี่ย 20-50%
-        const sprinklersPerLongestBranch = Math.max(estimatedSprinklersPerBranch, Math.ceil(estimatedSprinklersPerBranch * 1.3));
-        
-        // คำนวณจำนวนท่อย่อยต่อท่อรอง
-        const estimatedBranchesPerSecondary = hasValidSubmainPipe ? 
-            Math.max(1, Math.ceil(totalTrees / (numberOfZones * sprinklersPerLongestBranch))) : 1;
-        const branchesPerLongestSecondary = hasValidSubmainPipe ? 
-            Math.max(estimatedBranchesPerSecondary, Math.ceil(estimatedBranchesPerSecondary * 1.2)) : 1;
-        
-        // คำนวณจำนวนท่อรองต่อท่อเมน
-        const estimatedSecondariesPerMain = hasValidMainPipe ? 
-            Math.max(1, Math.ceil(estimatedBranchesPerSecondary / 2)) : 1;
-        const secondariesPerLongestMain = hasValidMainPipe ? 
-            Math.max(estimatedSecondariesPerMain, Math.ceil(estimatedSecondariesPerMain * 1.1)) : 1;
+        const totalTrees = zoneTotalTrees;
+        const numberOfZones = totalZones;
 
-        const result = {
-            farmSizeRai: formatNumber(area, 3),
+        // คำนวณจำนวนสปริงเกอร์ต่อท่อย่อยโดยประมาณ
+        const estimatedSprinklersPerBranch = Math.max(
+            1,
+            Math.ceil(totalTrees / (numberOfZones * 10))
+        ); // ประมาณ 10 ท่อย่อยต่อโซน
+
+        // สำหรับท่อย่อยเส้นที่ยาวที่สุด อาจมีสปริงเกอร์มากกว่าเฉลี่ย 20-50%
+        const sprinklersPerLongestBranch = Math.max(
+            estimatedSprinklersPerBranch,
+            Math.ceil(estimatedSprinklersPerBranch * 1.3)
+        );
+
+        // คำนวณจำนวนท่อย่อยต่อท่อรอง
+        const estimatedBranchesPerSecondary = hasValidSubmainPipe
+            ? Math.max(1, Math.ceil(totalTrees / (numberOfZones * sprinklersPerLongestBranch)))
+            : 1;
+        const branchesPerLongestSecondary = hasValidSubmainPipe
+            ? Math.max(
+                  estimatedBranchesPerSecondary,
+                  Math.ceil(estimatedBranchesPerSecondary * 1.2)
+              )
+            : 1;
+
+        // คำนวณจำนวนท่อรองต่อท่อเมน
+        const estimatedSecondariesPerMain = hasValidMainPipe
+            ? Math.max(1, Math.ceil(estimatedBranchesPerSecondary / 2))
+            : 1;
+        const secondariesPerLongestMain = hasValidMainPipe
+            ? Math.max(estimatedSecondariesPerMain, Math.ceil(estimatedSecondariesPerMain * 1.1))
+            : 1;
+
+        return {
+            farmSizeRai: formatNumber(zone.area / 1600, 3),
             totalTrees: totalTrees,
-            waterPerTreeLiters: formatNumber(totalTrees ? totalWater / totalTrees : 50, 3),
+            waterPerTreeLiters: formatNumber(totalTrees ? zone.totalWaterNeed / totalTrees : 50, 3),
             numberOfZones: numberOfZones,
             sprinklersPerTree: 1,
             irrigationTimeMinutes: 20,
             staticHeadM: 0,
             pressureHeadM: 20,
             pipeAgeYears: 0,
-            
+
             // ฟิลด์เดิม
             sprinklersPerBranch: estimatedSprinklersPerBranch,
             branchesPerSecondary: estimatedBranchesPerSecondary,
             simultaneousZones: 1,
-            
+
             // ฟิลด์ใหม่สำหรับการคำนวณแบบละเอียด
             sprinklersPerLongestBranch: sprinklersPerLongestBranch,
             branchesPerLongestSecondary: branchesPerLongestSecondary,
             secondariesPerLongestMain: secondariesPerLongestMain,
-            
+
             // ข้อมูลท่อ
             longestBranchPipeM: formatNumber(longestBranchPipeM, 3),
             totalBranchPipeM: formatNumber(totalBranchPipeM, 3),
@@ -343,6 +403,25 @@ export default function Product() {
         setSelectedPump(pump);
     };
 
+    // Handle zone selection
+    const handleZoneSelection = (zoneId: string, checked: boolean) => {
+        if (checked) {
+            setSelectedZones((prev) => [...prev, zoneId]);
+        } else {
+            setSelectedZones((prev) => prev.filter((id) => id !== zoneId));
+        }
+    };
+
+    // Handle input change
+    const handleInputChange = (input: IrrigationInput) => {
+        if (activeZoneId) {
+            setZoneInputs((prev) => ({
+                ...prev,
+                [activeZoneId]: input,
+            }));
+        }
+    };
+
     // Calculate results based on selected sprinkler and zone
     const results = useCalculations(currentInput as IrrigationInput, currentSprinkler);
 
@@ -367,42 +446,40 @@ export default function Product() {
     // Default selections when results update (ใช้ข้อมูลจาก database)
     useEffect(() => {
         if (!results) return;
-    
+
         console.log('Setting default equipment selections from database');
-    
+
         // ฟังก์ชันเลือกอุปกรณ์ที่ดีที่สุด (ราคาสูงสุดในกลุ่มแนะนำ)
-        const selectBestEquipment = (
-            recommended: any[], 
-            analyzed: any[], 
-            currentSelected: any
-        ) => {
+        const selectBestEquipment = (recommended: any[], analyzed: any[], currentSelected: any) => {
             // ถ้ามีอุปกรณ์ปัจจุบันและยังอยู่ในกลุ่มแนะนำ ให้ใช้ต่อ
             if (currentSelected) {
-                const currentInRecommended = recommended.find(item => item.id === currentSelected.id);
+                const currentInRecommended = recommended.find(
+                    (item) => item.id === currentSelected.id
+                );
                 if (currentInRecommended && currentInRecommended.isRecommended) {
                     return currentSelected;
                 }
             }
-    
+
             // เลือกจากกลุ่มแนะนำ (ราคาสูงสุด)
             if (recommended.length > 0) {
                 return recommended.sort((a, b) => b.price - a.price)[0];
             }
-    
+
             // เลือกจากกลุ่มที่ใช้ได้ (ราคาสูงสุด)
-            const usableItems = analyzed?.filter(item => item.isUsable) || [];
+            const usableItems = analyzed?.filter((item) => item.isUsable) || [];
             if (usableItems.length > 0) {
                 return usableItems.sort((a, b) => b.price - a.price)[0];
             }
-    
+
             // เลือกจากทั้งหมด (คะแนนสูงสุด)
             if (analyzed && analyzed.length > 0) {
                 return analyzed.sort((a, b) => b.score - a.score)[0];
             }
-    
+
             return null;
         };
-    
+
         // Sprinkler - เลือกราคาสูงสุดในกลุ่มแนะนำ
         const newSelectedSprinkler = selectBestEquipment(
             results.recommendedSprinklers || [],
@@ -412,7 +489,7 @@ export default function Product() {
         if (newSelectedSprinkler && newSelectedSprinkler.id !== selectedSprinkler?.id) {
             setSelectedSprinkler(newSelectedSprinkler);
         }
-    
+
         // Branch pipe - เลือกราคาสูงสุดในกลุ่มแนะนำ
         const newSelectedBranchPipe = selectBestEquipment(
             results.recommendedBranchPipe || [],
@@ -422,7 +499,7 @@ export default function Product() {
         if (newSelectedBranchPipe && newSelectedBranchPipe.id !== selectedBranchPipe?.id) {
             setSelectedBranchPipe(newSelectedBranchPipe);
         }
-    
+
         // Secondary pipe - เฉพาะเมื่อมีข้อมูล
         if (hasValidSubmainPipeData) {
             const newSelectedSecondaryPipe = selectBestEquipment(
@@ -430,13 +507,16 @@ export default function Product() {
                 results.analyzedSecondaryPipes || [],
                 selectedSecondaryPipe
             );
-            if (newSelectedSecondaryPipe && newSelectedSecondaryPipe.id !== selectedSecondaryPipe?.id) {
+            if (
+                newSelectedSecondaryPipe &&
+                newSelectedSecondaryPipe.id !== selectedSecondaryPipe?.id
+            ) {
                 setSelectedSecondaryPipe(newSelectedSecondaryPipe);
             }
         } else if (selectedSecondaryPipe) {
             setSelectedSecondaryPipe(null);
         }
-    
+
         // Main pipe - เฉพาะเมื่อมีข้อมูล
         if (hasValidMainPipeData) {
             const newSelectedMainPipe = selectBestEquipment(
@@ -450,7 +530,7 @@ export default function Product() {
         } else if (selectedMainPipe) {
             setSelectedMainPipe(null);
         }
-    
+
         // Pump - เลือกราคาสูงสุดในกลุ่มแนะนำ
         const newSelectedPump = selectBestEquipment(
             results.recommendedPump || [],
@@ -460,22 +540,26 @@ export default function Product() {
         if (newSelectedPump && newSelectedPump.id !== selectedPump?.id) {
             setSelectedPump(newSelectedPump);
         }
-    
-    }, [results, hasValidMainPipeData, hasValidSubmainPipeData, input]);
+    }, [results, hasValidMainPipeData, hasValidSubmainPipeData, currentInput]);
 
     useEffect(() => {
-        if (!results) return;
-    
+        if (!results || !currentInput) return;
+
         // ตรวจสอบว่า input เปลี่ยนแปลงมากพอที่จะต้อง reset
-        const shouldReset = (
+        const shouldReset =
             // เปลี่ยนจำนวนโซน
-            input.numberOfZones !== (input.numberOfZones || 1) ||
+            currentInput.numberOfZones !== (currentInput.numberOfZones || 1) ||
             // เปลี่ยนจำนวนต้นไม้มากกว่า 20%
-            Math.abs((input.totalTrees || 0) - (input.totalTrees || 0)) / (input.totalTrees || 1) > 0.2 ||
+            Math.abs((currentInput.totalTrees || 0) - (currentInput.totalTrees || 0)) /
+                (currentInput.totalTrees || 1) >
+                0.2 ||
             // เปลี่ยนความต้องการน้ำมากกว่า 20%
-            Math.abs((input.waterPerTreeLiters || 0) - (input.waterPerTreeLiters || 0)) / (input.waterPerTreeLiters || 1) > 0.2
-        );
-    
+            Math.abs(
+                (currentInput.waterPerTreeLiters || 0) - (currentInput.waterPerTreeLiters || 0)
+            ) /
+                (currentInput.waterPerTreeLiters || 1) >
+                0.2;
+
         if (shouldReset) {
             console.log('Major input change detected, resetting equipment selections');
             setSelectedSprinkler(null);
@@ -484,23 +568,23 @@ export default function Product() {
             setSelectedMainPipe(null);
             setSelectedPump(null);
         }
-    }, [input.numberOfZones, input.totalTrees, input.waterPerTreeLiters]);
+    }, [currentInput?.numberOfZones, currentInput?.totalTrees, currentInput?.waterPerTreeLiters]);
 
     // Update pipe-rolls calculations when pipes change
     useEffect(() => {
-        if (!results || !selectedBranchPipe) return;
+        if (!results || !currentInput) return;
 
         // Only calculate for pipes that are selected and have valid data
         if (selectedBranchPipe) {
-            calculatePipeRolls(input.totalBranchPipeM, selectedBranchPipe.lengthM);
+            calculatePipeRolls(currentInput.totalBranchPipeM, selectedBranchPipe.lengthM);
         }
         if (selectedSecondaryPipe) {
-            calculatePipeRolls(input.totalSecondaryPipeM, selectedSecondaryPipe.lengthM);
+            calculatePipeRolls(currentInput.totalSecondaryPipeM, selectedSecondaryPipe.lengthM);
         }
         if (selectedMainPipe) {
-            calculatePipeRolls(input.totalMainPipeM, selectedMainPipe.lengthM);
+            calculatePipeRolls(currentInput.totalMainPipeM, selectedMainPipe.lengthM);
         }
-    };
+    }, [selectedBranchPipe, selectedSecondaryPipe, selectedMainPipe, currentInput]);
 
     const handleQuotationModalConfirm = () => {
         setShowQuotationModal(false);

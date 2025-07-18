@@ -10,7 +10,7 @@ export interface SearchResult {
     };
     types: string[];
     rating?: number;
-    photos?: any[];
+    photos?: unknown[];
     vicinity?: string;
     business_status?: string;
 }
@@ -431,10 +431,15 @@ export const getPlacePhotoUrl = (
     if (!result.photos || result.photos.length === 0) return null;
 
     try {
-        return result.photos[0].getUrl({
-            maxWidth: options?.maxWidth || 400,
-            maxHeight: options?.maxHeight || 300,
-        });
+        // Type guard: check if getUrl exists on the first photo
+        const photo = result.photos[0] as google.maps.places.PlacePhoto | undefined;
+        if (photo && typeof photo.getUrl === 'function') {
+            return photo.getUrl({
+                maxWidth: options?.maxWidth || 400,
+                maxHeight: options?.maxHeight || 300,
+            });
+        }
+        return null;
     } catch (error) {
         console.error('Error getting photo URL:', error);
         return null;
@@ -443,12 +448,12 @@ export const getPlacePhotoUrl = (
 
 // ฟังก์ชัน debounce สำหรับการค้นหา
 export const createSearchDebouncer = (
-    searchFunction: (query: string) => Promise<any>,
+    searchFunction: (query: string) => Promise<unknown>,
     delay: number = 300
 ) => {
     let timeoutId: NodeJS.Timeout | null = null;
 
-    return (query: string): Promise<any> => {
+    return (query: string): Promise<unknown> => {
         return new Promise((resolve, reject) => {
             if (timeoutId) {
                 clearTimeout(timeoutId);

@@ -191,7 +191,12 @@
     }
 
     /* Header adjustments */
-    h1, h2, h3, h4, h5, h6 {
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
         page-break-after: avoid !important;
         color: black !important;
     }
@@ -447,11 +452,11 @@
         .grid.lg\\:grid-cols-3 {
             grid-template-columns: 1fr !important;
         }
-        
+
         .grid.lg\\:col-span-2 {
             grid-column: span 1 !important;
         }
-        
+
         .map-container {
             height: 400px !important;
         }

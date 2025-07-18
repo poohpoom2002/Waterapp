@@ -32,7 +32,7 @@ export const captureElementAsImage = async (
 
     // Clone the element to avoid modifying the original
     const clonedElement = element.cloneNode(true) as HTMLElement;
-    
+
     // Apply html2canvas compatibility styles
     const applyCompatibilityStyles = (el: HTMLElement) => {
         // Force background colors to hex/rgb
@@ -113,7 +113,7 @@ export const enhancedHtml2Canvas = async (
         return await html2canvas(element, finalOptions);
     } catch (error) {
         console.error('html2canvas error:', error);
-        
+
         // Fallback: try with more basic options
         const fallbackOptions: Partial<Options> = {
             scale: 1,
@@ -121,7 +121,7 @@ export const enhancedHtml2Canvas = async (
             allowTaint: true,
             foreignObjectRendering: false,
         };
-        
+
         return await html2canvas(element, fallbackOptions);
     }
 };
@@ -139,21 +139,21 @@ export const convertToPDF = async (
     } = {}
 ): Promise<void> => {
     const { jsPDF } = await import('jspdf');
-    
+
     try {
         const canvas = await enhancedHtml2Canvas(element);
         const img = canvas.toDataURL('image/png');
-        
+
         const pdf = new jsPDF({
             orientation: 'portrait',
             unit: 'pt',
             format: 'a4',
             ...options,
         });
-        
+
         const w = pdf.internal.pageSize.getWidth();
         const h = pdf.internal.pageSize.getHeight();
-        
+
         pdf.addImage(img, 'PNG', 0, 0, w, h);
         pdf.save(filename);
     } catch (error) {
@@ -173,7 +173,7 @@ export const downloadImage = async (
     try {
         const canvas = await enhancedHtml2Canvas(element);
         const dataUrl = canvas.toDataURL(`image/${format}`);
-        
+
         const link = document.createElement('a');
         link.download = filename;
         link.href = dataUrl;
@@ -184,4 +184,4 @@ export const downloadImage = async (
         console.error('Image download error:', error);
         throw error;
     }
-}; 
+};

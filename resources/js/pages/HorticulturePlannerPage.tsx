@@ -782,8 +782,8 @@ const findTargetZoneForMainPipe = (
 
 const calculateExactSpacingStats = (subMainPipes: SubMainPipe[]) => {
     let totalBranches = 0;
-    let totalRowSpacings: number[] = [];
-    let totalPlantSpacings: number[] = [];
+    const totalRowSpacings: number[] = [];
+    const totalPlantSpacings: number[] = [];
 
     subMainPipes.forEach((subMain) => {
         const branchCount = subMain.branchPipes.length;
@@ -2500,7 +2500,7 @@ export default function EnhancedHorticulturePlannerPage() {
 
     const handlePipeSave = useCallback(
         (updatedPipe: MainPipe | SubMainPipe | BranchPipe) => {
-            let newState: Partial<ProjectState> = {};
+            const newState: Partial<ProjectState> = {};
 
             if (selectedPipeType === 'main') {
                 const updatedMainPipes = history.present.mainPipes.map((pipe) =>
@@ -2529,7 +2529,7 @@ export default function EnhancedHorticulturePlannerPage() {
 
     const handlePipeDelete = useCallback(
         (pipeId: string) => {
-            let newState: Partial<ProjectState> = {};
+            const newState: Partial<ProjectState> = {};
 
             if (selectedPipeType === 'main') {
                 const updatedMainPipes = history.present.mainPipes.filter(

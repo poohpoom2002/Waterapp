@@ -1,5 +1,5 @@
 export class GoogleMapsErrorHandler {
-    static handleMapLoadError(error: any) {
+    static handleMapLoadError(error: unknown) {
         console.error('Google Maps Load Error:', error);
 
         // แสดง error message ที่เป็นมิตรกับผู้ใช้
@@ -12,7 +12,10 @@ export class GoogleMapsErrorHandler {
             UnknownError: 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ',
         };
 
-        const errorType = error.code || error.name || 'UnknownError';
+        const errorType =
+            (error as { code?: string; name?: string }).code ||
+            (error as { code?: string; name?: string }).name ||
+            'UnknownError';
         const message = errorMessages[errorType] || errorMessages['UnknownError'];
 
         return {

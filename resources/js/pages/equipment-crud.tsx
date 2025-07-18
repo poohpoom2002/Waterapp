@@ -403,8 +403,8 @@ const Pagination: React.FC<{
         const maxVisiblePages = 5;
 
         let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-        let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-        
+        const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
         if (endPage - startPage + 1 < maxVisiblePages) {
             startPage = Math.max(1, endPage - maxVisiblePages + 1);
         }
@@ -1327,7 +1327,7 @@ const EquipmentForm: React.FC<{
         }
 
         // Attribute validation
-        attributes.forEach(attr => {
+        attributes.forEach((attr) => {
             if (attr.is_required) {
                 const value = formData.attributes?.[attr.attribute_name];
                 if (!value || (Array.isArray(value) && value.length === 0) || value === '') {
@@ -2035,58 +2035,58 @@ const EquipmentDetailModal: React.FC<{
     const getThaiDisplayName = (attributeName: string) => {
         const thaiDisplayMap: { [key: string]: string } = {
             // สปริงเกอร์
-            'flow_rate': 'อัตราการไหล',
-            'pressure': 'ความดัน', 
-            'radius': 'รัศมีการพ่น',
-            'waterVolumeLitersPerHour': 'อัตราการไหล',
-            'pressureBar': 'ความดัน',
-            'radiusMeters': 'รัศมีการพ่น',
-            
+            flow_rate: 'อัตราการไหล',
+            pressure: 'ความดัน',
+            radius: 'รัศมีการพ่น',
+            waterVolumeLitersPerHour: 'อัตราการไหล',
+            pressureBar: 'ความดัน',
+            radiusMeters: 'รัศมีการพ่น',
+
             // ปั๊มน้ำ
-            'power_hp': 'กำลัง',
-            'powerHP': 'กำลัง',
-            'powerKW': 'กำลัง',
-            'phase': 'เฟส',
-            'inlet_size_inch': 'ขนาดท่อดูด',
-            'outlet_size_inch': 'ขนาดท่อส่ง',
-            'flow_rate_lpm': 'อัตราการไหล',
-            'head_m': 'หัวดัน',
-            'max_head_m': 'หัวดันสูงสุด',
-            'max_flow_rate_lpm': 'อัตราการไหลสูงสุด',
-            'suction_depth_m': 'ความลึกดูด',
-            'weight_kg': 'น้ำหนัก',
-            
+            power_hp: 'กำลัง',
+            powerHP: 'กำลัง',
+            powerKW: 'กำลัง',
+            phase: 'เฟส',
+            inlet_size_inch: 'ขนาดท่อดูด',
+            outlet_size_inch: 'ขนาดท่อส่ง',
+            flow_rate_lpm: 'อัตราการไหล',
+            head_m: 'หัวดัน',
+            max_head_m: 'หัวดันสูงสุด',
+            max_flow_rate_lpm: 'อัตราการไหลสูงสุด',
+            suction_depth_m: 'ความลึกดูด',
+            weight_kg: 'น้ำหนัก',
+
             // ท่อ
-            'size_mm': 'ขนาด',
-            'size_inch': 'ขนาด',
-            'sizeMM': 'ขนาด',
-            'sizeInch': 'ขนาด',
-            'lengthM': 'ความยาว',
-            'dimensions_cm': 'ขนาด',
-            'material': 'วัสดุ',
-            
+            size_mm: 'ขนาด',
+            size_inch: 'ขนาด',
+            sizeMM: 'ขนาด',
+            sizeInch: 'ขนาด',
+            lengthM: 'ความยาว',
+            dimensions_cm: 'ขนาด',
+            material: 'วัสดุ',
+
             // ไฟฟ้า
-            'voltage': 'แรงดันไฟฟ้า',
-            'current': 'กระแสไฟฟ้า',
-            'frequency': 'ความถี่',
-            
+            voltage: 'แรงดันไฟฟ้า',
+            current: 'กระแสไฟฟ้า',
+            frequency: 'ความถี่',
+
             // ทั่วไป
-            'brand': 'แบรนด์',
-            'model': 'รุ่น',
-            'color': 'สี',
-            'weight': 'น้ำหนัก',
-            'height': 'ความสูง',
-            'width': 'ความกว้าง',
-            'length': 'ความยาว',
-            'diameter': 'เส้นผ่านศูนย์กลาง',
-            'thickness': 'ความหนา',
-            'capacity': 'ความจุ',
-            'efficiency': 'ประสิทธิภาพ',
-            'temperature_range': 'ช่วงอุณหภูมิ',
-            'operating_pressure': 'ความดันใช้งาน',
-            'max_pressure': 'ความดันสูงสุด',
-            'connection_type': 'ประเภทการต่อ',
-            'thread_size': 'ขนาดเกลียว',
+            brand: 'แบรนด์',
+            model: 'รุ่น',
+            color: 'สี',
+            weight: 'น้ำหนัก',
+            height: 'ความสูง',
+            width: 'ความกว้าง',
+            length: 'ความยาว',
+            diameter: 'เส้นผ่านศูนย์กลาง',
+            thickness: 'ความหนา',
+            capacity: 'ความจุ',
+            efficiency: 'ประสิทธิภาพ',
+            temperature_range: 'ช่วงอุณหภูมิ',
+            operating_pressure: 'ความดันใช้งาน',
+            max_pressure: 'ความดันสูงสุด',
+            connection_type: 'ประเภทการต่อ',
+            thread_size: 'ขนาดเกลียว',
         };
 
         if (thaiDisplayMap[attributeName]) {
@@ -2558,7 +2558,7 @@ const ImageModal: React.FC<{
                 >
                     <X className="h-4 w-4" />
                 </button>
-                
+
                 {/* รูปภาพ */}
                 <img
                     src={imageSrc}
@@ -2566,10 +2566,10 @@ const ImageModal: React.FC<{
                     className="max-h-full max-w-full rounded-lg shadow-2xl"
                     onClick={(e) => e.stopPropagation()}
                 />
-                
+
                 {/* ชื่อรูป */}
                 <div className="mt-2 text-center">
-                    <p className="text-white text-sm bg-black bg-opacity-50 rounded px-2 py-1 inline-block">
+                    <p className="inline-block rounded bg-black bg-opacity-50 px-2 py-1 text-sm text-white">
                         {imageAlt}
                     </p>
                 </div>
@@ -2584,7 +2584,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
     const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10); // 10 รายการต่อหน้า
-    
+
     const [filters, setFilters] = useState<FilterOptions>({
         search: '',
         categoryId: null,

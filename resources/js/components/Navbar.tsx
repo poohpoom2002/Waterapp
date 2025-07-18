@@ -5,9 +5,9 @@ import LanguageSwitcher from './LanguageSwitcher';
 import UserAvatar from './UserAvatar';
 
 const Navbar: React.FC = () => {
-    const { t } = useLanguage();
+    useLanguage();
     const page = usePage();
-    const auth = (page.props as any).auth;
+    const auth = (page.props as { auth: unknown }).auth;
 
     return (
         <nav className="border-b border-gray-700 bg-gray-800 shadow-lg">

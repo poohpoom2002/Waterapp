@@ -23,7 +23,7 @@ export const greenhouseCrops: Crop[] = [
         nameEn: 'Tomato',
         description: 'ผลไม้ที่เป็นผักอเนกประสงค์ เหมาะสำหรับโรงเรือน',
         icon: '🍅',
-        category: 'vegetables'
+        category: 'vegetables',
     },
     {
         value: 'bell-pepper',
@@ -31,7 +31,7 @@ export const greenhouseCrops: Crop[] = [
         nameEn: 'Bell Pepper',
         description: 'พริกหวานหลากสี อุดมด้วยวิตามิน',
         icon: '🫑',
-        category: 'vegetables'
+        category: 'vegetables',
     },
     {
         value: 'cucumber',
@@ -39,7 +39,7 @@ export const greenhouseCrops: Crop[] = [
         nameEn: 'Cucumber',
         description: 'ผักเปรี้ยว สดชื่น เหมาะปลูกในโรงเรือน',
         icon: '🥒',
-        category: 'vegetables'
+        category: 'vegetables',
     },
     {
         value: 'melon',
@@ -47,7 +47,7 @@ export const greenhouseCrops: Crop[] = [
         nameEn: 'Melon',
         description: 'ผลไม้หวาน เนื้อนุ่ม ปลูกในโรงเรือนได้ดี',
         icon: '🍈',
-        category: 'vegetables'
+        category: 'vegetables',
     },
     {
         value: 'lettuce',
@@ -55,7 +55,7 @@ export const greenhouseCrops: Crop[] = [
         nameEn: 'Lettuce',
         description: 'ผักสลัดชนิดต่าง ๆ เช่น เรดโอ๊ค กรีนโอ๊ค',
         icon: '🥬',
-        category: 'vegetables'
+        category: 'vegetables',
     },
     {
         value: 'kale',
@@ -63,7 +63,7 @@ export const greenhouseCrops: Crop[] = [
         nameEn: 'Kale',
         description: 'ผักใบเขียวเข้ม อุดมด้วยสารอาหาร',
         icon: '🥬',
-        category: 'vegetables'
+        category: 'vegetables',
     },
     {
         value: 'pak-choi',
@@ -71,7 +71,7 @@ export const greenhouseCrops: Crop[] = [
         nameEn: 'Pak Choi',
         description: 'ผักใบเขียวจีน เติบโตเร็ว',
         icon: '🥬',
-        category: 'vegetables'
+        category: 'vegetables',
     },
     {
         value: 'chinese-kale',
@@ -79,7 +79,7 @@ export const greenhouseCrops: Crop[] = [
         nameEn: 'Chinese Kale',
         description: 'ผักใบเขียวไทย เติบโตเร็ว',
         icon: '🥬',
-        category: 'vegetables'
+        category: 'vegetables',
     },
     {
         value: 'cabbage',
@@ -87,7 +87,7 @@ export const greenhouseCrops: Crop[] = [
         nameEn: 'Cabbage',
         description: 'ผักหัวกะทัดรัด เหมาะสำหรับโรงเรือน',
         icon: '🥬',
-        category: 'vegetables'
+        category: 'vegetables',
     },
     {
         value: 'cauliflower',
@@ -95,7 +95,7 @@ export const greenhouseCrops: Crop[] = [
         nameEn: 'Cauliflower',
         description: 'ผักดอกสีขาว อุดมด้วยวิตามิน',
         icon: '🥦',
-        category: 'vegetables'
+        category: 'vegetables',
     },
     {
         value: 'broccoli',
@@ -103,7 +103,7 @@ export const greenhouseCrops: Crop[] = [
         nameEn: 'Broccoli',
         description: 'ผักดอกสีเขียว อุดมด้วยสารอาหาร',
         icon: '🥦',
-        category: 'vegetables'
+        category: 'vegetables',
     },
     // ผลไม้ (Fruits)
     {
@@ -112,7 +112,7 @@ export const greenhouseCrops: Crop[] = [
         nameEn: 'Strawberry',
         description: 'ผลไม้หวานฉ่ำ เหมาะปลูกในโรงเรือน',
         icon: '🍓',
-        category: 'fruits'
+        category: 'fruits',
     },
     {
         value: 'seedless-grape',
@@ -120,7 +120,7 @@ export const greenhouseCrops: Crop[] = [
         nameEn: 'Seedless Grape',
         description: 'องุ่นหวานไร้เมล็ด คุณภาพพรีเมี่ยม',
         icon: '🍇',
-        category: 'fruits'
+        category: 'fruits',
     },
     {
         value: 'cantaloupe',
@@ -128,7 +128,7 @@ export const greenhouseCrops: Crop[] = [
         nameEn: 'Cantaloupe',
         description: 'เมล่อนเนื้อส้ม หวานหอม',
         icon: '🍈',
-        category: 'fruits'
+        category: 'fruits',
     },
     {
         value: 'japanese-melon',
@@ -136,8 +136,8 @@ export const greenhouseCrops: Crop[] = [
         nameEn: 'Japanese Melon',
         description: 'เมล่อนพรีเมี่ยม เนื้อนุ่ม หวานเข้มข้น',
         icon: '🍈',
-        category: 'fruits'
-    }
+        category: 'fruits',
+    },
 ];
 
 // สำหรับโรงเรือนเท่านั้น - ตัดส่วนอื่นออก
@@ -145,23 +145,24 @@ export const greenhouseCrops: Crop[] = [
 // Categories definition (เฉพาะโรงเรือน)
 export const categories: Record<string, Category> = {
     vegetables: { name: 'พืชผัก', nameEn: 'Vegetables', icon: '🥬' },
-    fruits: { name: 'ผลไม้', nameEn: 'Fruits', icon: '🍓' }
+    fruits: { name: 'ผลไม้', nameEn: 'Fruits', icon: '🍓' },
 };
 
 // Helper functions (เฉพาะโรงเรือน)
 export const getCropByValue = (value: string): Crop | undefined => {
-    return greenhouseCrops.find(crop => crop.value === value);
+    return greenhouseCrops.find((crop) => crop.value === value);
 };
 
 export const searchCrops = (searchTerm: string): Crop[] => {
     const term = searchTerm.toLowerCase();
-    return greenhouseCrops.filter(crop => 
-        crop.name.toLowerCase().includes(term) ||
-        crop.nameEn.toLowerCase().includes(term) ||
-        crop.description.toLowerCase().includes(term)
+    return greenhouseCrops.filter(
+        (crop) =>
+            crop.name.toLowerCase().includes(term) ||
+            crop.nameEn.toLowerCase().includes(term) ||
+            crop.description.toLowerCase().includes(term)
     );
 };
 
 export const getCropsByCategory = (category: string): Crop[] => {
-    return greenhouseCrops.filter(crop => crop.category === category);
+    return greenhouseCrops.filter((crop) => crop.category === category);
 };

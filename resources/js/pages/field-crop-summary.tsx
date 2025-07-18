@@ -157,7 +157,7 @@ export default function FieldCropSummary() {
     const microSprayPoints = actualIrrigationPoints.filter((p) => p.type === 'micro_spray').length;
     const dripPoints = actualIrrigationPoints.filter((p) => p.type === 'drip_tape').length;
     const dripLines = actualIrrigationLines.filter((l) => l.type === 'drip_tape').length;
-    
+
     // Calculate drip tape statistics
     const dripTapeSummary = actualIrrigationPoints.find((p) => p.type === 'drip_tape');
     const totalDripHoles = dripTapeSummary ? dripTapeSummary.totalHoles || 0 : 0;
@@ -311,7 +311,7 @@ export default function FieldCropSummary() {
             <Head title="Field Crop Summary - Irrigation Planning" />
 
             {/* Header */}
-            <div className="border-b border-gray-700 bg-gray-800 print:border-gray-300 print:bg-white print:hidden">
+            <div className="border-b border-gray-700 bg-gray-800 print:hidden print:border-gray-300 print:bg-white">
                 <div className="container mx-auto px-4 py-4">
                     <div className="mx-auto max-w-7xl">
                         {/* Back Navigation */}
@@ -345,9 +345,11 @@ export default function FieldCropSummary() {
             </div>
 
             {/* Print Header */}
-            <div className="hidden print:block print:mb-4">
+            <div className="hidden print:mb-4 print:block">
                 <h1 className="text-2xl font-bold text-black">📊 Field Crop Summary</h1>
-                <p className="text-gray-600">Complete overview of your irrigation planning project</p>
+                <p className="text-gray-600">
+                    Complete overview of your irrigation planning project
+                </p>
                 <hr className="my-2 border-gray-300" />
             </div>
 
@@ -368,25 +370,33 @@ export default function FieldCropSummary() {
                                         <div className="text-lg font-bold text-blue-400 print:text-sm print:text-black">
                                             {areaInRai.toFixed(2)}
                                         </div>
-                                        <div className="text-xs text-gray-400 print:text-gray-600">ไร่</div>
+                                        <div className="text-xs text-gray-400 print:text-gray-600">
+                                            ไร่
+                                        </div>
                                     </div>
                                     <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-1">
                                         <div className="text-lg font-bold text-green-400 print:text-sm print:text-black">
                                             {totalZones}
                                         </div>
-                                        <div className="text-xs text-gray-400 print:text-gray-600">โซน</div>
+                                        <div className="text-xs text-gray-400 print:text-gray-600">
+                                            โซน
+                                        </div>
                                     </div>
                                     <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-1">
                                         <div className="text-lg font-bold text-purple-400 print:text-sm print:text-black">
                                             {totalPlantingPoints.toLocaleString()}
                                         </div>
-                                        <div className="text-xs text-gray-400 print:text-gray-600">จุดปลูก</div>
+                                        <div className="text-xs text-gray-400 print:text-gray-600">
+                                            จุดปลูก
+                                        </div>
                                     </div>
                                     <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-1">
                                         <div className="text-lg font-bold text-yellow-400 print:text-sm print:text-black">
                                             {totalEstimatedYield.toLocaleString()}
                                         </div>
-                                        <div className="text-xs text-gray-400 print:text-gray-600">กก.</div>
+                                        <div className="text-xs text-gray-400 print:text-gray-600">
+                                            กก.
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -417,10 +427,18 @@ export default function FieldCropSummary() {
                                                         </div>
                                                         <div className="text-right">
                                                             <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                แถว: {rowSpacing[crop.value] || crop.spacing || 1.5}m
+                                                                แถว:{' '}
+                                                                {rowSpacing[crop.value] ||
+                                                                    crop.spacing ||
+                                                                    1.5}
+                                                                m
                                                             </div>
                                                             <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                ต้น: {plantSpacing[crop.value] || crop.defaultPlantSpacing || 1.0}m
+                                                                ต้น:{' '}
+                                                                {plantSpacing[crop.value] ||
+                                                                    crop.defaultPlantSpacing ||
+                                                                    1.0}
+                                                                m
                                                             </div>
                                                         </div>
                                                     </div>
@@ -446,19 +464,25 @@ export default function FieldCropSummary() {
                                             <div className="text-sm font-bold text-blue-400 print:text-xs print:text-black">
                                                 {mainPipes}
                                             </div>
-                                            <div className="text-xs text-gray-400 print:text-gray-600">Main</div>
+                                            <div className="text-xs text-gray-400 print:text-gray-600">
+                                                Main
+                                            </div>
                                         </div>
                                         <div className="rounded bg-gray-700 p-1 text-center print:border print:border-gray-200 print:bg-gray-50">
                                             <div className="text-sm font-bold text-green-400 print:text-xs print:text-black">
                                                 {submainPipes}
                                             </div>
-                                            <div className="text-xs text-gray-400 print:text-gray-600">Submain</div>
+                                            <div className="text-xs text-gray-400 print:text-gray-600">
+                                                Submain
+                                            </div>
                                         </div>
                                         <div className="rounded bg-gray-700 p-1 text-center print:border print:border-gray-200 print:bg-gray-50">
                                             <div className="text-sm font-bold text-purple-400 print:text-xs print:text-black">
                                                 {lateralPipes}
                                             </div>
-                                            <div className="text-xs text-gray-400 print:text-gray-600">Lateral</div>
+                                            <div className="text-xs text-gray-400 print:text-gray-600">
+                                                Lateral
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -473,19 +497,25 @@ export default function FieldCropSummary() {
                                             <div className="text-sm font-bold text-orange-400 print:text-xs print:text-black">
                                                 {pumpCount}
                                             </div>
-                                            <div className="text-xs text-gray-400 print:text-gray-600">Pumps</div>
+                                            <div className="text-xs text-gray-400 print:text-gray-600">
+                                                Pumps
+                                            </div>
                                         </div>
                                         <div className="rounded bg-gray-700 p-1 text-center print:border print:border-gray-200 print:bg-gray-50">
                                             <div className="text-sm font-bold text-red-400 print:text-xs print:text-black">
                                                 {valveCount}
                                             </div>
-                                            <div className="text-xs text-gray-400 print:text-gray-600">Valves</div>
+                                            <div className="text-xs text-gray-400 print:text-gray-600">
+                                                Valves
+                                            </div>
                                         </div>
                                         <div className="rounded bg-gray-700 p-1 text-center print:border print:border-gray-200 print:bg-gray-50">
                                             <div className="text-sm font-bold text-yellow-400 print:text-xs print:text-black">
                                                 {solenoidCount}
                                             </div>
-                                            <div className="text-xs text-gray-400 print:text-gray-600">Solenoids</div>
+                                            <div className="text-xs text-gray-400 print:text-gray-600">
+                                                Solenoids
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -500,25 +530,33 @@ export default function FieldCropSummary() {
                                             <div className="text-sm font-bold text-green-400 print:text-xs print:text-black">
                                                 {sprinklerPoints}
                                             </div>
-                                            <div className="text-xs text-gray-400 print:text-gray-600">Sprinklers</div>
+                                            <div className="text-xs text-gray-400 print:text-gray-600">
+                                                Sprinklers
+                                            </div>
                                         </div>
                                         <div className="rounded bg-gray-700 p-1 text-center print:border print:border-gray-200 print:bg-gray-50">
                                             <div className="text-sm font-bold text-blue-400 print:text-xs print:text-black">
                                                 {miniSprinklerPoints}
                                             </div>
-                                            <div className="text-xs text-gray-400 print:text-gray-600">Mini Sprinklers</div>
+                                            <div className="text-xs text-gray-400 print:text-gray-600">
+                                                Mini Sprinklers
+                                            </div>
                                         </div>
                                         <div className="rounded bg-gray-700 p-1 text-center print:border print:border-gray-200 print:bg-gray-50">
                                             <div className="text-sm font-bold text-orange-400 print:text-xs print:text-black">
                                                 {microSprayPoints}
                                             </div>
-                                            <div className="text-xs text-gray-400 print:text-gray-600">Micro Sprays</div>
+                                            <div className="text-xs text-gray-400 print:text-gray-600">
+                                                Micro Sprays
+                                            </div>
                                         </div>
                                         <div className="rounded bg-gray-700 p-1 text-center print:border print:border-gray-200 print:bg-gray-50">
                                             <div className="text-sm font-bold text-cyan-400 print:text-xs print:text-black">
                                                 {dripPoints + dripLines}
                                             </div>
-                                            <div className="text-xs text-gray-400 print:text-gray-600">Drip Points</div>
+                                            <div className="text-xs text-gray-400 print:text-gray-600">
+                                                Drip Points
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -635,7 +673,8 @@ export default function FieldCropSummary() {
                                                                 Yield
                                                             </div>
                                                             <div className="font-semibold text-yellow-400 print:text-black">
-                                                                {summary.estimatedYield.toLocaleString()} kg
+                                                                {summary.estimatedYield.toLocaleString()}{' '}
+                                                                kg
                                                             </div>
                                                         </div>
                                                         <div>
@@ -643,7 +682,8 @@ export default function FieldCropSummary() {
                                                                 Income
                                                             </div>
                                                             <div className="font-semibold text-green-400 print:text-black">
-                                                                ฿{summary.estimatedPrice.toLocaleString()}
+                                                                ฿
+                                                                {summary.estimatedPrice.toLocaleString()}
                                                             </div>
                                                         </div>
                                                         {irrigationType && (
@@ -654,11 +694,14 @@ export default function FieldCropSummary() {
                                                                 <div className="font-semibold text-cyan-400 print:text-black">
                                                                     {irrigationType === 'sprinkler'
                                                                         ? '🌿 Sprinkler'
-                                                                        : irrigationType === 'mini_sprinkler'
+                                                                        : irrigationType ===
+                                                                            'mini_sprinkler'
                                                                           ? '🌱 Mini Sprinkler'
-                                                                          : irrigationType === 'micro_spray'
+                                                                          : irrigationType ===
+                                                                              'micro_spray'
                                                                             ? '💦 Micro Spray'
-                                                                            : irrigationType === 'drip_tape'
+                                                                            : irrigationType ===
+                                                                                'drip_tape'
                                                                               ? '💧 Drip Points'
                                                                               : irrigationType}
                                                                 </div>
@@ -687,7 +730,10 @@ export default function FieldCropSummary() {
                                         </div>
                                     </div>
                                     {/* MapContainer */}
-                                    <div className="relative print:h-64" style={{ minHeight: 300, height: '400px' }}>
+                                    <div
+                                        className="relative print:h-64"
+                                        style={{ minHeight: 300, height: '400px' }}
+                                    >
                                         <MapContainer
                                             center={optimalCenter}
                                             zoom={optimalZoom}
@@ -742,10 +788,18 @@ export default function FieldCropSummary() {
                                                             key={pipe.id}
                                                             positions={pipe.coordinates}
                                                             pathOptions={{
-                                                                color: pipe.type === 'main' ? '#2563eb' : 
-                                                                       pipe.type === 'submain' ? '#059669' : '#8b5cf6',
-                                                                weight: pipe.type === 'main' ? 4 : 
-                                                                       pipe.type === 'submain' ? 3 : 2,
+                                                                color:
+                                                                    pipe.type === 'main'
+                                                                        ? '#2563eb'
+                                                                        : pipe.type === 'submain'
+                                                                          ? '#059669'
+                                                                          : '#8b5cf6',
+                                                                weight:
+                                                                    pipe.type === 'main'
+                                                                        ? 4
+                                                                        : pipe.type === 'submain'
+                                                                          ? 3
+                                                                          : 2,
                                                                 opacity: 0.8,
                                                             }}
                                                         />
@@ -753,15 +807,20 @@ export default function FieldCropSummary() {
                                                 )}
                                                 {/* Equipment with proper icons */}
                                                 {actualEquipmentIcons.map((equipment, index) => {
-                                                    if (!equipment.lat || !equipment.lng) return null;
-                                                    
-                                                    const customIcon = createEquipmentIcon(equipment);
+                                                    if (!equipment.lat || !equipment.lng)
+                                                        return null;
+
+                                                    const customIcon =
+                                                        createEquipmentIcon(equipment);
                                                     if (!customIcon) return null;
-                                                    
+
                                                     return (
                                                         <Marker
                                                             key={equipment.id}
-                                                            position={[equipment.lat, equipment.lng]}
+                                                            position={[
+                                                                equipment.lat,
+                                                                equipment.lng,
+                                                            ]}
                                                             icon={customIcon}
                                                         />
                                                     );
@@ -769,23 +828,37 @@ export default function FieldCropSummary() {
                                                 {/* Irrigation Points */}
                                                 {actualIrrigationPoints.map((point, index) => {
                                                     if (!point.position) return null;
-                                                    
-                                                    const [lat, lng] = Array.isArray(point.position) 
-                                                        ? point.position 
+
+                                                    const [lat, lng] = Array.isArray(point.position)
+                                                        ? point.position
                                                         : [point.position.lat, point.position.lng];
-                                                    
+
                                                     return (
                                                         <CircleMarker
                                                             key={point.id}
                                                             center={[lat, lng]}
                                                             radius={4}
                                                             pathOptions={{
-                                                                color: point.type === 'sprinkler' ? '#22C55E' :
-                                                                       point.type === 'mini_sprinkler' ? '#3B82F6' :
-                                                                       point.type === 'micro_spray' ? '#F59E0B' : '#06B6D4',
-                                                                fillColor: point.type === 'sprinkler' ? '#22C55E' :
-                                                                          point.type === 'mini_sprinkler' ? '#3B82F6' :
-                                                                          point.type === 'micro_spray' ? '#F59E0B' : '#06B6D4',
+                                                                color:
+                                                                    point.type === 'sprinkler'
+                                                                        ? '#22C55E'
+                                                                        : point.type ===
+                                                                            'mini_sprinkler'
+                                                                          ? '#3B82F6'
+                                                                          : point.type ===
+                                                                              'micro_spray'
+                                                                            ? '#F59E0B'
+                                                                            : '#06B6D4',
+                                                                fillColor:
+                                                                    point.type === 'sprinkler'
+                                                                        ? '#22C55E'
+                                                                        : point.type ===
+                                                                            'mini_sprinkler'
+                                                                          ? '#3B82F6'
+                                                                          : point.type ===
+                                                                              'micro_spray'
+                                                                            ? '#F59E0B'
+                                                                            : '#06B6D4',
                                                                 fillOpacity: 1,
                                                                 weight: 2,
                                                             }}
@@ -808,24 +881,43 @@ export default function FieldCropSummary() {
                                                 )}
                                                 {/* Coverage Circles for Sprinklers */}
                                                 {actualIrrigationPoints.map((point, index) => {
-                                                    if (!point.position || !point.radius || point.type === 'drip_tape') return null;
-                                                    
-                                                    const [lat, lng] = Array.isArray(point.position) 
-                                                        ? point.position 
+                                                    if (
+                                                        !point.position ||
+                                                        !point.radius ||
+                                                        point.type === 'drip_tape'
+                                                    )
+                                                        return null;
+
+                                                    const [lat, lng] = Array.isArray(point.position)
+                                                        ? point.position
                                                         : [point.position.lat, point.position.lng];
-                                                    
+
                                                     return (
                                                         <Circle
                                                             key={`${point.id}-coverage`}
                                                             center={[lat, lng]}
                                                             radius={point.radius}
                                                             pathOptions={{
-                                                                color: point.type === 'sprinkler' ? '#22C55E' :
-                                                                       point.type === 'mini_sprinkler' ? '#3B82F6' :
-                                                                       point.type === 'micro_spray' ? '#F59E0B' : '#06B6D4',
-                                                                fillColor: point.type === 'sprinkler' ? '#22C55E' :
-                                                                          point.type === 'mini_sprinkler' ? '#3B82F6' :
-                                                                          point.type === 'micro_spray' ? '#F59E0B' : '#06B6D4',
+                                                                color:
+                                                                    point.type === 'sprinkler'
+                                                                        ? '#22C55E'
+                                                                        : point.type ===
+                                                                            'mini_sprinkler'
+                                                                          ? '#3B82F6'
+                                                                          : point.type ===
+                                                                              'micro_spray'
+                                                                            ? '#F59E0B'
+                                                                            : '#06B6D4',
+                                                                fillColor:
+                                                                    point.type === 'sprinkler'
+                                                                        ? '#22C55E'
+                                                                        : point.type ===
+                                                                            'mini_sprinkler'
+                                                                          ? '#3B82F6'
+                                                                          : point.type ===
+                                                                              'micro_spray'
+                                                                            ? '#F59E0B'
+                                                                            : '#06B6D4',
                                                                 fillOpacity: 0.1,
                                                                 weight: 1,
                                                                 opacity: 0.4,
@@ -844,27 +936,39 @@ export default function FieldCropSummary() {
                                         <div className="grid grid-cols-3 gap-1 text-xs print:grid-cols-6">
                                             <div className="flex items-center space-x-1">
                                                 <div className="h-2 w-2 rounded bg-green-500"></div>
-                                                <span className="text-gray-300 print:text-gray-700">Field</span>
+                                                <span className="text-gray-300 print:text-gray-700">
+                                                    Field
+                                                </span>
                                             </div>
                                             <div className="flex items-center space-x-1">
                                                 <div className="h-2 w-2 rounded bg-blue-500"></div>
-                                                <span className="text-gray-300 print:text-gray-700">Zones</span>
+                                                <span className="text-gray-300 print:text-gray-700">
+                                                    Zones
+                                                </span>
                                             </div>
                                             <div className="flex items-center space-x-1">
                                                 <div className="h-2 w-2 rounded bg-red-500"></div>
-                                                <span className="text-gray-300 print:text-gray-700">Pipes</span>
+                                                <span className="text-gray-300 print:text-gray-700">
+                                                    Pipes
+                                                </span>
                                             </div>
                                             <div className="flex items-center space-x-1">
                                                 <div className="h-2 w-2 rounded bg-yellow-500"></div>
-                                                <span className="text-gray-300 print:text-gray-700">Equipment</span>
+                                                <span className="text-gray-300 print:text-gray-700">
+                                                    Equipment
+                                                </span>
                                             </div>
                                             <div className="flex items-center space-x-1">
                                                 <div className="h-2 w-2 rounded bg-cyan-500"></div>
-                                                <span className="text-gray-300 print:text-gray-700">Irrigation</span>
+                                                <span className="text-gray-300 print:text-gray-700">
+                                                    Irrigation
+                                                </span>
                                             </div>
                                             <div className="flex items-center space-x-1">
                                                 <div className="h-2 w-2 rounded bg-purple-500"></div>
-                                                <span className="text-gray-300 print:text-gray-700">Coverage</span>
+                                                <span className="text-gray-300 print:text-gray-700">
+                                                    Coverage
+                                                </span>
                                             </div>
                                         </div>
                                     </div>

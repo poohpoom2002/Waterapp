@@ -763,21 +763,43 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                                             min="0.2"
                                                                             max="2.0"
                                                                             step="0.1"
-                                                                            value={irrigationSettings[zone.id]?.dripSpacing || 1.0}
+                                                                            value={
+                                                                                irrigationSettings[
+                                                                                    zone.id
+                                                                                ]?.dripSpacing ||
+                                                                                1.0
+                                                                            }
                                                                             onChange={(e) => {
-                                                                                const newSpacing = parseFloat(e.target.value);
-                                                                                setIrrigationSettings((prev: any) => ({
-                                                                                    ...prev,
-                                                                                    [zone.id]: {
-                                                                                        ...prev[zone.id],
-                                                                                        dripSpacing: newSpacing,
-                                                                                    }
-                                                                                }));
+                                                                                const newSpacing =
+                                                                                    parseFloat(
+                                                                                        e.target
+                                                                                            .value
+                                                                                    );
+                                                                                setIrrigationSettings(
+                                                                                    (
+                                                                                        prev: any
+                                                                                    ) => ({
+                                                                                        ...prev,
+                                                                                        [zone.id]: {
+                                                                                            ...prev[
+                                                                                                zone
+                                                                                                    .id
+                                                                                            ],
+                                                                                            dripSpacing:
+                                                                                                newSpacing,
+                                                                                        },
+                                                                                    })
+                                                                                );
                                                                             }}
                                                                             className="w-20"
                                                                         />
                                                                         <span className="w-12 text-xs text-white">
-                                                                            {irrigationSettings[zone.id]?.dripSpacing?.toFixed(1) || '1.0'}m
+                                                                            {irrigationSettings[
+                                                                                zone.id
+                                                                            ]?.dripSpacing?.toFixed(
+                                                                                1
+                                                                            ) || '1.0'}
+                                                                            m
                                                                         </span>
                                                                     </div>
                                                                 </div>
@@ -796,31 +818,46 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                                         <input
                                                                             type="range"
                                                                             min={
-                                                                                assignedIrrigation === 'sprinkler'
+                                                                                assignedIrrigation ===
+                                                                                'sprinkler'
                                                                                     ? 8
-                                                                                    : assignedIrrigation === 'mini_sprinkler'
-                                                                                    ? 0.5
-                                                                                    : assignedIrrigation === 'micro_spray'
+                                                                                    : assignedIrrigation ===
+                                                                                        'mini_sprinkler'
+                                                                                      ? 0.5
+                                                                                      : assignedIrrigation ===
+                                                                                          'micro_spray'
                                                                                         ? 3
                                                                                         : 0
                                                                             }
                                                                             max={
-                                                                                assignedIrrigation === 'sprinkler'
+                                                                                assignedIrrigation ===
+                                                                                'sprinkler'
                                                                                     ? 12
-                                                                                    : assignedIrrigation === 'mini_sprinkler'
-                                                                                    ? 3
-                                                                                    : assignedIrrigation === 'micro_spray'
+                                                                                    : assignedIrrigation ===
+                                                                                        'mini_sprinkler'
+                                                                                      ? 3
+                                                                                      : assignedIrrigation ===
+                                                                                          'micro_spray'
                                                                                         ? 8
                                                                                         : 0
                                                                             }
                                                                             step="0.5"
                                                                             value={zoneRadius}
                                                                             onChange={(e) => {
-                                                                                const newRadius = parseFloat(e.target.value);
-                                                                                setIrrigationRadius((prev: any) => ({
-                                                                                    ...prev,
-                                                                                    [zone.id]: newRadius,
-                                                                                }));
+                                                                                const newRadius =
+                                                                                    parseFloat(
+                                                                                        e.target
+                                                                                            .value
+                                                                                    );
+                                                                                setIrrigationRadius(
+                                                                                    (
+                                                                                        prev: any
+                                                                                    ) => ({
+                                                                                        ...prev,
+                                                                                        [zone.id]:
+                                                                                            newRadius,
+                                                                                    })
+                                                                                );
                                                                             }}
                                                                             className="w-20"
                                                                         />
@@ -831,7 +868,8 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                                 </div>
 
                                                                 {/* Overlap control - เฉพาะ sprinkler เท่านั้น */}
-                                                                {assignedIrrigation === 'sprinkler' && (
+                                                                {assignedIrrigation ===
+                                                                    'sprinkler' && (
                                                                     <div className="flex items-center justify-between">
                                                                         <span className="text-xs text-gray-400">
                                                                             รูปแบบทับซ้อน:
@@ -839,17 +877,28 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                                         <label className="flex items-center space-x-2">
                                                                             <input
                                                                                 type="checkbox"
-                                                                                checked={zoneOverlap}
+                                                                                checked={
+                                                                                    zoneOverlap
+                                                                                }
                                                                                 onChange={(e) => {
-                                                                                    setSprinklerOverlap((prev: any) => ({
-                                                                                        ...prev,
-                                                                                        [zone.id]: e.target.checked,
-                                                                                    }));
+                                                                                    setSprinklerOverlap(
+                                                                                        (
+                                                                                            prev: any
+                                                                                        ) => ({
+                                                                                            ...prev,
+                                                                                            [zone.id]:
+                                                                                                e
+                                                                                                    .target
+                                                                                                    .checked,
+                                                                                        })
+                                                                                    );
                                                                                 }}
                                                                                 className="h-3 w-3 rounded border-gray-600 bg-gray-700 text-cyan-600 focus:ring-cyan-500"
                                                                             />
                                                                             <span className="text-xs text-white">
-                                                                                {zoneOverlap ? 'เปิด' : 'ปิด'}
+                                                                                {zoneOverlap
+                                                                                    ? 'เปิด'
+                                                                                    : 'ปิด'}
                                                                             </span>
                                                                         </label>
                                                                     </div>
@@ -860,13 +909,20 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
 
                                                     <div className="mt-3 flex space-x-2">
                                                         <button
-                                                            onClick={() => generateIrrigationForZone(zone, assignedIrrigation)}
+                                                            onClick={() =>
+                                                                generateIrrigationForZone(
+                                                                    zone,
+                                                                    assignedIrrigation
+                                                                )
+                                                            }
                                                             className="flex-1 rounded bg-cyan-600 px-3 py-1 text-xs text-white transition-colors hover:bg-cyan-700"
                                                         >
                                                             🚿 สร้างระบบน้ำ
                                                         </button>
                                                         <button
-                                                            onClick={() => clearIrrigationForZone(zone.id)}
+                                                            onClick={() =>
+                                                                clearIrrigationForZone(zone.id)
+                                                            }
                                                             className="rounded bg-red-600 px-3 py-1 text-xs text-white transition-colors hover:bg-red-700"
                                                         >
                                                             🗑️ ลบ
