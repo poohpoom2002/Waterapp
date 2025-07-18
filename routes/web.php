@@ -201,6 +201,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('field-crop-summary', function () {
         return Inertia::render('field-crop-summary');
     })->name('field-crop-summary');
+    
+    // Field Crop Summary Route with POST data
+    Route::post('field-crop-summary', function () {
+        return Inertia::render('field-crop-summary', [
+            'summary' => request()->input('summary'),
+            'zones' => request()->input('zones'),
+            'equipment' => request()->input('equipment'),
+            'irrigationPoints' => request()->input('irrigationPoints')
+        ]);
+    })->name('field-crop-summary.post');
 
     // Farm-related API calls that might be using web sessions
     Route::get('/api/plant-types', [FarmController::class, 'getPlantTypes']);

@@ -47,6 +47,7 @@ const tools: Tool[] = [
             'คลิกพื้นที่ว่างเพื่อเลื่อนมุมมอง',
             'กด Delete เพื่อลบออบเจ็คที่เลือก',
             'กด Escape เพื่อยกเลิกการเลือก',
+            'แสดงข้อมูลการวัดเมื่อเลือกออบเจ็ค',
         ],
     },
     {
@@ -61,6 +62,8 @@ const tools: Tool[] = [
             'คลิกที่จุดแรก (เขียว) เพื่อปิดรูปร่าง',
             'กด Enter เพื่อจบการวาด',
             'โรงเรือนจะแสดงเป็นพื้นที่สีเขียว',
+            '🟢 สีเขียว: ระยะต่อเส้น',
+            '🟡 สีเหลือง: ระยะรวม',
         ],
     },
     {
@@ -75,6 +78,8 @@ const tools: Tool[] = [
             'คลิกที่จุดแรก (เขียว) เพื่อปิดรูปร่าง',
             'กด Enter เพื่อจบการวาด',
             'แปลงจะแสดงเป็นพื้นที่สีเหลือง',
+            '🟢 สีเขียว: ระยะต่อเส้น',
+            '🟡 สีเหลือง: ระยะรวม',
         ],
     },
     {
@@ -89,6 +94,8 @@ const tools: Tool[] = [
             'คลิกที่จุดแรก (เขียว) เพื่อปิดรูปร่าง',
             'กด Enter เพื่อจบการวาด',
             'ทางเดินจะแสดงเป็นพื้นที่สีเทา',
+            '🟢 สีเขียว: ระยะต่อเส้น',
+            '🟡 สีเหลือง: ระยะรวม',
         ],
     },
     {
@@ -103,6 +110,8 @@ const tools: Tool[] = [
             'คลิกที่จุดแรก (เขียว) เพื่อปิดรูปร่าง',
             'กด Enter เพื่อจบการวาด',
             'แหล่งน้ำจะแสดงเป็นสีน้ำเงินพร้อมไอคอน 💧',
+            '🟢 สีเขียว: ระยะต่อเส้น',
+            '🟡 สีเหลือง: ระยะรวม',
         ],
     },
     {
@@ -129,6 +138,8 @@ const generalInstructions = [
     { icon: '🚫', text: 'ยกเลิก: กด Escape' },
     { icon: '↶', text: 'ย้อนกลับ: Ctrl+Z' },
     { icon: '↷', text: 'ทำซ้ำ: Ctrl+Y หรือ Ctrl+Shift+Z' },
+    { icon: '🟢', text: 'สีเขียว: ระยะต่อเส้น (แต่ละด้าน)' },
+    { icon: '🟡', text: 'สีเหลือง: ระยะรวม (ทั้งหมด)' },
 ];
 
 const GRID_SIZE = 25;
@@ -166,6 +177,42 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
     // Undo/Redo states
     const [history, setHistory] = useState<Shape[][]>([[]]);
     const [historyIndex, setHistoryIndex] = useState(0);
+
+    // Calculate distance between two points in meters
+    const calculateDistance = useCallback((point1: Point, point2: Point): number => {
+        const pixelDistance = Math.sqrt(
+            Math.pow(point2.x - point1.x, 2) + Math.pow(point2.y - point1.y, 2)
+        );
+        return pixelDistance / GRID_SIZE; // Convert to meters
+    }, []);
+
+    // Calculate polygon area in square meters
+    const calculatePolygonArea = useCallback((points: Point[]): number => {
+        if (points.length < 3) return 0;
+        
+        let area = 0;
+        for (let i = 0; i < points.length; i++) {
+            const j = (i + 1) % points.length;
+            area += points[i].x * points[j].y;
+            area -= points[j].x * points[i].y;
+        }
+        area = Math.abs(area) / 2;
+        
+        // Convert from square pixels to square meters
+        return area / (GRID_SIZE * GRID_SIZE);
+    }, []);
+
+    // Calculate perimeter in meters
+    const calculatePerimeter = useCallback((points: Point[]): number => {
+        if (points.length < 2) return 0;
+        
+        let perimeter = 0;
+        for (let i = 0; i < points.length; i++) {
+            const j = (i + 1) % points.length;
+            perimeter += calculateDistance(points[i], points[j]);
+        }
+        return perimeter;
+    }, [calculateDistance]);
 
     // Add to history
     const addToHistory = useCallback(
@@ -336,6 +383,73 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
             }
         },
         [showGrid]
+    );
+
+    // Draw edge measurements for selected shape
+    const drawSelectedShapeMeasurements = useCallback(
+        (ctx: CanvasRenderingContext2D, shape: Shape) => {
+            if (shape.type === 'measurement' || shape.points.length < 2) return;
+
+            ctx.fillStyle = '#FFD700';
+            ctx.font = 'bold 11px Inter, sans-serif';
+            ctx.textAlign = 'center';
+
+            // Draw measurements for each edge
+            for (let i = 0; i < shape.points.length; i++) {
+                const point1 = shape.points[i];
+                const point2 = shape.points[(i + 1) % shape.points.length];
+                
+                // Skip the last edge if it's not a closed shape
+                if (i === shape.points.length - 1 && shape.points.length < 3) break;
+
+                const distance = calculateDistance(point1, point2);
+
+                const midX = (point1.x + point2.x) / 2;
+                const midY = (point1.y + point2.y) / 2;
+
+                // Calculate text position offset
+                const angle = Math.atan2(point2.y - point1.y, point2.x - point1.x);
+                const textOffsetX = Math.sin(angle) * 20;
+                const textOffsetY = -Math.cos(angle) * 20;
+
+                const textX = midX + textOffsetX;
+                const textY = midY + textOffsetY;
+
+                // Background for text
+                ctx.fillStyle = 'rgba(255, 215, 0, 0.9)';
+                const text = `${distance.toFixed(1)}m`;
+                const textWidth = ctx.measureText(text).width;
+                ctx.fillRect(textX - textWidth / 2 - 3, textY - 12, textWidth + 6, 16);
+
+                // Text
+                ctx.fillStyle = '#000000';
+                ctx.fillText(text, textX, textY - 2);
+            }
+
+            // Show total measurements for polygons
+            if (shape.points.length >= 3) {
+                const perimeter = calculatePerimeter(shape.points);
+                const area = calculatePolygonArea(shape.points);
+
+                // Calculate shape center for info display
+                const centerX = shape.points.reduce((sum, p) => sum + p.x, 0) / shape.points.length;
+                const centerY = shape.points.reduce((sum, p) => sum + p.y, 0) / shape.points.length;
+
+                // Draw info box near the shape
+                const infoX = centerX - 80;
+                const infoY = centerY - 50;
+                
+                ctx.fillStyle = 'rgba(255, 215, 0, 0.9)';
+                ctx.fillRect(infoX, infoY, 160, 45);
+                
+                ctx.fillStyle = '#000000';
+                ctx.font = 'bold 11px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(`รอบรูป: ${perimeter.toFixed(1)}m`, infoX + 80, infoY + 18);
+                ctx.fillText(`พื้นที่: ${area.toFixed(1)}m²`, infoX + 80, infoY + 35);
+            }
+        },
+        [calculateDistance, calculatePerimeter, calculatePolygonArea]
     );
 
     // Draw shapes
@@ -517,8 +631,154 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                     });
                 }
             });
+
+            // Draw measurements for selected shape
+            if (selectedShape) {
+                const shape = shapes.find(s => s.id === selectedShape);
+                if (shape && shape.type !== 'measurement') {
+                    drawSelectedShapeMeasurements(ctx, shape);
+                }
+            }
         },
-        [shapes, selectedShape, hoveredShape, selectedTool]
+        [shapes, selectedShape, hoveredShape, selectedTool, drawSelectedShapeMeasurements]
+    );
+
+    // Draw edge measurements for current path
+    const drawCurrentPathMeasurements = useCallback(
+        (ctx: CanvasRenderingContext2D) => {
+            if (currentPath.length < 1) return;
+
+            // Draw measurements for completed edges
+            if (currentPath.length >= 2) {
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = 'bold 12px Inter, sans-serif';
+                ctx.textAlign = 'center';
+
+                for (let i = 0; i < currentPath.length - 1; i++) {
+                    const point1 = currentPath[i];
+                    const point2 = currentPath[i + 1];
+                    const distance = calculateDistance(point1, point2);
+
+                    const midX = (point1.x + point2.x) / 2;
+                    const midY = (point1.y + point2.y) / 2;
+
+                    // Calculate text position offset
+                    const angle = Math.atan2(point2.y - point1.y, point2.x - point1.x);
+                    const textOffsetX = Math.sin(angle) * 20;
+                    const textOffsetY = -Math.cos(angle) * 20;
+
+                    const textX = midX + textOffsetX;
+                    const textY = midY + textOffsetY;
+
+                    // Background for text
+                    ctx.fillStyle = 'rgba(59, 130, 246, 0.9)';
+                    const text = `${distance.toFixed(1)}m`;
+                    const textWidth = ctx.measureText(text).width;
+                    ctx.fillRect(textX - textWidth / 2 - 4, textY - 14, textWidth + 8, 18);
+
+                    // Text
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillText(text, textX, textY - 2);
+                }
+            }
+
+            // Draw measurement for current edge (to mouse) - สีเขียว = ระยะต่อเส้น
+            if (mousePos && currentPath.length > 0) {
+                const lastPoint = currentPath[currentPath.length - 1];
+                const distance = calculateDistance(lastPoint, mousePos);
+
+                const midX = (lastPoint.x + mousePos.x) / 2;
+                const midY = (lastPoint.y + mousePos.y) / 2;
+
+                const angle = Math.atan2(mousePos.y - lastPoint.y, mousePos.x - lastPoint.x);
+                const textOffsetX = Math.sin(angle) * 25;
+                const textOffsetY = -Math.cos(angle) * 25;
+
+                const textX = midX + textOffsetX;
+                const textY = midY + textOffsetY;
+
+                // Background for text - สีเขียวสำหรับระยะต่อเส้น
+                ctx.fillStyle = 'rgba(16, 185, 129, 0.95)'; // สีเขียวเด่น
+                const text = `${distance.toFixed(1)}m`;
+                ctx.font = 'bold 14px Inter, sans-serif'; // ตัวอักษรใหญ่ขึ้น
+                const textWidth = ctx.measureText(text).width;
+                ctx.fillRect(textX - textWidth / 2 - 6, textY - 16, textWidth + 12, 22);
+
+                // Border
+                ctx.strokeStyle = '#10B981';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(textX - textWidth / 2 - 6, textY - 16, textWidth + 12, 22);
+
+                // Text
+                ctx.fillStyle = '#FFFFFF';
+                ctx.textAlign = 'center';
+                ctx.fillText(text, textX, textY - 2);
+            }
+
+            // แสดงระยะทางแบบ live ข้างเมาส์
+            if (mousePos && currentPath.length > 0 && isDrawing) {
+                // คำนวณระยะรวมทั้งหมด
+                let totalDistance = 0;
+                
+                // ระยะของเส้นที่วาดแล้ว
+                for (let i = 0; i < currentPath.length - 1; i++) {
+                    totalDistance += calculateDistance(currentPath[i], currentPath[i + 1]);
+                }
+                
+                // ระยะจากจุดสุดท้ายถึงเมาส์ปัจจุบัน
+                const lastPoint = currentPath[currentPath.length - 1];
+                totalDistance += calculateDistance(lastPoint, mousePos);
+
+                // แสดงระยะรวมข้างเมาส์ (สีเหลือง = ระยะรวม)
+                const mouseTextX = mousePos.x + 20;
+                const mouseTextY = mousePos.y - 10;
+
+                // Background
+                ctx.fillStyle = 'rgba(255, 193, 7, 0.95)'; // สีเหลือง
+                const mouseText = `รวม ${totalDistance.toFixed(1)}m`;
+                ctx.font = 'bold 13px Inter, sans-serif';
+                const mouseTextWidth = ctx.measureText(mouseText).width;
+                ctx.fillRect(mouseTextX - 4, mouseTextY - 15, mouseTextWidth + 8, 20);
+
+                // Border
+                ctx.strokeStyle = '#FFC107';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(mouseTextX - 4, mouseTextY - 15, mouseTextWidth + 8, 20);
+
+                // Text
+                ctx.fillStyle = '#000000';
+                ctx.textAlign = 'left';
+                ctx.fillText(mouseText, mouseTextX, mouseTextY);
+            }
+
+            // Show total perimeter and area for polygons
+            if (currentPath.length >= 3) {
+                const tempPoints = [...currentPath];
+                if (mousePos) tempPoints.push(mousePos);
+                
+                const perimeter = calculatePerimeter(tempPoints);
+                const area = calculatePolygonArea(tempPoints);
+
+                // Draw info box - ทำให้เด่นขึ้น
+                const infoX = 15;
+                const infoY = 15;
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+                ctx.fillRect(infoX, infoY, 180, 70);
+                
+                // Border
+                ctx.strokeStyle = '#3B82F6';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(infoX, infoY, 180, 70);
+                
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = 'bold 13px Inter, sans-serif';
+                ctx.textAlign = 'left';
+                ctx.fillText(`เส้นรอบรูป: ${perimeter.toFixed(1)}m`, infoX + 10, infoY + 25);
+                ctx.fillText(`พื้นที่: ${area.toFixed(1)}m²`, infoX + 10, infoY + 50);
+            }
+        },
+        [currentPath, mousePos, calculateDistance, calculatePerimeter, calculatePolygonArea, isDrawing]
     );
 
     // Draw current path
@@ -568,8 +828,11 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 }
                 ctx.fill();
             });
+
+            // Draw measurements
+            drawCurrentPathMeasurements(ctx);
         },
-        [currentPath, mousePos, isPointNearPoint]
+        [currentPath, mousePos, isPointNearPoint, drawCurrentPathMeasurements]
     );
 
     // Draw measuring line
@@ -821,7 +1084,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                     points: [measureStart, point],
                     color: '#FF6B6B',
                     fillColor: 'transparent',
-                    name: `📏 ${distanceInMeters.toFixed(2)}m`,
+                    name: `${distanceInMeters.toFixed(2)}m`,
                     measurement: {
                         distance: parseFloat(distanceInMeters.toFixed(2)),
                         unit: 'm',
@@ -1150,11 +1413,11 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                     <div className="flex items-center space-x-4">
                         <div>
                             <h1 className="text-xl font-bold">
-                                🏗️ ออกแบบพื้นที่โรงเรือน (ขนาดใหญ่)
+                                ออกแบบพื้นที่โรงเรือน พร้อมระบบวัดระยะ
                             </h1>
                             <p className="text-sm text-gray-400">
-                                วาดโครงสร้างโรงเรือนและแปลงปลูกของคุณ - พื้นที่ 2400x1600 pixels (1
-                                grid = 1 เมตร)
+                                วาดโครงสร้างโรงเรือนและแปลงปลูกของคุณ - พื้นที่ 2400x1600 pixels (1 grid = 1 เมตร) 
+                                <span className="ml-2 text-blue-300">แสดงการวัดระยะแบบ Real-time</span>
                             </p>
                         </div>
                     </div>
@@ -1264,7 +1527,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                             : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                     }`}
                                 >
-                                    📐 แสดงกริด (1 ช่อง = 1m)
+                                    แสดงกริด (1 ช่อง = 1m)
                                 </button>
                                 <button
                                     onClick={() => setShowCoordinates(!showCoordinates)}
@@ -1274,7 +1537,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                             : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                     }`}
                                 >
-                                    📍 แสดงพิกัด
+                                    แสดงพิกัด
                                 </button>
                                 <button
                                     onClick={() => {
@@ -1295,12 +1558,12 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                             </h3>
                             <div className="space-y-1 text-xs text-gray-400">
                                 <p>
-                                    📏 ขนาด: {CANVAS_SIZE.width} × {CANVAS_SIZE.height} px
+                                    ขนาด: {CANVAS_SIZE.width} × {CANVAS_SIZE.height} px
                                 </p>
-                                <p>📐 Grid: {GRID_SIZE} px = 1 เมตร</p>
-                                <p>🔍 Zoom: {(zoom * 100).toFixed(0)}%</p>
+                                <p>Grid: {GRID_SIZE} px = 1 เมตร</p>
+                                <p>Zoom: {(zoom * 100).toFixed(0)}%</p>
                                 <p>
-                                    📍 Pan: ({pan.x.toFixed(0)}, {pan.y.toFixed(0)})
+                                    Pan: ({pan.x.toFixed(0)}, {pan.y.toFixed(0)})
                                 </p>
                             </div>
                         </div>
@@ -1376,13 +1639,13 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                     {/* Status Messages */}
                     {isDrawing && (
                         <div className="absolute left-4 top-20 rounded bg-blue-600 px-3 py-1 text-sm text-white">
-                            กำลังวาด... (กด Enter เพื่อจบ, Escape เพื่อยกเลิก)
+                            กำลังวาด... 🟢 ระยะต่อเส้น 🟡 ระยะรวม (Enter=จบ, Escape=ยกเลิก)
                         </div>
                     )}
 
                     {measuringMode && !measureEnd && (
                         <div className="absolute left-4 top-20 rounded bg-red-600 px-3 py-1 text-sm text-white">
-                            📏 คลิกจุดที่สองเพื่อวัดระยะ (1 grid = 1m, Escape เพื่อยกเลิก)
+                            คลิกจุดที่สองเพื่อวัดระยะ (1 grid = 1m, Escape เพื่อยกเลิก)
                         </div>
                     )}
 
@@ -1498,6 +1761,41 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                             <p>
                                                 <strong>จำนวนจุด:</strong> {shape.points.length}
                                             </p>
+                                            {shape.type !== 'measurement' && shape.points.length >= 2 && (
+                                                <>
+                                                    {shape.points.length >= 3 && (
+                                                        <>
+                                                            <p>
+                                                                <strong>เส้นรอบรูป:</strong>{' '}
+                                                                {calculatePerimeter(shape.points).toFixed(1)}m
+                                                            </p>
+                                                            <p>
+                                                                <strong>พื้นที่:</strong>{' '}
+                                                                {calculatePolygonArea(shape.points).toFixed(1)}m²
+                                                            </p>
+                                                        </>
+                                                    )}
+                                                    {shape.points.length === 2 && (
+                                                        <p>
+                                                            <strong>ระยะทาง:</strong>{' '}
+                                                            {calculateDistance(shape.points[0], shape.points[1]).toFixed(1)}m
+                                                        </p>
+                                                    )}
+                                                    <div className="mt-2 space-y-1">
+                                                        <p><strong>ขนาดแต่ละด้าน:</strong></p>
+                                                        {shape.points.map((point, i) => {
+                                                            if (i === shape.points.length - 1 && shape.points.length < 3) return null;
+                                                            const nextPoint = shape.points[(i + 1) % shape.points.length];
+                                                            const distance = calculateDistance(point, nextPoint);
+                                                            return (
+                                                                <p key={i} className="ml-2 text-xs text-gray-400">
+                                                                    ด้านที่ {i + 1}: {distance.toFixed(1)}m
+                                                                </p>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </>
+                                            )}
                                             <div className="mt-2 text-xs text-yellow-300">
                                                 <p>• ลากเพื่อขยับ (ไม่กด Ctrl)</p>
                                                 <p>• Ctrl+คลิก เพื่อเลื่อนมุมมอง</p>
@@ -1543,6 +1841,36 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                     <span className="text-gray-400">รวม:</span>
                                     <span className="font-bold">{shapes.length}</span>
                                 </div>
+                                
+                                {/* Total Area Statistics */}
+                                {shapes.filter(s => s.type !== 'measurement' && s.points.length >= 3).length > 0 && (
+                                    <>
+                                        <div className="border-t border-gray-600 pt-2 mt-2">
+                                            <h5 className="text-xs font-medium text-gray-400 mb-1">พื้นที่รวม (m²)</h5>
+                                            {['greenhouse', 'plot', 'walkway', 'water-source'].map(type => {
+                                                const typeShapes = shapes.filter(s => s.type === type && s.points.length >= 3);
+                                                const totalArea = typeShapes.reduce((sum, shape) => 
+                                                    sum + calculatePolygonArea(shape.points), 0);
+                                                
+                                                if (totalArea === 0) return null;
+                                                
+                                                const typeNames = {
+                                                    greenhouse: 'โรงเรือน',
+                                                    plot: 'แปลงปลูก', 
+                                                    walkway: 'ทางเดิน',
+                                                    'water-source': 'แหล่งน้ำ'
+                                                };
+                                                
+                                                return (
+                                                    <div key={type} className="flex justify-between text-xs">
+                                                        <span className="text-gray-500">{typeNames[type as keyof typeof typeNames]}:</span>
+                                                        <span className="text-blue-300">{totalArea.toFixed(1)}m²</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -1602,4 +1930,4 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
             )}
         </div>
     );
-}
+};

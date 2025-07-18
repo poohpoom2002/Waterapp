@@ -134,12 +134,40 @@ export default function GreenhouseMap() {
     // Modal states
     const [showCropSelector, setShowCropSelector] = useState(false);
     const [selectedPlot, setSelectedPlot] = useState<string | null>(null);
-    const [sprinklerPattern, setSprinklerPattern] = useState<'grid' | 'zigzag'>('grid');
 
-    // Radius and angle adjustment states
+    // Radius and spacing adjustment states
     const [globalRadius, setGlobalRadius] = useState(1.5);
-    const [globalAngle, setGlobalAngle] = useState(360);
     const [globalDripSpacing, setGlobalDripSpacing] = useState(0.3);
+
+    // Image cache for component icons
+    const [componentImages, setComponentImages] = useState<{[key: string]: HTMLImageElement}>({});
+
+    // Load component images
+    useEffect(() => {
+        const imageConfigs = {
+            pump: '/generateTree/wtpump.png',
+            'solenoid-valve': '/generateTree/solv.png',
+            'ball-valve': '/generateTree/ballv.png'
+        };
+
+        const loadImages = async () => {
+            const images: {[key: string]: HTMLImageElement} = {};
+            
+            for (const [type, src] of Object.entries(imageConfigs)) {
+                const img = new Image();
+                img.src = src;
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = reject;
+                });
+                images[type] = img;
+            }
+            
+            setComponentImages(images);
+        };
+
+        loadImages().catch(console.error);
+    }, []);
 
     // Parse URL parameters on component mount
     useEffect(() => {
@@ -147,11 +175,13 @@ export default function GreenhouseMap() {
         const cropsParam = urlParams.get('crops');
         const shapesParam = urlParams.get('shapes');
         const irrigationParam = urlParams.get('irrigation');
+        const loadIrrigationParam = urlParams.get('loadIrrigation'); // เพิ่มตัวนี้
 
         console.log('Map received:', {
             crops: cropsParam,
             shapes: shapesParam ? 'มีข้อมูล shapes' : 'ไม่มีข้อมูล shapes',
             irrigation: irrigationParam,
+            loadIrrigation: loadIrrigationParam,
         });
 
         if (cropsParam) {
@@ -175,17 +205,24 @@ export default function GreenhouseMap() {
             }
         }
 
-        // โหลดข้อมูล irrigation elements จาก localStorage
-        const savedData = localStorage.getItem('greenhousePlanningData');
-        if (savedData) {
-            try {
-                const parsedData = JSON.parse(savedData);
-                if (parsedData.irrigationElements) {
-                    setIrrigationElements(parsedData.irrigationElements);
+        // โหลดข้อมูล irrigation elements จาก localStorage เฉพาะเมื่อมีการส่ง loadIrrigation=true
+        if (loadIrrigationParam === 'true') {
+            const savedData = localStorage.getItem('greenhousePlanningData');
+            if (savedData) {
+                try {
+                    const parsedData = JSON.parse(savedData);
+                    if (parsedData.irrigationElements) {
+                        console.log('Map: Loading irrigation elements from localStorage:', parsedData.irrigationElements);
+                        setIrrigationElements(parsedData.irrigationElements);
+                    }
+                } catch (error) {
+                    console.error('Error loading irrigation data:', error);
                 }
-            } catch (error) {
-                console.error('Error loading irrigation data:', error);
             }
+        } else {
+            // ไม่โหลดข้อมูล irrigation elements หากไม่ได้มาจาก summary
+            // เพื่อให้เริ่มต้นใหม่ทุกครั้งที่เข้าหน้านี้แบบปกติ
+            setIrrigationElements([]);
         }
     }, []);
 
@@ -412,8 +449,40 @@ export default function GreenhouseMap() {
             color: string,
             isSelected: boolean
         ) => {
-            const size = isSelected ? 12 : 10;
+            const size = isSelected ? 24 : 20;
+            
+            // Try to use image first
+            if (componentImages[type]) {
+                const img = componentImages[type];
+                
+                // Different sizes for different components
+                let imgSize, containerSize;
+                if (type === 'pump') {
+                    imgSize = isSelected ? 28 : 22;
+                    containerSize = isSelected ? 36 : 30;
+                } else { // valves
+                    imgSize = isSelected ? 20 : 16;
+                    containerSize = isSelected ? 28 : 24;
+                }
+                
+                ctx.save();
+                
+                // Draw circular container background
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.strokeStyle = isSelected ? '#FFD700' : '#666666';
+                ctx.lineWidth = isSelected ? 3 : 2;
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, containerSize/2, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+                
+                // Draw the component image
+                ctx.drawImage(img, point.x - imgSize/2, point.y - imgSize/2, imgSize, imgSize);
+                ctx.restore();
+                return;
+            }
 
+            // Fallback to original drawing if image not loaded
             ctx.fillStyle = color;
             ctx.strokeStyle = isSelected ? '#FFD700' : color;
             ctx.lineWidth = isSelected ? 3 : 2;
@@ -471,7 +540,7 @@ export default function GreenhouseMap() {
                     break;
             }
         },
-        []
+        [componentImages]
     );
 
     // Helper function to draw sprinkler coverage
@@ -480,136 +549,13 @@ export default function GreenhouseMap() {
             ctx: CanvasRenderingContext2D,
             point: Point,
             radius: number,
-            angle: number,
             color: string
         ) => {
-            if (angle >= 360) {
-                ctx.fillStyle = `${color}20`;
-                ctx.beginPath();
-                ctx.arc(point.x, point.y, radius, 0, 2 * Math.PI);
-                ctx.fill();
-            } else {
-                let baseDirection = 0;
-
-                const subPipes = irrigationElements.filter((el) => el.type === 'sub-pipe');
-                let pipeDirection: Point | null = null;
-
-                for (const pipe of subPipes) {
-                    for (let i = 0; i < pipe.points.length - 1; i++) {
-                        const p1 = pipe.points[i];
-                        const p2 = pipe.points[i + 1];
-
-                        const distToSegment =
-                            Math.abs(
-                                (p2.y - p1.y) * point.x -
-                                    (p2.x - p1.x) * point.y +
-                                    p2.x * p1.y -
-                                    p2.y * p1.x
-                            ) / Math.sqrt(Math.pow(p2.y - p1.y, 2) + Math.pow(p2.x - p1.x, 2));
-
-                        if (distToSegment < 30) {
-                            const distance = Math.sqrt(
-                                Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2)
-                            );
-                            if (distance > 0) {
-                                pipeDirection = {
-                                    x: (p2.x - p1.x) / distance,
-                                    y: (p2.y - p1.y) / distance,
-                                };
-                            }
-                            break;
-                        }
-                    }
-                    if (pipeDirection) break;
-                }
-
-                if (pipeDirection) {
-                    const perpendicular = { x: -pipeDirection.y, y: pipeDirection.x };
-                    let bestDirection = perpendicular;
-
-                    const plotShapes = shapes.filter(
-                        (s) => s.type === 'plot' || s.type === 'greenhouse'
-                    );
-
-                    for (const plot of plotShapes) {
-                        if (isPointInShape(point, plot)) {
-                            const testPoint1 = {
-                                x: point.x + perpendicular.x * 10,
-                                y: point.y + perpendicular.y * 10,
-                            };
-                            const testPoint2 = {
-                                x: point.x - perpendicular.x * 10,
-                                y: point.y - perpendicular.y * 10,
-                            };
-
-                            const plotCenterX =
-                                plot.points.reduce((sum, p) => sum + p.x, 0) / plot.points.length;
-                            const plotCenterY =
-                                plot.points.reduce((sum, p) => sum + p.y, 0) / plot.points.length;
-
-                            const dist1 = Math.sqrt(
-                                Math.pow(testPoint1.x - plotCenterX, 2) +
-                                    Math.pow(testPoint1.y - plotCenterY, 2)
-                            );
-                            const dist2 = Math.sqrt(
-                                Math.pow(testPoint2.x - plotCenterX, 2) +
-                                    Math.pow(testPoint2.y - plotCenterY, 2)
-                            );
-
-                            bestDirection =
-                                dist1 < dist2
-                                    ? perpendicular
-                                    : { x: -perpendicular.x, y: -perpendicular.y };
-
-                            const plotMinY = Math.min(...plot.points.map((p) => p.y));
-                            const plotMaxY = Math.max(...plot.points.map((p) => p.y));
-                            const plotHeight = plotMaxY - plotMinY;
-                            const threshold = plotHeight * 0.2;
-
-                            if (point.y <= plotMinY + threshold) {
-                                bestDirection = {
-                                    x: bestDirection.x * 0.7,
-                                    y: Math.abs(bestDirection.y),
-                                };
-                            } else if (point.y >= plotMaxY - threshold) {
-                                bestDirection = {
-                                    x: bestDirection.x * 0.7,
-                                    y: -Math.abs(bestDirection.y),
-                                };
-                            }
-
-                            break;
-                        }
-                    }
-
-                    baseDirection = Math.atan2(bestDirection.y, bestDirection.x);
-                }
-
-                const startAngle = baseDirection - ((angle / 2) * Math.PI) / 180;
-                const endAngle = baseDirection + ((angle / 2) * Math.PI) / 180;
-
-                ctx.fillStyle = `${color}20`;
-                ctx.beginPath();
-                ctx.moveTo(point.x, point.y);
-                ctx.arc(point.x, point.y, radius, startAngle, endAngle);
-                ctx.closePath();
-                ctx.fill();
-
-                ctx.strokeStyle = `${color}60`;
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(point.x, point.y);
-                ctx.lineTo(
-                    point.x + Math.cos(startAngle) * radius,
-                    point.y + Math.sin(startAngle) * radius
-                );
-                ctx.moveTo(point.x, point.y);
-                ctx.lineTo(
-                    point.x + Math.cos(endAngle) * radius,
-                    point.y + Math.sin(endAngle) * radius
-                );
-                ctx.stroke();
-            }
+            // ใช้เฉพาะ 360 องศา (วงกลมเต็ม)
+            ctx.fillStyle = `${color}20`;
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, radius, 0, 2 * Math.PI);
+            ctx.fill();
         },
         [irrigationElements, shapes, isPointInShape]
     );
@@ -899,9 +845,8 @@ export default function GreenhouseMap() {
                     if (element.points.length >= 1) {
                         const point = element.points[0];
                         const radius = element.radius || 30;
-                        const angle = element.angle || 360;
 
-                        drawSprinklerCoverage(ctx, point, radius, angle, element.color);
+                        drawSprinklerCoverage(ctx, point, radius, element.color);
 
                         ctx.fillStyle = element.color;
                         ctx.beginPath();
@@ -1082,7 +1027,7 @@ export default function GreenhouseMap() {
                 if (['pump', 'solenoid-valve', 'ball-valve', 'sprinkler'].includes(selectedTool)) {
                     const elementTypes: Record<
                         string,
-                        { color: string; width: number; radius?: number; angle?: number }
+                        { color: string; width: number; radius?: number }
                     > = {
                         pump: { color: '#8B5CF6', width: 1 },
                         'solenoid-valve': { color: '#F59E0B', width: 1 },
@@ -1091,7 +1036,6 @@ export default function GreenhouseMap() {
                             color: '#3B82F6',
                             width: 1,
                             radius: globalRadius * 20,
-                            angle: globalAngle,
                         },
                     };
 
@@ -1104,7 +1048,6 @@ export default function GreenhouseMap() {
                             color: config.color,
                             width: config.width,
                             radius: config.radius,
-                            angle: config.angle,
                         };
 
                         setIrrigationElements((prev) => [...prev, newElement]);
@@ -1121,7 +1064,6 @@ export default function GreenhouseMap() {
             getRawMousePos,
             isDrawing,
             globalRadius,
-            globalAngle,
         ]
     );
 
@@ -1362,39 +1304,6 @@ export default function GreenhouseMap() {
         }
     }, [selectedElement]);
 
-    // Check if zigzag pattern is possible
-    const canUseZigzagPattern = useMemo(() => {
-        const subPipes = irrigationElements.filter((el) => el.type === 'sub-pipe');
-        if (subPipes.length < 2) return false;
-
-        const firstPipe = subPipes[0];
-        const lastPipe = subPipes[subPipes.length - 1];
-
-        if (firstPipe.points.length < 2 || lastPipe.points.length < 2) return false;
-
-        const firstDirection = {
-            x: firstPipe.points[1].x - firstPipe.points[0].x,
-            y: firstPipe.points[1].y - firstPipe.points[0].y,
-        };
-
-        const lastDirection = {
-            x: lastPipe.points[1].x - lastPipe.points[0].x,
-            y: lastPipe.points[1].y - lastPipe.points[0].y,
-        };
-
-        const firstLength = Math.sqrt(firstDirection.x ** 2 + firstDirection.y ** 2);
-        const lastLength = Math.sqrt(lastDirection.x ** 2 + lastDirection.y ** 2);
-
-        if (firstLength === 0 || lastLength === 0) return false;
-
-        const firstNorm = { x: firstDirection.x / firstLength, y: firstDirection.y / firstLength };
-        const lastNorm = { x: lastDirection.x / lastLength, y: lastDirection.y / lastLength };
-
-        const dotProduct = Math.abs(firstNorm.x * lastNorm.x + firstNorm.y * lastNorm.y);
-
-        return dotProduct > 0.8;
-    }, [irrigationElements]);
-
     const autoGenerateSprinklers = useCallback(() => {
         if (!canAutoGenerate) {
             alert('กรุณาวาดท่อเมนและท่อย่อยก่อนทำการสร้างอัตโนมัติ');
@@ -1403,11 +1312,6 @@ export default function GreenhouseMap() {
 
         if (selectedIrrigationMethod !== 'mini-sprinkler') {
             alert('ฟังก์ชันนี้ใช้ได้เฉพาะระบบมินิสปริงเกลอร์เท่านั้น');
-            return;
-        }
-
-        if (sprinklerPattern === 'zigzag' && !canUseZigzagPattern) {
-            alert('รูปแบบฟันปลาต้องมีท่อย่อยอย่างน้อย 2 เส้นที่ขนานกัน');
             return;
         }
 
@@ -1487,24 +1391,12 @@ export default function GreenhouseMap() {
                         y: p1.y + direction.y * (actualSpacing * j),
                     };
 
-                    if (sprinklerPattern === 'zigzag' && canUseZigzagPattern) {
-                        const isEvenRow = pipeIndex % 2 === 0;
-                        const isEvenSprinkler = (j - 1) % 2 === 0;
-
-                        if (isEvenRow !== isEvenSprinkler) {
-                            const perpendicular = { x: -direction.y, y: direction.x };
-                            point.x += perpendicular.x * (spacing / 4);
-                            point.y += perpendicular.y * (spacing / 4);
-                        }
-                    }
-
                     const sprinkler: IrrigationElement = {
                         id: `sprinkler-${Date.now()}-${Math.random()}-${j}`,
                         type: 'sprinkler',
                         points: [point],
                         color: '#3B82F6',
                         radius: radius,
-                        angle: globalAngle,
                     };
                     newSprinklers.push(sprinkler);
                 }
@@ -1520,11 +1412,8 @@ export default function GreenhouseMap() {
     }, [
         canAutoGenerate,
         selectedIrrigationMethod,
-        sprinklerPattern,
-        canUseZigzagPattern,
         irrigationElements,
         globalRadius,
-        globalAngle,
     ]);
 
     const autoGenerateDripLines = useCallback(() => {
@@ -1610,7 +1499,7 @@ export default function GreenhouseMap() {
         [selectedPlot]
     );
 
-    // Radius and angle adjustment functions
+    // Radius adjustment functions
     const updateAllSprinklerRadius = useCallback((newRadius: number) => {
         const radiusInPixels = newRadius * 20;
         setIrrigationElements((prev) =>
@@ -1632,34 +1521,6 @@ export default function GreenhouseMap() {
                     prev.map((el) => {
                         if (el.id === selectedElement && el.type === 'sprinkler') {
                             return { ...el, radius: radiusInPixels };
-                        }
-                        return el;
-                    })
-                );
-            }
-        },
-        [selectedElement]
-    );
-
-    const updateAllSprinklerAngle = useCallback((newAngle: number) => {
-        setIrrigationElements((prev) =>
-            prev.map((el) => {
-                if (el.type === 'sprinkler') {
-                    return { ...el, angle: newAngle };
-                }
-                return el;
-            })
-        );
-        setGlobalAngle(newAngle);
-    }, []);
-
-    const updateSelectedSprinklerAngle = useCallback(
-        (newAngle: number) => {
-            if (selectedElement) {
-                setIrrigationElements((prev) =>
-                    prev.map((el) => {
-                        if (el.id === selectedElement && el.type === 'sprinkler') {
-                            return { ...el, angle: newAngle };
                         }
                         return el;
                     })
@@ -1929,30 +1790,6 @@ export default function GreenhouseMap() {
                                         </div>
                                     </div>
 
-                                    <div>
-                                        <label className="mb-1 block text-xs text-gray-400">
-                                            องศาการให้น้ำทั้งหมด:
-                                        </label>
-                                        <div className="flex items-center space-x-2">
-                                            <input
-                                                type="range"
-                                                min="45"
-                                                max="360"
-                                                step="15"
-                                                value={globalAngle}
-                                                onChange={(e) =>
-                                                    updateAllSprinklerAngle(
-                                                        parseInt(e.target.value)
-                                                    )
-                                                }
-                                                className="flex-1"
-                                            />
-                                            <span className="min-w-[2rem] text-xs text-white">
-                                                {globalAngle}°
-                                            </span>
-                                        </div>
-                                    </div>
-
                                     {selectedElement &&
                                         irrigationElements.find(
                                             (el) =>
@@ -1997,40 +1834,6 @@ export default function GreenhouseMap() {
                                                                     )?.radius || 30) / 20
                                                                 ).toFixed(1)}
                                                                 m
-                                                            </span>
-                                                        </div>
-                                                    </div>
-
-                                                    <div>
-                                                        <label className="mb-1 block text-xs text-gray-400">
-                                                            องศา:
-                                                        </label>
-                                                        <div className="flex items-center space-x-2">
-                                                            <input
-                                                                type="range"
-                                                                min="45"
-                                                                max="360"
-                                                                step="15"
-                                                                value={
-                                                                    irrigationElements.find(
-                                                                        (el) =>
-                                                                            el.id ===
-                                                                            selectedElement
-                                                                    )?.angle || 360
-                                                                }
-                                                                onChange={(e) =>
-                                                                    updateSelectedSprinklerAngle(
-                                                                        parseInt(e.target.value)
-                                                                    )
-                                                                }
-                                                                className="flex-1"
-                                                            />
-                                                            <span className="min-w-[2rem] text-xs text-white">
-                                                                {irrigationElements.find(
-                                                                    (el) =>
-                                                                        el.id === selectedElement
-                                                                )?.angle || 360}
-                                                                °
                                                             </span>
                                                         </div>
                                                     </div>
@@ -2122,42 +1925,16 @@ export default function GreenhouseMap() {
                             <div className="space-y-2">
                                 {selectedIrrigationMethod === 'mini-sprinkler' && (
                                     <div className="space-y-2">
-                                        <div className="mb-2 flex items-center space-x-2">
-                                            <label className="text-xs text-gray-400">รูปแบบ:</label>
-                                            <select
-                                                value={sprinklerPattern}
-                                                onChange={(e) =>
-                                                    setSprinklerPattern(
-                                                        e.target.value as 'grid' | 'zigzag'
-                                                    )
-                                                }
-                                                className="flex-1 rounded border border-gray-600 bg-gray-700 px-2 py-1 text-xs text-white focus:border-blue-500 focus:outline-none"
-                                            >
-                                                <option value="grid">แถวตรง</option>
-                                                <option value="zigzag">ฟันปลา</option>
-                                            </select>
-                                        </div>
-                                        {sprinklerPattern === 'zigzag' && !canUseZigzagPattern && (
-                                            <div className="mb-2 text-xs text-yellow-400">
-                                                ⚠️ รูปแบบฟันปลาต้องมีท่อย่อย 2 เส้นขนานกัน
-                                            </div>
-                                        )}
                                         <button
                                             onClick={autoGenerateSprinklers}
-                                            disabled={
-                                                !canAutoGenerate ||
-                                                (sprinklerPattern === 'zigzag' &&
-                                                    !canUseZigzagPattern)
-                                            }
+                                            disabled={!canAutoGenerate}
                                             className={`w-full rounded px-3 py-2 text-xs transition-colors ${
-                                                canAutoGenerate &&
-                                                (sprinklerPattern !== 'zigzag' ||
-                                                    canUseZigzagPattern)
+                                                canAutoGenerate
                                                     ? 'bg-blue-600 text-white hover:bg-blue-700'
                                                     : 'cursor-not-allowed bg-gray-600 text-gray-400'
                                             }`}
                                         >
-                                            💦 สร้างมินิสปริงเกลอร์
+                                            💦 สร้างมินิสปริงเกลอร์ (แถวตรง)
                                         </button>
                                     </div>
                                 )}
@@ -2561,9 +2338,6 @@ export default function GreenhouseMap() {
                                                     {element.points.length} จุด
                                                     {element.radius &&
                                                         ` | รัศมี: ${(element.radius / 20).toFixed(1)}m`}
-                                                    {element.angle &&
-                                                        element.angle !== 360 &&
-                                                        ` | องศา: ${element.angle}°`}
                                                     {element.spacing &&
                                                         ` | ระยะห่าง: ${element.spacing.toFixed(2)}m`}
                                                 </div>
@@ -2591,10 +2365,6 @@ export default function GreenhouseMap() {
                                 irrigationMethod: selectedIrrigationMethod,
                                 updatedAt: new Date().toISOString(),
                             };
-                            localStorage.setItem(
-                                'greenhousePlanningData',
-                                JSON.stringify(summaryData)
-                            );
 
                             const queryParams = new URLSearchParams();
                             if (selectedCrops && selectedCrops.length > 0) {
@@ -2749,4 +2519,4 @@ export default function GreenhouseMap() {
             )}
         </div>
     );
-}
+};
