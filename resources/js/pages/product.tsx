@@ -299,7 +299,7 @@ export default function Product() {
         // If multiple zones selected, calculate combined input
         if (selectedZones.length > 1) {
             // Calculate combined input for pump sizing
-            let combinedInput = { ...zoneInputs[activeZoneId] };
+            const combinedInput = { ...zoneInputs[activeZoneId] };
 
             // Sum up total trees and water requirements
             let totalTrees = 0;

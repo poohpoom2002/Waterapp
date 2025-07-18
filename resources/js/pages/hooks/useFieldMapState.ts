@@ -18,7 +18,7 @@ import {
 export const useMapState = () => {
     const [mapCenter, setMapCenter] = useState<[number, number]>(DEFAULT_MAP_CENTER);
     const [mapZoom, setMapZoom] = useState(DEFAULT_MAP_ZOOM);
-    const [mapType, setMapType] = useState<MapTileType>('street');
+    const [mapType, setMapType] = useState<MapTileType>('hybrid');
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [isSearching, setIsSearching] = useState(false);
