@@ -21,7 +21,7 @@ interface HorticultureSearchControlProps {
 
 const HorticultureSearchControl: React.FC<HorticultureSearchControlProps> = ({
     onPlaceSelect,
-    placeholder = "🔍 Search...",
+    placeholder = '🔍 Search...',
 }) => {
     const inputRef = useRef<HTMLInputElement>(null);
     const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
@@ -115,73 +115,76 @@ const HorticultureSearchControl: React.FC<HorticultureSearchControlProps> = ({
     }, [isGoogleMapsReady, onPlaceSelect]);
 
     // Alternative search using Nominatim (fallback)
-    const handleSearchChange = useCallback(async (query: string) => {
-        setSearchQuery(query);
-        setError('');
+    const handleSearchChange = useCallback(
+        async (query: string) => {
+            setSearchQuery(query);
+            setError('');
 
-        if (query.length < 3) {
-            setSuggestions([]);
-            setShowSuggestions(false);
-            return;
-        }
-
-        // If Google Places is available, let it handle the search
-        if (isGoogleMapsReady) {
-            return;
-        }
-
-        // Fallback to Nominatim
-        setIsLoading(true);
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-            const response = await fetch(
-                `https://nominatim.openstreetmap.org/search?` +
-                    `format=json&q=${encodeURIComponent(query)}&limit=8&` +
-                    // `countrycodes=th&` + // Removed country restriction
-                    `addressdetails=1&dedupe=1&` +
-                    `accept-language=th,en&bounded=0`,
-                {
-                    signal: controller.signal,
-                    headers: {
-                        'User-Agent': 'HorticulturePlanner/1.0',
-                        Accept: 'application/json',
-                    },
-                }
-            );
-
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const data = await response.json();
-
-            if (Array.isArray(data)) {
-                setSuggestions(data);
-                setShowSuggestions(true);
-                if (data.length === 0) {
-                    setError('ไม่พบสถานที่ที่ค้นหา');
-                }
-            } else {
+            if (query.length < 3) {
                 setSuggestions([]);
-                setError('ข้อมูลจากเซิร์ฟเวอร์ไม่ถูกต้อง');
+                setShowSuggestions(false);
+                return;
             }
-        } catch (error: any) {
-            console.error('Search error:', error);
-            setSuggestions([]);
 
-            if (error.name === 'AbortError') {
-                setError('การค้นหาใช้เวลานานเกินไป กรุณาลองใหม่');
-            } else {
-                setError('เกิดข้อผิดพลาดในการค้นหา');
+            // If Google Places is available, let it handle the search
+            if (isGoogleMapsReady) {
+                return;
             }
-        } finally {
-            setIsLoading(false);
-        }
-    }, [isGoogleMapsReady]);
+
+            // Fallback to Nominatim
+            setIsLoading(true);
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+                const response = await fetch(
+                    `https://nominatim.openstreetmap.org/search?` +
+                        `format=json&q=${encodeURIComponent(query)}&limit=8&` +
+                        // `countrycodes=th&` + // Removed country restriction
+                        `addressdetails=1&dedupe=1&` +
+                        `accept-language=th,en&bounded=0`,
+                    {
+                        signal: controller.signal,
+                        headers: {
+                            'User-Agent': 'HorticulturePlanner/1.0',
+                            Accept: 'application/json',
+                        },
+                    }
+                );
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+
+                if (Array.isArray(data)) {
+                    setSuggestions(data);
+                    setShowSuggestions(true);
+                    if (data.length === 0) {
+                        setError('ไม่พบสถานที่ที่ค้นหา');
+                    }
+                } else {
+                    setSuggestions([]);
+                    setError('ข้อมูลจากเซิร์ฟเวอร์ไม่ถูกต้อง');
+                }
+            } catch (error: any) {
+                console.error('Search error:', error);
+                setSuggestions([]);
+
+                if (error.name === 'AbortError') {
+                    setError('การค้นหาใช้เวลานานเกินไป กรุณาลองใหม่');
+                } else {
+                    setError('เกิดข้อผิดพลาดในการค้นหา');
+                }
+            } finally {
+                setIsLoading(false);
+            }
+        },
+        [isGoogleMapsReady]
+    );
 
     const handleSuggestionClick = (item: any) => {
         setSearchQuery(item.display_name);
@@ -264,7 +267,9 @@ const HorticultureSearchControl: React.FC<HorticultureSearchControlProps> = ({
                         </button>
                     )}
 
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">🔍</div>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
+                        🔍
+                    </div>
                 </div>
 
                 {error && (

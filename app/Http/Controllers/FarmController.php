@@ -1018,6 +1018,14 @@ class FarmController extends Controller
     public function getField($fieldId): JsonResponse
     {
         try {
+            // Validate fieldId
+            if (!is_numeric($fieldId) || (int) $fieldId <= 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid field ID provided'
+                ], 400);
+            }
+
             $field = Field::with(['plantType', 'user', 'zones', 'plantingPoints', 'pipes', 'layers'])->find((int) $fieldId);
             
             if (!$field) {
@@ -1027,20 +1035,35 @@ class FarmController extends Controller
                 ], 404);
             }
             
+            // Validate required data
+            if (!$field->area_coordinates || !is_array($field->area_coordinates) || count($field->area_coordinates) < 3) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Field area data is invalid or incomplete'
+                ], 422);
+            }
+
+            if (!$field->plantType) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Field plant type data is missing'
+                ], 422);
+            }
+
             $formattedField = [
                 'id' => $field->id,
                 'field_name' => $field->name,
                 'customer_name' => $field->customer_name,
                 'user_name' => $field->user ? $field->user->name : 'Unknown',
                 'area_coordinates' => $field->area_coordinates,
-                'plantType' => $field->plantType ? [
+                'plantType' => [
                     'id' => $field->plantType->id,
                     'name' => $field->plantType->name,
                     'type' => $field->plantType->type,
                     'plant_spacing' => $field->plantType->plant_spacing,
                     'row_spacing' => $field->plantType->row_spacing,
                     'water_needed' => $field->plantType->water_needed,
-                ] : null,
+                ],
                 'total_plants' => $field->total_plants,
                 'total_area' => $field->total_area,
                 'total_water_need' => $field->total_water_need,

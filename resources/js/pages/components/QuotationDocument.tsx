@@ -40,11 +40,11 @@ interface QuotationDocumentProps {
     selectedSecondaryPipe: any;
     selectedMainPipe: any;
     projectImage?: string | null;
-    
+
     projectData: any;
     zoneSprinklers: { [zoneId: string]: any };
     selectedPipes: { [zoneId: string]: { branch?: any; secondary?: any; main?: any } };
-    
+
     onClose: () => void;
 }
 const QuotationDocument: React.FC<QuotationDocumentProps> = ({
@@ -72,9 +72,11 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     const [selectedCategory, setSelectedCategory] = useState<string>('');
     const [equipmentSearchTerm, setEquipmentSearchTerm] = useState<string>('');
     const [isLoadingEquipment, setIsLoadingEquipment] = useState(false);
-    
-    const [editableProjectImage, setEditableProjectImage] = useState<string | null>(projectImage || null);
-    
+
+    const [editableProjectImage, setEditableProjectImage] = useState<string | null>(
+        projectImage || null
+    );
+
     const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
     useEffect(() => {
@@ -86,17 +88,17 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     const getItemsPerPage = (page: number, totalPages: number, totalItems: number) => {
         const imagePageOffset = hasProjectImagePage ? 1 : 0;
         const effectivePage = page - imagePageOffset;
-        
+
         if (hasProjectImagePage && page === 1) {
             return 0;
         }
-        
+
         if (effectivePage === 1) {
-            if (totalPages === (1 + imagePageOffset)) {
+            if (totalPages === 1 + imagePageOffset) {
                 return Math.min(10, Math.max(0, totalItems));
             }
             return 10;
-        } else if (effectivePage === (totalPages - imagePageOffset)) {
+        } else if (effectivePage === totalPages - imagePageOffset) {
             return Math.min(11, 14);
         } else {
             return 14;
@@ -105,7 +107,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
     const calculateTotalPages = (totalItems: number) => {
         const imagePageOffset = hasProjectImagePage ? 1 : 0;
-        
+
         if (totalItems <= 7) return 1 + imagePageOffset;
 
         let remainingItems = totalItems - 10;
@@ -280,28 +282,29 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
     useEffect(() => {
         if (!show) return;
-    
-    
-    
+
         if (!results) {
             return;
         }
-    
+
         const initialItems: QuotationItem[] = [];
         let seq = 1;
-    
-        const isMultiZone = projectData?.useZones && projectData.zones && projectData.zones.length > 1;
-    
+
+        const isMultiZone =
+            projectData?.useZones && projectData.zones && projectData.zones.length > 1;
+
         if (isMultiZone) {
-            
-            const totalTreesInAllZones = projectData.zones.reduce((sum, zone) => sum + zone.plantCount, 0);
-            
+            const totalTreesInAllZones = projectData.zones.reduce(
+                (sum, zone) => sum + zone.plantCount,
+                0
+            );
+
             const equipmentMap = new Map();
-        
+
             projectData.zones.forEach((zone) => {
                 const zoneSprinkler = zoneSprinklers[zone.id];
                 const zonePipes = selectedPipes[zone.id] || {};
-                
+
                 if (zoneSprinkler) {
                     const sprinklerKey = `sprinkler_${zoneSprinkler.id}`;
                     if (equipmentMap.has(sprinklerKey)) {
@@ -320,17 +323,20 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             discount: 30.0,
                             taxes: 'Output\nVAT\n7%',
                             originalData: zoneSprinkler,
-                            zones: [zone.name]
+                            zones: [zone.name],
                         });
                     }
                 }
-        
+
                 const branchPipe = zonePipes.branch || results.autoSelectedBranchPipe;
                 if (branchPipe) {
                     const pipeKey = `branch_${branchPipe.id}`;
                     const zoneTreeRatio = zone.plantCount / totalTreesInAllZones;
-                    const rolls = Math.max(1, Math.ceil((results.branchPipeRolls || 1) * zoneTreeRatio));
-                    
+                    const rolls = Math.max(
+                        1,
+                        Math.ceil((results.branchPipeRolls || 1) * zoneTreeRatio)
+                    );
+
                     if (equipmentMap.has(pipeKey)) {
                         const existing = equipmentMap.get(pipeKey);
                         existing.quantity += rolls;
@@ -347,17 +353,20 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             discount: 30.0,
                             taxes: 'Output\nVAT\n7%',
                             originalData: branchPipe,
-                            zones: [zone.name]
+                            zones: [zone.name],
                         });
                     }
                 }
-        
+
                 const secondaryPipe = zonePipes.secondary || results.autoSelectedSecondaryPipe;
                 if (secondaryPipe && results.hasValidSecondaryPipe) {
                     const pipeKey = `secondary_${secondaryPipe.id}`;
                     const zoneTreeRatio = zone.plantCount / totalTreesInAllZones;
-                    const rolls = Math.max(1, Math.ceil((results.secondaryPipeRolls || 1) * zoneTreeRatio));
-                    
+                    const rolls = Math.max(
+                        1,
+                        Math.ceil((results.secondaryPipeRolls || 1) * zoneTreeRatio)
+                    );
+
                     if (equipmentMap.has(pipeKey)) {
                         const existing = equipmentMap.get(pipeKey);
                         existing.quantity += rolls;
@@ -374,17 +383,20 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             discount: 30.0,
                             taxes: 'Output\nVAT\n7%',
                             originalData: secondaryPipe,
-                            zones: [zone.name]
+                            zones: [zone.name],
                         });
                     }
                 }
-        
+
                 const mainPipe = zonePipes.main || results.autoSelectedMainPipe;
                 if (mainPipe && results.hasValidMainPipe) {
                     const pipeKey = `main_${mainPipe.id}`;
                     const zoneTreeRatio = zone.plantCount / totalTreesInAllZones;
-                    const rolls = Math.max(1, Math.ceil((results.mainPipeRolls || 1) * zoneTreeRatio));
-                    
+                    const rolls = Math.max(
+                        1,
+                        Math.ceil((results.mainPipeRolls || 1) * zoneTreeRatio)
+                    );
+
                     if (equipmentMap.has(pipeKey)) {
                         const existing = equipmentMap.get(pipeKey);
                         existing.quantity += rolls;
@@ -401,23 +413,22 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             discount: 30.0,
                             taxes: 'Output\nVAT\n7%',
                             originalData: mainPipe,
-                            zones: [zone.name]
+                            zones: [zone.name],
                         });
                     }
                 }
             });
-        
+
             for (const [key, item] of equipmentMap.entries()) {
                 if (item.zones && item.zones.length > 1) {
                     item.description += ` (ใช้ในโซน: ${item.zones.join(', ')})`;
                 } else if (item.zones && item.zones.length === 1) {
                     item.description += ` (ใช้ในโซน: ${item.zones[0]})`;
                 }
-                    delete item.zones;
+                delete item.zones;
                 initialItems.push(item);
             }
         } else {
-            
             if (selectedSprinkler && results) {
                 initialItems.push({
                     id: 'sprinkler',
@@ -432,7 +443,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     originalData: selectedSprinkler,
                 });
             }
-    
+
             if (selectedBranchPipe && results) {
                 initialItems.push({
                     id: 'branchPipe',
@@ -447,7 +458,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     originalData: selectedBranchPipe,
                 });
             }
-    
+
             if (selectedSecondaryPipe && results) {
                 initialItems.push({
                     id: 'secondaryPipe',
@@ -462,7 +473,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     originalData: selectedSecondaryPipe,
                 });
             }
-    
+
             if (selectedMainPipe && results) {
                 initialItems.push({
                     id: 'mainPipe',
@@ -478,10 +489,10 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 });
             }
         }
-    
+
         if (selectedPump && results) {
             const pumpDescription = `${selectedPump.productCode || selectedPump.product_code || ''} - ปั๊มน้ำ ${selectedPump.name || ''} ${selectedPump.powerHP || ''}HP ${selectedPump.phase || ''}เฟส (${selectedPump.brand || ''})`;
-            
+
             initialItems.push({
                 id: 'pump',
                 seq: seq++,
@@ -494,54 +505,75 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 taxes: 'Output\nVAT\n7%',
                 originalData: selectedPump,
             });
-    
+
             const accessories = selectedPump.pumpAccessories || selectedPump.pumpAccessory || [];
-            
+
             if (accessories && accessories.length > 0) {
                 accessories
-                    .sort((a: { sort_order: any }, b: { sort_order: any }) => (a.sort_order || 0) - (b.sort_order || 0))
-                    .forEach((accessory: {
-                        id: any;
-                        name: any;
-                        size: any;
-                        is_included: any;
-                        price: any;
-                        image_url: any;
-                        image: any;
-                        accessory_type: any;
-                    }) => {
-                        if (!accessory.is_included || (accessory.price && accessory.price > 0)) {
-                            const accessoryTypeMap: { [key: string]: string } = {
-                                'foot_valve': 'Foot Valve',
-                                'check_valve': 'Check Valve',
-                                'ball_valve': 'Ball Valve',
-                                'pressure_gauge': 'เกจวัดแรงดัน',
-                                'other': 'อุปกรณ์เสริม'
-                            };
-                            
-                            const typeName = accessoryTypeMap[accessory.accessory_type] || accessory.accessory_type || '';
-                            
-                            initialItems.push({
-                                id: `pump_accessory_${accessory.id || seq}`,
-                                seq: seq++,
-                                image: accessory.image_url || accessory.image || '',
-                                date: '',
-                                description: `${accessory.name}${accessory.size ? ` ขนาด ${accessory.size}` : ''} - ${typeName}${accessory.is_included ? ' (รวมในชุด)' : ' (แยกขาย)'}`,
-                                quantity: 1,
-                                unitPrice: accessory.is_included ? 0 : (accessory.price || 0),
-                                discount: accessory.is_included ? 0 : 30.0,
-                                taxes: 'Output\nVAT\n7%',
-                                originalData: accessory,
-                            });
+                    .sort(
+                        (a: { sort_order: any }, b: { sort_order: any }) =>
+                            (a.sort_order || 0) - (b.sort_order || 0)
+                    )
+                    .forEach(
+                        (accessory: {
+                            id: any;
+                            name: any;
+                            size: any;
+                            is_included: any;
+                            price: any;
+                            image_url: any;
+                            image: any;
+                            accessory_type: any;
+                        }) => {
+                            if (
+                                !accessory.is_included ||
+                                (accessory.price && accessory.price > 0)
+                            ) {
+                                const accessoryTypeMap: { [key: string]: string } = {
+                                    foot_valve: 'Foot Valve',
+                                    check_valve: 'Check Valve',
+                                    ball_valve: 'Ball Valve',
+                                    pressure_gauge: 'เกจวัดแรงดัน',
+                                    other: 'อุปกรณ์เสริม',
+                                };
+
+                                const typeName =
+                                    accessoryTypeMap[accessory.accessory_type] ||
+                                    accessory.accessory_type ||
+                                    '';
+
+                                initialItems.push({
+                                    id: `pump_accessory_${accessory.id || seq}`,
+                                    seq: seq++,
+                                    image: accessory.image_url || accessory.image || '',
+                                    date: '',
+                                    description: `${accessory.name}${accessory.size ? ` ขนาด ${accessory.size}` : ''} - ${typeName}${accessory.is_included ? ' (รวมในชุด)' : ' (แยกขาย)'}`,
+                                    quantity: 1,
+                                    unitPrice: accessory.is_included ? 0 : accessory.price || 0,
+                                    discount: accessory.is_included ? 0 : 30.0,
+                                    taxes: 'Output\nVAT\n7%',
+                                    originalData: accessory,
+                                });
+                            }
                         }
-                    });
+                    );
             }
         }
-    
+
         setItems(initialItems);
         setCurrentPage(hasProjectImagePage ? 1 : 1);
-        
-    }, [show, selectedSprinkler, selectedPump, selectedBranchPipe, selectedSecondaryPipe, selectedMainPipe, results, zoneSprinklers, selectedPipes, projectData]);
+    }, [
+        show,
+        selectedSprinkler,
+        selectedPump,
+        selectedBranchPipe,
+        selectedSecondaryPipe,
+        selectedMainPipe,
+        results,
+        zoneSprinklers,
+        selectedPipes,
+        projectData,
+    ]);
 
     const calculateItemAmount = (item: QuotationItem) => {
         return item.unitPrice * item.quantity - item.unitPrice * (item.discount / 100);
@@ -581,11 +613,11 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
     const getItemsForPage = (page: number) => {
         const imagePageOffset = hasProjectImagePage ? 1 : 0;
-        
+
         if (hasProjectImagePage && page === 1) {
-                return [];
+            return [];
         }
-        
+
         const effectivePage = page - imagePageOffset;
         const itemsPerPage = getItemsPerPage(page, totalPages, items.length);
 
@@ -801,8 +833,8 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         let allPagesHTML = '';
         for (let page = 1; page <= currentTotalPages; page++) {
             const imagePageOffset = hasProjectImagePage ? 1 : 0;
-            
-                if (hasProjectImagePage && page === 1) {
+
+            if (hasProjectImagePage && page === 1) {
                 const imagePageHTML = `
                     <div class="mx-auto flex h-[1123px] w-[794px] flex-col bg-white p-8 text-black shadow-lg" style="page-break-after: always;">
                         <div class="print-page flex min-h-full flex-col">
@@ -826,11 +858,11 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 allPagesHTML += imagePageHTML;
                 continue;
             }
-            
+
             let pageItems;
             const itemsPerPage = getItemsPerPage(page, currentTotalPages, currentItems.length);
 
-            if (page === (1 + imagePageOffset)) {
+            if (page === 1 + imagePageOffset) {
                 pageItems = currentItems.slice(0, itemsPerPage);
             } else {
                 const startIndex = 10 + (page - 2 - imagePageOffset) * 14;
@@ -841,7 +873,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             const headerHTML = renderHeader();
 
             const customerInfoHTML =
-                page === (1 + imagePageOffset)
+                page === 1 + imagePageOffset
                     ? `
                 <div class="print-customer-info mb-6 self-end text-left text-sm">
                     <p class="font-semibold">[1234] ${quotationDataCustomer.name || '-'}</p>
@@ -853,7 +885,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     : '';
 
             const quotationDetailsHTML =
-                page === (1 + imagePageOffset)
+                page === 1 + imagePageOffset
                     ? `
                 <h1 class="print-title mb-4 text-xl font-bold">Quotation # QT1234567890</h1>
                 <div class="print-details mb-4 flex flex-row gap-9 text-left text-sm">
@@ -980,7 +1012,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         }, 100);
     };
 
-    const renderHeader = () => (
+    const renderHeader = () =>
         `<div class="print-header mb-2 flex items-center justify-between">
             <div class="flex items-center">
                 <img
@@ -996,18 +1028,16 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             <p>15 ซ. พระยามนธาตุ แยก 10</p>
             <p>แขวงคลองบางบอน เขตบางบอน</p>
             <p>กรุงเทพมหานคร 10150</p>
-        </div>`
-    );
+        </div>`;
 
-    const renderFooter = (page: number) => (
+    const renderFooter = (page: number) =>
         `<div class="print-footer-container mt-auto text-center text-xs">
             <hr class="print-footer-hr mb-2 border-gray-800" />
             <div class="print-footer">
                 <p>Phone: 02-451-1111 Tax ID: 0105549044446</p>
                 <p>Page: ${page} / ${totalPages}</p>
             </div>
-        </div>`
-    );
+        </div>`;
 
     const renderCustomerInfo = () => (
         <div className="print-customer-info mb-6 self-end text-left text-sm">
@@ -1254,40 +1284,42 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     <p>แขวงคลองบางบอน เขตบางบอน</p>
                     <p>กรุงเทพมหานคร 10150</p>
                 </div>
-                
+
                 <div className="flex flex-col items-center justify-center">
-                    <h1 className="text-2xl font-bold mb-8 text-center">แผนผังโครงการระบบชลประทาน</h1>
-                    <div className="flex items-center justify-center w-full max-h-[800px] relative">
+                    <h1 className="mb-8 text-center text-2xl font-bold">
+                        แผนผังโครงการระบบชลประทาน
+                    </h1>
+                    <div className="relative flex max-h-[800px] w-full items-center justify-center">
                         {isEditing ? (
-                            <div className="relative group">
+                            <div className="group relative">
                                 {editableProjectImage ? (
                                     <img
                                         src={editableProjectImage}
                                         alt="Project Layout"
-                                        className="max-w-full max-h-full object-contain rounded-lg shadow-lg cursor-pointer"
+                                        className="max-h-full max-w-full cursor-pointer rounded-lg object-contain shadow-lg"
                                         onClick={openProjectImageDialog}
                                         title="คลิกเพื่อเปลี่ยนรูปภาพ"
                                     />
                                 ) : (
-                                    <div 
-                                        className="w-[600px] h-[400px] border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer hover:border-blue-400 bg-gray-50"
+                                    <div
+                                        className="flex h-[400px] w-[600px] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 hover:border-blue-400"
                                         onClick={openProjectImageDialog}
                                         title="คลิกเพื่อเพิ่มรูปภาพ"
                                     >
                                         <div className="text-center">
-                                            <div className="text-6xl text-gray-400 mb-4">📷</div>
+                                            <div className="mb-4 text-6xl text-gray-400">📷</div>
                                             <p className="text-gray-500">คลิกเพื่อเพิ่มรูปแผนผัง</p>
                                         </div>
                                     </div>
                                 )}
                                 {editableProjectImage && (
-                                    <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="absolute right-2 top-2 flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 openProjectImageDialog();
                                             }}
-                                            className="bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600 shadow-lg"
+                                            className="rounded-full bg-blue-500 p-2 text-white shadow-lg hover:bg-blue-600"
                                             title="เปลี่ยนรูปภาพ"
                                         >
                                             📷
@@ -1297,7 +1329,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                                 e.stopPropagation();
                                                 handleProjectImageDelete();
                                             }}
-                                            className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600 shadow-lg"
+                                            className="rounded-full bg-red-500 p-2 text-white shadow-lg hover:bg-red-600"
                                             title="ลบรูปภาพ"
                                         >
                                             ×
@@ -1309,19 +1341,19 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             <img
                                 src={editableProjectImage}
                                 alt="Project Layout"
-                                className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                                className="max-h-full max-w-full rounded-lg object-contain shadow-lg"
                             />
                         ) : (
-                            <div className="w-[600px] h-[400px] border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
+                            <div className="flex h-[400px] w-[600px] items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50">
                                 <div className="text-center">
-                                    <div className="text-6xl text-gray-400 mb-4">📷</div>
+                                    <div className="mb-4 text-6xl text-gray-400">📷</div>
                                     <p className="text-gray-500">ไม่มีรูปแผนผัง</p>
                                 </div>
                             </div>
                         )}
                     </div>
                 </div>
-                
+
                 <div className="print-footer-container mt-auto text-center text-xs">
                     <hr className="print-footer-hr mb-2 border-gray-800" />
                     <div className="print-footer">
@@ -1469,7 +1501,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     <div>
                         Page: {currentPage}/{totalPages}
                     </div>
-                    <div>Items on this page: {isImagePage ? 0 : getItemsForPage(currentPage).length}</div>
+                    <div>
+                        Items on this page: {isImagePage ? 0 : getItemsForPage(currentPage).length}
+                    </div>
                     <div>Editing: {isEditing ? 'Yes' : 'No'}</div>
                 </div>
 
@@ -1544,8 +1578,8 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                 </button>
                                 <span className="text-white">
                                     หน้า {currentPage} / {totalPages}
-                                    {isImagePage && " (แผนผัง)"}
-                                    {!isImagePage && hasProjectImagePage && " (อุปกรณ์)"}
+                                    {isImagePage && ' (แผนผัง)'}
+                                    {!isImagePage && hasProjectImagePage && ' (อุปกรณ์)'}
                                 </span>
                                 <button
                                     onClick={() =>
@@ -1573,7 +1607,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 {showEquipmentSelector && <EquipmentSelector />}
 
                 {/* Render project image page or equipment page */}
-                {isImagePage ? renderProjectImagePage() : (
+                {isImagePage ? (
+                    renderProjectImagePage()
+                ) : (
                     <div className="mx-auto flex h-[1123px] w-[794px] flex-col bg-white p-8 text-black shadow-lg">
                         <div className="print-page flex min-h-full flex-col">
                             <div className="print-header mb-2 flex items-center justify-between">
@@ -1593,7 +1629,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                 <p>กรุงเทพมหานคร 10150</p>
                             </div>
 
-                            {currentPage === (1 + imagePageOffset) && (
+                            {currentPage === 1 + imagePageOffset && (
                                 <>
                                     {renderCustomerInfo()}
                                     {renderQuotationDetails()}

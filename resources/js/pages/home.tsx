@@ -432,17 +432,33 @@ export default function Home() {
     };
 
     const handleFieldSelect = (field: Field) => {
-        // Prepare the data in the same format as map-planner
-        const params = new URLSearchParams({
-            area: JSON.stringify(field.area),
-            areaType: '',
-            plantType: JSON.stringify(field.plantType),
-            layers: JSON.stringify(field.layers || []),
-            fieldId: field.id, // Add field ID for editing
-        });
+        try {
+            // Validate field data before navigation
+            if (!field.area || field.area.length < 3) {
+                alert('ข้อมูลพื้นที่ไม่ถูกต้อง กรุณาตรวจสอบข้อมูลแปลง');
+                return;
+            }
 
-        // Navigate to horticulture planner with URL parameters
-        router.visit(`/horticulture/planner?${params.toString()}`);
+            if (!field.plantType) {
+                alert('ข้อมูลพืชไม่ถูกต้อง กรุณาตรวจสอบข้อมูลแปลง');
+                return;
+            }
+
+            // Prepare the data in the same format as map-planner
+            const params = new URLSearchParams({
+                area: JSON.stringify(field.area),
+                areaType: '',
+                plantType: JSON.stringify(field.plantType),
+                layers: JSON.stringify(field.layers || []),
+                fieldId: field.id, // Add field ID for editing
+            });
+
+            // Navigate to horticulture planner with URL parameters
+            router.visit(`/horticulture/planner?${params.toString()}`);
+        } catch (error) {
+            console.error('Error preparing field data for navigation:', error);
+            alert('เกิดข้อผิดพลาดในการเปิดข้อมูลแปลง กรุณาลองใหม่อีกครั้ง');
+        }
     };
 
     const handleFieldDelete = (fieldId: string) => {
