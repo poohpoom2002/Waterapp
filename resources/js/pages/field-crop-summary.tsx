@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     MapContainer,
     TileLayer,
@@ -64,24 +64,125 @@ interface FieldCropSummaryProps {
     mapCenter?: [number, number];
     mapZoom?: number;
     mapType?: string;
+
+    // Summary data passed from field-map
+    summary?: any;
+    equipment?: any[];
 }
 
-export default function FieldCropSummary() {
-    // Get data from localStorage or URL parameters
+export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
+    // Get data from props (from route), localStorage, or default values
     const [summaryData, setSummaryData] = useState<any>(null);
+    const [dataSource, setDataSource] = useState<string>('');
+    const printMapRef = useRef<any>(null);
+
+    // Debug: Log all received props
+    console.log('🔍 FieldCropSummary received props:', {
+        hasMainField: !!props.mainField,
+        mainFieldCoordinates: props.mainField?.coordinates?.length || 0,
+        hasPipes: !!props.pipes,
+        pipesCount: props.pipes?.length || 0,
+        hasZones: !!props.zones,
+        zonesCount: props.zones?.length || 0,
+        allPropKeys: Object.keys(props),
+        props: props
+    });
 
     useEffect(() => {
-        // Try to get data from localStorage first
+        // Enhanced debugging - log all props received
+        console.log('🔍 FIELD CROP SUMMARY - All props received:', {
+            summary: props.summary ? 'Present' : 'Missing',
+            mainField: props.mainField ? 'Present' : 'Missing', 
+            fieldAreaSize: props.fieldAreaSize || 'Missing',
+            zones: props.zones?.length || 0,
+            pipes: props.pipes?.length || 0,
+            equipment: props.equipment?.length || 0,
+            equipmentIcons: props.equipmentIcons?.length || 0,
+            irrigationPoints: props.irrigationPoints?.length || 0,
+            irrigationLines: props.irrigationLines?.length || 0,
+            selectedCrops: props.selectedCrops?.length || 0,
+            zoneAssignments: props.zoneAssignments ? Object.keys(props.zoneAssignments).length : 0,
+            mapCenter: props.mapCenter || 'Missing',
+            mapZoom: props.mapZoom || 'Missing'
+        });
+
+        // Priority 1: Check if data passed from props (from field-map route)
+        if (props.summary || props.zones || props.pipes || props.equipmentIcons) {
+            console.log('📥 Using data from props/route');
+            setDataSource('route-props');
+            setSummaryData({
+                mainField: props.mainField,
+                // Debug the mainField data specifically
+                _debugMainField: {
+                    propsMainField: props.mainField,
+                    hasCoordinates: !!props.mainField?.coordinates,
+                    coordinatesLength: props.mainField?.coordinates?.length || 0,
+                    hasArea: !!props.mainField?.area,
+                    area: props.mainField?.area
+                },
+                fieldAreaSize: props.fieldAreaSize || 0,
+                selectedCrops: props.selectedCrops || [],
+                zones: props.zones || [],
+                zoneAssignments: props.zoneAssignments || {},
+                zoneSummaries: props.zoneSummaries || {},
+                pipes: props.pipes || [],
+                // Debug the pipes data specifically
+                _debugPipes: {
+                    propsPipes: props.pipes,
+                    pipesLength: props.pipes?.length || 0,
+                    pipeTypes: props.pipes?.map(p => ({ id: p.id, type: p.type, name: p.name })) || []
+                },
+                equipmentIcons: props.equipmentIcons || props.equipment || [],
+                irrigationPoints: props.irrigationPoints || [],
+                irrigationLines: props.irrigationLines || [],
+                irrigationAssignments: props.irrigationAssignments || {},
+                irrigationSettings: props.irrigationSettings || {},
+                rowSpacing: props.rowSpacing || {},
+                plantSpacing: props.plantSpacing || {},
+                mapCenter: props.mapCenter || [14.5995, 120.9842],
+                mapZoom: props.mapZoom || 18,
+                mapType: props.mapType || 'satellite',
+            });
+            return;
+        }
+
+        // Priority 2: Check URL search parameters (for direct navigation)
+        const urlParams = new URLSearchParams(window.location.search);
+        const summaryParam = urlParams.get('summary');
+        if (summaryParam) {
+            try {
+                console.log('📥 Using data from URL parameters');
+                const parsedData = JSON.parse(decodeURIComponent(summaryParam));
+                setDataSource('url-params');
+                setSummaryData(parsedData);
+                return;
+            } catch (error) {
+                console.error('Error parsing URL summary data:', error);
+            }
+        }
+
+        // Priority 3: Try localStorage
         const savedData = localStorage.getItem('fieldMapData');
         if (savedData) {
             try {
                 const parsedData = JSON.parse(savedData);
-                setSummaryData(parsedData);
+                if (parsedData && typeof parsedData === 'object') {
+                    console.log('📥 Using data from localStorage');
+                    setDataSource('localStorage');
+                    setSummaryData(parsedData);
+                } else {
+                    console.warn('📥 Invalid localStorage data structure');
+                    setDataSource('none');
+                }
             } catch (error) {
                 console.error('Error parsing saved data:', error);
+                setDataSource('error');
             }
+        } else {
+            console.warn('📥 No data found in any source');
+            setDataSource('none');
         }
-    }, []);
+    }, [props]);
 
     // Default values if no data is available
     const {
@@ -104,32 +205,6 @@ export default function FieldCropSummary() {
         mapType = 'satellite',
     } = summaryData || {};
 
-    // Calculate optimal map center and zoom based on field data
-    const calculateMapBounds = () => {
-        if (mainField && mainField.coordinates && mainField.coordinates.length > 0) {
-            // แปลง [lat, lng] → [lng, lat] สำหรับ turf
-            const coords = mainField.coordinates.map(([lat, lng]) => [lng, lat]);
-            const closedCoords = [...coords, coords[0]];
-            const polygon = turf.polygon([closedCoords]);
-            const centroid = turf.centroid(polygon);
-            const [centerLng, centerLat] = centroid.geometry.coordinates;
-
-            let optimalZoom = 18;
-            if (fieldAreaSize > 10000) {
-                optimalZoom = 16;
-            } else if (fieldAreaSize > 5000) {
-                optimalZoom = 17;
-            } else {
-                optimalZoom = 18;
-            }
-
-            return { center: [centerLat, centerLng], zoom: optimalZoom };
-        }
-        return { center: mapCenter, zoom: mapZoom };
-    };
-
-    const { center: optimalCenter, zoom: optimalZoom } = calculateMapBounds();
-
     // Handle case where zones might be just a number (from minimal data)
     const actualZones = Array.isArray(zones) ? zones : [];
     const actualPipes = Array.isArray(pipes) ? pipes : [];
@@ -137,35 +212,249 @@ export default function FieldCropSummary() {
     const actualIrrigationPoints = Array.isArray(irrigationPoints) ? irrigationPoints : [];
     const actualIrrigationLines = Array.isArray(irrigationLines) ? irrigationLines : [];
 
+    // Calculate optimal map center and zoom based on actual field data
+    const calculateMapBounds = () => {
+        console.log('🗺️ Calculating map bounds with data:', {
+            mainField,
+            zones: actualZones.length,
+            pipes: actualPipes.length,
+            fieldAreaSize
+        });
+
+        // First try to use mainField coordinates
+        if (mainField && mainField.coordinates && mainField.coordinates.length > 0) {
+            try {
+                console.log('📍 Using mainField coordinates:', mainField.coordinates);
+                
+                // Handle different coordinate formats
+                let coords;
+                if (Array.isArray(mainField.coordinates[0]) && mainField.coordinates[0].length === 2) {
+                    // Format: [[lat, lng], [lat, lng], ...]
+                    coords = mainField.coordinates.map(([lat, lng]) => [lng, lat]);
+                } else if (mainField.coordinates[0].lat && mainField.coordinates[0].lng) {
+                    // Format: [{lat: number, lng: number}, ...]
+                    coords = mainField.coordinates.map(coord => [coord.lng, coord.lat]);
+                } else {
+                    throw new Error('Unknown coordinate format');
+                }
+
+                const closedCoords = [...coords];
+                if (closedCoords[0][0] !== closedCoords[closedCoords.length - 1][0] || 
+                    closedCoords[0][1] !== closedCoords[closedCoords.length - 1][1]) {
+                    closedCoords.push(closedCoords[0]);
+                }
+
+                const polygon = turf.polygon([closedCoords]);
+                const centroid = turf.centroid(polygon);
+                const [centerLng, centerLat] = centroid.geometry.coordinates;
+
+                let optimalZoom = 18;
+                if (fieldAreaSize > 50000) {
+                    optimalZoom = 14;
+                } else if (fieldAreaSize > 20000) {
+                    optimalZoom = 15;
+                } else if (fieldAreaSize > 10000) {
+                    optimalZoom = 16;
+                } else if (fieldAreaSize > 5000) {
+                    optimalZoom = 17;
+                } else {
+                    optimalZoom = 18;
+                }
+
+                console.log('✅ Calculated center:', [centerLat, centerLng], 'zoom:', optimalZoom);
+                return { center: [centerLat, centerLng], zoom: optimalZoom };
+            } catch (error) {
+                console.error('Error calculating bounds from mainField:', error);
+            }
+        }
+
+        // Fallback: Try to use zones if mainField is not available
+        if (actualZones.length > 0) {
+            try {
+                console.log('📍 Using zones coordinates as fallback');
+                let allCoords: [number, number][] = [];
+                
+                actualZones.forEach(zone => {
+                    if (zone.coordinates && zone.coordinates.length > 0) {
+                        const zoneCoords = zone.coordinates.map(coord => {
+                            if (Array.isArray(coord)) {
+                                return coord;
+                            } else if (coord.lat && coord.lng) {
+                                return [coord.lat, coord.lng];
+                            }
+                            return null;
+                        }).filter(Boolean);
+                        allCoords.push(...zoneCoords);
+                    }
+                });
+
+                if (allCoords.length > 0) {
+                    const lats = allCoords.map(coord => coord[0]);
+                    const lngs = allCoords.map(coord => coord[1]);
+                    const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+                    const centerLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+                    
+                    console.log('✅ Calculated center from zones:', [centerLat, centerLng]);
+                    return { center: [centerLat, centerLng], zoom: 17 };
+                }
+            } catch (error) {
+                console.error('Error calculating bounds from zones:', error);
+            }
+        }
+
+        // Final fallback: Use provided mapCenter or default
+        const fallbackCenter = mapCenter || [14.5995, 120.9842];
+        const fallbackZoom = mapZoom || 15;
+        console.log('⚠️ Using fallback center:', fallbackCenter, 'zoom:', fallbackZoom);
+        return { center: fallbackCenter, zoom: fallbackZoom };
+    };
+
+    const { center: optimalCenter, zoom: optimalZoom } = calculateMapBounds();
+    
+    // Log the calculated map bounds for debugging
+    console.log('🗺️ Map bounds calculated:', {
+        center: optimalCenter,
+        zoom: optimalZoom,
+        source: mainField ? 'mainField' : (actualZones.length > 0 ? 'zones' : 'fallback')
+    });
+
+    // Handle print events to ensure map renders correctly
+    useEffect(() => {
+        const handleBeforePrint = () => {
+            // Force all map instances to refresh
+            setTimeout(() => {
+                window.dispatchEvent(new Event('resize'));
+            }, 500);
+        };
+
+        const handleAfterPrint = () => {
+            // Clean up after print
+            setTimeout(() => {
+                window.dispatchEvent(new Event('resize'));
+            }, 100);
+        };
+
+        window.addEventListener('beforeprint', handleBeforePrint);
+        window.addEventListener('afterprint', handleAfterPrint);
+
+        return () => {
+            window.removeEventListener('beforeprint', handleBeforePrint);
+            window.removeEventListener('afterprint', handleAfterPrint);
+        };
+    }, []);
+
+    // DEBUG: Log data to console for troubleshooting
+    console.log('🔍 SUMMARY DEBUG DATA:');
+    console.log('- Data source:', dataSource);
+    console.log('- Main field present:', !!mainField);
+    console.log('- Main field coordinates:', mainField?.coordinates?.length || 0);
+    console.log('- Zones:', actualZones.length, actualZones.map(z => ({ id: z.id, name: z.name, type: z.type })));
+    console.log('- Pipes:', actualPipes.length, actualPipes.map(p => ({ id: p.id, name: p.name, type: p.type })));
+    console.log('- Pipe types available:', [...new Set(actualPipes.map(p => p.type))]);
+    console.log('- Equipment:', actualEquipmentIcons.length, actualEquipmentIcons.map(e => ({ id: e.id, type: e.type })));
+    console.log('- Irrigation Points:', actualIrrigationPoints.length);
+    console.log('- Irrigation Lines:', actualIrrigationLines.length);
+
+    // FILTER irrigation points based on lateral pipes availability
+    const lateralPipesForFiltering = actualPipes.filter(p => p.type === 'lateral');
+    
+    // Remove duplicate irrigation points by unique ID
+    const uniqueIrrigationPoints = actualIrrigationPoints.filter((point, index, array) => {
+        // Handle case where point might not have proper structure
+        if (!point || !point.id) return false;
+        const firstIndex = array.findIndex(p => p && p.id === point.id);
+        return firstIndex === index;
+    });
+
+    // FIXED: Show irrigation points more liberally
+    let filteredIrrigationPoints = uniqueIrrigationPoints;
+
+    // Only filter if there are too many points (performance consideration)
+    if (uniqueIrrigationPoints.length > 200) {
+        // Show every 3rd point if there are more than 200 points
+        filteredIrrigationPoints = uniqueIrrigationPoints.filter((_, index) => index % 3 === 0);
+    } else if (uniqueIrrigationPoints.length > 100) {
+        // Show every 2nd point if there are more than 100 points
+        filteredIrrigationPoints = uniqueIrrigationPoints.filter((_, index) => index % 2 === 0);
+    }
+    // Otherwise show all points
+
+    // Clean and normalize irrigation types
+    const normalizeIrrigationType = (type: string): string => {
+        if (!type) return 'unknown';
+        
+        const normalizedType = type.toLowerCase().trim();
+        
+        // Map common variations to standard types
+        const typeMapping: { [key: string]: string } = {
+            'sprinkler': 'sprinkler',
+            'sprinkler-system': 'sprinkler',
+            'mini-sprinkler': 'mini_sprinkler', 
+            'mini_sprinkler': 'mini_sprinkler',
+            'minisprinkler': 'mini_sprinkler',
+            'micro-spray': 'micro_spray',
+            'micro_spray': 'micro_spray',
+            'microspray': 'micro_spray',
+            'micro': 'micro_spray',
+            'microsprinkler': 'micro_spray',
+            'drip': 'drip_tape',
+            'drip-tape': 'drip_tape',
+            'drip_tape': 'drip_tape',
+            'drip-irrigation': 'drip_tape',
+            'drip_irrigation': 'drip_tape'
+        };
+
+        return typeMapping[normalizedType] || normalizedType;
+    };
+
+    // Calculate irrigation types with proper normalization
+    const normalizedPoints = filteredIrrigationPoints.map(point => ({
+        ...point,
+        normalizedType: normalizeIrrigationType(point.type)
+    }));
+
+    const sprinklerPoints = normalizedPoints.filter(p => p.normalizedType === 'sprinkler').length;
+    const miniSprinklerPoints = normalizedPoints.filter(p => p.normalizedType === 'mini_sprinkler').length;
+    const microSprayPoints = normalizedPoints.filter(p => p.normalizedType === 'micro_spray').length;
+    const dripPoints = normalizedPoints.filter(p => p.normalizedType === 'drip_tape').length;
+
+    // Calculate drip lines separately and remove duplicates
+    const uniqueIrrigationLines = actualIrrigationLines.filter((line, index, array) => {
+        if (!line || !line.id) return false;
+        const firstIndex = array.findIndex(l => l && l.id === line.id);
+        return firstIndex === index;
+    });
+
+    const dripLines = uniqueIrrigationLines.filter(l => normalizeIrrigationType(l.type) === 'drip_tape').length;
+
     // Calculate totals
     const totalZones = actualZones.length;
     const totalPipes = actualPipes.length;
     const totalEquipment = actualEquipmentIcons.length;
-    const totalIrrigationPoints = actualIrrigationPoints.length;
-    const totalIrrigationLines = actualIrrigationLines.length;
+    const totalIrrigationPoints = uniqueIrrigationPoints.length;
+    const totalIrrigationLines = uniqueIrrigationLines.length;
 
-    // Calculate pipe types
+    // Calculate pipe types with filtering for display
     const mainPipes = actualPipes.filter((p) => p.type === 'main').length;
     const submainPipes = actualPipes.filter((p) => p.type === 'submain').length;
     const lateralPipes = actualPipes.filter((p) => p.type === 'lateral').length;
 
-    // Calculate irrigation types
-    const sprinklerPoints = actualIrrigationPoints.filter((p) => p.type === 'sprinkler').length;
-    const miniSprinklerPoints = actualIrrigationPoints.filter(
-        (p) => p.type === 'mini_sprinkler'
-    ).length;
-    const microSprayPoints = actualIrrigationPoints.filter((p) => p.type === 'micro_spray').length;
-    const dripPoints = actualIrrigationPoints.filter((p) => p.type === 'drip_tape').length;
-    const dripLines = actualIrrigationLines.filter((l) => l.type === 'drip_tape').length;
+    // FIXED: Show ALL pipes without filtering to ensure lateral pipes are visible
+    const displayPipes = actualPipes; // Show all pipes without any filtering
 
     // Calculate drip tape statistics
-    const dripTapeSummary = actualIrrigationPoints.find((p) => p.type === 'drip_tape');
+    const dripTapeSummary = uniqueIrrigationPoints.find((p) => normalizeIrrigationType(p.type) === 'drip_tape');
     const totalDripHoles = dripTapeSummary ? dripTapeSummary.totalHoles || 0 : 0;
 
-    // Calculate equipment types
-    const pumpCount = actualEquipmentIcons.filter((e) => e.type === 'pump').length;
-    const valveCount = actualEquipmentIcons.filter((e) => e.type === 'ballvalve').length;
-    const solenoidCount = actualEquipmentIcons.filter((e) => e.type === 'solenoid').length;
+    // Calculate equipment types with duplicate removal
+    const uniqueEquipment = actualEquipmentIcons.filter((equipment, index, array) => {
+        const firstIndex = array.findIndex(e => e.id === equipment.id);
+        return firstIndex === index;
+    });
+
+    const pumpCount = uniqueEquipment.filter((e) => e.type === 'pump').length;
+    const valveCount = uniqueEquipment.filter((e) => e.type === 'ballvalve').length;
+    const solenoidCount = uniqueEquipment.filter((e) => e.type === 'solenoid').length;
 
     // Calculate total estimated yield and income
     const totalEstimatedYield = Object.values(zoneSummaries).reduce((sum: number, summary: any) => {
@@ -206,9 +495,9 @@ export default function FieldCropSummary() {
             equipment.type === 'solenoid'
         ) {
             let imgSrc = '';
-            if (equipment.type === 'pump') imgSrc = '/generateTree/wtpump.png';
-            if (equipment.type === 'ballvalve') imgSrc = '/generateTree/ballv.png';
-            if (equipment.type === 'solenoid') imgSrc = '/generateTree/solv.png';
+            if (equipment.type === 'pump') imgSrc = './generateTree/wtpump.png';
+            if (equipment.type === 'ballvalve') imgSrc = './generateTree/ballv.png';
+            if (equipment.type === 'solenoid') imgSrc = './generateTree/solv.png';
             iconHtml = `<img src="${imgSrc}" alt="${equipmentConfig.name}" style="width:20px;height:20px;object-fit:contain;display:block;margin:auto;" />`;
         } else {
             iconHtml = `<span style="font-size: 12px;">${equipmentConfig.icon}</span>`;
@@ -309,9 +598,67 @@ export default function FieldCropSummary() {
     return (
         <div className="min-h-screen bg-gray-900 text-white print:bg-white print:text-black">
             <Head title="Field Crop Summary - Irrigation Planning" />
+            
+            {/* FIXED: Print-optimized styles for better layout */}
+            <style>{`
+                @media print {
+                    @page {
+                        size: A4 landscape;
+                        margin: 0.5in;
+                    }
+                    
+                    body {
+                        print-color-adjust: exact;
+                        -webkit-print-color-adjust: exact;
+                    }
+                    
+                    /* Hide non-essential elements for print */
+                    .print-hide {
+                        display: none !important;
+                    }
+                    
+                    /* Ensure content is visible */
+                    .print-show {
+                        display: block !important;
+                    }
+                    
+                    /* Optimize print layout */
+                    .print-layout {
+                        display: grid !important;
+                        grid-template-columns: 1fr 1fr !important;
+                        gap: 1rem !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                    }
+                    
+                    .print-summary-section {
+                        max-height: none !important;
+                        overflow: visible !important;
+                    }
+                    
+                    .print-map-section {
+                        height: 500px !important;
+                        width: 100% !important;
+                    }
+                    
+                    .leaflet-container {
+                        height: 100% !important;
+                        width: 100% !important;
+                    }
+                    
+                    /* Ensure map tiles load properly for print */
+                    .leaflet-tile-container {
+                        opacity: 1 !important;
+                    }
+                    
+                    .leaflet-tile {
+                        opacity: 1 !important;
+                    }
+                }
+            `}</style>
 
-            {/* Header */}
-            <div className="border-b border-gray-700 bg-gray-800 print:hidden print:border-gray-300 print:bg-white">
+            {/* Header - Hidden on print */}
+            <div className="border-b border-gray-700 bg-gray-800 print:hidden">
                 <div className="container mx-auto px-4 py-4">
                     <div className="mx-auto max-w-7xl">
                         {/* Back Navigation */}
@@ -337,29 +684,76 @@ export default function FieldCropSummary() {
 
                         {/* Main Title */}
                         <h1 className="mb-1 text-3xl font-bold">📊 Field Crop Summary</h1>
-                        <p className="mb-4 text-gray-400">
+                        <p className="mb-2 text-gray-400">
                             Complete overview of your irrigation planning project
                         </p>
+                         {/* Enhanced Debug Information */}
+                         {dataSource && (
+                             <div className="mb-2 text-xs text-gray-500">
+                                 <div className="mb-1">📂 Data source: {dataSource}</div>
+                                 <div className="grid grid-cols-2 gap-4 text-xs">
+                                     <div>
+                                         <div className="text-blue-300">📏 Pipes Debug:</div>
+                                         <div>• Total: {actualPipes.length}</div>
+                                         <div>• Main: {actualPipes.filter(p => p.type === 'main').length}</div>
+                                         <div>• Submain: {actualPipes.filter(p => p.type === 'submain').length}</div>
+                                         <div>• Lateral: {actualPipes.filter(p => p.type === 'lateral').length}</div>
+                                         <div>• Displayed: {displayPipes.length}</div>
+                                     </div>
+                                     <div>
+                                         <div className="text-green-300">💧 Irrigation Debug:</div>
+                                         <div>• Total Points: {actualIrrigationPoints.length}</div>
+                                         <div>• Unique Points: {uniqueIrrigationPoints.length}</div>
+                                         <div>• Filtered Points: {filteredIrrigationPoints.length}</div>
+                                         <div>• Lines: {actualIrrigationLines.length}</div>
+                                     </div>
+                                 </div>
+                                 <div className="mt-1">
+                                     <div className="text-yellow-300">🗺️ Map Debug:</div>
+                                     <div>• Field Area: {fieldAreaSize ? `${(fieldAreaSize/1600).toFixed(2)} rai` : 'Not set'}</div>
+                                     <div>• Map Center: [{optimalCenter[0].toFixed(4)}, {optimalCenter[1].toFixed(4)}]</div>
+                                     <div>• Map Zoom: {optimalZoom}</div>
+                                     <div>• Main Field: {mainField ? 'Available' : 'Missing'}</div>
+                                     <div>• Zones: {actualZones.length}</div>
+                                 </div>
+                                 {actualPipes.length === 0 && (
+                                     <div className="mt-1 text-yellow-400">
+                                         ⚠️ No pipes data found - check field-map data
+                                     </div>
+                                 )}
+                                 {actualIrrigationPoints.length === 0 && (
+                                     <div className="mt-1 text-yellow-400">
+                                         ⚠️ No irrigation points data found
+                                     </div>
+                                 )}
+                                 {!mainField && (
+                                     <div className="mt-1 text-red-400">
+                                         ❌ Main field boundary not found - map may not center correctly
+                                     </div>
+                                 )}
+                             </div>
+                         )}
                     </div>
                 </div>
             </div>
 
-            {/* Print Header */}
-            <div className="hidden print:mb-4 print:block">
+            {/* Print Header - Visible only on print */}
+            <div className="hidden print:block print:mb-4">
                 <h1 className="text-2xl font-bold text-black">📊 Field Crop Summary</h1>
                 <p className="text-gray-600">
-                    Complete overview of your irrigation planning project
+                    Complete overview of your irrigation planning project - Generated on {new Date().toLocaleDateString()}
                 </p>
                 <hr className="my-2 border-gray-300" />
             </div>
 
-            {/* Main Content */}
-            <div className="container mx-auto px-4 py-4 print:px-0 print:py-0">
-                <div className="mx-auto max-w-7xl">
-                    {/* Single Column Layout for Print */}
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 print:grid-cols-1 print:gap-2">
-                        {/* Project Overview & Crop Info */}
-                        <div className="space-y-4 print:space-y-2">
+            {/* Main Content - FIXED: Better print layout */}
+            <div className="container mx-auto px-4 py-4 print:print-layout">
+                <div className="mx-auto max-w-7xl print:max-w-none">
+                    {/* Layout: Side by side for print, stacked for screen */}
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 print:grid-cols-2 print:gap-6">
+                        
+                        {/* Left Column: Project Overview & Details */}
+                        <div className="space-y-4 print:print-summary-section">
                             {/* Project Overview */}
                             <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
                                 <h2 className="mb-3 text-lg font-bold text-green-400 print:text-base print:text-black">
@@ -478,7 +872,7 @@ export default function FieldCropSummary() {
                                         </div>
                                         <div className="rounded bg-gray-700 p-1 text-center print:border print:border-gray-200 print:bg-gray-50">
                                             <div className="text-sm font-bold text-purple-400 print:text-xs print:text-black">
-                                                {lateralPipes}
+                                                {lateralPipesForFiltering.length}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-gray-600">
                                                 Lateral
@@ -520,7 +914,7 @@ export default function FieldCropSummary() {
                                     </div>
                                 </div>
 
-                                {/* Irrigation Points */}
+                                {/* FIXED: Irrigation Points with corrected counts */}
                                 <div>
                                     <h3 className="mb-2 text-sm font-semibold text-cyan-400 print:text-xs print:text-black">
                                         💧 Irrigation System
@@ -591,12 +985,12 @@ export default function FieldCropSummary() {
                                 </div>
                             </div>
 
-                            {/* Action Buttons */}
+                            {/* Action Buttons - Hidden on print */}
                             <div className="rounded-lg bg-gray-800 p-4 print:hidden">
                                 <h2 className="mb-3 text-lg font-bold text-purple-400">
                                     📋 Actions
                                 </h2>
-                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                                     <Link
                                         href="/field-map"
                                         className="rounded-lg bg-blue-600 px-4 py-2 text-center font-semibold text-white transition-colors hover:bg-blue-700"
@@ -604,17 +998,116 @@ export default function FieldCropSummary() {
                                         🔄 Edit Project
                                     </Link>
                                     <button
-                                        onClick={() => window.print()}
+                                        onClick={() => {
+                                            console.log('📄 Preparing for print...');
+                                            console.log('Print map center:', optimalCenter);
+                                            console.log('Print map zoom:', optimalZoom);
+                                            
+                                            // Ensure the print map is properly positioned
+                                            if (printMapRef.current) {
+                                                printMapRef.current.setView(optimalCenter, optimalZoom);
+                                                printMapRef.current.invalidateSize();
+                                                console.log('📍 Print map synced to:', optimalCenter, optimalZoom);
+                                            }
+                                            
+                                            // Small delay to ensure maps are rendered
+                                            setTimeout(() => {
+                                                // Force resize event to ensure all maps are properly sized
+                                                window.dispatchEvent(new Event('resize'));
+                                                
+                                                // Additional sync just before printing
+                                                if (printMapRef.current) {
+                                                    printMapRef.current.setView(optimalCenter, optimalZoom);
+                                                    printMapRef.current.invalidateSize();
+                                                }
+                                                
+                                                setTimeout(() => {
+                                                    window.print();
+                                                }, 300);
+                                            }, 200);
+                                        }}
                                         className="rounded-lg bg-green-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-green-700"
                                     >
                                         🖨️ Print Summary
                                     </button>
+                                    <button
+                                        onClick={() => {
+                                            console.log('🔍 FULL DEBUG DATA:');
+                                            console.log('Summary Data:', summaryData);
+                                            console.log('Main Field:', mainField);
+                                            console.log('Zones:', actualZones);
+                                            console.log('Pipes:', actualPipes);
+                                            console.log('Equipment:', actualEquipmentIcons);
+                                            console.log('Irrigation Points:', actualIrrigationPoints);
+                                            console.log('Map Center:', optimalCenter);
+                                            console.log('Map Zoom:', optimalZoom);
+                                            alert('Debug information logged to console (F12)');
+                                        }}
+                                        className="rounded-lg bg-yellow-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-yellow-700"
+                                    >
+                                        🔍 Debug Data
+                                    </button>
+                                </div>
+                                
+                                {/* Manual Data Input for Testing */}
+                                <div className="mt-4 border-t border-gray-600 pt-4">
+                                    <h3 className="mb-2 text-sm font-semibold text-gray-300">
+                                        🛠️ Troubleshooting
+                                    </h3>
+                                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                                        <button
+                                            onClick={() => {
+                                                // Force reload from localStorage
+                                                const savedData = localStorage.getItem('fieldMapData');
+                                                if (savedData) {
+                                                    try {
+                                                        const parsedData = JSON.parse(savedData);
+                                                        setSummaryData(parsedData);
+                                                        setDataSource('localStorage-forced');
+                                                        console.log('🔄 Forced reload from localStorage:', parsedData);
+                                                    } catch (error) {
+                                                        console.error('Error parsing localStorage:', error);
+                                                        alert('Error parsing localStorage data');
+                                                    }
+                                                } else {
+                                                    alert('No data found in localStorage');
+                                                }
+                                            }}
+                                            className="rounded bg-gray-600 px-3 py-1 text-xs text-white hover:bg-gray-500"
+                                        >
+                                            🔄 Reload from Storage
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                if (confirm('Clear all localStorage data?')) {
+                                                    localStorage.removeItem('fieldMapData');
+                                                    setSummaryData(null);
+                                                    setDataSource('none');
+                                                    console.log('🗑️ LocalStorage cleared');
+                                                }
+                                            }}
+                                            className="rounded bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500"
+                                        >
+                                            🗑️ Clear Storage
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Quick Data Status */}
+                                    <div className="mt-2 text-xs text-gray-400">
+                                        <div>📊 Quick Status:</div>
+                                        <div>• Data loaded: {summaryData ? '✅' : '❌'}</div>
+                                        <div>• Main field: {mainField ? '✅' : '❌'}</div>
+                                        <div>• Zones: {actualZones.length} items</div>
+                                        <div>• Pipes: {actualPipes.length} items</div>
+                                        <div>• Equipment: {actualEquipmentIcons.length} items</div>
+                                        <div>• Irrigation: {actualIrrigationPoints.length} items</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Zone Details & Map */}
-                        <div className="space-y-4 print:space-y-2">
+                        {/* Right Column: Zone Details & Map */}
+                        <div className="space-y-4 print:print-summary-section">
                             {/* Zone Details */}
                             <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
                                 <h2 className="mb-3 text-lg font-bold text-blue-400 print:text-base print:text-black">
@@ -715,26 +1208,27 @@ export default function FieldCropSummary() {
                                 </div>
                             </div>
 
-                            {/* Map Visualization */}
+                            {/* Map Visualization - FIXED for print */}
                             <div className="overflow-hidden rounded-lg bg-gray-800 print:border print:border-gray-300 print:bg-white">
                                 <div className="flex h-full flex-col">
                                     {/* Map Header */}
-                                    <div className="border-b border-gray-600 bg-gray-700 p-2 print:border-gray-300 print:bg-gray-100 print:p-1">
+                                    <div className="border-b border-gray-600 bg-gray-700 p-2 print:border-gray-300 print:bg-gray-100">
                                         <div className="flex items-center justify-between">
-                                            <h3 className="text-sm font-semibold text-white print:text-xs print:text-black">
+                                            <h3 className="text-sm font-semibold text-white print:text-black">
                                                 🗺️ Project Map Overview
                                             </h3>
-                                            <div className="text-xs text-gray-300 print:text-xs print:text-gray-600">
+                                            <div className="text-xs text-gray-300 print:text-gray-700">
                                                 Area: {areaInRai.toFixed(2)} Rai
                                             </div>
                                         </div>
                                     </div>
-                                    {/* MapContainer */}
+                                    {/* MapContainer - FIXED: Proper sizing for print */}
                                     <div
-                                        className="relative print:h-64"
+                                        className="relative print:print-map-section"
                                         style={{ minHeight: 300, height: '400px' }}
                                     >
                                         <MapContainer
+                                            ref={printMapRef}
                                             center={optimalCenter}
                                             zoom={optimalZoom}
                                             style={{ height: '100%', width: '100%' }}
@@ -781,8 +1275,8 @@ export default function FieldCropSummary() {
                                                         />
                                                     ) : null
                                                 )}
-                                                {/* Pipes */}
-                                                {actualPipes.map((pipe, index) =>
+                                                {/* Pipes - ALL pipes with enhanced visibility for lateral pipes */}
+                                                {displayPipes.map((pipe, index) =>
                                                     pipe.coordinates ? (
                                                         <Polyline
                                                             key={pipe.id}
@@ -790,23 +1284,23 @@ export default function FieldCropSummary() {
                                                             pathOptions={{
                                                                 color:
                                                                     pipe.type === 'main'
-                                                                        ? '#2563eb'
+                                                                        ? '#2563eb' // Blue for main
                                                                         : pipe.type === 'submain'
-                                                                          ? '#059669'
-                                                                          : '#8b5cf6',
+                                                                          ? '#059669' // Green for submain
+                                                                          : '#9333ea', // Purple for lateral pipes - more vibrant
                                                                 weight:
                                                                     pipe.type === 'main'
-                                                                        ? 4
+                                                                        ? 6 // Thicker for main
                                                                         : pipe.type === 'submain'
-                                                                          ? 3
-                                                                          : 2,
-                                                                opacity: 0.8,
+                                                                          ? 4 // Medium for submain
+                                                                          : 3, // Thicker for lateral pipes - was 2
+                                                                opacity: pipe.type === 'lateral' ? 0.8 : 0.9, // Higher opacity for lateral pipes
                                                             }}
                                                         />
                                                     ) : null
                                                 )}
                                                 {/* Equipment with proper icons */}
-                                                {actualEquipmentIcons.map((equipment, index) => {
+                                                {uniqueEquipment.map((equipment, index) => {
                                                     if (!equipment.lat || !equipment.lng)
                                                         return null;
 
@@ -825,48 +1319,61 @@ export default function FieldCropSummary() {
                                                         />
                                                     );
                                                 })}
-                                                {/* Irrigation Points */}
-                                                {actualIrrigationPoints.map((point, index) => {
-                                                    if (!point.position) return null;
+                                                {/* Irrigation Points - MAX visibility */}
+                                                {filteredIrrigationPoints.map((point, index) => {
+                                                    // Handle different data structures for position
+                                                    let lat, lng;
+                                                    
+                                                    if (point.lat && point.lng) {
+                                                        lat = point.lat;
+                                                        lng = point.lng;
+                                                    } else if (point.position) {
+                                                        if (Array.isArray(point.position)) {
+                                                            [lat, lng] = point.position;
+                                                        } else if (point.position.lat && point.position.lng) {
+                                                            lat = point.position.lat;
+                                                            lng = point.position.lng;
+                                                        }
+                                                    }
+                                                    
+                                                    // Skip if no valid position found
+                                                    if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+                                                        return null;
+                                                    }
 
-                                                    const [lat, lng] = Array.isArray(point.position)
-                                                        ? point.position
-                                                        : [point.position.lat, point.position.lng];
+                                                    const normalizedType = normalizeIrrigationType(point.type);
 
                                                     return (
                                                         <CircleMarker
-                                                            key={point.id}
+                                                            key={point.id || `irrigation-${index}`}
                                                             center={[lat, lng]}
-                                                            radius={4}
+                                                            radius={12} // Larger size for maximum visibility
                                                             pathOptions={{
                                                                 color:
-                                                                    point.type === 'sprinkler'
-                                                                        ? '#22C55E'
-                                                                        : point.type ===
-                                                                            'mini_sprinkler'
-                                                                          ? '#3B82F6'
-                                                                          : point.type ===
-                                                                              'micro_spray'
-                                                                            ? '#F59E0B'
-                                                                            : '#06B6D4',
+                                                                    normalizedType === 'sprinkler'
+                                                                        ? '#16a34a' // Darker green for sprinkler
+                                                                        : normalizedType === 'mini_sprinkler'
+                                                                          ? '#2563eb' // Blue for mini sprinkler
+                                                                          : normalizedType === 'micro_spray'
+                                                                            ? '#ea580c' // Orange for micro spray
+                                                                            : '#0891b2', // Cyan for drip
                                                                 fillColor:
-                                                                    point.type === 'sprinkler'
-                                                                        ? '#22C55E'
-                                                                        : point.type ===
-                                                                            'mini_sprinkler'
-                                                                          ? '#3B82F6'
-                                                                          : point.type ===
-                                                                              'micro_spray'
-                                                                            ? '#F59E0B'
-                                                                            : '#06B6D4',
-                                                                fillOpacity: 1,
-                                                                weight: 2,
+                                                                    normalizedType === 'sprinkler'
+                                                                        ? '#22c55e' // Bright green for sprinkler
+                                                                        : normalizedType === 'mini_sprinkler'
+                                                                          ? '#3b82f6' // Bright blue for mini sprinkler
+                                                                          : normalizedType === 'micro_spray'
+                                                                            ? '#f97316' // Bright orange for micro spray
+                                                                            : '#06b6d4', // Bright cyan for drip
+                                                                fillOpacity: 0.9, // Maximum opacity
+                                                                weight: 3, // Thicker border
+                                                                opacity: 1, // Full opacity
                                                             }}
                                                         />
                                                     );
                                                 })}
                                                 {/* Irrigation Lines (Drip Tape) */}
-                                                {actualIrrigationLines.map((line, index) =>
+                                                {uniqueIrrigationLines.map((line, index) =>
                                                     line.coordinates ? (
                                                         <Polyline
                                                             key={line.id}
@@ -879,48 +1386,55 @@ export default function FieldCropSummary() {
                                                         />
                                                     ) : null
                                                 )}
-                                                {/* Coverage Circles for Sprinklers */}
-                                                {actualIrrigationPoints.map((point, index) => {
-                                                    if (
-                                                        !point.position ||
-                                                        !point.radius ||
-                                                        point.type === 'drip_tape'
-                                                    )
+                                                {/* Coverage Circles for Sprinklers - MAXIMUM visibility */}
+                                                {filteredIrrigationPoints.map((point, index) => {
+                                                    // Handle different data structures for position
+                                                    let lat, lng;
+                                                    
+                                                    if (point.lat && point.lng) {
+                                                        lat = point.lat;
+                                                        lng = point.lng;
+                                                    } else if (point.position) {
+                                                        if (Array.isArray(point.position)) {
+                                                            [lat, lng] = point.position;
+                                                        } else if (point.position.lat && point.position.lng) {
+                                                            lat = point.position.lat;
+                                                            lng = point.position.lng;
+                                                        }
+                                                    }
+                                                    
+                                                    // Skip if no valid position, radius, or is drip type
+                                                    if (!lat || !lng || isNaN(lat) || isNaN(lng) || !point.radius || normalizeIrrigationType(point.type) === 'drip_tape') {
                                                         return null;
+                                                    }
 
-                                                    const [lat, lng] = Array.isArray(point.position)
-                                                        ? point.position
-                                                        : [point.position.lat, point.position.lng];
+                                                    const normalizedType = normalizeIrrigationType(point.type);
 
                                                     return (
                                                         <Circle
-                                                            key={`${point.id}-coverage`}
+                                                            key={`${point.id || index}-coverage`}
                                                             center={[lat, lng]}
                                                             radius={point.radius}
                                                             pathOptions={{
                                                                 color:
-                                                                    point.type === 'sprinkler'
-                                                                        ? '#22C55E'
-                                                                        : point.type ===
-                                                                            'mini_sprinkler'
-                                                                          ? '#3B82F6'
-                                                                          : point.type ===
-                                                                              'micro_spray'
-                                                                            ? '#F59E0B'
-                                                                            : '#06B6D4',
+                                                                    normalizedType === 'sprinkler'
+                                                                        ? '#16a34a' // Darker green for sprinkler
+                                                                        : normalizedType === 'mini_sprinkler'
+                                                                          ? '#2563eb' // Blue for mini sprinkler
+                                                                          : normalizedType === 'micro_spray'
+                                                                            ? '#ea580c' // Orange for micro spray
+                                                                            : '#0891b2', // Cyan for drip
                                                                 fillColor:
-                                                                    point.type === 'sprinkler'
-                                                                        ? '#22C55E'
-                                                                        : point.type ===
-                                                                            'mini_sprinkler'
-                                                                          ? '#3B82F6'
-                                                                          : point.type ===
-                                                                              'micro_spray'
-                                                                            ? '#F59E0B'
-                                                                            : '#06B6D4',
-                                                                fillOpacity: 0.1,
-                                                                weight: 1,
-                                                                opacity: 0.4,
+                                                                    normalizedType === 'sprinkler'
+                                                                        ? '#22c55e' // Bright green for sprinkler
+                                                                        : normalizedType === 'mini_sprinkler'
+                                                                          ? '#3b82f6' // Bright blue for mini sprinkler
+                                                                          : normalizedType === 'micro_spray'
+                                                                            ? '#f97316' // Bright orange for micro spray
+                                                                            : '#06b6d4', // Bright cyan for drip
+                                                                fillOpacity: 0.15, // More visible
+                                                                weight: 2, // Thicker border
+                                                                opacity: 0.6, // More visible border
                                                             }}
                                                         />
                                                     );
@@ -928,12 +1442,12 @@ export default function FieldCropSummary() {
                                             </FeatureGroup>
                                         </MapContainer>
                                     </div>
-                                    {/* Map Legend */}
-                                    <div className="border-t border-gray-600 bg-gray-700 p-2 print:border-gray-300 print:bg-gray-100 print:p-1">
+                                    {/* Enhanced Map Legend with more detail */}
+                                    <div className="border-t border-gray-600 bg-gray-700 p-2 print:border-gray-300 print:bg-gray-100">
                                         <h4 className="mb-1 text-xs font-semibold text-white print:text-black">
-                                            Legend
+                                            Legend (Showing {displayPipes.length} pipes, {filteredIrrigationPoints.length} irrigation points)
                                         </h4>
-                                        <div className="grid grid-cols-3 gap-1 text-xs print:grid-cols-6">
+                                        <div className="grid grid-cols-4 gap-1 text-xs print:grid-cols-8 print:text-xs">
                                             <div className="flex items-center space-x-1">
                                                 <div className="h-2 w-2 rounded bg-green-500"></div>
                                                 <span className="text-gray-300 print:text-gray-700">
@@ -947,9 +1461,21 @@ export default function FieldCropSummary() {
                                                 </span>
                                             </div>
                                             <div className="flex items-center space-x-1">
-                                                <div className="h-2 w-2 rounded bg-red-500"></div>
+                                                <div className="h-3 w-3 rounded bg-blue-600"></div>
                                                 <span className="text-gray-300 print:text-gray-700">
-                                                    Pipes
+                                                    Main ({actualPipes.filter(p => p.type === 'main').length})
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center space-x-1">
+                                                <div className="h-3 w-3 rounded bg-green-600"></div>
+                                                <span className="text-gray-300 print:text-gray-700">
+                                                    Sub ({actualPipes.filter(p => p.type === 'submain').length})
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center space-x-1">
+                                                <div className="h-3 w-3 rounded bg-purple-600"></div>
+                                                <span className="text-gray-300 print:text-gray-700">
+                                                    Lateral ({actualPipes.filter(p => p.type === 'lateral').length})
                                                 </span>
                                             </div>
                                             <div className="flex items-center space-x-1">
@@ -959,15 +1485,27 @@ export default function FieldCropSummary() {
                                                 </span>
                                             </div>
                                             <div className="flex items-center space-x-1">
-                                                <div className="h-2 w-2 rounded bg-cyan-500"></div>
+                                                <div className="h-3 w-3 rounded-full bg-green-500"></div>
                                                 <span className="text-gray-300 print:text-gray-700">
-                                                    Irrigation
+                                                    Sprinklers ({sprinklerPoints})
                                                 </span>
                                             </div>
                                             <div className="flex items-center space-x-1">
-                                                <div className="h-2 w-2 rounded bg-purple-500"></div>
+                                                <div className="h-3 w-3 rounded-full bg-blue-500"></div>
                                                 <span className="text-gray-300 print:text-gray-700">
-                                                    Coverage
+                                                    Mini ({miniSprinklerPoints})
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center space-x-1">
+                                                <div className="h-3 w-3 rounded-full bg-orange-500"></div>
+                                                <span className="text-gray-300 print:text-gray-700">
+                                                    Micro ({microSprayPoints})
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center space-x-1">
+                                                <div className="h-3 w-3 rounded-full bg-cyan-500"></div>
+                                                <span className="text-gray-300 print:text-gray-700">
+                                                    Drip ({dripPoints})
                                                 </span>
                                             </div>
                                         </div>
@@ -980,4 +1518,4 @@ export default function FieldCropSummary() {
             </div>
         </div>
     );
-}
+};
