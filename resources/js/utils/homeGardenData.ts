@@ -1333,8 +1333,8 @@ export interface ZoneStatistics {
     zoneType: string;
     area: number;
     sprinklerCount: number;
-    sprinklerTypes: string[]; 
-    sprinklerRadius: number; 
+    sprinklerTypes: string[];
+    sprinklerRadius: number;
     pipeLength: number;
     longestPipe: number;
 }
@@ -1385,10 +1385,11 @@ export function calculateStatistics(data: GardenPlannerData): GardenStatistics {
 
         const zoneType = ZONE_TYPES.find((t) => t.id === zone.type);
 
-        const sprinklerTypes = [...new Set(zoneSprinklers.map(s => s.type.nameEN))];
-        const sprinklerRadius = zoneSprinklers.length > 0 
-            ? zoneSprinklers.reduce((sum, s) => sum + s.type.radius, 0) / zoneSprinklers.length
-            : 0;
+        const sprinklerTypes = [...new Set(zoneSprinklers.map((s) => s.type.nameEN))];
+        const sprinklerRadius =
+            zoneSprinklers.length > 0
+                ? zoneSprinklers.reduce((sum, s) => sum + s.type.radius, 0) / zoneSprinklers.length
+                : 0;
 
         return {
             zoneId: zone.id,
@@ -1397,7 +1398,7 @@ export function calculateStatistics(data: GardenPlannerData): GardenStatistics {
             area: zoneArea,
             sprinklerCount: zoneSprinklers.length,
             sprinklerTypes, // เพิ่ม
-            sprinklerRadius: sprinklerRadius, 
+            sprinklerRadius: sprinklerRadius,
             pipeLength: zonePipeLength,
             longestPipe: zoneLongestPipe,
         };

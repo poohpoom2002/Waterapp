@@ -13,7 +13,11 @@ const AiIcon = () => (
 const UserIcon = () => (
     <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 text-white shadow-lg">
         <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+            <path
+                fillRule="evenodd"
+                d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+                clipRule="evenodd"
+            />
         </svg>
     </div>
 );
@@ -75,7 +79,7 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
             });
         }
     }, [isOpen]);
-    
+
     const [isDragging, setIsDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
@@ -101,18 +105,18 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
     // Dragging functionality
     const handleMouseDown = (e) => {
         if (e.target.closest('.no-drag')) return;
-        
+
         setIsDragging(true);
         const rect = windowRef.current.getBoundingClientRect();
         setDragOffset({
             x: e.clientX - rect.left,
-            y: e.clientY - rect.top
+            y: e.clientY - rect.top,
         });
     };
 
     const handleMouseMove = (e) => {
         if (!isDragging) return;
-        
+
         const newX = e.clientX - dragOffset.x;
         const newY = e.clientY - dragOffset.y;
         
@@ -121,7 +125,7 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
         
         setPosition({
             x: Math.max(0, Math.min(newX, maxX)),
-            y: Math.max(0, Math.min(newY, maxY))
+            y: Math.max(0, Math.min(newY, maxY)),
         });
     };
 
@@ -165,25 +169,22 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json',
+                    Accept: 'application/json',
                 },
                 body: JSON.stringify({
                     message: messageToSend,
-                })
+                }),
             });
-            
+
             const data = await response.json();
             const aiReply = { role: 'assistant', content: data.reply };
             setChatHistory((prev) => [...prev, aiReply]);
         } catch (error) {
             console.error('AI Error:', error);
-            
+
             let errorMessage = 'ขออภัยนะ ระบบ AI ขัดข้องชั่วคราว 🔧\n\nลองใหม่อีกครั้งได้เลย!';
-            
-            setChatHistory((prev) => [
-                ...prev,
-                { role: 'assistant', content: errorMessage },
-            ]);
+
+            setChatHistory((prev) => [...prev, { role: 'assistant', content: errorMessage }]);
         } finally {
             setIsTyping(false);
         }
@@ -204,9 +205,9 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
             style={{
                 left: position.x,
                 top: position.y,
-                boxShadow: isDragging 
+                boxShadow: isDragging
                     ? '0 35px 60px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1)'
-                    : '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.05)'
+                    : '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.05)',
             }}
         >
             {/* Enhanced Header with AI Theme - ขยาย drag area */}
@@ -216,10 +217,10 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
                 style={{ touchAction: 'none' }} // ป้องกัน touch scrolling
             >
                 {/* Animated Background */}
-                <div className="absolute inset-0 opacity-20 pointer-events-none">
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent transform -skew-x-12 animate-pulse"></div>
+                <div className="pointer-events-none absolute inset-0 opacity-20">
+                    <div className="absolute inset-0 -skew-x-12 transform animate-pulse bg-gradient-to-r from-transparent via-white to-transparent"></div>
                 </div>
-                
+
                 {/* Drag Handle Visual Indicator */}
                 <div className="absolute top-1.5 left-1/2 transform -translate-x-1/2 flex space-x-0.5 opacity-40">
                     <div className="w-0.5 h-0.5 bg-white rounded-full"></div>
@@ -247,7 +248,7 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
                                 <span className="text-xs font-medium">Online</span>
                             </div>
                         )}
-                        
+
                         {/* Minimize button */}
                         <button
                             onClick={onMinimize}
@@ -256,13 +257,23 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
                         >
                             <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 {isMinimized ? (
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                                    />
                                 ) : (
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M20 12H4"
+                                    />
                                 )}
                             </svg>
                         </button>
-                        
+
                         {/* Clear chat button */}
                         {chatHistory.length > 0 && !isMinimized && (
                             <button
@@ -275,7 +286,7 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
                                 </svg>
                             </button>
                         )}
-                        
+
                         {/* Close button */}
                         <button
                             onClick={onClose}
@@ -294,7 +305,7 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
             {!isMinimized && (
                 <>
                     {/* Main chat area - ใช้ flex-1 แทน h-80 */}
-                    <div className="flex-1 flex flex-col min-h-0">
+                    <div className="flex min-h-0 flex-1 flex-col">
                         {/* Chat messages area */}
                         <div
                             ref={chatContainerRef}
@@ -384,14 +395,14 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
                                             ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg scale-105' 
                                             : 'bg-purple-200 text-purple-600 hover:bg-purple-300'
                                     }`}
-                                    title={showSuggestions ? "ซ่อนคำถามแนะนำ" : "แสดงคำถามแนะนำ"}
+                                    title={showSuggestions ? 'ซ่อนคำถามแนะนำ' : 'แสดงคำถามแนะนำ'}
                                 >
                                     <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
                                 </button>
                             )}
-                            
+
                             <textarea
                                 ref={textareaRef}
                                 className="flex-1 resize-none border-none bg-transparent text-xs text-gray-800 placeholder-gray-500 focus:outline-none min-h-[20px] max-h-[80px]"
@@ -423,7 +434,7 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
                                 )}
                             </button>
                         </div>
-                        
+
                         {/* Footer Info */}
                         <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
                             <span className="text-[10px]">🤖 AI Assistant • Gemini 2.0</span>

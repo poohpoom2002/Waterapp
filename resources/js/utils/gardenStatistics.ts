@@ -77,11 +77,13 @@ function calculateSummary(
 ): GardenSummary {
     // คำนวณพื้นที่รวม (ไม่รวมพื้นที่ห้ามและโซนย่อย)
     const totalArea = zones
-        .filter(z => z.type !== 'forbidden' && !z.parentZoneId)
+        .filter((z) => z.type !== 'forbidden' && !z.parentZoneId)
         .reduce((sum, zone) => {
             const coords = zone.canvasCoordinates || zone.coordinates;
             if (coords && coords.length >= 3) {
-                return sum + calculatePolygonArea(coords, zone.canvasCoordinates ? scale : undefined);
+                return (
+                    sum + calculatePolygonArea(coords, zone.canvasCoordinates ? scale : undefined)
+                );
             }
             return sum;
         }, 0);
@@ -95,7 +97,7 @@ function calculateSummary(
     return {
         totalArea,
         totalAreaFormatted: formatArea(totalArea),
-        totalZones: zones.filter(z => z.type !== 'forbidden' && !z.parentZoneId).length,
+        totalZones: zones.filter((z) => z.type !== 'forbidden' && !z.parentZoneId).length,
         totalSprinklers: sprinklers.length,
         longestPipeFromSource,
         longestPipeFromSourceFormatted: formatDistance(longestPipeFromSource),
@@ -113,30 +115,37 @@ function calculateZoneStatistics(
     scale: number
 ): ZoneStatistics[] {
     return zones
-        .filter(z => z.type !== 'forbidden' && !z.parentZoneId)
-        .map(zone => {
+        .filter((z) => z.type !== 'forbidden' && !z.parentZoneId)
+        .map((zone) => {
             // คำนวณพื้นที่โซน
             const coords = zone.canvasCoordinates || zone.coordinates;
-            const area = coords && coords.length >= 3 
-                ? calculatePolygonArea(coords, zone.canvasCoordinates ? scale : undefined)
-                : 0;
+            const area =
+                coords && coords.length >= 3
+                    ? calculatePolygonArea(coords, zone.canvasCoordinates ? scale : undefined)
+                    : 0;
 
             // หาหัวฉีดในโซนนี้
-            const zoneSprinklers = sprinklers.filter(s => s.zoneId === zone.id);
+            const zoneSprinklers = sprinklers.filter((s) => s.zoneId === zone.id);
 
             // หาประเภทหัวฉีดที่ใช้ในโซน - แก้ไขตรงนี้
-            const sprinklerTypes = [...new Set(zoneSprinklers.map(s => s.type.nameEN))];
+            const sprinklerTypes = [...new Set(zoneSprinklers.map((s) => s.type.nameEN))];
 
-            const sprinklerRadius = zoneSprinklers.length > 0 
-                ? zoneSprinklers.reduce((sum, s) => sum + s.type.radius, 0) / zoneSprinklers.length
-                : 0;
+            const sprinklerRadius =
+                zoneSprinklers.length > 0
+                    ? zoneSprinklers.reduce((sum, s) => sum + s.type.radius, 0) /
+                      zoneSprinklers.length
+                    : 0;
 
             // หาท่อในโซนนี้
-            const zonePipes = pipes.filter(p => p.zoneId === zone.id);
+            const zonePipes = pipes.filter((p) => p.zoneId === zone.id);
             const totalPipeLength = zonePipes.reduce((sum, pipe) => sum + pipe.length, 0);
 
             // หาท่อที่ยาวที่สุดจากแหล่งน้ำไปหาหัวฉีดในโซนนี้
-            const longestPipeFromSource = findLongestPipeFromSourceInZone(zoneSprinklers, waterSource, scale);
+            const longestPipeFromSource = findLongestPipeFromSourceInZone(
+                zoneSprinklers,
+                waterSource,
+                scale
+            );
 
             return {
                 zoneId: zone.id,
@@ -166,12 +175,12 @@ function findLongestPipeFromSource(
     const sourcePos = waterSource.canvasPosition || waterSource.position;
     let maxDistance = 0;
 
-    sprinklers.forEach(sprinkler => {
+    sprinklers.forEach((sprinkler) => {
         const sprinklerPos = sprinkler.canvasPosition || sprinkler.position;
         if (sprinklerPos) {
             const distance = calculateDistance(
-                sourcePos, 
-                sprinklerPos, 
+                sourcePos,
+                sprinklerPos,
                 sprinkler.canvasPosition ? scale : undefined
             );
             if (distance > maxDistance) {
@@ -195,12 +204,12 @@ function findLongestPipeFromSourceInZone(
     const sourcePos = waterSource.canvasPosition || waterSource.position;
     let maxDistance = 0;
 
-    zoneSprinklers.forEach(sprinkler => {
+    zoneSprinklers.forEach((sprinkler) => {
         const sprinklerPos = sprinkler.canvasPosition || sprinkler.position;
         if (sprinklerPos) {
             const distance = calculateDistance(
-                sourcePos, 
-                sprinklerPos, 
+                sourcePos,
+                sprinklerPos,
                 sprinkler.canvasPosition ? scale : undefined
             );
             if (distance > maxDistance) {
