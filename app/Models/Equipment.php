@@ -358,19 +358,28 @@ class Equipment extends Model
             return null;
         }
 
+        // ถ้าเป็น URL เต็มแล้ว
         if (filter_var($this->image, FILTER_VALIDATE_URL)) {
             return $this->image;
         }
 
+        // ถ้าเริ่มด้วย /storage/ แล้ว
         if (str_starts_with($this->image, '/storage/')) {
             return $this->image;
         }
 
+        // ถ้าเริ่มด้วย storage/ (ไม่มี /)
+        if (str_starts_with($this->image, 'storage/')) {
+            return '/' . $this->image;
+        }
+
+        // ถ้าเป็น path ที่เริ่มด้วย images/
         if (str_starts_with($this->image, 'images/')) {
             return Storage::url($this->image);
         }
 
-        return $this->image;
+        // ถ้าไม่มี path prefix ให้เพิ่ม
+        return Storage::url('images/' . basename($this->image));
     }
 
     // เพิ่ม static methods สำหรับ bulk operations

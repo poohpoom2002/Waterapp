@@ -71,8 +71,8 @@ export interface BranchPipe {
     plants: PlantLocation[];
     sprinklerType?: string;
     isEditable?: boolean;
-    angle?: number; 
-    connectionPoint?: number; 
+    angle?: number;
+    connectionPoint?: number;
 }
 
 export interface PlantLocation {
@@ -118,6 +118,7 @@ export interface HorticultureProjectData {
     exclusionAreas: ExclusionArea[];
     plants: PlantLocation[];
     useZones: boolean;
+    selectedPlantType?: PlantData; // [FIX] เพิ่ม property นี้
     branchPipeSettings?: BranchPipeSettings;
     createdAt: string;
     updatedAt: string;
@@ -130,7 +131,8 @@ export interface ProjectSummaryData {
     totalZones: number; // จำนวนโซน
     totalPlants: number; // จำนวนต้นไม้ทั้งหมด
     totalWaterNeedPerSession: number; // ปริมาณน้ำต่อครั้ง (ลิตร)
-    
+    waterPerPlant: number; // ปริมาณน้ำต่อต้น (ลิตร)
+
     // ข้อมูลท่อ
     mainPipes: {
         longest: number; // ท่อเมนที่ยาวที่สุด (เมตร)
@@ -145,7 +147,7 @@ export interface ProjectSummaryData {
         totalLength: number; // ความยาวรวมท่อย่อย (เมตร)
     };
     longestPipesCombined: number; // ท่อที่ยาวที่สุดรวมกัน (เมตร)
-    
+
     // ข้อมูลแยกโซน (ถ้ามี)
     zoneDetails: ZoneSummaryData[];
 }
@@ -156,7 +158,9 @@ export interface ZoneSummaryData {
     areaInRai: number; // พื้นที่โซนเป็นไร่
     plantCount: number; // จำนวนต้นไม้ในโซน
     waterNeedPerSession: number; // ปริมาณน้ำโซนต่อครั้ง (ลิตร)
-    
+    waterPerPlant: number; // ปริมาณน้ำต่อต้น (ลิตร)
+    plantData?: PlantData; // เพิ่มข้อมูลพืช
+
     // ข้อมูลท่อในโซน
     mainPipesInZone: {
         longest: number;
@@ -257,96 +261,136 @@ export const isPointInPolygon = (point: Coordinate, polygon: Coordinate[]): bool
 };
 
 // Main function to calculate project summary
-export const calculateProjectSummary = (projectData: HorticultureProjectData): ProjectSummaryData => {
+export const calculateProjectSummary = (
+    projectData: HorticultureProjectData
+): ProjectSummaryData => {
     console.log('📊 Calculating project summary...');
 
     // คำนวณข้อมูลโดยรวม
     const totalAreaInRai = projectData.totalArea / 1600; // แปลงจากตร.ม. เป็นไร่
     const totalZones = projectData.useZones ? projectData.zones.length : 1;
     const totalPlants = projectData.plants?.length || 0;
-    const totalWaterNeedPerSession = projectData.plants?.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0) || 0;
+    const totalWaterNeedPerSession =
+        projectData.plants?.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0) || 0;
+    const waterPerPlant = totalPlants > 0 ? totalWaterNeedPerSession / totalPlants : 0;
 
     // คำนวณข้อมูลท่อเมน
-    const mainPipeLengths = projectData.mainPipes?.map(pipe => pipe.length) || [];
+    const mainPipeLengths = projectData.mainPipes?.map((pipe) => pipe.length) || [];
     const mainPipesData = {
         longest: mainPipeLengths.length > 0 ? Math.max(...mainPipeLengths) : 0,
-        totalLength: mainPipeLengths.reduce((sum, length) => sum + length, 0)
+        totalLength: mainPipeLengths.reduce((sum, length) => sum + length, 0),
     };
 
     // คำนวณข้อมูลท่อเมนรอง
-    const subMainPipeLengths = projectData.subMainPipes?.map(pipe => pipe.length) || [];
+    const subMainPipeLengths = projectData.subMainPipes?.map((pipe) => pipe.length) || [];
     const subMainPipesData = {
         longest: subMainPipeLengths.length > 0 ? Math.max(...subMainPipeLengths) : 0,
-        totalLength: subMainPipeLengths.reduce((sum, length) => sum + length, 0)
+        totalLength: subMainPipeLengths.reduce((sum, length) => sum + length, 0),
     };
 
     // คำนวณข้อมูลท่อย่อย
-    const allBranchPipes = projectData.subMainPipes?.flatMap(subMain => subMain.branchPipes || []) || [];
-    const branchPipeLengths = allBranchPipes.map(pipe => pipe.length);
+    const allBranchPipes =
+        projectData.subMainPipes?.flatMap((subMain) => subMain.branchPipes || []) || [];
+    const branchPipeLengths = allBranchPipes.map((pipe) => pipe.length);
     const branchPipesData = {
         longest: branchPipeLengths.length > 0 ? Math.max(...branchPipeLengths) : 0,
-        totalLength: branchPipeLengths.reduce((sum, length) => sum + length, 0)
+        totalLength: branchPipeLengths.reduce((sum, length) => sum + length, 0),
     };
 
     // คำนวณท่อที่ยาวที่สุดรวมกัน
-    const longestPipesCombined = mainPipesData.longest + subMainPipesData.longest + branchPipesData.longest;
+    const longestPipesCombined =
+        mainPipesData.longest + subMainPipesData.longest + branchPipesData.longest;
 
     // คำนวณข้อมูลแยกโซน
     const zoneDetails: ZoneSummaryData[] = [];
 
-    if (projectData.useZones && projectData.zones) {
+    if (projectData.useZones && projectData.zones && projectData.zones.length > 0) {
         // โหมดหลายโซน
-        projectData.zones.forEach(zone => {
+        projectData.zones.forEach((zone) => {
             // หาต้นไม้ในโซนนี้
-            const plantsInZone = projectData.plants?.filter(plant => 
-                isPointInPolygon(plant.position, zone.coordinates)
-            ) || [];
+            const plantsInZone =
+                projectData.plants?.filter(
+                    (plant) =>
+                        (plant.zoneId && plant.zoneId === zone.id) ||
+                        (!plant.zoneId && isPointInPolygon(plant.position, zone.coordinates))
+                ) || [];
 
             // หาท่อในโซนนี้
-            const zoneSubMainPipes = projectData.subMainPipes?.filter(pipe => pipe.zoneId === zone.id) || [];
-            const zoneBranchPipes = zoneSubMainPipes.flatMap(subMain => subMain.branchPipes || []);
-            
+            const zoneSubMainPipes =
+                projectData.subMainPipes?.filter((pipe) => pipe.zoneId === zone.id) || [];
+            const zoneBranchPipes = zoneSubMainPipes.flatMap(
+                (subMain) => subMain.branchPipes || []
+            );
+
             // หาท่อเมนที่ไปยังโซนนี้
-            const zoneMainPipes = projectData.mainPipes?.filter(pipe => pipe.toZone === zone.id) || [];
+            const zoneMainPipes =
+                projectData.mainPipes?.filter((pipe) => pipe.toZone === zone.id) || [];
 
             // คำนวณความยาวท่อแต่ละประเภทในโซน
-            const mainPipeLengthsInZone = zoneMainPipes.map(pipe => pipe.length);
-            const subMainPipeLengthsInZone = zoneSubMainPipes.map(pipe => pipe.length);
-            const branchPipeLengthsInZone = zoneBranchPipes.map(pipe => pipe.length);
+            const mainPipeLengthsInZone = zoneMainPipes.map((pipe) => pipe.length);
+            const subMainPipeLengthsInZone = zoneSubMainPipes.map((pipe) => pipe.length);
+            const branchPipeLengthsInZone = zoneBranchPipes.map((pipe) => pipe.length);
+            const waterNeedInZone = plantsInZone.reduce(
+                (sum, plant) => sum + plant.plantData.waterNeed,
+                0
+            );
 
             const zoneData: ZoneSummaryData = {
                 zoneId: zone.id,
                 zoneName: zone.name,
                 areaInRai: zone.area / 1600, // แปลงเป็นไร่
                 plantCount: plantsInZone.length,
-                waterNeedPerSession: plantsInZone.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0),
+                waterNeedPerSession: waterNeedInZone,
+                waterPerPlant: plantsInZone.length > 0 ? waterNeedInZone / plantsInZone.length : 0,
+                plantData: zone.plantData, // เพิ่มข้อมูลพืช
                 mainPipesInZone: {
-                    longest: mainPipeLengthsInZone.length > 0 ? Math.max(...mainPipeLengthsInZone) : 0,
-                    totalLength: mainPipeLengthsInZone.reduce((sum, length) => sum + length, 0)
+                    longest:
+                        mainPipeLengthsInZone.length > 0 ? Math.max(...mainPipeLengthsInZone) : 0,
+                    totalLength: mainPipeLengthsInZone.reduce((sum, length) => sum + length, 0),
                 },
                 subMainPipesInZone: {
-                    longest: subMainPipeLengthsInZone.length > 0 ? Math.max(...subMainPipeLengthsInZone) : 0,
-                    totalLength: subMainPipeLengthsInZone.reduce((sum, length) => sum + length, 0)
+                    longest:
+                        subMainPipeLengthsInZone.length > 0
+                            ? Math.max(...subMainPipeLengthsInZone)
+                            : 0,
+                    totalLength: subMainPipeLengthsInZone.reduce((sum, length) => sum + length, 0),
                 },
                 branchPipesInZone: {
-                    longest: branchPipeLengthsInZone.length > 0 ? Math.max(...branchPipeLengthsInZone) : 0,
-                    totalLength: branchPipeLengthsInZone.reduce((sum, length) => sum + length, 0)
-                }
+                    longest:
+                        branchPipeLengthsInZone.length > 0
+                            ? Math.max(...branchPipeLengthsInZone)
+                            : 0,
+                    totalLength: branchPipeLengthsInZone.reduce((sum, length) => sum + length, 0),
+                },
             };
 
             zoneDetails.push(zoneData);
         });
     } else {
         // โหมดโซนเดียว
+        const plantDataForSingleZone =
+            projectData.selectedPlantType || projectData.plants?.[0]?.plantData;
+        const waterPerPlantSingleZone = plantDataForSingleZone?.waterNeed || 0;
+
+        console.log('🔍 Debug single zone plant data:', {
+            selectedPlantType: projectData.selectedPlantType,
+            firstPlantData: projectData.plants?.[0]?.plantData,
+            plantDataForSingleZone,
+            waterPerPlantSingleZone,
+        });
+
         const singleZoneData: ZoneSummaryData = {
             zoneId: 'main-area',
             zoneName: 'พื้นที่หลัก',
             areaInRai: totalAreaInRai,
             plantCount: totalPlants,
             waterNeedPerSession: totalWaterNeedPerSession,
+            waterPerPlant:
+                totalPlants > 0 ? totalWaterNeedPerSession / totalPlants : waterPerPlantSingleZone,
+            plantData: plantDataForSingleZone, // เพิ่มข้อมูลพืช
             mainPipesInZone: mainPipesData,
             subMainPipesInZone: subMainPipesData,
-            branchPipesInZone: branchPipesData
+            branchPipesInZone: branchPipesData,
         };
 
         zoneDetails.push(singleZoneData);
@@ -357,11 +401,12 @@ export const calculateProjectSummary = (projectData: HorticultureProjectData): P
         totalZones,
         totalPlants,
         totalWaterNeedPerSession,
+        waterPerPlant,
         mainPipes: mainPipesData,
         subMainPipes: subMainPipesData,
         branchPipes: branchPipesData,
         longestPipesCombined,
-        zoneDetails
+        zoneDetails,
     };
 
     console.log('✅ Project summary calculated:', summary);

@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class ImageUploadController extends Controller
 {
@@ -20,6 +21,7 @@ class ImageUploadController extends Controller
         ]);
 
         if ($validator->fails()) {
+            Log::error('Image validation failed', $validator->errors()->toArray());
             return response()->json([
                 'error' => 'Invalid image file',
                 'errors' => $validator->errors()
@@ -29,24 +31,54 @@ class ImageUploadController extends Controller
         try {
             $file = $request->file('image');
             
+            // สร้างโฟลเดอร์ images ถ้ายังไม่มี
+            $imagesPath = storage_path('app/public/images');
+            if (!file_exists($imagesPath)) {
+                mkdir($imagesPath, 0755, true);
+            }
+            
             // Generate unique filename
             $filename = time() . '_' . Str::random(10) . '.' . $file->getClientOriginalExtension();
             
             // Store in public disk under images folder
             $path = $file->storeAs('images', $filename, 'public');
             
+            // ตรวจสอบว่าไฟล์ถูกสร้างจริง
+            $fullPath = storage_path('app/public/' . $path);
+            if (!file_exists($fullPath)) {
+                throw new \Exception('File was not created successfully');
+            }
+            
+            // ตั้งค่า permission
+            chmod($fullPath, 0644);
+            
             // Get full URL
             $url = Storage::url($path);
+            
+            Log::info('Image uploaded successfully', [
+                'filename' => $filename,
+                'path' => $path,
+                'url' => $url,
+                'file_exists' => file_exists($fullPath),
+                'file_size' => file_exists($fullPath) ? filesize($fullPath) : 0
+            ]);
             
             return response()->json([
                 'success' => true,
                 'message' => 'Image uploaded successfully',
                 'url' => $url,
                 'path' => $path,
-                'filename' => $filename
+                'filename' => $filename,
+                'full_path' => $fullPath, // เพื่อ debug
+                'file_exists' => file_exists($fullPath)
             ]);
             
         } catch (\Exception $e) {
+            Log::error('Image upload failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             return response()->json([
                 'error' => 'Failed to upload image: ' . $e->getMessage()
             ], 500);
@@ -59,8 +91,8 @@ class ImageUploadController extends Controller
     public function multiple(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'images' => 'required|array|max:10', // Maximum 10 images
-            'images.*' => 'image|mimes:jpeg,png,jpg,gif,webp|max:5120', // 5MB max each
+            'images' => 'required|array|max:10',
+            'images.*' => 'image|mimes:jpeg,png,jpg,gif,webp|max:5120',
         ]);
 
         if ($validator->fails()) {
@@ -73,14 +105,22 @@ class ImageUploadController extends Controller
         try {
             $uploadedImages = [];
             
+            // สร้างโฟลเดอร์ images ถ้ายังไม่มี
+            $imagesPath = storage_path('app/public/images');
+            if (!file_exists($imagesPath)) {
+                mkdir($imagesPath, 0755, true);
+            }
+            
             foreach ($request->file('images') as $file) {
-                // Generate unique filename
                 $filename = time() . '_' . Str::random(10) . '.' . $file->getClientOriginalExtension();
-                
-                // Store in public disk under images folder
                 $path = $file->storeAs('images', $filename, 'public');
                 
-                // Get full URL
+                // ตั้งค่า permission
+                $fullPath = storage_path('app/public/' . $path);
+                if (file_exists($fullPath)) {
+                    chmod($fullPath, 0644);
+                }
+                
                 $url = Storage::url($path);
                 
                 $uploadedImages[] = [
@@ -100,6 +140,10 @@ class ImageUploadController extends Controller
             ]);
             
         } catch (\Exception $e) {
+            Log::error('Multiple images upload failed', [
+                'error' => $e->getMessage()
+            ]);
+            
             return response()->json([
                 'error' => 'Failed to upload images: ' . $e->getMessage()
             ], 500);
@@ -132,6 +176,8 @@ class ImageUploadController extends Controller
             if (Storage::disk('public')->exists($path)) {
                 Storage::disk('public')->delete($path);
                 
+                Log::info('Image deleted successfully', ['path' => $path]);
+                
                 return response()->json([
                     'success' => true,
                     'message' => 'Image deleted successfully'
@@ -143,6 +189,10 @@ class ImageUploadController extends Controller
             }
             
         } catch (\Exception $e) {
+            Log::error('Image deletion failed', [
+                'error' => $e->getMessage()
+            ]);
+            
             return response()->json([
                 'error' => 'Failed to delete image: ' . $e->getMessage()
             ], 500);
@@ -198,6 +248,10 @@ class ImageUploadController extends Controller
             }
             
         } catch (\Exception $e) {
+            Log::error('Get image info failed', [
+                'error' => $e->getMessage()
+            ]);
+            
             return response()->json([
                 'error' => 'Failed to get image info: ' . $e->getMessage()
             ], 500);
@@ -250,8 +304,41 @@ class ImageUploadController extends Controller
             ]);
             
         } catch (\Exception $e) {
+            Log::error('List images failed', [
+                'error' => $e->getMessage()
+            ]);
+            
             return response()->json([
                 'error' => 'Failed to list images: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * ตรวจสอบ storage configuration
+     */
+    public function checkStorage()
+    {
+        try {
+            $info = [
+                'storage_path' => storage_path('app/public'),
+                'public_path' => public_path('storage'),
+                'symlink_exists' => is_link(public_path('storage')),
+                'symlink_target' => is_link(public_path('storage')) ? readlink(public_path('storage')) : null,
+                'images_directory_exists' => is_dir(storage_path('app/public/images')),
+                'images_directory_writable' => is_writable(storage_path('app/public/images')),
+                'images_directory_permissions' => is_dir(storage_path('app/public/images')) ? 
+                    substr(sprintf('%o', fileperms(storage_path('app/public/images'))), -4) : null,
+            ];
+            
+            return response()->json([
+                'success' => true,
+                'storage_info' => $info
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to check storage: ' . $e->getMessage()
             ], 500);
         }
     }

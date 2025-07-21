@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import ReactMarkdown from 'react-markdown'; // ⬅️ 1. Import library
 
 const ChatBox = () => {
     const [message, setMessage] = useState('');
     const [chatHistory, setChatHistory] = useState([]);
-    const [isTyping, setIsTyping] = useState(false); // 🟡 สถานะกำลังพิมพ์
+    const [isTyping, setIsTyping] = useState(false);
 
     const sendMessage = async () => {
         if (!message.trim()) return;
@@ -46,18 +47,23 @@ const ChatBox = () => {
                         className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
                         <div
-                            className={`max-w-[70%] rounded-2xl px-4 py-2 text-sm ${
+                            className={`prose max-w-[70%] rounded-2xl px-4 py-2 text-sm ${
+                                // ⬅️ 2. เพิ่มคลาส 'prose' (แนะนำ)
                                 msg.role === 'user'
                                     ? 'rounded-br-none bg-blue-500 text-white'
                                     : 'rounded-bl-none bg-gray-200 text-black'
                             }`}
                         >
-                            {msg.content}
+                            {/* ⬅️ 3. ใช้ ReactMarkdown กับข้อความของ AI */}
+                            {msg.role === 'assistant' ? (
+                                <ReactMarkdown>{msg.content}</ReactMarkdown>
+                            ) : (
+                                msg.content
+                            )}
                         </div>
                     </div>
                 ))}
 
-                {/* 🟡 กำลังพิมพ์ */}
                 {isTyping && (
                     <div className="flex justify-start">
                         <div className="max-w-[70%] animate-pulse rounded-2xl bg-gray-100 px-4 py-2 text-sm italic text-gray-500">

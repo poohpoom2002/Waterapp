@@ -1,0 +1,182 @@
+// components/horticulture/HorticultureMapComponent.tsx
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Wrapper, Status } from '@googlemaps/react-wrapper';
+import { GOOGLE_MAPS_CONFIG } from '../../utils/googleMapsConfig';
+
+interface Coordinate {
+    lat: number;
+    lng: number;
+}
+
+interface HorticultureMapComponentProps {
+    center: [number, number];
+    zoom: number;
+    onMapLoad?: (map: google.maps.Map) => void;
+    children?: React.ReactNode;
+}
+
+const getGoogleMapsConfig = () => {
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+
+    return {
+        apiKey,
+        libraries: ['drawing', 'geometry', 'places'],
+        defaultMapOptions: {
+            mapTypeId: 'satellite',
+            disableDefaultUI: false,
+            zoomControl: true,
+            streetViewControl: false,
+            fullscreenControl: true,
+            mapTypeControl: true,
+            mapTypeControlOptions: {
+                position: 'LEFT_BOTTOM' as any,
+                style: 'HORIZONTAL_BAR' as any,
+                mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain'],
+            },
+            minZoom: 1,
+            gestureHandling: 'greedy',
+            clickableIcons: false,
+            scrollwheel: true,
+            disableDoubleClickZoom: false,
+        },
+    };
+};
+
+const MapLoadingComponent: React.FC = () => (
+    <div className="flex h-full w-full items-center justify-center bg-gray-900">
+        <div className="text-center">
+            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-blue-500"></div>
+            <p className="text-white">กำลังโหลด Google Maps...</p>
+        </div>
+    </div>
+);
+
+const MapErrorComponent: React.FC<{ onRetry?: () => void }> = ({ onRetry }) => {
+    const config = getGoogleMapsConfig();
+
+    return (
+        <div className="flex h-full w-full items-center justify-center bg-gray-900">
+            <div className="max-w-md rounded-lg bg-red-900 p-6 text-center text-white">
+                <div className="mb-4 text-4xl">❌</div>
+                <h3 className="mb-2 text-lg font-bold">ไม่สามารถโหลด Google Maps ได้</h3>
+                <p className="mb-4 text-sm text-gray-300">
+                    {!config.apiKey
+                        ? 'ไม่พบ Google Maps API Key'
+                        : 'เกิดข้อผิดพลาดในการเชื่อมต่อ Google Maps'}
+                </p>
+                {onRetry && (
+                    <button
+                        onClick={onRetry}
+                        className="w-full rounded bg-red-600 px-4 py-2 transition-colors hover:bg-red-700"
+                    >
+                        ลองใหม่
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+};
+
+const MapComponent: React.FC<{
+    center: google.maps.LatLngLiteral;
+    zoom: number;
+    onLoad?: (map: google.maps.Map) => void;
+    children?: React.ReactNode;
+}> = ({ center, zoom, onLoad, children }) => {
+    const ref = useRef<HTMLDivElement>(null);
+    const [map, setMap] = useState<google.maps.Map>();
+
+    useEffect(() => {
+        if (ref.current && !map && window.google?.maps) {
+            try {
+                const config = getGoogleMapsConfig();
+
+                const mapOptions = {
+                    ...config.defaultMapOptions,
+                    mapTypeControlOptions: {
+                        position: google.maps.ControlPosition.LEFT_BOTTOM,
+                        style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+                        mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain'],
+                    },
+                    zoomControlOptions: {
+                        position: google.maps.ControlPosition.RIGHT_CENTER,
+                    },
+                };
+
+                const newMap = new window.google.maps.Map(ref.current, {
+                    center,
+                    zoom,
+                    ...mapOptions,
+                });
+
+                setMap(newMap);
+                onLoad?.(newMap);
+            } catch (error) {
+                console.error('Error creating Google Map:', error);
+            }
+        }
+    }, [ref, map, center, zoom, onLoad]);
+
+    useEffect(() => {
+        if (map) {
+            map.setCenter(center);
+            map.setZoom(zoom);
+        }
+    }, [map, center, zoom]);
+
+    return (
+        <>
+            <div ref={ref} style={{ width: '100%', height: '100%' }} />
+            {React.Children.map(children, (child) => {
+                if (React.isValidElement(child)) {
+                    return React.cloneElement(child, { map } as any);
+                }
+            })}
+        </>
+    );
+};
+
+const renderMap = (status: Status): React.ReactElement => {
+    switch (status) {
+        case Status.LOADING:
+            return <MapLoadingComponent />;
+        case Status.FAILURE:
+            return <MapErrorComponent onRetry={() => window.location.reload()} />;
+        case Status.SUCCESS:
+            return <div style={{ width: '100%', height: '100%' }} />;
+        default:
+            return <MapLoadingComponent />;
+    }
+};
+
+const HorticultureMapComponent: React.FC<HorticultureMapComponentProps> = ({
+    center,
+    zoom,
+    onMapLoad,
+    children,
+}) => {
+    const config = getGoogleMapsConfig();
+
+    if (!config.apiKey) {
+        return <MapErrorComponent onRetry={() => window.location.reload()} />;
+    }
+
+    return (
+        <Wrapper
+            apiKey={config.apiKey}
+            render={renderMap}
+            libraries={config.libraries as any}
+            version="weekly"
+        >
+            <MapComponent
+                center={{ lat: center[0], lng: center[1] }}
+                zoom={zoom}
+                onLoad={onMapLoad}
+            >
+                {children}
+            </MapComponent>
+        </Wrapper>
+    );
+};
+
+export default HorticultureMapComponent;

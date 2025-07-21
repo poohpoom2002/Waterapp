@@ -1,187 +1,214 @@
-// C:\webchaiyo\Waterapp\resources\js\pages\components\PipeSelector.tsx
+// resources\js\pages\components\PipeSelector.tsx
 import React, { useState } from 'react';
 import { CalculationResults, PipeType, IrrigationInput, AnalyzedPipe } from '../types/interfaces';
+import { calculatePipeRolls } from '../utils/calculations';
 
 interface PipeSelectorProps {
     pipeType: PipeType;
-    selectedPipe: any;
-    onPipeChange: (pipe: any) => void;
     results: CalculationResults;
     input: IrrigationInput;
+    selectedPipe?: any;
+    onPipeChange: (pipe: any) => void;
 }
 
 const PipeSelector: React.FC<PipeSelectorProps> = ({
     pipeType,
-    selectedPipe,
-    onPipeChange,
     results,
     input,
+    selectedPipe,
+    onPipeChange,
 }) => {
-    // State สำหรับ Modal รูปภาพ
-    const [isImageModalOpen, setIsImageModalOpen] = useState(false);
-    const [modalImageSrc, setModalImageSrc] = useState('');
-    const [modalImageAlt, setModalImageAlt] = useState('');
+    const [showImageModal, setShowImageModal] = useState(false);
+    const [modalImage, setModalImage] = useState({ src: '', alt: '' });
 
-    // ฟังก์ชันเปิด Modal รูปภาพ
     const openImageModal = (src: string, alt: string) => {
-        setModalImageSrc(src);
-        setModalImageAlt(alt);
-        setIsImageModalOpen(true);
+        setModalImage({ src, alt });
+        setShowImageModal(true);
     };
 
-    // ฟังก์ชันปิด Modal รูปภาพ
     const closeImageModal = () => {
-        setIsImageModalOpen(false);
-        setModalImageSrc('');
-        setModalImageAlt('');
+        setShowImageModal(false);
+        setModalImage({ src: '', alt: '' });
     };
 
     const getPipeConfig = () => {
-        switch (pipeType) {
-            case 'branch':
-                return {
-                    title: 'เลือกท่อย่อย',
-                    titleColor: 'text-purple-400',
-                    description: `สำหรับแยกไปสปริงเกอร์ (${input.sprinklersPerBranch} หัว/ท่อ)`,
-                    analyzedPipes: results.analyzedBranchPipes || [],
-                    rolls: results.branchPipeRolls,
-                    flow: results.flows.branch,
-                    velocity: results.velocity.branch,
-                };
-            case 'secondary':
-                return {
-                    title: 'เลือกท่อเมนรอง',
-                    titleColor: 'text-orange-400',
-                    description: `รวบรวมน้ำจาก ${input.branchesPerSecondary} ท่อย่อย`,
-                    analyzedPipes: results.analyzedSecondaryPipes || [],
-                    rolls: results.secondaryPipeRolls,
-                    flow: results.flows.secondary,
-                    velocity: results.velocity.secondary,
-                };
-            case 'main':
-                return {
-                    title: 'เลือกท่อเมนหลัก',
-                    titleColor: 'text-cyan-400',
-                    description: `ท่อหลักจากปั๊ม (${input.simultaneousZones} โซนพร้อมกัน)`,
-                    analyzedPipes: results.analyzedMainPipes || [],
-                    rolls: results.mainPipeRolls,
-                    flow: results.flows.main,
-                    velocity: results.velocity.main,
-                };
-        }
+        const configs = {
+            branch: {
+                title: 'ท่อย่อย',
+                titleColor: 'text-purple-400',
+                description: `สำหรับแยกไปสปริงเกอร์ (${input.sprinklersPerBranch} หัว/ท่อ)`,
+                autoSelectedPipe: results.autoSelectedBranchPipe,
+                analyzedPipes: results.analyzedBranchPipes || [],
+                totalPipeLength: input.totalBranchPipeM,
+                flow: results.flows.branch,
+                velocity: results.velocity.branch,
+            },
+            secondary: {
+                title: 'ท่อเมนรอง',
+                titleColor: 'text-orange-400',
+                description: `รวบรวมน้ำจาก ${input.branchesPerSecondary} ท่อย่อย`,
+                autoSelectedPipe: results.autoSelectedSecondaryPipe,
+                analyzedPipes: results.analyzedSecondaryPipes || [],
+                totalPipeLength: input.totalSecondaryPipeM,
+                flow: results.flows.secondary,
+                velocity: results.velocity.secondary,
+            },
+            main: {
+                title: 'ท่อเมนหลัก',
+                titleColor: 'text-cyan-400',
+                description: `ท่อหลักจากปั๊ม (${input.simultaneousZones} โซนพร้อมกัน)`,
+                autoSelectedPipe: results.autoSelectedMainPipe,
+                analyzedPipes: results.analyzedMainPipes || [],
+                totalPipeLength: input.totalMainPipeM,
+                flow: results.flows.main,
+                velocity: results.velocity.main,
+            },
+        };
+        return configs[pipeType];
     };
 
     const config = getPipeConfig();
+    const currentPipe = selectedPipe || config.autoSelectedPipe;
 
-    // ใช้ข้อมูลที่ได้จาก database และผ่านการวิเคราะห์แล้วใน useCalculations
-    const allPipes = config.analyzedPipes;
+    const calculateCurrentPipeRolls = (pipe: any): number => {
+        if (!pipe || !pipe.lengthM || config.totalPipeLength <= 0) return 0;
+        return calculatePipeRolls(config.totalPipeLength, pipe.lengthM);
+    };
 
-    // เรียงลำดับ: แนะนำ > ตัวเลือกดี > ใช้ได้ > อื่นๆ (เรียงตามคะแนน)
-    const sortedPipes = allPipes.sort((a, b) => {
-        if (a.isRecommended !== b.isRecommended) {
-            return b.isRecommended ? 1 : -1;
-        }
-        if (a.isGoodChoice !== b.isGoodChoice) {
-            return b.isGoodChoice ? 1 : -1;
-        }
-        if (a.isUsable !== b.isUsable) {
-            return b.isUsable ? 1 : -1;
-        }
-        return b.score - a.score; // เรียงตามคะแนนจากมากไปน้อย
+    const currentRolls = calculateCurrentPipeRolls(currentPipe);
+
+    const sortedPipes = config.analyzedPipes.sort((a, b) => {
+        if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
+        if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
+        if (a.isUsable !== b.isUsable) return b.isUsable ? 1 : -1;
+        return b.score - a.score;
     });
 
-    const getRecommendationIcon = (pipe: any) => {
-        if (!pipe) return '⚪ ไม่มีข้อมูล';
-        if (pipe.isRecommended) return '🌟 แนะนำ';
-        if (pipe.isGoodChoice) return '✅ ตัวเลือกดี';
-        if (pipe.isUsable) return '⚡ ใช้ได้';
-        return '⚠️ ควรพิจารณา';
+    const getSelectionStatus = (pipe: any) => {
+        if (!pipe) return null;
+        const isAutoSelected = pipe.id === config.autoSelectedPipe?.id;
+
+        if (isAutoSelected) {
+            if (pipe.isRecommended) return '🤖⭐ เลือกอัตโนมัติ (แนะนำ)';
+            if (pipe.isGoodChoice) return '🤖✅ เลือกอัตโนมัติ (ดี)';
+            if (pipe.isUsable) return '🤖⚡ เลือกอัตโนมัติ (ใช้ได้)';
+            return '🤖⚠️ เลือกอัตโนมัติ (ตัวดีที่สุดที่มี)';
+        } else {
+            return '👤 เลือกเอง';
+        }
     };
 
-    const getRecommendationColor = (pipe: any) => {
-        if (!pipe) return 'text-gray-300';
-        if (pipe.isRecommended) return 'text-green-300';
-        if (pipe.isGoodChoice) return 'text-blue-300';
-        if (pipe.isUsable) return 'text-yellow-300';
-        return 'text-red-300';
-    };
-
-    // ฟังก์ชันช่วยในการหา pipe analysis ที่ปลอดภัย
-    const getSelectedPipeAnalysis = () => {
-        return allPipes.find((p) => p.id === selectedPipe?.id) || null;
-    };
-
-    // ฟังก์ชันสำหรับแสดงคำแนะนำสำหรับประเภทท่อ
-    const getPipeTypeRecommendation = (pipeType: string, sectionType: PipeType) => {
-        const recommendations: Record<PipeType, string[]> = {
-            branch: ['LDPE', 'Flexible PE', 'PE-RT', 'PVC'],
-            secondary: ['HDPE PE 80', 'HDPE PE 100', 'PVC'],
-            main: ['HDPE PE 100', 'HDPE PE 80'],
-        };
-
-        const recommendedTypes = recommendations[sectionType];
-        return recommendedTypes.includes(pipeType) ? '⭐' : '';
+    const getPipeGrouping = (pipe: any) => {
+        if (pipe.isRecommended) return 'แนะนำ';
+        if (pipe.isGoodChoice) return 'ตัวเลือกดี';
+        if (pipe.isUsable) return 'ใช้ได้';
+        return 'อื่นๆ';
     };
 
     return (
         <div className="rounded-lg bg-gray-700 p-6">
-            <h3 className={`mb-4 text-lg font-semibold ${config.titleColor}`}>{config.title}</h3>
+            <h3 className={`mb-4 text-lg font-semibold ${config.titleColor}`}>
+                {config.title}
+                <span className="ml-2 text-sm font-normal text-gray-400">
+                    (🤖 เลือกอัตโนมัติ + ปรับแต่งได้)
+                </span>
+            </h3>
             <p className="mb-3 text-sm text-gray-300">{config.description}</p>
 
-            {/* แสดงสถานะการโหลดข้อมูล */}
-            {/* <div className="mb-3 text-xs text-green-400">
-                🔗 ข้อมูลจากฐานข้อมูล: {allPipes.length} รายการ
-            </div> */}
+            <div className="mb-4 rounded bg-blue-900 p-3">
+                <h4 className="mb-2 text-sm font-medium text-blue-300">📏 ข้อมูลระยะท่อ:</h4>
+                <div className="text-xs text-gray-300">
+                    <p>
+                        ระยะท่อ{config.title}รวม:{' '}
+                        <span className="font-bold text-blue-300">
+                            {config.totalPipeLength.toLocaleString()} เมตร
+                        </span>
+                    </p>
+                    {currentPipe && (
+                        <>
+                            <p>
+                                ความยาวต่อม้วน:{' '}
+                                <span className="font-bold text-yellow-300">
+                                    {currentPipe.lengthM} เมตร/ม้วน
+                                </span>
+                            </p>
+                            <p>
+                                จำนวนม้วนที่ต้องใช้:{' '}
+                                <span className="font-bold text-green-300">
+                                    {currentRolls} ม้วน
+                                </span>
+                            </p>
+                        </>
+                    )}
+                </div>
+            </div>
 
-            <select
-                value={selectedPipe?.id || ''}
-                onChange={(e) => {
-                    const selected = allPipes.find((p) => p.id === parseInt(e.target.value));
-                    onPipeChange(selected);
-                }}
-                className="mb-4 w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
-            >
-                <option value="">-- เลือกท่อ --</option>
-                {sortedPipes.map((pipe) => (
-                    <option key={pipe.id} value={pipe.id}>
-                        {pipe.productCode} ({pipe.pipeType} {pipe.sizeMM}mm) - {pipe.price} บาท |
-                        {getPipeTypeRecommendation(pipe.pipeType, pipeType)}{' '}
-                        {getRecommendationIcon(pipe)}
-                    </option>
-                ))}
-            </select>
+            <div className="mb-4">
+                <label className="mb-2 block text-sm font-medium text-gray-300">
+                    เลือกท่อ{config.title}:
+                </label>
+                <select
+                    value={currentPipe?.id || ''}
+                    onChange={(e) => {
+                        const selected = config.analyzedPipes.find(
+                            (p) => p.id === parseInt(e.target.value)
+                        );
+                        onPipeChange(selected || null);
+                    }}
+                    className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
+                >
+                    <option value="">-- ใช้การเลือกอัตโนมัติ --</option>
+                    {sortedPipes.map((pipe) => {
+                        const group = getPipeGrouping(pipe);
+                        const isAuto = pipe.id === config.autoSelectedPipe?.id;
+                        const rolls = calculateCurrentPipeRolls(pipe);
+                        return (
+                            <option key={pipe.id} value={pipe.id}>
+                                {isAuto ? '🤖 ' : ''}
+                                {pipe.name || pipe.productCode} - {pipe.sizeMM}mm -{' '}
+                                {pipe.price?.toLocaleString()} บาท/ม้วน ({rolls} ม้วน) | {group} |
+                                คะแนน: {pipe.score}
+                            </option>
+                        );
+                    })}
+                </select>
+                <p className="mt-1 text-xs text-gray-400">
+                    เว้นว่างไว้เพื่อใช้การเลือกอัตโนมัติ หรือเลือกท่อที่ต้องการ
+                </p>
+            </div>
 
-            {selectedPipe && (
+            {currentPipe ? (
                 <div className="rounded bg-gray-600 p-3">
                     <div className="mb-3 flex items-center justify-between">
                         <h4 className="font-medium text-white">
-                            <strong> {selectedPipe.name}</strong>
+                            <strong>{currentPipe?.name || currentPipe?.productCode}</strong>
                         </h4>
                         <div className="flex items-center gap-2">
-                            <span className="text-sm text-yellow-300">
-                                {getPipeTypeRecommendation(selectedPipe.pipeType, pipeType) &&
-                                    '⭐ เหมาะสำหรับท่อนี้'}
-                            </span>
-                            <span
-                                className={`text-sm font-bold ${getRecommendationColor(getSelectedPipeAnalysis())}`}
-                            >
-                                {getRecommendationIcon(getSelectedPipeAnalysis())}
+                            <span className="text-sm font-bold text-green-300">
+                                คะแนน: {currentPipe?.score}/100
                             </span>
                         </div>
                     </div>
 
+                    <div className="mb-3 rounded bg-blue-900 p-2">
+                        <p className="text-sm text-blue-300">{getSelectionStatus(currentPipe)}</p>
+                    </div>
+
                     <div className="grid grid-cols-10 items-center justify-between gap-3 text-sm">
                         <div className="col-span-2 flex items-center justify-center">
-                            {selectedPipe.image ? (
+                            {currentPipe?.image ? (
                                 <img
-                                    src={selectedPipe.image}
-                                    alt={selectedPipe.name}
-                                    className="flex h-auto w-[85px] cursor-pointer items-center justify-center rounded border border-gray-500 transition-opacity hover:border-blue-400 hover:opacity-80"
+                                    src={currentPipe.image}
+                                    alt={currentPipe?.name || currentPipe?.productCode || ''}
+                                    className="h-auto w-[85px] cursor-pointer rounded border border-gray-500 transition-opacity hover:border-blue-400 hover:opacity-80"
                                     onError={(e) => {
                                         (e.target as HTMLImageElement).style.display = 'none';
                                     }}
                                     onClick={() =>
-                                        openImageModal(selectedPipe.image, selectedPipe.name)
+                                        openImageModal(
+                                            currentPipe?.image || '',
+                                            currentPipe?.name || currentPipe?.productCode || ''
+                                        )
                                     }
                                     title="คลิกเพื่อดูรูปขนาดใหญ่"
                                 />
@@ -191,35 +218,36 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                 </div>
                             )}
                         </div>
+
                         <div className="col-span-4">
                             <p>
                                 <strong>รหัสสินค้า:</strong>{' '}
-                                {selectedPipe.productCode || selectedPipe.product_code}
+                                {currentPipe?.productCode || currentPipe?.product_code}
                             </p>
                             <p>
-                                <strong>ประเภท:</strong> {selectedPipe.pipeType}
+                                <strong>ประเภท:</strong> {currentPipe?.pipeType}
                             </p>
                             <p>
-                                <strong>ขนาด:</strong> {selectedPipe.sizeMM} มม.
-                                {selectedPipe.sizeInch && ` (${selectedPipe.sizeInch}")`}
+                                <strong>ขนาด:</strong> {currentPipe?.sizeMM} มม.
+                                {currentPipe?.sizeInch && ` (${currentPipe.sizeInch}")`}
                             </p>
                             <p>
-                                <strong>ความยาวต่อม้วน:</strong> {selectedPipe.lengthM} เมตร
+                                <strong>ความยาวต่อม้วน:</strong> {currentPipe?.lengthM} เมตร
                             </p>
                             <p>
-                                <strong>ความดัน:</strong> PN{selectedPipe.pn}
+                                <strong>ความดัน:</strong> PN{currentPipe?.pn}
                             </p>
                             <p>
                                 <strong>อัตราการไหล:</strong> {config.flow.toFixed(1)} LPM
                             </p>
                         </div>
+
                         <div className="col-span-4">
-                            {selectedPipe.brand && (
+                            {currentPipe?.brand && (
                                 <p>
-                                    <strong>แบรนด์:</strong> {selectedPipe.brand}
+                                    <strong>แบรนด์:</strong> {currentPipe.brand}
                                 </p>
                             )}
-
                             <p>
                                 <strong>ความเร็ว:</strong>{' '}
                                 <span
@@ -235,142 +263,248 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                 </span>
                             </p>
                             <p>
-                                <strong>จำนวนม้วน:</strong>{' '}
-                                <span className="text-yellow-300">{config.rolls}</span> ม้วน
+                                <strong>ระยะท่อรวม:</strong>{' '}
+                                <span className="text-blue-300">
+                                    {config.totalPipeLength.toLocaleString()}
+                                </span>{' '}
+                                ม.
                             </p>
                             <p>
-                                <strong>ราคาต่อม้วน:</strong> {selectedPipe.price.toLocaleString()}{' '}
+                                <strong>จำนวนม้วน:</strong>{' '}
+                                <span className="text-yellow-300">{currentRolls}</span> ม้วน
+                            </p>
+                            <p>
+                                <strong>ราคาต่อม้วน:</strong> {currentPipe?.price?.toLocaleString()}{' '}
                                 บาท
                             </p>
                             <p>
                                 <strong>ราคารวม:</strong>{' '}
                                 <span className="text-green-300">
-                                    {(selectedPipe.price * config.rolls).toLocaleString()}
+                                    {((currentPipe?.price || 0) * currentRolls).toLocaleString()}
                                 </span>{' '}
                                 บาท
                             </p>
                         </div>
                     </div>
 
-                    {/* แสดงคะแนนและการวิเคราะห์ */}
-                    {(() => {
-                        const analysis = getSelectedPipeAnalysis();
-                        if (analysis && analysis.score > 0) {
-                            return (
-                                <div className="mt-3 rounded bg-gray-500 p-2">
-                                    <h5 className="text-xs font-medium text-yellow-300">
-                                        การวิเคราะห์:
-                                    </h5>
-                                    <div className="grid grid-cols-2 gap-2 text-xs">
-                                        <p>
-                                            คะแนนรวม:{' '}
-                                            <span className="font-bold">{analysis.score}</span>/100
-                                        </p>
-                                        <p>
-                                            Head Loss:{' '}
-                                            <span className="font-bold">
-                                                {analysis.headLoss.toFixed(2)}
-                                            </span>{' '}
-                                            m
-                                        </p>
-                                        {/* <p>
-                                            จากฐานข้อมูล:{' '}
-                                            <span className="font-bold text-green-400">✓</span>
-                                        </p> */}
-                                    </div>
-                                </div>
-                            );
-                        }
-                        return null;
-                    })()}
-
-                    {/* คำแนะนำการปรับปรุง */}
-                    {(() => {
-                        const analysis = getSelectedPipeAnalysis();
-                        if (analysis && !analysis.isRecommended) {
-                            const betterPipes = allPipes.filter((p) => p.isRecommended).slice(0, 2);
-                            if (betterPipes.length > 0) {
-                                return (
-                                    <div className="mt-3 rounded bg-blue-900 p-2">
-                                        <p className="text-sm text-blue-300">
-                                            💡 <strong>ท่อที่แนะนำ:</strong>{' '}
-                                            {betterPipes
-                                                .map(
-                                                    (p) =>
-                                                        `${p.productCode || p.product_code} (${p.sizeMM}mm)`
-                                                )
-                                                .join(', ')}
-                                        </p>
-                                    </div>
-                                );
-                            }
-                        }
-                        return null;
-                    })()}
-
-                    {/* แสดงคำแนะนำสำหรับประเภทท่อที่ไม่เหมาะสม */}
-                    {!getPipeTypeRecommendation(selectedPipe.pipeType, pipeType) && (
-                        <div className="mt-3 rounded bg-yellow-900 p-2">
-                            <p className="text-sm text-yellow-300">
-                                ⚠️ <strong>หมายเหตุ:</strong> ประเภทท่อ {selectedPipe.pipeType}{' '}
-                                ไม่ใช่ตัวเลือกที่แนะนำสำหรับ
-                                {pipeType === 'branch'
-                                    ? 'ท่อย่อย'
-                                    : pipeType === 'secondary'
-                                      ? 'ท่อเมนรอง'
-                                      : 'ท่อเมนหลัก'}
-                                แต่ยังสามารถใช้งานได้หากเหมาะสมกับการไหลและความเร็ว
+                    <div className="mt-3 rounded bg-purple-900 p-2">
+                        <h5 className="text-xs font-medium text-purple-300">
+                            📊 รายละเอียดการคำนวณ:
+                        </h5>
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                            <p>
+                                ระยะท่อรวม:{' '}
+                                <span className="font-bold text-blue-300">
+                                    {config.totalPipeLength.toLocaleString()} ม.
+                                </span>
+                            </p>
+                            <p>
+                                ความยาวต่อม้วน:{' '}
+                                <span className="font-bold text-yellow-300">
+                                    {currentPipe?.lengthM} ม./ม้วน
+                                </span>
+                            </p>
+                            <p>
+                                จำนวนม้วน:{' '}
+                                <span className="font-bold text-green-300">
+                                    {currentRolls} ม้วน
+                                </span>
                             </p>
                         </div>
-                    )}
+                        <p className="mt-1 text-xs text-purple-200">
+                            💡 สูตร: Math.ceil({config.totalPipeLength} ÷ {currentPipe?.lengthM}) ={' '}
+                            {currentRolls} ม้วน
+                        </p>
+                    </div>
+
+                    <div className="mt-3 rounded bg-gray-500 p-2">
+                        <h5 className="text-xs font-medium text-yellow-300">การวิเคราะห์:</h5>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                            <p>
+                                คะแนนรวม: <span className="font-bold">{currentPipe?.score}</span>
+                                /100
+                            </p>
+                            <p>
+                                Head Loss:{' '}
+                                <span className="font-bold">
+                                    {currentPipe?.headLoss?.toFixed(2)}
+                                </span>{' '}
+                                m
+                            </p>
+                        </div>
+                        <div className="mt-1 text-xs">
+                            <p>
+                                ความเหมาะสม:
+                                <span
+                                    className={`ml-1 font-bold ${
+                                        currentPipe?.isRecommended
+                                            ? 'text-green-300'
+                                            : currentPipe?.isGoodChoice
+                                              ? 'text-yellow-300'
+                                              : currentPipe?.isUsable
+                                                ? 'text-orange-300'
+                                                : 'text-red-300'
+                                    }`}
+                                >
+                                    {currentPipe?.isRecommended
+                                        ? '⭐ แนะนำ'
+                                        : currentPipe?.isGoodChoice
+                                          ? '✅ ดี'
+                                          : currentPipe?.isUsable
+                                            ? '⚡ ใช้ได้'
+                                            : '⚠️ ไม่เหมาะสม'}
+                                </span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="mt-3 rounded bg-purple-900 p-2">
+                        <h5 className="text-xs font-medium text-purple-300">การตรวจสอบ:</h5>
+                        <div className="text-xs">
+                            <p>
+                                ความเร็วน้ำ:
+                                <span
+                                    className={`ml-1 font-bold ${
+                                        config.velocity >= 0.8 && config.velocity <= 2.0
+                                            ? 'text-green-300'
+                                            : config.velocity >= 0.3 && config.velocity <= 2.5
+                                              ? 'text-yellow-300'
+                                              : 'text-red-300'
+                                    }`}
+                                >
+                                    {config.velocity >= 0.8 && config.velocity <= 2.0
+                                        ? '✅ อยู่ในช่วงที่เหมาะสม'
+                                        : config.velocity >= 0.3 && config.velocity <= 2.5
+                                          ? '⚠️ ใช้ได้ แต่ควรติดตาม'
+                                          : '❌ อยู่นอกช่วงที่แนะนำ'}
+                                </span>
+                            </p>
+                            <p className="mt-1 text-gray-400">
+                                แนะนำ: 0.8-2.0 m/s (ยอมรับได้: 0.3-2.5 m/s)
+                            </p>
+                        </div>
+                    </div>
+
+                    {selectedPipe &&
+                        selectedPipe.id !== config.autoSelectedPipe?.id &&
+                        config.autoSelectedPipe && (
+                            <div className="mt-3 rounded bg-yellow-900 p-2">
+                                <h5 className="text-xs font-medium text-yellow-300">
+                                    เปรียบเทียบกับการเลือกอัตโนมัติ:
+                                </h5>
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <div>
+                                        <p className="text-gray-300">
+                                            อัตโนมัติ: {config.autoSelectedPipe.productCode}
+                                        </p>
+                                        <p className="text-gray-300">
+                                            ขนาด: {config.autoSelectedPipe.sizeMM}mm
+                                        </p>
+                                        <p className="text-gray-300">
+                                            คะแนน: {config.autoSelectedPipe.score}
+                                        </p>
+                                        <p className="text-gray-300">
+                                            จำนวนม้วน:{' '}
+                                            {calculateCurrentPipeRolls(config.autoSelectedPipe)}{' '}
+                                            ม้วน
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-white">
+                                            เลือกเอง: {selectedPipe.productCode}
+                                        </p>
+                                        <p className="text-white">ขนาด: {selectedPipe.sizeMM}mm</p>
+                                        <p className="text-white">คะแนน: {selectedPipe.score}</p>
+                                        <p className="text-white">จำนวนม้วน: {currentRolls} ม้วน</p>
+                                    </div>
+                                </div>
+                                <div className="mt-1 text-xs">
+                                    <p className="text-yellow-200">
+                                        ส่วนต่าง:
+                                        <span
+                                            className={`ml-1 font-bold ${
+                                                selectedPipe.score >= config.autoSelectedPipe.score
+                                                    ? 'text-green-300'
+                                                    : 'text-red-300'
+                                            }`}
+                                        >
+                                            {selectedPipe.score >= config.autoSelectedPipe.score
+                                                ? '+'
+                                                : ''}
+                                            {(
+                                                selectedPipe.score - config.autoSelectedPipe.score
+                                            ).toFixed(1)}{' '}
+                                            คะแนน
+                                        </span>
+                                    </p>
+                                    <p className="text-yellow-200">
+                                        ราคารวม:
+                                        <span
+                                            className={`ml-1 font-bold ${
+                                                selectedPipe.price * currentRolls <=
+                                                config.autoSelectedPipe.price *
+                                                    calculateCurrentPipeRolls(
+                                                        config.autoSelectedPipe
+                                                    )
+                                                    ? 'text-green-300'
+                                                    : 'text-red-300'
+                                            }`}
+                                        >
+                                            {selectedPipe.price * currentRolls <=
+                                            config.autoSelectedPipe.price *
+                                                calculateCurrentPipeRolls(config.autoSelectedPipe)
+                                                ? '-'
+                                                : '+'}
+                                            {Math.abs(
+                                                selectedPipe.price * currentRolls -
+                                                    config.autoSelectedPipe.price *
+                                                        calculateCurrentPipeRolls(
+                                                            config.autoSelectedPipe
+                                                        )
+                                            ).toLocaleString()}{' '}
+                                            บาท
+                                        </span>
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+                </div>
+            ) : (
+                <div className="rounded bg-gray-600 p-4 text-center">
+                    <p className="text-gray-300">ไม่สามารถหาท่อประเภทนี้ได้</p>
+                    <p className="mt-1 text-sm text-gray-400">อาจไม่มีข้อมูลท่อที่เหมาะสมในระบบ</p>
                 </div>
             )}
 
-            {/* Modal สำหรับแสดงรูปขนาดใหญ่ */}
-            {isImageModalOpen && (
+            {showImageModal && (
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
                     onClick={closeImageModal}
                 >
-                    <div className="relative max-h-[90vh] max-w-[90vw] p-4">
-                        {/* ปุ่มปิด */}
+                    <div
+                        className="relative max-h-[90vh] max-w-[90vw] p-4"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <button
                             onClick={closeImageModal}
-                            className="absolute -right-2 -top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white transition-colors hover:bg-red-700"
+                            className="absolute -right-2 -top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700"
                             title="ปิด"
                         >
                             ✕
                         </button>
-
-                        {/* รูปภาพ */}
                         <img
-                            src={modalImageSrc}
-                            alt={modalImageAlt}
+                            src={modalImage.src}
+                            alt={modalImage.alt}
                             className="max-h-full max-w-full rounded-lg shadow-2xl"
-                            onClick={(e) => e.stopPropagation()} // ป้องกันไม่ให้ปิด modal เมื่อคลิกที่รูป
                         />
-
-                        {/* ชื่อรูป */}
                         <div className="mt-2 text-center">
                             <p className="inline-block rounded bg-black bg-opacity-50 px-2 py-1 text-sm text-white">
-                                {modalImageAlt}
+                                {modalImage.alt}
                             </p>
                         </div>
                     </div>
                 </div>
             )}
-
-            {/* แสดงสถิติจากฐานข้อมูล */}
-            {/* <div className="mt-4 text-xs text-gray-400">
-                <div className="grid grid-cols-2 gap-2">
-                    <div>
-                        ท่อที่แนะนำ: <span className="text-green-400">{allPipes.filter(p => p.isRecommended).length}</span>
-                    </div>
-                    <div>
-                        ท่อที่ใช้ได้: <span className="text-yellow-400">{allPipes.filter(p => p.isUsable).length}</span>
-                    </div>
-                </div>
-            </div> */}
         </div>
     );
 };
