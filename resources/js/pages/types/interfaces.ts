@@ -18,6 +18,9 @@ export interface IrrigationInput {
     sprinklersPerBranch: number;
     branchesPerSecondary: number;
     simultaneousZones: number;
+    sprinklersPerLongestBranch: number;
+    branchesPerLongestSecondary: number;
+    secondariesPerLongestMain: number;
 }
 
 export interface AnalyzedPipe {
@@ -33,11 +36,15 @@ export interface AnalyzedPipe {
     score: number;
     velocity: number;
     headLoss: number;
-    optimalSize?: number; // เพิ่ม field ใหม่
+    optimalSize?: number;
     isRecommended: boolean;
     isGoodChoice: boolean;
     isUsable: boolean;
-    isTypeAllowed?: boolean; // เพิ่ม field ใหม่
+    isTypeAllowed?: boolean;
+    name?: string;
+    image?: string;
+    brand?: string;
+    description?: string;
 }
 
 export interface AnalyzedSprinkler {
@@ -60,6 +67,9 @@ export interface AnalyzedSprinkler {
     maxFlow: number;
     avgRadius: number;
     pricePerFlow: number;
+    brand?: string;
+    image?: string;
+    description?: string;
 }
 
 export interface AnalyzedPump {
@@ -83,6 +93,15 @@ export interface AnalyzedPump {
     isRecommended: boolean;
     isGoodChoice: boolean;
     isUsable: boolean;
+    name?: string;
+    brand?: string;
+    image?: string;
+    description?: string;
+    suction_depth_m?: number;
+    weight_kg?: number;
+    flow_rate_lpm?: any;
+    head_m?: any;
+    pumpAccessories?: any[];
 }
 
 export interface CalculationResults {
@@ -100,12 +119,18 @@ export interface CalculationResults {
     recommendedSecondaryPipe: any[];
     recommendedMainPipe: any[];
     recommendedPump: any[];
-    // เพิ่ม field ใหม่สำหรับข้อมูลที่วิเคราะห์
+
     analyzedBranchPipes?: AnalyzedPipe[];
     analyzedSecondaryPipes?: AnalyzedPipe[];
     analyzedMainPipes?: AnalyzedPipe[];
     analyzedSprinklers?: AnalyzedSprinkler[];
     analyzedPumps?: AnalyzedPump[];
+
+    autoSelectedBranchPipe?: AnalyzedPipe;
+    autoSelectedSecondaryPipe?: AnalyzedPipe;
+    autoSelectedMainPipe?: AnalyzedPipe;
+    autoSelectedPump?: AnalyzedPump;
+
     branchPipeRolls: number;
     secondaryPipeRolls: number;
     mainPipeRolls: number;
@@ -145,12 +170,12 @@ export interface CalculationResults {
         main: number;
     };
     pumpHeadRequired: number;
-    pressureFromSprinkler?: number; // เพิ่ม field ใหม่ - แรงดันจากสปริงเกอร์
+    pressureFromSprinkler?: number;
     safetyFactor: number;
     adjustedFlow: number;
     velocityWarnings: string[];
-    hasValidSecondaryPipe?: boolean; // เพิ่ม field ใหม่ - สถานะท่อรอง
-    hasValidMainPipe?: boolean; // เพิ่ม field ใหม่ - สถานะท่อหลัก
+    hasValidSecondaryPipe?: boolean;
+    hasValidMainPipe?: boolean;
 }
 
 export interface QuotationData {
@@ -161,7 +186,6 @@ export interface QuotationData {
 }
 
 export interface QuotationDataCustomer {
-    // code: string;
     name: string;
     address1: string;
     address2: string;

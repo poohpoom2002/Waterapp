@@ -1,814 +1,364 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
-import {
-    MapContainer,
-    TileLayer,
-    FeatureGroup,
-    LayersControl,
-    useMap,
-    Polygon,
-    Marker,
-    Polyline,
-    Circle,
-} from 'react-leaflet';
-import { EditControl } from 'react-leaflet-draw';
-import 'leaflet/dist/leaflet.css';
-import 'leaflet-draw/dist/leaflet.draw.css';
-import L from 'leaflet';
-import { useLanguage } from '../contexts/LanguageContext';
-import LanguageSwitcher from '../components/LanguageSwitcher';
-import Footer from '../components/Footer';
+// resources/js/pages/home-garden-planner.tsx - Enhanced with pipe editing and Google Map fixes
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { router } from '@inertiajs/react';
+
+import GoogleMapDesigner from '../components/homegarden/GoogleMapDesigner';
+import CanvasDesigner from '../components/homegarden/CanvasDesigner';
+import ImageDesigner from '../components/homegarden/ImageDesigner';
 import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 
-interface Coordinate {
-    lat: number;
-    lng: number;
-}
+import {
+    Coordinate,
+    CanvasCoordinate,
+    GardenZone,
+    SprinklerType,
+    Sprinkler,
+    WaterSource,
+    Pipe,
+    GardenPlannerData,
+    ZONE_TYPES,
+    SPRINKLER_TYPES,
+    DEFAULT_CENTER,
+    CANVAS_DEFAULT_WIDTH,
+    CANVAS_DEFAULT_HEIGHT,
+    CANVAS_DEFAULT_SCALE,
+    CANVAS_GRID_SIZE,
+    isPointInPolygon,
+    calculateDistance,
+    calculatePolygonArea,
+    formatDistance,
+    formatArea,
+    saveGardenData,
+    loadGardenData,
+    clearGardenData,
+    createInitialData,
+    validateGardenData,
+    canvasToGPS,
+    getValidScale,
+    generateSmartPipeNetwork,
+    addCustomPipe,
+    removePipeById,
+    findPipesBetweenSprinklers,
+} from '../utils/homeGardenData';
 
-interface GardenZone {
-    id: string;
-    type: 'grass' | 'flowers' | 'trees' | 'forbidden';
-    coordinates: Coordinate[];
-    name: string;
-    sprinklerConfig?: {
-        type: string;
-        radius: number;
-    };
-    parentZoneId?: string;
-}
-
-interface SprinklerType {
-    id: string;
-    name: string;
-    icon: string;
-    radius: number;
-    suitableFor: string[];
-    color: string;
-}
-
-interface Sprinkler {
-    id: string;
-    position: Coordinate;
-    type: SprinklerType;
-    zoneId: string;
-    orientation?: number;
-}
-
-interface WaterSource {
-    id: string;
-    position: Coordinate;
-    type: 'main' | 'pump';
-}
-
-interface Pipe {
-    id: string;
-    start: Coordinate;
-    end: Coordinate;
-    type: 'main' | 'lateral' | 'submain';
-    length: number;
-    connectedSprinklers?: string[];
-    zoneId?: string;
-}
-
-interface MainPipe {
-    id: string;
-    points: Coordinate[];
-    totalLength: number;
-}
-
-interface SprinklerRow {
-    id: string;
-    sprinklers: Sprinkler[];
-    connectionPoint: Coordinate;
-    direction: 'horizontal' | 'vertical';
-    zoneId: string;
-}
-
-interface SearchResult {
-    place_id: string;
-    display_name: string;
-    lat: string;
-    lon: string;
-    type: string;
-}
-
-const DEFAULT_CENTER: [number, number] = [13.5799071, 100.8325833];
-
-const SPRINKLER_TYPES: SprinklerType[] = [
-    {
-        id: 'popup',
-        name: 'Pop-up Sprinkler',
-        icon: '🟢',
-        radius: 4,
-        suitableFor: ['grass'],
-        color: '#33CCFF',
-    },
-    {
-        id: 'spray',
-        name: 'Spray Sprinkler',
-        icon: '🔴',
-        radius: 3,
-        suitableFor: ['flowers'],
-        color: '#33CCFF',
-    },
-    {
-        id: 'drip',
-        name: 'Drip Irrigation',
-        icon: '🟤',
-        radius: 2,
-        suitableFor: ['trees', 'flowers'],
-        color: '#33CCFF',
-    },
-    {
-        id: 'rotary',
-        name: 'Rotary Sprinkler',
-        icon: '🟢',
-        radius: 8,
-        suitableFor: ['grass', 'trees'],
-        color: '#33CCFF',
-    },
-];
-
-const ZONE_TYPES = [
-    { id: 'grass', name: 'สนามหญ้า', color: '#22C55E', icon: '🌱' },
-    { id: 'flowers', name: 'แปลงดอกไม้', color: '#EC4899', icon: '🌸' },
-    { id: 'trees', name: 'ต้นไม้', color: '#059669', icon: '🌳' },
-    { id: 'forbidden', name: 'พื้นที่ต้องห้าม', color: '#EF4444', icon: '🚫' },
-];
-
-function isPointInPolygon(point: Coordinate, polygon: Coordinate[]): boolean {
-    if (polygon.length < 3) return false;
-
-    let inside = false;
-    const x = point.lng;
-    const y = point.lat;
-
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const xi = polygon[i].lng;
-        const yi = polygon[i].lat;
-        const xj = polygon[j].lng;
-        const yj = polygon[j].lat;
-
-        if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
-            inside = !inside;
-        }
-    }
-    return inside;
-}
-
-function calculateDistance(p1: Coordinate, p2: Coordinate): number {
-    const R = 6371000; // รัศมีโลกเป็นเมตร
-    const dLat = ((p2.lat - p1.lat) * Math.PI) / 180;
-    const dLng = ((p2.lng - p1.lng) * Math.PI) / 180;
-    const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos((p1.lat * Math.PI) / 180) *
-            Math.cos((p2.lat * Math.PI) / 180) *
-            Math.sin(dLng / 2) *
-            Math.sin(dLng / 2);
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function calculatePolygonArea(coordinates: Coordinate[]): number {
-    if (coordinates.length < 3) return 0;
-    let area = 0;
-    for (let i = 0; i < coordinates.length; i++) {
-        const j = (i + 1) % coordinates.length;
-        area += coordinates[i].lat * coordinates[j].lng;
-        area -= coordinates[j].lat * coordinates[i].lng;
-    }
-    area = Math.abs(area) / 2;
-    return area * 111000 * 111000 * Math.cos((coordinates[0].lat * Math.PI) / 180);
-}
-
-function formatDistance(meters: number): string {
-    if (meters >= 1000) return `${(meters / 1000).toFixed(2)} กม.`;
-    return `${meters.toFixed(1)} ม.`;
-}
-
-function formatArea(sqMeters: number): string {
-    if (sqMeters >= 1600) {
-        return `${(sqMeters / 1600).toFixed(2)} ไร่`;
-    }
-    return `${sqMeters.toFixed(1)} ตร.ม.`;
-}
-
-function isCornerSprinkler(sprinklerPosition: Coordinate, zoneCoordinates: Coordinate[]): boolean {
-    const tolerance = 0.00008;
-
-    return zoneCoordinates.some((corner) => {
-        const distance = calculateDistance(sprinklerPosition, corner);
-        return distance < tolerance * 111000;
-    });
-}
-
-// ประเภทสำหรับผลลัพธ์การตัด
-type ClipResult = Coordinate[] | 'FULL_CIRCLE';
-
-// ฟังก์ชันใหม่สำหรับการตัด polygon
-function clipCircleToPolygon(
-    center: Coordinate,
-    radius: number,
-    polygon: Coordinate[]
-): ClipResult {
-    const numPoints = 72;
-    const latRadians = (center.lat * Math.PI) / 180;
-    const metersPerDegreeLat =
-        111132.92 - 559.82 * Math.cos(2 * latRadians) + 1.175 * Math.cos(4 * latRadians);
-    const metersPerDegreeLng = 111412.84 * Math.cos(latRadians) - 93.5 * Math.cos(3 * latRadians);
-
-    const radiusInDegreesLat = radius / metersPerDegreeLat;
-    const radiusInDegreesLng = radius / metersPerDegreeLng;
-
-    // สร้างจุดของวงกลม
-    const circlePoints: Coordinate[] = [];
-    for (let i = 0; i < numPoints; i++) {
-        const angle = (i * 2 * Math.PI) / numPoints;
-        const pointLat = center.lat + Math.sin(angle) * radiusInDegreesLat;
-        const pointLng = center.lng + Math.cos(angle) * radiusInDegreesLng;
-        circlePoints.push({ lat: pointLat, lng: pointLng });
-    }
-
-    // ตรวจสอบว่าวงกลมอยู่ในโซนทั้งหมดหรือไม่
-    const pointsInZone = circlePoints.filter((point) => isPointInPolygon(point, polygon));
-
-    // ถ้าจุดเกือบทั้งหมดอยู่ในโซน ให้แสดงวงกลมเต็ม
-    if (pointsInZone.length >= numPoints * 0.95) {
-        return 'FULL_CIRCLE';
-    }
-
-    // ถ้าไม่มีจุดใดอยู่ในโซน ไม่แสดงอะไร
-    if (pointsInZone.length === 0) {
-        return [];
-    }
-
-    // สร้าง clipped polygon โดยใช้ Sutherland-Hodgman algorithm
-    let clippedPolygon = [...circlePoints];
-
-    // ตัดแต่ละขอบของโซน
-    for (let i = 0; i < polygon.length; i++) {
-        const edgeStart = polygon[i];
-        const edgeEnd = polygon[(i + 1) % polygon.length];
-
-        clippedPolygon = clipPolygonByEdge(clippedPolygon, edgeStart, edgeEnd);
-
-        if (clippedPolygon.length === 0) {
-            break;
-        }
-    }
-
-    // กรองจุดที่ซ้ำกัน
-    const uniquePoints = clippedPolygon.filter((point, index, arr) => {
-        for (let i = 0; i < index; i++) {
-            if (
-                Math.abs(arr[i].lat - point.lat) < 1e-8 &&
-                Math.abs(arr[i].lng - point.lng) < 1e-8
-            ) {
-                return false;
-            }
-        }
-        return true;
-    });
-
-    return uniquePoints.length >= 3 ? uniquePoints : [];
-}
-
-// Sutherland-Hodgman clipping algorithm
-function clipPolygonByEdge(
-    inputPolygon: Coordinate[],
-    edgeStart: Coordinate,
-    edgeEnd: Coordinate
-): Coordinate[] {
-    if (inputPolygon.length === 0) return [];
-
-    const outputPolygon: Coordinate[] = [];
-
-    for (let i = 0; i < inputPolygon.length; i++) {
-        const currentVertex = inputPolygon[i];
-        const previousVertex = inputPolygon[i === 0 ? inputPolygon.length - 1 : i - 1];
-
-        const currentInside = isPointInsideEdge(currentVertex, edgeStart, edgeEnd);
-        const previousInside = isPointInsideEdge(previousVertex, edgeStart, edgeEnd);
-
-        if (currentInside) {
-            if (!previousInside) {
-                // เข้าสู่พื้นที่ - หาจุดตัด
-                const intersection = getLineIntersection(
-                    previousVertex,
-                    currentVertex,
-                    edgeStart,
-                    edgeEnd
-                );
-                if (intersection) {
-                    outputPolygon.push(intersection);
-                }
-            }
-            outputPolygon.push(currentVertex);
-        } else if (previousInside) {
-            // ออกจากพื้นที่ - หาจุดตัด
-            const intersection = getLineIntersection(
-                previousVertex,
-                currentVertex,
-                edgeStart,
-                edgeEnd
-            );
-            if (intersection) {
-                outputPolygon.push(intersection);
-            }
-        }
-    }
-
-    return outputPolygon;
-}
-
-// ตรวจสอบว่าจุดอยู่ด้านในของขอบหรือไม่ (ใช้ cross product)
-function isPointInsideEdge(point: Coordinate, edgeStart: Coordinate, edgeEnd: Coordinate): boolean {
-    const crossProduct =
-        (edgeEnd.lng - edgeStart.lng) * (point.lat - edgeStart.lat) -
-        (edgeEnd.lat - edgeStart.lat) * (point.lng - edgeStart.lng);
-    return crossProduct >= 0;
-}
-
-function getLineIntersection(
-    p1: Coordinate,
-    p2: Coordinate,
-    p3: Coordinate,
-    p4: Coordinate
-): Coordinate | null {
-    const x1 = p1.lng,
-        y1 = p1.lat;
-    const x2 = p2.lng,
-        y2 = p2.lat;
-    const x3 = p3.lng,
-        y3 = p3.lat;
-    const x4 = p4.lng,
-        y4 = p4.lat;
-
-    const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-    if (Math.abs(denom) < 1e-10) return null;
-
-    const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
-    const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
-
-    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
-        return {
-            lat: y1 + t * (y2 - y1),
-            lng: x1 + t * (x2 - x1),
-        };
-    }
-
-    return null;
-}
-
-const ClippedSprinklerRadius: React.FC<{
-    center: Coordinate;
-    radius: number;
-    zoneCoordinates: Coordinate[];
-    color: string;
-    isCornerSprinkler: boolean;
-}> = ({ center, radius, zoneCoordinates, color, isCornerSprinkler }) => {
-    const createClippedCircle = useCallback((): ClipResult => {
-        // ใช้ฟังก์ชันใหม่ที่แก้ไขแล้ว
-        return clipCircleToPolygon(center, radius, zoneCoordinates);
-    }, [center, radius, zoneCoordinates]);
-
-    const result = createClippedCircle();
-
-    if (Array.isArray(result) && result.length === 0) {
-        return null;
-    }
-
-    if (result === 'FULL_CIRCLE') {
-        return (
-            <Circle
-                center={[center.lat, center.lng]}
-                radius={radius}
-                pathOptions={{
-                    color: color,
-                    fillColor: color,
-                    fillOpacity: 0.15,
-                    weight: 1,
-                    opacity: 0.5,
-                }}
-            />
-        );
-    }
-
-    if (Array.isArray(result) && result.length >= 3) {
-        return (
-            <Polygon
-                positions={result.map((p) => [p.lat, p.lng])}
-                pathOptions={{
-                    color: color,
-                    fillColor: color,
-                    fillOpacity: 0.15,
-                    weight: 1,
-                    opacity: 0.5,
-                }}
-            />
-        );
-    }
-
-    return null;
-};
-
-const MapController: React.FC<{ center: [number, number]; zoom?: number }> = ({ center, zoom }) => {
-    const map = useMap();
-
-    useEffect(() => {
-        if (map && center) {
-            map.flyTo(center, zoom || map.getZoom(), {
-                animate: false,
-                duration: 0.1,
-            });
-
-            setTimeout(() => {
-                map.invalidateSize();
-            }, 100);
-        }
-    }, [center, map, zoom]);
-
-    return null;
-};
-
-const MapSearchBox: React.FC<{
-    searchQuery: string;
-    searchResults: SearchResult[];
-    isSearching: boolean;
-    showSearchResults: boolean;
-    onSearchChange: (value: string) => void;
-    onResultClick: (result: SearchResult) => void;
-    onClear: () => void;
-}> = ({
-    searchQuery,
-    searchResults,
-    isSearching,
-    showSearchResults,
-    onSearchChange,
-    onResultClick,
-    onClear,
-}) => {
-    return (
-        <div className="absolute left-14 top-4 z-[1000] w-[380px] max-w-[calc(100vw-2rem)] rounded-lg border border-gray-600 bg-gray-800/95 shadow-xl backdrop-blur">
-            <div className="relative">
-                <input
-                    type="text"
-                    placeholder="🔍 ค้นหาสถานที่... (เช่น ถนน, ตำบล, อำเภอ, จังหวัด)"
-                    value={searchQuery}
-                    onChange={(e) => onSearchChange(e.target.value)}
-                    className="w-full rounded-lg border border-gray-600 bg-gray-800/95 px-4 py-3 pr-10 text-sm text-white placeholder-gray-400 shadow-xl backdrop-blur focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                {searchQuery && (
-                    <button
-                        onClick={onClear}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 transform text-gray-400 transition-colors hover:text-white"
-                    >
-                        ✕
-                    </button>
-                )}
-                {isSearching && (
-                    <div className="absolute right-10 top-1/2 -translate-y-1/2 transform">
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
-                    </div>
-                )}
-            </div>
-
-            {showSearchResults && searchResults.length > 0 && (
-                <div className="mt-1 max-h-60 overflow-y-auto rounded-lg border border-gray-600 bg-gray-800/95 shadow-xl backdrop-blur">
-                    {searchResults.map((result) => (
-                        <button
-                            key={result.place_id}
-                            onClick={() => onResultClick(result)}
-                            className="w-full border-b border-gray-700 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-gray-700/70"
-                        >
-                            <div className="text-sm font-medium text-white">
-                                {result.display_name.split(',')[0]}
-                            </div>
-                            <div className="truncate text-xs text-gray-400">
-                                {result.display_name}
-                            </div>
-                            <div className="mt-1 text-xs text-blue-400">
-                                📍 {result.type} • คลิกเพื่อไปยังตำแหน่ง
-                            </div>
-                        </button>
-                    ))}
-                </div>
-            )}
-
-            {showSearchResults &&
-                searchResults.length === 0 &&
-                !isSearching &&
-                searchQuery.length >= 3 && (
-                    <div className="mt-1 rounded-lg border border-gray-600 bg-gray-800/95 shadow-xl backdrop-blur">
-                        <div className="px-4 py-3 text-sm text-gray-400">
-                            ไม่พบผลการค้นหาสำหรับ "{searchQuery}"
-                        </div>
-                    </div>
-                )}
-        </div>
-    );
-};
-
-const StaticMapOverview: React.FC<{
+interface HistoryState {
     gardenZones: GardenZone[];
     sprinklers: Sprinkler[];
     waterSource: WaterSource | null;
     pipes: Pipe[];
-    mainPipe: MainPipe | null;
-}> = ({ gardenZones, sprinklers, waterSource, pipes, mainPipe }) => {
-    const calculateMapBounds = useCallback(() => {
-        const allPoints: Coordinate[] = [];
+    timestamp: number;
+}
 
-        gardenZones.forEach((zone) => {
-            allPoints.push(...zone.coordinates);
-        });
-
-        sprinklers.forEach((sprinkler) => {
-            allPoints.push(sprinkler.position);
-        });
-
-        if (waterSource) {
-            allPoints.push(waterSource.position);
-        }
-
-        if (mainPipe) {
-            allPoints.push(...mainPipe.points);
-        }
-
-        if (allPoints.length === 0) {
-            return { center: DEFAULT_CENTER, zoom: 18 };
-        }
-
-        const lats = allPoints.map((p) => p.lat);
-        const lngs = allPoints.map((p) => p.lng);
-        const minLat = Math.min(...lats);
-        const maxLat = Math.max(...lats);
-        const minLng = Math.min(...lngs);
-        const maxLng = Math.max(...lngs);
-
-        const latDiff = maxLat - minLat;
-        const lngDiff = maxLng - minLng;
-
-        let latPadding, lngPadding;
-        if (latDiff < 0.0001 && lngDiff < 0.0001) {
-            latPadding = 0.0005;
-            lngPadding = 0.0005;
-        } else if (latDiff < 0.001 && lngDiff < 0.001) {
-            latPadding = Math.max(latDiff * 0.3, 0.0002);
-            lngPadding = Math.max(lngDiff * 0.3, 0.0002);
-        } else {
-            latPadding = latDiff * 0.2;
-            lngPadding = lngDiff * 0.2;
-        }
-
-        const center: [number, number] = [(minLat + maxLat) / 2, (minLng + maxLng) / 2];
-
-        const paddedLatDiff = latDiff + latPadding * 2;
-        const paddedLngDiff = lngDiff + lngPadding * 2;
-        const maxDiff = Math.max(paddedLatDiff, paddedLngDiff);
-
-        let zoom = 17;
-        if (maxDiff > 0.05) zoom = 18;
-        else if (maxDiff > 0.02) zoom = 19;
-        else if (maxDiff > 0.01) zoom = 20;
-        else if (maxDiff > 0.005) zoom = 21;
-        else if (maxDiff > 0.002) zoom = 22;
-        else if (maxDiff > 0.001) zoom = 23;
-        else if (maxDiff > 0.0005) zoom = 24;
-        else zoom = 25;
-
-        return { center, zoom };
-    }, [gardenZones, sprinklers, waterSource, mainPipe]);
-
-    const { center, zoom } = calculateMapBounds();
-
-    const createStaticSprinklerIcon = (sprinkler: SprinklerType, orientation?: number) => {
-        const rotationStyle = orientation ? `transform: rotate(${orientation}deg);` : '';
-        return L.divIcon({
-            html: `<div class="flex items-center justify-center w-5 h-5 rounded-full shadow-md text-sm" style="border-color: ${sprinkler.color}; ${rotationStyle}">${sprinkler.icon}</div>`,
-            className: '',
-            iconSize: [20, 20],
-            iconAnchor: [10, 10],
-        });
-    };
-
-    const createStaticWaterSourceIcon = (type: 'main' | 'pump') =>
-        L.divIcon({
-            html: `<div class="flex items-center justify-center w-6 h-6 ${type === 'pump' ? 'bg-red-500' : 'bg-blue-600'} border-2 border-white rounded-full shadow-md text-white text-sm font-bold">${type === 'pump' ? '⚡' : '🚰'}</div>`,
-            className: '',
-            iconSize: [20, 20],
-            iconAnchor: [10, 10],
-        });
-
-    const sortedZones = [...gardenZones].sort((a, b) => {
-        if (a.parentZoneId && !b.parentZoneId) return 1;
-        if (!a.parentZoneId && b.parentZoneId) return -1;
-        return 0;
-    });
+const ModeSelection: React.FC<{
+    onSelectMode: (mode: 'map' | 'canvas' | 'image') => void;
+}> = ({ onSelectMode }) => {
+    const modes = [
+        {
+            id: 'map',
+            icon: '🗺️',
+            title: 'Google Map',
+            desc: 'ใช้แผนที่ดาวเทียมเพื่อดูพื้นที่จริงของบ้านคุณ',
+            features: ['เห็นพื้นที่จริงจากดาวเทียม', 'วัดระยะทางแม่นยำ', 'ค้นหาตำแหน่งได้ง่าย'],
+            color: 'blue',
+        },
+        {
+            id: 'canvas',
+            icon: '✏️',
+            title: 'วาดเอง',
+            desc: 'วาดแผนผังบ้านด้วยตัวเอง มีเครื่องมือช่วยวาด ตาราง และไม้บรรทัด',
+            features: [
+                'ไม่ต้องใช้อินเทอร์เน็ต',
+                'มีตารางและไม้บรรทัดช่วย',
+                'วาดได้อิสระตามต้องการ',
+            ],
+            color: 'green',
+        },
+        {
+            id: 'image',
+            icon: '🖼️',
+            title: 'ใช้รูปแบบแปลน',
+            desc: 'อัปโหลดรูปแบบแปลนบ้านที่มีอยู่แล้ว และวางระบบน้ำบนรูป',
+            features: ['ใช้แบบแปลนที่มีอยู่แล้ว', 'วางระบบบนรูปได้ทันที', 'รองรับไฟล์ JPG, PNG'],
+            color: 'purple',
+        },
+    ];
 
     return (
-        <div className="h-[55vh] w-full overflow-hidden rounded-xl border-2 border-gray-600 shadow-xl">
-            <MapContainer
-                center={center}
-                zoom={zoom}
-                scrollWheelZoom={false}
-                dragging={false}
-                touchZoom={false}
-                doubleClickZoom={false}
-                zoomControl={false}
-                attributionControl={false}
-                style={{ height: '100%', width: '100%' }}
-                key={`${center[0]}-${center[1]}-${zoom}`}
-            >
-                <MapController center={center} zoom={zoom} />
-                <TileLayer
-                    url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
-                    attribution=""
-                    maxNativeZoom={22}
-                    maxZoom={22}
-                />
+        <div className="flex min-h-screen w-full items-center justify-center bg-gray-900 p-6">
+            <div className="w-full max-w-4xl">
+                <h1 className="mb-8 text-center text-3xl font-bold text-white">
+                    🏡 เลือกวิธีการออกแบบระบบน้ำ
+                </h1>
 
-                {sortedZones.map((zone) => {
-                    const zoneType = ZONE_TYPES.find((z) => z.id === zone.type);
-                    const isNestedZone = !!zone.parentZoneId;
-                    return (
-                        <Polygon
-                            key={zone.id}
-                            positions={zone.coordinates.map((c) => [c.lat, c.lng])}
-                            pathOptions={{
-                                color: zoneType?.color || '#666',
-                                fillColor: zoneType?.color || '#666',
-                                fillOpacity:
-                                    zone.type === 'forbidden' ? 0.6 : isNestedZone ? 0.7 : 0.1,
-                                weight: isNestedZone ? 3 : 2,
-                                dashArray:
-                                    zone.type === 'forbidden'
-                                        ? '8,8'
-                                        : isNestedZone
-                                          ? '5,5'
-                                          : undefined,
-                            }}
-                        />
-                    );
-                })}
-
-                {mainPipe && (
-                    <Polyline
-                        positions={mainPipe.points.map((p) => [p.lat, p.lng])}
-                        pathOptions={{
-                            color: '#3B82F6',
-                            weight: 6,
-                            opacity: 0.9,
-                        }}
-                    />
-                )}
-
-                {pipes
-                    .filter((p) => p.type === 'submain')
-                    .map((pipe) => (
-                        <Polyline
-                            key={pipe.id}
-                            positions={[
-                                [pipe.start.lat, pipe.start.lng],
-                                [pipe.end.lat, pipe.end.lng],
-                            ]}
-                            pathOptions={{
-                                color: '#8B5CF6',
-                                weight: 4,
-                                opacity: 0.8,
-                            }}
-                        />
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                    {modes.map((mode) => (
+                        <div
+                            key={mode.id}
+                            onClick={() => onSelectMode(mode.id as any)}
+                            className={`cursor-pointer rounded-xl border-2 border-transparent bg-gray-800 p-6 transition-all hover:scale-105 hover:border-${mode.color}-500 hover:bg-gray-700`}
+                        >
+                            <div className="mb-4 text-center">
+                                <div className="mb-3 text-5xl">{mode.icon}</div>
+                                <h3 className="mb-2 text-xl font-semibold text-white">
+                                    {mode.title}
+                                </h3>
+                            </div>
+                            <p className="text-sm text-gray-300">{mode.desc}</p>
+                            <ul className="mt-4 space-y-1 text-xs text-gray-400">
+                                {mode.features.map((feature, i) => (
+                                    <li key={i}>✓ {feature}</li>
+                                ))}
+                            </ul>
+                        </div>
                     ))}
+                </div>
 
-                {pipes
-                    .filter((p) => p.type === 'lateral')
-                    .map((pipe) => (
-                        <Polyline
-                            key={pipe.id}
-                            positions={[
-                                [pipe.start.lat, pipe.start.lng],
-                                [pipe.end.lat, pipe.end.lng],
-                            ]}
-                            pathOptions={{
-                                color: '#FFFF00',
-                                weight: 2,
-                                opacity: 0.7,
-                            }}
-                        />
-                    ))}
-
-                {sprinklers.map((sprinkler) => {
-                    const zone = gardenZones.find((z) => z.id === sprinkler.zoneId);
-                    const isCorner = zone
-                        ? isCornerSprinkler(sprinkler.position, zone.coordinates)
-                        : false;
-
-                    return (
-                        <React.Fragment key={sprinkler.id}>
-                            {zone && (
-                                <ClippedSprinklerRadius
-                                    center={sprinkler.position}
-                                    radius={sprinkler.type.radius}
-                                    zoneCoordinates={zone.coordinates}
-                                    color={sprinkler.type.color}
-                                    isCornerSprinkler={isCorner}
-                                />
-                            )}
-                            <Marker
-                                position={[sprinkler.position.lat, sprinkler.position.lng]}
-                                icon={createStaticSprinklerIcon(
-                                    sprinkler.type,
-                                    sprinkler.orientation
-                                )}
-                            />
-                        </React.Fragment>
-                    );
-                })}
-
-                {waterSource && (
-                    <Marker
-                        position={[waterSource.position.lat, waterSource.position.lng]}
-                        icon={createStaticWaterSourceIcon(waterSource.type)}
-                    />
-                )}
-            </MapContainer>
+                <div className="mt-8 text-center text-sm text-gray-400">
+                    เลือกวิธีที่เหมาะสมกับคุณ • ข้อมูลทั้งหมดจะถูกบันทึกอัตโนมัติ
+                </div>
+            </div>
         </div>
     );
 };
 
-const createSprinklerIcon = (
-    sprinkler: SprinklerType,
-    isSelected: boolean = false,
-    orientation?: number
-) => {
-    const selectedClass = isSelected ? 'ring-4 ring-yellow-400 ring-opacity-80' : '';
-    const rotationStyle = orientation ? `transform: rotate(${orientation}deg);` : '';
-    return L.divIcon({
-        html: `<div class="flex items-center justify-center w-5 h-5 rounded-full ${selectedClass} shadow-lg text-lg transform transition-all duration-200 ${isSelected ? 'scale-110' : ''}" style="border-color: ${sprinkler.color}; ${rotationStyle}">${sprinkler.icon}</div>`,
-        className: '',
-        iconSize: [20, 20],
-        iconAnchor: [10, 10],
-    });
-};
-
-const createWaterSourceIcon = (type: 'main' | 'pump') =>
-    L.divIcon({
-        html: `<div class="flex items-center justify-center w-10 h-10 ${type === 'pump' ? 'bg-red-500' : 'bg-blue-600'} border-2 border-white rounded-full shadow-xl text-white text-xl font-bold">${type === 'pump' ? '⚡' : '🚰'}</div>`,
-        className: '',
-        iconSize: [40, 40],
-        iconAnchor: [20, 20],
-    });
-
-export default function AdvancedGardenPlanner() {
-    const [activeTab, setActiveTab] = useState<'zones' | 'sprinklers' | 'pipes' | 'summary'>(
-        'zones'
-    );
+export default function HomeGardenPlanner() {
+    const [designMode, setDesignMode] = useState<'map' | 'canvas' | 'image' | null>(null);
+    const [activeTab, setActiveTab] = useState<'zones' | 'sprinklers' | 'pipes'>('zones');
     const [mapCenter, setMapCenter] = useState<[number, number]>(DEFAULT_CENTER);
     const [selectedZoneType, setSelectedZoneType] = useState<string>('grass');
     const [selectedZoneForConfig, setSelectedZoneForConfig] = useState<string | null>(null);
-    const [selectedPipes, setSelectedPipes] = useState<Set<string>>(new Set());
-    const [manualPipeMode, setManualPipeMode] = useState<
-        'select-pipes' | 'connect-sprinklers' | null
-    >(null);
-    const [selectedSprinklersForPipe, setSelectedSprinklersForPipe] = useState<string[]>([]);
     const [editMode, setEditMode] = useState<
-        'draw' | 'place' | 'edit' | 'auto-place' | 'drag-sprinkler' | 'main-pipe' | 'lateral-pipe'
-    >('draw');
+        'draw' | 'place' | 'edit' | 'auto-place' | 'drag-sprinkler' | 'view' | 'edit-pipe' | ''
+    >('view');
 
     const [gardenZones, setGardenZones] = useState<GardenZone[]>([]);
     const [sprinklers, setSprinklers] = useState<Sprinkler[]>([]);
     const [waterSource, setWaterSource] = useState<WaterSource | null>(null);
     const [pipes, setPipes] = useState<Pipe[]>([]);
-    const [mainPipe, setMainPipe] = useState<MainPipe | null>(null);
     const [selectedSprinkler, setSelectedSprinkler] = useState<string | null>(null);
-    const [draggedSprinkler, setDraggedSprinkler] = useState<string | null>(null);
-    const [mainPipeDrawing, setMainPipeDrawing] = useState<Coordinate[]>([]);
+    const [selectedPipes, setSelectedPipes] = useState<Set<string>>(new Set());
 
-    const [manualSprinklerType, setManualSprinklerType] = useState<string>('popup');
+    // New state for pipe editing
+    const [pipeEditMode, setPipeEditMode] = useState<'add' | 'remove' | 'view'>('view');
+    const [selectedSprinklersForPipe, setSelectedSprinklersForPipe] = useState<string[]>([]);
+
+    const [manualSprinklerType, setManualSprinklerType] = useState<string>('pop-up-sprinkler');
     const [manualSprinklerRadius, setManualSprinklerRadius] = useState<number>(4);
 
-    const [searchQuery, setSearchQuery] = useState<string>('');
-    const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-    const [isSearching, setIsSearching] = useState<boolean>(false);
-    const [showSearchResults, setShowSearchResults] = useState<boolean>(false);
+    const [showValidationErrors, setShowValidationErrors] = useState<boolean>(false);
+    const [validationErrors, setValidationErrors] = useState<string[]>([]);
+    const [history, setHistory] = useState<HistoryState[]>([]);
+    const [historyIndex, setHistoryIndex] = useState(-1);
+    const [isRestoringFromHistory, setIsRestoringFromHistory] = useState(false);
 
-    const featureGroupRef = useRef<L.FeatureGroup>(null);
-    const mapRef = useRef<L.Map>(null);
-    const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const [imageData, setImageData] = useState<any>(null);
+    const [canvasData, setCanvasData] = useState({
+        width: CANVAS_DEFAULT_WIDTH,
+        height: CANVAS_DEFAULT_HEIGHT,
+        scale: CANVAS_DEFAULT_SCALE,
+        gridSize: CANVAS_GRID_SIZE,
+    });
 
-    const updateSprinklerOrientation = useCallback((sprinklerId: string, orientation: number) => {
-        setSprinklers((prev) =>
-            prev.map((s) => (s.id === sprinklerId ? { ...s, orientation } : s))
-        );
+    // Loading and error states for pipe generation
+    const [isGeneratingPipes, setIsGeneratingPipes] = useState(false);
+    const [pipeGenerationError, setPipeGenerationError] = useState<string | null>(null);
+
+    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    const currentScale = useMemo(() => {
+        const currentData: GardenPlannerData = {
+            gardenZones,
+            sprinklers,
+            waterSource,
+            pipes,
+            designMode,
+            imageData,
+            canvasData,
+        };
+        return getValidScale(currentData);
+    }, [gardenZones, sprinklers, waterSource, pipes, designMode, imageData, canvasData]);
+
+    const calculateZoneArea = useCallback(
+        (zone: GardenZone): number => {
+            const coords = zone.canvasCoordinates || zone.coordinates;
+            if (!coords || coords.length < 3) return 0;
+            const scale = zone.canvasCoordinates ? currentScale : undefined;
+            return calculatePolygonArea(coords, scale);
+        },
+        [currentScale]
+    );
+
+    const createSnapshot = useCallback((): HistoryState => {
+        return {
+            gardenZones: JSON.parse(JSON.stringify(gardenZones)),
+            sprinklers: JSON.parse(JSON.stringify(sprinklers)),
+            waterSource: waterSource ? JSON.parse(JSON.stringify(waterSource)) : null,
+            pipes: JSON.parse(JSON.stringify(pipes)),
+            timestamp: Date.now(),
+        };
+    }, [gardenZones, sprinklers, waterSource, pipes]);
+
+    const saveToHistory = useCallback(() => {
+        if (isRestoringFromHistory) return;
+
+        const newSnapshot = createSnapshot();
+
+        setHistory((prev) => {
+            const newHistory = prev.slice(0, historyIndex + 1);
+            newHistory.push(newSnapshot);
+
+            if (newHistory.length > 50) {
+                newHistory.shift();
+                return newHistory;
+            }
+
+            return newHistory;
+        });
+
+        setHistoryIndex((prev) => Math.min(prev + 1, 49));
+    }, [createSnapshot, historyIndex, isRestoringFromHistory]);
+
+    const handleUndo = useCallback(() => {
+        if (historyIndex <= 0) return;
+
+        const targetIndex = historyIndex - 1;
+        const targetState = history[targetIndex];
+
+        if (targetState) {
+            setIsRestoringFromHistory(true);
+
+            setGardenZones(targetState.gardenZones);
+            setSprinklers(targetState.sprinklers);
+            setWaterSource(targetState.waterSource);
+            setPipes(targetState.pipes);
+
+            setHistoryIndex(targetIndex);
+
+            setTimeout(() => setIsRestoringFromHistory(false), 100);
+        }
+    }, [history, historyIndex]);
+
+    const handleRedo = useCallback(() => {
+        if (historyIndex >= history.length - 1) return;
+
+        const targetIndex = historyIndex + 1;
+        const targetState = history[targetIndex];
+
+        if (targetState) {
+            setIsRestoringFromHistory(true);
+
+            setGardenZones(targetState.gardenZones);
+            setSprinklers(targetState.sprinklers);
+            setWaterSource(targetState.waterSource);
+            setPipes(targetState.pipes);
+
+            setHistoryIndex(targetIndex);
+
+            setTimeout(() => setIsRestoringFromHistory(false), 100);
+        }
+    }, [history, historyIndex]);
+
+    const initializeHistory = useCallback(() => {
+        const initialSnapshot = createSnapshot();
+        setHistory([initialSnapshot]);
+        setHistoryIndex(0);
+    }, [createSnapshot]);
+
+    useEffect(() => {
+        if (isRestoringFromHistory) return;
+
+        if (gardenZones.length > 0 || sprinklers.length > 0 || waterSource || pipes.length > 0) {
+            const timeoutId = setTimeout(saveToHistory, 300);
+            return () => clearTimeout(timeoutId);
+        }
+    }, [gardenZones, sprinklers, waterSource, pipes, saveToHistory, isRestoringFromHistory]);
+
+    useEffect(() => {
+        initializeHistory();
+    }, []);
+
+    const UndoRedoButtons = () => (
+        <div className="flex items-center gap-1 rounded-lg bg-gray-800 p-1">
+            <button
+                onClick={handleUndo}
+                disabled={historyIndex <= 0}
+                className="flex items-center gap-1 rounded px-3 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:text-gray-500 disabled:hover:bg-transparent"
+                title={`Undo (${historyIndex}/${history.length})`}
+            >
+                <span className="text-base">↶</span>
+                <span>Undo</span>
+            </button>
+            <div className="h-4 w-px bg-gray-600"></div>
+            <button
+                onClick={handleRedo}
+                disabled={historyIndex >= history.length - 1}
+                className="flex items-center gap-1 rounded px-3 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:text-gray-500 disabled:hover:bg-transparent"
+                title={`Redo (${historyIndex + 1}/${history.length})`}
+            >
+                <span className="text-base">↷</span>
+                <span>Redo</span>
+            </button>
+        </div>
+    );
+
+    useEffect(() => {
+        const savedData = loadGardenData();
+        if (savedData && savedData.designMode) {
+            setGardenZones(savedData.gardenZones || []);
+            setSprinklers(savedData.sprinklers || []);
+            setWaterSource(savedData.waterSource);
+            setPipes(savedData.pipes || []);
+            setDesignMode(savedData.designMode);
+            if (savedData.imageData) {
+                const imageDataWithScale = {
+                    ...savedData.imageData,
+                    isScaleSet:
+                        savedData.imageData.isScaleSet ||
+                        (savedData.imageData.scale && savedData.imageData.scale !== 20) ||
+                        false,
+                };
+                setImageData(imageDataWithScale);
+            }
+            setCanvasData(savedData.canvasData || canvasData);
+        }
+    }, []);
+
+    const resetAllData = useCallback(() => {
+        setGardenZones([]);
+        setSprinklers([]);
+        setWaterSource(null);
+        setPipes([]);
+        setSelectedSprinkler(null);
+        setSelectedPipes(new Set());
+        setSelectedSprinklersForPipe([]);
+        setPipeEditMode('view');
+        setImageData(null);
+        setCanvasData({
+            width: CANVAS_DEFAULT_WIDTH,
+            height: CANVAS_DEFAULT_HEIGHT,
+            scale: CANVAS_DEFAULT_SCALE,
+            gridSize: CANVAS_GRID_SIZE,
+        });
+        setEditMode('view');
+        setActiveTab('zones');
+        setSelectedZoneType('grass');
+        setSelectedZoneForConfig(null);
+        setPipeGenerationError(null);
+        clearGardenData();
     }, []);
 
     const findParentGrassZone = useCallback(
-        (point: Coordinate) => {
-            return gardenZones.find(
-                (zone) =>
-                    zone.type === 'grass' &&
-                    !zone.parentZoneId &&
-                    isPointInPolygon(point, zone.coordinates)
-            );
+        (point: Coordinate | CanvasCoordinate) => {
+            return gardenZones.find((zone) => {
+                if (zone.type !== 'grass' || zone.parentZoneId) return false;
+                if ('x' in point && zone.canvasCoordinates) {
+                    return isPointInPolygon(point, zone.canvasCoordinates);
+                } else if ('lat' in point && zone.coordinates) {
+                    return isPointInPolygon(point, zone.coordinates);
+                }
+                return false;
+            });
         },
         [gardenZones]
     );
@@ -821,42 +371,36 @@ export default function AdvancedGardenPlanner() {
     );
 
     const isPointInAvoidanceZone = useCallback(
-        (point: Coordinate, grassZoneId: string) => {
+        (point: Coordinate | CanvasCoordinate, grassZoneId: string) => {
             const nestedZones = getNestedZonesInParent(grassZoneId);
-            return nestedZones.some((nestedZone) =>
-                isPointInPolygon(point, nestedZone.coordinates)
-            );
+            return nestedZones.some((nestedZone) => {
+                if ('x' in point && nestedZone.canvasCoordinates) {
+                    return isPointInPolygon(point, nestedZone.canvasCoordinates);
+                } else if ('lat' in point && nestedZone.coordinates) {
+                    return isPointInPolygon(point, nestedZone.coordinates);
+                }
+                return false;
+            });
         },
         [getNestedZonesInParent]
     );
 
-    const handleZoneCreated = useCallback(
-        (e: any) => {
-            const layer = e.layer;
-            const coordinates = layer.getLatLngs()[0].map((latLng: any) => ({
-                lat: latLng.lat,
-                lng: latLng.lng,
-            }));
-
-            // ตรวจสอบขนาดพื้นที่
-            const area = calculatePolygonArea(coordinates);
-            if (area > 120) {
-                alert(`❌ ขนาดพื้นที่เกินกำหนด!\n\nขนาดที่วาด: ${formatArea(area)}\nขนาดสูงสุดที่อนุญาต: 60 ตร.ม.\n\nกรุณาวาดพื้นที่ให้มีขนาดเล็กลง`);
-                
-                // ลบ layer ที่เพิ่งวาด
-                if (featureGroupRef.current) {
-                    featureGroupRef.current.removeLayer(layer);
-                }
+    const handleCanvasZoneCreated = useCallback(
+        (coordinates: CanvasCoordinate[]) => {
+            const area = calculatePolygonArea(coordinates, currentScale);
+            if (area > 300) {
+                alert(
+                    `❌ ขนาดพื้นที่เกินกำหนด!\n\nขนาดที่วาด: ${formatArea(area)}\nขนาดสูงสุดที่อนุญาต: 300 ตร.ม.\n\nกรุณาวาดพื้นที่ให้มีขนาดเล็กลง`
+                );
                 return;
             }
 
             const centerPoint = {
-                lat: coordinates.reduce((sum, c) => sum + c.lat, 0) / coordinates.length,
-                lng: coordinates.reduce((sum, c) => sum + c.lng, 0) / coordinates.length,
+                x: coordinates.reduce((sum, c) => sum + c.x, 0) / coordinates.length,
+                y: coordinates.reduce((sum, c) => sum + c.y, 0) / coordinates.length,
             };
 
             let parentZoneId: string | undefined;
-
             if (selectedZoneType !== 'grass') {
                 const parentGrassZone = findParentGrassZone(centerPoint);
                 if (parentGrassZone) {
@@ -868,7 +412,63 @@ export default function AdvancedGardenPlanner() {
                 s.suitableFor.includes(selectedZoneType)
             );
             const defaultSprinkler = suitableSprinklers[0];
+            const zoneTypeInfo = ZONE_TYPES.find((z) => z.id === selectedZoneType);
+            const baseNameCount = gardenZones.filter((z) => z.type === selectedZoneType).length + 1;
+            const gpsCoordinates = coordinates.map((c) => canvasToGPS(c, canvasData));
 
+            const newZone: GardenZone = {
+                id: `zone_${Date.now()}`,
+                type: selectedZoneType as any,
+                coordinates: gpsCoordinates,
+                canvasCoordinates: coordinates,
+                name: parentZoneId
+                    ? `${zoneTypeInfo?.name} (ใน ${gardenZones.find((z) => z.id === parentZoneId)?.name}) ${baseNameCount}`
+                    : `${zoneTypeInfo?.name} ${baseNameCount}`,
+                parentZoneId,
+                sprinklerConfig:
+                    selectedZoneType !== 'forbidden' && defaultSprinkler
+                        ? { type: defaultSprinkler.id, radius: defaultSprinkler.radius }
+                        : undefined,
+            };
+
+            setGardenZones((prev) => [...prev, newZone]);
+        },
+        [selectedZoneType, gardenZones, findParentGrassZone, canvasData, currentScale]
+    );
+
+    const handleZoneCreated = useCallback(
+        (e: any) => {
+            const layer = e.layer;
+            const coordinates = layer.getLatLngs()[0].map((latLng: any) => ({
+                lat: latLng.lat,
+                lng: latLng.lng,
+            }));
+
+            const area = calculatePolygonArea(coordinates);
+            if (area > 300) {
+                alert(
+                    `❌ ขนาดพื้นที่เกินกำหนด!\n\nขนาดที่วาด: ${formatArea(area)}\nขนาดสูงสุดที่อนุญาต: 300 ตร.ม.\n\nกรุณาวาดพื้นที่ให้มีขนาดเล็กลง`
+                );
+                return;
+            }
+
+            const centerPoint = {
+                lat: coordinates.reduce((sum, c) => sum + c.lat, 0) / coordinates.length,
+                lng: coordinates.reduce((sum, c) => sum + c.lng, 0) / coordinates.length,
+            };
+
+            let parentZoneId: string | undefined;
+            if (selectedZoneType !== 'grass') {
+                const parentGrassZone = findParentGrassZone(centerPoint);
+                if (parentGrassZone) {
+                    parentZoneId = parentGrassZone.id;
+                }
+            }
+
+            const suitableSprinklers = SPRINKLER_TYPES.filter((s) =>
+                s.suitableFor.includes(selectedZoneType)
+            );
+            const defaultSprinkler = suitableSprinklers[0];
             const zoneTypeInfo = ZONE_TYPES.find((z) => z.id === selectedZoneType);
             const baseNameCount = gardenZones.filter((z) => z.type === selectedZoneType).length + 1;
 
@@ -882,65 +482,166 @@ export default function AdvancedGardenPlanner() {
                 parentZoneId,
                 sprinklerConfig:
                     selectedZoneType !== 'forbidden' && defaultSprinkler
-                        ? {
-                              type: defaultSprinkler.id,
-                              radius: defaultSprinkler.radius,
-                          }
+                        ? { type: defaultSprinkler.id, radius: defaultSprinkler.radius }
                         : undefined,
             };
 
             setGardenZones((prev) => [...prev, newZone]);
-
-            if (featureGroupRef.current) {
-                featureGroupRef.current.clearLayers();
-            }
         },
         [selectedZoneType, gardenZones, findParentGrassZone]
     );
 
-    const handleZoneEdited = useCallback((e: any) => {
-        console.log('Zone edited:', e);
-    }, []);
-
     const handleZoneDeleted = useCallback((e: any) => {
-        console.log('Zone deleted:', e);
+        const deletedLayers = e.layers.getLayers();
+
+        deletedLayers.forEach((layer: any) => {
+            const layerCoords = layer.getLatLngs()[0].map((latLng: any) => ({
+                lat: latLng.lat,
+                lng: latLng.lng,
+            }));
+
+            setGardenZones((prevZones) => {
+                const zoneToDelete = prevZones.find((zone) => {
+                    if (zone.coordinates.length !== layerCoords.length) return false;
+
+                    return zone.coordinates.every((coord, index) => {
+                        const tolerance = 0.000001;
+                        return (
+                            Math.abs(coord.lat - layerCoords[index].lat) < tolerance &&
+                            Math.abs(coord.lng - layerCoords[index].lng) < tolerance
+                        );
+                    });
+                });
+
+                if (zoneToDelete) {
+                    const zonesToDelete = [
+                        zoneToDelete.id,
+                        ...prevZones
+                            .filter((z) => z.parentZoneId === zoneToDelete.id)
+                            .map((z) => z.id),
+                    ];
+
+                    setSprinklers((prevSprinklers) =>
+                        prevSprinklers.filter((s) => !zonesToDelete.includes(s.zoneId))
+                    );
+
+                    setPipes((prevPipes) =>
+                        prevPipes.filter((p) => !zonesToDelete.includes(p.zoneId || ''))
+                    );
+
+                    return prevZones.filter((z) => !zonesToDelete.includes(z.id));
+                }
+
+                return prevZones;
+            });
+        });
     }, []);
 
-    const findLongestEdgeAngle = useCallback((coordinates: Coordinate[]) => {
-        if (coordinates.length < 3) return 0;
+    const handleCanvasSprinklerPlaced = useCallback(
+        (position: CanvasCoordinate) => {
+            const selectedSprinklerType = SPRINKLER_TYPES.find((s) => s.id === manualSprinklerType);
+            if (!selectedSprinklerType) return;
 
-        let longestDistance = 0;
-        let longestEdgeAngle = 0;
+            const sprinklerType = { ...selectedSprinklerType, radius: manualSprinklerRadius };
 
-        for (let i = 0; i < coordinates.length; i++) {
-            const start = coordinates[i];
-            const end = coordinates[(i + 1) % coordinates.length];
+            let targetZone = gardenZones.find((zone) => {
+                if (zone.type === 'forbidden') return false;
+                return zone.canvasCoordinates && isPointInPolygon(position, zone.canvasCoordinates);
+            });
 
-            const distance = calculateDistance(start, end);
+            let zoneId = 'virtual_zone';
+            if (targetZone) {
+                if (targetZone.parentZoneId) {
+                    alert('ไม่สามารถวางหัวฉีดในพื้นที่ย่อยได้ กรุณาวางในพื้นที่หลักเท่านั้น');
+                    return;
+                }
 
-            if (distance > longestDistance) {
-                longestDistance = distance;
-
-                const centerLat = (start.lat + end.lat) / 2;
-                const latToMeter = 111132.92 - 559.82 * Math.cos((2 * centerLat * Math.PI) / 180);
-                const lngToMeter = 111412.84 * Math.cos((centerLat * Math.PI) / 180);
-
-                const deltaLatMeter = (end.lat - start.lat) * latToMeter;
-                const deltaLngMeter = (end.lng - start.lng) * lngToMeter;
-
-                longestEdgeAngle = (Math.atan2(deltaLatMeter, deltaLngMeter) * 180) / Math.PI;
+                if (
+                    targetZone.type === 'grass' &&
+                    isPointInAvoidanceZone(position, targetZone.id)
+                ) {
+                    alert('ไม่สามารถวางหัวฉีดในพื้นที่ดอกไม้ ต้นไม้ หรือพื้นที่ต้องห้าม');
+                    return;
+                }
+                zoneId = targetZone.id;
             }
-        }
 
-        return longestEdgeAngle;
-    }, []);
+            const gpsPosition = canvasToGPS(position, canvasData);
+
+            const newSprinkler: Sprinkler = {
+                id: `sprinkler_${Date.now()}`,
+                position: gpsPosition,
+                canvasPosition: position,
+                type: sprinklerType,
+                zoneId: zoneId,
+                orientation: 0,
+            };
+
+            setSprinklers((prev) => [...prev, newSprinkler]);
+        },
+        [
+            gardenZones,
+            manualSprinklerType,
+            manualSprinklerRadius,
+            canvasData,
+            isPointInAvoidanceZone,
+        ]
+    );
+
+    const findLongestEdgeAngle = useCallback(
+        (coordinates: Coordinate[] | CanvasCoordinate[]) => {
+            if (!coordinates || coordinates.length < 3) return 0;
+
+            let longestDistance = 0;
+            let longestEdgeAngle = 0;
+
+            for (let i = 0; i < coordinates.length; i++) {
+                const start = coordinates[i];
+                const end = coordinates[(i + 1) % coordinates.length];
+
+                const distance = calculateDistance(
+                    start,
+                    end,
+                    'x' in start ? currentScale : undefined
+                );
+
+                if (distance > longestDistance) {
+                    longestDistance = distance;
+
+                    if ('x' in start && 'x' in end) {
+                        const deltaX = end.x - start.x;
+                        const deltaY = end.y - start.y;
+                        longestEdgeAngle = (Math.atan2(deltaY, deltaX) * 180) / Math.PI;
+                    } else {
+                        const coord1 = start as Coordinate;
+                        const coord2 = end as Coordinate;
+                        const centerLat = (coord1.lat + coord2.lat) / 2;
+                        const latToMeter =
+                            111132.92 - 559.82 * Math.cos((2 * centerLat * Math.PI) / 180);
+                        const lngToMeter = 111412.84 * Math.cos((centerLat * Math.PI) / 180);
+
+                        const deltaLatMeter = (coord2.lat - coord1.lat) * latToMeter;
+                        const deltaLngMeter = (coord2.lng - coord1.lng) * lngToMeter;
+
+                        longestEdgeAngle =
+                            (Math.atan2(deltaLatMeter, deltaLngMeter) * 180) / Math.PI;
+                    }
+                }
+            }
+
+            return longestEdgeAngle;
+        },
+        [currentScale]
+    );
 
     const placeCornerSprinklers = useCallback(
         (zone: GardenZone, sprinklerType: SprinklerType) => {
             const cornerSprinklers: Sprinkler[] = [];
             let sprinklerCounter = 0;
 
-            zone.coordinates.forEach((corner, index) => {
+            const coordinates = zone.canvasCoordinates || zone.coordinates;
+
+            coordinates.forEach((corner, index) => {
                 let shouldAvoid = false;
                 if (zone.type === 'grass') {
                     shouldAvoid = isPointInAvoidanceZone(corner, zone.id);
@@ -949,25 +650,41 @@ export default function AdvancedGardenPlanner() {
                         (forbiddenZone) =>
                             forbiddenZone.type === 'forbidden' &&
                             !forbiddenZone.parentZoneId &&
-                            isPointInPolygon(corner, forbiddenZone.coordinates)
+                            isPointInPolygon(
+                                corner,
+                                forbiddenZone.canvasCoordinates || forbiddenZone.coordinates
+                            )
                     );
                 }
 
                 if (!shouldAvoid) {
-                    const orientation = findLongestEdgeAngle(zone.coordinates);
-                    cornerSprinklers.push({
-                        id: `${zone.id}_corner_${index}_${Date.now()}_${sprinklerCounter++}`,
-                        position: corner,
-                        type: sprinklerType,
-                        zoneId: zone.id,
-                        orientation: orientation,
-                    });
+                    const orientation = findLongestEdgeAngle(coordinates);
+
+                    if ('x' in corner) {
+                        const gpsPos = canvasToGPS(corner as CanvasCoordinate, canvasData);
+                        cornerSprinklers.push({
+                            id: `${zone.id}_corner_${index}_${Date.now()}_${sprinklerCounter++}`,
+                            position: gpsPos,
+                            canvasPosition: corner as CanvasCoordinate,
+                            type: sprinklerType,
+                            zoneId: zone.id,
+                            orientation: orientation,
+                        });
+                    } else {
+                        cornerSprinklers.push({
+                            id: `${zone.id}_corner_${index}_${Date.now()}_${sprinklerCounter++}`,
+                            position: corner as Coordinate,
+                            type: sprinklerType,
+                            zoneId: zone.id,
+                            orientation: orientation,
+                        });
+                    }
                 }
             });
 
             return cornerSprinklers;
         },
-        [isPointInAvoidanceZone, findLongestEdgeAngle, gardenZones]
+        [isPointInAvoidanceZone, findLongestEdgeAngle, gardenZones, canvasData]
     );
 
     const autoPlaceSprinklersInZone = useCallback(
@@ -980,23 +697,26 @@ export default function AdvancedGardenPlanner() {
             );
             if (!sprinklerTypeData) return;
 
-            const sprinklerType = {
-                ...sprinklerTypeData,
-                radius: zone.sprinklerConfig.radius,
-            };
+            const sprinklerType = { ...sprinklerTypeData, radius: zone.sprinklerConfig.radius };
+            const coordinates = zone.canvasCoordinates || zone.coordinates;
+            const isCanvas = !!zone.canvasCoordinates;
+            const scale = isCanvas ? currentScale : 1;
 
-            const longestEdgeAngle = findLongestEdgeAngle(zone.coordinates);
+            const longestEdgeAngle = findLongestEdgeAngle(coordinates);
             const radians = (longestEdgeAngle * Math.PI) / 180;
 
-            const centerLat =
-                zone.coordinates.reduce((sum, c) => sum + c.lat, 0) / zone.coordinates.length;
-            const centerLng =
-                zone.coordinates.reduce((sum, c) => sum + c.lng, 0) / zone.coordinates.length;
+            let centerX: number, centerY: number;
+            if (isCanvas) {
+                const canvasCoords = coordinates as CanvasCoordinate[];
+                centerX = canvasCoords.reduce((sum, c) => sum + c.x, 0) / canvasCoords.length;
+                centerY = canvasCoords.reduce((sum, c) => sum + c.y, 0) / canvasCoords.length;
+            } else {
+                const gpsCoords = coordinates as Coordinate[];
+                centerX = gpsCoords.reduce((sum, c) => sum + c.lng, 0) / gpsCoords.length;
+                centerY = gpsCoords.reduce((sum, c) => sum + c.lat, 0) / gpsCoords.length;
+            }
 
             const spacing = sprinklerType.radius;
-            const latSpacing = spacing / 111000;
-            const lngSpacing = spacing / (111000 * Math.cos((centerLat * Math.PI) / 180));
-
             const newSprinklers: Sprinkler[] = [];
             let sprinklerCounter = 0;
 
@@ -1004,73 +724,148 @@ export default function AdvancedGardenPlanner() {
             newSprinklers.push(...cornerSprinklers);
             sprinklerCounter += cornerSprinklers.length;
 
-            const cos = Math.cos(radians);
-            const sin = Math.sin(radians);
+            if (isCanvas) {
+                const spacingPixels = spacing * scale;
+                const cos = Math.cos(radians);
+                const sin = Math.sin(radians);
 
-            const rotatedPoints = zone.coordinates.map((coord) => {
-                const relLat = coord.lat - centerLat;
-                const relLng = coord.lng - centerLng;
-                return {
-                    u: relLng * cos - relLat * sin,
-                    v: relLng * sin + relLat * cos,
-                };
-            });
+                const canvasCoords = coordinates as CanvasCoordinate[];
+                const rotatedPoints = canvasCoords.map((coord) => {
+                    const relX = coord.x - centerX;
+                    const relY = coord.y - centerY;
+                    return { u: relX * cos - relY * sin, v: relX * sin + relY * cos };
+                });
 
-            const minU = Math.min(...rotatedPoints.map((p) => p.u));
-            const maxU = Math.max(...rotatedPoints.map((p) => p.u));
-            const minV = Math.min(...rotatedPoints.map((p) => p.v));
-            const maxV = Math.max(...rotatedPoints.map((p) => p.v));
+                const minU = Math.min(...rotatedPoints.map((p) => p.u));
+                const maxU = Math.max(...rotatedPoints.map((p) => p.u));
+                const minV = Math.min(...rotatedPoints.map((p) => p.v));
+                const maxV = Math.max(...rotatedPoints.map((p) => p.v));
 
-            const rotatedLatSpacing = latSpacing;
-            const rotatedLngSpacing = lngSpacing;
+                for (let v = minV + spacingPixels / 2; v <= maxV; v += spacingPixels) {
+                    for (let u = minU + spacingPixels / 2; u <= maxU; u += spacingPixels) {
+                        const x = centerX + (u * cos + v * sin);
+                        const y = centerY + (u * -sin + v * cos);
+                        const point = { x, y };
 
-            for (let v = minV + rotatedLatSpacing / 2; v <= maxV; v += rotatedLatSpacing) {
-                for (let u = minU + rotatedLngSpacing / 2; u <= maxU; u += rotatedLngSpacing) {
-                    const lat = centerLat + (u * -sin + v * cos);
-                    const lng = centerLng + (u * cos + v * sin);
-                    const point = { lat, lng };
-
-                    if (isPointInPolygon(point, zone.coordinates)) {
-                        const tooCloseToCorner = cornerSprinklers.some(
-                            (corner) => calculateDistance(point, corner.position) < spacing * 0.9
-                        );
-
-                        if (tooCloseToCorner) continue;
-
-                        let shouldAvoid = false;
-
-                        if (zone.type === 'grass') {
-                            shouldAvoid = isPointInAvoidanceZone(point, zone.id);
-                        } else {
-                            shouldAvoid = gardenZones.some(
-                                (forbiddenZone) =>
-                                    forbiddenZone.type === 'forbidden' &&
-                                    !forbiddenZone.parentZoneId &&
-                                    isPointInPolygon(point, forbiddenZone.coordinates)
+                        if (isPointInPolygon(point, canvasCoords)) {
+                            const tooCloseToCorner = cornerSprinklers.some(
+                                (corner) =>
+                                    corner.canvasPosition &&
+                                    calculateDistance(point, corner.canvasPosition, scale) <
+                                        spacing * 0.9
                             );
-                        }
 
-                        if (!shouldAvoid) {
-                            newSprinklers.push({
-                                id: `${zone.id}_sprinkler_${Date.now()}_${sprinklerCounter++}`,
-                                position: point,
-                                type: sprinklerType,
-                                zoneId: zone.id,
-                                orientation: longestEdgeAngle,
-                            });
+                            if (tooCloseToCorner) continue;
+
+                            let shouldAvoid = false;
+
+                            if (zone.type === 'grass') {
+                                shouldAvoid = isPointInAvoidanceZone(point, zone.id);
+                            } else {
+                                shouldAvoid = gardenZones.some(
+                                    (forbiddenZone) =>
+                                        forbiddenZone.type === 'forbidden' &&
+                                        !forbiddenZone.parentZoneId &&
+                                        forbiddenZone.canvasCoordinates &&
+                                        isPointInPolygon(point, forbiddenZone.canvasCoordinates)
+                                );
+                            }
+
+                            if (!shouldAvoid) {
+                                const gpsPos = canvasToGPS(
+                                    point,
+                                    isCanvas ? canvasData : imageData
+                                );
+                                newSprinklers.push({
+                                    id: `${zone.id}_sprinkler_${Date.now()}_${sprinklerCounter++}`,
+                                    position: gpsPos,
+                                    canvasPosition: point,
+                                    type: sprinklerType,
+                                    zoneId: zone.id,
+                                    orientation: longestEdgeAngle,
+                                });
+                            }
+                        }
+                    }
+                }
+            } else {
+                const gpsCoords = coordinates as Coordinate[];
+                const centerLat = centerY;
+                const centerLng = centerX;
+
+                const latSpacing = spacing / 111000;
+                const lngSpacing = spacing / (111000 * Math.cos((centerLat * Math.PI) / 180));
+
+                const cos = Math.cos(radians);
+                const sin = Math.sin(radians);
+
+                const rotatedPoints = gpsCoords.map((coord) => {
+                    const relLat = coord.lat - centerLat;
+                    const relLng = coord.lng - centerLng;
+                    return { u: relLng * cos - relLat * sin, v: relLng * sin + relLat * cos };
+                });
+
+                const minU = Math.min(...rotatedPoints.map((p) => p.u));
+                const maxU = Math.max(...rotatedPoints.map((p) => p.u));
+                const minV = Math.min(...rotatedPoints.map((p) => p.v));
+                const maxV = Math.max(...rotatedPoints.map((p) => p.v));
+
+                const rotatedLatSpacing = latSpacing;
+                const rotatedLngSpacing = lngSpacing;
+
+                for (let v = minV + rotatedLatSpacing / 2; v <= maxV; v += rotatedLatSpacing) {
+                    for (let u = minU + rotatedLngSpacing / 2; u <= maxU; u += rotatedLngSpacing) {
+                        const lat = centerLat + (u * -sin + v * cos);
+                        const lng = centerLng + (u * cos + v * sin);
+                        const point = { lat, lng };
+
+                        if (isPointInPolygon(point, gpsCoords)) {
+                            const tooCloseToCorner = cornerSprinklers.some(
+                                (corner) =>
+                                    calculateDistance(point, corner.position) < spacing * 0.9
+                            );
+
+                            if (tooCloseToCorner) continue;
+
+                            let shouldAvoid = false;
+
+                            if (zone.type === 'grass') {
+                                shouldAvoid = isPointInAvoidanceZone(point, zone.id);
+                            } else {
+                                shouldAvoid = gardenZones.some(
+                                    (forbiddenZone) =>
+                                        forbiddenZone.type === 'forbidden' &&
+                                        !forbiddenZone.parentZoneId &&
+                                        isPointInPolygon(point, forbiddenZone.coordinates)
+                                );
+                            }
+
+                            if (!shouldAvoid) {
+                                newSprinklers.push({
+                                    id: `${zone.id}_sprinkler_${Date.now()}_${sprinklerCounter++}`,
+                                    position: point,
+                                    type: sprinklerType,
+                                    zoneId: zone.id,
+                                    orientation: longestEdgeAngle,
+                                });
+                            }
                         }
                     }
                 }
             }
 
-            console.log(
-                `Zone ${zone.name}: Placed ${cornerSprinklers.length} corner sprinklers and ${newSprinklers.length - cornerSprinklers.length} grid sprinklers`
-            );
-
             setSelectedSprinkler(null);
             setSprinklers((prev) => [...prev.filter((s) => s.zoneId !== zoneId), ...newSprinklers]);
         },
-        [gardenZones, findLongestEdgeAngle, isPointInAvoidanceZone, placeCornerSprinklers]
+        [
+            gardenZones,
+            findLongestEdgeAngle,
+            isPointInAvoidanceZone,
+            placeCornerSprinklers,
+            canvasData,
+            imageData,
+            currentScale,
+        ]
     );
 
     const autoPlaceAllSprinklers = useCallback(() => {
@@ -1083,446 +878,151 @@ export default function AdvancedGardenPlanner() {
         });
     }, [gardenZones, autoPlaceSprinklersInZone]);
 
-    const handleMainPipeClick = useCallback(
-        (e: any) => {
-            if (editMode !== 'main-pipe') return;
-
-            const { lat, lng } = e.latlng;
-            const newPoint = { lat, lng };
-
-            setMainPipeDrawing((prev) => [...prev, newPoint]);
-        },
-        [editMode]
-    );
-
-    const finishMainPipe = useCallback(() => {
-        if (mainPipeDrawing.length < 2) {
-            alert('ท่อเมนต้องมีอย่างน้อย 2 จุด');
+    // ===== ENHANCED PIPE GENERATION FUNCTION =====
+    const generatePipeNetwork = useCallback(async () => {
+        if (!waterSource) {
             return;
         }
 
-        const totalLength = mainPipeDrawing.reduce((total, point, index) => {
-            if (index === 0) return 0;
-            return total + calculateDistance(mainPipeDrawing[index - 1], point);
-        }, 0);
+        if (sprinklers.length === 0) {
+            return;
+        }
 
-        setMainPipe({
-            id: `main_pipe_${Date.now()}`,
-            points: [...mainPipeDrawing],
-            totalLength,
-        });
+        setPipeGenerationError(null);
+        setIsGeneratingPipes(true);
 
-        setMainPipeDrawing([]);
-        setEditMode('lateral-pipe');
-    }, [mainPipeDrawing]);
+        try {
+            const pipeNetwork = generateSmartPipeNetwork({
+                waterSource,
+                sprinklers,
+                gardenZones,
+                designMode,
+                canvasData,
+                imageData,
+            });
 
-    const clearMainPipe = useCallback(() => {
-        setMainPipe(null);
-        setMainPipeDrawing([]);
-        setPipes((prev) => prev.filter((p) => p.type !== 'lateral' && p.type !== 'submain'));
+            if (pipeNetwork.length === 0) {
+                throw new Error('ไม่สามารถสร้างระบบท่อได้ กรุณาตรวจสอบตำแหน่งแหล่งน้ำและหัวฉีด');
+            }
+
+            setPipes(pipeNetwork);
+        } catch (error) {
+            let errorMessage = 'เกิดข้อผิดพลาดในการสร้างระบบท่อ';
+
+            if (error instanceof Error) {
+                errorMessage = error.message;
+            }
+
+            setPipeGenerationError(errorMessage);
+        } finally {
+            setIsGeneratingPipes(false);
+        }
+    }, [waterSource, sprinklers, gardenZones, designMode, canvasData, imageData]);
+
+    const clearPipes = useCallback(() => {
+        setPipes([]);
+        setSelectedPipes(new Set());
+        setSelectedSprinklersForPipe([]);
+        setPipeEditMode('view');
+        setPipeGenerationError(null);
     }, []);
 
-    const findClosestPointOnMainPipe = useCallback(
-        (point: Coordinate): Coordinate => {
-            if (!mainPipe || mainPipe.points.length < 2) return point;
-
-            let closestPoint = mainPipe.points[0];
-            let minDistance = calculateDistance(point, closestPoint);
-
-            for (const pipePoint of mainPipe.points) {
-                const distance = calculateDistance(point, pipePoint);
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    closestPoint = pipePoint;
-                }
-            }
-
-            for (let i = 0; i < mainPipe.points.length - 1; i++) {
-                const segmentStart = mainPipe.points[i];
-                const segmentEnd = mainPipe.points[i + 1];
-
-                const segmentClosest = getClosestPointOnLineSegment(
-                    point,
-                    segmentStart,
-                    segmentEnd
-                );
-                const distance = calculateDistance(point, segmentClosest);
-
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    closestPoint = segmentClosest;
-                }
-            }
-
-            return closestPoint;
-        },
-        [mainPipe]
-    );
-
-    const getClosestPointOnLineSegment = (
-        point: Coordinate,
-        lineStart: Coordinate,
-        lineEnd: Coordinate
-    ): Coordinate => {
-        const A = point.lat - lineStart.lat;
-        const B = point.lng - lineStart.lng;
-        const C = lineEnd.lat - lineStart.lat;
-        const D = lineEnd.lng - lineStart.lng;
-
-        const dot = A * C + B * D;
-        const lenSq = C * C + D * D;
-
-        if (lenSq === 0) return lineStart;
-
-        let param = dot / lenSq;
-
-        param = Math.max(0, Math.min(1, param));
-
-        return {
-            lat: lineStart.lat + param * C,
-            lng: lineStart.lng + param * D,
-        };
-    };
-
-    const findClosestSprinklerToMainPipe = useCallback(
-        (
-            sprinklers: Sprinkler[]
-        ): { sprinkler: Sprinkler; connectionPoint: Coordinate; distance: number } | null => {
-            if (!mainPipe || sprinklers.length === 0) return null;
-
-            let closestSprinkler: Sprinkler | null = null;
-            let minDistance = Infinity;
-            let bestConnectionPoint: Coordinate | null = null;
-
-            for (const sprinkler of sprinklers) {
-                const connectionPoint = findClosestPointOnMainPipe(sprinkler.position);
-                const distance = calculateDistance(sprinkler.position, connectionPoint);
-
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    closestSprinkler = sprinkler;
-                    bestConnectionPoint = connectionPoint;
-                }
-            }
-
-            return closestSprinkler && bestConnectionPoint
-                ? {
-                      sprinkler: closestSprinkler,
-                      connectionPoint: bestConnectionPoint,
-                      distance: minDistance,
-                  }
-                : null;
-        },
-        [mainPipe, findClosestPointOnMainPipe]
-    );
-
-    const createSmartPipeLayout = useCallback(() => {
-        if (!mainPipe || sprinklers.length === 0) return;
-
-        const newPipes: Pipe[] = [];
-
-        const sprinklersByZone = sprinklers.reduce(
-            (acc, sprinkler) => {
-                if (!acc[sprinkler.zoneId]) {
-                    acc[sprinkler.zoneId] = [];
-                }
-                acc[sprinkler.zoneId].push(sprinkler);
-                return acc;
-            },
-            {} as Record<string, Sprinkler[]>
-        );
-
-        Object.entries(sprinklersByZone).forEach(([zoneId, zoneSprinklers]) => {
-            if (zoneSprinklers.length === 0) return;
-
-            const closestSprinklerData = findClosestSprinklerToMainPipe(zoneSprinklers);
-
-            if (!closestSprinklerData) return;
-
-            const { sprinkler: closestSprinkler, connectionPoint } = closestSprinklerData;
-
-            const submainPipe: Pipe = {
-                id: `submain_${zoneId}`,
-                start: connectionPoint,
-                end: closestSprinkler.position,
-                type: 'submain',
-                length: calculateDistance(connectionPoint, closestSprinkler.position),
-                zoneId,
-                connectedSprinklers: [closestSprinkler.id],
-            };
-            newPipes.push(submainPipe);
-
-            const gridLayout = detectGridLayout(zoneSprinklers);
-
-            if (gridLayout.rows.length > 0) {
-                let closestSprinklerRow: Sprinkler[] | null = null;
-                let closestSprinklerIndexInRow = -1;
-
-                for (const row of gridLayout.rows) {
-                    const index = row.findIndex((s) => s.id === closestSprinkler.id);
-                    if (index !== -1) {
-                        closestSprinklerRow = row;
-                        closestSprinklerIndexInRow = index;
-                        break;
-                    }
-                }
-
-                gridLayout.rows.forEach((row, rowIndex) => {
-                    if (row.length === 0) return;
-
-                    const sortedRow = [...row].sort((a, b) => a.position.lng - b.position.lng);
-
-                    if (row === closestSprinklerRow) {
-                        const closestInSorted = sortedRow.findIndex(
-                            (s) => s.id === closestSprinkler.id
-                        );
-
-                        for (let i = closestInSorted + 1; i < sortedRow.length; i++) {
-                            const lateralPipe: Pipe = {
-                                id: `lateral_right_${sortedRow[i].id}`,
-                                start: sortedRow[i - 1].position,
-                                end: sortedRow[i].position,
-                                type: 'lateral',
-                                length: calculateDistance(
-                                    sortedRow[i - 1].position,
-                                    sortedRow[i].position
-                                ),
-                                zoneId,
-                                connectedSprinklers: [sortedRow[i].id],
-                            };
-                            newPipes.push(lateralPipe);
-                        }
-
-                        for (let i = closestInSorted - 1; i >= 0; i--) {
-                            const lateralPipe: Pipe = {
-                                id: `lateral_left_${sortedRow[i].id}`,
-                                start: sortedRow[i + 1].position,
-                                end: sortedRow[i].position,
-                                type: 'lateral',
-                                length: calculateDistance(
-                                    sortedRow[i + 1].position,
-                                    sortedRow[i].position
-                                ),
-                                zoneId,
-                                connectedSprinklers: [sortedRow[i].id],
-                            };
-                            newPipes.push(lateralPipe);
-                        }
+    // ===== PIPE EDITING FUNCTIONS =====
+    const handleSprinklerClickForPipe = useCallback(
+        (sprinklerId: string) => {
+            if (pipeEditMode === 'add') {
+                setSelectedSprinklersForPipe((prev) => {
+                    if (prev.includes(sprinklerId)) {
+                        return prev.filter((id) => id !== sprinklerId);
+                    } else if (prev.length < 2) {
+                        return [...prev, sprinklerId];
                     } else {
-                        let minDistance = Infinity;
-                        let bestConnectionSprinkler = closestSprinkler;
-
-                        if (closestSprinklerRow) {
-                            for (const mainRowSprinkler of closestSprinklerRow) {
-                                for (const currentRowSprinkler of sortedRow) {
-                                    const distance = calculateDistance(
-                                        mainRowSprinkler.position,
-                                        currentRowSprinkler.position
-                                    );
-                                    if (distance < minDistance) {
-                                        minDistance = distance;
-                                        bestConnectionSprinkler = mainRowSprinkler;
-                                    }
-                                }
-                            }
-                        }
-
-                        let closestInCurrentRow = sortedRow[0];
-                        let minDistanceToCurrentRow = Infinity;
-
-                        for (const currentRowSprinkler of sortedRow) {
-                            const distance = calculateDistance(
-                                bestConnectionSprinkler.position,
-                                currentRowSprinkler.position
-                            );
-                            if (distance < minDistanceToCurrentRow) {
-                                minDistanceToCurrentRow = distance;
-                                closestInCurrentRow = currentRowSprinkler;
-                            }
-                        }
-
-                        const rowConnectionPipe: Pipe = {
-                            id: `lateral_row_connection_${zoneId}_row_${rowIndex}`,
-                            start: bestConnectionSprinkler.position,
-                            end: closestInCurrentRow.position,
-                            type: 'lateral',
-                            length: calculateDistance(
-                                bestConnectionSprinkler.position,
-                                closestInCurrentRow.position
-                            ),
-                            zoneId,
-                            connectedSprinklers: [closestInCurrentRow.id],
-                        };
-                        newPipes.push(rowConnectionPipe);
-
-                        const startIndex = sortedRow.findIndex(
-                            (s) => s.id === closestInCurrentRow.id
-                        );
-
-                        for (let i = startIndex + 1; i < sortedRow.length; i++) {
-                            const lateralPipe: Pipe = {
-                                id: `lateral_row_${rowIndex}_right_${sortedRow[i].id}`,
-                                start: sortedRow[i - 1].position,
-                                end: sortedRow[i].position,
-                                type: 'lateral',
-                                length: calculateDistance(
-                                    sortedRow[i - 1].position,
-                                    sortedRow[i].position
-                                ),
-                                zoneId,
-                                connectedSprinklers: [sortedRow[i].id],
-                            };
-                            newPipes.push(lateralPipe);
-                        }
-
-                        for (let i = startIndex - 1; i >= 0; i--) {
-                            const lateralPipe: Pipe = {
-                                id: `lateral_row_${rowIndex}_left_${sortedRow[i].id}`,
-                                start: sortedRow[i + 1].position,
-                                end: sortedRow[i].position,
-                                type: 'lateral',
-                                length: calculateDistance(
-                                    sortedRow[i + 1].position,
-                                    sortedRow[i].position
-                                ),
-                                zoneId,
-                                connectedSprinklers: [sortedRow[i].id],
-                            };
-                            newPipes.push(lateralPipe);
-                        }
+                        // Replace second sprinkler if already 2 selected
+                        return [prev[0], sprinklerId];
+                    }
+                });
+            } else if (pipeEditMode === 'remove') {
+                setSelectedSprinklersForPipe((prev) => {
+                    if (prev.includes(sprinklerId)) {
+                        return prev.filter((id) => id !== sprinklerId);
+                    } else {
+                        return [...prev, sprinklerId];
                     }
                 });
             } else {
-                const remainingSprinklers = zoneSprinklers.filter(
-                    (s) => s.id !== closestSprinkler.id
-                );
-
-                remainingSprinklers.forEach((sprinkler) => {
-                    const lateralPipe: Pipe = {
-                        id: `lateral_${sprinkler.id}`,
-                        start: closestSprinkler.position,
-                        end: sprinkler.position,
-                        type: 'lateral',
-                        length: calculateDistance(closestSprinkler.position, sprinkler.position),
-                        zoneId,
-                        connectedSprinklers: [sprinkler.id],
-                    };
-                    newPipes.push(lateralPipe);
-                });
+                // Normal sprinkler selection
+                setSelectedSprinkler((prev) => (prev === sprinklerId ? null : sprinklerId));
             }
-        });
+        },
+        [pipeEditMode]
+    );
 
-        setPipes((prev) => [
-            ...prev.filter((p) => p.type !== 'lateral' && p.type !== 'submain'),
-            ...newPipes,
-        ]);
-    }, [mainPipe, sprinklers, findClosestSprinklerToMainPipe]);
-
-    const detectGridLayout = useCallback((sprinklers: Sprinkler[]) => {
-        const tolerance = 0.00008;
-        const rows: Sprinkler[][] = [];
-        const processed = new Set<string>();
-
-        const sortedByLat = [...sprinklers].sort((a, b) => b.position.lat - a.position.lat);
-
-        for (const sprinkler of sortedByLat) {
-            if (processed.has(sprinkler.id)) continue;
-
-            const rowSprinklers = sortedByLat.filter(
-                (s) =>
-                    !processed.has(s.id) &&
-                    Math.abs(s.position.lat - sprinkler.position.lat) < tolerance
-            );
-
-            if (rowSprinklers.length >= 2) {
-                rowSprinklers.sort((a, b) => a.position.lng - b.position.lng);
-                rows.push(rowSprinklers);
-                rowSprinklers.forEach((s) => processed.add(s.id));
-            } else if (rowSprinklers.length === 1) {
-                rows.push(rowSprinklers);
-                processed.add(sprinkler.id);
-            }
+    const addPipeBetweenSprinklers = useCallback(() => {
+        if (selectedSprinklersForPipe.length !== 2) {
+            return;
         }
 
-        return { rows, columns: [] };
-    }, []);
+        const [sprinkler1Id, sprinkler2Id] = selectedSprinklersForPipe;
+        const isCanvasMode = designMode === 'canvas' || designMode === 'image';
+        const scale = isCanvasMode ? canvasData?.scale || imageData?.scale || 20 : 20;
 
-    const calculateZoneCenter = useCallback((sprinklers: Sprinkler[]): Coordinate => {
-        const avgLat = sprinklers.reduce((sum, s) => sum + s.position.lat, 0) / sprinklers.length;
-        const avgLng = sprinklers.reduce((sum, s) => sum + s.position.lng, 0) / sprinklers.length;
-        return { lat: avgLat, lng: avgLng };
-    }, []);
+        const newPipe = addCustomPipe(
+            sprinkler1Id,
+            sprinkler2Id,
+            sprinklers,
+            isCanvasMode,
+            scale,
+            canvasData,
+            imageData
+        );
 
-    const findBestConnectionPoint = useCallback((from: Coordinate, to: Coordinate): Coordinate => {
-        return from;
-    }, []);
+        if (newPipe) {
+            setPipes((prev) => [...prev, newPipe]);
+            setSelectedSprinklersForPipe([]);
+        }
+    }, [selectedSprinklersForPipe, sprinklers, designMode, canvasData, imageData]);
 
-    const handleSprinklerClickForPipe = useCallback(
-        (sprinklerId: string) => {
-            if (manualPipeMode !== 'connect-sprinklers') return;
+    const removePipesBetweenSprinklers = useCallback(() => {
+        if (selectedSprinklersForPipe.length !== 2) {
+            return;
+        }
 
-            setSelectedSprinklersForPipe((prev) => {
-                if (prev.includes(sprinklerId)) {
-                    return prev.filter((id) => id !== sprinklerId);
-                } else if (prev.length < 2) {
-                    return [...prev, sprinklerId];
-                } else {
-                    return [sprinklerId];
-                }
-            });
-        },
-        [manualPipeMode]
-    );
+        const [sprinkler1Id, sprinkler2Id] = selectedSprinklersForPipe;
+        const pipesToRemove = findPipesBetweenSprinklers(
+            sprinkler1Id,
+            sprinkler2Id,
+            pipes,
+            sprinklers
+        );
 
-    const createManualPipe = useCallback(() => {
-        if (selectedSprinklersForPipe.length !== 2) return;
+        if (pipesToRemove.length > 0) {
+            const pipeIdsToRemove = pipesToRemove.map((p) => p.id);
+            setPipes((prev) => prev.filter((p) => !pipeIdsToRemove.includes(p.id)));
+        }
 
-        const sprinkler1 = sprinklers.find((s) => s.id === selectedSprinklersForPipe[0]);
-        const sprinkler2 = sprinklers.find((s) => s.id === selectedSprinklersForPipe[1]);
-
-        if (!sprinkler1 || !sprinkler2) return;
-
-        const newPipe: Pipe = {
-            id: `manual_${Date.now()}`,
-            start: sprinkler1.position,
-            end: sprinkler2.position,
-            type: 'lateral',
-            length: calculateDistance(sprinkler1.position, sprinkler2.position),
-            zoneId: sprinkler1.zoneId,
-            connectedSprinklers: [sprinkler1.id, sprinkler2.id],
-        };
-
-        setPipes((prev) => [...prev, newPipe]);
         setSelectedSprinklersForPipe([]);
-    }, [selectedSprinklersForPipe, sprinklers]);
+    }, [selectedSprinklersForPipe, pipes, sprinklers]);
 
-    const handlePipeClick = useCallback(
-        (pipeId: string) => {
-            if (manualPipeMode !== 'select-pipes') return;
-
-            setSelectedPipes((prev) => {
-                const newSet = new Set(prev);
-                if (newSet.has(pipeId)) {
-                    newSet.delete(pipeId);
-                } else {
-                    newSet.add(pipeId);
-                }
-                return newSet;
-            });
-        },
-        [manualPipeMode]
-    );
+    const handlePipeClick = useCallback((pipeId: string) => {
+        setSelectedPipes((prev) => {
+            const newSet = new Set(prev);
+            if (newSet.has(pipeId)) {
+                newSet.delete(pipeId);
+            } else {
+                newSet.add(pipeId);
+            }
+            return newSet;
+        });
+    }, []);
 
     const deleteSelectedPipes = useCallback(() => {
-        setPipes((prev) => prev.filter((pipe) => !selectedPipes.has(pipe.id)));
-        setSelectedPipes(new Set());
-    }, [selectedPipes]);
+        if (selectedPipes.size === 0) {
+            return;
+        }
 
-    const clearManualPipeMode = useCallback(() => {
-        setManualPipeMode(null);
+        setPipes((prev) => prev.filter((p) => !selectedPipes.has(p.id)));
         setSelectedPipes(new Set());
-        setSelectedSprinklersForPipe([]);
-    }, []);
+    }, [selectedPipes, pipes]);
 
     const updateZoneConfig = useCallback(
         (zoneId: string, sprinklerType: string, radius: number) => {
@@ -1547,6 +1047,7 @@ export default function AdvancedGardenPlanner() {
 
             setGardenZones((prev) => prev.filter((z) => !zonesToDelete.includes(z.id)));
             setSprinklers((prev) => prev.filter((s) => !zonesToDelete.includes(s.zoneId)));
+            setPipes((prev) => prev.filter((p) => !zonesToDelete.includes(p.zoneId || '')));
         },
         [gardenZones]
     );
@@ -1564,20 +1065,18 @@ export default function AdvancedGardenPlanner() {
         [sprinklers, selectedSprinkler]
     );
 
+    // Enhanced map click handler that allows water source placement anywhere
     const handleMapClick = useCallback(
         (e: any) => {
-            if (editMode === 'place') {
-                const { lat, lng } = e.latlng;
+            const { lat, lng } = e.latlng;
 
+            if (editMode === 'place') {
                 const selectedSprinklerType = SPRINKLER_TYPES.find(
                     (s) => s.id === manualSprinklerType
                 );
                 if (!selectedSprinklerType) return;
 
-                const sprinklerType = {
-                    ...selectedSprinklerType,
-                    radius: manualSprinklerRadius,
-                };
+                const sprinklerType = { ...selectedSprinklerType, radius: manualSprinklerRadius };
 
                 let targetZone = gardenZones.find((zone) => {
                     if (zone.type === 'forbidden') return false;
@@ -1587,7 +1086,6 @@ export default function AdvancedGardenPlanner() {
                 let zoneId = 'virtual_zone';
                 if (targetZone) {
                     if (targetZone.parentZoneId) {
-                        alert('ไม่สามารถวางหัวฉีดในพื้นที่ย่อยได้ กรุณาวางในพื้นที่หลักเท่านั้น');
                         return;
                     }
 
@@ -1595,7 +1093,6 @@ export default function AdvancedGardenPlanner() {
                         targetZone.type === 'grass' &&
                         isPointInAvoidanceZone({ lat, lng }, targetZone.id)
                     ) {
-                        alert('ไม่สามารถวางหัวฉีดในพื้นที่ดอกไม้ ต้นไม้ หรือพื้นที่ต้องห้าม');
                         return;
                     }
                     zoneId = targetZone.id;
@@ -1612,22 +1109,18 @@ export default function AdvancedGardenPlanner() {
                 };
 
                 setSprinklers((prev) => [...prev, newSprinkler]);
-            } else if (editMode === 'edit' && !waterSource) {
-                const { lat, lng } = e.latlng;
+            } else if (editMode === 'edit') {
+                // Allow water source placement anywhere (no zone restriction)
                 setWaterSource({
                     id: `source_${Date.now()}`,
                     position: { lat, lng },
                     type: 'main',
                 });
-            } else if (editMode === 'main-pipe') {
-                handleMainPipeClick(e);
             }
         },
         [
             editMode,
             gardenZones,
-            waterSource,
-            handleMainPipeClick,
             findLongestEdgeAngle,
             isPointInAvoidanceZone,
             manualSprinklerType,
@@ -1635,204 +1128,237 @@ export default function AdvancedGardenPlanner() {
         ]
     );
 
-    const statistics = React.useMemo(() => {
-        const submainPipes = pipes.filter((p) => p.type === 'submain');
-        const lateralPipes = pipes.filter((p) => p.type === 'lateral');
+    const handleCanvasSprinklerDragged = useCallback(
+        (sprinklerId: string, newPos: CanvasCoordinate) => {
+            setSprinklers((prev) =>
+                prev.map((s) =>
+                    s.id === sprinklerId
+                        ? {
+                              ...s,
+                              position: canvasToGPS(newPos, canvasData),
+                              canvasPosition: newPos,
+                          }
+                        : s
+                )
+            );
+        },
+        [canvasData]
+    );
 
-        const totalMainLength = mainPipe ? mainPipe.totalLength : 0;
-        const totalSubmainLength = submainPipes.reduce((sum, pipe) => sum + pipe.length, 0);
-        const totalLateralLength = lateralPipes.reduce((sum, pipe) => sum + pipe.length, 0);
+    const handleCanvasSprinklerClick = useCallback(
+        (sprinklerId: string) => {
+            handleSprinklerClickForPipe(sprinklerId);
+        },
+        [handleSprinklerClickForPipe]
+    );
 
-        const longestSubmainPipe =
-            submainPipes.length > 0 ? Math.max(...submainPipes.map((p) => p.length)) : 0;
-        const longestLateralPipe =
-            lateralPipes.length > 0 ? Math.max(...lateralPipes.map((p) => p.length)) : 0;
+    const handleCanvasWaterSourcePlaced = useCallback(
+        (position: CanvasCoordinate) => {
+            setWaterSource({
+                id: `source_${Date.now()}`,
+                position: canvasToGPS(position, canvasData),
+                canvasPosition: position,
+                type: 'main',
+            });
+        },
+        [canvasData]
+    );
 
-        const totalArea = gardenZones.reduce((sum, zone) => {
-            if (zone.type !== 'forbidden') {
-                return sum + calculatePolygonArea(zone.coordinates);
-            }
-            return sum;
-        }, 0);
+    const handleWaterSourceDelete = useCallback(() => {
+        setWaterSource(null);
+    }, []);
 
-        const coverageArea = sprinklers.reduce((sum, sprinkler) => {
-            return sum + Math.PI * Math.pow(sprinkler.type.radius, 2);
-        }, 0);
+    const handleImageUpload = useCallback((file: File) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                setImageData({
+                    url: e.target?.result as string,
+                    width: img.width,
+                    height: img.height,
+                    scale: 20,
+                    isScaleSet: false,
+                });
+            };
+            img.src = e.target?.result as string;
+        };
+        reader.readAsDataURL(file);
+    }, []);
 
+    const statistics = useMemo(() => {
         const activeZones = Object.keys(
             sprinklers.reduce((acc, s) => ({ ...acc, [s.zoneId]: true }), {})
         ).length;
 
-        const mainZones = gardenZones.filter((z) => !z.parentZoneId);
-        const nestedZones = gardenZones.filter((z) => !!z.parentZoneId);
+        return { activeZones };
+    }, [sprinklers]);
 
-        const zoneDetails = ZONE_TYPES.map((zoneType) => {
-            const mainZonesOfType = mainZones.filter((z) => z.type === zoneType.id);
-            const nestedZonesOfType = nestedZones.filter((z) => z.type === zoneType.id);
-            const sprinklersInType = sprinklers.filter((s) => {
-                const zone = gardenZones.find((z) => z.id === s.zoneId);
-                return zone?.type === zoneType.id;
-            });
-
-            const zoneAreas = mainZonesOfType.map((zone) => ({
-                zoneId: zone.id,
-                zoneName: zone.name,
-                area: calculatePolygonArea(zone.coordinates),
-                sprinklerCount: sprinklers.filter((s) => s.zoneId === zone.id).length,
-                sprinklerType: zone.sprinklerConfig
-                    ? SPRINKLER_TYPES.find((s) => s.id === zone.sprinklerConfig!.type)
-                    : null,
-                sprinklerRadius: zone.sprinklerConfig?.radius || 0,
-            }));
-
-            const nestedZoneAreas = nestedZonesOfType.map((zone) => ({
-                zoneId: zone.id,
-                zoneName: zone.name,
-                area: calculatePolygonArea(zone.coordinates),
-                sprinklerCount: sprinklers.filter((s) => s.zoneId === zone.id).length,
-                parentZoneId: zone.parentZoneId,
-            }));
-
-            return {
-                type: zoneType.name,
-                id: zoneType.id,
-                icon: zoneType.icon,
-                count: mainZonesOfType.length,
-                nestedCount: nestedZonesOfType.length,
-                sprinklers: sprinklersInType.length,
-                totalArea: zoneAreas.reduce((sum, z) => sum + z.area, 0),
-                zones: zoneAreas,
-                nestedZones: nestedZoneAreas,
-            };
-        }).filter((zone) => zone.count > 0 || zone.nestedCount > 0);
-
-        return {
-            totalSprinklers: sprinklers.length,
-            totalMainPipeLength: totalMainLength,
-            totalSubmainPipeLength: totalSubmainLength,
-            totalLateralPipeLength: totalLateralLength,
-            longestSubmainPipe,
-            longestLateralPipe,
-            totalArea,
-            activeZones,
-            coveragePercentage: totalArea > 0 ? Math.min((coverageArea / totalArea) * 100, 100) : 0,
-            zoneDetails,
-            totalPipeLength: totalMainLength + totalSubmainLength + totalLateralLength,
-            submainPipeCount: submainPipes.length,
-            lateralPipeCount: lateralPipes.length,
+    const navigateToSummary = useCallback(() => {
+        const data: GardenPlannerData = {
+            gardenZones,
+            sprinklers,
+            waterSource,
+            pipes,
+            designMode,
+            imageData,
+            canvasData,
         };
-    }, [pipes, mainPipe, sprinklers, gardenZones]);
 
-    React.useEffect(() => {
-        setSelectedSprinkler(null);
-    }, [editMode]);
-
-    const searchLocation = useCallback(async (query: string) => {
-        if (!query.trim() || query.length < 3) {
-            setSearchResults([]);
-            setShowSearchResults(false);
+        const errors = validateGardenData(data);
+        if (errors.length > 0) {
+            setValidationErrors(errors);
+            setShowValidationErrors(true);
             return;
         }
 
-        setIsSearching(true);
-        try {
-            const response = await fetch(
-                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=th&addressdetails=1&extratags=1`
-            );
-            const results: SearchResult[] = await response.json();
-            setSearchResults(results);
-            setShowSearchResults(results.length > 0);
-        } catch (error) {
-            console.error('Search error:', error);
-            setSearchResults([]);
-            setShowSearchResults(false);
-        } finally {
-            setIsSearching(false);
-        }
-    }, []);
+        saveGardenData(data);
+        router.visit('/home-garden/summary');
+    }, [gardenZones, sprinklers, waterSource, pipes, designMode, imageData, canvasData]);
 
-    const handleSearchInputChange = useCallback(
-        (value: string) => {
-            setSearchQuery(value);
-
-            if (searchTimeoutRef.current) {
-                clearTimeout(searchTimeoutRef.current);
-            }
-
-            searchTimeoutRef.current = setTimeout(() => {
-                searchLocation(value);
-            }, 500);
-        },
-        [searchLocation]
-    );
-
-    const handleSearchResultClick = useCallback((result: SearchResult) => {
-        const lat = parseFloat(result.lat);
-        const lng = parseFloat(result.lon);
-        setMapCenter([lat, lng]);
-        setSearchQuery(result.display_name.split(',')[0]);
-        setShowSearchResults(false);
-    }, []);
-
-    const clearSearch = useCallback(() => {
-        setSearchQuery('');
-        setSearchResults([]);
-        setShowSearchResults(false);
-        if (searchTimeoutRef.current) {
-            clearTimeout(searchTimeoutRef.current);
-        }
-    }, []);
+    React.useEffect(() => {
+        setSelectedSprinkler(null);
+        setSelectedSprinklersForPipe([]);
+        setPipeEditMode('view');
+    }, [editMode]);
 
     React.useEffect(() => {
         return () => {
-            if (searchTimeoutRef.current) {
-                clearTimeout(searchTimeoutRef.current);
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
             }
         };
     }, []);
 
     useEffect(() => {
-        const map = mapRef.current;
-        if (!map || editMode === 'draw') return;
+        if (designMode && (gardenZones.length > 0 || sprinklers.length > 0)) {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+            }
 
-        const clickHandler = (e: any) => handleMapClick(e);
-        map.on('click', clickHandler);
+            saveTimeoutRef.current = setTimeout(() => {
+                const data: GardenPlannerData = {
+                    gardenZones,
+                    sprinklers,
+                    waterSource,
+                    pipes,
+                    designMode,
+                    imageData,
+                    canvasData,
+                };
+                saveGardenData(data);
+            }, 1000);
+        }
+    }, [gardenZones, sprinklers, waterSource, pipes, designMode, imageData, canvasData]);
 
-        return () => {
-            map.off('click', clickHandler);
-        };
-    }, [handleMapClick, editMode]);
+    // เพิ่ม useEffect สำหรับ pipe edit mode
+    useEffect(() => {
+        if (pipeEditMode === 'add' && selectedSprinklersForPipe.length === 2) {
+            addPipeBetweenSprinklers();
+        }
+        if (pipeEditMode === 'remove' && selectedSprinklersForPipe.length === 2) {
+            removePipesBetweenSprinklers();
+        }
+        // eslint-disable-next-line
+    }, [selectedSprinklersForPipe, pipeEditMode]);
+
+    if (!designMode) {
+        return <ModeSelection onSelectMode={setDesignMode} />;
+    }
 
     return (
         <div className="min-h-screen w-full overflow-hidden bg-gray-900">
-            <Navbar />
+            {showValidationErrors && (
+                <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black bg-opacity-50">
+                    <div className="mx-4 w-full max-w-md rounded-lg bg-gray-800 p-6">
+                        <h3 className="mb-4 text-xl font-bold text-red-400">
+                            ❌ ไม่สามารถดูสรุปผลได้
+                        </h3>
+                        <div className="mb-4 text-gray-200">
+                            <p className="mb-2">กรุณาแก้ไขปัญหาต่อไปนี้ก่อน:</p>
+                            <ul className="list-inside list-disc space-y-1">
+                                {validationErrors.map((error, index) => (
+                                    <li key={index} className="text-sm text-gray-300">
+                                        {error}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                        <button
+                            onClick={() => setShowValidationErrors(false)}
+                            className="w-full rounded-lg bg-blue-600 py-2 text-white transition-colors hover:bg-blue-700"
+                        >
+                            ตกลง
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <div className="container mx-auto w-full px-4 py-6">
                 <div className="mb-6 text-left">
-                    <h1 className="mb-2 text-2xl font-bold text-white">
-                        🏡 ระบบออกแบบระบบน้ำสำหรับสวนบ้าน
-                    </h1>
-                </div>
+                    <div className="flex items-center justify-between">
+                        <h1 className="text-2xl font-bold text-white">
+                            🏡 ระบบออกแบบระบบน้ำสำหรับสวนบ้าน
+                            <span className="ml-2 text-sm font-normal text-gray-400">
+                                (
+                                {designMode === 'map'
+                                    ? 'Google Map'
+                                    : designMode === 'canvas'
+                                      ? 'วาดเอง'
+                                      : 'รูปแบบแปลน'}
+                                )
+                            </span>
+                        </h1>
 
-                <div className="mb-6 flex justify-center">
-                    <div className="flex rounded-lg bg-gray-800 p-1">
-                        {[
-                            { id: 'zones', name: 'กำหนดโซน', icon: '🗺️' },
-                            { id: 'sprinklers', name: 'วางหัวฉีด', icon: '💧' },
-                            { id: 'pipes', name: 'ระบบท่อ', icon: '🔧' },
-                            { id: 'summary', name: 'สรุปผล', icon: '📊' },
-                        ].map((tab) => (
+                        <div className="flex items-center gap-4">
+                            <div className="flex rounded-lg bg-gray-800 p-1">
+                                {[
+                                    { id: 'zones', name: 'กำหนดโซน', icon: '🗺️' },
+                                    { id: 'sprinklers', name: 'วางหัวฉีด', icon: '💧' },
+                                    { id: 'pipes', name: 'ระบบท่อ', icon: '🔧' },
+                                ].map((tab) => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id as any)}
+                                        className={`rounded-md px-6 py-3 text-sm font-medium transition-all ${
+                                            activeTab === tab.id
+                                                ? 'bg-blue-600 text-white shadow-lg'
+                                                : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                                        }`}
+                                    >
+                                        {tab.icon} {tab.name}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <UndoRedoButtons />
+
                             <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id as any)}
-                                className={`rounded-md px-6 py-3 text-sm font-medium transition-all ${
-                                    activeTab === tab.id
-                                        ? 'bg-blue-600 text-white shadow-lg'
-                                        : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                                }`}
+                                onClick={navigateToSummary}
+                                className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 text-sm font-medium text-white shadow-lg transition-all hover:from-purple-700 hover:to-blue-700"
                             >
-                                {tab.icon} {tab.name}
+                                📊 ดูสรุปผล
                             </button>
-                        ))}
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => {
+                                    resetAllData();
+                                    setDesignMode(null);
+                                }}
+                                className="rounded-lg bg-gray-700 px-4 py-2 text-sm text-gray-300 transition-colors hover:bg-gray-600"
+                            >
+                                เปลี่ยนวิธี
+                            </button>
+                            <button
+                                onClick={() => {
+                                    resetAllData();
+                                }}
+                                className="rounded-lg bg-red-600 px-4 py-2 text-sm text-white transition-colors hover:bg-red-700"
+                            >
+                                🗑️ ลบทั้งหมด
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1874,29 +1400,48 @@ export default function AdvancedGardenPlanner() {
                                     </div>
                                 </div>
 
-                                <div className="mb-4">
-                                    <button
-                                        onClick={() => setEditMode('draw')}
-                                        className={`w-full rounded-lg py-3 font-medium transition-all ${
-                                            editMode === 'draw'
-                                                ? 'bg-blue-600 text-white shadow-lg'
-                                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                        }`}
-                                    >
-                                        ✏️{' '}
-                                        {editMode === 'draw'
-                                            ? 'กำลังวาดโซน - คลิกแผนที่'
-                                            : 'วาดโซนพื้นที่'}
-                                    </button>
-                                    {editMode === 'draw' && (
-                                        <div className="mt-2 rounded-md bg-blue-900/30 p-2 text-xs text-blue-300">
-                                            💡 ใช้เครื่องมือวาดทางซ้ายบนของแผนที่ เลือก Polygon หรือ
-                                            Rectangle
-                                            <br />
-                                            <span className="text-yellow-300">
-                                                🎯 สามารถวางโซนดอกไม้/ต้นไม้/ต้องห้าม
-                                                ในพื้นที่หญ้าได้
-                                            </span>
+                                <div className="mb-4 space-y-2">
+                                    {editMode !== 'draw' ? (
+                                        <button
+                                            onClick={() => setEditMode('draw')}
+                                            className="w-full rounded-lg bg-blue-600 py-3 font-medium text-white shadow-lg transition-all hover:bg-blue-700"
+                                        >
+                                            ✏️ เริ่มวาดโซนพื้นที่
+                                        </button>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <div className="rounded-lg bg-blue-900/30 p-3 text-center">
+                                                <div className="text-sm font-medium text-blue-300">
+                                                    🎯 กำลังวาดโซน:{' '}
+                                                    {
+                                                        ZONE_TYPES.find(
+                                                            (z) => z.id === selectedZoneType
+                                                        )?.name
+                                                    }
+                                                </div>
+                                                <div className="mt-1 text-xs text-blue-200">
+                                                    {designMode === 'map'
+                                                        ? 'คลิกและลากในแผนที่เพื่อวาดโซน'
+                                                        : 'คลิกเพื่อวาดจุดต่าง ๆ ของโซน'}
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    setEditMode('view');
+                                                    if (
+                                                        designMode === 'canvas' ||
+                                                        designMode === 'image'
+                                                    ) {
+                                                        window.dispatchEvent(
+                                                            new CustomEvent('cancelDrawing')
+                                                        );
+                                                    }
+                                                    setSelectedZoneForConfig(null);
+                                                }}
+                                                className="w-full rounded-lg bg-red-600 py-2 font-medium text-white transition-all hover:bg-red-700"
+                                            >
+                                                ❌ ยกเลิกการวาด
+                                            </button>
                                         </div>
                                     )}
                                 </div>
@@ -1922,6 +1467,8 @@ export default function AdvancedGardenPlanner() {
                                                           (z) => z.id === zone.parentZoneId
                                                       )
                                                     : null;
+
+                                                const zoneArea = calculateZoneArea(zone);
 
                                                 return (
                                                     <div
@@ -1958,11 +1505,7 @@ export default function AdvancedGardenPlanner() {
                                                                     <div className="text-xs text-gray-200">
                                                                         {zoneSprinklers.length}{' '}
                                                                         หัวฉีด •{' '}
-                                                                        {formatArea(
-                                                                            calculatePolygonArea(
-                                                                                zone.coordinates
-                                                                            )
-                                                                        )}
+                                                                        {formatArea(zoneArea)}
                                                                     </div>
                                                                     {zone.sprinklerConfig && (
                                                                         <div className="text-xs text-blue-300">
@@ -1973,7 +1516,7 @@ export default function AdvancedGardenPlanner() {
                                                                                         zone
                                                                                             .sprinklerConfig!
                                                                                             .type
-                                                                                )?.name
+                                                                                )?.nameEN
                                                                             }
                                                                             • รัศมี{' '}
                                                                             {
@@ -1986,53 +1529,52 @@ export default function AdvancedGardenPlanner() {
                                                                 </div>
                                                             </div>
                                                             <div className="flex space-x-1">
-                                                                {zone.type !== 'forbidden' &&
-                                                                    !isNestedZone && (
-                                                                        <>
-                                                                            <button
-                                                                                onClick={() =>
-                                                                                    setSelectedZoneForConfig(
-                                                                                        isConfigOpen
-                                                                                            ? null
-                                                                                            : zone.id
-                                                                                    )
-                                                                                }
-                                                                                className="text-blue-400 hover:text-blue-300"
-                                                                                title="ตั้งค่าหัวฉีด"
-                                                                            >
-                                                                                ⚙️
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={() =>
-                                                                                    autoPlaceSprinklersInZone(
-                                                                                        zone.id
-                                                                                    )
-                                                                                }
-                                                                                disabled={
-                                                                                    !zone.sprinklerConfig
-                                                                                }
-                                                                                className="text-green-400 hover:text-green-300 disabled:cursor-not-allowed disabled:text-gray-500"
-                                                                                title="วางหัวฉีดในโซนนี้"
-                                                                            >
-                                                                                🤖
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={() =>
-                                                                                    deleteSprinklersByZone(
-                                                                                        zone.id
-                                                                                    )
-                                                                                }
-                                                                                disabled={
-                                                                                    zoneSprinklers.length ===
-                                                                                    0
-                                                                                }
-                                                                                className="text-yellow-400 hover:text-yellow-300 disabled:cursor-not-allowed disabled:text-gray-500"
-                                                                                title="ลบหัวฉีดในโซนนี้"
-                                                                            >
-                                                                                💧
-                                                                            </button>
-                                                                        </>
-                                                                    )}
+                                                                {zone.type !== 'forbidden' && (
+                                                                    <>
+                                                                        <button
+                                                                            onClick={() =>
+                                                                                setSelectedZoneForConfig(
+                                                                                    isConfigOpen
+                                                                                        ? null
+                                                                                        : zone.id
+                                                                                )
+                                                                            }
+                                                                            className="text-blue-400 hover:text-blue-300"
+                                                                            title="ตั้งค่าหัวฉีด"
+                                                                        >
+                                                                            ⚙️
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() =>
+                                                                                autoPlaceSprinklersInZone(
+                                                                                    zone.id
+                                                                                )
+                                                                            }
+                                                                            disabled={
+                                                                                !zone.sprinklerConfig
+                                                                            }
+                                                                            className="text-green-400 hover:text-green-300 disabled:cursor-not-allowed disabled:text-gray-500"
+                                                                            title="วางหัวฉีดในโซนนี้"
+                                                                        >
+                                                                            🤖
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() =>
+                                                                                deleteSprinklersByZone(
+                                                                                    zone.id
+                                                                                )
+                                                                            }
+                                                                            disabled={
+                                                                                zoneSprinklers.length ===
+                                                                                0
+                                                                            }
+                                                                            className="text-yellow-400 hover:text-yellow-300 disabled:cursor-not-allowed disabled:text-gray-500"
+                                                                            title="ลบหัวฉีดในโซนนี้"
+                                                                        >
+                                                                            💧
+                                                                        </button>
+                                                                    </>
+                                                                )}
                                                                 <button
                                                                     onClick={() =>
                                                                         deleteZone(zone.id)
@@ -2046,8 +1588,7 @@ export default function AdvancedGardenPlanner() {
                                                         </div>
 
                                                         {isConfigOpen &&
-                                                            zone.type !== 'forbidden' &&
-                                                            !isNestedZone && (
+                                                            zone.type !== 'forbidden' && (
                                                                 <div className="mt-3 space-y-3 border-t border-gray-600 pt-3">
                                                                     <div>
                                                                         <label className="mb-2 block text-xs font-medium text-gray-300">
@@ -2093,7 +1634,7 @@ export default function AdvancedGardenPlanner() {
                                                                                         </span>
                                                                                         <span className="font-medium text-gray-100">
                                                                                             {
-                                                                                                sprinkler.name
+                                                                                                sprinkler.nameEN
                                                                                             }
                                                                                         </span>
                                                                                     </div>
@@ -2163,32 +1704,13 @@ export default function AdvancedGardenPlanner() {
                                 </h3>
 
                                 <div className="space-y-4">
-                                    <div className="rounded-lg bg-blue-900/30 p-3 text-xs text-blue-300">
-                                        <div className="mb-1 font-medium">💡 การแสดงรัศมีใหม่</div>
-                                        <div>
-                                            รัศมีจะแสดงเต็มในพื้นที่โซน ตัดเฉพาะส่วนนอกโซน
-                                            <br />
-                                            แต่ละโซนสามารถเลือกประเภทหัวฉีดและรัศมีได้อิสระ
-                                            <br />
-                                            <span className="text-yellow-300">
-                                                🎯 หัวฉีดจะวางขนานกับขอบที่ยาวที่สุดของแต่ละโซน
-                                            </span>
-                                            <br />
-                                            <span className="text-green-300">
-                                                ✅ หลีกเลี่ยงโซนย่อยในพื้นที่หญ้าอัตโนมัติ
-                                            </span>
-                                        </div>
-                                    </div>
-
                                     <div className="space-y-2">
                                         <button
                                             onClick={autoPlaceAllSprinklers}
                                             disabled={
                                                 gardenZones.filter(
                                                     (z) =>
-                                                        z.type !== 'forbidden' &&
-                                                        z.sprinklerConfig &&
-                                                        !z.parentZoneId
+                                                        z.type !== 'forbidden' && z.sprinklerConfig
                                                 ).length === 0
                                             }
                                             className="w-full rounded-lg bg-purple-600 py-3 font-medium text-white transition-all hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-600"
@@ -2206,11 +1728,12 @@ export default function AdvancedGardenPlanner() {
                                         >
                                             📍{' '}
                                             {editMode === 'place'
-                                                ? 'กำลังวางหัวฉีด - คลิกในแผนที่'
+                                                ? designMode === 'map'
+                                                    ? 'กำลังวางหัวฉีด - คลิกในแผนที่'
+                                                    : 'กำลังวางหัวฉีด - คลิกในพื้นที่'
                                                 : 'วางหัวฉีดเอง'}
                                         </button>
 
-                                        {/* Manual Sprinkler Settings */}
                                         {editMode === 'place' && (
                                             <div className="mt-3 space-y-3 border-t border-gray-600 pt-3">
                                                 <div>
@@ -2236,7 +1759,7 @@ export default function AdvancedGardenPlanner() {
                                                                 <div className="flex items-center space-x-2">
                                                                     <span>{sprinkler.icon}</span>
                                                                     <span className="font-medium text-gray-100">
-                                                                        {sprinkler.name}
+                                                                        {sprinkler.nameEN}
                                                                     </span>
                                                                 </div>
                                                             </button>
@@ -2267,12 +1790,6 @@ export default function AdvancedGardenPlanner() {
                                                         </span>
                                                     </div>
                                                 </div>
-
-                                                <div className="rounded-md bg-green-900/30 p-2 text-xs text-green-300">
-                                                    💡 คลิกแผนที่เพื่อวางหัวฉีด •
-                                                    สามารถวางได้ทุกตำแหน่ง •
-                                                    ระบบจะกำหนดโซนให้อัตโนมัติ
-                                                </div>
                                             </div>
                                         )}
 
@@ -2286,7 +1803,9 @@ export default function AdvancedGardenPlanner() {
                                         >
                                             🚰{' '}
                                             {editMode === 'edit'
-                                                ? 'กำลังวางแหล่งน้ำ - คลิกแผนที่'
+                                                ? designMode === 'map'
+                                                    ? 'กำลังวางแหล่งน้ำ - คลิกแผนที่'
+                                                    : 'กำลังวางแหล่งน้ำ - คลิกในพื้นที่'
                                                 : 'วางแหล่งน้ำ'}
                                         </button>
 
@@ -2303,19 +1822,6 @@ export default function AdvancedGardenPlanner() {
                                                 ? 'กำลังปรับตำแหน่ง - ลากหัวฉีด'
                                                 : 'ปรับตำแหน่งหัวฉีด'}
                                         </button>
-
-                                        {editMode === 'edit' && (
-                                            <div className="rounded-md bg-green-900/30 p-2 text-xs text-green-300">
-                                                💡 คลิกตำแหน่งที่ต้องการวางแหล่งน้ำ
-                                            </div>
-                                        )}
-
-                                        {editMode === 'drag-sprinkler' && (
-                                            <div className="rounded-md bg-orange-900/30 p-2 text-xs text-orange-300">
-                                                💡 ลากหัวฉีดไปตำแหน่งที่ต้องการ • Right-click
-                                                เพื่อลบ
-                                            </div>
-                                        )}
 
                                         {sprinklers.length > 0 && (
                                             <button
@@ -2337,11 +1843,7 @@ export default function AdvancedGardenPlanner() {
                                             </h4>
                                             <div className="max-h-40 space-y-2 overflow-y-auto">
                                                 {gardenZones
-                                                    .filter(
-                                                        (zone) =>
-                                                            zone.type !== 'forbidden' &&
-                                                            !zone.parentZoneId
-                                                    )
+                                                    .filter((zone) => zone.type !== 'forbidden')
                                                     .map((zone) => {
                                                         const zoneSprinklers = sprinklers.filter(
                                                             (s) => s.zoneId === zone.id
@@ -2352,13 +1854,21 @@ export default function AdvancedGardenPlanner() {
                                                         const zoneType = ZONE_TYPES.find(
                                                             (z) => z.id === zone.type
                                                         );
-                                                        const nestedZones = gardenZones.filter(
-                                                            (z) => z.parentZoneId === zone.id
-                                                        );
+                                                        const isNestedZone = !!zone.parentZoneId;
+
                                                         return (
                                                             <div
                                                                 key={zone.id}
-                                                                className="rounded-lg bg-gray-700 p-2 text-xs"
+                                                                className={`rounded-lg p-2 text-xs ${
+                                                                    isNestedZone
+                                                                        ? 'ml-4 border-l-2 bg-gray-600'
+                                                                        : 'bg-gray-700'
+                                                                }`}
+                                                                style={{
+                                                                    borderLeftColor: isNestedZone
+                                                                        ? zoneType?.color
+                                                                        : undefined,
+                                                                }}
                                                             >
                                                                 <div className="flex items-center justify-between">
                                                                     <div className="flex items-center space-x-2">
@@ -2367,16 +1877,6 @@ export default function AdvancedGardenPlanner() {
                                                                         </span>
                                                                         <span className="font-medium text-gray-100">
                                                                             {zone.name}
-                                                                            {nestedZones.length >
-                                                                                0 && (
-                                                                                <span className="ml-1 text-yellow-300">
-                                                                                    (+
-                                                                                    {
-                                                                                        nestedZones.length
-                                                                                    }{' '}
-                                                                                    โซนย่อย)
-                                                                                </span>
-                                                                            )}
                                                                         </span>
                                                                     </div>
                                                                     <div className="text-right">
@@ -2393,7 +1893,7 @@ export default function AdvancedGardenPlanner() {
                                                                                             zone
                                                                                                 .sprinklerConfig!
                                                                                                 .type
-                                                                                    )?.name
+                                                                                    )?.nameEN
                                                                                 }
                                                                             </div>
                                                                         )}
@@ -2403,7 +1903,6 @@ export default function AdvancedGardenPlanner() {
                                                         );
                                                     })}
 
-                                                {/* Show manual sprinklers */}
                                                 {sprinklers.filter(
                                                     (s) => s.zoneId === 'virtual_zone'
                                                 ).length > 0 && (
@@ -2434,20 +1933,6 @@ export default function AdvancedGardenPlanner() {
                                                     </div>
                                                 )}
                                             </div>
-
-                                            <div className="mt-3 border-t border-gray-600 pt-2">
-                                                <div className="text-xs text-blue-300">
-                                                    <div className="font-medium">
-                                                        ระบบท่อที่เป็นระเบียบ:
-                                                    </div>
-                                                    {sprinklers.length > 0 && (
-                                                        <div className="mt-1">
-                                                            โซนที่ใช้งาน: {statistics.activeZones}{' '}
-                                                            โซน
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -2457,558 +1942,248 @@ export default function AdvancedGardenPlanner() {
                         {activeTab === 'pipes' && (
                             <div className="rounded-xl bg-gray-800/90 p-6 shadow-2xl backdrop-blur">
                                 <h3 className="mb-4 text-xl font-semibold text-blue-400">
-                                    🔧 ระบบท่อน้ำขั้นสูง
+                                    🔧 ระบบท่อน้ำ
                                 </h3>
 
                                 <div className="space-y-4">
-                                    {!mainPipe ? (
-                                        <div className="space-y-3">
-                                            <div className="rounded-lg bg-blue-900/30 p-3 text-xs text-blue-300">
-                                                <div className="mb-1 font-medium">
-                                                    📍 หลักการออกแบบใหม่
-                                                </div>
-                                                <div>
-                                                    ✨ Smart Grid Layout - จัดท่อตาม pattern หัวฉีด
-                                                    <br />
-                                                    🎯 Zone-based System - แยกระบบตามโซน
-                                                    <br />
-                                                    ⚡ Hierarchical Design - ท่อเมน → ท่อรอง →
-                                                    ท่อย่อย
-                                                    <br />
-                                                    <span className="text-yellow-300">
-                                                        🔥 NEW: รองรับโซนซ้อน หลีกเลี่ยงโซนย่อย
-                                                    </span>
-                                                </div>
+                                    {!waterSource ? (
+                                        <div className="rounded-lg border border-amber-500 bg-amber-900/30 p-4 text-amber-200">
+                                            <div className="mb-2 flex items-center gap-2">
+                                                <span className="text-lg">⚠️</span>
+                                                <span className="font-semibold">
+                                                    ต้องวางแหล่งน้ำก่อน
+                                                </span>
                                             </div>
-
-                                            <button
-                                                onClick={() => {
-                                                    setEditMode('main-pipe');
-                                                    setMainPipeDrawing([]);
-                                                }}
-                                                disabled={!waterSource}
-                                                className={`w-full rounded-lg py-3 font-medium transition-all ${
-                                                    editMode === 'main-pipe'
-                                                        ? 'bg-blue-600 text-white shadow-lg'
-                                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                                } disabled:cursor-not-allowed disabled:bg-gray-600`}
-                                            >
-                                                🏗️{' '}
-                                                {editMode === 'main-pipe'
-                                                    ? 'กำลังวางท่อเมน - คลิกแผนที่'
-                                                    : 'วางท่อเมน'}
-                                            </button>
-
-                                            {editMode === 'main-pipe' && (
-                                                <div className="space-y-2">
-                                                    <div className="rounded-md bg-blue-900/30 p-2 text-xs text-blue-300">
-                                                        💡 คลิกแผนที่เพื่อวางจุดท่อเมน • อย่างน้อย 2
-                                                        จุด
-                                                    </div>
-                                                    <div className="text-xs text-gray-400">
-                                                        จุดที่วางแล้ว: {mainPipeDrawing.length}
-                                                    </div>
-                                                    <div className="flex space-x-2">
-                                                        <button
-                                                            onClick={finishMainPipe}
-                                                            disabled={mainPipeDrawing.length < 2}
-                                                            className="flex-1 rounded-lg bg-green-600 py-2 text-sm font-medium text-white transition-all hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-600"
-                                                        >
-                                                            ✅ เสร็จสิ้น
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setMainPipeDrawing([])}
-                                                            className="flex-1 rounded-lg bg-red-600 py-2 text-sm font-medium text-white transition-all hover:bg-red-700"
-                                                        >
-                                                            🗑️ ล้าง
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            )}
+                                            <p className="text-sm">
+                                                กรุณาไปแท็บ "วางหัวฉีด" และกดปุ่ม "วางแหล่งน้ำ"
+                                                ก่อนสร้างระบบท่อ
+                                            </p>
+                                        </div>
+                                    ) : sprinklers.length === 0 ? (
+                                        <div className="rounded-lg border border-amber-500 bg-amber-900/30 p-4 text-amber-200">
+                                            <div className="mb-2 flex items-center gap-2">
+                                                <span className="text-lg">⚠️</span>
+                                                <span className="font-semibold">
+                                                    ต้องวางหัวฉีดก่อน
+                                                </span>
+                                            </div>
+                                            <p className="text-sm">
+                                                กรุณาไปแท็บ "วางหัวฉีด" และวางหัวฉีดก่อนสร้างระบบท่อ
+                                            </p>
                                         </div>
                                     ) : (
                                         <div className="space-y-3">
                                             <div className="rounded-lg bg-green-900/30 p-3 text-xs text-green-300">
                                                 <div className="mb-1 font-medium">
-                                                    ✅ ท่อเมนเสร็จแล้ว
+                                                    ✅ พร้อมสร้างระบบท่อแล้ว
                                                 </div>
                                                 <div>
-                                                    ความยาว: {formatDistance(mainPipe.totalLength)}
+                                                    แหล่งน้ำ: 1 จุด • หัวฉีด: {sprinklers.length}{' '}
+                                                    ตัว
                                                 </div>
                                             </div>
 
-                                            <div className="rounded-lg bg-purple-900/30 p-3 text-xs text-purple-300">
-                                                <div className="mb-1 font-medium">
-                                                    🚀 ระบบท่ออัจฉริยะ
-                                                </div>
-                                                <div>
-                                                    สร้างท่อรองและท่อย่อยตามรูปแบบ Grid
-                                                    ที่เป็นระเบียบ
-                                                    <br />
-                                                    <span className="text-yellow-300">
-                                                        🎯
-                                                        ท่อรองจะเชื่อมไปยังหัวฉีดที่ใกล้ท่อเมนที่สุด
-                                                    </span>
-                                                    <br />
-                                                    <span className="text-green-300">
-                                                        ⚡ ท่อย่อยเดินผ่านแถวของหัวฉีด
-                                                        (หลีกเลี่ยงโซนย่อย)
-                                                    </span>
-                                                </div>
-                                                {sprinklers.length > 0 && (
-                                                    <div className="mt-1 text-purple-200">
-                                                        จะสร้าง:{' '}
-                                                        {
-                                                            Object.keys(
-                                                                sprinklers.reduce(
-                                                                    (acc, s) => ({
-                                                                        ...acc,
-                                                                        [s.zoneId]: true,
-                                                                    }),
-                                                                    {}
-                                                                )
-                                                            ).length
-                                                        }{' '}
-                                                        โซน
+                                            <button
+                                                onClick={generatePipeNetwork}
+                                                disabled={
+                                                    !waterSource ||
+                                                    sprinklers.length === 0 ||
+                                                    isGeneratingPipes
+                                                }
+                                                className="w-full rounded-lg bg-blue-600 py-4 text-lg font-bold text-white transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-600"
+                                            >
+                                                {isGeneratingPipes ? (
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                                                        🔧 กำลังสร้างระบบท่อ...
                                                     </div>
+                                                ) : (
+                                                    '🚀 สร้างระบบท่ออัตโนมัติ'
                                                 )}
-                                            </div>
-
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <button
-                                                    onClick={createSmartPipeLayout}
-                                                    disabled={sprinklers.length === 0}
-                                                    className="rounded-lg bg-purple-600 py-3 text-sm font-medium text-white transition-all hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-600"
-                                                >
-                                                    🤖 สร้างท่ออัตโนมัติ
-                                                </button>
-
-                                                <button
-                                                    onClick={() => {
-                                                        clearManualPipeMode();
-                                                        setManualPipeMode(
-                                                            manualPipeMode ? null : 'select-pipes'
-                                                        );
-                                                    }}
-                                                    className={`rounded-lg py-3 text-sm font-medium transition-all ${
-                                                        manualPipeMode === 'select-pipes'
-                                                            ? 'bg-orange-600 text-white'
-                                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                                    }`}
-                                                >
-                                                    ✂️{' '}
-                                                    {manualPipeMode === 'select-pipes'
-                                                        ? 'เลือกท่อลบ'
-                                                        : 'แก้ไขท่อ'}
-                                                </button>
-                                            </div>
-
-                                            {manualPipeMode === 'select-pipes' && (
-                                                <div className="space-y-2">
-                                                    <div className="rounded-md bg-orange-900/30 p-2 text-xs text-orange-300">
-                                                        💡 คลิกท่อที่ต้องการลบ • เลือกได้หลายเส้น
-                                                    </div>
-                                                    <div className="flex space-x-2">
-                                                        <button
-                                                            onClick={deleteSelectedPipes}
-                                                            disabled={selectedPipes.size === 0}
-                                                            className="flex-1 rounded-lg bg-red-600 py-2 text-sm font-medium text-white transition-all hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-600"
-                                                        >
-                                                            🗑️ ลบท่อ ({selectedPipes.size})
-                                                        </button>
-                                                        <button
-                                                            onClick={clearManualPipeMode}
-                                                            className="flex-1 rounded-lg bg-gray-600 py-2 text-sm font-medium text-white transition-all hover:bg-gray-700"
-                                                        >
-                                                            ❌ ยกเลิก
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            <button
-                                                onClick={() => {
-                                                    clearManualPipeMode();
-                                                    setManualPipeMode(
-                                                        manualPipeMode === 'connect-sprinklers'
-                                                            ? null
-                                                            : 'connect-sprinklers'
-                                                    );
-                                                }}
-                                                disabled={sprinklers.length < 2}
-                                                className={`w-full rounded-lg py-3 text-sm font-medium transition-all ${
-                                                    manualPipeMode === 'connect-sprinklers'
-                                                        ? 'bg-green-600 text-white'
-                                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                                } disabled:cursor-not-allowed disabled:bg-gray-600`}
-                                            >
-                                                🔗{' '}
-                                                {manualPipeMode === 'connect-sprinklers'
-                                                    ? 'เชื่อมต่อหัวฉีด'
-                                                    : 'เดินท่อเอง'}
                                             </button>
 
-                                            {manualPipeMode === 'connect-sprinklers' && (
-                                                <div className="space-y-2">
-                                                    <div className="rounded-md bg-green-900/30 p-2 text-xs text-green-300">
-                                                        💡 คลิกหัวฉีด 2 ตัวเพื่อเชื่อมต่อด้วยท่อ
+                                            {pipeGenerationError && (
+                                                <div className="rounded-lg border border-red-500 bg-red-900/30 p-3 text-red-200">
+                                                    <div className="mb-1 flex items-center gap-2">
+                                                        <span className="text-lg">❌</span>
+                                                        <span className="font-semibold">
+                                                            เกิดข้อผิดพลาด
+                                                        </span>
                                                     </div>
-                                                    <div className="text-xs text-gray-400">
-                                                        เลือกแล้ว:{' '}
-                                                        {selectedSprinklersForPipe.length}/2 ตัว
-                                                    </div>
-                                                    <div className="flex space-x-2">
-                                                        <button
-                                                            onClick={createManualPipe}
-                                                            disabled={
-                                                                selectedSprinklersForPipe.length !==
-                                                                2
-                                                            }
-                                                            className="flex-1 rounded-lg bg-blue-600 py-2 text-sm font-medium text-white transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-600"
-                                                        >
-                                                            ➕ สร้างท่อ
-                                                        </button>
-                                                        <button
-                                                            onClick={() =>
-                                                                setSelectedSprinklersForPipe([])
-                                                            }
-                                                            className="flex-1 rounded-lg bg-gray-600 py-2 text-sm font-medium text-white transition-all hover:bg-gray-700"
-                                                        >
-                                                            🔄 ล้าง
-                                                        </button>
-                                                    </div>
+                                                    <p className="text-sm">{pipeGenerationError}</p>
                                                 </div>
                                             )}
 
-                                            <button
-                                                onClick={clearMainPipe}
-                                                className="w-full rounded-lg bg-red-600 py-3 font-medium text-white transition-all hover:bg-red-700"
-                                            >
-                                                🗑️ เริ่มระบบท่อใหม่
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {(mainPipe || pipes.length > 0) && (
-                                        <div className="space-y-2 border-t border-gray-700 pt-4 text-sm">
-                                            {mainPipe && (
-                                                <div className="rounded-lg bg-blue-900/30 p-3">
-                                                    <div className="font-medium text-blue-300">
-                                                        ท่อเมน
-                                                    </div>
-                                                    <div className="text-xs text-blue-200">
-                                                        {mainPipe.points.length} จุด •{' '}
-                                                        {formatDistance(mainPipe.totalLength)}
-                                                    </div>
-                                                </div>
-                                            )}
-                                            {pipes.filter((p) => p.type === 'submain').length >
-                                                0 && (
-                                                <div className="rounded-lg bg-purple-900/30 p-3">
-                                                    <div className="font-medium text-purple-300">
-                                                        ท่อรอง (Submain)
-                                                    </div>
-                                                    <div className="text-xs text-purple-200">
-                                                        {
-                                                            pipes.filter(
-                                                                (p) => p.type === 'submain'
-                                                            ).length
-                                                        }{' '}
-                                                        เส้น •
-                                                        {formatDistance(
-                                                            pipes
-                                                                .filter((p) => p.type === 'submain')
-                                                                .reduce(
+                                            {pipes.length > 0 && (
+                                                <div className="space-y-3">
+                                                    <div className="rounded-lg bg-purple-900/30 p-3 text-sm text-purple-300">
+                                                        <div className="mb-1 font-medium">
+                                                            📊 สถิติระบบท่อ (สีเหลือง):
+                                                        </div>
+                                                        <div>
+                                                            จำนวนท่อทั้งหมด: {pipes.length} เส้น
+                                                        </div>
+                                                        <div>
+                                                            ความยาวรวม:{' '}
+                                                            {formatDistance(
+                                                                pipes.reduce(
                                                                     (sum, p) => sum + p.length,
                                                                     0
                                                                 )
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            )}
-                                            {pipes.filter((p) => p.type === 'lateral').length >
-                                                0 && (
-                                                <div className="rounded-lg bg-green-900/30 p-3">
-                                                    <div className="font-medium text-green-300">
-                                                        ท่อย่อย (Lateral)
-                                                    </div>
-                                                    <div className="text-xs text-green-200">
-                                                        {
-                                                            pipes.filter(
-                                                                (p) => p.type === 'lateral'
-                                                            ).length
-                                                        }{' '}
-                                                        เส้น •
-                                                        {formatDistance(
-                                                            pipes
-                                                                .filter((p) => p.type === 'lateral')
-                                                                .reduce(
-                                                                    (sum, p) => sum + p.length,
-                                                                    0
-                                                                )
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {activeTab === 'summary' && (
-                            <div className="rounded-xl bg-gray-800/90 p-6 shadow-2xl backdrop-blur">
-                                <h3 className="mb-4 text-xl font-semibold text-blue-400">
-                                    📊 สรุปผลการออกแบบ
-                                </h3>
-
-                                <div className="space-y-4 text-sm">
-                                    <div className="rounded-lg bg-gradient-to-r from-blue-900/50 to-green-900/50 p-4">
-                                        <h4 className="mb-3 font-medium text-blue-300">
-                                            📋 สรุปข้อมูลรวม
-                                        </h4>
-                                        <div className="grid grid-cols-2 gap-2 text-xs">
-                                            <div className="flex justify-between">
-                                                <span className="text-gray-300">จำนวนโซนหลัก:</span>
-                                                <span className="font-medium text-white">
-                                                    {statistics.zoneDetails.reduce(
-                                                        (sum, z) => sum + z.count,
-                                                        0
-                                                    )}{' '}
-                                                    โซน
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-gray-300">จำนวนโซนย่อย:</span>
-                                                <span className="font-medium text-white">
-                                                    {statistics.zoneDetails.reduce(
-                                                        (sum, z) => sum + z.nestedCount,
-                                                        0
-                                                    )}{' '}
-                                                    โซน
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-gray-300">พื้นที่รวม:</span>
-                                                <span className="font-medium text-white">
-                                                    {formatArea(statistics.totalArea)}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-gray-300">
-                                                    หัวฉีดทั้งหมด:
-                                                </span>
-                                                <span className="font-medium text-blue-400">
-                                                    {statistics.totalSprinklers} ตัว
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-gray-300">
-                                                    ท่อรวมทั้งหมด:
-                                                </span>
-                                                <span className="font-medium text-orange-400">
-                                                    {formatDistance(statistics.totalPipeLength)}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-gray-300">
-                                                    การคลุมพื้นที่:
-                                                </span>
-                                                <span className="font-medium text-green-400">
-                                                    {statistics.coveragePercentage.toFixed(1)}%
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* ระบบท่อ */}
-                                    <div className="rounded-lg bg-purple-900/30 p-4">
-                                        <h4 className="mb-3 font-medium text-purple-300">
-                                            🔧 รายละเอียดระบบท่อ
-                                        </h4>
-                                        <div className="space-y-2 text-xs">
-                                            {mainPipe && (
-                                                <div className="flex justify-between rounded bg-blue-900/20 p-2">
-                                                    <span className="text-blue-300">ท่อเมน:</span>
-                                                    <span className="font-medium text-white">
-                                                        {formatDistance(
-                                                            statistics.totalMainPipeLength
-                                                        )}
-                                                    </span>
-                                                </div>
-                                            )}
-                                            {statistics.submainPipeCount > 0 && (
-                                                <>
-                                                    <div className="flex justify-between rounded bg-purple-900/20 p-2">
-                                                        <span className="text-purple-300">
-                                                            ท่อรอง ({statistics.submainPipeCount}{' '}
-                                                            เส้น):
-                                                        </span>
-                                                        <span className="font-medium text-white">
-                                                            {formatDistance(
-                                                                statistics.totalSubmainPipeLength
                                                             )}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex justify-between rounded bg-purple-800/20 p-2">
-                                                        <span className="text-purple-200">
-                                                            ท่อรองยาวสุด:
-                                                        </span>
-                                                        <span className="font-medium text-yellow-300">
-                                                            {formatDistance(
-                                                                statistics.longestSubmainPipe
-                                                            )}
-                                                        </span>
-                                                    </div>
-                                                </>
-                                            )}
-                                            {statistics.lateralPipeCount > 0 && (
-                                                <>
-                                                    <div className="flex justify-between rounded bg-green-900/20 p-2">
-                                                        <span className="text-green-300">
-                                                            ท่อย่อย ({statistics.lateralPipeCount}{' '}
-                                                            เส้น):
-                                                        </span>
-                                                        <span className="font-medium text-white">
-                                                            {formatDistance(
-                                                                statistics.totalLateralPipeLength
-                                                            )}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex justify-between rounded bg-green-800/20 p-2">
-                                                        <span className="text-green-200">
-                                                            ท่อย่อยยาวสุด:
-                                                        </span>
-                                                        <span className="font-medium text-yellow-300">
-                                                            {formatDistance(
-                                                                statistics.longestLateralPipe
-                                                            )}
-                                                        </span>
-                                                    </div>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className="rounded-lg bg-green-900/30 p-4">
-                                        <h4 className="mb-3 font-medium text-green-300">
-                                            🌿 รายละเอียดแต่ละโซน
-                                        </h4>
-                                        <div className="space-y-3 text-xs">
-                                            {statistics.zoneDetails.map((zoneDetail, index) => (
-                                                <div
-                                                    key={index}
-                                                    className="border-l-4 border-opacity-50 pl-3"
-                                                    style={{
-                                                        borderColor: ZONE_TYPES.find(
-                                                            (z) => z.id === zoneDetail.id
-                                                        )?.color,
-                                                    }}
-                                                >
-                                                    <div className="mb-2 font-medium text-white">
-                                                        {zoneDetail.icon} {zoneDetail.type}
-                                                    </div>
-                                                    <div className="space-y-1 text-gray-300">
-                                                        <div className="flex justify-between">
-                                                            <span>จำนวนโซนหลัก:</span>
-                                                            <span className="font-medium">
-                                                                {zoneDetail.count} โซน
-                                                            </span>
                                                         </div>
-                                                        {zoneDetail.nestedCount > 0 && (
-                                                            <div className="flex justify-between">
-                                                                <span>จำนวนโซนย่อย:</span>
-                                                                <span className="font-medium text-yellow-300">
-                                                                    {zoneDetail.nestedCount} โซน
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                        <div className="flex justify-between">
-                                                            <span>พื้นที่รวม:</span>
-                                                            <span className="font-medium">
-                                                                {formatArea(zoneDetail.totalArea)}
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex justify-between">
-                                                            <span>จำนวนหัวฉีด:</span>
-                                                            <span className="font-medium text-blue-400">
-                                                                {zoneDetail.sprinklers} ตัว
-                                                            </span>
+                                                    </div>
+
+                                                    {/* Pipe editing controls */}
+                                                    <div className="rounded-lg bg-blue-900/30 p-3">
+                                                        <div className="mb-2 text-sm font-medium text-blue-300">
+                                                            🔧 แก้ไขระบบท่อ:
                                                         </div>
 
-                                                        {/* รายละเอียดแต่ละโซนย่อย */}
-                                                        {zoneDetail.zones.map((zone, zoneIndex) => (
-                                                            <div
-                                                                key={zoneIndex}
-                                                                className="mt-2 rounded bg-black/20 p-2"
+                                                        <div className="mb-3 flex gap-2">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setPipeEditMode(
+                                                                        pipeEditMode === 'add'
+                                                                            ? 'view'
+                                                                            : 'add'
+                                                                    );
+                                                                    setSelectedSprinklersForPipe(
+                                                                        []
+                                                                    );
+                                                                }}
+                                                                className={`flex-1 rounded py-2 text-xs font-medium transition-all ${
+                                                                    pipeEditMode === 'add'
+                                                                        ? 'bg-green-600 text-white'
+                                                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                                }`}
                                                             >
-                                                                <div className="text-xs font-medium text-gray-200">
-                                                                    {zone.zoneName}
-                                                                </div>
-                                                                <div className="grid grid-cols-2 gap-1 text-xs text-gray-400">
-                                                                    <div>
-                                                                        พื้นที่:{' '}
-                                                                        {formatArea(zone.area)}
-                                                                    </div>
-                                                                    <div>
-                                                                        หัวฉีด:{' '}
-                                                                        {zone.sprinklerCount} ตัว
-                                                                    </div>
-                                                                    {zone.sprinklerType && (
-                                                                        <>
-                                                                            <div>
-                                                                                ประเภท:{' '}
-                                                                                {
-                                                                                    zone
-                                                                                        .sprinklerType
-                                                                                        .name
-                                                                                }
-                                                                            </div>
-                                                                            <div>
-                                                                                รัศมี:{' '}
-                                                                                {
-                                                                                    zone.sprinklerRadius
-                                                                                }{' '}
-                                                                                ม.
-                                                                            </div>
-                                                                        </>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        ))}
+                                                                ➕ เพิ่มท่อ
+                                                            </button>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setPipeEditMode(
+                                                                        pipeEditMode === 'remove'
+                                                                            ? 'view'
+                                                                            : 'remove'
+                                                                    );
+                                                                    setSelectedSprinklersForPipe(
+                                                                        []
+                                                                    );
+                                                                }}
+                                                                className={`flex-1 rounded py-2 text-xs font-medium transition-all ${
+                                                                    pipeEditMode === 'remove'
+                                                                        ? 'bg-red-600 text-white'
+                                                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                                }`}
+                                                            >
+                                                                ➖ ลบท่อ
+                                                            </button>
+                                                        </div>
 
-                                                        {/* โซนย่อย */}
-                                                        {zoneDetail.nestedZones.map(
-                                                            (nestedZone, nestedIndex) => (
-                                                                <div
-                                                                    key={nestedIndex}
-                                                                    className="mt-2 rounded bg-yellow-900/20 p-2"
-                                                                >
-                                                                    <div className="text-xs font-medium text-yellow-200">
-                                                                        ↳ {nestedZone.zoneName}{' '}
-                                                                        (โซนย่อย)
-                                                                    </div>
-                                                                    <div className="grid grid-cols-2 gap-1 text-xs text-gray-400">
-                                                                        <div>
-                                                                            พื้นที่:{' '}
-                                                                            {formatArea(
-                                                                                nestedZone.area
-                                                                            )}
-                                                                        </div>
-                                                                        <div>
-                                                                            หัวฉีด:{' '}
-                                                                            {
-                                                                                nestedZone.sprinklerCount
-                                                                            }{' '}
-                                                                            ตัว
-                                                                        </div>
-                                                                    </div>
+                                                        {pipeEditMode === 'add' && (
+                                                            <div className="space-y-2">
+                                                                <div className="text-xs text-blue-200">
+                                                                    เลือกหัวฉีด 2
+                                                                    ตัวเพื่อเชื่อมต่อท่อ (
+                                                                    {
+                                                                        selectedSprinklersForPipe.length
+                                                                    }
+                                                                    /2)
                                                                 </div>
-                                                            )
+                                                                {selectedSprinklersForPipe.length ===
+                                                                    2 && (
+                                                                    <button
+                                                                        onClick={
+                                                                            addPipeBetweenSprinklers
+                                                                        }
+                                                                        className="w-full rounded bg-green-700 py-2 text-xs font-medium text-white hover:bg-green-600"
+                                                                    >
+                                                                        ✅ เชื่อมต่อท่อ
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        {pipeEditMode === 'remove' && (
+                                                            <div className="space-y-2">
+                                                                <div className="text-xs text-red-200">
+                                                                    เลือกหัวฉีด 2
+                                                                    ตัวเพื่อลบท่อระหว่างกัน (
+                                                                    {
+                                                                        selectedSprinklersForPipe.length
+                                                                    }
+                                                                    /2)
+                                                                </div>
+                                                                {selectedSprinklersForPipe.length ===
+                                                                    2 && (
+                                                                    <button
+                                                                        onClick={
+                                                                            removePipesBetweenSprinklers
+                                                                        }
+                                                                        className="w-full rounded bg-red-700 py-2 text-xs font-medium text-white hover:bg-red-600"
+                                                                    >
+                                                                        🗑️
+                                                                        ลบท่อระหว่างหัวฉีดที่เลือก
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        {selectedPipes.size > 0 && (
+                                                            <div className="mt-2 space-y-2">
+                                                                <div className="text-xs text-yellow-200">
+                                                                    เลือกแล้ว: {selectedPipes.size}{' '}
+                                                                    ท่อ
+                                                                </div>
+                                                                <button
+                                                                    onClick={deleteSelectedPipes}
+                                                                    className="w-full rounded bg-red-700 py-2 text-xs font-medium text-white hover:bg-red-600"
+                                                                >
+                                                                    🗑️ ลบท่อที่เลือก
+                                                                </button>
+                                                            </div>
                                                         )}
                                                     </div>
+
+                                                    <button
+                                                        onClick={clearPipes}
+                                                        className="w-full rounded-lg bg-red-600 py-3 font-medium text-white transition-all hover:bg-red-700"
+                                                    >
+                                                        🗑️ ลบระบบท่อทั้งหมด
+                                                    </button>
                                                 </div>
-                                            ))}
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <div className="border-t border-gray-600 pt-4">
+                                        <h4 className="mb-2 text-sm font-semibold text-gray-300">
+                                            💡 วิธีการทำงาน (ระบบใหม่):
+                                        </h4>
+                                        <div className="space-y-2 text-xs text-gray-400">
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-blue-400">1.</span>
+                                                <span>วิเคราะห์จำนวนหัวฉีดและตำแหน่ง</span>
+                                            </div>
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-blue-400">2.</span>
+                                                <span>เชื่อมต่อตรงสำหรับ ≤3 หัวฉีด</span>
+                                            </div>
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-blue-400">3.</span>
+                                                <span>ใช้ MST algorithm สำหรับ &gt;3 หัวฉีด</span>
+                                            </div>
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-blue-400">4.</span>
+                                                <span>
+                                                    ท่อทุกเส้นมีขนาดเดียวกัน (ไม่แบ่งหลัก/สาขา)
+                                                </span>
+                                            </div>
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-green-400">5.</span>
+                                                <span>สามารถแก้ไขเพิ่ม/ลบท่อได้หลังสร้างแล้ว</span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -3017,402 +2192,151 @@ export default function AdvancedGardenPlanner() {
                     </div>
 
                     <div className="lg:col-span-3">
-                        {activeTab === 'summary' ? (
-                            <div className="space-y-6">
-                                <div className="h-[70vh] rounded-xl bg-gray-800/90 p-6 shadow-2xl backdrop-blur">
-                                    <h3 className="mb-4 text-xl font-semibold text-blue-400">
-                                        🗺️ แผนผังโครงการ
-                                    </h3>
-                                    {gardenZones.length > 0 || sprinklers.length > 0 ? (
-                                        <div className="h-[70vh]">
-                                            <div className="mb-2 text-xs text-gray-400">
-                                                โซน: {gardenZones.length} | หัวฉีด:{' '}
-                                                {sprinklers.length} | แหล่งน้ำ:{' '}
-                                                {waterSource ? '1' : '0'}
-                                            </div>
-                                            <StaticMapOverview
-                                                gardenZones={gardenZones}
-                                                sprinklers={sprinklers}
-                                                waterSource={waterSource}
-                                                pipes={pipes}
-                                                mainPipe={mainPipe}
-                                            />
-                                        </div>
-                                    ) : (
-                                        <div className="flex h-80 w-full items-center justify-center rounded-xl border-2 border-dashed border-gray-600 bg-gray-700/50">
-                                            <div className="text-center text-gray-400">
-                                                <div className="mb-2 text-4xl">🗺️</div>
-                                                <div className="text-lg">
-                                                    ยังไม่มีข้อมูลการออกแบบ
-                                                </div>
-                                                <div className="mt-1 text-sm">
-                                                    กรุณาเริ่มต้นจากการสร้างโซนพื้นที่
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="relative h-[70vh] overflow-hidden rounded-xl border border-gray-600 shadow-2xl">
-                                <MapSearchBox
-                                    searchQuery={searchQuery}
-                                    searchResults={searchResults}
-                                    isSearching={isSearching}
-                                    showSearchResults={showSearchResults}
-                                    onSearchChange={handleSearchInputChange}
-                                    onResultClick={handleSearchResultClick}
-                                    onClear={clearSearch}
+                        <div className="relative h-[83vh] overflow-hidden rounded-xl border border-gray-600 shadow-2xl">
+                            {designMode === 'map' && (
+                                <GoogleMapDesigner
+                                    gardenZones={gardenZones}
+                                    sprinklers={sprinklers}
+                                    waterSource={waterSource}
+                                    pipes={pipes}
+                                    selectedZoneType={selectedZoneType}
+                                    editMode={editMode}
+                                    manualSprinklerType={manualSprinklerType}
+                                    manualSprinklerRadius={manualSprinklerRadius}
+                                    selectedSprinkler={selectedSprinkler}
+                                    selectedPipes={selectedPipes}
+                                    selectedSprinklersForPipe={selectedSprinklersForPipe}
+                                    mainPipeDrawing={[]}
+                                    onZoneCreated={handleZoneCreated}
+                                    onZoneDeleted={handleZoneDeleted}
+                                    onSprinklerPlaced={(position) => {
+                                        const { lat, lng } = position;
+                                        handleMapClick({ latlng: { lat, lng } });
+                                    }}
+                                    onWaterSourcePlaced={(position) => {
+                                        setWaterSource({
+                                            id: `source_${Date.now()}`,
+                                            position,
+                                            type: 'main',
+                                        });
+                                    }}
+                                    onMainPipeClick={() => {}}
+                                    onSprinklerClick={handleSprinklerClickForPipe}
+                                    onSprinklerDelete={(sprinklerId) => {
+                                        setSprinklers((prev) =>
+                                            prev.filter((s) => s.id !== sprinklerId)
+                                        );
+                                        if (selectedSprinkler === sprinklerId) {
+                                            setSelectedSprinkler(null);
+                                        }
+                                        setSelectedSprinklersForPipe((prev) =>
+                                            prev.filter((id) => id !== sprinklerId)
+                                        );
+                                    }}
+                                    onSprinklerDragged={(sprinklerId, position) => {
+                                        setSprinklers((prev) =>
+                                            prev.map((s) =>
+                                                s.id === sprinklerId ? { ...s, position } : s
+                                            )
+                                        );
+                                    }}
+                                    onWaterSourceDelete={() => setWaterSource(null)}
+                                    onPipeClick={handlePipeClick}
+                                    onMapClick={handleMapClick}
+                                    mapCenter={mapCenter}
+                                    pipeEditMode={pipeEditMode}
                                 />
+                            )}
 
-                                <MapContainer
-                                    center={mapCenter}
-                                    zoom={16}
-                                    maxZoom={22}
-                                    scrollWheelZoom={true}
-                                    style={{ height: '100%', width: '100%' }}
-                                    ref={mapRef}
-                                >
-                                    <MapController center={mapCenter} />
-                                    <LayersControl position="topright">
-                                        <LayersControl.BaseLayer checked name="ภาพถ่ายดาวเทียม">
-                                            <TileLayer
-                                                url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
-                                                attribution="Google Maps"
-                                                maxNativeZoom={22}
-                                                maxZoom={22}
-                                            />
-                                        </LayersControl.BaseLayer>
-                                        <LayersControl.BaseLayer name="แผนที่ถนน">
-                                            <TileLayer
-                                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                                attribution="OpenStreetMap"
-                                                maxNativeZoom={19}
-                                                maxZoom={22}
-                                            />
-                                        </LayersControl.BaseLayer>
-                                    </LayersControl>
-
-                                    {/* Sort zones so that parent zones are rendered before child zones */}
-                                    {[...gardenZones]
-                                        .sort((a, b) => {
-                                            if (a.parentZoneId && !b.parentZoneId) return 1;
-                                            if (!a.parentZoneId && b.parentZoneId) return -1;
-                                            return 0;
-                                        })
-                                        .map((zone) => {
-                                            const zoneType = ZONE_TYPES.find(
-                                                (z) => z.id === zone.type
+                            {designMode === 'canvas' && (
+                                <div className="flex h-full w-full items-center justify-center bg-gray-900">
+                                    <CanvasDesigner
+                                        gardenZones={gardenZones}
+                                        sprinklers={sprinklers}
+                                        waterSource={waterSource}
+                                        pipes={pipes}
+                                        selectedZoneType={selectedZoneType}
+                                        editMode={editMode}
+                                        manualSprinklerType={manualSprinklerType}
+                                        manualSprinklerRadius={manualSprinklerRadius}
+                                        selectedSprinkler={selectedSprinkler}
+                                        selectedPipes={selectedPipes}
+                                        selectedSprinklersForPipe={selectedSprinklersForPipe}
+                                        mainPipeDrawing={[]}
+                                        canvasData={canvasData}
+                                        onZoneCreated={handleCanvasZoneCreated}
+                                        onSprinklerPlaced={handleCanvasSprinklerPlaced}
+                                        onWaterSourcePlaced={handleCanvasWaterSourcePlaced}
+                                        onMainPipePoint={() => {}}
+                                        onSprinklerDragged={handleCanvasSprinklerDragged}
+                                        onSprinklerClick={handleCanvasSprinklerClick}
+                                        onSprinklerDelete={(id) => {
+                                            setSprinklers((prev) =>
+                                                prev.filter((s) => s.id !== id)
                                             );
-                                            const isNestedZone = !!zone.parentZoneId;
-                                            return (
-                                                <Polygon
-                                                    key={zone.id}
-                                                    positions={zone.coordinates.map((c) => [
-                                                        c.lat,
-                                                        c.lng,
-                                                    ])}
-                                                    pathOptions={{
-                                                        color: zoneType?.color || '#666',
-                                                        fillColor: zoneType?.color || '#666',
-                                                        fillOpacity:
-                                                            zone.type === 'forbidden'
-                                                                ? 0.5
-                                                                : isNestedZone
-                                                                  ? 0.6
-                                                                  : 0.2,
-                                                        weight: isNestedZone ? 3 : 2,
-                                                        dashArray:
-                                                            zone.type === 'forbidden'
-                                                                ? '10,10'
-                                                                : isNestedZone
-                                                                  ? '5,5'
-                                                                  : undefined,
-                                                    }}
-                                                />
+                                            if (selectedSprinkler === id) {
+                                                setSelectedSprinkler(null);
+                                            }
+                                            setSelectedSprinklersForPipe((prev) =>
+                                                prev.filter((sprinklerId) => sprinklerId !== id)
                                             );
-                                        })}
+                                        }}
+                                        onWaterSourceDelete={handleWaterSourceDelete}
+                                        onPipeClick={handlePipeClick}
+                                        hasMainArea={true}
+                                        pipeEditMode={pipeEditMode}
+                                    />
+                                </div>
+                            )}
 
-                                    {mainPipeDrawing.length > 0 && (
-                                        <Polyline
-                                            positions={mainPipeDrawing.map((p) => [p.lat, p.lng])}
-                                            pathOptions={{
-                                                color: '#60A5FA',
-                                                weight: 6,
-                                                opacity: 0.7,
-                                                dashArray: '10,10',
-                                            }}
-                                        />
-                                    )}
-
-                                    {mainPipe && (
-                                        <Polyline
-                                            positions={mainPipe.points.map((p) => [p.lat, p.lng])}
-                                            pathOptions={{
-                                                color: '#3B82F6',
-                                                weight: 8,
-                                                opacity: 0.9,
-                                            }}
-                                        />
-                                    )}
-
-                                    {sprinklers.map((sprinkler) => {
-                                        const zone = gardenZones.find(
-                                            (z) => z.id === sprinkler.zoneId
-                                        );
-                                        const isCorner = zone
-                                            ? isCornerSprinkler(
-                                                  sprinkler.position,
-                                                  zone.coordinates
-                                              )
-                                            : false;
-
-                                        return (
-                                            <React.Fragment key={sprinkler.id}>
-                                                {zone && (
-                                                    <ClippedSprinklerRadius
-                                                        center={sprinkler.position}
-                                                        radius={sprinkler.type.radius}
-                                                        zoneCoordinates={zone.coordinates}
-                                                        color={sprinkler.type.color}
-                                                        isCornerSprinkler={isCorner}
-                                                    />
-                                                )}
-                                                <Marker
-                                                    position={[
-                                                        sprinkler.position.lat,
-                                                        sprinkler.position.lng,
-                                                    ]}
-                                                    icon={createSprinklerIcon(
-                                                        sprinkler.type,
-                                                        selectedSprinkler === sprinkler.id ||
-                                                            selectedSprinklersForPipe.includes(
-                                                                sprinkler.id
-                                                            ),
-                                                        sprinkler.orientation
-                                                    )}
-                                                    draggable={editMode === 'drag-sprinkler'}
-                                                    eventHandlers={{
-                                                        click: () => {
-                                                            if (
-                                                                manualPipeMode ===
-                                                                'connect-sprinklers'
-                                                            ) {
-                                                                handleSprinklerClickForPipe(
-                                                                    sprinkler.id
-                                                                );
-                                                            } else {
-                                                                setSelectedSprinkler((prev) =>
-                                                                    prev === sprinkler.id
-                                                                        ? null
-                                                                        : sprinkler.id
-                                                                );
-                                                            }
-                                                        },
-                                                        contextmenu: () => {
-                                                            setSprinklers((prev) =>
-                                                                prev.filter(
-                                                                    (s) => s.id !== sprinkler.id
-                                                                )
-                                                            );
-                                                            if (
-                                                                selectedSprinkler === sprinkler.id
-                                                            ) {
-                                                                setSelectedSprinkler(null);
-                                                            }
-                                                            setSelectedSprinklersForPipe((prev) =>
-                                                                prev.filter(
-                                                                    (id) => id !== sprinkler.id
-                                                                )
-                                                            );
-                                                        },
-                                                        dragstart: () => {
-                                                            setDraggedSprinkler(sprinkler.id);
-                                                            setSelectedSprinkler(sprinkler.id);
-                                                        },
-                                                        dragend: (e: any) => {
-                                                            const { lat, lng } =
-                                                                e.target.getLatLng();
-                                                            setSprinklers((prev) =>
-                                                                prev.map((s) =>
-                                                                    s.id === sprinkler.id
-                                                                        ? {
-                                                                              ...s,
-                                                                              position: {
-                                                                                  lat,
-                                                                                  lng,
-                                                                              },
-                                                                          }
-                                                                        : s
-                                                                )
-                                                            );
-                                                            setDraggedSprinkler(null);
-                                                            if (
-                                                                pipes.some(
-                                                                    (p) =>
-                                                                        p.type === 'lateral' ||
-                                                                        p.type === 'submain'
-                                                                )
-                                                            ) {
-                                                                setTimeout(
-                                                                    createSmartPipeLayout,
-                                                                    100
-                                                                );
-                                                            }
-                                                        },
-                                                    }}
-                                                />
-                                            </React.Fragment>
-                                        );
-                                    })}
-
-                                    {waterSource && (
-                                        <Marker
-                                            position={[
-                                                waterSource.position.lat,
-                                                waterSource.position.lng,
-                                            ]}
-                                            icon={createWaterSourceIcon(waterSource.type)}
-                                            eventHandlers={{
-                                                contextmenu: () => setWaterSource(null),
-                                            }}
-                                        />
-                                    )}
-
-                                    {pipes
-                                        .filter((p) => p.type === 'submain')
-                                        .map((pipe) => (
-                                            <Polyline
-                                                key={pipe.id}
-                                                positions={[
-                                                    [pipe.start.lat, pipe.start.lng],
-                                                    [pipe.end.lat, pipe.end.lng],
-                                                ]}
-                                                pathOptions={{
-                                                    color: selectedPipes.has(pipe.id)
-                                                        ? '#FBBF24'
-                                                        : '#8B5CF6',
-                                                    weight: selectedPipes.has(pipe.id) ? 6 : 4,
-                                                    opacity: 0.9,
-                                                }}
-                                                eventHandlers={{
-                                                    click: () => handlePipeClick(pipe.id),
-                                                }}
-                                            />
-                                        ))}
-
-                                    {pipes
-                                        .filter((p) => p.type === 'lateral')
-                                        .map((pipe) => (
-                                            <Polyline
-                                                key={pipe.id}
-                                                positions={[
-                                                    [pipe.start.lat, pipe.start.lng],
-                                                    [pipe.end.lat, pipe.end.lng],
-                                                ]}
-                                                pathOptions={{
-                                                    color: selectedPipes.has(pipe.id)
-                                                        ? '#FBBF24'
-                                                        : '#FFFF00',
-                                                    weight: selectedPipes.has(pipe.id) ? 4 : 2,
-                                                    opacity: 0.8,
-                                                }}
-                                                eventHandlers={{
-                                                    click: () => handlePipeClick(pipe.id),
-                                                }}
-                                            />
-                                        ))}
-
-                                    {activeTab === 'zones' && editMode === 'draw' && (
-                                        <FeatureGroup ref={featureGroupRef}>
-                                            <EditControl
-                                                position="topleft"
-                                                onCreated={handleZoneCreated}
-                                                onEdited={handleZoneEdited}
-                                                onDeleted={handleZoneDeleted}
-                                                draw={{
-                                                    rectangle: true,
-                                                    circle: false,
-                                                    circlemarker: false,
-                                                    marker: false,
-                                                    polyline: false,
-                                                    polygon: true,
-                                                }}
-                                                edit={{
-                                                    edit: false,
-                                                    remove: true,
-                                                }}
-                                            />
-                                        </FeatureGroup>
-                                    )}
-                                </MapContainer>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                <div className="mt-6 rounded-lg bg-gray-800/80 p-4 text-center">
-                    <div className="flex flex-wrap justify-center gap-6 text-sm">
-                        <div className="text-blue-400">
-                            🗺️ โซน:{' '}
-                            <span className="font-bold">
-                                {gardenZones.filter((z) => !z.parentZoneId).length}
-                            </span>
-                            {gardenZones.filter((z) => !!z.parentZoneId).length > 0 && (
-                                <span className="ml-1 text-yellow-300">
-                                    (+{gardenZones.filter((z) => !!z.parentZoneId).length} ย่อย)
-                                </span>
+                            {designMode === 'image' && (
+                                <div className="h-full w-full items-center justify-center bg-gray-900 p-4">
+                                    <ImageDesigner
+                                        imageData={imageData}
+                                        gardenZones={gardenZones}
+                                        sprinklers={sprinklers}
+                                        waterSource={waterSource}
+                                        pipes={pipes}
+                                        selectedZoneType={selectedZoneType}
+                                        editMode={editMode}
+                                        manualSprinklerType={manualSprinklerType}
+                                        manualSprinklerRadius={manualSprinklerRadius}
+                                        selectedSprinkler={selectedSprinkler}
+                                        selectedPipes={selectedPipes}
+                                        selectedSprinklersForPipe={selectedSprinklersForPipe}
+                                        mainPipeDrawing={[]}
+                                        onImageUpload={handleImageUpload}
+                                        onZoneCreated={handleCanvasZoneCreated}
+                                        onSprinklerPlaced={handleCanvasSprinklerPlaced}
+                                        onWaterSourcePlaced={handleCanvasWaterSourcePlaced}
+                                        onMainPipePoint={() => {}}
+                                        onSprinklerDragged={handleCanvasSprinklerDragged}
+                                        onSprinklerClick={handleCanvasSprinklerClick}
+                                        onSprinklerDelete={(id) => {
+                                            setSprinklers((prev) =>
+                                                prev.filter((s) => s.id !== id)
+                                            );
+                                            if (selectedSprinkler === id) {
+                                                setSelectedSprinkler(null);
+                                            }
+                                            setSelectedSprinklersForPipe((prev) =>
+                                                prev.filter((sprinklerId) => sprinklerId !== id)
+                                            );
+                                        }}
+                                        onWaterSourceDelete={handleWaterSourceDelete}
+                                        onPipeClick={handlePipeClick}
+                                        onScaleChange={(scale) => {
+                                            setImageData((prev: any) => ({
+                                                ...prev,
+                                                scale,
+                                                isScaleSet: true,
+                                            }));
+                                        }}
+                                        pipeEditMode={pipeEditMode}
+                                    />
+                                </div>
                             )}
                         </div>
-                        <div className="text-green-400">
-                            💧 หัวฉีด: <span className="font-bold">{sprinklers.length}</span>
-                        </div>
-                        <div className="text-yellow-400">
-                            🚰 แหล่งน้ำ:{' '}
-                            <span className="font-bold">{waterSource ? '1' : '0'}</span>
-                        </div>
-                        {mainPipe && (
-                            <div className="text-blue-400">
-                                🏗️ ท่อเมน:{' '}
-                                <span className="font-bold">
-                                    {formatDistance(mainPipe.totalLength)}
-                                </span>
-                            </div>
-                        )}
-                        {pipes.filter((p) => p.type === 'submain').length > 0 && (
-                            <div className="text-purple-400">
-                                🔗 ท่อรอง:{' '}
-                                <span className="font-bold">
-                                    {pipes.filter((p) => p.type === 'submain').length} เส้น
-                                </span>
-                            </div>
-                        )}
-                        {pipes.filter((p) => p.type === 'lateral').length > 0 && (
-                            <div className="text-green-400">
-                                🔧 ท่อย่อย:{' '}
-                                <span className="font-bold">
-                                    {pipes.filter((p) => p.type === 'lateral').length} เส้น
-                                </span>
-                            </div>
-                        )}
-                        {statistics.coveragePercentage > 0 && (
-                            <div className="text-emerald-400">
-                                📊 คลุมพื้นที่:{' '}
-                                <span className="font-bold">
-                                    {statistics.coveragePercentage.toFixed(1)}%
-                                </span>
-                            </div>
-                        )}
-                        {manualPipeMode && (
-                            <div className="text-orange-400">
-                                ⚙️ โหมด:{' '}
-                                <span className="font-bold">
-                                    {manualPipeMode === 'select-pipes'
-                                        ? 'เลือกท่อ'
-                                        : 'เชื่อมหัวฉีด'}
-                                </span>
-                            </div>
-                        )}
                     </div>
                 </div>
             </div>

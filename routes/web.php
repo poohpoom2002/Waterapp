@@ -41,6 +41,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
             return Inertia::render('HorticultureResultsPage');
         })->name('results');
     });
+    // Home Garden Irrigation System Routes (ระบบชลประทานบ้านสวน)
+    Route::prefix('home-garden')->name('home-garden.')->group(function () {
+        // หน้าวางแผนระบบน้ำบ้านสวน
+        Route::get('planner', function () {
+            return Inertia::render('home-garden-planner');
+        })->name('planner');
+        
+        // หน้าแสดงผลลัพธ์ระบบน้ำบ้านสวน
+        Route::get('summary', function () {
+            return Inertia::render('home-garden-summary');
+        })->name('summary');
+    });
 
     // Legacy routes for backward compatibility
     Route::get('horticulture-planner', function () {
@@ -48,6 +60,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     Route::get('horticulture-results', function () {
         return redirect()->route('horticulture.results');
+    });
+    // Legacy routes for backward compatibility
+    Route::get('home-garden-planner', function () {
+        return redirect()->route('home-garden.planner');
+    });
+    Route::get('home-garden-summary', function () {
+        return redirect()->route('home-garden.summary');
     });
 
     // Greenhouse Irrigation System Routes
@@ -87,26 +106,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/api/plant-points/delete', [FarmController::class, 'deletePlantPoint'])->name('plant-points.delete');
     Route::post('/api/plant-points/move', [FarmController::class, 'movePlantPoint'])->name('plant-points.move');
 
-    // =======================================================
-    // Home Garden Page Routes (ส่วนที่เกี่ยวข้อง)
-    // =======================================================
-    Route::prefix('home-garden')->name('home-garden.')->group(function () {
-        // Route to the initial planner page
-        // เส้นทางไปยังหน้าแพลนเนอร์เริ่มต้น
-        Route::get('planner', [HomeGardenController::class, 'planner'])->name('planner');
-        
-        // Route that receives data from the planner and shows the calculation page
-        // Using 'match' allows this route to handle both GET (e.g., page refresh) and POST (form submission)
-        // เส้นทางสำหรับรับข้อมูลจากแพลนเนอร์และแสดงหน้าผลการคำนวณ
-        // การใช้ 'match' ทำให้รองรับได้ทั้ง GET (เช่น การรีเฟรชหน้า) และ POST (การส่งฟอร์ม)
-        Route::match(['get', 'post'], 'generate-sprinkler', [HomeGardenController::class, 'generateSprinkler'])->name('generate-sprinkler');
-        
-        // Route to the final summary page
-        // เส้นทางไปยังหน้าสรุปผลสุดท้าย
-        Route::get('summary', function () {
-            return Inertia::render('home-garden-summary');
-        })->name('summary');
-    });
     // =======================================================
 
     // Field Management Routes
