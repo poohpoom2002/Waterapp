@@ -399,9 +399,7 @@ const InputForm: React.FC<InputFormProps> = ({
                 </div>
             </div>
 
-            <h3 className="mb-4 mt-6 text-lg font-semibold text-blue-400">
-                🔧 ข้อมูลท่อ
-            </h3>
+            <h3 className="mb-4 mt-6 text-lg font-semibold text-blue-400">🔧 ข้อมูลท่อ</h3>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                 <div className="space-y-4 rounded-lg bg-gray-800 p-4 shadow-lg">

@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 const AiIcon = () => (
     <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-indigo-500 text-white shadow-lg ring-2 ring-white ring-opacity-30">
         <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L15 1L9 7V9L7 11V17H9L11 15L13 17H15V11L21 9ZM12 8L14 10H10L12 8Z"/>
+            <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L15 1L9 7V9L7 11V17H9L11 15L13 17H15V11L21 9ZM12 8L14 10H10L12 8Z" />
         </svg>
     </div>
 );
@@ -13,7 +13,11 @@ const AiIcon = () => (
 const UserIcon = () => (
     <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 text-white shadow-lg">
         <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+            <path
+                fillRule="evenodd"
+                d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+                clipRule="evenodd"
+            />
         </svg>
     </div>
 );
@@ -22,11 +26,17 @@ const UserIcon = () => (
 const TypingIndicator = () => (
     <div className="flex items-center space-x-2 p-3">
         <div className="flex space-x-1">
-            <div className="h-2 w-2 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full animate-bounce"></div>
-            <div className="h-2 w-2 bg-gradient-to-r from-pink-400 to-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-            <div className="h-2 w-2 bg-gradient-to-r from-indigo-400 to-purple-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+            <div className="h-2 w-2 animate-bounce rounded-full bg-gradient-to-r from-purple-400 to-pink-400"></div>
+            <div
+                className="h-2 w-2 animate-bounce rounded-full bg-gradient-to-r from-pink-400 to-indigo-400"
+                style={{ animationDelay: '0.1s' }}
+            ></div>
+            <div
+                className="h-2 w-2 animate-bounce rounded-full bg-gradient-to-r from-indigo-400 to-purple-400"
+                style={{ animationDelay: '0.2s' }}
+            ></div>
         </div>
-        <span className="text-sm text-gray-600 font-medium">AI กำลังคิด...</span>
+        <span className="text-sm font-medium text-gray-600">AI กำลังคิด...</span>
     </div>
 );
 
@@ -42,17 +52,21 @@ const QuickSuggestions = ({ onSuggestionSelect }) => {
     ];
 
     return (
-        <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 border-t border-purple-100">
-            <p className="text-xs text-gray-600 mb-3 font-medium text-center">✨ ลองถามเรื่องเหล่านี้:</p>
+        <div className="border-t border-purple-100 bg-gradient-to-r from-purple-50 to-pink-50 p-4">
+            <p className="mb-3 text-center text-xs font-medium text-gray-600">
+                ✨ ลองถามเรื่องเหล่านี้:
+            </p>
             <div className="grid grid-cols-2 gap-2">
                 {suggestions.map((suggestion, index) => (
                     <button
                         key={index}
                         onClick={() => onSuggestionSelect(suggestion.query)}
-                        className="flex items-center space-x-2 p-2 bg-white rounded-lg border border-purple-200 hover:border-purple-300 hover:shadow-sm transition-all duration-200 text-sm group"
+                        className="group flex items-center space-x-2 rounded-lg border border-purple-200 bg-white p-2 text-sm transition-all duration-200 hover:border-purple-300 hover:shadow-sm"
                     >
-                        <span className="text-lg group-hover:scale-110 transition-transform">{suggestion.icon}</span>
-                        <span className="text-gray-700 font-medium text-xs">{suggestion.text}</span>
+                        <span className="text-lg transition-transform group-hover:scale-110">
+                            {suggestion.icon}
+                        </span>
+                        <span className="text-xs font-medium text-gray-700">{suggestion.text}</span>
                     </button>
                 ))}
             </div>
@@ -71,13 +85,13 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
     // Position and dragging states
     useEffect(() => {
         if (isOpen) {
-            setPosition({ 
-                x: Math.max(100, (window.innerWidth || 1200) - 480), 
-                y: 100 
+            setPosition({
+                x: Math.max(100, (window.innerWidth || 1200) - 480),
+                y: 100,
             });
         }
     }, [isOpen]);
-    
+
     const [isDragging, setIsDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
@@ -96,34 +110,35 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
     useEffect(() => {
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 100) + 'px';
+            textareaRef.current.style.height =
+                Math.min(textareaRef.current.scrollHeight, 100) + 'px';
         }
     }, [message]);
 
     // Dragging functionality
     const handleMouseDown = (e) => {
         if (e.target.closest('.no-drag')) return;
-        
+
         setIsDragging(true);
         const rect = windowRef.current.getBoundingClientRect();
         setDragOffset({
             x: e.clientX - rect.left,
-            y: e.clientY - rect.top
+            y: e.clientY - rect.top,
         });
     };
 
     const handleMouseMove = (e) => {
         if (!isDragging) return;
-        
+
         const newX = e.clientX - dragOffset.x;
         const newY = e.clientY - dragOffset.y;
-        
+
         const maxX = window.innerWidth - 480;
         const maxY = window.innerHeight - 650;
-        
+
         setPosition({
             x: Math.max(0, Math.min(newX, maxX)),
-            y: Math.max(0, Math.min(newY, maxY))
+            y: Math.max(0, Math.min(newY, maxY)),
         });
     };
 
@@ -167,25 +182,22 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json',
+                    Accept: 'application/json',
                 },
                 body: JSON.stringify({
                     message: messageToSend,
-                })
+                }),
             });
-            
+
             const data = await response.json();
             const aiReply = { role: 'assistant', content: data.reply };
             setChatHistory((prev) => [...prev, aiReply]);
         } catch (error) {
             console.error('AI Error:', error);
-            
+
             let errorMessage = 'ขออภัยนะ ระบบ AI ขัดข้องชั่วคราว 🔧\n\nลองใหม่อีกครั้งได้เลย!';
-            
-            setChatHistory((prev) => [
-                ...prev,
-                { role: 'assistant', content: errorMessage },
-            ]);
+
+            setChatHistory((prev) => [...prev, { role: 'assistant', content: errorMessage }]);
         } finally {
             setIsTyping(false);
         }
@@ -200,92 +212,129 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
     return (
         <div
             ref={windowRef}
-            className={`fixed z-50 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden transition-all duration-300 flex flex-col ${
-                isMinimized ? 'w-80 h-16' : 'w-[30rem] h-[45rem]'
-            } ${isDragging ? 'cursor-grabbing scale-105 shadow-3xl' : 'cursor-auto'}`}
+            className={`fixed z-50 flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl transition-all duration-300 ${
+                isMinimized ? 'h-16 w-80' : 'h-[45rem] w-[30rem]'
+            } ${isDragging ? 'shadow-3xl scale-105 cursor-grabbing' : 'cursor-auto'}`}
             style={{
                 left: position.x,
                 top: position.y,
-                boxShadow: isDragging 
+                boxShadow: isDragging
                     ? '0 35px 60px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1)'
-                    : '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.05)'
+                    : '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.05)',
             }}
         >
             {/* Enhanced Header with AI Theme - ขยาย drag area */}
             <div
-                className="bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 p-4 text-white cursor-grab active:cursor-grabbing relative overflow-hidden select-none"
+                className="relative cursor-grab select-none overflow-hidden bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 p-4 text-white active:cursor-grabbing"
                 onMouseDown={handleMouseDown}
                 style={{ touchAction: 'none' }} // ป้องกัน touch scrolling
             >
                 {/* Animated Background */}
-                <div className="absolute inset-0 opacity-20 pointer-events-none">
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent transform -skew-x-12 animate-pulse"></div>
+                <div className="pointer-events-none absolute inset-0 opacity-20">
+                    <div className="absolute inset-0 -skew-x-12 transform animate-pulse bg-gradient-to-r from-transparent via-white to-transparent"></div>
                 </div>
-                
+
                 {/* Drag Handle Visual Indicator */}
-                <div className="absolute top-2 left-1/2 transform -translate-x-1/2 flex space-x-1 opacity-40">
-                    <div className="w-1 h-1 bg-white rounded-full"></div>
-                    <div className="w-1 h-1 bg-white rounded-full"></div>
-                    <div className="w-1 h-1 bg-white rounded-full"></div>
-                    <div className="w-1 h-1 bg-white rounded-full"></div>
+                <div className="absolute left-1/2 top-2 flex -translate-x-1/2 transform space-x-1 opacity-40">
+                    <div className="h-1 w-1 rounded-full bg-white"></div>
+                    <div className="h-1 w-1 rounded-full bg-white"></div>
+                    <div className="h-1 w-1 rounded-full bg-white"></div>
+                    <div className="h-1 w-1 rounded-full bg-white"></div>
                 </div>
-                
-                <div className="flex items-center justify-between relative pt-2">
+
+                <div className="relative flex items-center justify-between pt-2">
                     <div className="flex items-center space-x-3">
                         <AiIcon />
                         <div>
                             <h1 className="text-lg font-bold">🤖 AI Assistant</h1>
                             {!isMinimized && (
-                                <p className="text-sm text-purple-100">ผู้ช่วยอัจฉริยะ • พร้อมคุยได้ทุกเรื่อง</p>
+                                <p className="text-sm text-purple-100">
+                                    ผู้ช่วยอัจฉริยะ • พร้อมคุยได้ทุกเรื่อง
+                                </p>
                             )}
                         </div>
                     </div>
-                    
-                    <div className="flex items-center space-x-2 no-drag">
+
+                    <div className="no-drag flex items-center space-x-2">
                         {/* AI Status Indicator */}
                         {!isMinimized && (
-                            <div className="flex items-center space-x-1 bg-white/20 rounded-full px-3 py-1">
-                                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                            <div className="flex items-center space-x-1 rounded-full bg-white/20 px-3 py-1">
+                                <div className="h-2 w-2 animate-pulse rounded-full bg-green-400"></div>
                                 <span className="text-xs font-medium">Online</span>
                             </div>
                         )}
-                        
+
                         {/* Minimize button */}
                         <button
                             onClick={onMinimize}
-                            className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors duration-200 hover:scale-110"
-                            title={isMinimized ? "ขยาย" : "ย่อ"}
+                            className="rounded-full bg-white/20 p-2 transition-colors duration-200 hover:scale-110 hover:bg-white/30"
+                            title={isMinimized ? 'ขยาย' : 'ย่อ'}
                         >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg
+                                className="h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
                                 {isMinimized ? (
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                                    />
                                 ) : (
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M20 12H4"
+                                    />
                                 )}
                             </svg>
                         </button>
-                        
+
                         {/* Clear chat button */}
                         {chatHistory.length > 0 && !isMinimized && (
                             <button
                                 onClick={clearChat}
-                                className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors duration-200 hover:scale-110"
+                                className="rounded-full bg-white/20 p-2 transition-colors duration-200 hover:scale-110 hover:bg-white/30"
                                 title="เคลียร์แชท"
                             >
-                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                <svg
+                                    className="h-4 w-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                    />
                                 </svg>
                             </button>
                         )}
-                        
+
                         {/* Close button */}
                         <button
                             onClick={onClose}
-                            className="p-2 rounded-full bg-white/20 hover:bg-red-500/70 transition-colors duration-200 hover:scale-110"
+                            className="rounded-full bg-white/20 p-2 transition-colors duration-200 hover:scale-110 hover:bg-red-500/70"
                             title="ปิด"
                         >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            <svg
+                                className="h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M6 18L18 6M6 6l12 12"
+                                />
                             </svg>
                         </button>
                     </div>
@@ -296,26 +345,35 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
             {!isMinimized && (
                 <>
                     {/* Main chat area - ใช้ flex-1 แทน h-80 */}
-                    <div className="flex-1 flex flex-col min-h-0">
+                    <div className="flex min-h-0 flex-1 flex-col">
                         {/* Chat messages area */}
                         <div
                             ref={chatContainerRef}
-                            className="flex-1 space-y-4 overflow-y-auto p-4 bg-gradient-to-b from-gray-50 to-white"
+                            className="flex-1 space-y-4 overflow-y-auto bg-gradient-to-b from-gray-50 to-white p-4"
                             style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e0 #f7fafc' }}
                         >
                             {chatHistory.length === 0 && (
-                                <div className="flex flex-col items-center justify-center h-full text-center">
-                                    <div className="mb-4 p-4 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-indigo-500 text-white shadow-xl animate-pulse">
-                                        <svg className="h-8 w-8" fill="currentColor" viewBox="0 0 24 24">
-                                            <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L15 1L9 7V9L7 11V17H9L11 15L13 17H15V11L21 9ZM12 8L14 10H10L12 8Z"/>
+                                <div className="flex h-full flex-col items-center justify-center text-center">
+                                    <div className="mb-4 animate-pulse rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-indigo-500 p-4 text-white shadow-xl">
+                                        <svg
+                                            className="h-8 w-8"
+                                            fill="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L15 1L9 7V9L7 11V17H9L11 15L13 17H15V11L21 9ZM12 8L14 10H10L12 8Z" />
                                         </svg>
                                     </div>
-                                    <h3 className="text-xl font-bold text-gray-800 mb-3">สวัสดี! 👋</h3>
-                                    <p className="text-gray-600 mb-4 max-w-xs leading-relaxed">
-                                        ฉันคือ <span className="font-semibold text-purple-600">AI Assistant</span> ผู้ช่วยอัจฉริยะ 
-                                        พร้อมคุยและช่วยเหลือคุณได้ทุกเรื่อง!
+                                    <h3 className="mb-3 text-xl font-bold text-gray-800">
+                                        สวัสดี! 👋
+                                    </h3>
+                                    <p className="mb-4 max-w-xs leading-relaxed text-gray-600">
+                                        ฉันคือ{' '}
+                                        <span className="font-semibold text-purple-600">
+                                            AI Assistant
+                                        </span>{' '}
+                                        ผู้ช่วยอัจฉริยะ พร้อมคุยและช่วยเหลือคุณได้ทุกเรื่อง!
                                     </p>
-                                    <div className="text-sm text-gray-500 bg-purple-50 rounded-lg p-3 max-w-xs border border-purple-100">
+                                    <div className="max-w-xs rounded-lg border border-purple-100 bg-purple-50 p-3 text-sm text-gray-500">
                                         <p className="flex items-center justify-center space-x-1">
                                             <span>✨</span>
                                             <span>เลือกหัวข้อด้านล่าง หรือพิมพ์คำถามเลย</span>
@@ -336,22 +394,56 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
                                         className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-lg transition-all duration-300 ${
                                             msg.role === 'user'
                                                 ? 'rounded-br-md bg-gradient-to-r from-blue-500 to-cyan-600 text-white'
-                                                : 'rounded-bl-md bg-white border border-purple-200 text-gray-800'
+                                                : 'rounded-bl-md border border-purple-200 bg-white text-gray-800'
                                         }`}
                                     >
                                         <div className="text-sm leading-relaxed">
-                                            <ReactMarkdown 
+                                            <ReactMarkdown
                                                 components={{
-                                                    p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
-                                                    ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-                                                    ol: ({children}) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
-                                                    li: ({children}) => <li className="mb-1">{children}</li>,
-                                                    strong: ({children}) => <strong className="font-semibold text-purple-600">{children}</strong>,
-                                                    em: ({children}) => <em className="italic text-gray-600">{children}</em>,
-                                                    h3: ({children}) => <h3 className="font-bold text-lg mb-2 text-gray-800">{children}</h3>,
-                                                    h4: ({children}) => <h4 className="font-semibold text-base mb-1 text-gray-700">{children}</h4>,
-                                                    code: ({children}) => <code className="bg-purple-100 px-1 py-0.5 rounded text-sm font-mono">{children}</code>,
-                                                    hr: () => <hr className="my-3 border-purple-300" />,
+                                                    p: ({ children }) => (
+                                                        <p className="mb-2 last:mb-0">{children}</p>
+                                                    ),
+                                                    ul: ({ children }) => (
+                                                        <ul className="mb-2 list-inside list-disc space-y-1">
+                                                            {children}
+                                                        </ul>
+                                                    ),
+                                                    ol: ({ children }) => (
+                                                        <ol className="mb-2 list-inside list-decimal space-y-1">
+                                                            {children}
+                                                        </ol>
+                                                    ),
+                                                    li: ({ children }) => (
+                                                        <li className="mb-1">{children}</li>
+                                                    ),
+                                                    strong: ({ children }) => (
+                                                        <strong className="font-semibold text-purple-600">
+                                                            {children}
+                                                        </strong>
+                                                    ),
+                                                    em: ({ children }) => (
+                                                        <em className="italic text-gray-600">
+                                                            {children}
+                                                        </em>
+                                                    ),
+                                                    h3: ({ children }) => (
+                                                        <h3 className="mb-2 text-lg font-bold text-gray-800">
+                                                            {children}
+                                                        </h3>
+                                                    ),
+                                                    h4: ({ children }) => (
+                                                        <h4 className="mb-1 text-base font-semibold text-gray-700">
+                                                            {children}
+                                                        </h4>
+                                                    ),
+                                                    code: ({ children }) => (
+                                                        <code className="rounded bg-purple-100 px-1 py-0.5 font-mono text-sm">
+                                                            {children}
+                                                        </code>
+                                                    ),
+                                                    hr: () => (
+                                                        <hr className="my-3 border-purple-300" />
+                                                    ),
                                                 }}
                                             >
                                                 {msg.content}
@@ -365,7 +457,7 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
                             {isTyping && (
                                 <div className="flex items-end gap-3">
                                     <AiIcon />
-                                    <div className="max-w-[70%] rounded-2xl rounded-bl-md bg-white border border-purple-200 shadow-lg">
+                                    <div className="max-w-[70%] rounded-2xl rounded-bl-md border border-purple-200 bg-white shadow-lg">
                                         <TypingIndicator />
                                     </div>
                                 </div>
@@ -381,28 +473,38 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
                     </div>
 
                     {/* Footer with input - ใช้ flex-shrink-0 เพื่อไม่ให้หด และอยู่ด้านล่างตลอด */}
-                    <div className="flex-shrink-0 p-4 bg-white border-t border-purple-200">
-                        <div className="flex items-end gap-3 rounded-xl border border-purple-300 bg-purple-50 p-3 focus-within:border-purple-400 focus-within:ring-2 focus-within:ring-purple-200 focus-within:bg-white transition-all duration-200">
+                    <div className="flex-shrink-0 border-t border-purple-200 bg-white p-4">
+                        <div className="flex items-end gap-3 rounded-xl border border-purple-300 bg-purple-50 p-3 transition-all duration-200 focus-within:border-purple-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-purple-200">
                             {/* Quick Suggestions Toggle Button - แสดงเมื่อมี chat history */}
                             {chatHistory.length > 0 && (
                                 <button
                                     onClick={toggleSuggestions}
-                                    className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 flex-shrink-0 ${
-                                        showSuggestions 
-                                            ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg scale-105' 
+                                    className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg transition-all duration-200 ${
+                                        showSuggestions
+                                            ? 'scale-105 bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg'
                                             : 'bg-purple-200 text-purple-600 hover:bg-purple-300'
                                     }`}
-                                    title={showSuggestions ? "ซ่อนคำถามแนะนำ" : "แสดงคำถามแนะนำ"}
+                                    title={showSuggestions ? 'ซ่อนคำถามแนะนำ' : 'แสดงคำถามแนะนำ'}
                                 >
-                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    <svg
+                                        className="h-4 w-4"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                        />
                                     </svg>
                                 </button>
                             )}
-                            
+
                             <textarea
                                 ref={textareaRef}
-                                className="flex-1 resize-none border-none bg-transparent text-sm text-gray-800 placeholder-gray-500 focus:outline-none min-h-[24px] max-h-[100px]"
+                                className="max-h-[100px] min-h-[24px] flex-1 resize-none border-none bg-transparent text-sm text-gray-800 placeholder-gray-500 focus:outline-none"
                                 rows={1}
                                 placeholder="พิมพ์ข้อความ... 💬"
                                 value={message}
@@ -416,27 +518,47 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
                                 disabled={isTyping}
                             />
                             <button
-                                className="flex items-center justify-center rounded-xl bg-gradient-to-r from-purple-500 to-pink-600 px-4 py-2 font-semibold text-white shadow-lg transition-all duration-200 hover:from-purple-600 hover:to-pink-700 hover:shadow-xl disabled:cursor-not-allowed disabled:from-gray-400 disabled:to-gray-500 active:scale-95"
+                                className="flex items-center justify-center rounded-xl bg-gradient-to-r from-purple-500 to-pink-600 px-4 py-2 font-semibold text-white shadow-lg transition-all duration-200 hover:from-purple-600 hover:to-pink-700 hover:shadow-xl active:scale-95 disabled:cursor-not-allowed disabled:from-gray-400 disabled:to-gray-500"
                                 onClick={() => sendMessage()}
                                 disabled={isTyping || !message.trim()}
                             >
                                 {isTyping ? (
-                                    <svg className="h-4 w-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    <svg
+                                        className="h-4 w-4 animate-spin"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                                        />
                                     </svg>
                                 ) : (
-                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                    <svg
+                                        className="h-4 w-4"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                                        />
                                     </svg>
                                 )}
                             </button>
                         </div>
-                        
+
                         {/* Footer Info */}
                         <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
                             <span>🤖 AI Assistant • Gemini 2.0</span>
                             <span className="flex items-center space-x-1">
-                                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                <div className="h-2 w-2 animate-pulse rounded-full bg-green-400"></div>
                                 <span>พร้อมช่วยเหลือ</span>
                             </span>
                         </div>

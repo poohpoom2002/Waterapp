@@ -1261,35 +1261,43 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                             </span>
                                         </div>
                                         {zone.sprinklerCount > 0 && (
-                            <>
-                                <div className="flex justify-between">
-                                    <span className="text-gray-400">ประเภทหัวฉีด:</span>
-                                    <div className="text-right">
-                                        {zone.sprinklerTypes.length > 0 ? (
-                                            <div className="text-xs">
-                                                {zone.sprinklerTypes.map((type, idx) => (
-                                                    <div key={idx} className="font-medium text-cyan-400">
-                                                        {type}
+                                            <>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-400">
+                                                        ประเภทหัวฉีด:
+                                                    </span>
+                                                    <div className="text-right">
+                                                        {zone.sprinklerTypes.length > 0 ? (
+                                                            <div className="text-xs">
+                                                                {zone.sprinklerTypes.map(
+                                                                    (type, idx) => (
+                                                                        <div
+                                                                            key={idx}
+                                                                            className="font-medium text-cyan-400"
+                                                                        >
+                                                                            {type}
+                                                                        </div>
+                                                                    )
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="font-medium text-gray-500">
+                                                                -
+                                                            </span>
+                                                        )}
                                                     </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <span className="font-medium text-gray-500">-</span>
-                                        )}
-                                    </div>
-                                </div>
+                                                </div>
 
-                                <div className="flex justify-between">
-                                    <span className="text-gray-400">รัศมี:</span>
-                                    <span className="font-medium text-cyan-400">
-                                        {zone.sprinklerRadius > 0 
-                                            ? `${zone.sprinklerRadius.toFixed(1)} ม.`
-                                            : '-'
-                                        }
-                                    </span>
-                                </div>
-                            </>
-                        )}
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-400">รัศมี:</span>
+                                                    <span className="font-medium text-cyan-400">
+                                                        {zone.sprinklerRadius > 0
+                                                            ? `${zone.sprinklerRadius.toFixed(1)} ม.`
+                                                            : '-'}
+                                                    </span>
+                                                </div>
+                                            </>
+                                        )}
 
                                         {zone.pipeLength > 0 && (
                                             <div className="border-t border-gray-600 pt-2">

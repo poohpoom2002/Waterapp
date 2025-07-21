@@ -238,14 +238,17 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
             );
 
             listeners.push(
-                drawingManager.addListener('rectanglecomplete', (rectangle: google.maps.Rectangle) => {
-                    const coordinates = extractCoordinatesFromShape(rectangle);
-                    if (coordinates.length > 0) {
-                        onCreated(coordinates, 'rectangle');
-                        console.log('✅ Rectangle created with', coordinates.length, 'points');
+                drawingManager.addListener(
+                    'rectanglecomplete',
+                    (rectangle: google.maps.Rectangle) => {
+                        const coordinates = extractCoordinatesFromShape(rectangle);
+                        if (coordinates.length > 0) {
+                            onCreated(coordinates, 'rectangle');
+                            console.log('✅ Rectangle created with', coordinates.length, 'points');
+                        }
+                        rectangle.setMap(null);
                     }
-                    rectangle.setMap(null);
-                })
+                )
             );
 
             listeners.push(
@@ -271,7 +274,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
             );
 
             return () => {
-                listeners.forEach(listener => {
+                listeners.forEach((listener) => {
                     if (listener) {
                         google.maps.event.removeListener(listener);
                     }
