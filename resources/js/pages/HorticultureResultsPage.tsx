@@ -14,6 +14,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
+import { useLanguage } from '../contexts/LanguageContext';
 
 import {
     HorticultureProjectData,
@@ -135,9 +136,10 @@ const createEnhancedPlantIcon = (size: number = 16) =>
         iconAnchor: [size / 2, size / 2],
     });
 
-export default function EnhancedHorticultureResultsPage() {
+function EnhancedHorticultureResultsPageContent() {
     const page = usePage();
     const auth = (page.props as any).auth;
+    const { t } = useLanguage();
     const [projectData, setProjectData] = useState<HorticultureProjectData | null>(null);
     const [projectSummary, setProjectSummary] = useState<ProjectSummaryData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -231,13 +233,13 @@ export default function EnhancedHorticultureResultsPage() {
     // Enhanced image creation with rotation reset
     const handleCreateMapImage = async () => {
         if (!mapRef.current) {
-            alert('ไม่พบแผนที่');
+            alert(t('ไม่พบแผนที่'));
             return;
         }
 
         setIsCreatingImage(true);
         try {
-            console.log('🖼️ เริ่มสร้างภาพแผนที่...');
+            console.log('🖼️ ' + t('เริ่มสร้างภาพแผนที่') + '...');
             
             // Reset rotation temporarily for image capture
             const currentRotation = mapRotation;
@@ -262,7 +264,7 @@ export default function EnhancedHorticultureResultsPage() {
                 text-align: center;
             `;
             loadingDiv.innerHTML = `
-                <div>🖼️ กำลังสร้างภาพแผนที่...</div>
+                <div>🖼️ {t('กำลังสร้างภาพแผนที่')}...</div>
                 <div style="margin-top: 10px; font-size: 12px;">กรุณารอสักครู่</div>
             `;
             document.body.appendChild(loadingDiv);
@@ -281,13 +283,13 @@ export default function EnhancedHorticultureResultsPage() {
             }
 
             if (success) {
-                alert('✅ ดาวน์โหลดภาพแผนที่สำเร็จ!\n\nหากไม่สามารถดาวน์โหลดได้ กรุณาใช้วิธี Screenshot:\n• กด F11 เพื่อ Fullscreen\n• กด Print Screen\n• หรือกด F12 > Ctrl+Shift+P > พิมพ์ "screenshot"');
+                alert('✅ ' + t('ดาวน์โหลดภาพแผนที่สำเร็จ') + '!\n\nหากไม่สามารถดาวน์โหลดได้ กรุณาใช้วิธี Screenshot:\n• กด F11 เพื่อ Fullscreen\n• กด Print Screen\n• หรือกด F12 > Ctrl+Shift+P > พิมพ์ "screenshot"');
             } else {
-                alert('⚠️ ไม่สามารถสร้างภาพแผนที่ได้อัตโนมัติ\n\nกรุณาใช้วิธี Screenshot แทน:\n\n1. กด F11 เพื่อเข้าโหมด Fullscreen\n2. กด Print Screen หรือใช้ Snipping Tool\n3. หรือกด F12 > เปิด Developer Tools\n4. กด Ctrl+Shift+P > พิมพ์ "screenshot"\n5. เลือก "Capture full size screenshot"');
+                alert('⚠️ ' + t('ไม่สามารถสร้างภาพแผนที่ได้อัตโนมัติ') + '\n\nกรุณาใช้วิธี Screenshot แทน:\n\n1. กด F11 เพื่อเข้าโหมด Fullscreen\n2. กด Print Screen หรือใช้ Snipping Tool\n3. หรือกด F12 > เปิด Developer Tools\n4. กด Ctrl+Shift+P > พิมพ์ "screenshot"\n5. เลือก "Capture full size screenshot"');
             }
         } catch (error) {
             console.error('❌ Error creating map image:', error);
-            alert('❌ เกิดข้อผิดพลาดในการสร้างภาพ\n\nกรุณาใช้วิธี Screenshot แทน:\n• กด Print Screen\n• หรือใช้ Extension เช่น "Full Page Screen Capture"');
+            alert('❌ ' + t('เกิดข้อผิดพลาดในการสร้างภาพ') + '\n\nกรุณาใช้วิธี Screenshot แทน:\n• กด Print Screen\n• หรือใช้ Extension เช่น "Full Page Screen Capture"');
         } finally {
             setIsCreatingImage(false);
         }
@@ -295,13 +297,13 @@ export default function EnhancedHorticultureResultsPage() {
 
     const handleCreatePDFReport = async () => {
         if (!mapRef.current) {
-            alert('ไม่พบแผนที่');
+            alert(t('ไม่พบแผนที่'));
             return;
         }
 
         setIsCreatingPDF(true);
         try {
-            console.log('📄 เริ่มสร้าง PDF Report...');
+            console.log('📄 ' + t('เริ่มสร้าง PDF Report') + '...');
             
             // Reset rotation for PDF
             const currentRotation = mapRotation;
@@ -341,13 +343,13 @@ export default function EnhancedHorticultureResultsPage() {
             }
             
             if (success) {
-                alert('✅ สร้างรายงานสำเร็จ!\n\n• หากเป็น PDF: ไฟล์จะถูกดาวน์โหลดอัตโนมัติ\n• หากเป็น HTML: หน้าต่างใหม่จะเปิดขึ้น\n• สามารถพิมพ์หรือบันทึกเป็น PDF ได้');
+                alert('✅ ' + t('สร้างรายงานสำเร็จ') + '!\n\n• หากเป็น PDF: ไฟล์จะถูกดาวน์โหลดอัตโนมัติ\n• หากเป็น HTML: หน้าต่างใหม่จะเปิดขึ้น\n• สามารถพิมพ์หรือบันทึกเป็น PDF ได้');
             } else {
-                alert('⚠️ ไม่สามารถสร้างรายงานอัตโนมัติได้\n\nกรุณาใช้วิธีดาวน์โหลดข้อมูล JSON/CSV แทน\nหรือคัดลอกข้อมูลจากหน้าจอ');
+                alert('⚠️ ' + t('ไม่สามารถสร้างรายงานอัตโนมัติได้') + '\n\nกรุณาใช้วิธีดาวน์โหลดข้อมูล JSON/CSV แทน\nหรือคัดลอกข้อมูลจากหน้าจอ');
             }
         } catch (error) {
             console.error('❌ Error creating PDF:', error);
-            alert('❌ เกิดข้อผิดพลาดในการสร้าง PDF\n\nกรุณาลองใช้:\n• ดาวน์โหลด JSON/CSV\n• Screenshot หน้าจอ\n• คัดลอกข้อมูลด้วยตนเอง');
+            alert('❌ ' + t('เกิดข้อผิดพลาดในการสร้าง PDF') + '\n\nกรุณาลองใช้:\n• ดาวน์โหลด JSON/CSV\n• Screenshot หน้าจอ\n• คัดลอกข้อมูลด้วยตนเอง');
         } finally {
             setIsCreatingPDF(false);
         }
@@ -357,10 +359,10 @@ export default function EnhancedHorticultureResultsPage() {
         setIsCreatingExport(true);
         try {
             downloadStatsAsJSON(`${projectData?.projectName || 'horticulture'}-stats`);
-            alert('✅ ดาวน์โหลดไฟล์ JSON สำเร็จ!');
+            alert('✅ ' + t('ดาวน์โหลดไฟล์ JSON สำเร็จ') + '!');
         } catch (error) {
             console.error('❌ Error downloading JSON:', error);
-            alert('❌ เกิดข้อผิดพลาดในการดาวน์โหลด JSON');
+            alert('❌ ' + t('เกิดข้อผิดพลาดในการดาวน์โหลด JSON'));
         } finally {
             setIsCreatingExport(false);
         }
@@ -370,10 +372,10 @@ export default function EnhancedHorticultureResultsPage() {
         setIsCreatingExport(true);
         try {
             downloadStatsAsCSV(`${projectData?.projectName || 'horticulture'}-stats`);
-            alert('✅ ดาวน์โหลดไฟล์ CSV สำเร็จ!');
+            alert('✅ ' + t('ดาวน์โหลดไฟล์ CSV สำเร็จ') + '!');
         } catch (error) {
             console.error('❌ Error downloading CSV:', error);
-            alert('❌ เกิดข้อผิดพลาดในการดาวน์โหลด CSV');
+            alert('❌ ' + t('เกิดข้อผิดพลาดในการดาวน์โหลด CSV'));
         } finally {
             setIsCreatingExport(false);
         }
@@ -383,13 +385,13 @@ export default function EnhancedHorticultureResultsPage() {
         const formattedStats = getFormattedStats();
         if (formattedStats) {
             navigator.clipboard.writeText(formattedStats).then(() => {
-                alert('✅ คัดลอกข้อมูลสถิติลงคลิปบอร์ดเรียบร้อยแล้ว!');
+                alert('✅ ' + t('คัดลอกข้อมูลสถิติลงคลิปบอร์ดเรียบร้อยแล้ว') + '!');
             }).catch(() => {
                 // Fallback: แสดงข้อมูลในหน้าต่างใหม่
                 const newWindow = window.open('', '_blank');
                 if (newWindow) {
                     newWindow.document.write(`<pre>${formattedStats}</pre>`);
-                    alert('เปิดข้อมูลในหน้าต่างใหม่ กรุณาคัดลอกด้วยตนเอง');
+                    alert(t('เปิดข้อมูลในหน้าต่างใหม่ กรุณาคัดลอกด้วยตนเอง'));
                 }
             });
         }
@@ -681,7 +683,7 @@ export default function EnhancedHorticultureResultsPage() {
                         onClick={handleNewProject}
                         className="rounded-lg bg-blue-600 px-6 py-3 transition-colors hover:bg-blue-700"
                     >
-                        กลับไปสร้างโครงการใหม่
+                        {t('กลับไปสร้างโครงการใหม่')}
                     </button>
                 </div>
             </div>
@@ -696,11 +698,11 @@ export default function EnhancedHorticultureResultsPage() {
                 {/* Header */}
                 <div className="mb-8 text-center">
                     <h1 className="mb-4 text-4xl font-bold text-green-400">
-                        🌱 รายงานการออกแบบระบบน้ำสวนผลไม้
+                        🌱 {t('รายงานการออกแบบระบบน้ำสวนผลไม้')}
                     </h1>
                     <h2 className="text-2xl text-gray-300">{projectData.projectName}</h2>
                     <p className="mt-2 text-gray-400">
-                        วันที่สร้าง: {new Date(projectData.createdAt).toLocaleDateString('th-TH')}
+                        {t('วันที่สร้าง')}: {new Date(projectData.createdAt).toLocaleDateString('th-TH')}
                     </p>
                 </div>
 
@@ -719,7 +721,7 @@ export default function EnhancedHorticultureResultsPage() {
                                             : 'bg-blue-600 text-white hover:bg-blue-700'
                                     }`}
                                 >
-                                    {isCreatingImage ? '⏳ สร้าง...' : '📷 ดาวน์โหลดภาพ'}
+                                    {isCreatingImage ? '⏳ ' + t('สร้าง...') : '📷 ' + t('ดาวน์โหลดภาพ')}
                                 </button>
 
                                 <button
@@ -731,7 +733,7 @@ export default function EnhancedHorticultureResultsPage() {
                                             : 'bg-red-600 text-white hover:bg-red-700'
                                     }`}
                                 >
-                                    {isCreatingPDF ? '⏳ สร้าง...' : '📄 สร้างรายงาน'}
+                                    {isCreatingPDF ? '⏳ ' + t('สร้าง...') : '📄 ' + t('สร้างรายงาน')}
                                 </button>
 
                                 <button
@@ -857,7 +859,7 @@ export default function EnhancedHorticultureResultsPage() {
                                 whenReady={() => setMapLoaded(true)}
                             >
                                 <LayersControl position="topright">
-                                    <LayersControl.BaseLayer checked name="ภาพถ่ายดาวเทียม">
+                                    <LayersControl.BaseLayer checked name={t('ภาพถ่ายดาวเทียม')}>
                                         <TileLayer
                                             url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
                                             attribution="Google Maps"
@@ -865,7 +867,7 @@ export default function EnhancedHorticultureResultsPage() {
                                             maxNativeZoom={20}
                                         />
                                     </LayersControl.BaseLayer>
-                                    <LayersControl.BaseLayer name="ภาพถ่าย + ป้ายชื่อ">
+                                    <LayersControl.BaseLayer name={t('ภาพถ่าย + ป้ายชื่อ')}>
                                         <TileLayer
                                             url="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
                                             attribution="Google Maps"
@@ -873,7 +875,7 @@ export default function EnhancedHorticultureResultsPage() {
                                             maxNativeZoom={20}
                                         />
                                     </LayersControl.BaseLayer>
-                                    <LayersControl.BaseLayer name="แผนที่ถนน">
+                                    <LayersControl.BaseLayer name={t('แผนที่ถนน')}>
                                         <TileLayer
                                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                                             attribution="OpenStreetMap"
@@ -1080,7 +1082,7 @@ export default function EnhancedHorticultureResultsPage() {
                     <div className="space-y-6">
                         {/* Overall Summary */}
                         <div className="rounded-lg bg-gray-800 p-6">
-                            <h3 className="mb-4 text-xl font-semibold text-green-400">📊 ข้อมูลโดยรวม</h3>
+                            <h3 className="mb-4 text-xl font-semibold text-green-400">📊 {t('ข้อมูลโดยรวม')}</h3>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="rounded bg-gray-700 p-3">
                                     <div className="text-gray-400">พื้นที่รวมทั้งหมด</div>
@@ -1089,19 +1091,19 @@ export default function EnhancedHorticultureResultsPage() {
                                     </div>
                                 </div>
                                 <div className="rounded bg-gray-700 p-3">
-                                    <div className="text-gray-400">จำนวนโซน</div>
-                                    <div className="text-lg font-bold text-blue-400">
-                                        {projectSummary.totalZones} โซน
+                                    <div className="text-gray-400">{t('จำนวนโซน')}</div>
+                                    <div className="text-2xl font-bold">
+                                        {projectSummary.totalZones} {t('โซน')}
                                     </div>
                                 </div>
                                 <div className="rounded bg-gray-700 p-3">
-                                    <div className="text-gray-400">จำนวนต้นไม้ทั้งหมด</div>
+                                    <div className="text-gray-400">{t('จำนวนต้นไม้ทั้งหมด')}</div>
                                     <div className="text-lg font-bold text-yellow-400">
                                         {projectSummary.totalPlants.toLocaleString()} ต้น
                                     </div>
                                 </div>
                                 <div className="rounded bg-gray-700 p-3">
-                                    <div className="text-gray-400">ปริมาณน้ำต่อครั้ง</div>
+                                    <div className="text-gray-400">{t('ปริมาณน้ำต่อครั้ง')}</div>
                                     <div className="text-lg font-bold text-cyan-400">
                                         {formatWaterVolume(projectSummary.totalWaterNeedPerSession)}
                                     </div>
@@ -1111,7 +1113,7 @@ export default function EnhancedHorticultureResultsPage() {
 
                         {/* Pipe System Summary */}
                         <div className="rounded-lg bg-gray-800 p-6">
-                            <h3 className="mb-4 text-xl font-semibold text-blue-400">🔧 ระบบท่อ</h3>
+                            <h3 className="mb-4 text-xl font-semibold text-blue-400">🔧 {t('ระบบท่อ')}</h3>
                             
                             {/* Main Pipes */}
                             <div className="mb-4 rounded bg-gray-700 p-4">
@@ -1188,7 +1190,7 @@ export default function EnhancedHorticultureResultsPage() {
                         {projectSummary.zoneDetails.length > 0 && (
                             <div className="rounded-lg bg-gray-800 p-6">
                                 <h3 className="mb-4 text-xl font-semibold text-green-400">
-                                    🏞️ รายละเอียดแต่ละโซน
+                                    🏞️ {t('รายละเอียดแต่ละโซน')}
                                 </h3>
                                 <div className="space-y-4">
                                     {projectSummary.zoneDetails.map((zone) => (
@@ -1200,42 +1202,23 @@ export default function EnhancedHorticultureResultsPage() {
                                             {/* Zone Basic Info */}
                                             <div className="mb-3 grid grid-cols-2 gap-4 text-sm">
                                                 <div>
-                                                    <span className="text-gray-400">พื้นที่โซน:</span>
-                                                    <div className="font-bold text-green-400">
-                                                        {formatAreaInRai(zone.areaInRai)}
-                                                    </div>
+                                                    <span className="text-gray-400">{t('พื้นที่โซน')}:</span>
+                                                    <span className="font-medium">{formatAreaInRai(zone.areaInRai)}</span>
                                                 </div>
-                                                <div>
-                                                    <span className="text-gray-400">จำนวนต้นไม้:</span>
-                                                    <div className="font-bold text-yellow-400">
-                                                        {zone.plantCount.toLocaleString()} ต้น
-                                                    </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-400">{t('จำนวนต้นไม้')}:</span>
+                                                    <span className="font-medium">{zone.plantCount}</span>
                                                 </div>
-                                                <div className="col-span-2">
-                                                    <span className="text-gray-400">ปริมาณน้ำต่อครั้ง:</span>
-                                                    <div className="font-bold text-cyan-400">
-                                                        {formatWaterVolume(zone.waterNeedPerSession)}
-                                                    </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-400">{t('น้ำต่อครั้ง')}:</span>
+                                                    <span className="font-medium">{formatWaterVolume(zone.waterNeedPerSession)}</span>
                                                 </div>
-                                            </div>
-
-                                            {/* Zone Pipes */}
-                                            <div className="space-y-2 text-xs">
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <div className="rounded bg-blue-900/30 p-2">
-                                                        <div className="text-blue-300">ท่อเมนในโซน</div>
-                                                        <div>ยาวที่สุด: {formatDistance(zone.mainPipesInZone.longest)}</div>
-                                                        <div>รวม: {formatDistance(zone.mainPipesInZone.totalLength)}</div>
-                                                    </div>
-                                                    <div className="rounded bg-purple-900/30 p-2">
-                                                        <div className="text-purple-300">ท่อเมนรองในโซน</div>
-                                                        <div>ยาวที่สุด: {formatDistance(zone.subMainPipesInZone.longest)}</div>
-                                                        <div>รวม: {formatDistance(zone.subMainPipesInZone.totalLength)}</div>
-                                                    </div>
-                                                </div>
-                                                <div className="rounded bg-green-900/30 p-2">
-                                                    <div className="text-green-300">ท่อย่อยในโซน</div>
-                                                    <div>ยาวที่สุด: {formatDistance(zone.branchPipesInZone.longest)} | รวม: {formatDistance(zone.branchPipesInZone.totalLength)}</div>
+                                                
+                                                {/* Pipe Information */}
+                                                <div className="mt-3 space-y-2">
+                                                    <div className="text-blue-300">{t('ท่อเมนในโซน')}</div>
+                                                    <div className="text-purple-300">{t('ท่อเมนรองในโซน')}</div>
+                                                    <div className="text-green-300">{t('ท่อย่อยในโซน')}</div>
                                                 </div>
                                             </div>
                                         </div>
@@ -1331,7 +1314,7 @@ export default function EnhancedHorticultureResultsPage() {
                 {/* Enhanced Footer */}
                 <div className="mt-12 text-center text-gray-400">
                     <p>
-                        ระบบออกแบบการวางระบบน้ำสวนผลไม้ | สร้างเมื่อ{' '}
+                        ระบบออกแบบการวางระบบน้ำสวนผลไม้ | {t('สร้างเมื่อ')}{' '}
                         {new Date().toLocaleDateString('th-TH')}
                     </p>
                     <div className="mt-2 text-sm text-green-300">
@@ -1347,4 +1330,8 @@ export default function EnhancedHorticultureResultsPage() {
             <Footer />
         </div>
     );
+}
+
+export default function EnhancedHorticultureResultsPage() {
+    return <EnhancedHorticultureResultsPageContent />;
 }
