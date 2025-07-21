@@ -1,34 +1,35 @@
-// resources\js\pages\utils\calculations.ts
+// resources\js\pages\utils\calculations.ts - แก้ไขการคำนวณและให้คะแนนท่อ
 export const calculatePipeRolls = (totalLength: number, rollLength: number): number => {
     return Math.ceil(totalLength / rollLength);
 };
 
 export const getAdjustedC = (pipeType: string, age: number): number => {
-    const baseC =
-        {
-            'HDPE PE 100': 145,
-            'HDPE PE 80': 140,
-            LDPE: 135,
-            PVC: 150,
-            'PE-RT': 145,
-            'Flexible PE': 130,
-        }[pipeType] || 135;
+    const baseC = {
+        'HDPE PE 100': 145,
+        'HDPE PE 80': 140,
+        LDPE: 135,
+        PVC: 150,
+        'PE-RT': 145,
+        'Flexible PE': 130,
+    }[pipeType] || 135;
 
     return Math.max(100, baseC - age * 1.5);
 };
+
 export const getMinorLossRatio = (sectionType: string, velocity: number): number => {
     const baseRatios = {
-        branch: 0.25,
-        secondary: 0.2,
-        main: 0.15,
+        branch: 0.12,    // ลดลง
+        secondary: 0.10, // ลดลง  
+        main: 0.08,      // ลดลง
     };
 
-    const baseRatio = baseRatios[sectionType as keyof typeof baseRatios] || 0.2;
+    const baseRatio = baseRatios[sectionType as keyof typeof baseRatios] || 0.10;
 
+    // ลด velocity factor
     let velocityFactor = 1.0;
-    if (velocity > 2.0) velocityFactor = 1.3;
-    else if (velocity > 1.5) velocityFactor = 1.15;
-    else if (velocity > 1.0) velocityFactor = 1.05;
+    if (velocity > 2.5) velocityFactor = 1.15;      // ลดลง
+    else if (velocity > 2.0) velocityFactor = 1.08; // ลดลง
+    else if (velocity > 1.5) velocityFactor = 1.03; // ลดลง
 
     return baseRatio * velocityFactor;
 };
@@ -41,29 +42,42 @@ export const calculateImprovedHeadLoss = (
     sectionType: string,
     pipeAgeYears: number
 ) => {
-    const Q = flow_lpm / 60000;
-    const D = diameter_mm / 1000;
+    // แปลงหน่วย
+    const Q = flow_lpm / 60000; // LPM เป็น m³/s
+    const D = diameter_mm / 1000; // mm เป็น m
     const C = getAdjustedC(pipeType, pipeAgeYears);
 
+    // คำนวณพื้นที่หน้าตัดและความเร็ว
     const A = Math.PI * Math.pow(D / 2, 2);
     const velocity = A > 0 ? Q / A : 0;
 
-    const majorLoss =
-        (10.67 * length_m * Math.pow(Q, 1.852)) / (Math.pow(C, 1.852) * Math.pow(D, 4.87));
+    // คำนวณ Major Loss ด้วยสูตร Hazen-Williams
+    const majorLoss = (10.67 * length_m * Math.pow(Q, 1.852)) / (Math.pow(C, 1.852) * Math.pow(D, 4.87));
 
+    // คำนวณ Velocity Head
     const velocityHead = Math.pow(velocity, 2) / (2 * 9.81);
 
+    // คำนวณ Minor Loss แบบสมเหตุสมผล
     const minorLossRatio = getMinorLossRatio(sectionType, velocity);
     let minorLoss = majorLoss * minorLossRatio;
 
+    // เพิ่ม minor loss เฉพาะที่จำเป็น
     if (sectionType === 'main') {
-        const entranceLoss = 0.5 * velocityHead;
-        const exitLoss = 1.0 * velocityHead;
+        // Entrance และ exit loss สำหรับท่อหลัก
+        const entranceLoss = 0.2 * velocityHead; // ลดลง
+        const exitLoss = 0.3 * velocityHead;     // ลดลง
         minorLoss += entranceLoss + exitLoss;
     }
 
     if (sectionType === 'branch') {
-        const fittingLoss = velocityHead * 2.0;
+        // Fitting loss สำหรับท่อย่อย (T-junction, elbow)
+        const fittingLoss = velocityHead * 0.8; // ลดลง
+        minorLoss += fittingLoss;
+    }
+
+    if (sectionType === 'secondary') {
+        // Fitting loss สำหรับท่อรอง
+        const fittingLoss = velocityHead * 0.4; // ลดลง
         minorLoss += fittingLoss;
     }
 
@@ -99,7 +113,6 @@ export const getVelocityScore = (velocity: number): number => {
 
 export const getSizeScore = (pipeSize: number, optimalSize: number, flowLPM: number): number => {
     const sizeRatio = pipeSize / optimalSize;
-
     const standardSizes = [16, 20, 25, 32, 40, 50, 63, 75, 90, 110, 125, 140, 160, 200, 250, 315];
     const isStandardSize = standardSizes.includes(pipeSize);
 
@@ -112,8 +125,7 @@ export const getSizeScore = (pipeSize: number, optimalSize: number, flowLPM: num
     else score = 5;
 
     if (isStandardSize) score += 5;
-
-    if (sizeRatio > 1.5) score -= 10;
+    if (sizeRatio > 1.5) score -= 5; // ลดการหักคะแนน
 
     return Math.max(0, score);
 };
@@ -122,10 +134,10 @@ export const getCostEfficiencyScore = (pipe: any, pipeType: string): number => {
     const costPerMeterPerMM = pipe.price / (pipe.lengthM * pipe.sizeMM);
 
     const thresholds = {
-        branch: { excellent: 0.3, good: 0.8, average: 1.5 },
-        secondary: { excellent: 0.8, good: 1.5, average: 3.0 },
-        main: { excellent: 1.5, good: 3.0, average: 6.0 },
-    }[pipeType] || { excellent: 0.8, good: 1.5, average: 3.0 };
+        branch: { excellent: 0.4, good: 1.0, average: 2.0 },    // ปรับเพิ่ม
+        secondary: { excellent: 1.0, good: 2.0, average: 4.0 }, // ปรับเพิ่ม
+        main: { excellent: 2.0, good: 4.0, average: 8.0 },      // ปรับเพิ่ม
+    }[pipeType] || { excellent: 1.0, good: 2.0, average: 4.0 };
 
     if (costPerMeterPerMM <= thresholds.excellent) return 15;
     if (costPerMeterPerMM <= thresholds.good) return 12;
@@ -137,10 +149,10 @@ export const getHeadLossScore = (headLoss: number, pipeType: string, length: num
     const headLossPer100m = (headLoss / length) * 100;
 
     const thresholds = {
-        branch: { excellent: 2.0, good: 5.0, average: 10.0 },
-        secondary: { excellent: 1.5, good: 3.0, average: 6.0 },
-        main: { excellent: 1.0, good: 2.0, average: 4.0 },
-    }[pipeType] || { excellent: 1.5, good: 3.0, average: 6.0 };
+        branch: { excellent: 4.0, good: 8.0, average: 15.0 },    // ปรับให้หลวมขึ้น
+        secondary: { excellent: 3.0, good: 6.0, average: 12.0 }, // ปรับให้หลวมขึ้น
+        main: { excellent: 2.0, good: 4.0, average: 8.0 },       // ปรับให้หลวมขึ้น
+    }[pipeType] || { excellent: 3.0, good: 6.0, average: 12.0 };
 
     if (headLossPer100m <= thresholds.excellent) return 15;
     if (headLossPer100m <= thresholds.good) return 12;
@@ -148,19 +160,14 @@ export const getHeadLossScore = (headLoss: number, pipeType: string, length: num
     return 3;
 };
 
-export const calculateOptimalPipeSize = (
-    flow_lpm: number,
-    targetVelocity: number = 1.5
-): number => {
-    const Q = flow_lpm / 60000;
+export const calculateOptimalPipeSize = (flow_lpm: number, targetVelocity: number = 1.5): number => {
+    const Q = flow_lpm / 60000; // แปลง LPM เป็น m³/s
     const V = targetVelocity;
     const D = 2 * Math.sqrt(Q / (Math.PI * V));
     const sizeInMM = D * 1000;
 
     const standardSizes = [16, 20, 25, 32, 40, 50, 63, 75, 90, 110, 125, 140, 160, 200, 250, 315];
-    return (
-        standardSizes.find((size) => size >= sizeInMM) || standardSizes[standardSizes.length - 1]
-    );
+    return standardSizes.find((size) => size >= sizeInMM) || standardSizes[standardSizes.length - 1];
 };
 
 export const formatWaterFlow = (waterFlow: any) => {
@@ -220,6 +227,7 @@ export const formatNumber = (value: number, decimals: number = 3): number => {
     return Math.round(value * Math.pow(10, decimals)) / Math.pow(10, decimals);
 };
 
+// แก้ไขฟังก์ชันให้คะแนนท่อ - ลดการเน้นประเภทท่อ
 export const evaluatePipeOverall = (
     pipe: any,
     flow_lpm: number,
@@ -241,58 +249,48 @@ export const evaluatePipeOverall = (
     const velocity = headLossData.velocity;
     const optimalSize = calculateOptimalPipeSize(flow_lpm);
 
-    const velocityScore = getVelocityScore(velocity);
-    score += velocityScore;
+    // คะแนนความเร็ว (50 คะแนน) - ยังคงเป็นหลัก
+    score += getVelocityScore(velocity);
 
-    const sizeScore = getSizeScore(pipe.sizeMM, optimalSize, flow_lpm);
-    score += sizeScore;
+    // คะแนนขนาด (35 คะแนน) - ยังคงสำคัญ
+    score += getSizeScore(pipe.sizeMM, optimalSize, flow_lpm);
 
-    const headLossScore = getHeadLossScore(headLossData.total, sectionType, length_m);
-    score += headLossScore;
+    // คะแนน head loss (10 คะแนน) - ลดลง
+    score += getHeadLossScore(headLossData.total, sectionType, length_m) * 0.67;
 
-    const costScore = getCostEfficiencyScore(pipe, sectionType);
-    score += costScore;
+    // คะแนนความคุ้มค่า (15 คะแนน) - ยังคงเดิม
+    score += getCostEfficiencyScore(pipe, sectionType);
 
-    const typeAllowed = allowedTypes.length === 0 || allowedTypes.includes(pipe.pipeType);
-    const typeScore = typeAllowed ? 5 : 0;
+    // คะแนนประเภทท่อ - ลดความสำคัญลง (0-5 คะแนน)
+    let typeScore = 0;
+    if (allowedTypes.length === 0) {
+        // ถ้าไม่จำกัดประเภท ให้คะแนนตามประเภทแต่น้อยลง
+        const typeBonus = {
+            'HDPE PE 100': 5,
+            'HDPE PE 80': 4,
+            'PVC': 3,
+            'PE-RT': 3,
+            'LDPE': 2,
+            'Flexible PE': 2,
+        }[pipe.pipeType] || 1;
+        typeScore = typeBonus;
+    } else {
+        // ถ้าจำกัดประเภท
+        typeScore = allowedTypes.includes(pipe.pipeType) ? 5 : 0;
+    }
     score += typeScore;
 
+    // เงื่อนไขพื้นฐาน - เน้นความเร็วและแรงดัน
     const isVelocityOK = velocity >= 0.3 && velocity <= 3.5;
     const isPressureRatingOK = pipe.pn >= 6;
-    const isReasonablyPriced = pipe.price > 0 && pipe.price < 50000;
-
-    const debugInfo = {
-        velocityScore: velocityScore,
-        sizeScore: sizeScore,
-        headLossScore: headLossScore,
-        costScore: costScore,
-        typeScore: typeScore,
-        velocityValue: velocity,
-        isVelocityOK: isVelocityOK,
-        typeAllowed: typeAllowed,
-        allowedTypesList: allowedTypes,
-        actualPipeType: pipe.pipeType,
-        costPerMeterPerMM: pipe.price / (pipe.lengthM * pipe.sizeMM),
-        optimalSizeCalculated: optimalSize,
-        headLossPer100m: (headLossData.total / length_m) * 100,
-        reasonNotRecommended: [] as string[],
-    };
-
+    const isTypeAllowed = allowedTypes.length === 0 || allowedTypes.includes(pipe.pipeType);
+    
     const totalScore = formatNumber(score, 1);
-    const isRecommended = totalScore >= 65 && typeAllowed && isVelocityOK && isPressureRatingOK;
-    const isGoodChoice = totalScore >= 45 && typeAllowed && isVelocityOK;
-    const isUsable = totalScore >= 25 && isVelocityOK;
-
-    if (!isRecommended) {
-        if (totalScore < 65) debugInfo.reasonNotRecommended.push(`คะแนนต่ำ (${totalScore}/65)`);
-        if (!typeAllowed) debugInfo.reasonNotRecommended.push(`ประเภทท่อไม่เหมาะสม`);
-        if (!isVelocityOK)
-            debugInfo.reasonNotRecommended.push(
-                `ความเร็วน้ำไม่เหมาะสม (${velocity.toFixed(3)} m/s)`
-            );
-        if (!isPressureRatingOK)
-            debugInfo.reasonNotRecommended.push(`ความดันจำนวนไม่เพียงพอ (PN${pipe.pn})`);
-    }
+    
+    // ปรับเกณฑ์การแนะนำ - เน้นประสิทธิภาพมากกว่าประเภท
+    const isRecommended = totalScore >= 60 && isVelocityOK && isPressureRatingOK && velocity >= 0.8 && velocity <= 2.0;
+    const isGoodChoice = totalScore >= 40 && isVelocityOK && isPressureRatingOK;
+    const isUsable = totalScore >= 20 && isVelocityOK && isPressureRatingOK;
 
     return {
         ...pipe,
@@ -300,11 +298,13 @@ export const evaluatePipeOverall = (
         velocity: formatNumber(velocity, 3),
         headLoss: formatNumber(headLossData.total, 3),
         optimalSize: formatNumber(optimalSize, 1),
-        isRecommended: isRecommended,
-        isGoodChoice: isGoodChoice,
-        isUsable: isUsable,
-        isTypeAllowed: typeAllowed,
-        debugInfo: debugInfo,
+        isRecommended,
+        isGoodChoice,
+        isUsable,
+        isTypeAllowed,
+        velocityRating: velocity >= 0.8 && velocity <= 2.0 ? 'excellent' : 
+                       velocity >= 0.6 && velocity <= 2.5 ? 'good' : 
+                       velocity >= 0.3 && velocity <= 3.5 ? 'fair' : 'poor',
     };
 };
 
@@ -335,32 +335,39 @@ export const evaluateSprinklerOverall = (sprinkler: any, targetFlow: number) => 
 
     let score = 0;
 
-    const flowMatchRatio = targetFlow / ((minFlow + maxFlow) / 2);
+    // คะแนนความเหมาะสมการไหล (60 คะแนน) - เพิ่มความสำคัญ
+    const avgFlow = (minFlow + maxFlow) / 2;
+    const flowMatchRatio = targetFlow / avgFlow;
+    
     if (targetFlow >= minFlow && targetFlow <= maxFlow) {
-        if (flowMatchRatio >= 0.8 && flowMatchRatio <= 1.2) score += 50;
-        else score += 40;
+        // อยู่ในช่วงที่เหมาะสม
+        if (flowMatchRatio >= 0.9 && flowMatchRatio <= 1.1) score += 60; // เหมาะสมมาก
+        else if (flowMatchRatio >= 0.8 && flowMatchRatio <= 1.2) score += 55; // เหมาะสม
+        else score += 45; // อยู่ในช่วงแต่ไม่เหมาะสมมาก
     } else if (targetFlow >= minFlow * 0.8 && targetFlow <= maxFlow * 1.2) {
-        score += 30;
+        score += 35; // ใกล้เคียง
     } else if (targetFlow >= minFlow * 0.6 && targetFlow <= maxFlow * 1.5) {
-        score += 15;
+        score += 20; // ใช้ได้
     } else {
-        score += 5;
+        score += 5; // ไม่เหมาะสม
     }
 
-    const avgFlow = (minFlow + maxFlow) / 2;
+    // คะแนนความคุ้มค่าด้านราคา (20 คะแนน)
     const pricePerFlow = sprinkler.price / avgFlow;
-    if (pricePerFlow < 0.5) score += 25;
-    else if (pricePerFlow < 1.0) score += 20;
-    else if (pricePerFlow < 2.0) score += 15;
-    else if (pricePerFlow < 5.0) score += 10;
-    else score += 5;
+    if (pricePerFlow < 0.5) score += 20;
+    else if (pricePerFlow < 1.0) score += 16;
+    else if (pricePerFlow < 2.0) score += 12;
+    else if (pricePerFlow < 5.0) score += 8;
+    else score += 4;
 
+    // คะแนนรัศมีการฉีด (10 คะแนน)
     const avgRadius = (minRadius + maxRadius) / 2;
-    if (avgRadius >= 8) score += 15;
-    else if (avgRadius >= 5) score += 12;
-    else if (avgRadius >= 3) score += 8;
-    else score += 5;
+    if (avgRadius >= 8) score += 10;
+    else if (avgRadius >= 5) score += 8;
+    else if (avgRadius >= 3) score += 6;
+    else score += 4;
 
+    // คะแนนช่วงแรงดัน (10 คะแนน)
     const pressureRangeSize = maxPressure - minPressure;
     if (pressureRangeSize >= 3) score += 10;
     else if (pressureRangeSize >= 2) score += 8;
@@ -374,26 +381,25 @@ export const evaluateSprinklerOverall = (sprinkler: any, targetFlow: number) => 
         score: totalScore,
         flowMatch: targetFlow >= minFlow && targetFlow <= maxFlow,
         flowCloseMatch: targetFlow >= minFlow * 0.8 && targetFlow <= maxFlow * 1.2,
-        isRecommended:
-            totalScore >= 70 && targetFlow >= minFlow * 0.9 && targetFlow <= maxFlow * 1.1,
-        isGoodChoice:
-            totalScore >= 50 && targetFlow >= minFlow * 0.8 && targetFlow <= maxFlow * 1.2,
-        isUsable: totalScore >= 30 && targetFlow >= minFlow * 0.6 && targetFlow <= maxFlow * 1.4,
+        isRecommended: totalScore >= 75 && targetFlow >= minFlow * 0.9 && targetFlow <= maxFlow * 1.1,
+        isGoodChoice: totalScore >= 55 && targetFlow >= minFlow * 0.8 && targetFlow <= maxFlow * 1.2,
+        isUsable: totalScore >= 35 && targetFlow >= minFlow * 0.6 && targetFlow <= maxFlow * 1.4,
         targetFlow: formatNumber(targetFlow, 3),
         minFlow: formatNumber(minFlow, 3),
         maxFlow: formatNumber(maxFlow, 3),
+        avgFlow: formatNumber(avgFlow, 3),
         avgRadius: formatNumber(avgRadius, 3),
         pricePerFlow: formatNumber(pricePerFlow, 3),
     };
 };
 
 export const evaluatePumpOverall = (pump: any, requiredFlow: number, requiredHead: number) => {
-    const maxFlow =
-        pump.max_flow_rate_lpm || (Array.isArray(pump.flow_rate_lpm) ? pump.flow_rate_lpm[1] : 0);
+    const maxFlow = pump.max_flow_rate_lpm || (Array.isArray(pump.flow_rate_lpm) ? pump.flow_rate_lpm[1] : 0);
     const maxHead = pump.max_head_m || (Array.isArray(pump.head_m) ? pump.head_m[0] : 0);
 
     let score = 0;
 
+    // คะแนนการไหล (35 คะแนน)
     if (maxFlow >= requiredFlow) {
         const flowRatio = maxFlow / requiredFlow;
         if (flowRatio >= 1.1 && flowRatio <= 1.8) score += 35;
@@ -402,6 +408,7 @@ export const evaluatePumpOverall = (pump: any, requiredFlow: number, requiredHea
         else score += 10;
     }
 
+    // คะแนน head (35 คะแนน)
     if (maxHead >= requiredHead) {
         const headRatio = maxHead / requiredHead;
         if (headRatio >= 1.1 && headRatio <= 1.8) score += 35;
@@ -410,6 +417,7 @@ export const evaluatePumpOverall = (pump: any, requiredFlow: number, requiredHea
         else score += 10;
     }
 
+    // คะแนนความคุ้มค่า (20 คะแนน)
     const flowPerBaht = maxFlow / pump.price;
     if (flowPerBaht > 0.3) score += 20;
     else if (flowPerBaht > 0.2) score += 15;
@@ -417,6 +425,7 @@ export const evaluatePumpOverall = (pump: any, requiredFlow: number, requiredHea
     else if (flowPerBaht > 0.05) score += 5;
     else score += 2;
 
+    // คะแนนขนาดเครื่อง (10 คะแนน)
     const powerHP = parseFloat(String(pump.powerHP).replace(/[^0-9.]/g, '')) || 0;
     const estimatedHP = (requiredFlow * requiredHead) / 3000;
     const powerRatio = powerHP / estimatedHP;
@@ -445,6 +454,7 @@ export const evaluatePumpOverall = (pump: any, requiredFlow: number, requiredHea
     };
 };
 
+// ฟังก์ชันเรียงลำดับ
 export const sortForDropdown = (allItems: any[], recommendedItems: any[]) => {
     const highly_recommended = allItems
         .filter((item) => recommendedItems.includes(item) && item.score >= 70)
@@ -473,44 +483,22 @@ export const isRecommended = (item: any, recommendedList: any[]) => {
     return recommendedList.includes(item);
 };
 
-export const selectBestEquipmentByPrice = (
-    equipmentList: any[],
-    preferHighPrice: boolean = false
-): any => {
+export const selectBestEquipmentByPrice = (equipmentList: any[], preferHighPrice: boolean = false): any => {
     if (!equipmentList || equipmentList.length === 0) return null;
 
     const recommended = equipmentList.filter((item) => item.isRecommended);
     const goodChoice = equipmentList.filter((item) => item.isGoodChoice && !item.isRecommended);
-    const usable = equipmentList.filter(
-        (item) => item.isUsable && !item.isGoodChoice && !item.isRecommended
-    );
+    const usable = equipmentList.filter((item) => item.isUsable && !item.isGoodChoice && !item.isRecommended);
 
-    let targetGroup =
-        recommended.length > 0
-            ? recommended
-            : goodChoice.length > 0
-              ? goodChoice
-              : usable.length > 0
-                ? usable
-                : equipmentList;
+    let targetGroup = recommended.length > 0 ? recommended : goodChoice.length > 0 ? goodChoice : usable.length > 0 ? usable : equipmentList;
 
     return targetGroup.sort((a, b) => a.price - b.price)[0];
 };
 
-export const detectSignificantInputChanges = (
-    oldInput: any,
-    newInput: any,
-    threshold: number = 0.15
-): boolean => {
+export const detectSignificantInputChanges = (oldInput: any, newInput: any, threshold: number = 0.15): boolean => {
     if (!oldInput || !newInput) return true;
 
-    const significantFields = [
-        'totalTrees',
-        'waterPerTreeLiters',
-        'numberOfZones',
-        'farmSizeRai',
-        'irrigationTimeMinutes',
-    ];
+    const significantFields = ['totalTrees', 'waterPerTreeLiters', 'numberOfZones', 'farmSizeRai', 'irrigationTimeMinutes'];
 
     return significantFields.some((field) => {
         const oldValue = oldInput[field] || 0;
@@ -524,27 +512,14 @@ export const detectSignificantInputChanges = (
     });
 };
 
-export const validateEquipmentData = (
-    equipment: any,
-    categoryType: 'sprinkler' | 'pump' | 'pipe'
-): boolean => {
-    if (
-        !equipment ||
-        !equipment.id ||
-        !equipment.name ||
-        equipment.price === null ||
-        equipment.price === undefined
-    ) {
+export const validateEquipmentData = (equipment: any, categoryType: 'sprinkler' | 'pump' | 'pipe'): boolean => {
+    if (!equipment || !equipment.id || !equipment.name || equipment.price === null || equipment.price === undefined) {
         return false;
     }
 
     switch (categoryType) {
         case 'sprinkler':
-            return !!(
-                equipment.waterVolumeLitersPerHour &&
-                equipment.radiusMeters &&
-                equipment.pressureBar
-            );
+            return !!(equipment.waterVolumeLitersPerHour && equipment.radiusMeters && equipment.pressureBar);
         case 'pump':
             return !!(equipment.powerHP && equipment.flow_rate_lpm && equipment.head_m);
         case 'pipe':
@@ -578,10 +553,7 @@ export const flattenEquipmentAttributes = (equipment: any): any => {
     return flattened;
 };
 
-export const normalizeEquipmentData = (
-    equipment: any,
-    categoryType: 'sprinkler' | 'pump' | 'pipe'
-): any => {
+export const normalizeEquipmentData = (equipment: any, categoryType: 'sprinkler' | 'pump' | 'pipe'): any => {
     const flattened = flattenEquipmentAttributes(equipment);
 
     const normalized = {
@@ -595,9 +567,7 @@ export const normalizeEquipmentData = (
     switch (categoryType) {
         case 'sprinkler':
             if (normalized.waterVolumeLitersPerHour) {
-                normalized.waterVolumeLitersPerHour = parseRangeValue(
-                    normalized.waterVolumeLitersPerHour
-                );
+                normalized.waterVolumeLitersPerHour = parseRangeValue(normalized.waterVolumeLitersPerHour);
             }
             if (normalized.radiusMeters) {
                 normalized.radiusMeters = parseRangeValue(normalized.radiusMeters);
@@ -608,17 +578,7 @@ export const normalizeEquipmentData = (
             break;
 
         case 'pump':
-            const numericFields = [
-                'powerHP',
-                'powerKW',
-                'phase',
-                'inlet_size_inch',
-                'outlet_size_inch',
-                'max_head_m',
-                'max_flow_rate_lpm',
-                'suction_depth_m',
-                'weight_kg',
-            ];
+            const numericFields = ['powerHP', 'powerKW', 'phase', 'inlet_size_inch', 'outlet_size_inch', 'max_head_m', 'max_flow_rate_lpm', 'suction_depth_m', 'weight_kg'];
             numericFields.forEach((field) => {
                 if (normalized[field] !== undefined) {
                     normalized[field] = Number(normalized[field]) || 0;

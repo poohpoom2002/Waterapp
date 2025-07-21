@@ -4,7 +4,7 @@ import axios from 'axios';
 import HorticultureMapComponent from '../components/horticulture/HorticultureMapComponent';
 import HorticultureDrawingManager from '../components/horticulture/HorticultureDrawingManager';
 import HorticultureSearchControl from '../components/horticulture/HorticultureSearchControl';
-
+import EnhancedHorticultureSearchControl from '../components/horticulture/HorticultureSearchControl';
 import { router } from '@inertiajs/react';
 import { useLanguage } from '../contexts/LanguageContext';
 import LanguageSwitcher from '../components/LanguageSwitcher';
@@ -2383,11 +2383,85 @@ export default function EnhancedHorticulturePlannerPage() {
         [history.present.subMainPipes, history.present.plants, pushToHistory]
     );
 
-    const handleSearch = useCallback((lat: number, lng: number) => {
+    const handleSearch = useCallback((lat: number, lng: number, placeDetails?: any) => {
         setMapCenter([lat, lng]);
         if (mapRef.current) {
             mapRef.current.setCenter({ lat, lng });
-            mapRef.current.setZoom(18);
+            
+            // Intelligent zoom based on place type
+            let zoomLevel = 18; // Default zoom
+            
+            if (placeDetails?.types) {
+                const types = placeDetails.types;
+                
+                // Adjust zoom based on place type
+                if (types.includes('country')) {
+                    zoomLevel = 6;
+                } else if (types.includes('administrative_area_level_1') || types.includes('state')) {
+                    zoomLevel = 8;
+                } else if (types.includes('administrative_area_level_2') || types.includes('city')) {
+                    zoomLevel = 12;
+                } else if (types.includes('locality') || types.includes('sublocality')) {
+                    zoomLevel = 15;
+                } else if (types.includes('route') || types.includes('street_address')) {
+                    zoomLevel = 18;
+                } else if (types.includes('premise') || types.includes('building')) {
+                    zoomLevel = 20;
+                } else if (types.includes('park') || types.includes('airport')) {
+                    zoomLevel = 16;
+                } else if (types.includes('restaurant') || types.includes('store')) {
+                    zoomLevel = 19;
+                }
+            }
+            
+            mapRef.current.setZoom(zoomLevel);
+            
+            // Optional: Add a marker for the searched place
+            if (placeDetails) {
+                // Create a temporary marker for the searched location
+                const searchMarker = new google.maps.Marker({
+                    position: { lat, lng },
+                    map: mapRef.current,
+                    title: placeDetails.name || 'ตำแหน่งที่ค้นหา',
+                    animation: google.maps.Animation.DROP,
+                    icon: {
+                        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="16" cy="16" r="16" fill="#EA4335" fill-opacity="0.3"/>
+                                <circle cx="16" cy="16" r="12" fill="#EA4335"/>
+                                <circle cx="16" cy="16" r="4" fill="white"/>
+                            </svg>
+                        `),
+                        scaledSize: new google.maps.Size(32, 32),
+                        anchor: new google.maps.Point(16, 16),
+                    },
+                });
+                
+                // Remove the marker after 5 seconds
+                setTimeout(() => {
+                    searchMarker.setMap(null);
+                }, 5000);
+                
+                // Optional: Show info about the place
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `
+                        <div style="color: black; padding: 8px;">
+                            <strong>${placeDetails.name || 'สถานที่'}</strong><br/>
+                            <span style="font-size: 12px; color: #666;">
+                                ${placeDetails.formatted_address || placeDetails.vicinity || ''}
+                            </span>
+                            ${placeDetails.rating ? `<br/><span style="font-size: 12px;">⭐ ${placeDetails.rating}</span>` : ''}
+                        </div>
+                    `,
+                });
+                
+                infoWindow.open(mapRef.current, searchMarker);
+                
+                // Close info window after 5 seconds
+                setTimeout(() => {
+                    infoWindow.close();
+                }, 5000);
+            }
         }
     }, []);
 
@@ -2759,7 +2833,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                     key={stepId}
                                     onClick={() => handleStepClick(stepId)}
                                     disabled={!canProceedToStep(stepId)}
-                                    className={`rounded-lg p-3 text-center text-sm font-medium transition-all ${
+                                    className={`rounded-lg p-1 text-center text-sm font-medium transition-all ${
                                         getStepStatus(stepId) === 'active'
                                             ? 'bg-blue-600 text-white shadow-lg'
                                             : getStepStatus(stepId) === 'completed'
@@ -2769,27 +2843,23 @@ export default function EnhancedHorticulturePlannerPage() {
                                                 : 'cursor-not-allowed bg-gray-600 text-gray-400'
                                     }`}
                                 >
-                                    <div className="mb-1 text-lg">
                                         {stepId === 1 && '🗺️'}
                                         {stepId === 2 && '🌿'}
                                         {stepId === 3 && '🚰'}
                                         {stepId === 4 && '🔧'}
                                         {stepId === 5 && '✅'}
-                                    </div>
-                                    <div className="text-xs">
                                         {stepId === 1 && 'พื้นที่หลัก'}
                                         {stepId === 2 && 'พืช/โซน'}
                                         {stepId === 3 && 'ปั๊มน้ำ'}
                                         {stepId === 4 && 'ท่อน้ำ'}
                                         {stepId === 5 && 'เสร็จสิ้น'}
-                                    </div>
                                 </button>
                             ))}
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
-                        <div className="h-[88vh] space-y-6 overflow-y-auto lg:col-span-1">
+                        <div className="h-[60vh] space-y-6 overflow-y-auto lg:col-span-1">
                             <div className="rounded-lg bg-gray-800 p-4">
                                 <h3 className="mb-3 text-lg font-semibold">📊 ข้อมูลโครงการ</h3>
                                 <div className="space-y-4">
@@ -3628,7 +3698,7 @@ export default function EnhancedHorticulturePlannerPage() {
                         </div>
 
                         <div className="lg:col-span-3">
-                            <div className="top-18 sticky z-10 h-[88vh]">
+                            <div className="top-18 sticky z-10 h-[60vh]">
                                 <div className="h-full w-full overflow-hidden rounded-lg border border-gray-700">
                                     <HorticultureMapComponent
                                         center={mapCenter}
@@ -3636,7 +3706,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                         onMapLoad={handleMapLoad}
                                     >
                                         {/* Search Control */}
-                                        <HorticultureSearchControl
+                                        <EnhancedHorticultureSearchControl
                                             onPlaceSelect={handleSearch}
                                             placeholder="🔍 ค้นหาสถานที่..."
                                         />
@@ -3835,7 +3905,7 @@ export default function EnhancedHorticulturePlannerPage() {
                 </div>
             </div>
             {/* Footer */}
-            <Footer />
+            {/* <Footer /> */}
         </div>
     );
 }

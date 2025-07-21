@@ -40,8 +40,10 @@ interface QuotationDocumentProps {
     selectedSecondaryPipe: any;
     selectedMainPipe: any;
     projectImage?: string | null;
-    
+    projectMode: 'horticulture' | 'garden';
+    gardenData: any;
     projectData: any;
+    showPump: boolean;
     zoneSprinklers: { [zoneId: string]: any };
     selectedPipes: { [zoneId: string]: { branch?: any; secondary?: any; main?: any } };
     
@@ -59,8 +61,11 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     selectedMainPipe,
     projectImage,
     projectData,
+    projectMode,
+    gardenData,
     zoneSprinklers,
     selectedPipes,
+    showPump,
     onClose,
 }) => {
     const [items, setItems] = useState<QuotationItem[]>([]);

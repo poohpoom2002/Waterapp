@@ -14,6 +14,9 @@ interface CalculationSummaryProps {
     activeZone?: Zone;
     selectedZones?: string[];
     allZoneSprinklers: { [zoneId: string]: any };
+    projectMode?: 'horticulture' | 'garden';
+    showPump?: boolean;
+    simultaneousZonesCount?: number;
 }
 
 const CalculationSummary: React.FC<CalculationSummaryProps> = ({
@@ -23,6 +26,9 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
     activeZone,
     selectedZones = [],
     allZoneSprinklers,
+    projectMode = 'horticulture',
+    showPump = true,
+    simultaneousZonesCount = 1,
 }) => {
     const actualPump = results.autoSelectedPump;
     const actualBranchPipe = results.autoSelectedBranchPipe;
@@ -31,15 +37,18 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
 
     const calculateTotalSystemCost = () => {
         if (selectedZones.length <= 1) {
-            return (
-                (selectedSprinkler?.price || 0) * results.totalSprinklers +
-                (actualPump?.price || 0) +
+            let cost = (selectedSprinkler?.price || 0) * results.totalSprinklers +
                 (actualBranchPipe?.price || 0) * results.branchPipeRolls +
                 (actualSecondaryPipe?.price || 0) * results.secondaryPipeRolls +
-                (actualMainPipe?.price || 0) * results.mainPipeRolls
-            );
+                (actualMainPipe?.price || 0) * results.mainPipeRolls;
+            
+            if (showPump) {
+                cost += (actualPump?.price || 0);
+            }
+            
+            return cost;
         } else {
-            let totalCost = actualPump?.price || 0;
+            let totalCost = showPump ? (actualPump?.price || 0) : 0;
 
             selectedZones.forEach((zoneId) => {
                 const zoneSprinkler = allZoneSprinklers[zoneId];
@@ -98,7 +107,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
 
         return {
             pressure: pressureM,
-            source: `จากสปริงเกอร์ (${avgPressureBar.toFixed(1)} bar)`,
+            source: `จาก${projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'} (${avgPressureBar.toFixed(1)} bar)`,
             pressureBar: avgPressureBar,
         };
     };
@@ -150,7 +159,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
         if (results.headLoss.total > 20) performance.headLossStatus = 'critical';
         else if (results.headLoss.total > 15) performance.headLossStatus = 'warning';
 
-        if (actualPump) {
+        if (showPump && actualPump) {
             if (!actualPump.isFlowAdequate || !actualPump.isHeadAdequate) {
                 performance.pumpStatus = 'critical';
             } else if (actualPump.flowRatio > 2.5 || actualPump.headRatio > 2.5) {
@@ -161,8 +170,12 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
         const statuses = [
             performance.velocityStatus,
             performance.headLossStatus,
-            performance.pumpStatus,
         ];
+        
+        if (showPump) {
+            statuses.push(performance.pumpStatus);
+        }
+        
         if (statuses.includes('critical')) performance.overallStatus = 'critical';
         else if (statuses.includes('warning')) performance.overallStatus = 'warning';
 
@@ -197,18 +210,34 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
         }
     };
 
+    // Labels based on project mode
+    const getLabel = (key: string) => {
+        if (projectMode === 'garden') {
+            switch (key) {
+                case 'trees': return 'หัวฉีด';
+                case 'tree': return 'หัวฉีด';
+                case 'waterPerTree': return 'น้ำต่อหัวฉีด';
+                case 'treeDensity': return 'ความหนาแน่นหัวฉีด';
+                default: return key;
+            }
+        }
+        return key;
+    };
+
     return (
         <div className="space-y-6">
             {activeZone && (
                 <div className="rounded-lg bg-purple-900 p-4">
                     <h3 className="mb-2 text-lg font-bold text-purple-300">
-                        🌿 ข้อมูลโซน: {activeZone.name}
+                        {projectMode === 'garden' ? '🏡' : '🌿'} ข้อมูลโซน: {activeZone.name}
                     </h3>
                     <div className="grid grid-cols-2 gap-4 text-sm text-gray-300 md:grid-cols-4">
-                        <p>พื้นที่: {(activeZone.area / 1600).toFixed(2)} ไร่</p>
-                        <p>จำนวนต้น: {activeZone.plantCount.toLocaleString()} ต้น</p>
+                        {activeZone.area >= 1600 ? <p>พื้นที่: {(activeZone.area / 1600).toFixed(1)} ไร่</p> : <p>พื้นที่: {activeZone.area.toFixed(2)} ตร.ม.</p>}
+                        <p>จำนวน{projectMode === 'garden' ? 'หัวฉีด' : 'ต้น'}: {activeZone.plantCount.toLocaleString()} {projectMode === 'garden' ? 'หัว' : 'ต้น'}</p>
                         <p>ความต้องการน้ำ: {activeZone.totalWaterNeed.toFixed(0)} ลิตร/วัน</p>
-                        <p>พืชที่ปลูก: {activeZone.plantData?.name || 'ไม่ระบุ'}</p>
+                        {projectMode === 'horticulture' && (
+                            <p>พืชที่ปลูก: {activeZone.plantData?.name || 'ไม่ระบุ'}</p>
+                        )}
                     </div>
                     {selectedZones.length > 1 && (
                         <div className="mt-2 rounded bg-purple-800 p-2">
@@ -248,15 +277,17 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             {results.headLoss.total.toFixed(1)} m
                         </p>
                     </div>
-                    <div className="text-center">
-                        <div
-                            className={`text-xl font-bold ${getStatusColor(systemPerformance.pumpStatus)}`}
-                        >
-                            {getStatusIcon(systemPerformance.pumpStatus)}
+                    {showPump && (
+                        <div className="text-center">
+                            <div
+                                className={`text-xl font-bold ${getStatusColor(systemPerformance.pumpStatus)}`}
+                            >
+                                {getStatusIcon(systemPerformance.pumpStatus)}
+                            </div>
+                            <p className="text-sm text-gray-300">ปั๊มน้ำ</p>
+                            <p className="text-xs text-gray-400">{actualPump?.powerHP || 'N/A'} HP</p>
                         </div>
-                        <p className="text-sm text-gray-300">ปั๊มน้ำ</p>
-                        <p className="text-xs text-gray-400">{actualPump?.powerHP || 'N/A'} HP</p>
-                    </div>
+                    )}
                     <div className="text-center">
                         <div className="text-xl font-bold text-blue-400">💰</div>
                         <p className="text-sm text-gray-300">ประมาณการ</p>
@@ -268,7 +299,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
             {Object.keys(allZoneSprinklers).length > 1 && (
                 <div className="rounded-lg bg-indigo-900 p-4">
                     <h3 className="mb-2 text-lg font-bold text-indigo-300">
-                        💧 สรุปสปริงเกอร์ทั้งระบบ ({uniqueSprinklers.length} ชนิด)
+                        💧 สรุป{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}ทั้งระบบ ({uniqueSprinklers.length} ชนิด)
                     </h3>
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         {uniqueSprinklers.map((item, index) => (
@@ -395,38 +426,40 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         </div>
                     )}
 
-                    <div className="text-center">
-                        <p className="text-red-200">ปั๊ม</p>
-                        <p
-                            className={`text-xl font-bold ${
-                                actualPump?.isRecommended
-                                    ? 'text-green-300'
+                    {showPump && (
+                        <div className="text-center">
+                            <p className="text-red-200">ปั๊ม</p>
+                            <p
+                                className={`text-xl font-bold ${
+                                    actualPump?.isRecommended
+                                        ? 'text-green-300'
+                                        : actualPump?.isGoodChoice
+                                          ? 'text-yellow-300'
+                                          : 'text-orange-300'
+                                }`}
+                            >
+                                {actualPump ? `${actualPump.powerHP}HP` : 'ไม่มี'}
+                            </p>
+                            <p className="text-xs text-red-100">
+                                {actualPump?.isRecommended
+                                    ? '🌟 แนะนำ'
                                     : actualPump?.isGoodChoice
-                                      ? 'text-yellow-300'
-                                      : 'text-orange-300'
-                            }`}
-                        >
-                            {actualPump ? `${actualPump.powerHP}HP` : 'ไม่มี'}
-                        </p>
-                        <p className="text-xs text-red-100">
-                            {actualPump?.isRecommended
-                                ? '🌟 แนะนำ'
-                                : actualPump?.isGoodChoice
-                                  ? '✅ ดี'
-                                  : actualPump
-                                    ? '⚡ ใช้ได้'
-                                    : '❌ ไม่มี'}
-                        </p>
-                        <p className="text-xs text-red-200">
-                            คะแนน: {actualPump?.score || 'N/A'}/100
-                        </p>
-                    </div>
+                                      ? '✅ ดี'
+                                      : actualPump
+                                        ? '⚡ ใช้ได้'
+                                        : '❌ ไม่มี'}
+                            </p>
+                            <p className="text-xs text-red-200">
+                                คะแนน: {actualPump?.score || 'N/A'}/100
+                            </p>
+                        </div>
+                    )}
                 </div>
                 <div className="mt-3 text-center text-sm text-white">
                     <p>🎛️ สามารถปรับแต่งการเลือกได้ในแต่ละส่วน</p>
                     {selectedZones.length > 1 && (
                         <p className="text-yellow-200">
-                            ท่อคำนวณแยกตามโซน | ปั๊มใช้ตัวเดียวทั้งระบบ
+                            ท่อคำนวณแยกตามโซน {showPump && '| ปั๊มใช้ตัวเดียวทั้งระบบ'}
                         </p>
                     )}
                 </div>
@@ -462,18 +495,20 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                   : 'สูงเกินไป'}
                         </p>
                     </div>
-                    <div className="text-center">
-                        <p className="text-purple-200">Pump Head</p>
-                        <p className="text-xl font-bold text-orange-300">
-                            {results.pumpHeadRequired.toFixed(1)} m
-                        </p>
-                        {selectedZones.length > 1 && (
-                            <p className="text-xs text-purple-100">({selectedZones.length} โซน)</p>
-                        )}
-                        <p className="text-xs text-purple-100">
-                            Safety Factor: {results.safetyFactor.toFixed(2)}x
-                        </p>
-                    </div>
+                    {showPump && (
+                        <div className="text-center">
+                            <p className="text-purple-200">Pump Head</p>
+                            <p className="text-xl font-bold text-orange-300">
+                                {results.pumpHeadRequired.toFixed(1)} m
+                            </p>
+                            {selectedZones.length > 1 && (
+                                <p className="text-xs text-purple-100">({selectedZones.length} โซน)</p>
+                            )}
+                            <p className="text-xs text-purple-100">
+                                Safety Factor: {results.safetyFactor.toFixed(2)}x
+                            </p>
+                        </div>
+                    )}
                     <div className="text-center">
                         <p className="text-pink-200">ประมาณการ</p>
                         <p className="text-xl font-bold text-green-300">
@@ -481,7 +516,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         </p>
                         {selectedZones.length > 1 && (
                             <p className="text-xs text-pink-100">
-                                ({uniqueSprinklers.length} ชนิดสปริงเกอร์)
+                                ({uniqueSprinklers.length} ชนิด{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'})
                             </p>
                         )}
                         <p className="text-xs text-pink-100">
@@ -533,7 +568,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                     </div>
 
                     <div className="rounded bg-gray-600 p-4">
-                        <h3 className="mb-2 font-medium text-purple-300">🚰 น้ำต่อหัวสปริงเกอร์</h3>
+                        <h3 className="mb-2 font-medium text-purple-300">🚰 น้ำต่อหัว{projectMode === 'garden' ? 'ฉีด' : 'สปริงเกอร์'}</h3>
                         <p className="text-lg font-bold">
                             {results.waterPerSprinklerLPH.toFixed(1)} ลิตร/ชั่วโมง
                         </p>
@@ -550,7 +585,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
 
                     {/* Number of Sprinklers */}
                     <div className="rounded bg-gray-600 p-4">
-                        <h3 className="mb-2 font-medium text-green-300">🔢 จำนวนสปริงเกอร์</h3>
+                        <h3 className="mb-2 font-medium text-green-300">🔢 จำนวน{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}</h3>
                         <p className="text-lg font-bold">{results.totalSprinklers} หัว</p>
                         <p className="text-sm text-gray-300">
                             {results.sprinklersPerZone.toFixed(1)} หัว/โซน
@@ -564,7 +599,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             </p>
                         )}
                         <p className="mt-1 text-xs text-gray-400">
-                            อัตราส่วน: {input.sprinklersPerTree} หัว/ต้น
+                            อัตราส่วน: {input.sprinklersPerTree} หัว/{projectMode === 'garden' ? 'จุด' : 'ต้น'}
                         </p>
                     </div>
 
@@ -596,15 +631,17 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             )}
                         </div>
                         <p className="mt-1 text-xs text-gray-400">ตามการออกแบบระบบ</p>
-                        <p className="mt-1 text-xs text-yellow-300">
-                            ปั๊ม:{' '}
-                            {Math.max(
-                                results.flows.branch,
-                                results.flows.secondary,
-                                results.flows.main
-                            ).toFixed(1)}{' '}
-                            LPM
-                        </p>
+                        {showPump && (
+                            <p className="mt-1 text-xs text-yellow-300">
+                                ปั๊ม:{' '}
+                                {Math.max(
+                                    results.flows.branch,
+                                    results.flows.secondary,
+                                    results.flows.main
+                                ).toFixed(1)}{' '}
+                                LPM
+                            </p>
+                        )}
                     </div>
 
                     {/* Head Loss Details */}
@@ -715,43 +752,45 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                     </div>
 
                     {/* Pump Head Requirements */}
-                    <div className="rounded bg-gray-600 p-4">
-                        <h3 className="mb-2 font-medium text-orange-300">
-                            ⚡ Pump Head ที่ต้องการ
-                        </h3>
-                        <p
-                            className={`text-lg font-bold ${getStatusColor(systemPerformance.pumpStatus)}`}
-                        >
-                            {results.pumpHeadRequired.toFixed(1)} เมตร
-                        </p>
-                        <div className="text-xs text-gray-300">
-                            <p>Static: {input.staticHeadM.toFixed(1)}m</p>
-                            <p>Head Loss: {results.headLoss.total.toFixed(1)}m</p>
-                            <p className="text-yellow-300">
-                                Pressure: {pressureInfo.pressure.toFixed(1)}m
+                    {showPump && (
+                        <div className="rounded bg-gray-600 p-4">
+                            <h3 className="mb-2 font-medium text-orange-300">
+                                ⚡ Pump Head ที่ต้องการ
+                            </h3>
+                            <p
+                                className={`text-lg font-bold ${getStatusColor(systemPerformance.pumpStatus)}`}
+                            >
+                                {results.pumpHeadRequired.toFixed(1)} เมตร
                             </p>
-                            <p>
-                                Safety:{' '}
-                                {(
-                                    (results.pumpHeadRequired /
-                                        Math.max(
-                                            input.staticHeadM +
-                                                results.headLoss.total +
-                                                pressureInfo.pressure,
-                                            1
-                                        ) -
-                                        1) *
-                                    100
-                                ).toFixed(0)}
-                                %
-                            </p>
+                            <div className="text-xs text-gray-300">
+                                <p>Static: {input.staticHeadM.toFixed(1)}m</p>
+                                <p>Head Loss: {results.headLoss.total.toFixed(1)}m</p>
+                                <p className="text-yellow-300">
+                                    Pressure: {pressureInfo.pressure.toFixed(1)}m
+                                </p>
+                                <p>
+                                    Safety:{' '}
+                                    {(
+                                        (results.pumpHeadRequired /
+                                            Math.max(
+                                                input.staticHeadM +
+                                                    results.headLoss.total +
+                                                    pressureInfo.pressure,
+                                                1
+                                            ) -
+                                            1) *
+                                        100
+                                    ).toFixed(0)}
+                                    %
+                                </p>
+                            </div>
+                            {selectedZones.length > 1 && (
+                                <p className="mt-2 text-xs text-orange-200">
+                                    สำหรับ {selectedZones.length} โซนพร้อมกัน
+                                </p>
+                            )}
                         </div>
-                        {selectedZones.length > 1 && (
-                            <p className="mt-2 text-xs text-orange-200">
-                                สำหรับ {selectedZones.length} โซนพร้อมกัน
-                            </p>
-                        )}
-                    </div>
+                    )}
 
                     {/* Auto-Selected Equipment Performance */}
                     <div className="rounded bg-gray-600 p-4">
@@ -788,15 +827,17 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                     )}
                                 </p>
                             )}
-                            <p>
-                                ปั๊ม:{' '}
-                                <span className="font-bold text-white">
-                                    {actualPump ? `${actualPump.score}/100` : 'N/A'}
-                                </span>
-                                {actualPump?.isRecommended && (
-                                    <span className="ml-1 text-green-400">⭐</span>
-                                )}
-                            </p>
+                            {showPump && (
+                                <p>
+                                    ปั๊ม:{' '}
+                                    <span className="font-bold text-white">
+                                        {actualPump ? `${actualPump.score}/100` : 'N/A'}
+                                    </span>
+                                    {actualPump?.isRecommended && (
+                                        <span className="ml-1 text-green-400">⭐</span>
+                                    )}
+                                </p>
+                            )}
                         </div>
                         <p className="mt-1 text-xs text-gray-400">คะแนน 70+ = แนะนำ</p>
                         <p className="mt-1 text-xs text-pink-200">
@@ -804,8 +845,8 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             {((actualBranchPipe?.score || 0) +
                                 (actualSecondaryPipe?.score || 0) +
                                 (actualMainPipe?.score || 0) +
-                                (actualPump?.score || 0)) /
-                                4}
+                                (showPump ? (actualPump?.score || 0) : 0)) /
+                                (showPump ? 4 : 3)}
                             /100
                         </p>
                     </div>
@@ -815,11 +856,11 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                 {selectedSprinkler && (
                     <div className="mt-6 rounded bg-blue-900 p-4">
                         <h3 className="mb-2 font-medium text-blue-300">
-                            💧 แรงดันจากสปริงเกอร์ที่เลือก
+                            💧 แรงดันจาก{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}ที่เลือก
                         </h3>
                         <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-3">
                             <p>
-                                <strong>สปริงเกอร์:</strong> {selectedSprinkler.productCode}
+                                <strong>{projectMode === 'garden' ? 'หัวฉีด:' : 'สปริงเกอร์:'}</strong> {selectedSprinkler.productCode}
                             </p>
                             <p>
                                 <strong>ช่วงแรงดัน:</strong> {pressureInfo.pressureBar?.toFixed(1)}{' '}
@@ -831,32 +872,28 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             </p>
                         </div>
                         <p className="mt-2 text-xs text-blue-200">
-                            💡 ระบบใช้แรงดัน 70% ของช่วงสูงสุดในการคำนวณ Pump Head
+                            💡 ระบบใช้แรงดัน 70% ของช่วงสูงสุดในการคำนวณ {showPump && 'Pump Head'}
                         </p>
                     </div>
                 )}
 
                 {/* ===== MULTI-ZONE NOTE ===== */}
                 {activeZone && selectedZones.length > 1 && (
-                    <div className="mt-6 rounded bg-yellow-900 p-4">
-                        <h3 className="mb-2 font-medium text-yellow-300">
-                            ⚠️ หมายเหตุการคำนวณหลายโซน
-                        </h3>
-                        <p className="text-sm text-yellow-200">
-                            การคำนวณขนาดท่อจะแยกตามแต่ละโซน แต่ปั๊มจะใช้ตัวเดียวทั้งระบบ
-                            โดยคำนวณจากความต้องการสูงสุดของโซนที่เปิดพร้อมกัน
-                        </p>
-                        <div className="mt-2 text-xs text-yellow-100">
-                            <p>• ท่อย่อย: คำนวณแยกตามโซนที่กำลังดู ({activeZone.name})</p>
-                            <p>• ท่อรอง/หลัก: คำนวณแยกตามแต่ละโซน</p>
-                            <p>• ปั๊ม: คำนวณตามความต้องการรวมของโซนที่เปิดพร้อมกัน</p>
-                            <p>
-                                • สปริงเกอร์: แต่ละโซนเลือกได้อิสระ ({uniqueSprinklers.length}{' '}
-                                ชนิดที่เลือก)
-                            </p>
-                        </div>
-                    </div>
-                )}
+    <div className="mt-6 rounded bg-yellow-900 p-4">
+        <h3 className="mb-2 font-medium text-yellow-300">
+            ⚠️ หมายเหตุการคำนวณหลายโซน
+        </h3>
+        <p className="text-sm text-yellow-200">
+            การคำนวณขนาดท่อจะแยกตามแต่ละโซน {showPump && `แต่ปั๊มจะคำนวณสำหรับการเปิด ${simultaneousZonesCount} โซนพร้อมกัน`}
+        </p>
+        <div className="mt-2 text-xs text-yellow-100">
+            <p>• ท่อย่อย: คำนวณแยกตามโซนที่กำลังดู ({activeZone.name})</p>
+            <p>• ท่อรอง/หลัก: คำนวณแยกตามแต่ละโซน</p>
+            {showPump && <p>• ปั๊ม: คำนวณตาม {simultaneousZonesCount} โซนที่มีความต้องการสูงสุด</p>}
+            <p>• {projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}: แต่ละโซนเลือกได้อิสระ ({uniqueSprinklers.length} ชนิดที่เลือก)</p>
+        </div>
+    </div>
+)}
 
                 {/* ===== VELOCITY WARNINGS ===== */}
                 {results.velocityWarnings.length > 0 && (
@@ -887,7 +924,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                         actualBranchPipe,
                                         actualSecondaryPipe,
                                         actualMainPipe,
-                                        actualPump,
+                                        showPump ? actualPump : null,
                                     ]
                                         .filter(Boolean)
                                         .reduce((sum, item) => sum + (item?.score || 0), 0) /
@@ -895,7 +932,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                         actualBranchPipe,
                                         actualSecondaryPipe,
                                         actualMainPipe,
-                                        actualPump,
+                                        showPump ? actualPump : null,
                                     ].filter(Boolean).length
                                 ).toFixed(1)}
                                 /100
@@ -921,14 +958,16 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                 m/s
                             </p>
                         </div>
-                        <div>
-                            <p className="text-green-200">ประสิทธิภาพปั๊ม:</p>
-                            <p className="font-bold text-white">
-                                {actualPump
-                                    ? `${(actualPump.flowPerBaht * 1000).toFixed(1)} L/฿`
-                                    : 'N/A'}
-                            </p>
-                        </div>
+                        {showPump && (
+                            <div>
+                                <p className="text-green-200">ประสิทธิภาพปั๊ม:</p>
+                                <p className="font-bold text-white">
+                                    {actualPump
+                                        ? `${(actualPump.flowPerBaht * 1000).toFixed(1)} L/฿`
+                                        : 'N/A'}
+                                </p>
+                            </div>
+                        )}
                         <div>
                             <p className="text-green-200">สถานะโดยรวม:</p>
                             <p
