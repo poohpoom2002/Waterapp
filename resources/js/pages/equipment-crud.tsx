@@ -3176,7 +3176,10 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                 {category.icon || '📦'}
                                             </div>
                                             <div className="mb-1 text-sm font-medium text-white">
-                                                {category.display_name}
+                                                {category.name}
+                                            </div>
+                                            <div className="mb-1 text-xs font-light text-white">
+                                                ({category.display_name})
                                             </div>
                                             <div className="mb-2 text-xs text-gray-300">
                                                 {categoryEquipments.length} รายการ

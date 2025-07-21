@@ -1,14 +1,24 @@
 // resources\js\pages\components\PumpSelector.tsx
 import React, { useState } from 'react';
-import { CalculationResults } from '../types/interfaces';
+import { CalculationResults, IrrigationInput } from '../types/interfaces';
 
 interface PumpSelectorProps {
     results: CalculationResults;
     selectedPump?: any;
     onPumpChange: (pump: any) => void;
+    simultaneousZonesCount?: number;
+    selectedZones?: string[];
+    zoneInputs?: { [zoneId: string]: IrrigationInput };
 }
 
-const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPumpChange }) => {
+const PumpSelector: React.FC<PumpSelectorProps> = ({ 
+    results, 
+    selectedPump, 
+    onPumpChange,
+    simultaneousZonesCount = 1,
+    selectedZones = [],
+    zoneInputs = {},
+}) => {
     const [showImageModal, setShowImageModal] = useState(false);
     const [modalImage, setModalImage] = useState({ src: '', alt: '' });
 
@@ -24,6 +34,27 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
 
     const requiredFlow = results.flows.main;
     const requiredHead = results.pumpHeadRequired;
+
+    // Calculate actual flow requirement for simultaneous zones
+const calculateSimultaneousFlow = () => {
+    if (!selectedZones || selectedZones.length <= 1 || !zoneInputs) {
+        return requiredFlow;
+    }
+
+    // Sort zones by flow requirement and take the top simultaneous zones
+    const zoneFlows = selectedZones.map(zoneId => {
+        const zoneInput = zoneInputs[zoneId];
+        if (!zoneInput) return { zoneId, flow: 0 };
+        
+        const flowLPH = (zoneInput.totalTrees * zoneInput.waterPerTreeLiters) / (zoneInput.irrigationTimeMinutes / 60);
+        return { zoneId, flow: flowLPH / 60 }; // Convert to LPM
+    }).sort((a, b) => b.flow - a.flow);
+
+    const topFlows = zoneFlows.slice(0, simultaneousZonesCount);
+    return topFlows.reduce((sum, zone) => sum + zone.flow, 0);
+};
+
+const actualRequiredFlow = calculateSimultaneousFlow();
 
     const currentPump = selectedPump || results.autoSelectedPump;
     const autoSelectedPump = results.autoSelectedPump;
@@ -147,6 +178,12 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({ results, selectedPump, onPu
                         </span>
                     </p>
                 </div>
+                {selectedZones.length > 1 && simultaneousZonesCount > 1 && (
+    <div className="mt-2 text-xs text-purple-200">
+        <p>🔄 คำนวณสำหรับ {simultaneousZonesCount} โซนที่เปิดพร้อมกัน</p>
+        <p>💧 อัตราการไหลรวม: {actualRequiredFlow.toFixed(1)} LPM</p>
+    </div>
+)}
             </div>
 
             <div className="mb-4">
