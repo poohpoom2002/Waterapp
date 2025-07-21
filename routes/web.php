@@ -206,9 +206,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('field-crop-summary', function () {
         return Inertia::render('field-crop-summary', [
             'summary' => request()->input('summary'),
+            'mainField' => request()->input('mainField'),
+            'fieldAreaSize' => request()->input('fieldAreaSize'),
+            'selectedCrops' => request()->input('selectedCrops'),
             'zones' => request()->input('zones'),
+            'zoneAssignments' => request()->input('zoneAssignments'),
+            'pipes' => request()->input('pipes'),
             'equipment' => request()->input('equipment'),
-            'irrigationPoints' => request()->input('irrigationPoints')
+            'equipmentIcons' => request()->input('equipment'), // Alias for backward compatibility
+            'irrigationPoints' => request()->input('irrigationPoints'),
+            'irrigationLines' => request()->input('irrigationLines'),
+            'irrigationAssignments' => request()->input('irrigationAssignments'),
+            'irrigationSettings' => request()->input('irrigationSettings'),
+            'rowSpacing' => request()->input('rowSpacing'),
+            'plantSpacing' => request()->input('plantSpacing'),
+            'mapCenter' => request()->input('mapCenter'),
+            'mapZoom' => request()->input('mapZoom'),
+            'mapType' => request()->input('mapType'),
         ]);
     })->name('field-crop-summary.post');
 
