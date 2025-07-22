@@ -884,7 +884,7 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                                     lng: sprinkler.position.lng,
                                 },
                                 icon: createSprinklerIcon(
-                                    sprinkler,
+                                    sprinkler.type,
                                     isSelected,
                                     sprinkler.orientation
                                 ),

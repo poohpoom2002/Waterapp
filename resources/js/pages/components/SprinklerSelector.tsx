@@ -1,4 +1,4 @@
-// C:\webchaiyo\Waterapp\resources\js\pages\components\SprinklerSelector.tsx
+// resources\js\pages\components\SprinklerSelector.tsx
 import React, { useState } from 'react';
 import { CalculationResults } from '../types/interfaces';
 import { Zone } from '../../utils/horticultureUtils';
@@ -10,6 +10,7 @@ interface SprinklerSelectorProps {
     results: CalculationResults;
     activeZone?: Zone;
     allZoneSprinklers: { [zoneId: string]: any };
+    projectMode?: 'horticulture' | 'garden';
 }
 
 const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
@@ -18,67 +19,45 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
     results,
     activeZone,
     allZoneSprinklers,
+    projectMode = 'horticulture',
 }) => {
-    // State สำหรับ Modal รูปภาพ
-    const [isImageModalOpen, setIsImageModalOpen] = useState(false);
-    const [modalImageSrc, setModalImageSrc] = useState('');
-    const [modalImageAlt, setModalImageAlt] = useState('');
+    const [showImageModal, setShowImageModal] = useState(false);
+    const [modalImage, setModalImage] = useState({ src: '', alt: '' });
 
-    // ฟังก์ชันเปิด Modal รูปภาพ
     const openImageModal = (src: string, alt: string) => {
-        setModalImageSrc(src);
-        setModalImageAlt(alt);
-        setIsImageModalOpen(true);
+        setModalImage({ src, alt });
+        setShowImageModal(true);
     };
 
-    // ฟังก์ชันปิด Modal รูปภาพ
     const closeImageModal = () => {
-        setIsImageModalOpen(false);
-        setModalImageSrc('');
-        setModalImageAlt('');
+        setShowImageModal(false);
+        setModalImage({ src: '', alt: '' });
     };
 
-    // ใช้ข้อมูลที่ได้จาก database และผ่านการวิเคราะห์แล้วใน useCalculations
     const analyzedSprinklers = results.analyzedSprinklers || [];
-
-    // เรียงลำดับตามคะแนน (ไม่ต้องแสดงป้ายกำกับ)
-    const sortedSprinklers = analyzedSprinklers.sort((a, b) => {
-        // เรียงตามคะแนนเท่านั้น
-        return b.score - a.score;
-    });
-
+    const sortedSprinklers = analyzedSprinklers.sort((a, b) => b.score - a.score);
     const selectedAnalyzed = selectedSprinkler
         ? analyzedSprinklers.find((s) => s.id === selectedSprinkler.id)
         : null;
 
-    // Helper function สำหรับแสดงค่า range
     const formatRangeValue = (value: any) => {
-        if (Array.isArray(value)) {
-            return `${value[0]}-${value[1]}`;
-        }
+        if (Array.isArray(value)) return `${value[0]}-${value[1]}`;
         return String(value);
     };
 
-    // Helper function สำหรับแสดงค่าเฉลี่ย
     const getAverageValue = (value: any) => {
-        if (Array.isArray(value)) {
-            return (value[0] + value[1]) / 2;
-        }
+        if (Array.isArray(value)) return (value[0] + value[1]) / 2;
         return parseFloat(String(value)) || 0;
     };
 
-    // NEW: Get unique sprinklers across all zones
     const getUniqueSprinklers = () => {
         const sprinklerMap = new Map();
         Object.values(allZoneSprinklers).forEach((sprinkler) => {
-            if (sprinkler) {
-                sprinklerMap.set(sprinkler.id, sprinkler);
-            }
+            if (sprinkler) sprinklerMap.set(sprinkler.id, sprinkler);
         });
         return Array.from(sprinklerMap.values());
     };
 
-    // NEW: Get zones using specific sprinkler
     const getZonesUsingSprinkler = (sprinklerId: number) => {
         const zones: string[] = [];
         Object.entries(allZoneSprinklers).forEach(([zoneId, sprinkler]) => {
@@ -91,10 +70,37 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
 
     const uniqueSprinklers = getUniqueSprinklers();
 
+    // Labels and icons based on project mode
+    const getLabel = (key: string) => {
+        if (projectMode === 'garden') {
+            switch (key) {
+                case 'sprinkler': return 'หัวฉีด';
+                case 'perHead': return 'ต่อหัวฉีด';
+                case 'totalRequired': return 'จำนวนที่ต้องใช้';
+                default: return key;
+            }
+        }
+        return key;
+    };
+
+    const getSprinklerRecommendations = () => {
+        if (projectMode === 'garden') {
+            return [
+                'หัวฉีดแบบ Pop-up เหมาะสำหรับสนามหญ้า',
+                'หัวฉีดแบบ Spray เหมาะสำหรับพื้นที่แคบ',
+                'หัวฉีดแบบ Rotor เหมาะสำหรับพื้นที่กว้าง',
+                'พิจารณารัศมีการฉีดให้เหมาะกับขนาดพื้นที่',
+            ];
+        }
+        return [];
+    };
+
+    const recommendations = getSprinklerRecommendations();
+
     return (
         <div className="rounded-lg bg-gray-700 p-6">
             <h3 className="mb-4 text-lg font-semibold text-green-400">
-                เลือกสปริงเกอร์
+                เลือก{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}
                 {activeZone && (
                     <span className="ml-2 text-sm font-normal text-gray-400">
                         - {activeZone.name}
@@ -102,66 +108,13 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 )}
             </h3>
 
-            {/* Multi-zone summary */}
-            {Object.keys(allZoneSprinklers).length > 1 && (
-                <div className="mb-4 rounded bg-purple-900 p-3">
-                    <h4 className="mb-2 text-sm font-semibold text-purple-300">
-                        📋 สรุปสปริงเกอร์ทั้งหมด ({uniqueSprinklers.length} ชนิด):
-                    </h4>
-                    <div className="space-y-2">
-                        {uniqueSprinklers.map((sprinkler) => {
-                            const zonesUsing = getZonesUsingSprinkler(sprinkler.id);
-                            return (
-                                <div
-                                    key={sprinkler.id}
-                                    className="flex items-center justify-between rounded bg-purple-800 p-2"
-                                >
-                                    <div className="flex items-center space-x-3">
-                                        <div className="flex h-8 w-8 items-center justify-center rounded bg-purple-600 text-xs">
-                                            💧
-                                        </div>
-                                        <div className="text-sm">
-                                            <p className="font-medium text-white">
-                                                {sprinkler.name}
-                                            </p>
-                                            <p className="text-purple-200">
-                                                {formatRangeValue(
-                                                    sprinkler.waterVolumeLitersPerHour
-                                                )}{' '}
-                                                L/H |{sprinkler.price} บาท
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="text-right text-sm">
-                                        <p className="text-purple-200">
-                                            ใช้ใน {zonesUsing.length} โซน
-                                        </p>
-                                        <p className="text-xs text-purple-300">
-                                            {zonesUsing
-                                                .map((zoneId) => {
-                                                    // Find zone name from zoneId if possible
-                                                    return zoneId === 'main-area'
-                                                        ? 'พื้นที่หลัก'
-                                                        : `Zone ${zoneId}`;
-                                                })
-                                                .join(', ')}
-                                        </p>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
-
-            {/* ข้อมูลความต้องการ */}
             <div className="mb-4 rounded bg-gray-600 p-3">
                 <h4 className="mb-2 text-sm font-medium text-green-300">
                     💧 ความต้องการ{activeZone ? ` (${activeZone.name})` : ''}:
                 </h4>
                 <div className="text-xs text-gray-300">
                     <p>
-                        อัตราการไหลต่อหัว:{' '}
+                        อัตราการไหล{projectMode === 'garden' ? 'ต่อหัวฉีด' : 'ต่อหัว'}:{' '}
                         <span className="font-bold text-blue-300">
                             {results.waterPerSprinklerLPH.toFixed(1)} ลิตร/ชั่วโมง
                         </span>
@@ -176,6 +129,17 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 </div>
             </div>
 
+            {projectMode === 'garden' && recommendations.length > 0 && (
+                <div className="mb-4 rounded bg-blue-900 p-3">
+                    <h4 className="mb-2 text-sm font-medium text-blue-300">💡 คำแนะนำการเลือกหัวฉีด:</h4>
+                    <ul className="space-y-1 text-xs text-blue-200">
+                        {recommendations.map((rec, index) => (
+                            <li key={index}>• {rec}</li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
             <select
                 value={selectedSprinkler?.id || ''}
                 onChange={(e) => {
@@ -187,7 +151,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 className="mb-4 w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
             >
                 <option value="">
-                    -- เลือกสปริงเกอร์{activeZone ? ` สำหรับ ${activeZone.name}` : ''} --
+                    -- เลือก{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}{activeZone ? ` สำหรับ ${activeZone.name}` : ''} --
                 </option>
                 {sortedSprinklers.map((sprinkler) => (
                     <option key={sprinkler.id} value={sprinkler.id}>
@@ -201,7 +165,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 <div className="rounded bg-gray-600 p-3">
                     <div className="mb-3 flex items-center justify-between">
                         <h4 className="font-medium text-white">
-                            <strong> {selectedSprinkler.name}</strong>
+                            <strong>{selectedSprinkler.name}</strong>
                             {activeZone && (
                                 <span className="ml-2 text-sm font-normal text-gray-400">
                                     (สำหรับ {activeZone.name})
@@ -219,7 +183,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                                 <img
                                     src={selectedSprinkler.image}
                                     alt={selectedSprinkler.name}
-                                    className="flex h-auto w-[85px] cursor-pointer items-center justify-center rounded border border-gray-500 transition-opacity hover:border-blue-400 hover:opacity-80"
+                                    className="h-auto w-[85px] cursor-pointer rounded border border-gray-500 transition-opacity hover:border-blue-400 hover:opacity-80"
                                     onError={(e) => {
                                         (e.target as HTMLImageElement).style.display = 'none';
                                     }}
@@ -237,12 +201,12 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                                 </div>
                             )}
                         </div>
+
                         <div className="col-span-4">
                             <p>
                                 <strong>รหัสสินค้า:</strong>{' '}
                                 {selectedSprinkler.productCode || selectedSprinkler.product_code}
                             </p>
-
                             <p>
                                 <strong>อัตราการไหล:</strong>{' '}
                                 {formatRangeValue(selectedSprinkler.waterVolumeLitersPerHour)} L/H
@@ -256,6 +220,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                                 {formatRangeValue(selectedSprinkler.pressureBar)} บาร์
                             </p>
                         </div>
+
                         <div className="col-span-4">
                             <p>
                                 <strong>แบรนด์:</strong> {selectedSprinkler.brand || '-'}
@@ -281,7 +246,6 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         </div>
                     </div>
 
-                    {/* การวิเคราะห์ความเหมาะสม */}
                     <div className="mt-3 rounded bg-gray-500 p-2">
                         <h5 className="text-xs font-medium text-yellow-300">การวิเคราะห์:</h5>
                         <div className="grid grid-cols-2 gap-2 text-xs">
@@ -310,7 +274,6 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         </div>
                     </div>
 
-                    {/* แสดงข้อมูลเพิ่มเติมจากฐานข้อมูล */}
                     {selectedSprinkler.description && (
                         <div className="mt-3 rounded bg-gray-800 p-2">
                             <p className="text-xs text-gray-300">
@@ -319,14 +282,13 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         </div>
                     )}
 
-                    {/* แสดงการเปรียบเทียบกับความต้องการ */}
                     <div className="mt-3 rounded bg-blue-900 p-2">
                         <h5 className="text-xs font-medium text-blue-300">การเปรียบเทียบ:</h5>
                         <div className="grid grid-cols-2 gap-2 text-xs">
                             <div>
                                 <p>ความต้องการ: {results.waterPerSprinklerLPH.toFixed(1)} L/H</p>
                                 <p>
-                                    ช่วงสปริงเกอร์:{' '}
+                                    ช่วง{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}:{' '}
                                     {formatRangeValue(selectedSprinkler.waterVolumeLitersPerHour)}{' '}
                                     L/H
                                 </p>
@@ -344,13 +306,28 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         </div>
                     </div>
 
-                    {/* Zone-specific info */}
-                    {activeZone && (
+                    {projectMode === 'garden' && (
+                        <div className="mt-3 rounded bg-green-900 p-2">
+                            <h5 className="text-xs font-medium text-green-300">🏡 ข้อมูลสำหรับสวนบ้าน:</h5>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div>
+                                    <p>ประเภทหัวฉีด: {selectedSprinkler.type || 'ไม่ระบุ'}</p>
+                                    <p>พื้นที่ครอบคลุม: {(Math.PI * Math.pow(getAverageValue(selectedSprinkler.radiusMeters), 2)).toFixed(1)} ตร.ม./หัว</p>
+                                </div>
+                                <div>
+                                    <p>เหมาะสำหรับ: {selectedSprinkler.suitable_for || 'ทั่วไป'}</p>
+                                    <p>การติดตั้ง: {selectedSprinkler.installation || 'ฝังดิน/ยกพื้น'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeZone && projectMode === 'horticulture' && (
                         <div className="mt-3 rounded bg-green-900 p-2">
                             <h5 className="text-xs font-medium text-green-300">ข้อมูลโซน:</h5>
                             <div className="grid grid-cols-2 gap-2 text-xs">
                                 <div>
-                                    <p>พื้นที่โซน: {(activeZone.area / 1600).toFixed(2)} ไร่</p>
+                                    {activeZone.area >= 1600 ? <p>พื้นที่โซน: {(activeZone.area / 1600).toFixed(1)} ไร่</p> : <p>พื้นที่โซน: {activeZone.area.toFixed(2)} ตร.ม.</p>}
                                     <p>จำนวนต้นไม้: {activeZone.plantCount} ต้น</p>
                                 </div>
                                 <div>
@@ -365,34 +342,30 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 </div>
             )}
 
-            {/* Modal สำหรับแสดงรูปขนาดใหญ่ */}
-            {isImageModalOpen && (
+            {showImageModal && (
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
                     onClick={closeImageModal}
                 >
-                    <div className="relative max-h-[90vh] max-w-[90vw] p-4">
-                        {/* ปุ่มปิด */}
+                    <div
+                        className="relative max-h-[90vh] max-w-[90vw] p-4"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <button
                             onClick={closeImageModal}
-                            className="absolute -right-2 -top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white transition-colors hover:bg-red-700"
+                            className="absolute -right-2 -top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700"
                             title="ปิด"
                         >
                             ✕
                         </button>
-
-                        {/* รูปภาพ */}
                         <img
-                            src={modalImageSrc}
-                            alt={modalImageAlt}
+                            src={modalImage.src}
+                            alt={modalImage.alt}
                             className="max-h-full max-w-full rounded-lg shadow-2xl"
-                            onClick={(e) => e.stopPropagation()} // ป้องกันไม่ให้ปิด modal เมื่อคลิกที่รูป
                         />
-
-                        {/* ชื่อรูป */}
                         <div className="mt-2 text-center">
                             <p className="inline-block rounded bg-black bg-opacity-50 px-2 py-1 text-sm text-white">
-                                {modalImageAlt}
+                                {modalImage.alt}
                             </p>
                         </div>
                     </div>
