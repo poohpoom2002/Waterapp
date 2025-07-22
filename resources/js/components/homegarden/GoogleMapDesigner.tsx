@@ -869,28 +869,25 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                             }
                         });
 
-                    // Render sprinklers with improved dragging
-                    props.sprinklers?.forEach((sprinkler) => {
-                        if (!sprinkler.position) return;
-                        try {
-                            const isSelected =
-                                props.selectedSprinkler === sprinkler.id ||
-                                props.selectedSprinklersForPipe.includes(sprinkler.id);
-
-                            const marker = new google.maps.Marker({
-                                position: {
-                                    lat: sprinkler.position.lat,
-                                    lng: sprinkler.position.lng,
-                                },
-                                icon: createSprinklerIcon(
-                                    sprinkler.type,
-                                    isSelected,
-                                    sprinkler.orientation
-                                ),
-                                title: `หัวฉีด: ${sprinkler.type.name} (รัศมี ${sprinkler.type.radius}ม.)`,
-                                draggable: props.editMode === 'drag-sprinkler',
-                                map: props.map,
-                            });
+                // Render sprinklers with improved dragging
+                props.sprinklers?.forEach((sprinkler) => {
+                    if (!sprinkler.position) return;
+                    try {
+                        const isSelected =
+                            props.selectedSprinkler === sprinkler.id ||
+                            props.selectedSprinklersForPipe.includes(sprinkler.id);
+                        
+                        const marker = new google.maps.Marker({
+                            position: { lat: sprinkler.position.lat, lng: sprinkler.position.lng },
+                            icon: createSprinklerIcon(
+                                sprinkler.type,
+                                isSelected,
+                                sprinkler.orientation
+                            ),
+                            title: `หัวฉีด: ${sprinkler.type.name} (รัศมี ${sprinkler.type.radius}ม.)`,
+                            draggable: props.editMode === 'drag-sprinkler',
+                            map: props.map,
+                        });
 
                             // Enhanced click handling
                             marker.addListener('click', () => {

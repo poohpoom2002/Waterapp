@@ -1,4 +1,4 @@
-// resources/js/pages/home-garden-summary.tsx - Updated with image save and print only
+// resources/js/pages/home-garden-summary.tsx - แก้ไขปุ่มคำนวณอุปกรณ์
 import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import { router } from '@inertiajs/react';
 
@@ -1036,6 +1036,41 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
         }
     }, [gardenData]);
 
+    // Enhanced handler for equipment calculation button with debugging
+    const handleEquipmentCalculation = useCallback(() => {
+        try {
+            console.log('🏡 กดปุ่มคำนวณอุปกรณ์ Home Garden');
+            console.log('🏡 ข้อมูลสวน:', {
+                hasData: !!gardenData,
+                zones: gardenData?.gardenZones?.length || 0,
+                sprinklers: gardenData?.sprinklers?.length || 0,
+                designMode: gardenData?.designMode,
+            });
+
+            // บันทึกข้อมูลเพิ่มเติมลง localStorage เพื่อให้แน่ใจ
+            if (gardenData) {
+                localStorage.setItem('garden_planner_data', JSON.stringify(gardenData));
+                console.log('🏡 บันทึกข้อมูลสวนแล้ว');
+            }
+
+            // บันทึกข้อมูลสถิติ
+            if (statistics) {
+                localStorage.setItem('garden_statistics', JSON.stringify(statistics));
+                console.log('🏡 บันทึกสถิติแล้ว:', {
+                    totalArea: statistics.totalArea,
+                    zones: statistics.totalZones,
+                    sprinklers: statistics.totalSprinklers,
+                });
+            }
+
+            // ไปยังหน้าคำนวณพร้อม mode parameter
+            router.visit('/product?mode=garden');
+        } catch (error) {
+            console.error('🏡 Error navigating to equipment calculation:', error);
+            setError('เกิดข้อผิดพลาดในการไปยังหน้าคำนวณอุปกรณ์');
+        }
+    }, [gardenData, statistics]);
+
     // Error display
     useEffect(() => {
         if (error) {
@@ -1125,6 +1160,15 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                             >
                                 🖨️ พิมพ์รูปภาพ
                             </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={handleEquipmentCalculation}
+                                    className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-white transition-colors hover:bg-purple-700"
+                                    title="คำนวณอุปกรณ์สำหรับสวนบ้าน"
+                                >
+                                    💰 คำนวณอุปกรณ์
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <div className="text-right text-sm text-gray-400">
@@ -1252,6 +1296,44 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                                 {zone.sprinklerCount} ตัว
                                             </span>
                                         </div>
+                                        {zone.sprinklerCount > 0 && (
+                                            <>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-400">
+                                                        ประเภทหัวฉีด:
+                                                    </span>
+                                                    <div className="text-right">
+                                                        {zone.sprinklerTypes.length > 0 ? (
+                                                            <div className="text-xs">
+                                                                {zone.sprinklerTypes.map(
+                                                                    (type, idx) => (
+                                                                        <div
+                                                                            key={idx}
+                                                                            className="font-medium text-cyan-400"
+                                                                        >
+                                                                            {type}
+                                                                        </div>
+                                                                    )
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="font-medium text-gray-500">
+                                                                -
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-400">รัศมี:</span>
+                                                    <span className="font-medium text-cyan-400">
+                                                        {zone.sprinklerRadius > 0
+                                                            ? `${zone.sprinklerRadius.toFixed(1)} ม.`
+                                                            : '-'}
+                                                    </span>
+                                                </div>
+                                            </>
+                                        )}
 
                                         {zone.pipeLength > 0 && (
                                             <div className="border-t border-gray-600 pt-2">
