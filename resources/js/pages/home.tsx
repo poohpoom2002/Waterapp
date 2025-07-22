@@ -7,6 +7,7 @@ import axios from 'axios';
 import { useLanguage } from '../contexts/LanguageContext';
 import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
+import { FaFolder, FaFolderOpen, FaArrowLeft } from 'react-icons/fa';
 
 // Types
 type Field = {
@@ -398,8 +399,20 @@ export default function Home() {
     const [fieldToDelete, setFieldToDelete] = useState<Field | null>(null);
     const [deleting, setDeleting] = useState(false);
     const [showCategoryModal, setShowCategoryModal] = useState(false);
+    const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
     const plantCategories = getPlantCategories(t);
+
+    // Group fields by customer and then by category
+    const groupedFields = fields.reduce((acc, field) => {
+        const customer = field.customerName || 'Unknown';
+        const category = field.category || 'Unknown';
+        if (!acc[customer]) acc[customer] = {};
+        if (!acc[customer][category]) acc[customer][category] = [];
+        acc[customer][category].push(field);
+        return acc;
+    }, {} as Record<string, Record<string, Field[]>>);
 
     useEffect(() => {
         // Load saved fields from database
@@ -505,89 +518,129 @@ export default function Home() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-900">
+        <div className="min-h-screen flex flex-col bg-gray-900">
             <Navbar />
-
-            <div className="p-6">
-                <div className="mx-auto max-w-7xl">
-                    {/* Main Content Header */}
-                    <div className="mb-8">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h1 className="text-3xl font-bold text-white">
-                                    {t('water_management_system')}
-                                </h1>
-                                <p className="mt-2 text-gray-400">
-                                    {t('manage_irrigation_fields')}
-                                </p>
-                            </div>
-                            <button
-                                onClick={handleAddField}
-                                className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition-colors duration-200 hover:bg-blue-700"
-                            >
-                                <svg
-                                    className="h-5 w-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M12 4v16m8-8H4"
-                                    />
-                                </svg>
-                                {t('add_field')}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Content */}
-                    {fields.length === 0 ? (
-                        <div className="py-16 text-center">
-                            <div className="mb-4 text-6xl">🌾</div>
-                            <h2 className="mb-2 text-2xl font-semibold text-white">
-                                {t('no_fields_yet')}
-                            </h2>
-                            <p className="mb-6 text-gray-400">{t('start_first_field')}</p>
-                            <button
-                                onClick={handleAddField}
-                                className="rounded-lg bg-blue-600 px-8 py-3 font-semibold text-white transition-colors duration-200 hover:bg-blue-700"
-                            >
-                                {t('create_first_field')}
-                            </button>
-                        </div>
-                    ) : (
-                        <div>
-                            <div className="mb-6 flex items-center justify-between">
-                                <h2 className="text-xl font-semibold text-white">
-                                    {t('your_fields')} ({fields.length})
-                                </h2>
-                                <div className="text-sm text-gray-400">
-                                    {t('click_field_manage')}
+            <div className="flex-1">
+                <div className="p-6">
+                    <div className="mx-auto max-w-7xl">
+                        {/* Main Content Header */}
+                        <div className="mb-8">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h1 className="text-3xl font-bold text-white">
+                                        {t('water_management_system')}
+                                    </h1>
+                                    <p className="mt-2 text-gray-400">
+                                        {t('manage_irrigation_fields')}
+                                    </p>
                                 </div>
+                                <button
+                                    onClick={handleAddField}
+                                    className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition-colors duration-200 hover:bg-blue-700"
+                                >
+                                    <svg
+                                        className="h-5 w-5"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M12 4v16m8-8H4"
+                                        />
+                                    </svg>
+                                    {t('add_field')}
+                                </button>
                             </div>
+                        </div>
 
+                        {/* Folder Navigation */}
+                        <div className="mb-6">
+                            {(selectedCustomer || selectedCategory) && (
+                                <button
+                                    className="mb-2 flex items-center gap-2 text-blue-400 hover:underline"
+                                    onClick={() => {
+                                        if (selectedCategory) {
+                                            setSelectedCategory(null);
+                                        } else {
+                                            setSelectedCustomer(null);
+                                        }
+                                    }}
+                                >
+                                    <FaArrowLeft /> {selectedCategory ? selectedCustomer : t('all_customers')}
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Content */}
+                        {!selectedCustomer ? (
+                            // Show customer folders
                             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                                {fields.map((field) => (
-                                    <FieldCard
-                                        key={field.id}
-                                        field={field}
-                                        onSelect={handleFieldSelect}
-                                        onDelete={handleFieldDelete}
-                                        t={t}
-                                    />
+                                {Object.keys(groupedFields).map((customer) => (
+                                    <div
+                                        key={customer}
+                                        className="cursor-pointer rounded-lg border border-gray-700 bg-gray-800 p-6 hover:border-blue-500 hover:bg-blue-900/10"
+                                        onClick={() => setSelectedCustomer(customer)}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <FaFolder className="text-yellow-400 text-2xl" />
+                                            <span className="text-lg font-semibold text-white">{customer}</span>
+                                        </div>
+                                        <div className="mt-2 text-xs text-gray-400">
+                                            {Object.values(groupedFields[customer]).reduce((sum, arr) => sum + arr.length, 0)} {t('fields')}
+                                        </div>
+                                    </div>
                                 ))}
                             </div>
-                        </div>
-                    )}
+                        ) : !selectedCategory ? (
+                            // Show category folders for selected customer
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                                {Object.keys(groupedFields[selectedCustomer]).map((category) => (
+                                    <div
+                                        key={category}
+                                        className="cursor-pointer rounded-lg border border-gray-700 bg-gray-800 p-6 hover:border-green-500 hover:bg-green-900/10"
+                                        onClick={() => setSelectedCategory(category)}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <FaFolderOpen className="text-green-400 text-2xl" />
+                                            <span className="text-lg font-semibold text-white">{category}</span>
+                                        </div>
+                                        <div className="mt-2 text-xs text-gray-400">
+                                            {groupedFields[selectedCustomer][category].length} {t('fields')}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            // Show fields for selected customer and category
+                            <div>
+                                <div className="mb-6 flex items-center justify-between">
+                                    <h2 className="text-xl font-semibold text-white">
+                                        {selectedCustomer} / {selectedCategory} ({groupedFields[selectedCustomer][selectedCategory].length})
+                                    </h2>
+                                    <div className="text-sm text-gray-400">
+                                        {t('click_field_manage')}
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                                    {groupedFields[selectedCustomer][selectedCategory].map((field) => (
+                                        <FieldCard
+                                            key={field.id}
+                                            field={field}
+                                            onSelect={handleFieldSelect}
+                                            onDelete={handleFieldDelete}
+                                            t={t}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
-
-            {/* Footer */}
             <Footer />
-
             {/* Category Selection Modal */}
             <CategorySelectionModal
                 isOpen={showCategoryModal}
@@ -596,7 +649,6 @@ export default function Home() {
                 plantCategories={plantCategories}
                 t={t}
             />
-
             {/* Delete Confirmation Dialog */}
             {showDeleteConfirm && fieldToDelete && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50">
