@@ -1,5 +1,5 @@
 // resources/js/components/homegarden/CanvasDesigner.tsx - Enhanced with pipe editing support
-import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
     CanvasCoordinate,
     GardenZone,
@@ -7,15 +7,11 @@ import {
     WaterSource,
     Pipe,
     ZONE_TYPES,
-    SPRINKLER_TYPES,
     CANVAS_GRID_SIZE,
-    isPointInPolygon,
     calculateDistance,
     calculatePolygonArea,
     formatArea,
-    formatDistance,
     clipCircleToPolygon,
-    canvasToGPS,
 } from '../../utils/homeGardenData';
 
 // ===== ENHANCED TYPES =====
@@ -50,6 +46,10 @@ interface ViewportState {
     scale: number;
 }
 
+interface CanvasData {
+    scale: number;
+}
+
 interface CanvasDesignerProps {
     gardenZones: GardenZone[];
     sprinklers: Sprinkler[];
@@ -57,13 +57,12 @@ interface CanvasDesignerProps {
     pipes: Pipe[];
     selectedZoneType: string;
     editMode: string;
-    manualSprinklerType: string;
     manualSprinklerRadius: number;
     selectedSprinkler: string | null;
     selectedPipes: Set<string>;
     selectedSprinklersForPipe: string[];
     mainPipeDrawing: CanvasCoordinate[];
-    canvasData: any;
+    canvasData: CanvasData;
     onZoneCreated: (coordinates: CanvasCoordinate[]) => void;
     onSprinklerPlaced: (position: CanvasCoordinate) => void;
     onWaterSourcePlaced: (position: CanvasCoordinate) => void;
@@ -73,7 +72,6 @@ interface CanvasDesignerProps {
     onSprinklerDelete: (sprinklerId: string) => void;
     onWaterSourceDelete: () => void;
     onPipeClick: (pipeId: string) => void;
-    hasMainArea: boolean;
     pipeEditMode?: string;
 }
 
@@ -84,7 +82,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
     pipes,
     selectedZoneType,
     editMode,
-    manualSprinklerType,
     manualSprinklerRadius,
     selectedSprinkler,
     selectedPipes,
@@ -100,7 +97,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
     onSprinklerDelete,
     onWaterSourceDelete,
     onPipeClick,
-    hasMainArea,
     pipeEditMode,
 }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -138,13 +134,13 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
 
     // Display and snap settings
     const [showGrid, setShowGrid] = useState(true);
-    const [showRuler, setShowRuler] = useState(true);
+    const [showRuler] = useState(true);
     const [showSprinklerRadius, setShowSprinklerRadius] = useState(true);
     const [showMeasurements, setShowMeasurements] = useState(true);
     const [showDimensions, setShowDimensions] = useState(true);
     const [snapToGrid, setSnapToGrid] = useState(true);
     const [snapToVertex, setSnapToVertex] = useState(true);
-    const [snapDistance, setSnapDistance] = useState(15);
+    const [snapDistance] = useState(15);
     const [hoveredSnapPoint, setHoveredSnapPoint] = useState<SnapPoint | null>(null);
 
     // Scale and measurement
@@ -628,8 +624,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         (ctx: CanvasRenderingContext2D) => {
             if (!showRuler || !enhancedMode) return;
 
-            const scale = getEffectiveScale();
-
             ctx.save();
             ctx.fillStyle = '#444';
             ctx.fillRect(0, 0, canvasSize.width, 30);
@@ -691,15 +685,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
 
             ctx.restore();
         },
-        [
-            showRuler,
-            enhancedMode,
-            canvasSize,
-            viewport,
-            getEffectiveScale,
-            enhancedScale,
-            canvasData.scale,
-        ]
+        [showRuler, enhancedMode, canvasSize, viewport, enhancedScale, canvasData.scale]
     );
 
     const drawZone = useCallback(
@@ -1300,7 +1286,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         sprinklers,
         waterSource,
         pipes,
-        currentPolygon,
         enhancedMode,
         hoveredSnapPoint,
         scalePoints,
@@ -1326,8 +1311,8 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             if (!canvas) return;
 
             const rect = canvas.getBoundingClientRect();
-            let x = e.clientX - rect.left;
-            let y = e.clientY - rect.top;
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
 
             let worldPos = screenToWorld({ x, y });
 
@@ -1357,11 +1342,12 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                     case 'rectangle':
                         previewShape = createRectangleZone(enhancedDrawing.startPoint, worldPos);
                         break;
-                    case 'circle':
+                    case 'circle': {
                         const radius = calculateDistance(enhancedDrawing.startPoint, worldPos);
                         previewShape = createCircleZone(enhancedDrawing.startPoint, radius);
                         break;
-                    case 'polygon':
+                    }
+                    case 'polygon': {
                         const polyRadius = calculateDistance(enhancedDrawing.startPoint, worldPos);
                         previewShape = createRegularPolygon(
                             enhancedDrawing.startPoint,
@@ -1369,6 +1355,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                             6
                         );
                         break;
+                    }
                 }
 
                 setEnhancedDrawing((prev) => ({ ...prev, previewShape }));
@@ -1427,8 +1414,8 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             if (!canvas) return;
 
             const rect = canvas.getBoundingClientRect();
-            let x = e.clientX - rect.left;
-            let y = e.clientY - rect.top;
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
 
             let worldPos = screenToWorld({ x, y });
 
@@ -1528,7 +1515,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                         worldPos
                                     );
                                     break;
-                                case 'circle':
+                                case 'circle': {
                                     const radius = calculateDistance(
                                         enhancedDrawing.startPoint!,
                                         worldPos
@@ -1538,7 +1525,8 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                         radius
                                     );
                                     break;
-                                case 'polygon':
+                                }
+                                case 'polygon': {
                                     const polyRadius = calculateDistance(
                                         enhancedDrawing.startPoint!,
                                         worldPos
@@ -1549,6 +1537,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                         6
                                     );
                                     break;
+                                }
                             }
 
                             finalizeEnhancedZone(finalPoints);
@@ -1631,8 +1620,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             isDrawing,
             waterSource,
             sprinklers,
-            viewport,
-            pipes,
             distanceToLine,
             pipeEditMode,
             onPipeClick,
@@ -1640,6 +1627,8 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             onWaterSourcePlaced,
             onMainPipePoint,
             onSprinklerClick,
+            checkDimensionLineClick,
+            removeDimensionLine,
         ]
     );
 
@@ -1970,14 +1959,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         ]
     );
 
-    const handleSprinklerClick = (sprinklerId: string) => {
-        if (pipeEditMode === 'add' || pipeEditMode === 'remove') {
-            onSprinklerClick(sprinklerId);
-        } else {
-            onSprinklerClick(sprinklerId);
-        }
-    };
-
     return (
         <div ref={containerRef} className="relative h-full w-full">
             <div className="absolute bottom-2 left-2 z-10 flex gap-2">
@@ -2276,7 +2257,16 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                 ].map((dir) => (
                                     <button
                                         key={dir.id}
-                                        onClick={() => setDimensionDirection(dir.id as any)}
+                                        onClick={() =>
+                                            setDimensionDirection(
+                                                dir.id as
+                                                    | 'auto'
+                                                    | 'left'
+                                                    | 'right'
+                                                    | 'top'
+                                                    | 'bottom'
+                                            )
+                                        }
                                         className={`rounded-lg p-3 text-sm transition-all ${
                                             dimensionDirection === dir.id
                                                 ? 'border-2 border-yellow-400 bg-yellow-600 text-white'

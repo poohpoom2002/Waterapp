@@ -720,51 +720,46 @@ function EnhancedHorticultureResultsPageContent() {
             <Navbar />
             <div className="p-6">
                 <div className="mx-auto w-full">
-                    {/* Header */}
-                    <div className="mb-8 text-center">
-                        <h1 className="mb-4 text-4xl font-bold text-green-400">
-                            🌱 {t('รายงานการออกแบบระบบน้ำสวนผลไม้')}
-                        </h1>
-                        <h2 className="text-2xl text-gray-300">{projectData.projectName}</h2>
-                        <p className="mt-2 text-gray-400">
-                            {t('วันที่สร้าง')}:{' '}
-                            {new Date(projectData.createdAt).toLocaleDateString('th-TH')}
-                        </p>
-                    </div>
+                {/* Header */}
+                <div className="mb-8 text-center">
+                    <h1 className="mb-4 text-4xl font-bold text-green-400">
+                        🌱 รายงานการออกแบบระบบน้ำสำหรับพืชสวน
+                    </h1>
+                    <h2 className="text-2xl text-gray-300">{projectData.projectName}</h2>
+                    <p className="mt-2 text-gray-400">
+                        วันที่สร้าง: {new Date(projectData.createdAt).toLocaleDateString('th-TH')}
+                    </p>
+                </div>
 
-                    <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-                        {/* Enhanced Map Section */}
-                        <div className="rounded-lg bg-gray-800 p-6">
-                            <div className="mb-4 flex items-center justify-between">
-                                <h3 className="text-xl font-semibold">🗺️ แผนผังโครงการ</h3>
-                                <div className="flex flex-wrap gap-2">
-                                    <button
-                                        onClick={handleCreateMapImage}
-                                        disabled={isCreatingImage}
-                                        className={`rounded px-3 py-1 text-sm transition-colors ${
-                                            isCreatingImage
-                                                ? 'cursor-not-allowed bg-gray-600 text-gray-400'
-                                                : 'bg-blue-600 text-white hover:bg-blue-700'
-                                        }`}
-                                    >
-                                        {isCreatingImage
-                                            ? '⏳ ' + t('สร้าง...')
-                                            : '📷 ' + t('ดาวน์โหลดภาพ')}
-                                    </button>
+                <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+                    {/* Enhanced Map Section */}
+                    <div className="rounded-lg bg-gray-800 p-6">
+                        <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-xl font-semibold">🗺️ แผนผังโครงการ</h3>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    onClick={handleCreateMapImage}
+                                    disabled={isCreatingImage}
+                                    className={`rounded px-3 py-1 text-sm transition-colors ${
+                                        isCreatingImage
+                                            ? 'cursor-not-allowed bg-gray-600 text-gray-400'
+                                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                                    }`}
+                                >
+                                    {isCreatingImage ? '⏳ สร้าง...' : '📷 ดาวน์โหลดภาพ'}
+                                </button>
 
-                                    <button
-                                        onClick={handleCreatePDFReport}
-                                        disabled={isCreatingPDF}
-                                        className={`rounded px-3 py-1 text-sm transition-colors ${
-                                            isCreatingPDF
-                                                ? 'cursor-not-allowed bg-gray-600 text-gray-400'
-                                                : 'bg-red-600 text-white hover:bg-red-700'
-                                        }`}
-                                    >
-                                        {isCreatingPDF
-                                            ? '⏳ ' + t('สร้าง...')
-                                            : '📄 ' + t('สร้างรายงาน')}
-                                    </button>
+                                <button
+                                    onClick={handleCreatePDFReport}
+                                    disabled={isCreatingPDF}
+                                    className={`rounded px-3 py-1 text-sm transition-colors ${
+                                        isCreatingPDF
+                                            ? 'cursor-not-allowed bg-gray-600 text-gray-400'
+                                            : 'bg-red-600 text-white hover:bg-red-700'
+                                    }`}
+                                >
+                                    {isCreatingPDF ? '⏳ สร้าง...' : '📄 สร้างรายงาน'}
+                                </button>
 
                                     <button
                                         onClick={handleShowScreenshotGuide}

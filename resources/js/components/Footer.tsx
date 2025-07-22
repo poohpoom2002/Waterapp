@@ -2,7 +2,7 @@ import React from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 const Footer: React.FC = () => {
-    const { t } = useLanguage();
+    useLanguage();
 
     return (
         <footer className="mt-8 border-t border-gray-700 bg-gray-800">
