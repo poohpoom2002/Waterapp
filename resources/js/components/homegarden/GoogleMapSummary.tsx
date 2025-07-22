@@ -562,7 +562,7 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
                     const marker = new google.maps.Marker({
                         position: { lat: sprinkler.position.lat, lng: sprinkler.position.lng },
                         icon: createSprinklerIcon(sprinkler.type, sprinkler.orientation),
-                        title: `หัวฉีด: ${sprinkler.type.name} (รัศมี ${sprinkler.type.radius}ม.)`,
+                        title: `หัวฉีด: ${sprinkler.type.nameEN} (รัศมี ${sprinkler.type.radius}ม.)`,
                         map: map,
                     });
                     overlaysRef.current.set(`sprinkler-${sprinkler.id}`, marker);

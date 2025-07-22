@@ -39,9 +39,16 @@ interface QuotationDocumentProps {
     selectedBranchPipe: any;
     selectedSecondaryPipe: any;
     selectedMainPipe: any;
+    projectImage?: string | null;
+    projectMode: 'horticulture' | 'garden';
+    gardenData: any;
+    projectData: any;
+    showPump: boolean;
+    zoneSprinklers: { [zoneId: string]: any };
+    selectedPipes: { [zoneId: string]: { branch?: any; secondary?: any; main?: any } };
+
     onClose: () => void;
 }
-
 const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     show,
     results,
@@ -52,6 +59,13 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     selectedBranchPipe,
     selectedSecondaryPipe,
     selectedMainPipe,
+    projectImage,
+    projectData,
+    projectMode,
+    gardenData,
+    zoneSprinklers,
+    selectedPipes,
+    showPump,
     onClose,
 }) => {
     const [items, setItems] = useState<QuotationItem[]>([]);
@@ -63,15 +77,33 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     const [selectedCategory, setSelectedCategory] = useState<string>('');
     const [equipmentSearchTerm, setEquipmentSearchTerm] = useState<string>('');
     const [isLoadingEquipment, setIsLoadingEquipment] = useState(false);
+
+    const [editableProjectImage, setEditableProjectImage] = useState<string | null>(
+        projectImage || null
+    );
+
     const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
+    useEffect(() => {
+        setEditableProjectImage(projectImage || null);
+    }, [projectImage]);
+
+    const hasProjectImagePage = !!editableProjectImage;
+
     const getItemsPerPage = (page: number, totalPages: number, totalItems: number) => {
-        if (page === 1) {
-            if (totalPages === 1) {
+        const imagePageOffset = hasProjectImagePage ? 1 : 0;
+        const effectivePage = page - imagePageOffset;
+
+        if (hasProjectImagePage && page === 1) {
+            return 0;
+        }
+
+        if (effectivePage === 1) {
+            if (totalPages === 1 + imagePageOffset) {
                 return Math.min(10, Math.max(0, totalItems));
             }
             return 10;
-        } else if (page === totalPages) {
+        } else if (effectivePage === totalPages - imagePageOffset) {
             return Math.min(11, 14);
         } else {
             return 14;
@@ -79,7 +111,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     };
 
     const calculateTotalPages = (totalItems: number) => {
-        if (totalItems <= 7) return 1; // หน้าเดียว เหลือพื้นที่สำหรับ total
+        if (totalItems <= 7) return 1;
 
         let remainingItems = totalItems - 10; // หักหน้าแรก 10 รายการ
         let additionalPages = 0;
@@ -94,7 +126,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             }
         }
 
-        return 1 + additionalPages;
+        return 1 + additionalPages + imagePageOffset;
     };
 
     const totalPages = calculateTotalPages(items.length);
@@ -157,6 +189,32 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             return () => clearTimeout(timeoutId);
         }
     }, [selectedCategory, equipmentSearchTerm]);
+
+    const handleProjectImageUpload = (file: File) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const imageUrl = e.target?.result as string;
+            setEditableProjectImage(imageUrl);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleProjectImageDelete = () => {
+        setEditableProjectImage(null);
+    };
+
+    const openProjectImageDialog = () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = (e) => {
+            const file = (e.target as HTMLInputElement).files?.[0];
+            if (file) {
+                handleProjectImageUpload(file);
+            }
+        };
+        input.click();
+    };
 
     const handleImageUpload = (itemId: string, file: File) => {
         const reader = new FileReader();
@@ -228,103 +286,222 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     useEffect(() => {
         if (!show) return;
 
-        console.log('useEffect triggered with:', {
-            show,
-            selectedSprinkler: !!selectedSprinkler,
-            selectedPump: !!selectedPump,
-            selectedBranchPipe: !!selectedBranchPipe,
-            selectedSecondaryPipe: !!selectedSecondaryPipe,
-            selectedMainPipe: !!selectedMainPipe,
-            results: !!results,
-        });
-
-        if (
-            (!selectedSprinkler &&
-                !selectedBranchPipe &&
-                !selectedSecondaryPipe &&
-                !selectedMainPipe &&
-                !selectedPump) ||
-            !results
-        ) {
-            console.log('Missing equipment or results, skipping initialization');
+        if (!results) {
             return;
         }
 
         const initialItems: QuotationItem[] = [];
         let seq = 1;
 
-        if (selectedSprinkler && results) {
-            console.log('Adding sprinkler:', selectedSprinkler);
-            initialItems.push({
-                id: 'sprinkler',
-                seq: seq++,
-                image: selectedSprinkler.image_url || selectedSprinkler.image || '',
-                date: '',
-                description: selectedSprinkler.name || 'Sprinkler',
-                quantity: results.totalSprinklers || 0,
-                unitPrice: selectedSprinkler.price || 0,
-                discount: 30.0,
-                taxes: 'Output\nVAT\n7%',
-                originalData: selectedSprinkler,
-            });
-        }
+        const isMultiZone =
+            projectData?.useZones && projectData.zones && projectData.zones.length > 1;
 
-        if (selectedBranchPipe && results) {
-            console.log('Adding branch pipe:', selectedBranchPipe);
-            initialItems.push({
-                id: 'branchPipe',
-                seq: seq++,
-                image: selectedBranchPipe.image_url || selectedBranchPipe.image || '',
-                date: '',
-                description: `${selectedBranchPipe.productCode || ''} ${selectedBranchPipe.pipeType || ''} ${selectedBranchPipe.sizeMM || ''}" ยาว ${selectedBranchPipe.lengthM || ''} ม.`,
-                quantity: results.branchPipeRolls || 0,
-                unitPrice: selectedBranchPipe.price || 0,
-                discount: 30.0,
-                taxes: 'Output\nVAT\n7%',
-                originalData: selectedBranchPipe,
-            });
-        }
+        if (isMultiZone) {
+            const totalTreesInAllZones = projectData.zones.reduce(
+                (sum, zone) => sum + zone.plantCount,
+                0
+            );
 
-        if (selectedSecondaryPipe && results) {
-            console.log('Adding secondary pipe:', selectedSecondaryPipe);
-            initialItems.push({
-                id: 'secondaryPipe',
-                seq: seq++,
-                image: selectedSecondaryPipe.image_url || selectedSecondaryPipe.image || '',
-                date: '',
-                description: `${selectedSecondaryPipe.productCode || ''} ${selectedSecondaryPipe.pipeType || ''} ${selectedSecondaryPipe.sizeMM || ''}" ยาว ${selectedSecondaryPipe.lengthM || ''} ม.`,
-                quantity: results.secondaryPipeRolls || 0,
-                unitPrice: selectedSecondaryPipe.price || 0,
-                discount: 30.0,
-                taxes: 'Output\nVAT\n7%',
-                originalData: selectedSecondaryPipe,
-            });
-        }
+            const equipmentMap = new Map();
 
-        if (selectedMainPipe && results) {
-            console.log('Adding main pipe:', selectedMainPipe);
-            initialItems.push({
-                id: 'mainPipe',
-                seq: seq++,
-                image: selectedMainPipe.image_url || selectedMainPipe.image || '',
-                date: '',
-                description: `${selectedMainPipe.productCode || ''} ${selectedMainPipe.pipeType || ''} ${selectedMainPipe.sizeMM || ''}" ยาว ${selectedMainPipe.lengthM || ''} ม.`,
-                quantity: results.mainPipeRolls || 0,
-                unitPrice: selectedMainPipe.price || 0,
-                discount: 30.0,
-                taxes: 'Output\nVAT\n7%',
-                originalData: selectedMainPipe,
+            projectData.zones.forEach((zone) => {
+                const zoneSprinkler = zoneSprinklers[zone.id];
+                const zonePipes = selectedPipes[zone.id] || {};
+
+                if (zoneSprinkler) {
+                    const sprinklerKey = `sprinkler_${zoneSprinkler.id}`;
+                    if (equipmentMap.has(sprinklerKey)) {
+                        const existing = equipmentMap.get(sprinklerKey);
+                        existing.quantity += zone.plantCount;
+                        existing.zones.push(zone.name);
+                    } else {
+                        equipmentMap.set(sprinklerKey, {
+                            id: sprinklerKey,
+                            seq: seq++,
+                            image: zoneSprinkler.image_url || zoneSprinkler.image || '',
+                            date: '',
+                            description: `${zoneSprinkler.productCode || zoneSprinkler.product_code || ''} - ${zoneSprinkler.name || 'สปริงเกอร์'} (${zoneSprinkler.brand || ''})`,
+                            quantity: zone.plantCount,
+                            unitPrice: zoneSprinkler.price || 0,
+                            discount: 30.0,
+                            taxes: 'Output\nVAT\n7%',
+                            originalData: zoneSprinkler,
+                            zones: [zone.name],
+                        });
+                    }
+                }
+
+                const branchPipe = zonePipes.branch || results.autoSelectedBranchPipe;
+                if (branchPipe) {
+                    const pipeKey = `branch_${branchPipe.id}`;
+                    const zoneTreeRatio = zone.plantCount / totalTreesInAllZones;
+                    const rolls = Math.max(
+                        1,
+                        Math.ceil((results.branchPipeRolls || 1) * zoneTreeRatio)
+                    );
+
+                    if (equipmentMap.has(pipeKey)) {
+                        const existing = equipmentMap.get(pipeKey);
+                        existing.quantity += rolls;
+                        existing.zones.push(zone.name);
+                    } else {
+                        equipmentMap.set(pipeKey, {
+                            id: pipeKey,
+                            seq: seq++,
+                            image: branchPipe.image_url || branchPipe.image || '',
+                            date: '',
+                            description: `${branchPipe.productCode || branchPipe.product_code || ''} - ท่อย่อย ${branchPipe.pipeType || ''} ${branchPipe.sizeMM || ''}mm ยาว ${branchPipe.lengthM || ''} ม./ม้วน`,
+                            quantity: rolls,
+                            unitPrice: branchPipe.price || 0,
+                            discount: 30.0,
+                            taxes: 'Output\nVAT\n7%',
+                            originalData: branchPipe,
+                            zones: [zone.name],
+                        });
+                    }
+                }
+
+                const secondaryPipe = zonePipes.secondary || results.autoSelectedSecondaryPipe;
+                if (secondaryPipe && results.hasValidSecondaryPipe) {
+                    const pipeKey = `secondary_${secondaryPipe.id}`;
+                    const zoneTreeRatio = zone.plantCount / totalTreesInAllZones;
+                    const rolls = Math.max(
+                        1,
+                        Math.ceil((results.secondaryPipeRolls || 1) * zoneTreeRatio)
+                    );
+
+                    if (equipmentMap.has(pipeKey)) {
+                        const existing = equipmentMap.get(pipeKey);
+                        existing.quantity += rolls;
+                        existing.zones.push(zone.name);
+                    } else {
+                        equipmentMap.set(pipeKey, {
+                            id: pipeKey,
+                            seq: seq++,
+                            image: secondaryPipe.image_url || secondaryPipe.image || '',
+                            date: '',
+                            description: `${secondaryPipe.productCode || secondaryPipe.product_code || ''} - ท่อรอง ${secondaryPipe.pipeType || ''} ${secondaryPipe.sizeMM || ''}mm ยาว ${secondaryPipe.lengthM || ''} ม./ม้วน`,
+                            quantity: rolls,
+                            unitPrice: secondaryPipe.price || 0,
+                            discount: 30.0,
+                            taxes: 'Output\nVAT\n7%',
+                            originalData: secondaryPipe,
+                            zones: [zone.name],
+                        });
+                    }
+                }
+
+                const mainPipe = zonePipes.main || results.autoSelectedMainPipe;
+                if (mainPipe && results.hasValidMainPipe) {
+                    const pipeKey = `main_${mainPipe.id}`;
+                    const zoneTreeRatio = zone.plantCount / totalTreesInAllZones;
+                    const rolls = Math.max(
+                        1,
+                        Math.ceil((results.mainPipeRolls || 1) * zoneTreeRatio)
+                    );
+
+                    if (equipmentMap.has(pipeKey)) {
+                        const existing = equipmentMap.get(pipeKey);
+                        existing.quantity += rolls;
+                        existing.zones.push(zone.name);
+                    } else {
+                        equipmentMap.set(pipeKey, {
+                            id: pipeKey,
+                            seq: seq++,
+                            image: mainPipe.image_url || mainPipe.image || '',
+                            date: '',
+                            description: `${mainPipe.productCode || mainPipe.product_code || ''} - ท่อหลัก ${mainPipe.pipeType || ''} ${mainPipe.sizeMM || ''}mm ยาว ${mainPipe.lengthM || ''} ม./ม้วน`,
+                            quantity: rolls,
+                            unitPrice: mainPipe.price || 0,
+                            discount: 30.0,
+                            taxes: 'Output\nVAT\n7%',
+                            originalData: mainPipe,
+                            zones: [zone.name],
+                        });
+                    }
+                }
             });
+
+            for (const [key, item] of equipmentMap.entries()) {
+                if (item.zones && item.zones.length > 1) {
+                    item.description += ` (ใช้ในโซน: ${item.zones.join(', ')})`;
+                } else if (item.zones && item.zones.length === 1) {
+                    item.description += ` (ใช้ในโซน: ${item.zones[0]})`;
+                }
+                delete item.zones;
+                initialItems.push(item);
+            }
+        } else {
+            if (selectedSprinkler && results) {
+                initialItems.push({
+                    id: 'sprinkler',
+                    seq: seq++,
+                    image: selectedSprinkler.image_url || selectedSprinkler.image || '',
+                    date: '',
+                    description: `${selectedSprinkler.productCode || selectedSprinkler.product_code || ''} - ${selectedSprinkler.name || 'สปริงเกอร์'} (${selectedSprinkler.brand || ''})`,
+                    quantity: results.totalSprinklers || 0,
+                    unitPrice: selectedSprinkler.price || 0,
+                    discount: 30.0,
+                    taxes: 'Output\nVAT\n7%',
+                    originalData: selectedSprinkler,
+                });
+            }
+
+            if (selectedBranchPipe && results) {
+                initialItems.push({
+                    id: 'branchPipe',
+                    seq: seq++,
+                    image: selectedBranchPipe.image_url || selectedBranchPipe.image || '',
+                    date: '',
+                    description: `${selectedBranchPipe.productCode || selectedBranchPipe.product_code || ''} - ท่อย่อย ${selectedBranchPipe.pipeType || ''} ${selectedBranchPipe.sizeMM || ''}mm ยาว ${selectedBranchPipe.lengthM || ''} ม./ม้วน`,
+                    quantity: results.branchPipeRolls || 0,
+                    unitPrice: selectedBranchPipe.price || 0,
+                    discount: 30.0,
+                    taxes: 'Output\nVAT\n7%',
+                    originalData: selectedBranchPipe,
+                });
+            }
+
+            if (selectedSecondaryPipe && results) {
+                initialItems.push({
+                    id: 'secondaryPipe',
+                    seq: seq++,
+                    image: selectedSecondaryPipe.image_url || selectedSecondaryPipe.image || '',
+                    date: '',
+                    description: `${selectedSecondaryPipe.productCode || selectedSecondaryPipe.product_code || ''} - ท่อรอง ${selectedSecondaryPipe.pipeType || ''} ${selectedSecondaryPipe.sizeMM || ''}mm ยาว ${selectedSecondaryPipe.lengthM || ''} ม./ม้วน`,
+                    quantity: results.secondaryPipeRolls || 0,
+                    unitPrice: selectedSecondaryPipe.price || 0,
+                    discount: 30.0,
+                    taxes: 'Output\nVAT\n7%',
+                    originalData: selectedSecondaryPipe,
+                });
+            }
+
+            if (selectedMainPipe && results) {
+                initialItems.push({
+                    id: 'mainPipe',
+                    seq: seq++,
+                    image: selectedMainPipe.image_url || selectedMainPipe.image || '',
+                    date: '',
+                    description: `${selectedMainPipe.productCode || selectedMainPipe.product_code || ''} - ท่อหลัก ${selectedMainPipe.pipeType || ''} ${selectedMainPipe.sizeMM || ''}mm ยาว ${selectedMainPipe.lengthM || ''} ม./ม้วน`,
+                    quantity: results.mainPipeRolls || 0,
+                    unitPrice: selectedMainPipe.price || 0,
+                    discount: 30.0,
+                    taxes: 'Output\nVAT\n7%',
+                    originalData: selectedMainPipe,
+                });
+            }
         }
 
         if (selectedPump && results) {
-            console.log('Adding pump:', selectedPump);
+            const pumpDescription = `${selectedPump.productCode || selectedPump.product_code || ''} - ปั๊มน้ำ ${selectedPump.name || ''} ${selectedPump.powerHP || ''}HP ${selectedPump.phase || ''}เฟส (${selectedPump.brand || ''})`;
+
             initialItems.push({
                 id: 'pump',
                 seq: seq++,
-                image: selectedPump.image_url || selectedPump.image || '', // FIXED
+                image: selectedPump.image_url || selectedPump.image || '',
                 date: '',
-                description: `${selectedPump.productCode || selectedPump.product_code || ''} ${selectedPump.powerHP || ''} HP ${selectedPump.sizeMM || ''}" ${selectedPump.phase || ''} phase`,
+                description: pumpDescription,
                 quantity: 1,
                 unitPrice: selectedPump.price || 0,
                 discount: 30.0,
@@ -332,9 +509,10 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 originalData: selectedPump,
             });
 
-            if (selectedPump.pumpAccessories && selectedPump.pumpAccessories.length > 0) {
-                console.log('Adding pump accessories:', selectedPump.pumpAccessories);
-                selectedPump.pumpAccessories
+            const accessories = selectedPump.pumpAccessories || selectedPump.pumpAccessory || [];
+
+            if (accessories && accessories.length > 0) {
+                accessories
                     .sort(
                         (a: { sort_order: any }, b: { sort_order: any }) =>
                             (a.sort_order || 0) - (b.sort_order || 0)
@@ -348,70 +526,45 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             price: any;
                             image_url: any;
                             image: any;
+                            accessory_type: any;
                         }) => {
-                            initialItems.push({
-                                id: `pump_accessory_${accessory.id || seq}`,
-                                seq: seq++,
-                                image: accessory.image_url || accessory.image || '', // FIXED
-                                date: '',
-                                description: `${accessory.name}${accessory.size ? ` (${accessory.size})` : ''} - ${accessory.is_included ? 'รวมในชุด' : 'แยกขาย'}`,
-                                quantity: 1,
-                                unitPrice: accessory.is_included ? 0 : accessory.price || 0,
-                                discount: 0,
-                                taxes: 'Output\nVAT\n7%',
-                                originalData: accessory,
-                            });
-                        }
-                    );
-            }
+                            if (
+                                !accessory.is_included ||
+                                (accessory.price && accessory.price > 0)
+                            ) {
+                                const accessoryTypeMap: { [key: string]: string } = {
+                                    foot_valve: 'Foot Valve',
+                                    check_valve: 'Check Valve',
+                                    ball_valve: 'Ball Valve',
+                                    pressure_gauge: 'เกจวัดแรงดัน',
+                                    other: 'อุปกรณ์เสริม',
+                                };
 
-            if (
-                !selectedPump.pumpAccessories &&
-                selectedPump.pumpAccessory &&
-                selectedPump.pumpAccessory.length > 0
-            ) {
-                console.log(
-                    'Adding pump accessories from pumpAccessory field:',
-                    selectedPump.pumpAccessory
-                );
-                selectedPump.pumpAccessory
-                    .sort(
-                        (a: { sort_order: any }, b: { sort_order: any }) =>
-                            (a.sort_order || 0) - (b.sort_order || 0)
-                    )
-                    .forEach(
-                        (accessory: {
-                            id: any;
-                            name: any;
-                            size: any;
-                            is_included: any;
-                            price: any;
-                            image_url: any;
-                            image: any;
-                        }) => {
-                            initialItems.push({
-                                id: `pump_accessory_${accessory.id || seq}`,
-                                seq: seq++,
-                                image: accessory.image_url || accessory.image || '', // FIXED
-                                date: '',
-                                description: `${accessory.name}${accessory.size ? ` (${accessory.size})` : ''} - ${accessory.is_included ? 'รวมในชุด' : 'แยกขาย'}`,
-                                quantity: 1,
-                                unitPrice: accessory.is_included ? 0 : accessory.price || 0,
-                                discount: 30.0,
-                                taxes: 'Output\nVAT\n7%',
-                                originalData: accessory,
-                            });
+                                const typeName =
+                                    accessoryTypeMap[accessory.accessory_type] ||
+                                    accessory.accessory_type ||
+                                    '';
+
+                                initialItems.push({
+                                    id: `pump_accessory_${accessory.id || seq}`,
+                                    seq: seq++,
+                                    image: accessory.image_url || accessory.image || '',
+                                    date: '',
+                                    description: `${accessory.name}${accessory.size ? ` ขนาด ${accessory.size}` : ''} - ${typeName}${accessory.is_included ? ' (รวมในชุด)' : ' (แยกขาย)'}`,
+                                    quantity: 1,
+                                    unitPrice: accessory.is_included ? 0 : accessory.price || 0,
+                                    discount: accessory.is_included ? 0 : 30.0,
+                                    taxes: 'Output\nVAT\n7%',
+                                    originalData: accessory,
+                                });
+                            }
                         }
                     );
             }
         }
 
-        console.log('Final initialItems:', initialItems);
-
-        if (initialItems.length > 0) {
-            setItems(initialItems);
-            setCurrentPage(1);
-        }
+        setItems(initialItems);
+        setCurrentPage(hasProjectImagePage ? 1 : 1);
     }, [
         show,
         selectedSprinkler,
@@ -420,6 +573,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         selectedSecondaryPipe,
         selectedMainPipe,
         results,
+        zoneSprinklers,
+        selectedPipes,
+        projectData,
     ]);
 
     const calculateItemAmount = (item: QuotationItem) => {
@@ -459,12 +615,19 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     };
 
     const getItemsForPage = (page: number) => {
+        const imagePageOffset = hasProjectImagePage ? 1 : 0;
+
+        if (hasProjectImagePage && page === 1) {
+            return [];
+        }
+
+        const effectivePage = page - imagePageOffset;
         const itemsPerPage = getItemsPerPage(page, totalPages, items.length);
 
-        if (page === 1) {
+        if (effectivePage === 1) {
             return items.slice(0, itemsPerPage);
         } else {
-            const startIndex = 10 + (page - 2) * 14;
+            const startIndex = 10 + (effectivePage - 2) * 14;
             const endIndex = startIndex + itemsPerPage;
             return items.slice(startIndex, endIndex);
         }
@@ -672,38 +835,48 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
         let allPagesHTML = '';
         for (let page = 1; page <= currentTotalPages; page++) {
+            const imagePageOffset = hasProjectImagePage ? 1 : 0;
+
+            if (hasProjectImagePage && page === 1) {
+                const imagePageHTML = `
+                    <div class="mx-auto flex h-[1123px] w-[794px] flex-col bg-white p-8 text-black shadow-lg" style="page-break-after: always;">
+                        <div class="print-page flex min-h-full flex-col">
+                            ${renderHeader()}
+                            
+                            <div class="flex flex-col items-center justify-center">
+                                <h1 class="text-2xl font-bold mb-8 text-center">แผนผังโครงการระบบชลประทาน</h1>
+                                <div class="flex items-center justify-center w-full max-h-[800px]">
+                                    <img
+                                        src="${editableProjectImage}"
+                                        alt="Project Layout"
+                                        class="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                                    />
+                                </div>
+                            </div>
+                            
+                            ${renderFooter(page)}
+                        </div>
+                    </div>
+                `;
+                allPagesHTML += imagePageHTML;
+                continue;
+            }
+
             let pageItems;
             const itemsPerPage = getItemsPerPage(page, currentTotalPages, currentItems.length);
 
-            if (page === 1) {
+            if (page === 1 + imagePageOffset) {
                 pageItems = currentItems.slice(0, itemsPerPage);
             } else {
-                const startIndex = 10 + (page - 2) * 14;
+                const startIndex = 10 + (page - 2 - imagePageOffset) * 14;
                 const endIndex = startIndex + itemsPerPage;
                 pageItems = currentItems.slice(startIndex, endIndex);
             }
 
-            const headerHTML = `
-                <div class="print-header mb-2 flex items-center justify-between">
-                    <div class="flex items-center">
-                        <img
-                            src="https://f.btwcdn.com/store-50036/store/e4c1b5ae-cf8e-5017-536b-66ecd994018d.jpg"
-                            alt="logo"
-                            class="print-logo h-10 w-10"
-                        />
-                    </div>
-                </div>
-                <hr class="print-hr mb-4 border-gray-800" />
-                <div class="print-company-info mb-4 self-start text-sm">
-                    <p class="font-semibold">บจก. กนกโปรดักส์ (สำนักงานใหญ่)</p>
-                    <p>15 ซ. พระยามนธาตุ แยก 10</p>
-                    <p>แขวงคลองบางบอน เขตบางบอน</p>
-                    <p>กรุงเทพมหานคร 10150</p>
-                </div>
-            `;
+            const headerHTML = renderHeader();
 
             const customerInfoHTML =
-                page === 1
+                page === 1 + imagePageOffset
                     ? `
                 <div class="print-customer-info mb-6 self-end text-left text-sm">
                     <p class="font-semibold">[1234] ${quotationDataCustomer.name || '-'}</p>
@@ -715,7 +888,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     : '';
 
             const quotationDetailsHTML =
-                page === 1
+                page === 1 + imagePageOffset
                     ? `
                 <h1 class="print-title mb-4 text-xl font-bold">Quotation # QT1234567890</h1>
                 <div class="print-details mb-4 flex flex-row gap-9 text-left text-sm">
@@ -810,15 +983,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             `
                     : '';
 
-            const footerHTML = `
-                <div class="print-footer-container mt-auto text-center text-xs">
-                    <hr class="print-footer-hr mb-2 border-gray-800" />
-                    <div class="print-footer">
-                        <p>Phone: 02-451-1111 Tax ID: 0105549044446</p>
-                        <p>Page: ${page} / ${currentTotalPages}</p>
-                    </div>
-                </div>
-            `;
+            const footerHTML = renderFooter(page);
 
             const pageBreak = page < currentTotalPages ? 'page-break-after: always;' : '';
             allPagesHTML += `
@@ -850,38 +1015,32 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         }, 100);
     };
 
-    const renderHeader = () => (
-        <>
-            <div className="print-header mb-2 flex items-center justify-between">
-                <div className="flex items-center">
-                    <img
-                        src="https://f.btwcdn.com/store-50036/store/e4c1b5ae-cf8e-5017-536b-66ecd994018d.jpg"
-                        alt="logo"
-                        className="print-logo h-10 w-10"
-                    />
-                </div>
-            </div>
-            <hr className="print-hr mb-4 border-gray-800" />
-            <div className="print-company-info mb-4 self-start text-sm">
-                <p className="font-semibold">บจก. กนกโปรดักส์ (สำนักงานใหญ่)</p>
-                <p>15 ซ. พระยามนธาตุ แยก 10</p>
-                <p>แขวงคลองบางบอน เขตบางบอน</p>
-                <p>กรุงเทพมหานคร 10150</p>
-            </div>
-        </>
-    );
-
-    const renderFooter = (page: number) => (
-        <div className="print-footer-container mt-auto text-center text-xs">
-            <hr className="print-footer-hr mb-2 border-gray-800" />
-            <div className="print-footer">
-                <p>Phone: 02-451-1111 Tax ID: 0105549044446</p>
-                <p>
-                    Page: {page} / {totalPages}
-                </p>
+    const renderHeader = () =>
+        `<div class="print-header mb-2 flex items-center justify-between">
+            <div class="flex items-center">
+                <img
+                    src="https://f.btwcdn.com/store-50036/store/e4c1b5ae-cf8e-5017-536b-66ecd994018d.jpg"
+                    alt="logo"
+                    class="print-logo h-10 w-10"
+                />
             </div>
         </div>
-    );
+        <hr class="print-hr mb-4 border-gray-800" />
+        <div class="print-company-info mb-4 self-start text-sm">
+            <p class="font-semibold">บจก. กนกโปรดักส์ (สำนักงานใหญ่)</p>
+            <p>15 ซ. พระยามนธาตุ แยก 10</p>
+            <p>แขวงคลองบางบอน เขตบางบอน</p>
+            <p>กรุงเทพมหานคร 10150</p>
+        </div>`;
+
+    const renderFooter = (page: number) =>
+        `<div class="print-footer-container mt-auto text-center text-xs">
+            <hr class="print-footer-hr mb-2 border-gray-800" />
+            <div class="print-footer">
+                <p>Phone: 02-451-1111 Tax ID: 0105549044446</p>
+                <p>Page: ${page} / ${totalPages}</p>
+            </div>
+        </div>`;
 
     const renderCustomerInfo = () => (
         <div className="print-customer-info mb-6 self-end text-left text-sm">
@@ -950,8 +1109,10 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         const imageUrl = getImageUrl(item);
         const currentPageItems = getItemsForPage(currentPage);
         const currentIndex = currentPageItems.findIndex((i) => i.id === item.id);
+        const imagePageOffset = hasProjectImagePage ? 1 : 0;
+        const effectivePage = currentPage - imagePageOffset;
         const absoluteIndex =
-            currentPage === 1 ? currentIndex : 10 + (currentPage - 2) * 14 + currentIndex;
+            effectivePage === 1 ? currentIndex : 10 + (effectivePage - 2) * 14 + currentIndex;
 
         return (
             <tr key={item.id}>
@@ -1107,7 +1268,111 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         );
     };
 
+    const renderProjectImagePage = () => (
+        <div className="mx-auto flex h-[1123px] w-[794px] flex-col bg-white p-8 text-black shadow-lg">
+            <div className="print-page flex min-h-full flex-col">
+                <div className="print-header mb-2 flex items-center justify-between">
+                    <div className="flex items-center">
+                        <img
+                            src="https://f.btwcdn.com/store-50036/store/e4c1b5ae-cf8e-5017-536b-66ecd994018d.jpg"
+                            alt="logo"
+                            className="print-logo h-10 w-10"
+                        />
+                    </div>
+                </div>
+                <hr className="print-hr mb-4 border-gray-800" />
+                <div className="print-company-info mb-4 self-start text-sm">
+                    <p className="font-semibold">บจก. กนกโปรดักส์ (สำนักงานใหญ่)</p>
+                    <p>15 ซ. พระยามนธาตุ แยก 10</p>
+                    <p>แขวงคลองบางบอน เขตบางบอน</p>
+                    <p>กรุงเทพมหานคร 10150</p>
+                </div>
+
+                <div className="flex flex-col items-center justify-center">
+                    <h1 className="mb-8 text-center text-2xl font-bold">
+                        แผนผังโครงการระบบชลประทาน
+                    </h1>
+                    <div className="relative flex max-h-[800px] w-full items-center justify-center">
+                        {isEditing ? (
+                            <div className="group relative">
+                                {editableProjectImage ? (
+                                    <img
+                                        src={editableProjectImage}
+                                        alt="Project Layout"
+                                        className="max-h-full max-w-full cursor-pointer rounded-lg object-contain shadow-lg"
+                                        onClick={openProjectImageDialog}
+                                        title="คลิกเพื่อเปลี่ยนรูปภาพ"
+                                    />
+                                ) : (
+                                    <div
+                                        className="flex h-[400px] w-[600px] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 hover:border-blue-400"
+                                        onClick={openProjectImageDialog}
+                                        title="คลิกเพื่อเพิ่มรูปภาพ"
+                                    >
+                                        <div className="text-center">
+                                            <div className="mb-4 text-6xl text-gray-400">📷</div>
+                                            <p className="text-gray-500">คลิกเพื่อเพิ่มรูปแผนผัง</p>
+                                        </div>
+                                    </div>
+                                )}
+                                {editableProjectImage && (
+                                    <div className="absolute right-2 top-2 flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                openProjectImageDialog();
+                                            }}
+                                            className="rounded-full bg-blue-500 p-2 text-white shadow-lg hover:bg-blue-600"
+                                            title="เปลี่ยนรูปภาพ"
+                                        >
+                                            📷
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleProjectImageDelete();
+                                            }}
+                                            className="rounded-full bg-red-500 p-2 text-white shadow-lg hover:bg-red-600"
+                                            title="ลบรูปภาพ"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        ) : editableProjectImage ? (
+                            <img
+                                src={editableProjectImage}
+                                alt="Project Layout"
+                                className="max-h-full max-w-full rounded-lg object-contain shadow-lg"
+                            />
+                        ) : (
+                            <div className="flex h-[400px] w-[600px] items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50">
+                                <div className="text-center">
+                                    <div className="mb-4 text-6xl text-gray-400">📷</div>
+                                    <p className="text-gray-500">ไม่มีรูปแผนผัง</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="print-footer-container mt-auto text-center text-xs">
+                    <hr className="print-footer-hr mb-2 border-gray-800" />
+                    <div className="print-footer">
+                        <p>Phone: 02-451-1111 Tax ID: 0105549044446</p>
+                        <p>Page: 1 / {totalPages}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
     if (!show) return null;
+
+    const imagePageOffset = hasProjectImagePage ? 1 : 0;
+    const isImagePage = hasProjectImagePage && currentPage === 1;
+    const isEquipmentPage = !isImagePage;
 
     return (
         <div className="fixed inset-0 z-50 overflow-auto bg-gray-800">
@@ -1160,17 +1425,24 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         .mb-2 { margin-bottom: 0.5rem !important; }
                         .mb-4 { margin-bottom: 1rem !important; }
                         .mb-6 { margin-bottom: 1.5rem !important; }
+                        .mb-8 { margin-bottom: 2rem !important; }
                         .mt-auto { margin-top: auto !important; }
                         .mt-4 { margin-top: 1rem !important; }
                         
                         .items-center { align-items: center !important; }
                         .justify-between { justify-content: space-between !important; }
+                        .justify-center { justify-content: center !important; }
                         .justify-end { justify-content: flex-end !important; }
                         .self-start { align-self: flex-start !important; }
                         .self-end { align-self: flex-end !important; }
+                        .flex-1 { flex: 1 !important; }
                         
                         .h-10 { height: 2.5rem !important; }
                         .w-10 { width: 2.5rem !important; }
+                        .w-full { width: 100% !important; }
+                        .max-w-full { max-width: 100% !important; }
+                        .max-h-full { max-height: 100% !important; }
+                        .max-h-\\[800px\\] { max-height: 800px !important; }
                         
                         .border-gray-800 { border-color: rgb(31, 41, 55) !important; }
                         .border-gray-400 { border-color: rgb(156, 163, 175) !important; }
@@ -1179,6 +1451,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         .text-sm { font-size: 0.875rem !important; line-height: 1.25rem !important; }
                         .text-xs { font-size: 0.75rem !important; line-height: 1rem !important; }
                         .text-xl { font-size: 1.25rem !important; line-height: 1.75rem !important; }
+                        .text-2xl { font-size: 1.5rem !important; line-height: 2rem !important; }
                         .text-lg { font-size: 1.125rem !important; line-height: 1.75rem !important; }
                         
                         .font-semibold { font-weight: 600 !important; }
@@ -1191,7 +1464,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         .flex-row { flex-direction: row !important; }
                         .gap-9 { gap: 2.25rem !important; }
                         
-                        .w-full { width: 100% !important; }
                         .border-collapse { border-collapse: collapse !important; }
                         .border { border-width: 1px !important; }
                         .border-x-0 { border-left-width: 0 !important; border-right-width: 0 !important; }
@@ -1203,9 +1475,14 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         .w-\\[120px\\] { width: 120px !important; }
                         .w-\\[200px\\] { width: 200px !important; }
                         .w-\\[250px\\] { width: 250px !important; }
+                        .w-\\[600px\\] { width: 600px !important; }
+                        .h-\\[400px\\] { height: 400px !important; }
                         .p-1 { padding: 0.25rem !important; }
                         .p-2 { padding: 0.5rem !important; }
                         .align-top { vertical-align: top !important; }
+                        
+                        .object-contain { object-fit: contain !important; }
+                        .rounded-lg { border-radius: 0.5rem !important; }
                         
                         .no-print { display: none !important; }
                         
@@ -1223,10 +1500,13 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             <div className="mx-auto my-8 max-w-4xl p-4">
                 <div className="no-print fixed bottom-4 left-4 rounded bg-gray-900 p-2 text-xs text-white">
                     <div>Items: {items.length}</div>
+                    <div>Has image page: {hasProjectImagePage ? 'Yes' : 'No'}</div>
                     <div>
                         Page: {currentPage}/{totalPages}
                     </div>
-                    <div>Items on this page: {getItemsForPage(currentPage).length}</div>
+                    <div>
+                        Items on this page: {isImagePage ? 0 : getItemsForPage(currentPage).length}
+                    </div>
                     <div>Editing: {isEditing ? 'Yes' : 'No'}</div>
                 </div>
 
@@ -1271,7 +1551,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         >
                             {isEditing ? 'เสร็จสิ้น' : 'แก้ไข'}
                         </button>
-                        {isEditing && (
+                        {isEditing && !isImagePage && (
                             <>
                                 <button
                                     onClick={addNewItem}
@@ -1301,6 +1581,8 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                 </button>
                                 <span className="text-white">
                                     หน้า {currentPage} / {totalPages}
+                                    {isImagePage && ' (แผนผัง)'}
+                                    {!isImagePage && hasProjectImagePage && ' (อุปกรณ์)'}
                                 </span>
                                 <button
                                     onClick={() =>
@@ -1327,78 +1609,106 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
                 {showEquipmentSelector && <EquipmentSelector />}
 
-                <div className="mx-auto flex h-[1123px] w-[794px] flex-col bg-white p-8 text-black shadow-lg">
-                    <div className="print-page flex min-h-full flex-col">
-                        {renderHeader()}
+                {/* Render project image page or equipment page */}
+                {isImagePage ? (
+                    renderProjectImagePage()
+                ) : (
+                    <div className="mx-auto flex h-[1123px] w-[794px] flex-col bg-white p-8 text-black shadow-lg">
+                        <div className="print-page flex min-h-full flex-col">
+                            <div className="print-header mb-2 flex items-center justify-between">
+                                <div className="flex items-center">
+                                    <img
+                                        src="https://f.btwcdn.com/store-50036/store/e4c1b5ae-cf8e-5017-536b-66ecd994018d.jpg"
+                                        alt="logo"
+                                        className="print-logo h-10 w-10"
+                                    />
+                                </div>
+                            </div>
+                            <hr className="print-hr mb-4 border-gray-800" />
+                            <div className="print-company-info mb-4 self-start text-sm">
+                                <p className="font-semibold">บจก. กนกโปรดักส์ (สำนักงานใหญ่)</p>
+                                <p>15 ซ. พระยามนธาตุ แยก 10</p>
+                                <p>แขวงคลองบางบอน เขตบางบอน</p>
+                                <p>กรุงเทพมหานคร 10150</p>
+                            </div>
 
-                        {currentPage === 1 && (
-                            <>
-                                {renderCustomerInfo()}
-                                {renderQuotationDetails()}
-                            </>
-                        )}
-
-                        <table className="print-table w-full border-collapse border border-gray-400 text-xs">
-                            {renderTableHeader()}
-                            <tbody>
-                                {getItemsForPage(currentPage).map((item, index) =>
-                                    renderTableRow(item, index)
-                                )}
-                            </tbody>
-                        </table>
-
-                        <div className="mt-4 flex justify-end">
-                            {currentPage === totalPages && (
-                                <table className="w-[250px] border-collapse border-gray-400 text-sm">
-                                    <tbody>
-                                        <tr className="border-gray-400">
-                                            <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
-                                                Subtotal
-                                            </td>
-                                            <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
-                                                {calculateTotal().toFixed(2)} ฿
-                                            </td>
-                                        </tr>
-                                        <tr className="border-gray-400">
-                                            <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
-                                                Vat 7%
-                                            </td>
-                                            <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
-                                                {(calculateTotal() * 0.07).toFixed(2)} ฿
-                                            </td>
-                                        </tr>
-                                        <tr className="border-gray-400">
-                                            <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
-                                                Subtotal Without Discount
-                                            </td>
-                                            <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
-                                                {(calculateTotal() * 1.07).toFixed(2)} ฿
-                                            </td>
-                                        </tr>
-                                        <tr className="border-gray-400">
-                                            <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
-                                                Discount Subtotal
-                                            </td>
-                                            <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
-                                                0.00 ฿
-                                            </td>
-                                        </tr>
-                                        <tr className="border-gray-400">
-                                            <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
-                                                Total
-                                            </td>
-                                            <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
-                                                {(calculateTotal() * 1.07).toFixed(2)} ฿
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                            {currentPage === 1 + imagePageOffset && (
+                                <>
+                                    {renderCustomerInfo()}
+                                    {renderQuotationDetails()}
+                                </>
                             )}
-                        </div>
 
-                        {renderFooter(currentPage)}
+                            <table className="print-table w-full border-collapse border border-gray-400 text-xs">
+                                {renderTableHeader()}
+                                <tbody>
+                                    {getItemsForPage(currentPage).map((item, index) =>
+                                        renderTableRow(item, index)
+                                    )}
+                                </tbody>
+                            </table>
+
+                            <div className="mt-4 flex justify-end">
+                                {currentPage === totalPages && (
+                                    <table className="w-[250px] border-collapse border-gray-400 text-sm">
+                                        <tbody>
+                                            <tr className="border-gray-400">
+                                                <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
+                                                    Subtotal
+                                                </td>
+                                                <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
+                                                    {calculateTotal().toFixed(2)} ฿
+                                                </td>
+                                            </tr>
+                                            <tr className="border-gray-400">
+                                                <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
+                                                    Vat 7%
+                                                </td>
+                                                <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
+                                                    {(calculateTotal() * 0.07).toFixed(2)} ฿
+                                                </td>
+                                            </tr>
+                                            <tr className="border-gray-400">
+                                                <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
+                                                    Subtotal Without Discount
+                                                </td>
+                                                <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
+                                                    {(calculateTotal() * 1.07).toFixed(2)} ฿
+                                                </td>
+                                            </tr>
+                                            <tr className="border-gray-400">
+                                                <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
+                                                    Discount Subtotal
+                                                </td>
+                                                <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
+                                                    0.00 ฿
+                                                </td>
+                                            </tr>
+                                            <tr className="border-gray-400">
+                                                <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
+                                                    Total
+                                                </td>
+                                                <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
+                                                    {(calculateTotal() * 1.07).toFixed(2)} ฿
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+
+                            <div className="print-footer-container mt-auto text-center text-xs">
+                                <hr className="print-footer-hr mb-2 border-gray-800" />
+                                <div className="print-footer">
+                                    <p>Phone: 02-451-1111 Tax ID: 0105549044446</p>
+                                    <p>
+                                        Page: {currentPage} / {totalPages}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
         </div>
     );

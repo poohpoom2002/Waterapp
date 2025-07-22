@@ -1,14 +1,11 @@
+import postcssNesting from 'postcss-nesting';
+import tailwindcss from 'tailwindcss';
+import autoprefixer from 'autoprefixer';
+
 export default {
-    plugins: {
-        'tailwindcss/nesting': {},
-        tailwindcss: {},
-        autoprefixer: {
-            overrideBrowserslist: [
-                '> 1%',
-                'last 2 versions',
-                'not dead',
-                'not ie 11'
-            ]
-        },
-    },
+  plugins: [
+    postcssNesting,
+    tailwindcss,
+    autoprefixer,
+  ],
 }; 
