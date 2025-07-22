@@ -190,6 +190,7 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
     const lastExternalCenter = useRef<google.maps.LatLngLiteral>(center);
     const lastExternalZoom = useRef<number>(zoom);
     const isInternalChange = useRef(false);
+    
 
     // Initialize map
     useEffect(() => {
@@ -560,6 +561,11 @@ interface FieldMapProps {
 
 export default function FieldMap({ crops, irrigation }: FieldMapProps) {
     // Custom hooks for state management
+    const urlParams = new URLSearchParams(window.location.search);
+    const isEditMode = urlParams.get('edit') === 'true';
+    const targetStep = parseInt(urlParams.get('step') || '1');
+    const isPrintMode = urlParams.get('print') === 'true';
+
     const mapState = useMapState();
     const stepWizard = useStepWizard();
     const fieldZoneState = useFieldZoneState();
@@ -694,6 +700,11 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
     // Map instance
     const [map, setMap] = useState<google.maps.Map | null>(null);
 
+    // State flags for edit mode restore
+    const [isRestoring, setIsRestoring] = useState(false);
+    const [hasRestoredOnce, setHasRestoredOnce] = useState(false);
+    const [isResetting, setIsResetting] = useState(false);
+
     // Store Google Maps objects
     const [mapObjects, setMapObjects] = useState<{
         zones: google.maps.Polygon[];
@@ -717,16 +728,59 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         zoneLabels: [],
     });
 
-    // Parse URL parameters
+    // Parse URL parameters and load saved data
     useEffect(() => {
-        if (crops) {
-            const cropArray = crops.split(',').filter(Boolean);
-            setSelectedCrops(cropArray);
+        // Handle edit mode - load from localStorage
+        if (isEditMode) {
+            const savedData = localStorage.getItem('fieldMapData');
+            if (savedData) {
+                try {
+                    const parsedData = JSON.parse(savedData);
+                    console.log('🔄 Loading saved project data for editing:', parsedData);
+                    
+                    // Restore all state from saved data
+                    if (parsedData.selectedCrops) setSelectedCrops(parsedData.selectedCrops);
+                    if (parsedData.fieldAreaSize) setFieldAreaSize(parsedData.fieldAreaSize);
+                    if (parsedData.zoneAssignments) setZoneAssignments(parsedData.zoneAssignments);
+                    if (parsedData.irrigationAssignments) setIrrigationAssignments(parsedData.irrigationAssignments);
+                    if (parsedData.irrigationSettings) setIrrigationSettings(parsedData.irrigationSettings);
+                    if (parsedData.rowSpacing) setRowSpacing(parsedData.rowSpacing);
+                    if (parsedData.plantSpacing) setPlantSpacing(parsedData.plantSpacing);
+                    if (parsedData.mapCenter) setMapCenter(parsedData.mapCenter);
+                    if (parsedData.mapZoom) setMapZoom(parsedData.mapZoom);
+                    if (parsedData.mapType) setMapType(parsedData.mapType);
+
+                    // Set step completed status for all previous steps
+                    setStepCompleted({
+                        1: true, 2: true, 3: true,
+                        4: parsedData.irrigationAssignments && Object.keys(parsedData.irrigationAssignments).length > 0
+                    });
+
+                    // Set the target step
+                    setCurrentStep(targetStep);
+                    const stages = ['', 'field', 'zones', 'pipes', 'irrigation'];
+                    setDrawingStage(stages[targetStep] as 'field' | 'zones' | 'pipes' | 'irrigation');
+
+                    console.log(`✅ Edit mode: Set to step ${targetStep}`);
+                } catch (error) {
+                    console.error('Error loading saved data for editing:', error);
+                    handleError('Failed to load saved project data');
+                }
+            } else {
+                console.warn('No saved data found for editing');
+                handleError('No saved project data found');
+            }
+        } else {
+            // Handle normal URL parameters (crops and irrigation)
+            if (crops) {
+                const cropArray = crops.split(',').filter(Boolean);
+                setSelectedCrops(cropArray);
+            }
+            if (irrigation) {
+                setSelectedIrrigationType(irrigation);
+            }
         }
-        if (irrigation) {
-            setSelectedIrrigationType(irrigation);
-        }
-    }, [crops, irrigation]);
+    }, [isEditMode, targetStep, crops, irrigation]);
 
     // Selected crop objects
     const selectedCropObjects = selectedCrops
@@ -1166,6 +1220,13 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
 
     const resetAll = useCallback(() => {
         if (confirm('⚠️ Reset all data? All drawn elements will be lost.')) {
+
+            localStorage.removeItem('fieldMapData');
+
+            if (mainField && mainField.polygon) {
+                mainField.polygon.setMap(null);
+            }
+
             clearAllMapObjects();
 
             setMainField(null);
@@ -1197,6 +1258,14 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             setZoneSummaries({});
             setPlantingPoints([]);
             setError(null);
+            setHasRestoredOnce(false);
+            setIsRestoring(false);
+
+            // *** เพิ่มส่วนนี้: Reset isResetting flag หลัง delay ***
+            setTimeout(() => {
+                setIsResetting(false);
+                console.log('🧹 Reset completed');
+            }, 300);
         }
     }, [clearAllMapObjects, setMainField, setZones, setObstacles, setZoneAssignments, setPipes, setUsedColors, setCanDrawZone, setCanDrawPipe, setCurrentZoneColor, setCurrentPipeType, setDrawingMode, setCurrentStep, setStepCompleted, setDrawingStage, setFieldAreaSize, setEquipmentIcons, setSelectedEquipmentType, setIsPlacingEquipment, setEquipmentHistory, setEquipmentHistoryIndex, setIrrigationAssignments, setIrrigationPoints, setIrrigationLines, setIrrigationSettings, setIrrigationRadius, setSprinklerOverlap, setZoneSummaries, setPlantingPoints]);
 
@@ -2311,8 +2380,351 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         }
     };
 
+    // Load and restore Google Maps objects when in edit mode
+    useEffect(() => {
+        if (isEditMode && map && !isRestoring && !hasRestoredOnce && !isResetting) {
+            const savedData = localStorage.getItem('fieldMapData');
+            if (savedData) {
+                setIsRestoring(true);
+                
+                setTimeout(() => { // เพิ่ม delay เล็กน้อยเพื่อให้ map เสถียร
+                    try {
+                        const parsedData = JSON.parse(savedData);
+                        console.log('🗺️ Restoring map objects for editing...');
+
+                        // Clear existing objects first
+                        clearAllMapObjects();
+
+                        // Restore main field
+                        if (parsedData.mainField && parsedData.mainField.coordinates) {
+                            const fieldPolygon = new google.maps.Polygon({
+                                paths: parsedData.mainField.coordinates,
+                                fillColor: '#22C55E',
+                                fillOpacity: 0.2,
+                                strokeColor: '#22C55E',
+                                strokeWeight: 3,
+                                clickable: false,
+                                editable: false,
+                                zIndex: 1,
+                                map: map
+                            });
+
+                            setMainField({
+                                polygon: fieldPolygon,
+                                coordinates: parsedData.mainField.coordinates,
+                                area: parsedData.mainField.area || parsedData.fieldAreaSize
+                            });
+                        }
+
+                        // Restore zones
+                        if (parsedData.zones && Array.isArray(parsedData.zones)) {
+                            const restoredZones: Zone[] = [];
+                            const zonePolygons: google.maps.Polygon[] = [];
+                            const usedColorsArray: string[] = [];
+
+                            parsedData.zones.forEach((zoneData: any) => {
+                                if (zoneData.coordinates && Array.isArray(zoneData.coordinates)) {
+                                    const zonePolygon = new google.maps.Polygon({
+                                        paths: zoneData.coordinates,
+                                        fillColor: zoneData.color,
+                                        fillOpacity: 0.3,
+                                        strokeColor: zoneData.color,
+                                        strokeWeight: 2,
+                                        clickable: true,
+                                        editable: false,
+                                        zIndex: 1,
+                                        map: map
+                                    });
+
+                                    // Add click listener for zone
+                                    zonePolygon.addListener('click', (e: google.maps.MapMouseEvent) => {
+                                        if (isPlacingEquipment && selectedEquipmentType && e.latLng) {
+                                            const lat = e.latLng.lat();
+                                            const lng = e.latLng.lng();
+                                            placeEquipmentAtPosition(lat, lng);
+                                        } else {
+                                            const zone = restoredZones.find(z => z.polygon === zonePolygon);
+                                            if (zone) {
+                                                setSelectedZone(zone);
+                                                setShowPlantSelector(true);
+                                            }
+                                        }
+                                    });
+
+                                    const restoredZone: Zone = {
+                                        id: zoneData.id,
+                                        polygon: zonePolygon,
+                                        coordinates: zoneData.coordinates,
+                                        color: zoneData.color,
+                                        name: zoneData.name
+                                    };
+
+                                    restoredZones.push(restoredZone);
+                                    zonePolygons.push(zonePolygon);
+                                    usedColorsArray.push(zoneData.color);
+                                }
+                            });
+
+                            setZones(restoredZones);
+                            setUsedColors(usedColorsArray);
+                            
+                            const availableColors = ZONE_COLORS.filter(color => !usedColorsArray.includes(color));
+                            if (availableColors.length > 0) {
+                                setCurrentZoneColor(availableColors[0]);
+                                setCanDrawZone(true);
+                            } else {
+                                setCanDrawZone(false);
+                            }
+
+                            setMapObjects(prev => ({ ...prev, zones: zonePolygons }));
+
+                            // Restore Zone Labels (ไอคอนพืชบนโซน)
+                            if (parsedData.zoneAssignments) {
+                                setTimeout(() => {
+                                    const zoneLabelsMarkers: google.maps.Marker[] = [];
+                                    
+                                    Object.entries(parsedData.zoneAssignments).forEach(([zoneId, cropValue]: [string, any]) => {
+                                        const zone = restoredZones.find(z => z.id.toString() === zoneId);
+                                        const crop = getCropByValue(cropValue);
+                                        
+                                        if (zone && crop) {
+                                            const bounds = new google.maps.LatLngBounds();
+                                            zone.coordinates.forEach((coord: Coordinate) => {
+                                                bounds.extend(new google.maps.LatLng(coord.lat, coord.lng));
+                                            });
+                                            const center = bounds.getCenter();
+
+                                            const labelMarker = new google.maps.Marker({
+                                                position: center,
+                                                map: map,
+                                                title: `${zone.name} - ${crop.name}`,
+                                                icon: {
+                                                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                                                        <svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
+                                                            <circle cx="20" cy="20" r="18" fill="white" stroke="${zone.color}" stroke-width="2"/>
+                                                            <text x="20" y="26" text-anchor="middle" font-size="20">${crop.icon}</text>
+                                                        </svg>
+                                                    `)}`,
+                                                    scaledSize: new google.maps.Size(40, 40),
+                                                    anchor: new google.maps.Point(20, 20)
+                                                },
+                                                zIndex: 10
+                                            });
+
+                                            (labelMarker as any).zoneId = zoneId;
+                                            zoneLabelsMarkers.push(labelMarker);
+                                        }
+                                    });
+
+                                    setMapObjects(prev => ({ ...prev, zoneLabels: zoneLabelsMarkers }));
+                                }, 300); // รอให้ zones set เสร็จก่อน
+                            }
+                        }
+
+                        // Restore pipes
+                        if (parsedData.pipes && Array.isArray(parsedData.pipes)) {
+                            const restoredPipes: any[] = [];
+                            const pipePolylines: google.maps.Polyline[] = [];
+
+                            parsedData.pipes.forEach((pipeData: any) => {
+                                if (pipeData.coordinates && Array.isArray(pipeData.coordinates)) {
+                                    const pipePolyline = new google.maps.Polyline({
+                                        path: pipeData.coordinates,
+                                        strokeColor: pipeData.color,
+                                        strokeWeight: pipeData.type === 'main' ? 6 : pipeData.type === 'submain' ? 4 : 2,
+                                        strokeOpacity: 0.9,
+                                        clickable: false,
+                                        editable: false,
+                                        zIndex: 2,
+                                        map: map
+                                    });
+
+                                    const restoredPipe = {
+                                        id: pipeData.id,
+                                        polyline: pipePolyline,
+                                        coordinates: pipeData.coordinates,
+                                        type: pipeData.type,
+                                        name: pipeData.name,
+                                        color: pipeData.color,
+                                        zoneId: pipeData.zoneId
+                                    };
+
+                                    restoredPipes.push(restoredPipe);
+                                    pipePolylines.push(pipePolyline);
+                                }
+                            });
+
+                            setPipes(restoredPipes);
+                            setMapObjects(prev => ({ ...prev, pipes: pipePolylines }));
+                        }
+
+                        // Restore equipment
+                        if (parsedData.equipmentIcons && Array.isArray(parsedData.equipmentIcons)) {
+                            const restoredEquipment: Equipment[] = [];
+                            const equipmentMarkers: google.maps.Marker[] = [];
+
+                            parsedData.equipmentIcons.forEach((equipmentData: any) => {
+                                if (equipmentData.lat && equipmentData.lng && equipmentData.type) {
+                                    const equipmentConfig = EQUIPMENT_TYPES[equipmentData.type as EquipmentType];
+                                    if (equipmentConfig) {
+                                        let markerIcon;
+                                        
+                                        if (equipmentData.type === 'pump' || equipmentData.type === 'ballvalve' || equipmentData.type === 'solenoid') {
+                                            let imgSrc = '';
+                                            if (equipmentData.type === 'pump') imgSrc = './generateTree/wtpump.png';
+                                            if (equipmentData.type === 'ballvalve') imgSrc = './generateTree/ballv.png';
+                                            if (equipmentData.type === 'solenoid') imgSrc = './generateTree/solv.png';
+                                            
+                                            markerIcon = {
+                                                url: imgSrc,
+                                                scaledSize: new google.maps.Size(40, 40),
+                                                anchor: new google.maps.Point(20, 20),
+                                                optimized: false
+                                            };
+                                        } else {
+                                            const svg = `<svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
+                                                <circle cx="20" cy="20" r="18" fill="white" stroke="${equipmentConfig.color}" stroke-width="2"/>
+                                                <text x="20" y="26" text-anchor="middle" font-size="20" fill="${equipmentConfig.color}">${equipmentConfig.icon}</text>
+                                            </svg>`;
+                                            
+                                            markerIcon = {
+                                                url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+                                                scaledSize: new google.maps.Size(40, 40),
+                                                anchor: new google.maps.Point(20, 20),
+                                                optimized: false
+                                            };
+                                        }
+
+                                        const marker = new google.maps.Marker({
+                                            position: { lat: equipmentData.lat, lng: equipmentData.lng },
+                                            map: map,
+                                            title: equipmentData.name,
+                                            icon: markerIcon,
+                                            clickable: true,
+                                            optimized: false,
+                                            zIndex: 1000
+                                        });
+
+                                        const infoWindow = new google.maps.InfoWindow({
+                                            content: `<div style="text-align: center; min-width: 150px;">
+                                                <h3 style="margin: 0 0 8px 0; color: #333;">${equipmentConfig.name}</h3>
+                                                <p style="margin: 0 0 8px 0; color: #666; font-size: 12px;">${equipmentConfig.description || 'Equipment'}</p>
+                                                <button onclick="window.removeEquipment('${equipmentData.id}')" 
+                                                        style="background: #dc2626; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                                    Remove Equipment
+                                                </button>
+                                            </div>`
+                                        });
+
+                                        marker.addListener('click', () => {
+                                            equipmentMarkers.forEach(otherMarker => {
+                                                if ((otherMarker as any).infoWindow) {
+                                                    (otherMarker as any).infoWindow.close();
+                                                }
+                                            });
+                                            infoWindow.open(map, marker);
+                                        });
+
+                                        (marker as any).infoWindow = infoWindow;
+
+                                        restoredEquipment.push({
+                                            id: equipmentData.id,
+                                            type: equipmentData.type,
+                                            lat: equipmentData.lat,
+                                            lng: equipmentData.lng,
+                                            name: equipmentData.name,
+                                            config: equipmentData.config,
+                                            marker: marker
+                                        });
+                                        equipmentMarkers.push(marker);
+                                    }
+                                }
+                            });
+
+                            setEquipmentIcons(restoredEquipment);
+                            setEquipmentHistory([restoredEquipment]);
+                            setEquipmentHistoryIndex(0);
+                            setMapObjects(prev => ({ ...prev, equipment: equipmentMarkers }));
+                        }
+
+                        // Restore irrigation points
+                        if (parsedData.irrigationPoints && Array.isArray(parsedData.irrigationPoints)) {
+                            const restoredIrrigationPoints: IrrigationPoint[] = [];
+                            const irrigationMarkers: google.maps.Marker[] = [];
+                            const irrigationCircles: google.maps.Circle[] = [];
+
+                            parsedData.irrigationPoints.forEach((pointData: any) => {
+                                if (pointData.lat && pointData.lng) {
+                                    const marker = new google.maps.Marker({
+                                        position: { lat: pointData.lat, lng: pointData.lng },
+                                        map: map,
+                                        title: `${pointData.type} - Zone ${pointData.zoneId} (R:${pointData.radius}m)`,
+                                        icon: {
+                                            path: google.maps.SymbolPath.CIRCLE,
+                                            scale: 4,
+                                            fillColor: '#0099ff',
+                                            fillOpacity: 1,
+                                            strokeColor: 'white',
+                                            strokeWeight: 1
+                                        }
+                                    });
+
+                                    const circle = new google.maps.Circle({
+                                        center: { lat: pointData.lat, lng: pointData.lng },
+                                        radius: pointData.radius,
+                                        map: map,
+                                        fillColor: '#0099ff',
+                                        fillOpacity: 0.1,
+                                        strokeColor: '#0099ff',
+                                        strokeWeight: 1,
+                                        strokeOpacity: 0.3
+                                    });
+
+                                    restoredIrrigationPoints.push({
+                                        id: pointData.id,
+                                        lat: pointData.lat,
+                                        lng: pointData.lng,
+                                        type: pointData.type,
+                                        radius: pointData.radius,
+                                        zoneId: pointData.zoneId,
+                                        marker: marker,
+                                        circle: circle
+                                    });
+                                    irrigationMarkers.push(marker);
+                                    irrigationCircles.push(circle);
+                                }
+                            });
+
+                            setIrrigationPoints(restoredIrrigationPoints);
+                            setMapObjects(prev => ({ 
+                                ...prev, 
+                                irrigation: irrigationMarkers,
+                                irrigationCircles: irrigationCircles
+                            }));
+                        }
+
+                        setHasRestoredOnce(true);
+                        console.log('✅ Successfully restored all map objects for editing');
+
+                    } catch (error) {
+                        console.error('Error restoring map objects:', error);
+                        handleError('Failed to restore map data');
+                    } finally {
+                        setIsRestoring(false);
+                    }
+                }, 500); // Delay 500ms เพื่อให้แผนที่เสถียร
+            }
+        }
+    }, [isEditMode, map, isRestoring, hasRestoredOnce]);
+
     // Load existing zone labels when map is ready
     useEffect(() => {
+        // ป้องกันการทำงานใน edit mode
+        if (isEditMode || isRestoring || hasRestoredOnce || isResetting) {
+            console.log('📝 Skipping zone labels update in edit mode');
+            return;
+        }
+        
         if (map && zones.length > 0) {
             mapObjects.zoneLabels.forEach(marker => marker.setMap(null));
             setMapObjects(prev => ({ ...prev, zoneLabels: [] }));
@@ -2321,10 +2733,16 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 updateZoneLabel(zoneId, cropValue);
             });
         }
-    }, [map, zones.length]);
+    }, [map, zones.length, isEditMode, isRestoring, hasRestoredOnce]);
 
-    // Auto-update zone configuration based on step changes
+    // Auto-update zone configuration based on step changes (modified for edit mode)
     useEffect(() => {
+        // ป้องกันการทำงานใน edit mode
+        if (isEditMode || isRestoring || isResetting) {
+            console.log('📝 Edit mode: Skipping auto-configuration');
+            return;
+        }
+
         if (currentStep === 2 && zones.length === 0) {
             setCanDrawZone(true);
             setUsedColors([]);
@@ -2334,7 +2752,16 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             setCanDrawPipe(true);
             setCurrentPipeType('main');
         }
-    }, [currentStep, zones.length, pipes.length, setCanDrawZone, setUsedColors, setCurrentZoneColor, setDrawingMode, setCanDrawPipe, setCurrentPipeType]);
+    }, [currentStep, zones.length, pipes.length, isEditMode, isRestoring, setCanDrawZone, setUsedColors, setCurrentZoneColor, setDrawingMode, setCanDrawPipe, setCurrentPipeType]);
+
+    // Reset flags when not in edit mode
+    useEffect(() => {
+        if (!isEditMode && !isResetting) {
+            console.log('🔄 Resetting edit mode flags');
+            setHasRestoredOnce(false);
+            setIsRestoring(false);
+        }
+    }, [isEditMode]);
 
     // Cleanup
     useEffect(() => {
