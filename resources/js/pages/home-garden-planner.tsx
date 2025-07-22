@@ -143,7 +143,7 @@ export default function HomeGardenPlanner() {
     const [pipeEditMode, setPipeEditMode] = useState<'add' | 'remove' | 'view'>('view');
     const [selectedSprinklersForPipe, setSelectedSprinklersForPipe] = useState<string[]>([]);
 
-    const [manualSprinklerType, setManualSprinklerType] = useState<string>('popup');
+    const [manualSprinklerType, setManualSprinklerType] = useState<string>('pop-up-sprinkler');
     const [manualSprinklerRadius, setManualSprinklerRadius] = useState<number>(4);
 
     const [showValidationErrors, setShowValidationErrors] = useState<boolean>(false);
@@ -1516,7 +1516,7 @@ export default function HomeGardenPlanner() {
                                                                                         zone
                                                                                             .sprinklerConfig!
                                                                                             .type
-                                                                                )?.name
+                                                                                )?.nameEN
                                                                             }
                                                                             • รัศมี{' '}
                                                                             {
@@ -1634,7 +1634,7 @@ export default function HomeGardenPlanner() {
                                                                                         </span>
                                                                                         <span className="font-medium text-gray-100">
                                                                                             {
-                                                                                                sprinkler.name
+                                                                                                sprinkler.nameEN
                                                                                             }
                                                                                         </span>
                                                                                     </div>
@@ -1759,7 +1759,7 @@ export default function HomeGardenPlanner() {
                                                                 <div className="flex items-center space-x-2">
                                                                     <span>{sprinkler.icon}</span>
                                                                     <span className="font-medium text-gray-100">
-                                                                        {sprinkler.name}
+                                                                        {sprinkler.nameEN}
                                                                     </span>
                                                                 </div>
                                                             </button>
@@ -1893,7 +1893,7 @@ export default function HomeGardenPlanner() {
                                                                                             zone
                                                                                                 .sprinklerConfig!
                                                                                                 .type
-                                                                                    )?.name
+                                                                                    )?.nameEN
                                                                                 }
                                                                             </div>
                                                                         )}

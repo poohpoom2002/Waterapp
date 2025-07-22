@@ -25,7 +25,8 @@ export interface GardenZone {
 
 export interface SprinklerType {
     id: string;
-    name: string;
+    nameEN: string;
+    nameTH: string;
     icon: string;
     radius: number;
     suitableFor: string[];
@@ -105,35 +106,84 @@ export const ZONE_TYPES = [
 
 export const SPRINKLER_TYPES: SprinklerType[] = [
     {
-        id: 'popup',
-        name: 'Pop-up Sprinkler',
-        icon: '🟢',
-        radius: 4,
-        suitableFor: ['grass'],
+        id: 'pop-up-sprinkler',
+        nameEN: 'Pop-up Sprinkler',
+        nameTH: 'หัว Pop‑Up ยก–หดได้',
+        icon: '🟤',
+        radius: 5,
+        suitableFor: ['grass', 'flowers'],
         color: '#33CCFF',
     },
     {
-        id: 'spray',
-        name: 'Spray Sprinkler',
-        icon: '🔴',
-        radius: 3,
-        suitableFor: ['flowers'],
-        color: '#33CCFF',
-    },
-    {
-        id: 'drip',
-        name: 'Drip Irrigation',
+        id: 'mini-sprinkler',
+        nameEN: 'Mini‑sprinkler',
+        nameTH: 'มินิสปริงเกอร์',
         icon: '🟤',
         radius: 2,
-        suitableFor: ['trees', 'flowers'],
+        suitableFor: ['flowers', 'trees'],
         color: '#33CCFF',
     },
     {
-        id: 'rotary',
-        name: 'Rotary Sprinkler',
-        icon: '🟢',
-        radius: 8,
-        suitableFor: ['grass', 'trees'],
+        id: 'sprinkler',
+        nameEN: 'Sprinkler',
+        nameTH: 'สปริงเกอร์แบบหมุน/ยิงไกล',
+        icon: '🟤',
+        radius: 12,
+        suitableFor: ['trees', 'grass'],
+        color: '#33CCFF',
+    },
+    {
+        id: 'single-side',
+        nameEN: 'Single‑side Sprinkler',
+        nameTH: 'หัวฉีดด้านเดียวปรับมุม',
+        icon: '🟤',
+        radius: 4,
+        suitableFor: ['grass', 'flowers'], // เหมาะสำหรับพื้นที่แคบ แปลงดอกไม้ หรือสนามหญ้าริมทางเดิน
+        color: '#33CCFF',
+    },
+    {
+        id: 'butterfly',
+        nameEN: 'Butterfly Sprinkler',
+        nameTH: 'หัวฉีดผีเสื้อ',
+        icon: '🟤',
+        radius: 1,
+        suitableFor: ['flowers'], // เหมาะสำหรับแปลงดอกไม้ขนาดเล็ก หรือกระถางที่ต้องการน้ำแบบฝอยละเอียด
+        color: '#33CCFF',
+    },
+    {
+        id: 'mist-nozzle',
+        nameEN: 'Mist nozzle',
+        nameTH: 'หัวพ่นหมอก – แบบเสียบท่อ PE',
+        icon: '🟤',
+        radius: 1,
+        suitableFor: ['flowers'], // เหมาะสำหรับดอกไม้ที่ต้องการความชื้นสูง หรือไม้ประดับในเรือนเพาะชำ
+        color: '#33CCFF',
+    },
+    {
+        id: 'impact-sprinkler',
+        nameEN: 'Impact Sprinkler',
+        nameTH: 'สปริงเกอร์ชนิดกระแทก',
+        icon: '🟤',
+        radius: 15,
+        suitableFor: ['trees', 'grass'], // เหมาะสำหรับไม้ผล ไม้ยืนต้น หรือพื้นที่สนามหญ้ากว้างขนาดใหญ่
+        color: '#33CCFF',
+    },
+    {
+        id: 'gear-drive-nozzle',
+        nameEN: 'Gear‑Drive nozzle',
+        nameTH: 'หัวฉีดเกียร์ไดร์ฟ ปรับแรงและมุม',
+        icon: '🟤',
+        radius: 10,
+        suitableFor: ['grass', 'trees'], // เหมาะกับพื้นที่สนามหญ้า และไม้ผลขนาดกลางที่ต้องการการกระจายน้ำแม่นยำ
+        color: '#33CCFF',
+    },
+    {
+        id: 'drip-spray-tape',
+        nameEN: 'Drip/Spray tape',
+        nameTH: 'เทปน้ำหยดหรือสเปรย์ แบบม้วน',
+        icon: '🟤',
+        radius: 0.3,
+        suitableFor: ['flowers', 'trees'], // เหมาะกับไม้ผล พืชผัก ดอกไม้ขนาดเล็กที่ต้องการน้ำตรงโคนต้นแบบประหยัดน้ำ
         color: '#33CCFF',
     },
 ];
@@ -1276,6 +1326,29 @@ export interface GardenStatistics {
     zoneStatistics: ZoneStatistics[];
 }
 
+// แก้ไข interface ZoneStatistics ใน homeGardenData.ts
+export interface ZoneStatistics {
+    zoneId: string;
+    zoneName: string;
+    zoneType: string;
+    area: number;
+    sprinklerCount: number;
+    sprinklerTypes: string[];
+    sprinklerRadius: number;
+    pipeLength: number;
+    longestPipe: number;
+}
+
+export interface GardenStatistics {
+    totalArea: number;
+    totalZones: number;
+    totalSprinklers: number;
+    totalPipeLength: number;
+    longestPipe: number;
+    zoneStatistics: ZoneStatistics[];
+}
+
+// แก้ไขฟังก์ชัน calculateStatistics ใน homeGardenData.ts
 export function calculateStatistics(data: GardenPlannerData): GardenStatistics {
     const { gardenZones = [], sprinklers = [], pipes = [] } = data || {};
     const mainZones = gardenZones.filter((z) => z.type !== 'forbidden' && !z.parentZoneId);
@@ -1312,12 +1385,20 @@ export function calculateStatistics(data: GardenPlannerData): GardenStatistics {
 
         const zoneType = ZONE_TYPES.find((t) => t.id === zone.type);
 
+        const sprinklerTypes = [...new Set(zoneSprinklers.map((s) => s.type.nameEN))];
+        const sprinklerRadius =
+            zoneSprinklers.length > 0
+                ? zoneSprinklers.reduce((sum, s) => sum + s.type.radius, 0) / zoneSprinklers.length
+                : 0;
+
         return {
             zoneId: zone.id,
             zoneName: zone.name,
             zoneType: zoneType?.name || zone.type,
             area: zoneArea,
             sprinklerCount: zoneSprinklers.length,
+            sprinklerTypes, // เพิ่ม
+            sprinklerRadius: sprinklerRadius,
             pipeLength: zonePipeLength,
             longestPipe: zoneLongestPipe,
         };
