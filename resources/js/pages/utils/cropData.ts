@@ -11,6 +11,10 @@ export interface Crop {
     spacing: number; // cm between plants
     yield: number; // kg/ไร่
     price: number; // บาท/kg
+    // Added for field-crop-summary calculations
+    defaultPlantSpacing?: number; // meters between plants (default for calculations)
+    yieldPerPlant?: number; // kg per plant (for yield estimation)
+    pricePerKg?: number; // price per kg (for price estimation)
 }
 
 export const cropTypes: Crop[] = [
@@ -26,7 +30,10 @@ export const cropTypes: Crop[] = [
         waterRequirement: 5.0,
         spacing: 20,
         yield: 800,
-        price: 15
+        price: 15,
+        defaultPlantSpacing: 0.2,
+        yieldPerPlant: 0.04, // 800kg/rai, ~200,000 plants/rai
+        pricePerKg: 15
     },
     {
         value: 'corn',
@@ -39,7 +46,10 @@ export const cropTypes: Crop[] = [
         waterRequirement: 3.0,
         spacing: 30,
         yield: 1200,
-        price: 8
+        price: 8,
+        defaultPlantSpacing: 0.3,
+        yieldPerPlant: 0.2, // 1200kg/rai, ~6000 plants/rai
+        pricePerKg: 8
     },
     {
         value: 'sorghum',
@@ -52,7 +62,10 @@ export const cropTypes: Crop[] = [
         waterRequirement: 2.0,
         spacing: 25,
         yield: 600,
-        price: 12
+        price: 12,
+        defaultPlantSpacing: 0.25,
+        yieldPerPlant: 0.1,
+        pricePerKg: 12
     },
 
     // Root crops (พืชหัว)
@@ -67,7 +80,10 @@ export const cropTypes: Crop[] = [
         waterRequirement: 1.5,
         spacing: 80,
         yield: 4000,
-        price: 2.5
+        price: 2.5,
+        defaultPlantSpacing: 0.8,
+        yieldPerPlant: 0.01,
+        pricePerKg: 2.5
     },
     {
         value: 'sweet_potato',
@@ -80,7 +96,10 @@ export const cropTypes: Crop[] = [
         waterRequirement: 2.2,
         spacing: 40,
         yield: 2500,
-        price: 8
+        price: 8,
+        defaultPlantSpacing: 0.4,
+        yieldPerPlant: 0.02,
+        pricePerKg: 8
     },
 
     // Legumes (พืชตระกูลถั่ว)
@@ -95,7 +114,10 @@ export const cropTypes: Crop[] = [
         waterRequirement: 2.8,
         spacing: 30,
         yield: 350,
-        price: 25
+        price: 25,
+        defaultPlantSpacing: 0.3,
+        yieldPerPlant: 0.003,
+        pricePerKg: 25
     },
     {
         value: 'mung_bean',
@@ -108,7 +130,10 @@ export const cropTypes: Crop[] = [
         waterRequirement: 1.8,
         spacing: 20,
         yield: 280,
-        price: 40
+        price: 40,
+        defaultPlantSpacing: 0.2,
+        yieldPerPlant: 0.002,
+        pricePerKg: 40
     },
     {
         value: 'peanut',
@@ -121,7 +146,10 @@ export const cropTypes: Crop[] = [
         waterRequirement: 2.5,
         spacing: 25,
         yield: 500,
-        price: 45
+        price: 45,
+        defaultPlantSpacing: 0.25,
+        yieldPerPlant: 0.004,
+        pricePerKg: 45
     },
     {
         value: 'black_gram',
@@ -134,7 +162,10 @@ export const cropTypes: Crop[] = [
         waterRequirement: 1.5,
         spacing: 20,
         yield: 250,
-        price: 50
+        price: 50,
+        defaultPlantSpacing: 0.2,
+        yieldPerPlant: 0.003,
+        pricePerKg: 50
     },
 
     // Industrial crops (พืชอุตสาหกรรม)
@@ -149,7 +180,10 @@ export const cropTypes: Crop[] = [
         waterRequirement: 4.5,
         spacing: 50,
         yield: 15000,
-        price: 1
+        price: 1,
+        defaultPlantSpacing: 0.5,
+        yieldPerPlant: 0.04,
+        pricePerKg: 1
     },
     {
         value: 'cotton',
@@ -162,7 +196,10 @@ export const cropTypes: Crop[] = [
         waterRequirement: 3.5,
         spacing: 45,
         yield: 180,
-        price: 80
+        price: 80,
+        defaultPlantSpacing: 0.45,
+        yieldPerPlant: 0.001,
+        pricePerKg: 80
     },
     {
         value: 'rubber',
@@ -175,7 +212,10 @@ export const cropTypes: Crop[] = [
         waterRequirement: 8.0,
         spacing: 300,
         yield: 1800,
-        price: 50
+        price: 50,
+        defaultPlantSpacing: 3.0,
+        yieldPerPlant: 0.0007,
+        pricePerKg: 50
     },
     {
         value: 'tobacco',
@@ -188,7 +228,10 @@ export const cropTypes: Crop[] = [
         waterRequirement: 2.8,
         spacing: 60,
         yield: 800,
-        price: 120
+        price: 120,
+        defaultPlantSpacing: 0.6,
+        yieldPerPlant: 0.008,
+        pricePerKg: 120
     },
 
     // Oil crops (พืชน้ำมัน)
@@ -203,7 +246,10 @@ export const cropTypes: Crop[] = [
         waterRequirement: 12.0,
         spacing: 900,
         yield: 3500,
-        price: 4
+        price: 4,
+        defaultPlantSpacing: 9.0,
+        yieldPerPlant: 0.03,
+        pricePerKg: 4
     },
     {
         value: 'sesame',
@@ -216,7 +262,10 @@ export const cropTypes: Crop[] = [
         waterRequirement: 1.8,
         spacing: 15,
         yield: 200,
-        price: 60
+        price: 60,
+        defaultPlantSpacing: 0.15,
+        yieldPerPlant: 0.002,
+        pricePerKg: 60
     },
     {
         value: 'sunflower',
@@ -229,7 +278,10 @@ export const cropTypes: Crop[] = [
         waterRequirement: 2.5,
         spacing: 40,
         yield: 400,
-        price: 35
+        price: 35,
+        defaultPlantSpacing: 0.4,
+        yieldPerPlant: 0.004,
+        pricePerKg: 35
     },
     {
         value: 'coconut',
@@ -242,7 +294,10 @@ export const cropTypes: Crop[] = [
         waterRequirement: 10.0,
         spacing: 800,
         yield: 2000,
-        price: 8
+        price: 8,
+        defaultPlantSpacing: 8.0,
+        yieldPerPlant: 0.02,
+        pricePerKg: 8
     }
 ];
 
