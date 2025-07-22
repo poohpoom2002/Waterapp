@@ -16,5 +16,5 @@ if (token) {
 
 // Set up Ziggy routes
 if (typeof Ziggy !== 'undefined') {
-    (window as any).Ziggy = Ziggy;
+    (window as typeof window & { Ziggy: typeof Ziggy }).Ziggy = Ziggy;
 }

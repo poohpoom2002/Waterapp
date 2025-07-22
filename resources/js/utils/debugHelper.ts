@@ -78,7 +78,7 @@ export const debugLocalStorage = (): { data: ProjectData | null; report: DebugRe
     console.group('🔍 Enhanced Debug: LocalStorage Comprehensive Analysis');
 
     const timestamp = new Date().toISOString();
-    let report: DebugReport = {
+    const report: DebugReport = {
         timestamp,
         projectValid: false,
         dataConsistency: {
@@ -466,7 +466,7 @@ export const debugMapComponents = (mapRef: React.RefObject<HTMLDivElement>) => {
     let oklchCount = 0;
     let rgbCount = 0;
     let hexCount = 0;
-    let problematicElements: string[] = [];
+    const problematicElements: string[] = [];
 
     elementsWithProblematicColors.forEach((el, index) => {
         const styles = window.getComputedStyle(el);
@@ -580,7 +580,7 @@ export const debugImageExport = async (mapElement: HTMLElement) => {
 
     // Step 3: Pre-export analysis
     const elementsWithProblematicStyles = mapElement.querySelectorAll('*');
-    let styleIssues: string[] = [];
+    const styleIssues: string[] = [];
     let elementCount = 0;
 
     elementsWithProblematicStyles.forEach((el) => {

@@ -490,7 +490,15 @@ export const selectBestEquipmentByPrice = (equipmentList: any[], preferHighPrice
     const goodChoice = equipmentList.filter((item) => item.isGoodChoice && !item.isRecommended);
     const usable = equipmentList.filter((item) => item.isUsable && !item.isGoodChoice && !item.isRecommended);
 
-    let targetGroup = recommended.length > 0 ? recommended : goodChoice.length > 0 ? goodChoice : usable.length > 0 ? usable : equipmentList;
+    // เลือกจากกลุ่มที่ดีที่สุดที่มี
+    let targetGroup =
+        recommended.length > 0
+            ? recommended
+            : goodChoice.length > 0
+              ? goodChoice
+              : usable.length > 0
+                ? usable
+                : equipmentList;
 
     return targetGroup.sort((a, b) => a.price - b.price)[0];
 };
