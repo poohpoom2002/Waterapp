@@ -1,9 +1,12 @@
 // resources/js/pages/home-garden-summary.tsx - แก้ไขปุ่มคำนวณอุปกรณ์
 import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import { router } from '@inertiajs/react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 // Import Google Maps component instead of Leaflet
 import GoogleMapSummary from '../components/homegarden/GoogleMapSummary';
+import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 
 import {
     Coordinate,
@@ -767,6 +770,7 @@ const CanvasRenderer: React.FC<{
 };
 
 export default function HomeGardenSummary({ data: propsData }: HomeGardenSummaryProps) {
+    const { t } = useLanguage();
     const [gardenData, setGardenData] = useState<GardenPlannerData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -1110,277 +1114,281 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
 
     return (
         <SummaryErrorBoundary>
-            <div className="min-h-screen w-full bg-gray-900 p-6">
-                {/* Error notification */}
-                {error && (
-                    <div className="fixed left-4 top-4 z-50 rounded-lg bg-red-600 p-4 text-white shadow-lg">
-                        <div className="flex items-center justify-between">
-                            <span>{error}</span>
-                            <button
-                                onClick={() => setError(null)}
-                                className="ml-4 text-white hover:text-gray-200"
-                            >
-                                ✕
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                <div className="mb-6 flex items-start justify-between">
-                    <div>
-                        <h1 className="mb-2 text-2xl font-bold text-white">
-                            📊 สรุปผลการออกแบบระบบน้ำ
-                            <span className="ml-2 text-sm font-normal text-gray-400">
-                                (
-                                {gardenData.designMode === 'map'
-                                    ? 'Google Map'
-                                    : gardenData.designMode === 'canvas'
-                                      ? 'วาดเอง'
-                                      : 'รูปแบบแปลน'}
-                                )
-                            </span>
-                        </h1>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => router.visit('/home-garden-planner')}
-                                className="rounded-lg bg-gray-700 px-4 py-2 text-gray-300 transition-colors hover:bg-gray-600"
-                            >
-                                ← กลับไปหน้าออกแบบ
-                            </button>
-                            <button
-                                onClick={handleSaveImage}
-                                disabled={isSavingImage}
-                                className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700 disabled:opacity-50"
-                            >
-                                {isSavingImage ? '⏳ กำลังบันทึก...' : '💾 บันทึกรูปภาพ (.png)'}
-                            </button>
-                            <button
-                                onClick={handlePrintImage}
-                                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
-                            >
-                                🖨️ พิมพ์รูปภาพ
-                            </button>
-                            <div className="flex items-center gap-2">
+            <div className="min-h-screen flex flex-col bg-gray-900">
+                <Navbar />
+                <div className="flex-1 w-full p-6">
+                    {/* Error notification */}
+                    {error && (
+                        <div className="fixed left-4 top-4 z-50 rounded-lg bg-red-600 p-4 text-white shadow-lg">
+                            <div className="flex items-center justify-between">
+                                <span>{error}</span>
                                 <button
-                                    onClick={handleEquipmentCalculation}
-                                    className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-white transition-colors hover:bg-purple-700"
-                                    title="คำนวณอุปกรณ์สำหรับสวนบ้าน"
+                                    onClick={() => setError(null)}
+                                    className="ml-4 text-white hover:text-gray-200"
                                 >
-                                    💰 คำนวณอุปกรณ์
+                                    ✕
                                 </button>
                             </div>
                         </div>
-                    </div>
-                    <div className="text-right text-sm text-gray-400">
-                        <div>วันที่: {new Date().toLocaleDateString('th-TH')}</div>
-                        <div>เวลา: {new Date().toLocaleTimeString('th-TH')}</div>
-                    </div>
-                </div>
+                    )}
 
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    <div className="lg:col-span-2">
-                        <div className="rounded-xl bg-gray-800 p-6">
-                            <h3 className="mb-4 text-lg font-semibold text-blue-400">
-                                🗺️ แผนผังโครงการ
-                            </h3>
-                            <div className="h-[600px] overflow-hidden rounded-lg border border-gray-600 bg-gray-900">
-                                {gardenData.designMode === 'map' && (
-                                    <div id="map-container" className="h-full">
-                                        <GoogleMapSummary
-                                            gardenData={gardenData}
-                                            mapCenter={mapCenter}
-                                            calculateZoomLevel={calculateZoomLevel}
-                                        />
+                    <div className="mb-6 flex items-start justify-between">
+                        <div>
+                            <h1 className="mb-2 text-2xl font-bold text-white">
+                                📊 สรุปผลการออกแบบระบบน้ำ
+                                <span className="ml-2 text-sm font-normal text-gray-400">
+                                    (
+                                    {gardenData.designMode === 'map'
+                                        ? 'Google Map'
+                                        : gardenData.designMode === 'canvas'
+                                          ? 'วาดเอง'
+                                          : 'รูปแบบแปลน'}
+                                    )
+                                </span>
+                            </h1>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => router.visit('/home-garden-planner')}
+                                    className="rounded-lg bg-gray-700 px-4 py-2 text-gray-300 transition-colors hover:bg-gray-600"
+                                >
+                                    ← กลับไปหน้าออกแบบ
+                                </button>
+                                <button
+                                    onClick={handleSaveImage}
+                                    disabled={isSavingImage}
+                                    className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+                                >
+                                    {isSavingImage ? '⏳ กำลังบันทึก...' : '💾 บันทึกรูปภาพ (.png)'}
+                                </button>
+                                <button
+                                    onClick={handlePrintImage}
+                                    className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
+                                >
+                                    🖨️ พิมพ์รูปภาพ
+                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={handleEquipmentCalculation}
+                                        className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-white transition-colors hover:bg-purple-700"
+                                        title="คำนวณอุปกรณ์สำหรับสวนบ้าน"
+                                    >
+                                        💰 คำนวณอุปกรณ์
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="text-right text-sm text-gray-400">
+                            <div>วันที่: {new Date().toLocaleDateString('th-TH')}</div>
+                            <div>เวลา: {new Date().toLocaleTimeString('th-TH')}</div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                        <div className="lg:col-span-2">
+                            <div className="rounded-xl bg-gray-800 p-6">
+                                <h3 className="mb-4 text-lg font-semibold text-blue-400">
+                                    🗺️ แผนผังโครงการ
+                                </h3>
+                                <div className="h-[600px] overflow-hidden rounded-lg border border-gray-600 bg-gray-900">
+                                    {gardenData.designMode === 'map' && (
+                                        <div id="map-container" className="h-full">
+                                            <GoogleMapSummary
+                                                gardenData={gardenData}
+                                                mapCenter={mapCenter}
+                                                calculateZoomLevel={calculateZoomLevel}
+                                            />
+                                        </div>
+                                    )}
+
+                                    {(gardenData.designMode === 'canvas' ||
+                                        gardenData.designMode === 'image') && (
+                                        <CanvasRenderer gardenData={gardenData} canvasRef={canvasRef} />
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="rounded-xl bg-gray-800 p-6">
+                                <h3 className="mb-4 text-lg font-semibold text-blue-400">
+                                    📊 ข้อมูลรวม
+                                </h3>
+                                <div className="space-y-3 text-sm">
+                                    <div className="rounded-lg bg-gray-700 p-3">
+                                        <div className="mb-1 text-gray-400">พื้นที่รวมทั้งหมด</div>
+                                        <div className="text-xl font-bold text-white">
+                                            {formatArea(statistics.totalArea)}
+                                        </div>
                                     </div>
-                                )}
 
-                                {(gardenData.designMode === 'canvas' ||
-                                    gardenData.designMode === 'image') && (
-                                    <CanvasRenderer gardenData={gardenData} canvasRef={canvasRef} />
-                                )}
+                                    <div className="rounded-lg bg-gray-700 p-3">
+                                        <div className="mb-1 text-gray-400">
+                                            จำนวนโซน (ไม่รวมพื้นที่ห้าม)
+                                        </div>
+                                        <div className="text-xl font-bold text-green-400">
+                                            {statistics.totalZones} โซน
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-lg bg-gray-700 p-3">
+                                        <div className="mb-1 text-gray-400">จำนวนหัวฉีดทั้งหมด</div>
+                                        <div className="text-xl font-bold text-blue-400">
+                                            {statistics.totalSprinklers} ตัว
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-lg bg-gray-700 p-3">
+                                        <div className="mb-1 text-gray-400">ระบบท่อ</div>
+                                        <div className="mt-1 grid grid-cols-2 gap-2">
+                                            <div>
+                                                <div className="text-xs text-gray-500">
+                                                    ท่อที่ยาวที่สุด
+                                                </div>
+                                                <div className="font-bold text-yellow-400">
+                                                    {formatDistance(statistics.longestPipe)}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div className="text-xs text-gray-500">ความยาวรวม</div>
+                                                <div className="font-bold text-yellow-400">
+                                                    {formatDistance(statistics.totalPipeLength)}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div className="space-y-4">
-                        <div className="rounded-xl bg-gray-800 p-6">
-                            <h3 className="mb-4 text-lg font-semibold text-blue-400">
-                                📊 ข้อมูลรวม
+                    {statistics.zoneStatistics.length > 0 && (
+                        <div className="mt-6 rounded-xl bg-gray-800 p-6">
+                            <h3 className="mb-4 text-lg font-semibold text-green-400">
+                                📍 ข้อมูลแยกตามโซน
                             </h3>
-                            <div className="space-y-3 text-sm">
-                                <div className="rounded-lg bg-gray-700 p-3">
-                                    <div className="mb-1 text-gray-400">พื้นที่รวมทั้งหมด</div>
-                                    <div className="text-xl font-bold text-white">
-                                        {formatArea(statistics.totalArea)}
-                                    </div>
-                                </div>
-
-                                <div className="rounded-lg bg-gray-700 p-3">
-                                    <div className="mb-1 text-gray-400">
-                                        จำนวนโซน (ไม่รวมพื้นที่ห้าม)
-                                    </div>
-                                    <div className="text-xl font-bold text-green-400">
-                                        {statistics.totalZones} โซน
-                                    </div>
-                                </div>
-
-                                <div className="rounded-lg bg-gray-700 p-3">
-                                    <div className="mb-1 text-gray-400">จำนวนหัวฉีดทั้งหมด</div>
-                                    <div className="text-xl font-bold text-blue-400">
-                                        {statistics.totalSprinklers} ตัว
-                                    </div>
-                                </div>
-
-                                <div className="rounded-lg bg-gray-700 p-3">
-                                    <div className="mb-1 text-gray-400">ระบบท่อ</div>
-                                    <div className="mt-1 grid grid-cols-2 gap-2">
-                                        <div>
-                                            <div className="text-xs text-gray-500">
-                                                ท่อที่ยาวที่สุด
-                                            </div>
-                                            <div className="font-bold text-yellow-400">
-                                                {formatDistance(statistics.longestPipe)}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <div className="text-xs text-gray-500">ความยาวรวม</div>
-                                            <div className="font-bold text-yellow-400">
-                                                {formatDistance(statistics.totalPipeLength)}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {statistics.zoneStatistics.length > 0 && (
-                    <div className="mt-6 rounded-xl bg-gray-800 p-6">
-                        <h3 className="mb-4 text-lg font-semibold text-green-400">
-                            📍 ข้อมูลแยกตามโซน
-                        </h3>
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                            {statistics.zoneStatistics.map((zone, index) => (
-                                <div key={zone.zoneId} className="rounded-lg bg-gray-700 p-4">
-                                    <div className="mb-3 flex items-center justify-between">
-                                        <h4 className="font-semibold text-white">
-                                            {index + 1}. {zone.zoneName}
-                                        </h4>
-                                        <span
-                                            className={`rounded bg-gray-600 px-2 py-1 text-xs ${
-                                                zone.zoneType === 'สนามหญ้า'
-                                                    ? 'bg-green-200 text-green-600'
-                                                    : zone.zoneType === 'แปลงดอกไม้'
-                                                      ? 'bg-pink-200 text-pink-600'
-                                                      : zone.zoneType === 'ต้นไม้'
-                                                        ? 'bg-green-300 text-green-800'
-                                                        : ''
-                                            }`}
-                                        >
-                                            {zone.zoneType}
-                                        </span>
-                                    </div>
-
-                                    <div className="space-y-2 text-sm">
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-400">พื้นที่:</span>
-                                            <span className="font-medium text-white">
-                                                {formatArea(zone.area)}
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                {statistics.zoneStatistics.map((zone, index) => (
+                                    <div key={zone.zoneId} className="rounded-lg bg-gray-700 p-4">
+                                        <div className="mb-3 flex items-center justify-between">
+                                            <h4 className="font-semibold text-white">
+                                                {index + 1}. {zone.zoneName}
+                                            </h4>
+                                            <span
+                                                className={`rounded bg-gray-600 px-2 py-1 text-xs ${
+                                                    zone.zoneType === 'สนามหญ้า'
+                                                        ? 'bg-green-200 text-green-600'
+                                                        : zone.zoneType === 'แปลงดอกไม้'
+                                                          ? 'bg-pink-200 text-pink-600'
+                                                          : zone.zoneType === 'ต้นไม้'
+                                                            ? 'bg-green-300 text-green-800'
+                                                            : ''
+                                                }`}
+                                            >
+                                                {zone.zoneType}
                                             </span>
                                         </div>
 
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-400">จำนวนหัวฉีด:</span>
-                                            <span className="font-medium text-blue-400">
-                                                {zone.sprinklerCount} ตัว
-                                            </span>
-                                        </div>
-                                        {zone.sprinklerCount > 0 && (
-                                            <>
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-400">
-                                                        ประเภทหัวฉีด:
-                                                    </span>
-                                                    <div className="text-right">
-                                                        {zone.sprinklerTypes.length > 0 ? (
-                                                            <div className="text-xs">
-                                                                {zone.sprinklerTypes.map(
-                                                                    (type, idx) => (
-                                                                        <div
-                                                                            key={idx}
-                                                                            className="font-medium text-cyan-400"
-                                                                        >
-                                                                            {type}
-                                                                        </div>
-                                                                    )
-                                                                )}
-                                                            </div>
-                                                        ) : (
-                                                            <span className="font-medium text-gray-500">
-                                                                -
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-400">พื้นที่:</span>
+                                                <span className="font-medium text-white">
+                                                    {formatArea(zone.area)}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-400">จำนวนหัวฉีด:</span>
+                                                <span className="font-medium text-blue-400">
+                                                    {zone.sprinklerCount} ตัว
+                                                </span>
+                                            </div>
+                                            {zone.sprinklerCount > 0 && (
+                                                <>
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-400">
+                                                            ประเภทหัวฉีด:
+                                                        </span>
+                                                        <div className="text-right">
+                                                            {zone.sprinklerTypes.length > 0 ? (
+                                                                <div className="text-xs">
+                                                                    {zone.sprinklerTypes.map(
+                                                                        (type, idx) => (
+                                                                            <div
+                                                                                key={idx}
+                                                                                className="font-medium text-cyan-400"
+                                                                            >
+                                                                                {type}
+                                                                            </div>
+                                                                        )
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="font-medium text-gray-500">
+                                                                    -
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-400">รัศมี:</span>
+                                                        <span className="font-medium text-cyan-400">
+                                                            {zone.sprinklerRadius > 0
+                                                                ? `${zone.sprinklerRadius.toFixed(1)} ม.`
+                                                                : '-'}
+                                                        </span>
+                                                    </div>
+                                                </>
+                                            )}
+
+                                            {zone.pipeLength > 0 && (
+                                                <div className="border-t border-gray-600 pt-2">
+                                                    <div className="mb-1 text-gray-400">ระบบท่อ:</div>
+                                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                                        <div>
+                                                            <span className="text-gray-500">
+                                                                ยาวที่สุด:{' '}
                                                             </span>
-                                                        )}
+                                                            <span className="text-yellow-400">
+                                                                {formatDistance(zone.longestPipe)}
+                                                            </span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-gray-500">รวม: </span>
+                                                            <span className="text-yellow-400">
+                                                                {formatDistance(zone.pipeLength)}
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </div>
-
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-400">รัศมี:</span>
-                                                    <span className="font-medium text-cyan-400">
-                                                        {zone.sprinklerRadius > 0
-                                                            ? `${zone.sprinklerRadius.toFixed(1)} ม.`
-                                                            : '-'}
-                                                    </span>
-                                                </div>
-                                            </>
-                                        )}
-
-                                        {zone.pipeLength > 0 && (
-                                            <div className="border-t border-gray-600 pt-2">
-                                                <div className="mb-1 text-gray-400">ระบบท่อ:</div>
-                                                <div className="grid grid-cols-2 gap-2 text-xs">
-                                                    <div>
-                                                        <span className="text-gray-500">
-                                                            ยาวที่สุด:{' '}
-                                                        </span>
-                                                        <span className="text-yellow-400">
-                                                            {formatDistance(zone.longestPipe)}
-                                                        </span>
-                                                    </div>
-                                                    <div>
-                                                        <span className="text-gray-500">รวม: </span>
-                                                        <span className="text-yellow-400">
-                                                            {formatDistance(zone.pipeLength)}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {/* Print styles */}
-                <style>{`
-                    @media print {
-                        .bg-gray-900 { background-color: white !important; }
-                        .bg-gray-800 { background-color: #f3f4f6 !important; border: 1px solid #d1d5db !important; }
-                        .bg-gray-700 { background-color: #e5e7eb !important; }
-                        .bg-orange-700 { background-color: #fed7aa !important; }
-                        .text-white { color: black !important; }
-                        .text-gray-300, .text-gray-400, .text-gray-500 { color: #374151 !important; }
-                        .text-gray-200 { color: #1f2937 !important; }
-                        .text-blue-400 { color: #2563eb !important; }
-                        .text-green-400 { color: #16a34a !important; }
-                        .text-purple-400 { color: #7c3aed !important; }
-                        .text-yellow-400 { color: #ca8a04 !important; }
-                        .text-orange-400 { color: #ea580c !important; }
-                        button { display: none !important; }
-                    }
-                `}</style>
+                    {/* Print styles */}
+                    <style>{`
+                        @media print {
+                            .bg-gray-900 { background-color: white !important; }
+                            .bg-gray-800 { background-color: #f3f4f6 !important; border: 1px solid #d1d5db !important; }
+                            .bg-gray-700 { background-color: #e5e7eb !important; }
+                            .bg-orange-700 { background-color: #fed7aa !important; }
+                            .text-white { color: black !important; }
+                            .text-gray-300, .text-gray-400, .text-gray-500 { color: #374151 !important; }
+                            .text-gray-200 { color: #1f2937 !important; }
+                            .text-blue-400 { color: #2563eb !important; }
+                            .text-green-400 { color: #16a34a !important; }
+                            .text-purple-400 { color: #7c3aed !important; }
+                            .text-yellow-400 { color: #ca8a04 !important; }
+                            .text-orange-400 { color: #ea580c !important; }
+                            button { display: none !important; }
+                        }
+                    `}</style>
+                </div>
+                <Footer />
             </div>
         </SummaryErrorBoundary>
     );
