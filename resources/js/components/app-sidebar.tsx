@@ -21,6 +21,11 @@ const mainNavItems: NavItem[] = [
         href: '/dashboard',
         icon: LayoutGrid,
     },
+    {
+        title: 'Map Planner',
+        href: '/planner',
+        icon: BookOpen,
+    },
 ];
 
 const footerNavItems: NavItem[] = [

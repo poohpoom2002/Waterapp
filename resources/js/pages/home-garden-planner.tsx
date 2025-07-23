@@ -1,7 +1,6 @@
 // resources/js/pages/home-garden-planner.tsx - Enhanced with pipe editing and Google Map fixes
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { router } from '@inertiajs/react';
-import { useLanguage } from '../contexts/LanguageContext';
 
 import GoogleMapDesigner from '../components/homegarden/GoogleMapDesigner';
 import CanvasDesigner from '../components/homegarden/CanvasDesigner';
@@ -124,7 +123,6 @@ const ModeSelection: React.FC<{
 };
 
 export default function HomeGardenPlanner() {
-    const { t } = useLanguage();
     const [designMode, setDesignMode] = useState<'map' | 'canvas' | 'image' | null>(null);
     const [activeTab, setActiveTab] = useState<'zones' | 'sprinklers' | 'pipes'>('zones');
     const [mapCenter, setMapCenter] = useState<[number, number]>(DEFAULT_CENTER);
@@ -1269,250 +1267,625 @@ export default function HomeGardenPlanner() {
     }
 
     return (
-        <div className="min-h-screen flex flex-col bg-gray-900">
-            <Navbar />
-            <div className="flex-1 w-full overflow-hidden">
-                {showValidationErrors && (
-                    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black bg-opacity-50">
-                        <div className="mx-4 w-full max-w-md rounded-lg bg-gray-800 p-6">
-                            <h3 className="mb-4 text-xl font-bold text-red-400">
-                                ❌ ไม่สามารถดูสรุปผลได้
-                            </h3>
-                            <div className="mb-4 text-gray-200">
-                                <p className="mb-2">กรุณาแก้ไขปัญหาต่อไปนี้ก่อน:</p>
-                                <ul className="list-inside list-disc space-y-1">
-                                    {validationErrors.map((error, index) => (
-                                        <li key={index} className="text-sm text-gray-300">
-                                            {error}
-                                        </li>
-                                    ))}
-                                </ul>
+        <div className="min-h-screen w-full overflow-hidden bg-gray-900">
+            {showValidationErrors && (
+                <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black bg-opacity-50">
+                    <div className="mx-4 w-full max-w-md rounded-lg bg-gray-800 p-6">
+                        <h3 className="mb-4 text-xl font-bold text-red-400">
+                            ❌ ไม่สามารถดูสรุปผลได้
+                        </h3>
+                        <div className="mb-4 text-gray-200">
+                            <p className="mb-2">กรุณาแก้ไขปัญหาต่อไปนี้ก่อน:</p>
+                            <ul className="list-inside list-disc space-y-1">
+                                {validationErrors.map((error, index) => (
+                                    <li key={index} className="text-sm text-gray-300">
+                                        {error}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                        <button
+                            onClick={() => setShowValidationErrors(false)}
+                            className="w-full rounded-lg bg-blue-600 py-2 text-white transition-colors hover:bg-blue-700"
+                        >
+                            ตกลง
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <div className="container mx-auto w-full px-4 py-6">
+                <div className="mb-6 text-left">
+                    <div className="flex items-center justify-between">
+                        <h1 className="text-2xl font-bold text-white">
+                            🏡 ระบบออกแบบระบบน้ำสำหรับสวนบ้าน
+                            <span className="ml-2 text-sm font-normal text-gray-400">
+                                (
+                                {designMode === 'map'
+                                    ? 'Google Map'
+                                    : designMode === 'canvas'
+                                      ? 'วาดเอง'
+                                      : 'รูปแบบแปลน'}
+                                )
+                            </span>
+                        </h1>
+
+                        <div className="flex items-center gap-4">
+                            <div className="flex rounded-lg bg-gray-800 p-1">
+                                {[
+                                    { id: 'zones', name: 'กำหนดโซน', icon: '🗺️' },
+                                    { id: 'sprinklers', name: 'วางหัวฉีด', icon: '💧' },
+                                    { id: 'pipes', name: 'ระบบท่อ', icon: '🔧' },
+                                ].map((tab) => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id as any)}
+                                        className={`rounded-md px-6 py-3 text-sm font-medium transition-all ${
+                                            activeTab === tab.id
+                                                ? 'bg-blue-600 text-white shadow-lg'
+                                                : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                                        }`}
+                                    >
+                                        {tab.icon} {tab.name}
+                                    </button>
+                                ))}
                             </div>
+
+                            <UndoRedoButtons />
+
                             <button
-                                onClick={() => setShowValidationErrors(false)}
-                                className="w-full rounded-lg bg-blue-600 py-2 text-white transition-colors hover:bg-blue-700"
+                                onClick={navigateToSummary}
+                                className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 text-sm font-medium text-white shadow-lg transition-all hover:from-purple-700 hover:to-blue-700"
                             >
-                                ตกลง
+                                📊 ดูสรุปผล
+                            </button>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => {
+                                    resetAllData();
+                                    setDesignMode(null);
+                                }}
+                                className="rounded-lg bg-gray-700 px-4 py-2 text-sm text-gray-300 transition-colors hover:bg-gray-600"
+                            >
+                                เปลี่ยนวิธี
+                            </button>
+                            <button
+                                onClick={() => {
+                                    resetAllData();
+                                }}
+                                className="rounded-lg bg-red-600 px-4 py-2 text-sm text-white transition-colors hover:bg-red-700"
+                            >
+                                🗑️ ลบทั้งหมด
                             </button>
                         </div>
                     </div>
-                )}
+                </div>
 
-                <div className="container mx-auto w-full px-4 py-6">
-                    <div className="mb-6 text-left">
-                        <div className="flex items-center justify-between">
-                            <h1 className="text-2xl font-bold text-white">
-                                🏡 ระบบออกแบบระบบน้ำสำหรับสวนบ้าน
-                                <span className="ml-2 text-sm font-normal text-gray-400">
-                                    (
-                                    {designMode === 'map'
-                                        ? 'Google Map'
-                                        : designMode === 'canvas'
-                                          ? 'วาดเอง'
-                                          : 'รูปแบบแปลน'}
-                                    )
-                                </span>
-                            </h1>
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
+                    <div className="space-y-6 lg:col-span-1">
+                        {activeTab === 'zones' && (
+                            <div className="rounded-xl bg-gray-800/90 p-6 shadow-2xl backdrop-blur">
+                                <h3 className="mb-4 text-xl font-semibold text-blue-400">
+                                    🗺️ จัดการโซนพื้นที่
+                                </h3>
 
-                            <div className="flex items-center gap-4">
-                                <div className="flex rounded-lg bg-gray-800 p-1">
-                                    {[
-                                        { id: 'zones', name: 'กำหนดโซน', icon: '🗺️' },
-                                        { id: 'sprinklers', name: 'วางหัวฉีด', icon: '💧' },
-                                        { id: 'pipes', name: 'ระบบท่อ', icon: '🔧' },
-                                    ].map((tab) => (
-                                        <button
-                                            key={tab.id}
-                                            onClick={() => setActiveTab(tab.id as any)}
-                                            className={`rounded-md px-6 py-3 text-sm font-medium transition-all ${
-                                                activeTab === tab.id
-                                                    ? 'bg-blue-600 text-white shadow-lg'
-                                                    : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                                            }`}
-                                        >
-                                            {tab.icon} {tab.name}
-                                        </button>
-                                    ))}
+                                <div className="mb-4">
+                                    <label className="mb-2 block text-sm font-medium text-gray-100">
+                                        เลือกประเภทโซน:
+                                    </label>
+                                    <div className="grid grid-cols-2 gap-2 text-gray-100">
+                                        {ZONE_TYPES.map((zone) => (
+                                            <button
+                                                key={zone.id}
+                                                onClick={() => setSelectedZoneType(zone.id)}
+                                                className={`rounded-lg p-3 text-center transition-all ${
+                                                    selectedZoneType === zone.id
+                                                        ? 'shadow-lg ring-2 ring-blue-400'
+                                                        : 'hover:bg-gray-700'
+                                                }`}
+                                                style={{
+                                                    backgroundColor:
+                                                        selectedZoneType === zone.id
+                                                            ? zone.color + '20'
+                                                            : 'transparent',
+                                                }}
+                                            >
+                                                <div className="text-2xl">{zone.icon}</div>
+                                                <div className="text-xs font-medium">
+                                                    {zone.name}
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
 
-                                <UndoRedoButtons />
+                                <div className="mb-4 space-y-2">
+                                    {editMode !== 'draw' ? (
+                                        <button
+                                            onClick={() => setEditMode('draw')}
+                                            className="w-full rounded-lg bg-blue-600 py-3 font-medium text-white shadow-lg transition-all hover:bg-blue-700"
+                                        >
+                                            ✏️ เริ่มวาดโซนพื้นที่
+                                        </button>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <div className="rounded-lg bg-blue-900/30 p-3 text-center">
+                                                <div className="text-sm font-medium text-blue-300">
+                                                    🎯 กำลังวาดโซน:{' '}
+                                                    {
+                                                        ZONE_TYPES.find(
+                                                            (z) => z.id === selectedZoneType
+                                                        )?.name
+                                                    }
+                                                </div>
+                                                <div className="mt-1 text-xs text-blue-200">
+                                                    {designMode === 'map'
+                                                        ? 'คลิกและลากในแผนที่เพื่อวาดโซน'
+                                                        : 'คลิกเพื่อวาดจุดต่าง ๆ ของโซน'}
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    setEditMode('view');
+                                                    if (
+                                                        designMode === 'canvas' ||
+                                                        designMode === 'image'
+                                                    ) {
+                                                        window.dispatchEvent(
+                                                            new CustomEvent('cancelDrawing')
+                                                        );
+                                                    }
+                                                    setSelectedZoneForConfig(null);
+                                                }}
+                                                className="w-full rounded-lg bg-red-600 py-2 font-medium text-white transition-all hover:bg-red-700"
+                                            >
+                                                ❌ ยกเลิกการวาด
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
 
-                                <button
-                                    onClick={navigateToSummary}
-                                    className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 text-sm font-medium text-white shadow-lg transition-all hover:from-purple-700 hover:to-blue-700"
-                                >
-                                    📊 ดูสรุปผล
-                                </button>
-                            </div>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => {
-                                        resetAllData();
-                                        setDesignMode(null);
-                                    }}
-                                    className="rounded-lg bg-gray-700 px-4 py-2 text-sm text-gray-300 transition-colors hover:bg-gray-600"
-                                >
-                                    เปลี่ยนวิธี
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        resetAllData();
-                                    }}
-                                    className="rounded-lg bg-red-600 px-4 py-2 text-sm text-white transition-colors hover:bg-red-700"
-                                >
-                                    🗑️ ลบทั้งหมด
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                                {gardenZones.length > 0 && (
+                                    <div>
+                                        <h4 className="mb-2 text-sm font-medium text-gray-300">
+                                            โซนที่สร้างแล้ว:
+                                        </h4>
+                                        <div className="max-h-96 space-y-3 overflow-y-auto">
+                                            {gardenZones.map((zone) => {
+                                                const zoneType = ZONE_TYPES.find(
+                                                    (z) => z.id === zone.type
+                                                );
+                                                const zoneSprinklers = sprinklers.filter(
+                                                    (s) => s.zoneId === zone.id
+                                                );
+                                                const isConfigOpen =
+                                                    selectedZoneForConfig === zone.id;
+                                                const isNestedZone = !!zone.parentZoneId;
+                                                const parentZone = zone.parentZoneId
+                                                    ? gardenZones.find(
+                                                          (z) => z.id === zone.parentZoneId
+                                                      )
+                                                    : null;
 
-                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
-                        <div className="space-y-6 lg:col-span-1">
-                            {activeTab === 'zones' && (
-                                <div className="rounded-xl bg-gray-800/90 p-6 shadow-2xl backdrop-blur">
-                                    <h3 className="mb-4 text-xl font-semibold text-blue-400">
-                                        🗺️ จัดการโซนพื้นที่
-                                    </h3>
+                                                const zoneArea = calculateZoneArea(zone);
 
-                                    <div className="mb-4">
-                                        <label className="mb-2 block text-sm font-medium text-gray-100">
-                                            เลือกประเภทโซน:
-                                        </label>
-                                        <div className="grid grid-cols-2 gap-2 text-gray-100">
-                                            {ZONE_TYPES.map((zone) => (
-                                                <button
-                                                    key={zone.id}
-                                                    onClick={() => setSelectedZoneType(zone.id)}
-                                                    className={`rounded-lg p-3 text-center transition-all ${
-                                                        selectedZoneType === zone.id
-                                                            ? 'shadow-lg ring-2 ring-blue-400'
-                                                            : 'hover:bg-gray-700'
-                                                    }`}
-                                                    style={{
-                                                        backgroundColor:
-                                                            selectedZoneType === zone.id
-                                                                ? zone.color + '20'
-                                                                : 'transparent',
-                                                    }}
-                                                >
-                                                    <div className="text-2xl">{zone.icon}</div>
-                                                    <div className="text-xs font-medium">
-                                                        {zone.name}
+                                                return (
+                                                    <div
+                                                        key={zone.id}
+                                                        className={`space-y-2 rounded-lg p-3 ${
+                                                            isNestedZone
+                                                                ? 'ml-4 border-l-4 bg-gray-600'
+                                                                : 'bg-gray-700'
+                                                        }`}
+                                                        style={{
+                                                            borderLeftColor: isNestedZone
+                                                                ? zoneType?.color
+                                                                : undefined,
+                                                        }}
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center space-x-2">
+                                                                <span className="text-lg">
+                                                                    {zoneType?.icon}
+                                                                </span>
+                                                                <div>
+                                                                    <div className="text-sm font-medium text-gray-100">
+                                                                        {zone.name}
+                                                                        {isNestedZone &&
+                                                                            parentZone && (
+                                                                                <span className="block text-xs text-gray-400">
+                                                                                    ↳ ใน{' '}
+                                                                                    {
+                                                                                        parentZone.name
+                                                                                    }
+                                                                                </span>
+                                                                            )}
+                                                                    </div>
+                                                                    <div className="text-xs text-gray-200">
+                                                                        {zoneSprinklers.length}{' '}
+                                                                        หัวฉีด •{' '}
+                                                                        {formatArea(zoneArea)}
+                                                                    </div>
+                                                                    {zone.sprinklerConfig && (
+                                                                        <div className="text-xs text-blue-300">
+                                                                            {
+                                                                                SPRINKLER_TYPES.find(
+                                                                                    (s) =>
+                                                                                        s.id ===
+                                                                                        zone
+                                                                                            .sprinklerConfig!
+                                                                                            .type
+                                                                                )?.nameEN
+                                                                            }
+                                                                            • รัศมี{' '}
+                                                                            {
+                                                                                zone.sprinklerConfig
+                                                                                    .radius
+                                                                            }
+                                                                            ม.
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex space-x-1">
+                                                                {zone.type !== 'forbidden' && (
+                                                                    <>
+                                                                        <button
+                                                                            onClick={() =>
+                                                                                setSelectedZoneForConfig(
+                                                                                    isConfigOpen
+                                                                                        ? null
+                                                                                        : zone.id
+                                                                                )
+                                                                            }
+                                                                            className="text-blue-400 hover:text-blue-300"
+                                                                            title="ตั้งค่าหัวฉีด"
+                                                                        >
+                                                                            ⚙️
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() =>
+                                                                                autoPlaceSprinklersInZone(
+                                                                                    zone.id
+                                                                                )
+                                                                            }
+                                                                            disabled={
+                                                                                !zone.sprinklerConfig
+                                                                            }
+                                                                            className="text-green-400 hover:text-green-300 disabled:cursor-not-allowed disabled:text-gray-500"
+                                                                            title="วางหัวฉีดในโซนนี้"
+                                                                        >
+                                                                            🤖
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() =>
+                                                                                deleteSprinklersByZone(
+                                                                                    zone.id
+                                                                                )
+                                                                            }
+                                                                            disabled={
+                                                                                zoneSprinklers.length ===
+                                                                                0
+                                                                            }
+                                                                            className="text-yellow-400 hover:text-yellow-300 disabled:cursor-not-allowed disabled:text-gray-500"
+                                                                            title="ลบหัวฉีดในโซนนี้"
+                                                                        >
+                                                                            💧
+                                                                        </button>
+                                                                    </>
+                                                                )}
+                                                                <button
+                                                                    onClick={() =>
+                                                                        deleteZone(zone.id)
+                                                                    }
+                                                                    className="text-red-400 hover:text-red-300"
+                                                                    title="ลบโซน"
+                                                                >
+                                                                    🗑️
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
+                                                        {isConfigOpen &&
+                                                            zone.type !== 'forbidden' && (
+                                                                <div className="mt-3 space-y-3 border-t border-gray-600 pt-3">
+                                                                    <div>
+                                                                        <label className="mb-2 block text-xs font-medium text-gray-300">
+                                                                            เลือกประเภทหัวฉีด:
+                                                                        </label>
+                                                                        <div className="grid grid-cols-1 gap-1">
+                                                                            {SPRINKLER_TYPES.filter(
+                                                                                (s) =>
+                                                                                    s.suitableFor.includes(
+                                                                                        zone.type
+                                                                                    )
+                                                                            ).map((sprinkler) => (
+                                                                                <button
+                                                                                    key={
+                                                                                        sprinkler.id
+                                                                                    }
+                                                                                    onClick={() => {
+                                                                                        const currentRadius =
+                                                                                            zone
+                                                                                                .sprinklerConfig
+                                                                                                ?.radius ||
+                                                                                            sprinkler.radius;
+                                                                                        updateZoneConfig(
+                                                                                            zone.id,
+                                                                                            sprinkler.id,
+                                                                                            currentRadius
+                                                                                        );
+                                                                                    }}
+                                                                                    className={`rounded p-2 text-left text-xs transition-all ${
+                                                                                        zone
+                                                                                            .sprinklerConfig
+                                                                                            ?.type ===
+                                                                                        sprinkler.id
+                                                                                            ? 'bg-blue-900/30 ring-1 ring-blue-400'
+                                                                                            : 'hover:bg-gray-600'
+                                                                                    }`}
+                                                                                >
+                                                                                    <div className="flex items-center space-x-2">
+                                                                                        <span>
+                                                                                            {
+                                                                                                sprinkler.icon
+                                                                                            }
+                                                                                        </span>
+                                                                                        <span className="font-medium text-gray-100">
+                                                                                            {
+                                                                                                sprinkler.nameEN
+                                                                                            }
+                                                                                        </span>
+                                                                                    </div>
+                                                                                </button>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {zone.sprinklerConfig && (
+                                                                        <div>
+                                                                            <label className="mb-2 block text-xs font-medium text-gray-300">
+                                                                                รัศมีการฉีดน้ำ
+                                                                                (เมตร):
+                                                                            </label>
+                                                                            <div className="flex items-center space-x-3">
+                                                                                <input
+                                                                                    type="range"
+                                                                                    min="1"
+                                                                                    max="15"
+                                                                                    step="0.5"
+                                                                                    value={
+                                                                                        zone
+                                                                                            .sprinklerConfig
+                                                                                            .radius
+                                                                                    }
+                                                                                    onChange={(e) =>
+                                                                                        updateZoneConfig(
+                                                                                            zone.id,
+                                                                                            zone
+                                                                                                .sprinklerConfig!
+                                                                                                .type,
+                                                                                            Number(
+                                                                                                e
+                                                                                                    .target
+                                                                                                    .value
+                                                                                            )
+                                                                                        )
+                                                                                    }
+                                                                                    className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-gray-600"
+                                                                                />
+                                                                                <span className="min-w-[3rem] text-sm font-bold text-blue-400">
+                                                                                    {
+                                                                                        zone
+                                                                                            .sprinklerConfig
+                                                                                            .radius
+                                                                                    }
+                                                                                    ม.
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
                                                     </div>
-                                                </button>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     </div>
+                                )}
+                            </div>
+                        )}
 
-                                    <div className="mb-4 space-y-2">
-                                        {editMode !== 'draw' ? (
-                                            <button
-                                                onClick={() => setEditMode('draw')}
-                                                className="w-full rounded-lg bg-blue-600 py-3 font-medium text-white shadow-lg transition-all hover:bg-blue-700"
-                                            >
-                                                ✏️ เริ่มวาดโซนพื้นที่
-                                            </button>
-                                        ) : (
-                                            <div className="space-y-2">
-                                                <div className="rounded-lg bg-blue-900/30 p-3 text-center">
-                                                    <div className="text-sm font-medium text-blue-300">
-                                                        🎯 กำลังวาดโซน:{' '}
-                                                        {
-                                                            ZONE_TYPES.find(
-                                                                (z) => z.id === selectedZoneType
-                                                            )?.name
-                                                        }
-                                                    </div>
-                                                    <div className="mt-1 text-xs text-blue-200">
-                                                        {designMode === 'map'
-                                                            ? 'คลิกและลากในแผนที่เพื่อวาดโซน'
-                                                            : 'คลิกเพื่อวาดจุดต่าง ๆ ของโซน'}
+                        {activeTab === 'sprinklers' && (
+                            <div className="rounded-xl bg-gray-800/90 p-6 shadow-2xl backdrop-blur">
+                                <h3 className="mb-4 text-xl font-semibold text-blue-400">
+                                    💧 จัดการหัวฉีดน้ำ
+                                </h3>
+
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <button
+                                            onClick={autoPlaceAllSprinklers}
+                                            disabled={
+                                                gardenZones.filter(
+                                                    (z) =>
+                                                        z.type !== 'forbidden' && z.sprinklerConfig
+                                                ).length === 0
+                                            }
+                                            className="w-full rounded-lg bg-purple-600 py-3 font-medium text-white transition-all hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-600"
+                                        >
+                                            🤖 วางหัวฉีดอัตโนมัติ (ทุกโซน)
+                                        </button>
+
+                                        <button
+                                            onClick={() => setEditMode('place')}
+                                            className={`w-full rounded-lg py-3 font-medium transition-all ${
+                                                editMode === 'place'
+                                                    ? 'bg-green-600 text-white shadow-lg'
+                                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                            }`}
+                                        >
+                                            📍{' '}
+                                            {editMode === 'place'
+                                                ? designMode === 'map'
+                                                    ? 'กำลังวางหัวฉีด - คลิกในแผนที่'
+                                                    : 'กำลังวางหัวฉีด - คลิกในพื้นที่'
+                                                : 'วางหัวฉีดเอง'}
+                                        </button>
+
+                                        {editMode === 'place' && (
+                                            <div className="mt-3 space-y-3 border-t border-gray-600 pt-3">
+                                                <div>
+                                                    <label className="mb-2 block text-xs font-medium text-gray-300">
+                                                        เลือกประเภทหัวฉีด:
+                                                    </label>
+                                                    <div className="grid grid-cols-1 gap-1">
+                                                        {SPRINKLER_TYPES.map((sprinkler) => (
+                                                            <button
+                                                                key={sprinkler.id}
+                                                                onClick={() =>
+                                                                    setManualSprinklerType(
+                                                                        sprinkler.id
+                                                                    )
+                                                                }
+                                                                className={`rounded p-2 text-left text-xs transition-all ${
+                                                                    manualSprinklerType ===
+                                                                    sprinkler.id
+                                                                        ? 'bg-blue-900/30 ring-1 ring-blue-400'
+                                                                        : 'hover:bg-gray-600'
+                                                                }`}
+                                                            >
+                                                                <div className="flex items-center space-x-2">
+                                                                    <span>{sprinkler.icon}</span>
+                                                                    <span className="font-medium text-gray-100">
+                                                                        {sprinkler.nameEN}
+                                                                    </span>
+                                                                </div>
+                                                            </button>
+                                                        ))}
                                                     </div>
                                                 </div>
-                                                <button
-                                                    onClick={() => {
-                                                        setEditMode('view');
-                                                        if (
-                                                            designMode === 'canvas' ||
-                                                            designMode === 'image'
-                                                        ) {
-                                                            window.dispatchEvent(
-                                                                new CustomEvent('cancelDrawing')
-                                                            );
-                                                        }
-                                                        setSelectedZoneForConfig(null);
-                                                    }}
-                                                    className="w-full rounded-lg bg-red-600 py-2 font-medium text-white transition-all hover:bg-red-700"
-                                                >
-                                                    ❌ ยกเลิกการวาด
-                                                </button>
+
+                                                <div>
+                                                    <label className="mb-2 block text-xs font-medium text-gray-300">
+                                                        รัศมีการฉีดน้ำ (เมตร):
+                                                    </label>
+                                                    <div className="flex items-center space-x-3">
+                                                        <input
+                                                            type="range"
+                                                            min="1"
+                                                            max="15"
+                                                            step="0.5"
+                                                            value={manualSprinklerRadius}
+                                                            onChange={(e) =>
+                                                                setManualSprinklerRadius(
+                                                                    Number(e.target.value)
+                                                                )
+                                                            }
+                                                            className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-gray-600"
+                                                        />
+                                                        <span className="min-w-[3rem] text-sm font-bold text-blue-400">
+                                                            {manualSprinklerRadius}ม.
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             </div>
+                                        )}
+
+                                        <button
+                                            onClick={() => setEditMode('edit')}
+                                            className={`w-full rounded-lg py-3 font-medium transition-all ${
+                                                editMode === 'edit'
+                                                    ? 'bg-yellow-600 text-white shadow-lg'
+                                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                            }`}
+                                        >
+                                            🚰{' '}
+                                            {editMode === 'edit'
+                                                ? designMode === 'map'
+                                                    ? 'กำลังวางแหล่งน้ำ - คลิกแผนที่'
+                                                    : 'กำลังวางแหล่งน้ำ - คลิกในพื้นที่'
+                                                : 'วางแหล่งน้ำ'}
+                                        </button>
+
+                                        <button
+                                            onClick={() => setEditMode('drag-sprinkler')}
+                                            className={`w-full rounded-lg py-3 font-medium transition-all ${
+                                                editMode === 'drag-sprinkler'
+                                                    ? 'bg-orange-600 text-white shadow-lg'
+                                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                            }`}
+                                        >
+                                            ↔️{' '}
+                                            {editMode === 'drag-sprinkler'
+                                                ? 'กำลังปรับตำแหน่ง - ลากหัวฉีด'
+                                                : 'ปรับตำแหน่งหัวฉีด'}
+                                        </button>
+
+                                        {sprinklers.length > 0 && (
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedSprinkler(null);
+                                                    setSprinklers([]);
+                                                }}
+                                                className="w-full rounded-lg bg-red-600 py-3 font-medium text-white transition-all hover:bg-red-700"
+                                            >
+                                                🗑️ ลบหัวฉีดทั้งหมด
+                                            </button>
                                         )}
                                     </div>
 
-                                    {gardenZones.length > 0 && (
-                                        <div>
-                                            <h4 className="mb-2 text-sm font-medium text-gray-300">
-                                                โซนที่สร้างแล้ว:
+                                    {sprinklers.length > 0 && (
+                                        <div className="space-y-2">
+                                            <h4 className="text-sm font-medium text-gray-300">
+                                                สรุปหัวฉีด: {sprinklers.length} ตัว
                                             </h4>
-                                            <div className="max-h-96 space-y-3 overflow-y-auto">
-                                                {gardenZones.map((zone) => {
-                                                    const zoneType = ZONE_TYPES.find(
-                                                        (z) => z.id === zone.type
-                                                    );
-                                                    const zoneSprinklers = sprinklers.filter(
-                                                        (s) => s.zoneId === zone.id
-                                                    );
-                                                    const isConfigOpen =
-                                                        selectedZoneForConfig === zone.id;
-                                                    const isNestedZone = !!zone.parentZoneId;
-                                                    const parentZone = zone.parentZoneId
-                                                        ? gardenZones.find(
-                                                              (z) => z.id === zone.parentZoneId
-                                                          )
-                                                        : null;
+                                            <div className="max-h-40 space-y-2 overflow-y-auto">
+                                                {gardenZones
+                                                    .filter((zone) => zone.type !== 'forbidden')
+                                                    .map((zone) => {
+                                                        const zoneSprinklers = sprinklers.filter(
+                                                            (s) => s.zoneId === zone.id
+                                                        );
+                                                        if (zoneSprinklers.length === 0)
+                                                            return null;
 
-                                                    const zoneArea = calculateZoneArea(zone);
+                                                        const zoneType = ZONE_TYPES.find(
+                                                            (z) => z.id === zone.type
+                                                        );
+                                                        const isNestedZone = !!zone.parentZoneId;
 
-                                                    return (
-                                                        <div
-                                                            key={zone.id}
-                                                            className={`space-y-2 rounded-lg p-3 ${
-                                                                isNestedZone
-                                                                    ? 'ml-4 border-l-4 bg-gray-600'
-                                                                    : 'bg-gray-700'
-                                                            }`}
-                                                            style={{
-                                                                borderLeftColor: isNestedZone
-                                                                    ? zoneType?.color
-                                                                    : undefined,
-                                                            }}
-                                                        >
-                                                            <div className="flex items-center justify-between">
-                                                                <div className="flex items-center space-x-2">
-                                                                    <span className="text-lg">
-                                                                        {zoneType?.icon}
-                                                                    </span>
-                                                                    <div>
-                                                                        <div className="text-sm font-medium text-gray-100">
+                                                        return (
+                                                            <div
+                                                                key={zone.id}
+                                                                className={`rounded-lg p-2 text-xs ${
+                                                                    isNestedZone
+                                                                        ? 'ml-4 border-l-2 bg-gray-600'
+                                                                        : 'bg-gray-700'
+                                                                }`}
+                                                                style={{
+                                                                    borderLeftColor: isNestedZone
+                                                                        ? zoneType?.color
+                                                                        : undefined,
+                                                                }}
+                                                            >
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex items-center space-x-2">
+                                                                        <span>
+                                                                            {zoneType?.icon}
+                                                                        </span>
+                                                                        <span className="font-medium text-gray-100">
                                                                             {zone.name}
-                                                                            {isNestedZone &&
-                                                                                parentZone && (
-                                                                                    <span className="block text-xs text-gray-400">
-                                                                                        ↳ ใน{' '}
-                                                                                        {
-                                                                                            parentZone.name
-                                                                                        }
-                                                                                    </span>
-                                                                                )}
-                                                                        </div>
-                                                                        <div className="text-xs text-gray-200">
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="text-right">
+                                                                        <div className="font-bold text-blue-400">
                                                                             {zoneSprinklers.length}{' '}
-                                                                            หัวฉีด •{' '}
-                                                                            {formatArea(zoneArea)}
+                                                                            หัว
                                                                         </div>
                                                                         {zone.sprinklerConfig && (
-                                                                            <div className="text-xs text-blue-300">
+                                                                            <div className="text-gray-400">
                                                                                 {
                                                                                     SPRINKLER_TYPES.find(
                                                                                         (s) =>
@@ -1522,683 +1895,362 @@ export default function HomeGardenPlanner() {
                                                                                                 .type
                                                                                     )?.nameEN
                                                                                 }
-                                                                                • รัศมี{' '}
-                                                                                {
-                                                                                    zone.sprinklerConfig
-                                                                                        .radius
-                                                                                }
-                                                                                ม.
                                                                             </div>
                                                                         )}
                                                                     </div>
-                                                                </div>
-                                                                <div className="flex space-x-1">
-                                                                    {zone.type !== 'forbidden' && (
-                                                                        <>
-                                                                            <button
-                                                                                onClick={() =>
-                                                                                    setSelectedZoneForConfig(
-                                                                                        isConfigOpen
-                                                                                            ? null
-                                                                                            : zone.id
-                                                                                    )
-                                                                                }
-                                                                                className="text-blue-400 hover:text-blue-300"
-                                                                                title="ตั้งค่าหัวฉีด"
-                                                                            >
-                                                                                ⚙️
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={() =>
-                                                                                    autoPlaceSprinklersInZone(
-                                                                                        zone.id
-                                                                                    )
-                                                                                }
-                                                                                disabled={
-                                                                                    !zone.sprinklerConfig
-                                                                                }
-                                                                                className="text-green-400 hover:text-green-300 disabled:cursor-not-allowed disabled:text-gray-500"
-                                                                                title="วางหัวฉีดในโซนนี้"
-                                                                            >
-                                                                                🤖
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={() =>
-                                                                                    deleteSprinklersByZone(
-                                                                                        zone.id
-                                                                                    )
-                                                                                }
-                                                                                disabled={
-                                                                                    zoneSprinklers.length ===
-                                                                                    0
-                                                                                }
-                                                                                className="text-yellow-400 hover:text-yellow-300 disabled:cursor-not-allowed disabled:text-gray-500"
-                                                                                title="ลบหัวฉีดในโซนนี้"
-                                                                            >
-                                                                                💧
-                                                                            </button>
-                                                                        </>
-                                                                    )}
-                                                                    <button
-                                                                        onClick={() =>
-                                                                            deleteZone(zone.id)
-                                                                        }
-                                                                        className="text-red-400 hover:text-red-300"
-                                                                        title="ลบโซน"
-                                                                    >
-                                                                        🗑️
-                                                                    </button>
                                                                 </div>
                                                             </div>
+                                                        );
+                                                    })}
 
-                                                            {isConfigOpen &&
-                                                                zone.type !== 'forbidden' && (
-                                                                    <div className="mt-3 space-y-3 border-t border-gray-600 pt-3">
-                                                                        <div>
-                                                                            <label className="mb-2 block text-xs font-medium text-gray-300">
-                                                                                เลือกประเภทหัวฉีด:
-                                                                            </label>
-                                                                            <div className="grid grid-cols-1 gap-1">
-                                                                                {SPRINKLER_TYPES.filter(
-                                                                                    (s) =>
-                                                                                        s.suitableFor.includes(
-                                                                                            zone.type
-                                                                                        )
-                                                                                ).map((sprinkler) => (
-                                                                                    <button
-                                                                                        key={
-                                                                                            sprinkler.id
-                                                                                        }
-                                                                                        onClick={() => {
-                                                                                            const currentRadius =
-                                                                                                zone
-                                                                                                    .sprinklerConfig
-                                                                                                    ?.radius ||
-                                                                                                sprinkler.radius;
-                                                                                            updateZoneConfig(
-                                                                                                zone.id,
-                                                                                                sprinkler.id,
-                                                                                                currentRadius
-                                                                                            );
-                                                                                        }}
-                                                                                        className={`rounded p-2 text-left text-xs transition-all ${
-                                                                                            zone
-                                                                                                .sprinklerConfig
-                                                                                                ?.type ===
-                                                                                            sprinkler.id
-                                                                                                ? 'bg-blue-900/30 ring-1 ring-blue-400'
-                                                                                                : 'hover:bg-gray-600'
-                                                                                        }`}
-                                                                                    >
-                                                                                        <div className="flex items-center space-x-2">
-                                                                                            <span>
-                                                                                                {
-                                                                                                    sprinkler.icon
-                                                                                                }
-                                                                                            </span>
-                                                                                            <span className="font-medium text-gray-100">
-                                                                                                {
-                                                                                                    sprinkler.nameEN
-                                                                                                }
-                                                                                            </span>
-                                                                                        </div>
-                                                                                    </button>
-                                                                                ))}
-                                                                            </div>
-                                                                        </div>
-
-                                                                        {zone.sprinklerConfig && (
-                                                                            <div>
-                                                                                <label className="mb-2 block text-xs font-medium text-gray-300">
-                                                                                    รัศมีการฉีดน้ำ
-                                                                                    (เมตร):
-                                                                                </label>
-                                                                                <div className="flex items-center space-x-3">
-                                                                                    <input
-                                                                                        type="range"
-                                                                                        min="1"
-                                                                                        max="15"
-                                                                                        step="0.5"
-                                                                                        value={
-                                                                                            zone
-                                                                                                .sprinklerConfig
-                                                                                                .radius
-                                                                                        }
-                                                                                        onChange={(e) =>
-                                                                                            updateZoneConfig(
-                                                                                                zone.id,
-                                                                                                zone
-                                                                                                    .sprinklerConfig!
-                                                                                                    .type,
-                                                                                                Number(
-                                                                                                    e
-                                                                                                        .target
-                                                                                                        .value
-                                                                                                )
-                                                                                            )
-                                                                                        }
-                                                                                        className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-gray-600"
-                                                                                    />
-                                                                                    <span className="min-w-[3rem] text-sm font-bold text-blue-400">
-                                                                                        {
-                                                                                            zone
-                                                                                                .sprinklerConfig
-                                                                                                .radius
-                                                                                        }
-                                                                                        ม.
-                                                                                    </span>
-                                                                                </div>
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                )}
+                                                {sprinklers.filter(
+                                                    (s) => s.zoneId === 'virtual_zone'
+                                                ).length > 0 && (
+                                                    <div className="rounded-lg bg-gray-700 p-2 text-xs">
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center space-x-2">
+                                                                <span>⚙️</span>
+                                                                <span className="font-medium text-gray-100">
+                                                                    หัวฉีดแบบกำหนดเอง
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <div className="font-bold text-blue-400">
+                                                                    {
+                                                                        sprinklers.filter(
+                                                                            (s) =>
+                                                                                s.zoneId ===
+                                                                                'virtual_zone'
+                                                                        ).length
+                                                                    }{' '}
+                                                                    หัว
+                                                                </div>
+                                                                <div className="text-gray-400">
+                                                                    หัวฉีดผสม
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                    );
-                                                })}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     )}
                                 </div>
-                            )}
+                            </div>
+                        )}
 
-                            {activeTab === 'sprinklers' && (
-                                <div className="rounded-xl bg-gray-800/90 p-6 shadow-2xl backdrop-blur">
-                                    <h3 className="mb-4 text-xl font-semibold text-blue-400">
-                                        💧 จัดการหัวฉีดน้ำ
-                                    </h3>
+                        {activeTab === 'pipes' && (
+                            <div className="rounded-xl bg-gray-800/90 p-6 shadow-2xl backdrop-blur">
+                                <h3 className="mb-4 text-xl font-semibold text-blue-400">
+                                    🔧 ระบบท่อน้ำ
+                                </h3>
 
-                                    <div className="space-y-4">
-                                        <div className="space-y-2">
-                                            <button
-                                                onClick={autoPlaceAllSprinklers}
-                                                disabled={
-                                                    gardenZones.filter(
-                                                        (z) =>
-                                                            z.type !== 'forbidden' && z.sprinklerConfig
-                                                    ).length === 0
-                                                }
-                                                className="w-full rounded-lg bg-purple-600 py-3 font-medium text-white transition-all hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-600"
-                                            >
-                                                🤖 วางหัวฉีดอัตโนมัติ (ทุกโซน)
-                                            </button>
-
-                                            <button
-                                                onClick={() => setEditMode('place')}
-                                                className={`w-full rounded-lg py-3 font-medium transition-all ${
-                                                    editMode === 'place'
-                                                        ? 'bg-green-600 text-white shadow-lg'
-                                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                                }`}
-                                            >
-                                                📍{' '}
-                                                {editMode === 'place'
-                                                    ? designMode === 'map'
-                                                        ? 'กำลังวางหัวฉีด - คลิกในแผนที่'
-                                                        : 'กำลังวางหัวฉีด - คลิกในพื้นที่'
-                                                    : 'วางหัวฉีดเอง'}
-                                            </button>
-
-                                            {editMode === 'place' && (
-                                                <div className="mt-3 space-y-3 border-t border-gray-600 pt-3">
-                                                    <div>
-                                                        <label className="mb-2 block text-xs font-medium text-gray-300">
-                                                            เลือกประเภทหัวฉีด:
-                                                        </label>
-                                                        <div className="grid grid-cols-1 gap-1">
-                                                            {SPRINKLER_TYPES.map((sprinkler) => (
-                                                                <button
-                                                                    key={sprinkler.id}
-                                                                    onClick={() =>
-                                                                        setManualSprinklerType(
-                                                                            sprinkler.id
-                                                                        )
-                                                                    }
-                                                                    className={`rounded p-2 text-left text-xs transition-all ${
-                                                                        manualSprinklerType ===
-                                                                        sprinkler.id
-                                                                            ? 'bg-blue-900/30 ring-1 ring-blue-400'
-                                                                            : 'hover:bg-gray-600'
-                                                                    }`}
-                                                                >
-                                                                    <div className="flex items-center space-x-2">
-                                                                        <span>{sprinkler.icon}</span>
-                                                                        <span className="font-medium text-gray-100">
-                                                                            {sprinkler.nameEN}
-                                                                        </span>
-                                                                    </div>
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-
-                                                    <div>
-                                                        <label className="mb-2 block text-xs font-medium text-gray-300">
-                                                            รัศมีการฉีดน้ำ (เมตร):
-                                                        </label>
-                                                        <div className="flex items-center space-x-3">
-                                                            <input
-                                                                type="range"
-                                                                min="1"
-                                                                max="15"
-                                                                step="0.5"
-                                                                value={manualSprinklerRadius}
-                                                                onChange={(e) =>
-                                                                    setManualSprinklerRadius(
-                                                                        Number(e.target.value)
-                                                                    )
-                                                                }
-                                                                className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-gray-600"
-                                                            />
-                                                            <span className="min-w-[3rem] text-sm font-bold text-blue-400">
-                                                                {manualSprinklerRadius}ม.
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            <button
-                                                onClick={() => setEditMode('edit')}
-                                                className={`w-full rounded-lg py-3 font-medium transition-all ${
-                                                    editMode === 'edit'
-                                                        ? 'bg-yellow-600 text-white shadow-lg'
-                                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                                }`}
-                                            >
-                                                🚰{' '}
-                                                {editMode === 'edit'
-                                                    ? designMode === 'map'
-                                                        ? 'กำลังวางแหล่งน้ำ - คลิกแผนที่'
-                                                        : 'กำลังวางแหล่งน้ำ - คลิกในพื้นที่'
-                                                    : 'วางแหล่งน้ำ'}
-                                            </button>
-
-                                            <button
-                                                onClick={() => setEditMode('drag-sprinkler')}
-                                                className={`w-full rounded-lg py-3 font-medium transition-all ${
-                                                    editMode === 'drag-sprinkler'
-                                                        ? 'bg-orange-600 text-white shadow-lg'
-                                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                                }`}
-                                            >
-                                                ↔️{' '}
-                                                {editMode === 'drag-sprinkler'
-                                                    ? 'กำลังปรับตำแหน่ง - ลากหัวฉีด'
-                                                    : 'ปรับตำแหน่งหัวฉีด'}
-                                            </button>
-
-                                            {sprinklers.length > 0 && (
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedSprinkler(null);
-                                                        setSprinklers([]);
-                                                    }}
-                                                    className="w-full rounded-lg bg-red-600 py-3 font-medium text-white transition-all hover:bg-red-700"
-                                                >
-                                                    🗑️ ลบหัวฉีดทั้งหมด
-                                                </button>
-                                            )}
+                                <div className="space-y-4">
+                                    {!waterSource ? (
+                                        <div className="rounded-lg border border-amber-500 bg-amber-900/30 p-4 text-amber-200">
+                                            <div className="mb-2 flex items-center gap-2">
+                                                <span className="text-lg">⚠️</span>
+                                                <span className="font-semibold">
+                                                    ต้องวางแหล่งน้ำก่อน
+                                                </span>
+                                            </div>
+                                            <p className="text-sm">
+                                                กรุณาไปแท็บ "วางหัวฉีด" และกดปุ่ม "วางแหล่งน้ำ"
+                                                ก่อนสร้างระบบท่อ
+                                            </p>
                                         </div>
-
-                                        {sprinklers.length > 0 && (
-                                            <div className="space-y-2">
-                                                <h4 className="text-sm font-medium text-gray-300">
-                                                    สรุปหัวฉีด: {sprinklers.length} ตัว
-                                                </h4>
-                                                <div className="max-h-40 space-y-2 overflow-y-auto">
-                                                    {gardenZones
-                                                        .filter((zone) => zone.type !== 'forbidden')
-                                                        .map((zone) => {
-                                                            const zoneSprinklers = sprinklers.filter(
-                                                                (s) => s.zoneId === zone.id
-                                                            );
-                                                            if (zoneSprinklers.length === 0)
-                                                                return null;
-
-                                                            const zoneType = ZONE_TYPES.find(
-                                                                (z) => z.id === zone.type
-                                                            );
-                                                            const isNestedZone = !!zone.parentZoneId;
-
-                                                            return (
-                                                                <div
-                                                                    key={zone.id}
-                                                                    className={`rounded-lg p-2 text-xs ${
-                                                                        isNestedZone
-                                                                            ? 'ml-4 border-l-2 bg-gray-600'
-                                                                            : 'bg-gray-700'
-                                                                    }`}
-                                                                    style={{
-                                                                        borderLeftColor: isNestedZone
-                                                                            ? zoneType?.color
-                                                                            : undefined,
-                                                                    }}
-                                                                >
-                                                                    <div className="flex items-center justify-between">
-                                                                        <div className="flex items-center space-x-2">
-                                                                            <span>
-                                                                                {zoneType?.icon}
-                                                                            </span>
-                                                                            <span className="font-medium text-gray-100">
-                                                                                {zone.name}
-                                                                            </span>
-                                                                        </div>
-                                                                        <div className="text-right">
-                                                                            <div className="font-bold text-blue-400">
-                                                                                {zoneSprinklers.length}{' '}
-                                                                                หัว
-                                                                            </div>
-                                                                            {zone.sprinklerConfig && (
-                                                                                <div className="text-gray-400">
-                                                                                    {
-                                                                                        SPRINKLER_TYPES.find(
-                                                                                            (s) =>
-                                                                                                s.id ===
-                                                                                                zone
-                                                                                                    .sprinklerConfig!
-                                                                                                    .type
-                                                                                        )?.nameEN
-                                                                                    }
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
-
-                                                    {sprinklers.filter(
-                                                        (s) => s.zoneId === 'virtual_zone'
-                                                    ).length > 0 && (
-                                                        <div className="rounded-lg bg-gray-700 p-2 text-xs">
-                                                            <div className="flex items-center justify-between">
-                                                                <div className="flex items-center space-x-2">
-                                                                    <span>⚙️</span>
-                                                                    <span className="font-medium text-gray-100">
-                                                                        หัวฉีดแบบกำหนดเอง
-                                                                    </span>
-                                                                </div>
-                                                                <div className="text-right">
-                                                                    <div className="font-bold text-blue-400">
-                                                                        {
-                                                                            sprinklers.filter(
-                                                                                (s) =>
-                                                                                    s.zoneId ===
-                                                                                    'virtual_zone'
-                                                                            ).length
-                                                                        }{' '}
-                                                                        หัว
-                                                                    </div>
-                                                                    <div className="text-gray-400">
-                                                                        หัวฉีดผสม
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    )}
+                                    ) : sprinklers.length === 0 ? (
+                                        <div className="rounded-lg border border-amber-500 bg-amber-900/30 p-4 text-amber-200">
+                                            <div className="mb-2 flex items-center gap-2">
+                                                <span className="text-lg">⚠️</span>
+                                                <span className="font-semibold">
+                                                    ต้องวางหัวฉีดก่อน
+                                                </span>
+                                            </div>
+                                            <p className="text-sm">
+                                                กรุณาไปแท็บ "วางหัวฉีด" และวางหัวฉีดก่อนสร้างระบบท่อ
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            <div className="rounded-lg bg-green-900/30 p-3 text-xs text-green-300">
+                                                <div className="mb-1 font-medium">
+                                                    ✅ พร้อมสร้างระบบท่อแล้ว
+                                                </div>
+                                                <div>
+                                                    แหล่งน้ำ: 1 จุด • หัวฉีด: {sprinklers.length}{' '}
+                                                    ตัว
                                                 </div>
                                             </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
 
-                            {activeTab === 'pipes' && (
-                                <div className="rounded-xl bg-gray-800/90 p-6 shadow-2xl backdrop-blur">
-                                    <h3 className="mb-4 text-xl font-semibold text-blue-400">
-                                        🔧 ระบบท่อน้ำ
-                                    </h3>
-
-                                    <div className="space-y-4">
-                                        {!waterSource ? (
-                                            <div className="rounded-lg border border-amber-500 bg-amber-900/30 p-4 text-amber-200">
-                                                <div className="mb-2 flex items-center gap-2">
-                                                    <span className="text-lg">⚠️</span>
-                                                    <span className="font-semibold">
-                                                        ต้องวางแหล่งน้ำก่อน
-                                                    </span>
-                                                </div>
-                                                <p className="text-sm">
-                                                    กรุณาไปแท็บ "วางหัวฉีด" และกดปุ่ม "วางแหล่งน้ำ"
-                                                    ก่อนสร้างระบบท่อ
-                                                </p>
-                                            </div>
-                                        ) : sprinklers.length === 0 ? (
-                                            <div className="rounded-lg border border-amber-500 bg-amber-900/30 p-4 text-amber-200">
-                                                <div className="mb-2 flex items-center gap-2">
-                                                    <span className="text-lg">⚠️</span>
-                                                    <span className="font-semibold">
-                                                        ต้องวางหัวฉีดก่อน
-                                                    </span>
-                                                </div>
-                                                <p className="text-sm">
-                                                    กรุณาไปแท็บ "วางหัวฉีด" และวางหัวฉีดก่อนสร้างระบบท่อ
-                                                </p>
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-3">
-                                                <div className="rounded-lg bg-green-900/30 p-3 text-xs text-green-300">
-                                                    <div className="mb-1 font-medium">
-                                                        ✅ พร้อมสร้างระบบท่อแล้ว
+                                            <button
+                                                onClick={generatePipeNetwork}
+                                                disabled={
+                                                    !waterSource ||
+                                                    sprinklers.length === 0 ||
+                                                    isGeneratingPipes
+                                                }
+                                                className="w-full rounded-lg bg-blue-600 py-4 text-lg font-bold text-white transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-600"
+                                            >
+                                                {isGeneratingPipes ? (
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                                                        🔧 กำลังสร้างระบบท่อ...
                                                     </div>
-                                                    <div>
-                                                        แหล่งน้ำ: 1 จุด • หัวฉีด: {sprinklers.length}{' '}
-                                                        ตัว
-                                                    </div>
-                                                </div>
-
-                                                <button
-                                                    onClick={generatePipeNetwork}
-                                                    disabled={
-                                                        !waterSource ||
-                                                        sprinklers.length === 0 ||
-                                                        isGeneratingPipes
-                                                    }
-                                                    className="w-full rounded-lg bg-blue-600 py-4 text-lg font-bold text-white transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-600"
-                                                >
-                                                    {isGeneratingPipes ? (
-                                                        <div className="flex items-center justify-center gap-2">
-                                                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                                                            🔧 กำลังสร้างระบบท่อ...
-                                                        </div>
-                                                    ) : (
-                                                        '🚀 สร้างระบบท่ออัตโนมัติ'
-                                                    )}
-                                                </button>
-
-                                                {pipeGenerationError && (
-                                                    <div className="rounded-lg border border-red-500 bg-red-900/30 p-3 text-red-200">
-                                                        <div className="mb-1 flex items-center gap-2">
-                                                            <span className="text-lg">❌</span>
-                                                            <span className="font-semibold">
-                                                                เกิดข้อผิดพลาด
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-sm">{pipeGenerationError}</p>
-                                                    </div>
+                                                ) : (
+                                                    '🚀 สร้างระบบท่ออัตโนมัติ'
                                                 )}
+                                            </button>
 
-                                                {pipes.length > 0 && (
-                                                    <div className="space-y-3">
-                                                        <div className="rounded-lg bg-purple-900/30 p-3 text-sm text-purple-300">
-                                                            <div className="mb-1 font-medium">
-                                                                📊 สถิติระบบท่อ (สีเหลือง):
-                                                            </div>
-                                                            <div>
-                                                                จำนวนท่อทั้งหมด: {pipes.length} เส้น
-                                                            </div>
-                                                            <div>
-                                                                ความยาวรวม:{' '}
-                                                                {formatDistance(
-                                                                    pipes.reduce(
-                                                                        (sum, p) => sum + p.length,
-                                                                        0
-                                                                    )
+                                            {pipeGenerationError && (
+                                                <div className="rounded-lg border border-red-500 bg-red-900/30 p-3 text-red-200">
+                                                    <div className="mb-1 flex items-center gap-2">
+                                                        <span className="text-lg">❌</span>
+                                                        <span className="font-semibold">
+                                                            เกิดข้อผิดพลาด
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-sm">{pipeGenerationError}</p>
+                                                </div>
+                                            )}
+
+                                            {pipes.length > 0 && (
+                                                <div className="space-y-3">
+                                                    <div className="rounded-lg bg-purple-900/30 p-3 text-sm text-purple-300">
+                                                        <div className="mb-1 font-medium">
+                                                            📊 สถิติระบบท่อ (สีเหลือง):
+                                                        </div>
+                                                        <div>
+                                                            จำนวนท่อทั้งหมด: {pipes.length} เส้น
+                                                        </div>
+                                                        <div>
+                                                            ความยาวรวม:{' '}
+                                                            {formatDistance(
+                                                                pipes.reduce(
+                                                                    (sum, p) => sum + p.length,
+                                                                    0
+                                                                )
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Pipe editing controls */}
+                                                    <div className="rounded-lg bg-blue-900/30 p-3">
+                                                        <div className="mb-2 text-sm font-medium text-blue-300">
+                                                            🔧 แก้ไขระบบท่อ:
+                                                        </div>
+
+                                                        <div className="mb-3 flex gap-2">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setPipeEditMode(
+                                                                        pipeEditMode === 'add'
+                                                                            ? 'view'
+                                                                            : 'add'
+                                                                    );
+                                                                    setSelectedSprinklersForPipe(
+                                                                        []
+                                                                    );
+                                                                }}
+                                                                className={`flex-1 rounded py-2 text-xs font-medium transition-all ${
+                                                                    pipeEditMode === 'add'
+                                                                        ? 'bg-green-600 text-white'
+                                                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                                }`}
+                                                            >
+                                                                ➕ เพิ่มท่อ
+                                                            </button>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setPipeEditMode(
+                                                                        pipeEditMode === 'remove'
+                                                                            ? 'view'
+                                                                            : 'remove'
+                                                                    );
+                                                                    setSelectedSprinklersForPipe(
+                                                                        []
+                                                                    );
+                                                                }}
+                                                                className={`flex-1 rounded py-2 text-xs font-medium transition-all ${
+                                                                    pipeEditMode === 'remove'
+                                                                        ? 'bg-red-600 text-white'
+                                                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                                }`}
+                                                            >
+                                                                ➖ ลบท่อ
+                                                            </button>
+                                                        </div>
+
+                                                        {pipeEditMode === 'add' && (
+                                                            <div className="space-y-2">
+                                                                <div className="text-xs text-blue-200">
+                                                                    เลือกหัวฉีด 2
+                                                                    ตัวเพื่อเชื่อมต่อท่อ (
+                                                                    {
+                                                                        selectedSprinklersForPipe.length
+                                                                    }
+                                                                    /2)
+                                                                </div>
+                                                                {selectedSprinklersForPipe.length ===
+                                                                    2 && (
+                                                                    <button
+                                                                        onClick={
+                                                                            addPipeBetweenSprinklers
+                                                                        }
+                                                                        className="w-full rounded bg-green-700 py-2 text-xs font-medium text-white hover:bg-green-600"
+                                                                    >
+                                                                        ✅ เชื่อมต่อท่อ
+                                                                    </button>
                                                                 )}
                                                             </div>
-                                                        </div>
+                                                        )}
 
-                                                        {/* Pipe editing controls */}
-                                                        <div className="rounded-lg bg-blue-900/30 p-3">
-                                                            <div className="mb-2 text-sm font-medium text-blue-300">
-                                                                🔧 แก้ไขระบบท่อ:
-                                                            </div>
-
-                                                            <div className="mb-3 flex gap-2">
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setPipeEditMode(
-                                                                            pipeEditMode === 'add'
-                                                                                ? 'view'
-                                                                                : 'add'
-                                                                        );
-                                                                        setSelectedSprinklersForPipe(
-                                                                            []
-                                                                        );
-                                                                    }}
-                                                                    className={`flex-1 rounded py-2 text-xs font-medium transition-all ${
-                                                                        pipeEditMode === 'add'
-                                                                            ? 'bg-green-600 text-white'
-                                                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                                                    }`}
-                                                                >
-                                                                    ➕ เพิ่มท่อ
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setPipeEditMode(
-                                                                            pipeEditMode === 'remove'
-                                                                                ? 'view'
-                                                                                : 'remove'
-                                                                        );
-                                                                        setSelectedSprinklersForPipe(
-                                                                            []
-                                                                        );
-                                                                    }}
-                                                                    className={`flex-1 rounded py-2 text-xs font-medium transition-all ${
-                                                                        pipeEditMode === 'remove'
-                                                                            ? 'bg-red-600 text-white'
-                                                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                                                    }`}
-                                                                >
-                                                                    ➖ ลบท่อ
-                                                                </button>
-                                                            </div>
-
-                                                            {pipeEditMode === 'add' && (
-                                                                <div className="space-y-2">
-                                                                    <div className="text-xs text-blue-200">
-                                                                        เลือกหัวฉีด 2
-                                                                        ตัวเพื่อเชื่อมต่อท่อ (
-                                                                        {
-                                                                            selectedSprinklersForPipe.length
-                                                                        }
-                                                                        /2)
-                                                                    </div>
-                                                                    {selectedSprinklersForPipe.length ===
-                                                                        2 && (
-                                                                        <button
-                                                                            onClick={
-                                                                                addPipeBetweenSprinklers
-                                                                            }
-                                                                            className="w-full rounded bg-green-700 py-2 text-xs font-medium text-white hover:bg-green-600"
-                                                                        >
-                                                                            ✅ เชื่อมต่อท่อ
-                                                                        </button>
-                                                                    )}
+                                                        {pipeEditMode === 'remove' && (
+                                                            <div className="space-y-2">
+                                                                <div className="text-xs text-red-200">
+                                                                    เลือกหัวฉีด 2
+                                                                    ตัวเพื่อลบท่อระหว่างกัน (
+                                                                    {
+                                                                        selectedSprinklersForPipe.length
+                                                                    }
+                                                                    /2)
                                                                 </div>
-                                                            )}
-
-                                                            {pipeEditMode === 'remove' && (
-                                                                <div className="space-y-2">
-                                                                    <div className="text-xs text-red-200">
-                                                                        เลือกหัวฉีด 2
-                                                                        ตัวเพื่อลบท่อระหว่างกัน (
-                                                                        {
-                                                                            selectedSprinklersForPipe.length
-                                                                        }
-                                                                        /2)
-                                                                    </div>
-                                                                    {selectedSprinklersForPipe.length ===
-                                                                        2 && (
-                                                                        <button
-                                                                            onClick={
-                                                                                removePipesBetweenSprinklers
-                                                                            }
-                                                                            className="w-full rounded bg-red-700 py-2 text-xs font-medium text-white hover:bg-red-600"
-                                                                        >
-                                                                            🗑️
-                                                                            ลบท่อระหว่างหัวฉีดที่เลือก
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            )}
-
-                                                            {selectedPipes.size > 0 && (
-                                                                <div className="mt-2 space-y-2">
-                                                                    <div className="text-xs text-yellow-200">
-                                                                        เลือกแล้ว: {selectedPipes.size}{' '}
-                                                                        ท่อ
-                                                                    </div>
+                                                                {selectedSprinklersForPipe.length ===
+                                                                    2 && (
                                                                     <button
-                                                                        onClick={deleteSelectedPipes}
+                                                                        onClick={
+                                                                            removePipesBetweenSprinklers
+                                                                        }
                                                                         className="w-full rounded bg-red-700 py-2 text-xs font-medium text-white hover:bg-red-600"
                                                                     >
-                                                                        🗑️ ลบท่อที่เลือก
+                                                                        🗑️
+                                                                        ลบท่อระหว่างหัวฉีดที่เลือก
                                                                     </button>
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        {selectedPipes.size > 0 && (
+                                                            <div className="mt-2 space-y-2">
+                                                                <div className="text-xs text-yellow-200">
+                                                                    เลือกแล้ว: {selectedPipes.size}{' '}
+                                                                    ท่อ
                                                                 </div>
-                                                            )}
-                                                        </div>
-
-                                                        <button
-                                                            onClick={clearPipes}
-                                                            className="w-full rounded-lg bg-red-600 py-3 font-medium text-white transition-all hover:bg-red-700"
-                                                        >
-                                                            🗑️ ลบระบบท่อทั้งหมด
-                                                        </button>
+                                                                <button
+                                                                    onClick={deleteSelectedPipes}
+                                                                    className="w-full rounded bg-red-700 py-2 text-xs font-medium text-white hover:bg-red-600"
+                                                                >
+                                                                    🗑️ ลบท่อที่เลือก
+                                                                </button>
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                )}
-                                            </div>
-                                        )}
 
-                                        <div className="border-t border-gray-600 pt-4">
-                                            <h4 className="mb-2 text-sm font-semibold text-gray-300">
-                                                💡 วิธีการทำงาน (ระบบใหม่):
-                                            </h4>
-                                            <div className="space-y-2 text-xs text-gray-400">
-                                                <div className="flex items-start gap-2">
-                                                    <span className="text-blue-400">1.</span>
-                                                    <span>วิเคราะห์จำนวนหัวฉีดและตำแหน่ง</span>
+                                                    <button
+                                                        onClick={clearPipes}
+                                                        className="w-full rounded-lg bg-red-600 py-3 font-medium text-white transition-all hover:bg-red-700"
+                                                    >
+                                                        🗑️ ลบระบบท่อทั้งหมด
+                                                    </button>
                                                 </div>
-                                                <div className="flex items-start gap-2">
-                                                    <span className="text-blue-400">2.</span>
-                                                    <span>เชื่อมต่อตรงสำหรับ ≤3 หัวฉีด</span>
-                                                </div>
-                                                <div className="flex items-start gap-2">
-                                                    <span className="text-blue-400">3.</span>
-                                                    <span>ใช้ MST algorithm สำหรับ &gt;3 หัวฉีด</span>
-                                                </div>
-                                                <div className="flex items-start gap-2">
-                                                    <span className="text-blue-400">4.</span>
-                                                    <span>
-                                                        ท่อทุกเส้นมีขนาดเดียวกัน (ไม่แบ่งหลัก/สาขา)
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-start gap-2">
-                                                    <span className="text-green-400">5.</span>
-                                                    <span>สามารถแก้ไขเพิ่ม/ลบท่อได้หลังสร้างแล้ว</span>
-                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <div className="border-t border-gray-600 pt-4">
+                                        <h4 className="mb-2 text-sm font-semibold text-gray-300">
+                                            💡 วิธีการทำงาน (ระบบใหม่):
+                                        </h4>
+                                        <div className="space-y-2 text-xs text-gray-400">
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-blue-400">1.</span>
+                                                <span>วิเคราะห์จำนวนหัวฉีดและตำแหน่ง</span>
+                                            </div>
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-blue-400">2.</span>
+                                                <span>เชื่อมต่อตรงสำหรับ ≤3 หัวฉีด</span>
+                                            </div>
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-blue-400">3.</span>
+                                                <span>ใช้ MST algorithm สำหรับ &gt;3 หัวฉีด</span>
+                                            </div>
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-blue-400">4.</span>
+                                                <span>
+                                                    ท่อทุกเส้นมีขนาดเดียวกัน (ไม่แบ่งหลัก/สาขา)
+                                                </span>
+                                            </div>
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-green-400">5.</span>
+                                                <span>สามารถแก้ไขเพิ่ม/ลบท่อได้หลังสร้างแล้ว</span>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            )}
-                        </div>
+                            </div>
+                        )}
+                    </div>
 
-                        <div className="lg:col-span-3">
-                            <div className="relative h-[83vh] overflow-hidden rounded-xl border border-gray-600 shadow-2xl">
-                                {designMode === 'map' && (
-                                    <GoogleMapDesigner
+                    <div className="lg:col-span-3">
+                        <div className="relative h-[83vh] overflow-hidden rounded-xl border border-gray-600 shadow-2xl">
+                            {designMode === 'map' && (
+                                <GoogleMapDesigner
+                                    gardenZones={gardenZones}
+                                    sprinklers={sprinklers}
+                                    waterSource={waterSource}
+                                    pipes={pipes}
+                                    selectedZoneType={selectedZoneType}
+                                    editMode={editMode}
+                                    manualSprinklerType={manualSprinklerType}
+                                    manualSprinklerRadius={manualSprinklerRadius}
+                                    selectedSprinkler={selectedSprinkler}
+                                    selectedPipes={selectedPipes}
+                                    selectedSprinklersForPipe={selectedSprinklersForPipe}
+                                    mainPipeDrawing={[]}
+                                    onZoneCreated={handleZoneCreated}
+                                    onZoneDeleted={handleZoneDeleted}
+                                    onSprinklerPlaced={(position) => {
+                                        const { lat, lng } = position;
+                                        handleMapClick({ latlng: { lat, lng } });
+                                    }}
+                                    onWaterSourcePlaced={(position) => {
+                                        setWaterSource({
+                                            id: `source_${Date.now()}`,
+                                            position,
+                                            type: 'main',
+                                        });
+                                    }}
+                                    onMainPipeClick={() => {}}
+                                    onSprinklerClick={handleSprinklerClickForPipe}
+                                    onSprinklerDelete={(sprinklerId) => {
+                                        setSprinklers((prev) =>
+                                            prev.filter((s) => s.id !== sprinklerId)
+                                        );
+                                        if (selectedSprinkler === sprinklerId) {
+                                            setSelectedSprinkler(null);
+                                        }
+                                        setSelectedSprinklersForPipe((prev) =>
+                                            prev.filter((id) => id !== sprinklerId)
+                                        );
+                                    }}
+                                    onSprinklerDragged={(sprinklerId, position) => {
+                                        setSprinklers((prev) =>
+                                            prev.map((s) =>
+                                                s.id === sprinklerId ? { ...s, position } : s
+                                            )
+                                        );
+                                    }}
+                                    onWaterSourceDelete={() => setWaterSource(null)}
+                                    onPipeClick={handlePipeClick}
+                                    onMapClick={handleMapClick}
+                                    mapCenter={mapCenter}
+                                    pipeEditMode={pipeEditMode}
+                                />
+                            )}
+
+                            {designMode === 'canvas' && (
+                                <div className="flex h-full w-full items-center justify-center bg-gray-900">
+                                    <CanvasDesigner
                                         gardenZones={gardenZones}
                                         sprinklers={sprinklers}
                                         waterSource={waterSource}
@@ -2211,140 +2263,85 @@ export default function HomeGardenPlanner() {
                                         selectedPipes={selectedPipes}
                                         selectedSprinklersForPipe={selectedSprinklersForPipe}
                                         mainPipeDrawing={[]}
-                                        onZoneCreated={handleZoneCreated}
-                                        onZoneDeleted={handleZoneDeleted}
-                                        onSprinklerPlaced={(position) => {
-                                            const { lat, lng } = position;
-                                            handleMapClick({ latlng: { lat, lng } });
-                                        }}
-                                        onWaterSourcePlaced={(position) => {
-                                            setWaterSource({
-                                                id: `source_${Date.now()}`,
-                                                position,
-                                                type: 'main',
-                                            });
-                                        }}
-                                        onMainPipeClick={() => {}}
-                                        onSprinklerClick={handleSprinklerClickForPipe}
-                                        onSprinklerDelete={(sprinklerId) => {
+                                        canvasData={canvasData}
+                                        onZoneCreated={handleCanvasZoneCreated}
+                                        onSprinklerPlaced={handleCanvasSprinklerPlaced}
+                                        onWaterSourcePlaced={handleCanvasWaterSourcePlaced}
+                                        onMainPipePoint={() => {}}
+                                        onSprinklerDragged={handleCanvasSprinklerDragged}
+                                        onSprinklerClick={handleCanvasSprinklerClick}
+                                        onSprinklerDelete={(id) => {
                                             setSprinklers((prev) =>
-                                                prev.filter((s) => s.id !== sprinklerId)
+                                                prev.filter((s) => s.id !== id)
                                             );
-                                            if (selectedSprinkler === sprinklerId) {
+                                            if (selectedSprinkler === id) {
                                                 setSelectedSprinkler(null);
                                             }
                                             setSelectedSprinklersForPipe((prev) =>
-                                                prev.filter((id) => id !== sprinklerId)
+                                                prev.filter((sprinklerId) => sprinklerId !== id)
                                             );
                                         }}
-                                        onSprinklerDragged={(sprinklerId, position) => {
-                                            setSprinklers((prev) =>
-                                                prev.map((s) =>
-                                                    s.id === sprinklerId ? { ...s, position } : s
-                                                )
-                                            );
-                                        }}
-                                        onWaterSourceDelete={() => setWaterSource(null)}
+                                        onWaterSourceDelete={handleWaterSourceDelete}
                                         onPipeClick={handlePipeClick}
-                                        onMapClick={handleMapClick}
-                                        mapCenter={mapCenter}
+                                        hasMainArea={true}
                                         pipeEditMode={pipeEditMode}
                                     />
-                                )}
+                                </div>
+                            )}
 
-                                {designMode === 'canvas' && (
-                                    <div className="flex h-full w-full items-center justify-center bg-gray-900">
-                                        <CanvasDesigner
-                                            gardenZones={gardenZones}
-                                            sprinklers={sprinklers}
-                                            waterSource={waterSource}
-                                            pipes={pipes}
-                                            selectedZoneType={selectedZoneType}
-                                            editMode={editMode}
-                                            manualSprinklerType={manualSprinklerType}
-                                            manualSprinklerRadius={manualSprinklerRadius}
-                                            selectedSprinkler={selectedSprinkler}
-                                            selectedPipes={selectedPipes}
-                                            selectedSprinklersForPipe={selectedSprinklersForPipe}
-                                            mainPipeDrawing={[]}
-                                            canvasData={canvasData}
-                                            onZoneCreated={handleCanvasZoneCreated}
-                                            onSprinklerPlaced={handleCanvasSprinklerPlaced}
-                                            onWaterSourcePlaced={handleCanvasWaterSourcePlaced}
-                                            onMainPipePoint={() => {}}
-                                            onSprinklerDragged={handleCanvasSprinklerDragged}
-                                            onSprinklerClick={handleCanvasSprinklerClick}
-                                            onSprinklerDelete={(id) => {
-                                                setSprinklers((prev) =>
-                                                    prev.filter((s) => s.id !== id)
-                                                );
-                                                if (selectedSprinkler === id) {
-                                                    setSelectedSprinkler(null);
-                                                }
-                                                setSelectedSprinklersForPipe((prev) =>
-                                                    prev.filter((sprinklerId) => sprinklerId !== id)
-                                                );
-                                            }}
-                                            onWaterSourceDelete={handleWaterSourceDelete}
-                                            onPipeClick={handlePipeClick}
-                                            hasMainArea={true}
-                                            pipeEditMode={pipeEditMode}
-                                        />
-                                    </div>
-                                )}
-
-                                {designMode === 'image' && (
-                                    <div className="h-full w-full items-center justify-center bg-gray-900 p-4">
-                                        <ImageDesigner
-                                            imageData={imageData}
-                                            gardenZones={gardenZones}
-                                            sprinklers={sprinklers}
-                                            waterSource={waterSource}
-                                            pipes={pipes}
-                                            selectedZoneType={selectedZoneType}
-                                            editMode={editMode}
-                                            manualSprinklerType={manualSprinklerType}
-                                            manualSprinklerRadius={manualSprinklerRadius}
-                                            selectedSprinkler={selectedSprinkler}
-                                            selectedPipes={selectedPipes}
-                                            selectedSprinklersForPipe={selectedSprinklersForPipe}
-                                            mainPipeDrawing={[]}
-                                            onImageUpload={handleImageUpload}
-                                            onZoneCreated={handleCanvasZoneCreated}
-                                            onSprinklerPlaced={handleCanvasSprinklerPlaced}
-                                            onWaterSourcePlaced={handleCanvasWaterSourcePlaced}
-                                            onMainPipePoint={() => {}}
-                                            onSprinklerDragged={handleCanvasSprinklerDragged}
-                                            onSprinklerClick={handleCanvasSprinklerClick}
-                                            onSprinklerDelete={(id) => {
-                                                setSprinklers((prev) =>
-                                                    prev.filter((s) => s.id !== id)
-                                                );
-                                                if (selectedSprinkler === id) {
-                                                    setSelectedSprinkler(null);
-                                                }
-                                                setSelectedSprinklersForPipe((prev) =>
-                                                    prev.filter((sprinklerId) => sprinklerId !== id)
-                                                );
-                                            }}
-                                            onWaterSourceDelete={handleWaterSourceDelete}
-                                            onPipeClick={handlePipeClick}
-                                            onScaleChange={(scale) => {
-                                                setImageData((prev: any) => ({
-                                                    ...prev,
-                                                    scale,
-                                                    isScaleSet: true,
-                                                }));
-                                            }}
-                                            pipeEditMode={pipeEditMode}
-                                        />
-                                    </div>
-                                )}
-                            </div>
+                            {designMode === 'image' && (
+                                <div className="h-full w-full items-center justify-center bg-gray-900 p-4">
+                                    <ImageDesigner
+                                        imageData={imageData}
+                                        gardenZones={gardenZones}
+                                        sprinklers={sprinklers}
+                                        waterSource={waterSource}
+                                        pipes={pipes}
+                                        selectedZoneType={selectedZoneType}
+                                        editMode={editMode}
+                                        manualSprinklerType={manualSprinklerType}
+                                        manualSprinklerRadius={manualSprinklerRadius}
+                                        selectedSprinkler={selectedSprinkler}
+                                        selectedPipes={selectedPipes}
+                                        selectedSprinklersForPipe={selectedSprinklersForPipe}
+                                        mainPipeDrawing={[]}
+                                        onImageUpload={handleImageUpload}
+                                        onZoneCreated={handleCanvasZoneCreated}
+                                        onSprinklerPlaced={handleCanvasSprinklerPlaced}
+                                        onWaterSourcePlaced={handleCanvasWaterSourcePlaced}
+                                        onMainPipePoint={() => {}}
+                                        onSprinklerDragged={handleCanvasSprinklerDragged}
+                                        onSprinklerClick={handleCanvasSprinklerClick}
+                                        onSprinklerDelete={(id) => {
+                                            setSprinklers((prev) =>
+                                                prev.filter((s) => s.id !== id)
+                                            );
+                                            if (selectedSprinkler === id) {
+                                                setSelectedSprinkler(null);
+                                            }
+                                            setSelectedSprinklersForPipe((prev) =>
+                                                prev.filter((sprinklerId) => sprinklerId !== id)
+                                            );
+                                        }}
+                                        onWaterSourceDelete={handleWaterSourceDelete}
+                                        onPipeClick={handlePipeClick}
+                                        onScaleChange={(scale) => {
+                                            setImageData((prev: any) => ({
+                                                ...prev,
+                                                scale,
+                                                isScaleSet: true,
+                                            }));
+                                        }}
+                                        pipeEditMode={pipeEditMode}
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
             </div>
+
+            {/* Footer */}
             <Footer />
         </div>
     );

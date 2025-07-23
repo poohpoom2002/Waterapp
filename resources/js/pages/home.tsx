@@ -86,7 +86,7 @@ const getPlantCategories = (t: (key: string) => string): PlantCategory[] => [
         description: t('greenhouse_desc'),
         icon: '🌱',
         color: 'from-purple-600 to-purple-800',
-        route: '/greenhouse/planner',
+        route: '/greenhouse-crop',
         features: [
             t('controlled_environment'),
             t('precision_irrigation'),
@@ -101,7 +101,7 @@ const getPlantCategories = (t: (key: string) => string): PlantCategory[] => [
         description: t('field_crop_desc'),
         icon: '🌾',
         color: 'from-yellow-600 to-yellow-800',
-        route: '/field-crop/planner',
+        route: '/field-crop',
         features: [
             t('large_scale_planning'),
             t('crop_rotation'),

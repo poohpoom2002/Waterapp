@@ -790,7 +790,8 @@ export default function MapPlanner() {
                                 <select
                                     value={selectedPlantCategory}
                                     onChange={(e) => {
-                                        setSelectedPlantCategory(e.target.value);
+                                        const selectedCategory = e.target.value;
+                                        setSelectedPlantCategory(selectedCategory);
                                         setSelectedPlant(null);
                                         console.log('Selected Plant Category:', e.target.value);
 
@@ -825,7 +826,7 @@ export default function MapPlanner() {
                                         } else {
                                             console.log(
                                                 'No plants available for category:',
-                                                e.target.value
+                                                selectedCategory
                                             );
                                             setFilteredPlants([]);
                                         }
