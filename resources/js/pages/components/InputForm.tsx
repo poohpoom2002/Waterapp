@@ -111,7 +111,7 @@ const InputForm: React.FC<InputFormProps> = ({
                 validatedValue = Math.max(1, Math.min(Math.round(value), input.numberOfZones));
                 break;
             case 'irrigationTimeMinutes':
-                validatedValue = Math.max(5, Math.min(300, value));
+                validatedValue = Math.max(1, Math.min(300, value));
                 break;
             case 'staticHeadM':
             case 'pressureHeadM':
@@ -782,18 +782,13 @@ const InputForm: React.FC<InputFormProps> = ({
                     <input
                         type="number"
                         step="1"
-                        value={input.irrigationTimeMinutes.toFixed(1)}
+                        value={input.irrigationTimeMinutes}
                         onChange={(e) =>
-                            updateInput('irrigationTimeMinutes', parseFloat(e.target.value) || 20)
+                            updateInput('irrigationTimeMinutes', parseInt(e.target.value) || 45)
                         }
-                        min="5"
-                        max="300"
                         className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
-                        placeholder="20"
+                        placeholder="45"
                     />
-                    <p className="mt-1 text-xs text-gray-400">
-                        {projectMode === 'garden' ? 'แนะนำ 20-45 นาที' : 'แนะนำ 15-60 นาที'}
-                    </p>
                 </div>
 
                 <div>

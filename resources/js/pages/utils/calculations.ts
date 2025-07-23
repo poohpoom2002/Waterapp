@@ -636,10 +636,6 @@ export const selectBestEquipmentByPrice = (
         (item) => item.isUsable && !item.isGoodChoice && !item.isRecommended
     );
 
-<<<<<<< HEAD
-=======
-    // เลือกจากกลุ่มที่ดีที่สุดที่มี
->>>>>>> main
     let targetGroup =
         recommended.length > 0
             ? recommended
