@@ -36,17 +36,20 @@ export const GOOGLE_MAPS_CONFIG = {
         streetViewControl: false,
         fullscreenControl: true,
         mapTypeControl: true,
-        // ✅ แก้ไข 1: ย้ายปุ่มสลับแผนที่ไปล่างซ้าย (ใช้ string แทน)
         mapTypeControlOptions: {
+<<<<<<< HEAD
+            position: 'TOP_CENTER' as any,
+            style: 'HORIZONTAL_BAR' as any,
+=======
             position: 'LEFT_BOTTOM' as unknown, // ใช้ string แทน google.maps.ControlPosition.LEFT_BOTTOM
             style: 'HORIZONTAL_BAR' as unknown, // ใช้ string แทน google.maps.MapTypeControlStyle.HORIZONTAL_BAR
+>>>>>>> main
             mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain'],
         },
-        // ✅ แก้ไข 2: ปรับการซูมให้ใกล้มากๆ จนเห็นบ้านหลังเดียว
-        minZoom: 1, // ซูมออกได้มากที่สุด
+        minZoom: 1,
+        maxZoom: 25,
         gestureHandling: 'greedy' as const,
         clickableIcons: false,
-        // เพิ่มการควบคุมการซูม
         scrollwheel: true,
         disableDoubleClickZoom: false,
     },
@@ -81,10 +84,11 @@ export const GOOGLE_MAPS_CONFIG = {
         country: 6,
         city: 12,
         area: 15,
-        building: 30, // เพิ่มจาก 25 เป็น 30
-        detail: 45, // เพิ่มจาก 35 เป็น 45
-        extreme: 60, // เพิ่มจาก 45 เป็น 60
-        house: 80, // เพิ่มใหม่ - ซูมระดับบ้านหลังเดียว
+        building: 19,
+        detail: 20,
+        extreme: 21,
+        house: 22,
+        maximum: 25,
     },
 };
 

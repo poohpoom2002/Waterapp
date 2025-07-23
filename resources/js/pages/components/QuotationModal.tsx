@@ -112,6 +112,21 @@ const QuotationModal: React.FC<QuotationModalProps> = ({
                             />
                         </div> */}
                         <div>
+                            <label className="mb-2 block text-sm font-medium">ProjectName:</label>
+                            <input
+                                type="text"
+                                value={quotationDataCustomer.projectName}
+                                onChange={(e) =>
+                                    onQuotationDataCustomerChange({
+                                        ...quotationDataCustomer,
+                                        projectName: e.target.value,
+                                    })
+                                }
+                                className="w-full rounded border border-gray-300 p-2 focus:border-blue-500 focus:outline-none"
+                                placeholder="ชื่อโครงการ"
+                            />
+                        </div>
+                        <div>
                             <label className="mb-2 block text-sm font-medium">Name:</label>
                             <input
                                 type="text"
@@ -126,34 +141,20 @@ const QuotationModal: React.FC<QuotationModalProps> = ({
                                 placeholder="ชื่อ - นามสกุล"
                             />
                         </div>
+
                         <div>
-                            <label className="mb-2 block text-sm font-medium">Address1:</label>
+                            <label className="mb-2 block text-sm font-medium">Address:</label>
                             <input
                                 type="text"
-                                value={quotationDataCustomer.address1}
+                                value={quotationDataCustomer.address}
                                 onChange={(e) =>
                                     onQuotationDataCustomerChange({
                                         ...quotationDataCustomer,
-                                        address1: e.target.value,
+                                        address: e.target.value,
                                     })
                                 }
                                 className="w-full rounded border border-gray-300 p-2 focus:border-blue-500 focus:outline-none"
                                 placeholder="ที่อยู่"
-                            />
-                        </div>
-                        <div>
-                            <label className="mb-2 block text-sm font-medium">Address2:</label>
-                            <input
-                                type="text"
-                                value={quotationDataCustomer.address2}
-                                onChange={(e) =>
-                                    onQuotationDataCustomerChange({
-                                        ...quotationDataCustomer,
-                                        address2: e.target.value,
-                                    })
-                                }
-                                className="w-full rounded border border-gray-300 p-2 focus:border-blue-500 focus:outline-none"
-                                placeholder="จังหวัด"
                             />
                         </div>
                         <div>
