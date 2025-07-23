@@ -6,9 +6,20 @@ interface PumpSelectorProps {
     results: CalculationResults;
     selectedPump?: any;
     onPumpChange: (pump: any) => void;
+    zoneOperationGroups?: ZoneOperationGroup[];
+    zoneInputs?: { [zoneId: string]: IrrigationInput };
     simultaneousZonesCount?: number;
     selectedZones?: string[];
-    zoneInputs?: { [zoneId: string]: IrrigationInput };
+    allZoneResults?: any[];
+    projectSummary?: any;
+    zoneOperationMode?: string;
+}
+
+interface ZoneOperationGroup {
+    id: string;
+    zones: string[];
+    order: number;
+    label: string;
 }
 
 const PumpSelector: React.FC<PumpSelectorProps> = ({
@@ -35,30 +46,63 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
     const requiredFlow = results.flows.main;
     const requiredHead = results.pumpHeadRequired;
 
-    // Calculate actual flow requirement for simultaneous zones
     const calculateSimultaneousFlow = () => {
-        if (!selectedZones || selectedZones.length <= 1 || !zoneInputs) {
-            return requiredFlow;
+        if (results.projectSummary) {
+            return {
+                flow: results.projectSummary.selectedGroupFlowLPM,
+                head: results.projectSummary.selectedGroupHeadM,
+                mode: results.projectSummary.operationMode,
+                sourceInfo: 'คำนวณจากระบบ Project Summary',
+            };
         }
 
-        // Sort zones by flow requirement and take the top simultaneous zones
+        if (!selectedZones || selectedZones.length <= 1 || !zoneInputs) {
+            return {
+                flow: requiredFlow,
+                head: requiredHead,
+                mode: 'single',
+                sourceInfo: 'โซนเดียว',
+            };
+        }
+
         const zoneFlows = selectedZones
             .map((zoneId) => {
                 const zoneInput = zoneInputs[zoneId];
-                if (!zoneInput) return { zoneId, flow: 0 };
+                if (!zoneInput) return { zoneId, flow: 0, head: 0 };
 
                 const flowLPH =
                     (zoneInput.totalTrees * zoneInput.waterPerTreeLiters) /
                     (zoneInput.irrigationTimeMinutes / 60);
-                return { zoneId, flow: flowLPH / 60 }; // Convert to LPM
-            })
-            .sort((a, b) => b.flow - a.flow);
+                const headTotal = zoneInput.staticHeadM + zoneInput.pressureHeadM;
 
-        const topFlows = zoneFlows.slice(0, simultaneousZonesCount);
-        return topFlows.reduce((sum, zone) => sum + zone.flow, 0);
+                return {
+                    zoneId,
+                    flow: flowLPH / 60,
+                    head: headTotal,
+                };
+            })
+            .sort((a, b) => b.head - a.head);
+
+        const topZones = zoneFlows.slice(0, simultaneousZonesCount);
+        const totalFlow = topZones.reduce((sum, zone) => sum + zone.flow, 0);
+        const maxHead = topZones.length > 0 ? topZones[0].head : 0;
+
+        return {
+            flow: totalFlow,
+            head: maxHead,
+            mode:
+                simultaneousZonesCount === selectedZones.length
+                    ? 'simultaneous'
+                    : simultaneousZonesCount === 1
+                      ? 'sequential'
+                      : 'custom',
+            sourceInfo: `${simultaneousZonesCount} โซนพร้อมกัน (Fallback calculation)`,
+        };
     };
 
-    const actualRequiredFlow = calculateSimultaneousFlow();
+    const flowData = calculateSimultaneousFlow();
+    const actualRequiredFlow = flowData.flow;
+    const actualRequiredHead = flowData.head;
 
     const currentPump = selectedPump || results.autoSelectedPump;
     const autoSelectedPump = results.autoSelectedPump;
@@ -172,22 +216,48 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                     <p>
                         อัตราการไหล:{' '}
                         <span className="font-bold text-blue-300">
-                            {requiredFlow.toFixed(1)} LPM
+                            {results.projectSummary
+                                ? results.projectSummary.selectedGroupFlowLPM.toFixed(1)
+                                : requiredFlow.toFixed(1)}{' '}
+                            LPM
                         </span>
                     </p>
                     <p>
                         Head รวม:{' '}
                         <span className="font-bold text-yellow-300">
-                            {requiredHead.toFixed(1)} เมตร
+                            {results.projectSummary
+                                ? results.projectSummary.selectedGroupHeadM.toFixed(1)
+                                : requiredHead.toFixed(1)}{' '}
+                            เมตร
                         </span>
                     </p>
                 </div>
-                {selectedZones.length > 1 && simultaneousZonesCount > 1 && (
+                {results.projectSummary && (
                     <div className="mt-2 text-xs text-purple-200">
-                        <p>🔄 คำนวณสำหรับ {simultaneousZonesCount} โซนที่เปิดพร้อมกัน</p>
-                        <p>💧 อัตราการไหลรวม: {actualRequiredFlow.toFixed(1)} LPM</p>
+                        <p>
+                            🎯 รูปแบบการเปิด:{' '}
+                            {results.projectSummary.operationMode === 'simultaneous'
+                                ? 'เปิดพร้อมกันทุกโซน'
+                                : results.projectSummary.operationMode === 'custom'
+                                  ? 'เปิดแบบกำหนดเอง'
+                                  : 'เปิดทีละโซน'}
+                        </p>
+                        <p>💧 คำนวณจากโซน: {results.projectSummary.criticalZone}</p>
+                        {results.projectSummary.criticalGroup && (
+                            <p>🔗 กลุ่มที่คำนวณ: {results.projectSummary.criticalGroup.label}</p>
+                        )}
                     </div>
                 )}
+                {selectedZones &&
+                    selectedZones.length > 1 &&
+                    simultaneousZonesCount &&
+                    simultaneousZonesCount > 1 &&
+                    !results.projectSummary && (
+                        <div className="mt-2 text-xs text-purple-200">
+                            <p>🔄 คำนวณสำหรับ {simultaneousZonesCount} โซนที่เปิดพร้อมกัน</p>
+                            <p>💧 อัตราการไหลรวม: {actualRequiredFlow.toFixed(1)} LPM (Fallback)</p>
+                        </div>
+                    )}
             </div>
 
             <div className="mb-4">
@@ -208,13 +278,14 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                     {sortedPumps.map((pump) => {
                         const group = getPumpGrouping(pump);
                         const isAuto = pump.id === autoSelectedPump?.id;
-                        const isAdequate = pump.isFlowAdequate && pump.isHeadAdequate;
                         return (
-                            <option key={pump.id} value={pump.id} disabled={!isAdequate}>
+                            <option key={pump.id} value={pump.id}>
                                 {isAuto ? '🤖 ' : ''}
                                 {pump.name || pump.productCode} - {pump.powerHP}HP -{' '}
                                 {pump.price?.toLocaleString()} บาท | {group} | คะแนน: {pump.score}
-                                {!isAdequate ? ' (ไม่เพียงพอ)' : ''}
+                                {!pump.isFlowAdequate || !pump.isHeadAdequate
+                                    ? ' (ไม่เพียงพอ)'
+                                    : ''}
                             </option>
                         );
                     })}

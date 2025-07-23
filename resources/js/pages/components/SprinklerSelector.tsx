@@ -35,7 +35,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
     };
 
     const analyzedSprinklers = results.analyzedSprinklers || [];
-    const sortedSprinklers = analyzedSprinklers.sort((a, b) => b.score - a.score);
+    const sortedSprinklers = analyzedSprinklers.sort((a, b) => a.price - b.price);
     const selectedAnalyzed = selectedSprinkler
         ? analyzedSprinklers.find((s) => s.id === selectedSprinkler.id)
         : null;
@@ -70,7 +70,6 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
 
     const uniqueSprinklers = getUniqueSprinklers();
 
-    // Labels and icons based on project mode
     const getLabel = (key: string) => {
         if (projectMode === 'garden') {
             switch (key) {
@@ -162,8 +161,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 </option>
                 {sortedSprinklers.map((sprinkler) => (
                     <option key={sprinkler.id} value={sprinkler.id}>
-                        {sprinkler.name} - {sprinkler.price} บาท | {sprinkler.brand_name || '-'} |
-                        คะแนน: {sprinkler.score}
+                        {sprinkler.name} - {sprinkler.price} บาท | {sprinkler.brand_name || '-'}
                     </option>
                 ))}
             </select>
@@ -179,9 +177,6 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                                 </span>
                             )}
                         </h4>
-                        <span className="text-sm font-bold text-blue-300">
-                            คะแนน: {selectedAnalyzed.score}/100
-                        </span>
                     </div>
 
                     <div className="grid grid-cols-10 items-center justify-between gap-3 text-sm">
@@ -249,34 +244,6 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                                     ).toLocaleString()}
                                 </span>{' '}
                                 บาท
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="mt-3 rounded bg-gray-500 p-2">
-                        <h5 className="text-xs font-medium text-yellow-300">การวิเคราะห์:</h5>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                            <p>
-                                คะแนนรวม:{' '}
-                                <span className="font-bold">{selectedAnalyzed.score}</span>/100
-                            </p>
-                            <p>
-                                ความเหมาะสมการไหล:
-                                <span
-                                    className={`ml-1 font-bold ${
-                                        selectedAnalyzed.flowMatch
-                                            ? 'text-green-300'
-                                            : selectedAnalyzed.flowCloseMatch
-                                              ? 'text-yellow-300'
-                                              : 'text-red-300'
-                                    }`}
-                                >
-                                    {selectedAnalyzed.flowMatch
-                                        ? '✅ เหมาะสม'
-                                        : selectedAnalyzed.flowCloseMatch
-                                          ? '⚠️ ใกล้เคียง'
-                                          : '❌ ไม่เหมาะสม'}
-                                </span>
                             </p>
                         </div>
                     </div>

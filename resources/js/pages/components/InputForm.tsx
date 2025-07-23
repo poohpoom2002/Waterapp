@@ -1,4 +1,4 @@
-// resources\js\pages\components\InputForm.tsx - แก้ไขสำหรับ Multi-Zone
+// resources\js\pages\components\InputForm.tsx
 import React, { useEffect, useState } from 'react';
 import { IrrigationInput } from '../types/interfaces';
 import { formatNumber } from '../utils/calculations';
@@ -8,6 +8,7 @@ import {
     getSubMainPipeBranchCount,
     getDetailedBranchPipeStats,
 } from '../../utils/horticultureProjectStats';
+import { useCalculations } from '../hooks/useCalculations';
 
 interface InputFormProps {
     input: IrrigationInput;
@@ -15,8 +16,6 @@ interface InputFormProps {
     selectedSprinkler?: any;
     activeZone?: Zone;
     projectMode?: 'horticulture' | 'garden';
-    simultaneousZonesCount?: number;
-    onSimultaneousZonesChange?: (count: number) => void;
     maxZones?: number;
 }
 
@@ -44,8 +43,52 @@ const InputForm: React.FC<InputFormProps> = ({
 }) => {
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [validationMessages, setValidationMessages] = useState<string[]>([]);
+    const [pipeData, setPipeData] = useState<any[]>([]);
 
-    // ตรวจสอบว่าเป็น multi-zone หรือไม่
+    useEffect(() => {
+        const fetchPipeData = async () => {
+            try {
+                const endpoints = [
+                    '/api/equipments/by-category/pipe',
+                    '/api/equipments/category/pipe',
+                    '/api/equipments?category=pipe',
+                    '/api/equipments/by-category-name/pipe',
+                ];
+                let data: any[] = [];
+                for (const endpoint of endpoints) {
+                    try {
+                        const response = await fetch(endpoint);
+                        if (response.ok) {
+                            const result = await response.json();
+                            data = Array.isArray(result) ? result : [];
+                            break;
+                        }
+                    } catch (error) {
+                        continue;
+                    }
+                }
+                if (data.length === 0) {
+                    const response = await fetch('/api/equipments');
+                    if (response.ok) {
+                        const allEquipments = await response.json();
+                        data = Array.isArray(allEquipments)
+                            ? allEquipments.filter((item) => {
+                                  const categoryMatch =
+                                      item.category?.name === 'pipe' ||
+                                      item.category?.display_name?.toLowerCase().includes('pipe');
+                                  return categoryMatch;
+                              })
+                            : [];
+                    }
+                }
+                setPipeData(data);
+            } catch (error) {
+                setPipeData([]);
+            }
+        };
+        fetchPipeData();
+    }, []);
+
     const isMultiZone = input.numberOfZones > 1;
 
     const updateInput = (field: keyof IrrigationInput, value: number) => {
@@ -68,14 +111,14 @@ const InputForm: React.FC<InputFormProps> = ({
                 validatedValue = Math.max(1, Math.min(Math.round(value), input.numberOfZones));
                 break;
             case 'irrigationTimeMinutes':
-                validatedValue = Math.max(5, Math.min(300, value)); // 5-300 minutes
+                validatedValue = Math.max(5, Math.min(300, value));
                 break;
             case 'staticHeadM':
             case 'pressureHeadM':
                 validatedValue = Math.max(0, value);
                 break;
             case 'pipeAgeYears':
-                validatedValue = Math.max(0, Math.min(50, value)); // 0-50 years
+                validatedValue = Math.max(0, Math.min(50, value));
                 break;
             default:
                 validatedValue = Math.max(0, value);
@@ -112,51 +155,31 @@ const InputForm: React.FC<InputFormProps> = ({
             );
         }
 
-        if (input.waterPerTreeLiters < 0.1) {
-            messages.push(
-                projectMode === 'garden'
-                    ? 'ปริมาณน้ำต่อหัวฉีดต้องมากกว่า 0.1 ลิตร'
-                    : 'ปริมาณน้ำต่อต้นต้องมากกว่า 0.1 ลิตร'
-            );
+        const estimatedVelocity = calculateEstimatedVelocity(input);
+        if (estimatedVelocity > 2.5) {
+            messages.push('⚠️ ความเร็วน้ำอาจสูงเกินไป - ควรใช้ท่อขนาดใหญ่ขึ้น');
+        } else if (estimatedVelocity < 0.6) {
+            messages.push('⚠️ ความเร็วน้ำอาจต่ำเกินไป - อาจมีการตกตะกอน');
         }
 
-        if (input.farmSizeRai <= 0) {
-            messages.push(
-                projectMode === 'garden'
-                    ? 'ขนาดพื้นที่ต้องมากกว่า 0 ตร.ม.'
-                    : 'ขนาดพื้นที่ต้องมากกว่า 0 ไร่'
-            );
-        }
-
-        if (input.longestBranchPipeM > input.totalBranchPipeM && input.totalBranchPipeM > 0) {
-            messages.push('ท่อย่อยที่ยาวที่สุดไม่ควรยาวกว่าท่อย่อยรวม');
-        }
-
-        if (
-            input.longestSecondaryPipeM > input.totalSecondaryPipeM &&
-            input.totalSecondaryPipeM > 0
-        ) {
-            messages.push('ท่อเมนรองที่ยาวที่สุดไม่ควรยาวกว่าท่อเมนรองรวม');
-        }
-
-        if (input.longestMainPipeM > input.totalMainPipeM && input.totalMainPipeM > 0) {
-            messages.push('ท่อเมนหลักที่ยาวที่สุดไม่ควรยาวกว่าท่อเมนหลักรวม');
-        }
-
-        if (input.sprinklersPerLongestBranch > input.totalTrees) {
-            messages.push(
-                projectMode === 'garden'
-                    ? 'จำนวนหัวฉีดในท่อย่อยที่ยาวที่สุดไม่ควรมากกว่าจำนวนหัวฉีดทั้งหมด'
-                    : 'จำนวนสปริงเกอร์ในท่อย่อยที่ยาวที่สุดไม่ควรมากกว่าจำนวนต้นไม้ทั้งหมด'
-            );
-        }
-
-        if (input.simultaneousZones > input.numberOfZones) {
-            messages.push('จำนวนโซนที่ทำงานพร้อมกันไม่ควรมากกว่าจำนวนโซนทั้งหมด');
+        if (input.longestBranchPipeM > 200 || input.longestSecondaryPipeM > 300) {
+            messages.push('⚠️ ระยะท่อยาวมาก - อาจมี Head Loss สูง (>20%)');
         }
 
         setValidationMessages(messages);
     }, [input, projectMode]);
+
+    const calculateEstimatedVelocity = (input: IrrigationInput): number => {
+        const estimatedFlow =
+            (input.totalTrees * input.waterPerTreeLiters) /
+            (input.irrigationTimeMinutes || 30) /
+            60;
+        const estimatedDiameter = Math.sqrt((4 * (estimatedFlow / 60000)) / (Math.PI * 1.5));
+        const recommendedSize = estimatedDiameter * 1000;
+
+        const pipeArea = Math.PI * Math.pow(0.032 / 2, 2);
+        return estimatedFlow / 60000 / pipeArea;
+    };
 
     const getSprinklerPressureInfo = (): SprinklerPressureInfo | null => {
         if (!selectedSprinkler) return null;
@@ -197,7 +220,6 @@ const InputForm: React.FC<InputFormProps> = ({
 
     const calculateBranchPipeStats = (): BranchPipeStats | null => {
         if (projectMode === 'garden') {
-            // For home garden, return simplified stats
             return null;
         }
 
@@ -263,7 +285,6 @@ const InputForm: React.FC<InputFormProps> = ({
         const recommendations: string[] = [];
 
         if (projectMode === 'garden') {
-            // Home garden specific recommendations
             const sprinklersPerRai = input.totalTrees / input.farmSizeRai;
             if (sprinklersPerRai > 50) {
                 recommendations.push('ความหนาแน่นหัวฉีดสูง (>50 หัว/ไร่) ควรใช้หัวฉีดรัศมีเล็ก');
@@ -289,7 +310,6 @@ const InputForm: React.FC<InputFormProps> = ({
                 );
             }
         } else {
-            // Horticulture recommendations
             const treesPerRai = input.totalTrees / input.farmSizeRai;
             if (treesPerRai > 200) {
                 recommendations.push(
@@ -315,15 +335,7 @@ const InputForm: React.FC<InputFormProps> = ({
             }
 
             if (isMultiZone) {
-                if (input.simultaneousZones === input.numberOfZones) {
-                    recommendations.push('เปิดทุกโซนพร้อมกัน - ต้องการปั๊มขนาดใหญ่แต่ประหยัดเวลา');
-                } else if (input.simultaneousZones === 1) {
-                    recommendations.push('เปิดทีละโซน - ประหยัดขนาดปั๊มแต่ใช้เวลานาน');
-                } else {
-                    recommendations.push(
-                        `เปิด ${input.simultaneousZones} โซนพร้อมกัน - สมดุลระหว่างขนาดปั๊มและเวลา`
-                    );
-                }
+                recommendations.push(`ระบบ ${input.numberOfZones} โซน - การเปิดโซนกำหนดในหน้าหลัก`);
             }
         }
 
@@ -332,7 +344,6 @@ const InputForm: React.FC<InputFormProps> = ({
 
     const systemRecommendations = getSystemRecommendations();
 
-    // Labels based on project mode
     const getLabel = (key: string) => {
         if (projectMode === 'garden') {
             switch (key) {
@@ -405,12 +416,6 @@ const InputForm: React.FC<InputFormProps> = ({
                             {projectMode === 'garden' ? 'Home Garden' : 'Horticulture'} -
                             สามารถปรับแต่งได้ตามความต้องการ
                         </p>
-                        {isMultiZone && (
-                            <p>
-                                🔄 ปั๊มคำนวณจาก {input.simultaneousZones} โซนที่ต้องการ head
-                                มากที่สุด
-                            </p>
-                        )}
                     </div>
                 </div>
             )}
@@ -438,10 +443,6 @@ const InputForm: React.FC<InputFormProps> = ({
                             <p className="font-medium text-white">{input.numberOfZones} โซน</p>
                         </div>
                         <div>
-                            <p className="text-purple-200">เปิดพร้อมกัน:</p>
-                            <p className="font-medium text-white">{input.simultaneousZones} โซน</p>
-                        </div>
-                        <div>
                             <p className="text-purple-200">ประเภทระบบ:</p>
                             <p className="font-medium text-white">
                                 {input.simultaneousZones === input.numberOfZones
@@ -459,10 +460,7 @@ const InputForm: React.FC<InputFormProps> = ({
                         </div>
                     </div>
                     <div className="mt-2 text-xs text-purple-200">
-                        <p>
-                            💡 การเปิด {input.simultaneousZones} โซนพร้อมกัน หมายถึงปั๊มต้องรองรับ{' '}
-                            {input.simultaneousZones} โซนที่ต้องการแรงดันมากที่สุด
-                        </p>
+                        <p>💡 ปั๊มจะคำนวณตามการตั้งค่าการเปิดโซนที่กำหนดไว้ในหน้าหลัก</p>
                     </div>
                 </div>
             )}
@@ -571,7 +569,7 @@ const InputForm: React.FC<InputFormProps> = ({
                         step="1"
                         className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                         placeholder="1"
-                        disabled={true} // ไม่ให้แก้ไขเพราะมาจากระบบ
+                        disabled={true}
                     />
                     <p className="mt-1 text-xs text-gray-400">
                         การคำนวณ: {input.numberOfZones} โซน
@@ -594,7 +592,7 @@ const InputForm: React.FC<InputFormProps> = ({
                         </label>
                         <input
                             type="number"
-                            value={input.longestBranchPipeM}
+                            value={input.longestBranchPipeM.toFixed(1)}
                             onChange={(e) =>
                                 updateInput('longestBranchPipeM', parseFloat(e.target.value) || 0)
                             }
@@ -616,7 +614,7 @@ const InputForm: React.FC<InputFormProps> = ({
                         </label>
                         <input
                             type="number"
-                            value={input.totalBranchPipeM}
+                            value={input.totalBranchPipeM.toFixed(1)}
                             onChange={(e) =>
                                 updateInput('totalBranchPipeM', parseFloat(e.target.value) || 0)
                             }
@@ -640,7 +638,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                 </label>
                                 <input
                                     type="number"
-                                    value={input.longestSecondaryPipeM}
+                                    value={input.longestSecondaryPipeM.toFixed(1)}
                                     onChange={(e) =>
                                         updateInput(
                                             'longestSecondaryPipeM',
@@ -659,7 +657,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                 </label>
                                 <input
                                     type="number"
-                                    value={input.totalSecondaryPipeM}
+                                    value={input.totalSecondaryPipeM.toFixed(1)}
                                     onChange={(e) =>
                                         updateInput(
                                             'totalSecondaryPipeM',
@@ -703,7 +701,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                 </label>
                                 <input
                                     type="number"
-                                    value={input.longestMainPipeM}
+                                    value={input.longestMainPipeM.toFixed(1)}
                                     onChange={(e) =>
                                         updateInput(
                                             'longestMainPipeM',
@@ -722,7 +720,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                 </label>
                                 <input
                                     type="number"
-                                    value={input.totalMainPipeM}
+                                    value={input.totalMainPipeM.toFixed(1)}
                                     onChange={(e) =>
                                         updateInput(
                                             'totalMainPipeM',
@@ -765,7 +763,7 @@ const InputForm: React.FC<InputFormProps> = ({
                     <input
                         type="number"
                         step="0.1"
-                        value={input.sprinklersPerTree}
+                        value={input.sprinklersPerTree.toFixed(1)}
                         onChange={(e) =>
                             updateInput('sprinklersPerTree', parseFloat(e.target.value) || 1)
                         }
@@ -784,7 +782,7 @@ const InputForm: React.FC<InputFormProps> = ({
                     <input
                         type="number"
                         step="1"
-                        value={input.irrigationTimeMinutes}
+                        value={input.irrigationTimeMinutes.toFixed(1)}
                         onChange={(e) =>
                             updateInput('irrigationTimeMinutes', parseFloat(e.target.value) || 20)
                         }
@@ -805,7 +803,7 @@ const InputForm: React.FC<InputFormProps> = ({
                     <input
                         type="number"
                         step="0.1"
-                        value={input.staticHeadM}
+                        value={input.staticHeadM.toFixed(1)}
                         onChange={(e) =>
                             updateInput('staticHeadM', parseFloat(e.target.value) || 0)
                         }
@@ -909,7 +907,7 @@ const InputForm: React.FC<InputFormProps> = ({
                         <input
                             type="number"
                             step="0.1"
-                            value={input.pressureHeadM}
+                            value={input.pressureHeadM.toFixed(1)}
                             onChange={(e) =>
                                 updateInput('pressureHeadM', parseFloat(e.target.value) || 20)
                             }
@@ -1066,6 +1064,61 @@ const InputForm: React.FC<InputFormProps> = ({
                     </ul>
                 </div>
             )}
+
+            <h3 className="mb-4 mt-6 text-lg font-semibold text-blue-400">🔧 ข้อมูลท่อเสริม</h3>
+            <div className="space-y-4 rounded-lg bg-gray-800 p-4 shadow-lg">
+                <h4 className="text-md font-medium text-blue-300">
+                    ท่อเสริมต่อหัวสปริงเกอร์ (Riser/แขนง)
+                </h4>
+                <div>
+                    <label className="mb-2 block text-sm font-medium">เลือกชนิดท่อ</label>
+                    <select
+                        value={input.extraPipePerSprinkler?.pipeId || ''}
+                        onChange={(e) => {
+                            const pipeId = e.target.value ? parseInt(e.target.value) : null;
+                            onInputChange({
+                                ...input,
+                                extraPipePerSprinkler: {
+                                    pipeId,
+                                    lengthPerHead: input.extraPipePerSprinkler?.lengthPerHead || 0,
+                                },
+                            });
+                        }}
+                        className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
+                    >
+                        <option value="">-- ไม่ใช้ท่อเสริม --</option>
+                        {pipeData &&
+                            pipeData.map((pipe) => (
+                                <option key={pipe.id} value={pipe.id}>
+                                    {pipe.name || pipe.productCode} - {pipe.sizeMM}mm -{' '}
+                                    {pipe.price?.toLocaleString()} บาท/ม้วน
+                                </option>
+                            ))}
+                    </select>
+                </div>
+                <div>
+                    <label className="mb-2 block text-sm font-medium">ความยาวต่อหัว (เมตร)</label>
+                    <input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        value={input.extraPipePerSprinkler?.lengthPerHead || ''}
+                        onChange={(e) => {
+                            const lengthPerHead = parseFloat(e.target.value) || 0;
+                            onInputChange({
+                                ...input,
+                                extraPipePerSprinkler: {
+                                    pipeId: input.extraPipePerSprinkler?.pipeId ?? null,
+                                    lengthPerHead,
+                                },
+                            });
+                        }}
+                        className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
+                        placeholder="0.5"
+                    />
+                    <p className="mt-1 text-xs text-gray-400">เช่น 0.5-1 เมตร/หัว</p>
+                </div>
+            </div>
         </div>
     );
 };

@@ -1,8 +1,7 @@
-// resources/js/pages/home-garden-summary.tsx - แก้ไขปุ่มคำนวณอุปกรณ์
+// resources/js/pages/home-garden-summary.tsx
 import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import { router } from '@inertiajs/react';
 
-// Import Google Maps component instead of Leaflet
 import GoogleMapSummary from '../components/homegarden/GoogleMapSummary';
 
 import {
@@ -27,7 +26,6 @@ interface HomeGardenSummaryProps {
     data?: GardenPlannerData;
 }
 
-// Enhanced interface for dimension lines
 interface DimensionLine {
     id: string;
     start: CanvasCoordinate;
@@ -37,7 +35,6 @@ interface DimensionLine {
     direction: 'auto' | 'left' | 'right' | 'top' | 'bottom';
 }
 
-// Error Boundary Component
 class SummaryErrorBoundary extends React.Component<
     { children: React.ReactNode },
     { hasError: boolean; error?: Error }
@@ -77,7 +74,6 @@ class SummaryErrorBoundary extends React.Component<
     }
 }
 
-// Enhanced Canvas Renderer with dimension lines and auto-centering
 const CanvasRenderer: React.FC<{
     gardenData: GardenPlannerData;
     canvasRef?: React.RefObject<HTMLCanvasElement>;
@@ -85,9 +81,7 @@ const CanvasRenderer: React.FC<{
     const internalCanvasRef = useRef<HTMLCanvasElement>(null);
     const activeCanvasRef = canvasRef || internalCanvasRef;
 
-    // Extract dimension lines from gardenData (if available)
     const dimensionLines = useMemo(() => {
-        // Try to get dimension lines from localStorage or gardenData
         try {
             const savedDimensions = localStorage.getItem('gardenDimensionLines');
             if (savedDimensions) {
@@ -99,36 +93,30 @@ const CanvasRenderer: React.FC<{
         return [];
     }, []);
 
-    // Calculate bounds and centering for canvas content
     const canvasBounds = useMemo(() => {
         const allPoints: CanvasCoordinate[] = [];
 
-        // Collect all points from zones
         gardenData.gardenZones?.forEach((zone) => {
             if (zone.canvasCoordinates) {
                 allPoints.push(...zone.canvasCoordinates);
             }
         });
 
-        // Collect all points from sprinklers
         gardenData.sprinklers?.forEach((sprinkler) => {
             if (sprinkler.canvasPosition) {
                 allPoints.push(sprinkler.canvasPosition);
             }
         });
 
-        // Collect all points from pipes
         gardenData.pipes?.forEach((pipe) => {
             if (pipe.canvasStart) allPoints.push(pipe.canvasStart);
             if (pipe.canvasEnd) allPoints.push(pipe.canvasEnd);
         });
 
-        // Collect all points from dimension lines
         dimensionLines.forEach((dim) => {
             allPoints.push(dim.start, dim.end);
         });
 
-        // Collect water source
         if (gardenData.waterSource?.canvasPosition) {
             allPoints.push(gardenData.waterSource.canvasPosition);
         }
@@ -159,21 +147,18 @@ const CanvasRenderer: React.FC<{
         return { minX, maxX, minY, maxY, width, height, centerX, centerY };
     }, [gardenData, dimensionLines]);
 
-    // Calculate transform for centering
     const transform = useMemo(() => {
         const canvas = activeCanvasRef.current;
         if (!canvas) return { scale: 1, offsetX: 0, offsetY: 0 };
 
         const canvasWidth = canvas.width;
         const canvasHeight = canvas.height;
-        const padding = 50; // Padding around content
+        const padding = 50;
 
-        // Calculate scale to fit content with padding
         const scaleX = (canvasWidth - 2 * padding) / Math.max(canvasBounds.width, 1);
         const scaleY = (canvasHeight - 2 * padding) / Math.max(canvasBounds.height, 1);
-        const scale = Math.min(scaleX, scaleY, 2); // Max scale of 2
+        const scale = Math.min(scaleX, scaleY, 2);
 
-        // Calculate offset to center content
         const scaledWidth = canvasBounds.width * scale;
         const scaledHeight = canvasBounds.height * scale;
         const offsetX = (canvasWidth - scaledWidth) / 2 - canvasBounds.minX * scale;
@@ -182,7 +167,6 @@ const CanvasRenderer: React.FC<{
         return { scale, offsetX, offsetY };
     }, [canvasBounds, activeCanvasRef]);
 
-    // Transform function
     const transformPoint = useCallback(
         (point: CanvasCoordinate) => {
             return {
@@ -193,7 +177,6 @@ const CanvasRenderer: React.FC<{
         [transform]
     );
 
-    // Draw dimension lines
     const drawDimensionLines = useCallback(
         (ctx: CanvasRenderingContext2D) => {
             if (dimensionLines.length === 0) return;
@@ -204,7 +187,6 @@ const CanvasRenderer: React.FC<{
                 const startScreen = transformPoint(dimension.start);
                 const endScreen = transformPoint(dimension.end);
 
-                // Calculate line direction
                 const dx = endScreen.x - startScreen.x;
                 const dy = endScreen.y - startScreen.y;
                 const length = Math.sqrt(dx * dx + dy * dy);
@@ -215,12 +197,10 @@ const CanvasRenderer: React.FC<{
                 const unitY = dy / length;
                 const offsetDistance = 30 * transform.scale;
 
-                // Determine offset direction based on dimension.direction
                 let offsetX = 0;
                 let offsetY = 0;
 
                 if (dimension.direction === 'auto') {
-                    // Auto direction - perpendicular to line
                     offsetX = -unitY * offsetDistance;
                     offsetY = unitX * offsetDistance;
                 } else if (dimension.direction === 'left') {
@@ -246,7 +226,6 @@ const CanvasRenderer: React.FC<{
                     y: endScreen.y + offsetY,
                 };
 
-                // Draw dimension line
                 ctx.strokeStyle = '#FFD700';
                 ctx.lineWidth = 2 * transform.scale;
                 ctx.beginPath();
@@ -254,7 +233,6 @@ const CanvasRenderer: React.FC<{
                 ctx.lineTo(dimEnd.x, dimEnd.y);
                 ctx.stroke();
 
-                // Draw extension lines
                 ctx.strokeStyle = '#FFD700';
                 ctx.lineWidth = 1 * transform.scale;
                 ctx.setLineDash([3 * transform.scale, 3 * transform.scale]);
@@ -271,12 +249,10 @@ const CanvasRenderer: React.FC<{
 
                 ctx.setLineDash([]);
 
-                // Draw arrows
                 const arrowSize = 8 * transform.scale;
                 const angle1 = Math.atan2(dimEnd.y - dimStart.y, dimEnd.x - dimStart.x);
                 const angle2 = angle1 + Math.PI;
 
-                // Arrow at start
                 ctx.beginPath();
                 ctx.moveTo(dimStart.x, dimStart.y);
                 ctx.lineTo(
@@ -290,7 +266,6 @@ const CanvasRenderer: React.FC<{
                 );
                 ctx.stroke();
 
-                // Arrow at end
                 ctx.beginPath();
                 ctx.moveTo(dimEnd.x, dimEnd.y);
                 ctx.lineTo(
@@ -304,7 +279,6 @@ const CanvasRenderer: React.FC<{
                 );
                 ctx.stroke();
 
-                // Draw label
                 const midX = (dimStart.x + dimEnd.x) / 2;
                 const midY = (dimStart.y + dimEnd.y) / 2;
 
@@ -342,7 +316,6 @@ const CanvasRenderer: React.FC<{
         try {
             const isImageMode = gardenData.designMode === 'image';
 
-            // Get correct scale
             let scale: number;
             if (isImageMode) {
                 scale = gardenData.imageData?.scale || 20;
@@ -357,11 +330,9 @@ const CanvasRenderer: React.FC<{
                 console.log('Canvas mode scale:', scale);
             }
 
-            // Clear canvas
             ctx.fillStyle = '#1a1a1a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Apply transform
             ctx.save();
             ctx.scale(transform.scale, transform.scale);
             ctx.translate(transform.offsetX / transform.scale, transform.offsetY / transform.scale);
@@ -405,11 +376,9 @@ const CanvasRenderer: React.FC<{
                 try {
                     console.log('Drawing with scale:', scale);
 
-                    // Restore transform for drawing elements
                     ctx.restore();
                     ctx.save();
 
-                    // Draw zones
                     gardenData.gardenZones?.forEach((zone) => {
                         if (!zone.canvasCoordinates || zone.canvasCoordinates.length < 3) return;
 
@@ -434,7 +403,6 @@ const CanvasRenderer: React.FC<{
                         ctx.stroke();
                         ctx.setLineDash([]);
 
-                        // Zone label
                         const centerX =
                             zone.canvasCoordinates.reduce((sum, c) => sum + c.x, 0) /
                             zone.canvasCoordinates.length;
@@ -449,7 +417,6 @@ const CanvasRenderer: React.FC<{
                         ctx.textBaseline = 'middle';
                         ctx.fillText(zone.name, centerPoint.x, centerPoint.y);
 
-                        // Area label
                         try {
                             const area =
                                 gardenData.canvasData && zone.canvasCoordinates
@@ -477,7 +444,6 @@ const CanvasRenderer: React.FC<{
                         }
                     });
 
-                    // Draw pipes (simplified single type)
                     gardenData.pipes?.forEach((pipe) => {
                         if (!pipe.canvasStart || !pipe.canvasEnd) return;
 
@@ -486,7 +452,7 @@ const CanvasRenderer: React.FC<{
 
                         ctx.lineCap = 'round';
                         ctx.lineJoin = 'round';
-                        ctx.strokeStyle = '#FFFF00'; // Yellow for all pipes
+                        ctx.strokeStyle = '#FFFF00';
                         ctx.lineWidth = 3 * transform.scale;
 
                         ctx.beginPath();
@@ -495,7 +461,6 @@ const CanvasRenderer: React.FC<{
                         ctx.stroke();
                     });
 
-                    // Draw enhanced sprinkler radii
                     gardenData.sprinklers?.forEach((sprinkler) => {
                         if (!sprinkler.canvasPosition) return;
 
@@ -511,7 +476,6 @@ const CanvasRenderer: React.FC<{
                         });
 
                         if (zone && zone.canvasCoordinates && zone.canvasCoordinates.length >= 3) {
-                            // Don't show radius for forbidden zones
                             if (zone.type === 'forbidden') {
                                 return;
                             }
@@ -551,7 +515,6 @@ const CanvasRenderer: React.FC<{
                                         `Drawing masked circle with radius: ${radiusPixels}px`
                                     );
 
-                                    // Create clipping path for zone
                                     ctx.save();
                                     ctx.beginPath();
                                     const firstZonePoint = transformPoint(
@@ -565,7 +528,6 @@ const CanvasRenderer: React.FC<{
                                     ctx.closePath();
                                     ctx.clip();
 
-                                    // Draw circle within clip
                                     ctx.fillStyle = sprinkler.type.color + '33';
                                     ctx.beginPath();
                                     ctx.arc(
@@ -578,7 +540,6 @@ const CanvasRenderer: React.FC<{
                                     ctx.fill();
                                     ctx.restore();
 
-                                    // Draw full circle outline with dashes
                                     ctx.strokeStyle = sprinkler.type.color + '66';
                                     ctx.lineWidth = 1 * transform.scale;
                                     ctx.setLineDash([3 * transform.scale, 3 * transform.scale]);
@@ -616,7 +577,7 @@ const CanvasRenderer: React.FC<{
                                 ctx.restore();
                             } catch (error) {
                                 console.error('Error drawing sprinkler radius:', error);
-                                // Fallback - simple circle
+
                                 const radiusPixels =
                                     sprinkler.type.radius * scale * transform.scale;
                                 ctx.fillStyle = sprinkler.type.color + '26';
@@ -634,7 +595,6 @@ const CanvasRenderer: React.FC<{
                                 ctx.stroke();
                             }
                         } else if (sprinkler.zoneId === 'virtual_zone') {
-                            // Virtual zone - dashed circle
                             const radiusPixels = sprinkler.type.radius * scale * transform.scale;
                             console.log(
                                 `Drawing virtual zone circle with radius: ${radiusPixels}px`
@@ -658,7 +618,6 @@ const CanvasRenderer: React.FC<{
                         }
                     });
 
-                    // Draw sprinklers with enhanced styling
                     gardenData.sprinklers?.forEach((sprinkler) => {
                         if (!sprinkler.canvasPosition) return;
 
@@ -666,7 +625,6 @@ const CanvasRenderer: React.FC<{
 
                         ctx.save();
 
-                        // Add shadow
                         ctx.shadowColor = 'rgba(0,0,0,0.8)';
                         ctx.shadowBlur = 3 * transform.scale;
                         ctx.shadowOffsetX = 1 * transform.scale;
@@ -688,7 +646,6 @@ const CanvasRenderer: React.FC<{
                         }
                     });
 
-                    // Draw water source with enhanced styling
                     if (gardenData.waterSource?.canvasPosition) {
                         const waterSourcePoint = transformPoint(
                             gardenData.waterSource.canvasPosition
@@ -696,7 +653,6 @@ const CanvasRenderer: React.FC<{
 
                         ctx.save();
 
-                        // Shadow
                         ctx.shadowColor = 'rgba(0,0,0,0.6)';
                         ctx.shadowBlur = 8 * transform.scale;
                         ctx.shadowOffsetX = 2 * transform.scale;
@@ -730,7 +686,6 @@ const CanvasRenderer: React.FC<{
 
                     ctx.restore();
 
-                    // Draw dimension lines (outside transform)
                     drawDimensionLines(ctx);
                 } catch (error) {
                     console.error('Error drawing canvas elements:', error);
@@ -772,6 +727,8 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
     const [error, setError] = useState<string | null>(null);
     const [isSavingImage, setIsSavingImage] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const mapContainerRef = useRef<HTMLDivElement>(null);
+    const [isCreatingImage, setIsCreatingImage] = useState(false);
 
     useEffect(() => {
         const initializeData = async () => {
@@ -847,7 +804,6 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                 allPoints.push(gardenData.waterSource.position);
             }
 
-            // Add pipe points
             if (gardenData.pipes) {
                 gardenData.pipes.forEach((pipe) => {
                     allPoints.push(pipe.start, pipe.end);
@@ -931,14 +887,29 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
         }
     }, [gardenData]);
 
-    const handleSaveImage = useCallback(async () => {
-        if (!gardenData) return;
+    // ฟังก์ชันสร้างภาพแผนที่ เหมือนใน HorticultureResultsPage.tsx
+    const createMapImage = async () => {
+        console.log('🏡 เริ่มสร้างภาพแผนที่สวนบ้าน...');
 
-        setIsSavingImage(true);
-        try {
-            // Dynamic import for html2canvas
-            const { default: html2canvas } = await import('html2canvas');
+        // หา element ที่จะ capture
+        let targetElement: HTMLElement | null = null;
 
+<<<<<<< HEAD
+        if (gardenData?.designMode === 'map' && mapContainerRef.current) {
+            targetElement = mapContainerRef.current;
+            console.log('🏡 ใช้ Google Map container');
+        } else if (
+            (gardenData?.designMode === 'canvas' || gardenData?.designMode === 'image') &&
+            canvasRef.current
+        ) {
+            targetElement = canvasRef.current;
+            console.log('🏡 ใช้ Canvas element');
+        }
+
+        if (!targetElement) {
+            console.error('🏡 ไม่พบ element สำหรับ capture');
+            return null;
+=======
             // Target the specific container
             const elementId =
                 gardenData.designMode === 'map' ? 'map-container' : 'canvas-container';
@@ -966,82 +937,172 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
             setError('เกิดข้อผิดพลาดในการบันทึกรูปภาพ');
         } finally {
             setIsSavingImage(false);
+>>>>>>> main
         }
-    }, [gardenData]);
 
-    const handlePrintImage = useCallback(() => {
         try {
+<<<<<<< HEAD
+            // รอให้ element โหลดเสร็จ
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+=======
             // Get the specific container
             const elementId =
                 gardenData?.designMode === 'map' ? 'map-container' : 'canvas-container';
             const element = document.getElementById(elementId);
+>>>>>>> main
 
-            if (element) {
-                // Create a new window for printing
-                const printWindow = window.open('', '_blank');
-                if (printWindow) {
-                    printWindow.document.write(`
-                        <html>
-                            <head>
-                                <title>แผนผังระบบน้ำสำหรับสวนบ้าน</title>
-                                <style>
-                                    body { 
-                                        margin: 0; 
-                                        padding: 20px; 
-                                        background: white;
-                                        font-family: Arial, sans-serif;
-                                    }
-                                    .print-container { 
-                                        width: 100%; 
-                                        height: auto; 
-                                        text-align: center;
-                                    }
-                                    .print-title {
-                                        font-size: 18px;
-                                        font-weight: bold;
-                                        margin-bottom: 20px;
-                                        color: #333;
-                                    }
-                                    @media print {
-                                        body { 
-                                            margin: 0; 
-                                            padding: 0; 
-                                        }
-                                        .print-container {
-                                            width: 100%;
-                                            height: 100vh;
-                                            display: flex;
-                                            flex-direction: column;
-                                            justify-content: center;
-                                            align-items: center;
-                                        }
-                                    }
-                                </style>
-                            </head>
-                            <body>
-                                <div class="print-container">
-                                    <div class="print-title">แผนผังระบบน้ำสำหรับสวนบ้าน - ${new Date().toLocaleDateString('th-TH')}</div>
-                                    ${element.outerHTML}
-                                </div>
-                            </body>
-                        </html>
-                    `);
-                    printWindow.document.close();
-                    printWindow.focus();
-                    printWindow.print();
-                    printWindow.close();
-                }
+            const html2canvas = await import('html2canvas');
+            const html2canvasLib = html2canvas.default || html2canvas;
+
+            console.log('🏡 เริ่ม capture element:', targetElement);
+
+            const canvas = await html2canvasLib(targetElement, {
+                useCORS: true,
+                allowTaint: true,
+                scale: 2,
+                logging: false,
+                backgroundColor: '#1F2937',
+                width: targetElement.offsetWidth,
+                height: targetElement.offsetHeight,
+                onclone: (clonedDoc) => {
+                    try {
+                        // ลบ controls ที่ไม่ต้องการออกจากภาพ
+                        const controls = clonedDoc.querySelectorAll(
+                            '.leaflet-control-container, .gm-control-active, .gm-style-cc'
+                        );
+                        controls.forEach((el) => el.remove());
+
+                        // ปรับสีที่อาจมีปัญหา
+                        const elements = clonedDoc.querySelectorAll('*');
+                        elements.forEach((el: Element) => {
+                            const htmlEl = el as HTMLElement;
+                            const computedStyle = window.getComputedStyle(htmlEl);
+
+                            const color = computedStyle.color;
+                            if (color && (color.includes('oklch') || color.includes('hsl'))) {
+                                htmlEl.style.color = '#FFFFFF';
+                            }
+
+                            const backgroundColor = computedStyle.backgroundColor;
+                            if (
+                                backgroundColor &&
+                                (backgroundColor.includes('oklch') ||
+                                    backgroundColor.includes('hsl'))
+                            ) {
+                                if (
+                                    backgroundColor.includes('transparent') ||
+                                    backgroundColor.includes('rgba(0,0,0,0)')
+                                ) {
+                                    htmlEl.style.backgroundColor = 'transparent';
+                                } else {
+                                    htmlEl.style.backgroundColor = '#1F2937';
+                                }
+                            }
+
+                            const borderColor = computedStyle.borderColor;
+                            if (
+                                borderColor &&
+                                (borderColor.includes('oklch') || borderColor.includes('hsl'))
+                            ) {
+                                htmlEl.style.borderColor = '#374151';
+                            }
+                        });
+
+                        // ลบ element ที่อาจมีปัญหา
+                        const problematicElements = clonedDoc.querySelectorAll(
+                            '[style*="oklch"], [style*="hsl"]'
+                        );
+                        problematicElements.forEach((el) => {
+                            const htmlEl = el as HTMLElement;
+                            htmlEl.style.removeProperty('color');
+                            htmlEl.style.removeProperty('background-color');
+                            htmlEl.style.removeProperty('border-color');
+                            htmlEl.style.removeProperty('outline-color');
+                        });
+                    } catch (error) {
+                        console.warn('⚠️ คำเตือนใน onclone:', error);
+                    }
+                },
+            });
+
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+            console.log('🏡 สร้างภาพสำเร็จ, ขนาด:', dataUrl.length, 'characters');
+
+            if (dataUrl && dataUrl !== 'data:,' && dataUrl.length > 100) {
+                return dataUrl;
+            } else {
+                throw new Error('ไม่สามารถสร้างภาพแผนที่ได้');
             }
         } catch (error) {
-            console.error('Error printing:', error);
-            setError('เกิดข้อผิดพลาดในการพิมพ์');
-        }
-    }, [gardenData]);
+            console.error('🏡 Error creating map image:', error);
 
-    // Enhanced handler for equipment calculation button with debugging
-    const handleEquipmentCalculation = useCallback(() => {
+            // สร้างภาพ fallback
+            try {
+                const fallbackCanvas = document.createElement('canvas');
+                const ctx = fallbackCanvas.getContext('2d');
+
+                if (ctx) {
+                    fallbackCanvas.width = 800;
+                    fallbackCanvas.height = 600;
+
+                    ctx.fillStyle = '#1F2937';
+                    ctx.fillRect(0, 0, fallbackCanvas.width, fallbackCanvas.height);
+
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.font = '24px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(
+                        '🏡 แผนผังสวนบ้าน',
+                        fallbackCanvas.width / 2,
+                        fallbackCanvas.height / 2 - 40
+                    );
+                    ctx.fillText(
+                        '(ไม่สามารถสร้างภาพแผนที่ได้)',
+                        fallbackCanvas.width / 2,
+                        fallbackCanvas.height / 2
+                    );
+                    ctx.fillText(
+                        'กรุณาใช้ screenshot แทน',
+                        fallbackCanvas.width / 2,
+                        fallbackCanvas.height / 2 + 40
+                    );
+
+                    return fallbackCanvas.toDataURL('image/jpeg', 0.8);
+                }
+            } catch (fallbackError) {
+                console.error('🏡 การสร้างภาพ fallback ล้มเหลว:', fallbackError);
+            }
+
+            return null;
+        }
+    };
+
+    const handleEquipmentCalculation = useCallback(async () => {
         try {
             console.log('🏡 กดปุ่มคำนวณอุปกรณ์ Home Garden');
+            setIsCreatingImage(true);
+
+            // สร้างหน้าต่างโหลด
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = 'garden-image-loading';
+            loadingDiv.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(0,0,0,0.8);
+                color: white;
+                padding: 20px;
+                border-radius: 10px;
+                z-index: 10000;
+                text-align: center;
+            `;
+            loadingDiv.innerHTML = `
+                <div>🏡 กำลังเตรียมข้อมูลสวนบ้าน...</div>
+                <div style="margin-top: 10px; font-size: 12px;">กรุณารอสักครู่</div>
+            `;
+            document.body.appendChild(loadingDiv);
+
             console.log('🏡 ข้อมูลสวน:', {
                 hasData: !!gardenData,
                 zones: gardenData?.gardenZones?.length || 0,
@@ -1049,13 +1110,12 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                 designMode: gardenData?.designMode,
             });
 
-            // บันทึกข้อมูลเพิ่มเติมลง localStorage เพื่อให้แน่ใจ
+            // บันทึกข้อมูลลง localStorage
             if (gardenData) {
                 localStorage.setItem('garden_planner_data', JSON.stringify(gardenData));
                 console.log('🏡 บันทึกข้อมูลสวนแล้ว');
             }
 
-            // บันทึกข้อมูลสถิติ
             if (statistics) {
                 localStorage.setItem('garden_statistics', JSON.stringify(statistics));
                 console.log('🏡 บันทึกสถิติแล้ว:', {
@@ -1065,15 +1125,42 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                 });
             }
 
-            // ไปยังหน้าคำนวณพร้อม mode parameter
-            router.visit('/product?mode=garden');
+            // สร้างภาพแผนที่
+            const imageUrl = await createMapImage();
+
+            if (imageUrl) {
+                localStorage.setItem('projectMapImage', imageUrl);
+                localStorage.setItem('projectType', 'home-garden');
+                console.log('🏡 บันทึกภาพแผนที่สำเร็จ');
+
+                // ลบหน้าต่างโหลด
+                document.body.removeChild(loadingDiv);
+
+                // ไปหน้า product
+                window.location.href = '/product?mode=garden';
+            } else {
+                // ลบหน้าต่างโหลด
+                document.body.removeChild(loadingDiv);
+
+                console.log('🏡 ไม่สามารถสร้างภาพได้ แต่จะไปหน้า product ต่อไป');
+
+                // ไปหน้า product แม้ไม่มีรูป
+                router.visit('/product?mode=garden');
+            }
         } catch (error) {
             console.error('🏡 Error navigating to equipment calculation:', error);
             setError('เกิดข้อผิดพลาดในการไปยังหน้าคำนวณอุปกรณ์');
+
+            // ลบหน้าต่างโหลดถ้าไม่ได้ลบแล้ว
+            const loadingDiv = document.getElementById('garden-image-loading');
+            if (loadingDiv) {
+                document.body.removeChild(loadingDiv);
+            }
+        } finally {
+            setIsCreatingImage(false);
         }
     }, [gardenData, statistics]);
 
-    // Error display
     useEffect(() => {
         if (error) {
             const timer = setTimeout(() => setError(null), 5000);
@@ -1113,7 +1200,6 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
     return (
         <SummaryErrorBoundary>
             <div className="min-h-screen w-full bg-gray-900 p-6">
-                {/* Error notification */}
                 {error && (
                     <div className="fixed left-4 top-4 z-50 rounded-lg bg-red-600 p-4 text-white shadow-lg">
                         <div className="flex items-center justify-between">
@@ -1149,26 +1235,39 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                             >
                                 ← กลับไปหน้าออกแบบ
                             </button>
-                            <button
-                                onClick={handleSaveImage}
-                                disabled={isSavingImage}
-                                className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700 disabled:opacity-50"
-                            >
-                                {isSavingImage ? '⏳ กำลังบันทึก...' : '💾 บันทึกรูปภาพ (.png)'}
-                            </button>
-                            <button
-                                onClick={handlePrintImage}
-                                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
-                            >
-                                🖨️ พิมพ์รูปภาพ
-                            </button>
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={handleEquipmentCalculation}
-                                    className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-white transition-colors hover:bg-purple-700"
+                                    disabled={isCreatingImage}
+                                    className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
                                     title="คำนวณอุปกรณ์สำหรับสวนบ้าน"
                                 >
-                                    💰 คำนวณอุปกรณ์
+                                    {isCreatingImage ? (
+                                        <>
+                                            <svg
+                                                className="mr-2 inline h-4 w-4 animate-spin"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <circle
+                                                    className="opacity-25"
+                                                    cx="12"
+                                                    cy="12"
+                                                    r="10"
+                                                    stroke="currentColor"
+                                                    strokeWidth="4"
+                                                ></circle>
+                                                <path
+                                                    className="opacity-75"
+                                                    fill="currentColor"
+                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                                ></path>
+                                            </svg>
+                                            กำลังเตรียม...
+                                        </>
+                                    ) : (
+                                        '💰 คำนวณอุปกรณ์'
+                                    )}
                                 </button>
                             </div>
                         </div>
@@ -1187,7 +1286,11 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                             </h3>
                             <div className="h-[600px] overflow-hidden rounded-lg border border-gray-600 bg-gray-900">
                                 {gardenData.designMode === 'map' && (
-                                    <div id="map-container" className="h-full">
+                                    <div
+                                        ref={mapContainerRef}
+                                        id="map-container"
+                                        className="h-full"
+                                    >
                                         <GoogleMapSummary
                                             gardenData={gardenData}
                                             mapCenter={mapCenter}
@@ -1365,8 +1468,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                     </div>
                 )}
 
-                {/* Print styles */}
-                <style>{`
+                <style>{`   
                     @media print {
                         .bg-gray-900 { background-color: white !important; }
                         .bg-gray-800 { background-color: #f3f4f6 !important; border: 1px solid #d1d5db !important; }
