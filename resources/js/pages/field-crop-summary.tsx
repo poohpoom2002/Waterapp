@@ -105,13 +105,20 @@ const calculateZoneArea = (coordinates: any[]): number => {
     }
 };
 
-// ฟังก์ชันคำนวณจำนวนจุดปลูกในโซน
+// ฟังก์ชันคำนวณจำนวนจุดปลูกในโซน - ใช้ข้อมูลจาก cropData
 const calculatePlantingPoints = (
     zoneArea: number, // ตารางเมตร
-    rowSpacing: number, // เมตร
-    plantSpacing: number // เมตร
+    crop: any, // crop object จาก cropData
+    customRowSpacing?: number, // custom spacing ถ้ามี (เมตร)
+    customPlantSpacing?: number // custom spacing ถ้ามี (เมตร)
 ): number => {
-    if (!zoneArea || !rowSpacing || !plantSpacing) return 0;
+    if (!zoneArea || !crop) return 0;
+
+    // ใช้ custom spacing ถ้ามี หรือใช้ค่าจาก cropData (แปลง cm เป็น m)
+    const rowSpacing = customRowSpacing || (crop.rowSpacing / 100); // cm -> m
+    const plantSpacing = customPlantSpacing || (crop.plantSpacing / 100); // cm -> m
+
+    if (!rowSpacing || !plantSpacing) return 0;
 
     // คำนวณจำนวนแถวต่อตารางเมตร
     const rowsPerSquareMeter = 1 / rowSpacing;
@@ -125,52 +132,64 @@ const calculatePlantingPoints = (
     return totalPlants;
 };
 
-// ฟังก์ชันคำนวณผลผลิตและราคา
+// ฟังก์ชันคำนวณผลผลิตและราคา - ใช้ข้อมูลจาก cropData
 const calculateYieldAndPrice = (
-    plantingPoints: number,
+    zoneArea: number, // ตารางเมตร
     crop: any
 ): { estimatedYield: number; estimatedPrice: number } => {
-    if (!plantingPoints || !crop) {
+    if (!zoneArea || !crop) {
         return { estimatedYield: 0, estimatedPrice: 0 };
     }
 
-    // ข้อมูลผลผลิตต่อต้น (กิโลกรัม) และราคาต่อกิโลกรัม (บาท)
-    const cropYieldData: { [key: string]: { yieldPerPlant: number; pricePerKg: number } } = {
-        corn: { yieldPerPlant: 0.4, pricePerKg: 8 },
-        rice: { yieldPerPlant: 0.03, pricePerKg: 15 },
-        sugarcane: { yieldPerPlant: 2.5, pricePerKg: 1.2 },
-        cassava: { yieldPerPlant: 2.0, pricePerKg: 3.5 },
-        soybeans: { yieldPerPlant: 0.05, pricePerKg: 20 },
-        peanuts: { yieldPerPlant: 0.08, pricePerKg: 35 },
-        sunflower: { yieldPerPlant: 0.06, pricePerKg: 25 },
-        sesame: { yieldPerPlant: 0.02, pricePerKg: 45 },
-        tomatoes: { yieldPerPlant: 3.0, pricePerKg: 12 },
-        cucumber: { yieldPerPlant: 2.5, pricePerKg: 8 },
-        cabbage: { yieldPerPlant: 1.5, pricePerKg: 10 },
-        lettuce: { yieldPerPlant: 0.3, pricePerKg: 25 },
-        carrot: { yieldPerPlant: 0.15, pricePerKg: 18 },
-        onion: { yieldPerPlant: 0.2, pricePerKg: 15 },
-        chili: { yieldPerPlant: 0.8, pricePerKg: 30 },
-        eggplant: { yieldPerPlant: 2.0, pricePerKg: 12 },
-        mango: { yieldPerPlant: 50, pricePerKg: 25 },
-        banana: { yieldPerPlant: 15, pricePerKg: 8 },
-        papaya: { yieldPerPlant: 20, pricePerKg: 10 },
-        coconut: { yieldPerPlant: 30, pricePerKg: 5 },
-        durian: { yieldPerPlant: 80, pricePerKg: 150 },
-        rambutan: { yieldPerPlant: 25, pricePerKg: 20 },
-    };
+    // แปลงพื้นที่จากตารางเมตรเป็นไร่ (1 ไร่ = 1600 ตารางเมตร)
+    const areaInRai = zoneArea / 1600;
 
-    // ใช้ข้อมูลเริ่มต้นถ้าไม่มีข้อมูลพืชนั้น
-    const defaultYield = { yieldPerPlant: 0.5, pricePerKg: 10 };
-    const yieldData = cropYieldData[crop.value] || defaultYield;
+    // คำนวณผลผลิตรวม (กิโลกรัม) จากข้อมูล yield ใน cropData (กก./ไร่)
+    const estimatedYield = Math.round(areaInRai * crop.yield);
 
-    // คำนวณผลผลิตรวม (กิโลกรัม)
-    const estimatedYield = Math.round(plantingPoints * yieldData.yieldPerPlant);
-
-    // คำนวณราคารวม (บาท)
-    const estimatedPrice = Math.round(estimatedYield * yieldData.pricePerKg);
+    // คำนวณราคารวม (บาท) จากข้อมูล price ใน cropData (บาท/กก.)
+    const estimatedPrice = Math.round(estimatedYield * crop.price);
 
     return { estimatedYield, estimatedPrice };
+};
+
+// ฟังก์ชันคำนวณความต้องการน้ำรวม - ใช้ข้อมูลจาก cropData
+const calculateWaterRequirement = (
+    plantingPoints: number,
+    crop: any
+): number => {
+    if (!plantingPoints || !crop || !crop.waterRequirement) {
+        return 0;
+    }
+
+    // คำนวณความต้องการน้ำรวมต่อวัน (ลิตร/วัน)
+    // waterRequirement ใน cropData เป็น ลิตร/ต้น/วัน
+    const totalWaterRequirement = plantingPoints * crop.waterRequirement;
+
+    return Math.round(totalWaterRequirement);
+};
+
+// Helper function to standardize irrigation types for consistent coloring
+const normalizeIrrigationType = (type: string): string => {
+    if (!type) return 'unknown';
+    const normalizedType = type.toLowerCase().trim();
+    const typeMapping: { [key: string]: string } = {
+        sprinkler: 'sprinkler',
+        'sprinkler-system': 'sprinkler',
+        'mini-sprinkler': 'mini_sprinkler',
+        mini_sprinkler: 'mini_sprinkler',
+        minisprinkler: 'mini_sprinkler',
+        'micro-spray': 'micro_spray',
+        micro_spray: 'micro_spray',
+        microspray: 'micro_spray',
+        micro: 'micro_spray',
+        microsprinkler: 'micro_spray',
+        drip: 'drip_tape',
+        'drip-tape': 'drip_tape',
+        drip_tape: 'drip_tape',
+        'drip-irrigation': 'drip_tape',
+    };
+    return typeMapping[normalizedType] || normalizedType;
 };
 
 export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
@@ -178,7 +197,6 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
     const [summaryData, setSummaryData] = useState<any>(null);
     const [dataSource, setDataSource] = useState<string>('');
     const [calculatedZoneSummaries, setCalculatedZoneSummaries] = useState<Record<string, any>>({});
-    const printMapRef = useRef<any>(null);
 
     useEffect(() => {
         // Always load data from localStorage as the single source of truth
@@ -234,10 +252,10 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
         mapType = 'satellite',
     } = summaryData || {};
 
-    // คำนวณข้อมูลโซนเมื่อข้อมูลพร้อม
+    // คำนวณข้อมูลโซนเมื่อข้อมูลพร้อม - ใช้ข้อมูลจาก cropData
     useEffect(() => {
         if (summaryData && zones.length > 0) {
-            console.log('🧮 Starting zone calculations...');
+            console.log('🧮 Starting zone calculations with cropData...');
             const newZoneSummaries: Record<string, any> = {};
 
             zones.forEach((zone: any) => {
@@ -250,21 +268,31 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                         // คำนวณพื้นที่โซน
                         const zoneArea = calculateZoneArea(zone.coordinates);
 
-                        // ใช้ spacing ที่ตั้งค่าไว้ หรือใช้ค่าเริ่มต้นจากข้อมูลพืช
-                        const effectiveRowSpacing =
-                            rowSpacing[assignedCropValue] || crop.spacing || 1.5;
-                        const effectivePlantSpacing =
-                            plantSpacing[assignedCropValue] || crop.defaultPlantSpacing || 1.0;
+                        // ใช้ spacing ที่ตั้งค่าไว้ หรือใช้ค่าเริ่มต้นจากข้อมูลพืชใน cropData
+                        const effectiveRowSpacing = rowSpacing[assignedCropValue] 
+                            ? rowSpacing[assignedCropValue] 
+                            : (crop.rowSpacing / 100); // แปลง cm เป็น m
+
+                        const effectivePlantSpacing = plantSpacing[assignedCropValue] 
+                            ? plantSpacing[assignedCropValue] 
+                            : (crop.plantSpacing / 100); // แปลง cm เป็น m
 
                         // คำนวณจำนวนจุดปลูก
                         const totalPlantingPoints = calculatePlantingPoints(
                             zoneArea,
+                            crop,
                             effectiveRowSpacing,
                             effectivePlantSpacing
                         );
 
-                        // คำนวณผลผลิตและราคา
+                        // คำนวณผลผลิตและราคาจาก cropData
                         const { estimatedYield, estimatedPrice } = calculateYieldAndPrice(
+                            zoneArea,
+                            crop
+                        );
+
+                        // คำนวณความต้องการน้ำ
+                        const waterRequirement = calculateWaterRequirement(
                             totalPlantingPoints,
                             crop
                         );
@@ -275,23 +303,35 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                             cropName: crop.name,
                             cropValue: assignedCropValue,
                             cropIcon: crop.icon,
+                            cropCategory: crop.category,
                             zoneArea: Math.round(zoneArea), // ตารางเมตร
+                            zoneAreaRai: Math.round((zoneArea / 1600) * 100) / 100, // ไร่
                             rowSpacing: effectiveRowSpacing,
                             plantSpacing: effectivePlantSpacing,
                             totalPlantingPoints: totalPlantingPoints,
                             estimatedYield: estimatedYield, // กิโลกรัม
                             estimatedPrice: estimatedPrice, // บาท
+                            waterRequirement: waterRequirement, // ลิตร/วัน
+                            cropYieldPerRai: crop.yield, // กก./ไร่ จาก cropData
+                            cropPricePerKg: crop.price, // บาท/กก. จาก cropData
+                            cropWaterPerPlant: crop.waterRequirement, // ลิตร/ต้น/วัน จาก cropData
+                            growthPeriod: crop.growthPeriod, // วัน
+                            irrigationNeeds: crop.irrigationNeeds, // low/medium/high
                             irrigationType: irrigationAssignments[zoneId] || 'ไม่ได้กำหนด',
                         };
 
-                        console.log(`📊 Zone ${zone.name} calculations:`, {
-                            area: `${Math.round(zoneArea)} ตร.ม.`,
+                        console.log(`📊 Zone ${zone.name} calculations with cropData:`, {
+                            area: `${Math.round(zoneArea)} ตร.ม. (${Math.round((zoneArea / 1600) * 100) / 100} ไร่)`,
                             crop: crop.name,
-                            rowSpacing: `${effectiveRowSpacing} ม.`,
-                            plantSpacing: `${effectivePlantSpacing} ม.`,
+                            category: crop.category,
+                            rowSpacing: `${effectiveRowSpacing} ม. (จาก cropData: ${crop.rowSpacing} ซม.)`,
+                            plantSpacing: `${effectivePlantSpacing} ม. (จาก cropData: ${crop.plantSpacing} ซม.)`,
                             plantingPoints: totalPlantingPoints.toLocaleString(),
-                            yield: `${estimatedYield.toLocaleString()} กก.`,
-                            price: `${estimatedPrice.toLocaleString()} บาท`,
+                            yield: `${estimatedYield.toLocaleString()} กก. (${crop.yield} กก./ไร่)`,
+                            price: `${estimatedPrice.toLocaleString()} บาท (${crop.price} บาท/กก.)`,
+                            water: `${waterRequirement.toLocaleString()} ลิตร/วัน (${crop.waterRequirement} ลิตร/ต้น/วัน)`,
+                            growthPeriod: `${crop.growthPeriod} วัน`,
+                            irrigationNeeds: crop.irrigationNeeds,
                         });
                     }
                 } else {
@@ -302,21 +342,31 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                         cropName: 'ไม่ได้กำหนด',
                         cropValue: null,
                         cropIcon: '❓',
+                        cropCategory: null,
                         zoneArea: zone.coordinates
                             ? Math.round(calculateZoneArea(zone.coordinates))
+                            : 0,
+                        zoneAreaRai: zone.coordinates
+                            ? Math.round((calculateZoneArea(zone.coordinates) / 1600) * 100) / 100
                             : 0,
                         rowSpacing: 0,
                         plantSpacing: 0,
                         totalPlantingPoints: 0,
                         estimatedYield: 0,
                         estimatedPrice: 0,
+                        waterRequirement: 0,
+                        cropYieldPerRai: 0,
+                        cropPricePerKg: 0,
+                        cropWaterPerPlant: 0,
+                        growthPeriod: 0,
+                        irrigationNeeds: 'unknown',
                         irrigationType: irrigationAssignments[zoneId] || 'ไม่ได้กำหนด',
                     };
                 }
             });
 
             setCalculatedZoneSummaries(newZoneSummaries);
-            console.log('✅ Zone calculations completed:', newZoneSummaries);
+            console.log('✅ Zone calculations completed with cropData:', newZoneSummaries);
         }
     }, [summaryData, zones, zoneAssignments, rowSpacing, plantSpacing, irrigationAssignments]);
 
@@ -425,22 +475,6 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
 
     const { center: optimalCenter, zoom: optimalZoom } = calculateMapBounds();
 
-    // Handle print events to ensure map renders correctly
-    useEffect(() => {
-        const handleBeforePrint = () => {
-            setTimeout(() => window.dispatchEvent(new Event('resize')), 500);
-        };
-        const handleAfterPrint = () => {
-            setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
-        };
-        window.addEventListener('beforeprint', handleBeforePrint);
-        window.addEventListener('afterprint', handleAfterPrint);
-        return () => {
-            window.removeEventListener('beforeprint', handleBeforePrint);
-            window.removeEventListener('afterprint', handleAfterPrint);
-        };
-    }, []);
-
     // Remove duplicate irrigation points by unique ID
     const uniqueIrrigationPoints = actualIrrigationPoints.filter((point, index, array) => {
         if (!point || !point.id) return false;
@@ -455,29 +489,6 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
     } else if (uniqueIrrigationPoints.length > 100) {
         filteredIrrigationPoints = uniqueIrrigationPoints.filter((_, index) => index % 2 === 0);
     }
-
-    // Clean and normalize irrigation types
-    const normalizeIrrigationType = (type: string): string => {
-        if (!type) return 'unknown';
-        const normalizedType = type.toLowerCase().trim();
-        const typeMapping: { [key: string]: string } = {
-            sprinkler: 'sprinkler',
-            'sprinkler-system': 'sprinkler',
-            'mini-sprinkler': 'mini_sprinkler',
-            mini_sprinkler: 'mini_sprinkler',
-            minisprinkler: 'mini_sprinkler',
-            'micro-spray': 'micro_spray',
-            micro_spray: 'micro_spray',
-            microspray: 'micro_spray',
-            micro: 'micro_spray',
-            microsprinkler: 'micro_spray',
-            drip: 'drip_tape',
-            'drip-tape': 'drip_tape',
-            drip_tape: 'drip_tape',
-            'drip-irrigation': 'drip_tape',
-        };
-        return typeMapping[normalizedType] || normalizedType;
-    };
 
     const normalizedPoints = filteredIrrigationPoints.map((point) => ({
         ...point,
@@ -514,7 +525,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
     const valveCount = uniqueEquipment.filter((e) => e.type === 'ballvalve').length;
     const solenoidCount = uniqueEquipment.filter((e) => e.type === 'solenoid').length;
 
-    // *** THE FIX: ใช้ข้อมูลที่คำนวณแล้ว ***
+    // *** การคำนวณรวมใช้ข้อมูลที่คำนวณแล้วจาก cropData ***
     const totalEstimatedYield = Object.values(calculatedZoneSummaries).reduce(
         (sum: number, summary: any) => sum + (summary.estimatedYield || 0),
         0
@@ -525,6 +536,10 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
     );
     const totalPlantingPoints = Object.values(calculatedZoneSummaries).reduce(
         (sum: number, summary: any) => sum + (summary.totalPlantingPoints || 0),
+        0
+    );
+    const totalWaterRequirement = Object.values(calculatedZoneSummaries).reduce(
+        (sum: number, summary: any) => sum + (summary.waterRequirement || 0),
         0
     );
 
@@ -593,59 +608,12 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
         <div className="min-h-screen bg-gray-900 text-white print:bg-white print:text-black">
             <Head title="Field Crop Summary - Irrigation Planning" />
 
-            <style>{`
-                @media print {
-                    @page { 
-                        size: A4 landscape; 
-                        margin: 0.5in; 
-                    }
-                    body { 
-                        print-color-adjust: exact; 
-                        -webkit-print-color-adjust: exact; 
-                    }
-                    .print-hide { 
-                        display: none !important; 
-                    }
-                    .print-show { 
-                        display: block !important; 
-                    }
-                    .print-map-only {
-                        display: flex !important;
-                        flex-direction: column !important;
-                        height: 100vh !important;
-                        width: 100vw !important;
-                        padding: 0 !important;
-                        margin: 0 !important;
-                    }
-                    .print-map-container {
-                        flex: 1 !important;
-                        width: 100% !important;
-                        height: 100% !important;
-                        min-height: 700px !important;
-                    }
-                    .print-map-header {
-                        background: white !important;
-                        color: black !important;
-                        padding: 10px !important;
-                        border-bottom: 1px solid #ccc !important;
-                        flex-shrink: 0 !important;
-                    }
-                    .leaflet-container { 
-                        height: 100% !important; 
-                        width: 100% !important; 
-                    }
-                    .print-other-content {
-                        display: none !important;
-                    }
-                }
-            `}</style>
-
             {/* Header */}
             <div className="border-b border-gray-700 bg-gray-800 print:hidden">
                 <div className="container mx-auto px-4 py-4">
                     <div className="mx-auto max-w-7xl">
                         <Link
-                            href="/field-map"
+                            href="/field-map?edit=true&step=4"
                             className="mb-2 inline-flex items-center text-blue-400 hover:text-blue-300"
                         >
                             <svg
@@ -728,7 +696,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                             {/* Crop Information */}
                             <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
                                 <h2 className="mb-3 text-lg font-bold text-green-400 print:text-base print:text-black">
-                                    🌱 Crop Information
+                                    🌱 Crop Information (from cropData)
                                 </h2>
                                 <div className="space-y-2 print:space-y-1">
                                     {selectedCropObjects.map(
@@ -747,22 +715,38 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                                 <h3 className="text-sm font-semibold text-white print:text-xs print:text-black">
                                                                     {crop.name}
                                                                 </h3>
+                                                                <div className="text-xs text-gray-400 print:text-gray-600">
+                                                                    {crop.category} • {crop.irrigationNeeds} water needs
+                                                                </div>
+                                                                <div className="text-xs text-gray-400 print:text-gray-600">
+                                                                    Growth: {crop.growthPeriod} days
+                                                                </div>
                                                             </div>
                                                         </div>
                                                         <div className="text-right">
                                                             <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                แถว:{' '}
-                                                                {rowSpacing[crop.value] ||
-                                                                    crop.spacing ||
-                                                                    1.5}
-                                                                m
+                                                                <strong>Spacing:</strong>
                                                             </div>
                                                             <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                ต้น:{' '}
-                                                                {plantSpacing[crop.value] ||
-                                                                    crop.defaultPlantSpacing ||
-                                                                    1.0}
-                                                                m
+                                                                แถว: {crop.rowSpacing} ซม.
+                                                            </div>
+                                                            <div className="text-xs text-gray-400 print:text-gray-600">
+                                                                ต้น: {crop.plantSpacing} ซม.
+                                                            </div>
+                                                            <div className="text-xs text-gray-400 print:text-gray-600 mt-1">
+                                                                <strong>Production:</strong>
+                                                            </div>
+                                                            <div className="text-xs text-gray-400 print:text-gray-600">
+                                                                {crop.yield} กก./ไร่
+                                                            </div>
+                                                            <div className="text-xs text-gray-400 print:text-gray-600">
+                                                                {crop.price} บาท/กก.
+                                                            </div>
+                                                            <div className="text-xs text-gray-400 print:text-gray-600 mt-1">
+                                                                <strong>Water:</strong>
+                                                            </div>
+                                                            <div className="text-xs text-gray-400 print:text-gray-600">
+                                                                {crop.waterRequirement} ล./ต้น/วัน
                                                             </div>
                                                         </div>
                                                     </div>
@@ -864,30 +848,108 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                 </div>
                             </div>
 
-                            {/* Financial Summary */}
+                            {/* Financial & Water Summary */}
                             <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
                                 <h2 className="mb-3 text-lg font-bold text-green-400 print:text-base print:text-black">
-                                    💰 Financial Summary
+                                    💰 Financial & Water Summary
                                 </h2>
-                                <div className="space-y-2 print:space-y-1">
-                                    <div className="rounded-lg bg-gray-700 p-2 print:border">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm text-gray-400">
-                                                Total Estimated Yield
-                                            </span>
-                                            <span className="text-sm font-bold text-yellow-400">
-                                                {totalEstimatedYield.toLocaleString()} kg
-                                            </span>
+                                <div className="space-y-3 print:space-y-2">
+                                    {/* Financial Summary */}
+                                    <div className="space-y-2">
+                                        <div className="rounded-lg bg-gray-700 p-2 print:border print:bg-gray-50">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm text-gray-400 print:text-gray-700">
+                                                    Total Estimated Yield
+                                                </span>
+                                                <span className="text-sm font-bold text-yellow-400 print:text-black">
+                                                    {totalEstimatedYield.toLocaleString()} กก.
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="rounded-lg bg-gray-700 p-2 print:border print:bg-gray-50">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm text-gray-400 print:text-gray-700">
+                                                    Total Estimated Income
+                                                </span>
+                                                <span className="text-sm font-bold text-green-400 print:text-black">
+                                                    ฿{totalEstimatedIncome.toLocaleString()}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="rounded-lg bg-gray-700 p-2 print:border">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm text-gray-400">
-                                                Total Estimated Income
-                                            </span>
-                                            <span className="text-sm font-bold text-green-400">
-                                                ฿{totalEstimatedIncome.toLocaleString()}
-                                            </span>
+
+                                    {/* Water Requirements Summary */}
+                                    <div className="bg-cyan-900/30 p-3 rounded-lg print:bg-cyan-50 print:border-2 print:border-cyan-200">
+                                        <h3 className="text-sm font-semibold text-cyan-300 mb-2 print:text-cyan-800">
+                                            💧 Total Water Requirements (from cropData)
+                                        </h3>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1">
+                                                <div className="text-xs text-cyan-200 print:text-cyan-700">
+                                                    Total Farm Area: {areaInRai.toFixed(2)} ไร่
+                                                </div>
+                                                <div className="text-xs text-cyan-200 print:text-cyan-700">
+                                                    Total Plants: {totalPlantingPoints.toLocaleString()} ต้น
+                                                </div>
+                                                <div className="text-xs text-cyan-200 print:text-cyan-700">
+                                                    Active Zones: {Object.keys(calculatedZoneSummaries).filter(id => calculatedZoneSummaries[id].cropValue).length} zones
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-xs text-cyan-200 print:text-cyan-700 mb-1">
+                                                    Daily Water Need:
+                                                </div>
+                                                <div className="font-bold text-cyan-100 print:text-cyan-800 text-xl">
+                                                    {totalWaterRequirement.toLocaleString()}
+                                                </div>
+                                                <div className="text-xs text-cyan-200 print:text-cyan-700">
+                                                    ลิตร/วัน
+                                                </div>
+                                                <div className="text-xs text-cyan-200 print:text-cyan-700 mt-1">
+                                                    ({(totalWaterRequirement / 1000).toFixed(1)} ลบ.ม./วัน)
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Water breakdown by zone */}
+                                        <div className="mt-3 pt-2 border-t border-cyan-700 print:border-cyan-300">
+                                            <div className="text-xs text-cyan-200 print:text-cyan-700 mb-2 font-medium">
+                                                Water Requirements by Zone:
+                                            </div>
+                                            <div className="space-y-1 max-h-24 overflow-y-auto">
+                                                {Object.values(calculatedZoneSummaries)
+                                                    .filter((summary: any) => summary.cropValue)
+                                                    .map((summary: any) => (
+                                                        <div key={summary.zoneId} className="flex justify-between text-xs">
+                                                            <span className="text-cyan-200 print:text-cyan-700">
+                                                                {summary.zoneName} ({summary.zoneAreaRai} ไร่)
+                                                            </span>
+                                                            <span className="text-cyan-100 print:text-cyan-800 font-medium">
+                                                                {summary.waterRequirement.toLocaleString()} ล./วัน
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Monthly and yearly projections */}
+                                        <div className="mt-3 pt-2 border-t border-cyan-700 print:border-cyan-300">
+                                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                                <div className="text-center bg-cyan-800/50 p-2 rounded print:bg-cyan-100">
+                                                    <div className="text-cyan-200 print:text-cyan-700">Monthly</div>
+                                                    <div className="font-bold text-cyan-100 print:text-cyan-800">
+                                                        {(totalWaterRequirement * 30 / 1000).toFixed(1)}
+                                                    </div>
+                                                    <div className="text-cyan-200 print:text-cyan-700">ลบ.ม./เดือน</div>
+                                                </div>
+                                                <div className="text-center bg-cyan-800/50 p-2 rounded print:bg-cyan-100">
+                                                    <div className="text-cyan-200 print:text-cyan-700">Yearly</div>
+                                                    <div className="font-bold text-cyan-100 print:text-cyan-800">
+                                                        {(totalWaterRequirement * 365 / 1000).toFixed(0)}
+                                                    </div>
+                                                    <div className="text-cyan-200 print:text-cyan-700">ลบ.ม./ปี</div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -920,9 +982,9 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                             {/* Zone Details - ซ่อนเมื่อพิมพ์ */}
                             <div className="print:print-other-content rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
                                 <h2 className="mb-3 text-lg font-bold text-blue-400 print:text-base print:text-black">
-                                    🎯 Zone Details
+                                    🎯 Zone Details & Water Requirements
                                 </h2>
-                                <div className="space-y-2 print:space-y-1">
+                                <div className="space-y-3 print:space-y-2">
                                     {actualZones.map((zone) => {
                                         const summary = calculatedZoneSummaries[zone.id];
                                         const assignedCrop = zoneAssignments[zone.id]
@@ -932,83 +994,162 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                         return (
                                             <div
                                                 key={zone.id}
-                                                className="rounded-lg bg-gray-700 p-2 print:border"
+                                                className="rounded-lg bg-gray-700 p-3 print:border print:bg-gray-50"
                                             >
-                                                <div className="mb-1 flex items-center justify-between">
+                                                <div className="mb-2 flex items-center justify-between">
                                                     <div className="flex items-center space-x-2">
                                                         <div
-                                                            className="h-2 w-2 rounded-full"
+                                                            className="h-3 w-3 rounded-full"
                                                             style={{ backgroundColor: zone.color }}
                                                         ></div>
-                                                        <h3 className="text-sm font-semibold text-white">
+                                                        <h3 className="text-sm font-semibold text-white print:text-black">
                                                             {zone.name}
                                                         </h3>
                                                     </div>
                                                     {assignedCrop && (
-                                                        <span className="text-sm">
+                                                        <span className="text-lg">
                                                             {assignedCrop.icon}
                                                         </span>
                                                     )}
                                                 </div>
                                                 {summary ? (
-                                                    <div className="grid grid-cols-2 gap-2 text-xs">
-                                                        <div>
-                                                            <div className="text-gray-400">
-                                                                Crop
-                                                            </div>
-                                                            <div className="font-semibold text-white">
-                                                                {summary.cropName}
-                                                            </div>
-                                                        </div>
-                                                        <div>
-                                                            <div className="text-gray-400">
-                                                                Points
-                                                            </div>
-                                                            <div className="font-semibold text-green-400">
-                                                                {summary.totalPlantingPoints.toLocaleString()}
-                                                            </div>
-                                                        </div>
-                                                        <div>
-                                                            <div className="text-gray-400">
-                                                                Yield
-                                                            </div>
-                                                            <div className="font-semibold text-yellow-400">
-                                                                {summary.estimatedYield.toLocaleString()}{' '}
-                                                                kg
-                                                            </div>
-                                                        </div>
-                                                        <div>
-                                                            <div className="text-gray-400">
-                                                                Income
-                                                            </div>
-                                                            <div className="font-semibold text-green-400">
-                                                                ฿
-                                                                {summary.estimatedPrice.toLocaleString()}
-                                                            </div>
-                                                        </div>
-                                                        {irrigationType && (
-                                                            <div className="col-span-2">
-                                                                <div className="text-gray-400">
-                                                                    Irrigation
+                                                    <div className="space-y-3">
+                                                        {/* Zone Basic Info */}
+                                                        <div className="grid grid-cols-3 gap-2 text-xs">
+                                                            <div className="text-center bg-gray-600 p-2 rounded print:bg-gray-100">
+                                                                <div className="text-gray-400 print:text-gray-600">Area</div>
+                                                                <div className="font-semibold text-blue-400 print:text-black">
+                                                                    {summary.zoneAreaRai} ไร่
                                                                 </div>
-                                                                <div className="font-semibold text-cyan-400">
+                                                                <div className="text-gray-400 text-xs print:text-gray-600">
+                                                                    {summary.zoneArea} ตร.ม.
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-center bg-gray-600 p-2 rounded print:bg-gray-100">
+                                                                <div className="text-gray-400 print:text-gray-600">Plants</div>
+                                                                <div className="font-semibold text-green-400 print:text-black">
+                                                                    {summary.totalPlantingPoints.toLocaleString()}
+                                                                </div>
+                                                                <div className="text-gray-400 text-xs print:text-gray-600">
+                                                                    ต้น
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-center bg-gray-600 p-2 rounded print:bg-gray-100">
+                                                                <div className="text-gray-400 print:text-gray-600">Crop</div>
+                                                                <div className="font-semibold text-white print:text-black text-xs">
+                                                                    {summary.cropName}
+                                                                </div>
+                                                                <div className="text-gray-400 text-xs print:text-gray-600">
+                                                                    {summary.cropCategory}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Water Requirements Section */}
+                                                        <div className="bg-cyan-900/30 p-3 rounded-lg print:bg-cyan-50 print:border">
+                                                            <h4 className="text-sm font-semibold text-cyan-300 mb-2 print:text-cyan-800">
+                                                                💧 Water Requirements (from cropData)
+                                                            </h4>
+                                                            <div className="grid grid-cols-2 gap-3 text-xs">
+                                                                <div>
+                                                                    <div className="text-cyan-200 print:text-cyan-700 mb-1">
+                                                                        Zone Area: {summary.zoneAreaRai} ไร่
+                                                                    </div>
+                                                                    <div className="text-cyan-200 print:text-cyan-700 mb-1">
+                                                                        Plants: {summary.totalPlantingPoints.toLocaleString()} ต้น
+                                                                    </div>
+                                                                    <div className="text-cyan-200 print:text-cyan-700">
+                                                                        Rate: {summary.cropWaterPerPlant} ลิตร/ต้น/วัน
+                                                                    </div>
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <div className="text-cyan-200 print:text-cyan-700 text-xs mb-1">
+                                                                        Total Water Need/Day:
+                                                                    </div>
+                                                                    <div className="font-bold text-cyan-100 print:text-cyan-800 text-lg">
+                                                                        {summary.waterRequirement.toLocaleString()}
+                                                                    </div>
+                                                                    <div className="text-cyan-200 print:text-cyan-700 text-xs">
+                                                                        ลิตร/วัน
+                                                                    </div>
+                                                                    <div className="text-cyan-200 print:text-cyan-700 text-xs mt-1">
+                                                                        ({(summary.waterRequirement / 1000).toFixed(1)} ลบ.ม./วัน)
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="mt-2 text-xs text-cyan-200 print:text-cyan-700 bg-cyan-800/30 p-2 rounded print:bg-cyan-100">
+                                                                <strong>การคำนวณ:</strong> {summary.totalPlantingPoints.toLocaleString()} ต้น × {summary.cropWaterPerPlant} ลิตร/ต้น/วัน = {summary.waterRequirement.toLocaleString()} ลิตร/วัน
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Production & Income */}
+                                                        <div className="grid grid-cols-2 gap-2 text-xs">
+                                                            <div className="bg-yellow-900/30 p-2 rounded print:bg-yellow-50">
+                                                                <div className="text-yellow-300 print:text-yellow-800 mb-1">
+                                                                    Expected Yield
+                                                                </div>
+                                                                <div className="font-semibold text-yellow-100 print:text-yellow-900">
+                                                                    {summary.estimatedYield.toLocaleString()} กก.
+                                                                </div>
+                                                                <div className="text-yellow-300 text-xs print:text-yellow-700">
+                                                                    @ {summary.cropYieldPerRai} กก./ไร่
+                                                                </div>
+                                                            </div>
+                                                            <div className="bg-green-900/30 p-2 rounded print:bg-green-50">
+                                                                <div className="text-green-300 print:text-green-800 mb-1">
+                                                                    Expected Income
+                                                                </div>
+                                                                <div className="font-semibold text-green-100 print:text-green-900">
+                                                                    ฿{summary.estimatedPrice.toLocaleString()}
+                                                                </div>
+                                                                <div className="text-green-300 text-xs print:text-green-700">
+                                                                    @ {summary.cropPricePerKg} บาท/กก.
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Additional Info */}
+                                                        <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-gray-600 print:border-gray-300">
+                                                            <div>
+                                                                <div className="text-gray-400 print:text-gray-600">
+                                                                    Plant Spacing
+                                                                </div>
+                                                                <div className="font-semibold text-blue-400 print:text-black">
+                                                                    แถว: {(summary.rowSpacing * 100)} ซม.
+                                                                </div>
+                                                                <div className="font-semibold text-blue-400 print:text-black">
+                                                                    ต้น: {(summary.plantSpacing * 100)} ซม.
+                                                                </div>
+                                                            </div>
+                                                            <div>
+                                                                <div className="text-gray-400 print:text-gray-600">
+                                                                    Growth Info
+                                                                </div>
+                                                                <div className="font-semibold text-purple-400 print:text-black">
+                                                                    {summary.growthPeriod} วัน
+                                                                </div>
+                                                                <div className="font-semibold text-purple-400 print:text-black">
+                                                                    น้ำ: {summary.irrigationNeeds}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {irrigationType && (
+                                                            <div className="text-center bg-blue-900/30 p-2 rounded print:bg-blue-50">
+                                                                <div className="text-blue-300 print:text-blue-800 text-xs">
+                                                                    Irrigation System
+                                                                </div>
+                                                                <div className="font-semibold text-blue-100 print:text-blue-900">
                                                                     {irrigationType}
                                                                 </div>
                                                             </div>
                                                         )}
-                                                        <div className="col-span-2">
-                                                            <div className="text-gray-400">
-                                                                Spacing
-                                                            </div>
-                                                            <div className="font-semibold text-blue-400">
-                                                                แถว: {summary.rowSpacing}m, ต้น:{' '}
-                                                                {summary.plantSpacing}m
-                                                            </div>
-                                                        </div>
                                                     </div>
                                                 ) : (
-                                                    <div className="text-xs text-gray-400">
-                                                        No summary data available.
+                                                    <div className="text-center text-gray-400 print:text-gray-600 py-4">
+                                                        <div className="text-4xl mb-2">❓</div>
+                                                        <div className="text-sm">No crop assigned to this zone</div>
+                                                        <div className="text-xs">Cannot calculate water requirements</div>
                                                     </div>
                                                 )}
                                             </div>
@@ -1022,7 +1163,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                 <div className="flex h-full flex-col">
                                     <div className="print:print-map-header border-b border-gray-600 bg-gray-700 p-2">
                                         <h3 className="text-sm font-semibold text-white print:text-black">
-                                            🗺️ Project Map Overview - Scale 1:1000
+                                            🗺️ Project Map Overview
                                         </h3>
                                     </div>
                                     <div
@@ -1077,29 +1218,17 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                     ) : null
                                                 )}
                                                 {actualPipes.map((pipe) => {
-                                                    // กำหนดสีและน้ำหนักของเส้นตามประเภทท่อ
-                                                    let pipeColor = pipe.color;
-                                                    let pipeWeight = 4;
-
-                                                    if (pipe.type === 'main') {
-                                                        pipeColor = pipeColor || '#DC2626'; // สีแดง
-                                                        pipeWeight = 6;
-                                                    } else if (pipe.type === 'submain') {
-                                                        pipeColor = pipeColor || '#2563EB'; // สีน้ำเงิน
-                                                        pipeWeight = 4;
-                                                    } else if (pipe.type === 'lateral') {
-                                                        pipeColor = pipeColor || '#16A34A'; // สีเขียว
-                                                        pipeWeight = 2;
-                                                    }
-
+                                                    // **IMPROVED LOGIC**
+                                                    const pipeConfig = PIPE_TYPES[pipe.type as PipeType] || { color: '#888888', weight: 3 };
+                                                    
                                                     return pipe.coordinates &&
                                                         Array.isArray(pipe.coordinates) ? (
                                                         <Polyline
                                                             key={pipe.id}
                                                             positions={pipe.coordinates}
                                                             pathOptions={{
-                                                                color: pipeColor,
-                                                                weight: pipeWeight,
+                                                                color: pipeConfig.color,
+                                                                weight: pipeConfig.weight,
                                                                 opacity: 0.9,
                                                             }}
                                                         />
@@ -1130,20 +1259,18 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                     }
                                                     if (!lat || !lng) return null;
 
+                                                    // **IMPROVED LOGIC**
                                                     const normalizedType = normalizeIrrigationType(
                                                         point.type
                                                     );
-                                                    // กำหนดสีตามประเภทระบบรดน้ำ
-                                                    let color = '#06b6d4'; // สีเริ่มต้น (cyan)
+                                                    let color = '#06b6d4'; // Default (cyan)
                                                     if (normalizedType === 'sprinkler')
-                                                        color = '#22c55e'; // เขียว
+                                                        color = '#22c55e'; // Green
                                                     else if (normalizedType === 'mini_sprinkler')
-                                                        color = '#3b82f6'; // น้ำเงิน
+                                                        color = '#3b82f6'; // Blue
                                                     else if (normalizedType === 'micro_spray')
-                                                        color = '#f97316'; // ส้ม
-                                                    else if (normalizedType === 'drip_tape')
-                                                        color = '#06b6d4'; // cyan
-
+                                                        color = '#f97316'; // Orange
+                                                    
                                                     return (
                                                         <CircleMarker
                                                             key={point.id || `irrigation-${index}`}
@@ -1187,18 +1314,18 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                             'drip_tape'
                                                     )
                                                         return null;
-
+                                                    
+                                                    // **IMPROVED LOGIC**
                                                     const normalizedType = normalizeIrrigationType(
                                                         point.type
                                                     );
-                                                    // กำหนดสีตามประเภทระบบรดน้ำ - ใช้สีเดียวกันกับจุด
-                                                    let color = '#06b6d4'; // สีเริ่มต้น (cyan)
+                                                    let color = '#06b6d4'; // Default (cyan)
                                                     if (normalizedType === 'sprinkler')
-                                                        color = '#22c55e'; // เขียว
+                                                        color = '#22c55e'; // Green
                                                     else if (normalizedType === 'mini_sprinkler')
-                                                        color = '#3b82f6'; // น้ำเงิน
+                                                        color = '#3b82f6'; // Blue
                                                     else if (normalizedType === 'micro_spray')
-                                                        color = '#f97316'; // ส้ม
+                                                        color = '#f97316'; // Orange
 
                                                     return (
                                                         <Circle
