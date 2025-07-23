@@ -1792,7 +1792,11 @@ const RealTimeBranchControlModal = ({
     );
 };
 
-const DistanceIndicator = ({ map, isActive, editMode }: {
+const DistanceIndicator = ({
+    map,
+    isActive,
+    editMode,
+}: {
     map: google.maps.Map | null;
     isActive: boolean;
     editMode: string | null;
@@ -1816,32 +1820,35 @@ const DistanceIndicator = ({ map, isActive, editMode }: {
             }
         });
 
-        const mouseMoveListener = map.addListener('mousemove', (event: google.maps.MapMouseEvent) => {
-            if (event.latLng && tempStartPoint) {
-                const currentPos = { lat: event.latLng.lat(), lng: event.latLng.lng() };
-                setMousePosition(currentPos);
-                
-                const distance = calculateDistanceBetweenPoints(tempStartPoint, currentPos);
-                setCurrentDistance(distance);
+        const mouseMoveListener = map.addListener(
+            'mousemove',
+            (event: google.maps.MapMouseEvent) => {
+                if (event.latLng && tempStartPoint) {
+                    const currentPos = { lat: event.latLng.lat(), lng: event.latLng.lng() };
+                    setMousePosition(currentPos);
 
-                const pixel = map.getProjection()?.fromLatLngToPoint(event.latLng);
-                if (pixel && indicatorRef.current) {
-                    const scale = Math.pow(2, map.getZoom() || 16);
-                    const worldCoordinate = new google.maps.Point(
-                        pixel.x * scale,
-                        pixel.y * scale
-                    );
-                    
-                    const topLeft = new google.maps.Point(0, 0);
-                    const topRight = new google.maps.Point(map.getDiv().offsetWidth, 0);
-                    const bottomLeft = new google.maps.Point(0, map.getDiv().offsetHeight);
-                    
-                    indicatorRef.current.style.left = `${worldCoordinate.x - topLeft.x + 10}px`;
-                    indicatorRef.current.style.top = `${worldCoordinate.y - topLeft.y - 10}px`;
-                    indicatorRef.current.style.display = 'block';
+                    const distance = calculateDistanceBetweenPoints(tempStartPoint, currentPos);
+                    setCurrentDistance(distance);
+
+                    const pixel = map.getProjection()?.fromLatLngToPoint(event.latLng);
+                    if (pixel && indicatorRef.current) {
+                        const scale = Math.pow(2, map.getZoom() || 16);
+                        const worldCoordinate = new google.maps.Point(
+                            pixel.x * scale,
+                            pixel.y * scale
+                        );
+
+                        const topLeft = new google.maps.Point(0, 0);
+                        const topRight = new google.maps.Point(map.getDiv().offsetWidth, 0);
+                        const bottomLeft = new google.maps.Point(0, map.getDiv().offsetHeight);
+
+                        indicatorRef.current.style.left = `${worldCoordinate.x - topLeft.x + 10}px`;
+                        indicatorRef.current.style.top = `${worldCoordinate.y - topLeft.y - 10}px`;
+                        indicatorRef.current.style.display = 'block';
+                    }
                 }
             }
-        });
+        );
 
         const rightClickListener = map.addListener('rightclick', () => {
             setStartPoint(null);
@@ -2548,7 +2555,8 @@ export default function EnhancedHorticulturePlannerPage() {
                 if (containingZone) {
                     targetZoneId = containingZone.id;
                 } else {
-                    const isInMainArea = history.present.mainArea.length > 0 && 
+                    const isInMainArea =
+                        history.present.mainArea.length > 0 &&
                         isPointInPolygon(newPosition, history.present.mainArea);
                     if (!isInMainArea) {
                         canPlace = false;
@@ -2794,11 +2802,11 @@ export default function EnhancedHorticulturePlannerPage() {
                 ...history.present.subMainPipes.map((p) => p.id),
                 ...history.present.subMainPipes.flatMap((sm) => sm.branchPipes.map((bp) => bp.id)),
             ];
-            
+
             const availablePlantIds = history.present.plants
-                .filter(p => p.id !== plantId)
-                .map(p => p.id);
-            
+                .filter((p) => p.id !== plantId)
+                .map((p) => p.id);
+
             setHighlightedPipes([...availablePipeIds, ...availablePlantIds]);
         },
         [history.present.plants, history.present.subMainPipes]
@@ -2871,7 +2879,7 @@ export default function EnhancedHorticulturePlannerPage() {
         (targetPlantId: string) => {
             if (!connectionStartPlant || !isCreatingConnection) return;
 
-            const targetPlant = history.present.plants.find(p => p.id === targetPlantId);
+            const targetPlant = history.present.plants.find((p) => p.id === targetPlantId);
             if (!targetPlant) return;
 
             const newBranchPipe: BranchPipe = {
@@ -2891,14 +2899,17 @@ export default function EnhancedHorticulturePlannerPage() {
             };
 
             const hasExistingSubMain = history.present.subMainPipes.length > 0;
-            
+
             if (hasExistingSubMain) {
                 const targetSubMain = history.present.subMainPipes[0];
                 const updatedSubMainPipes = history.present.subMainPipes.map((subMain) => {
                     if (subMain.id === targetSubMain.id) {
                         return {
                             ...subMain,
-                            branchPipes: [...subMain.branchPipes, { ...newBranchPipe, subMainPipeId: subMain.id }],
+                            branchPipes: [
+                                ...subMain.branchPipes,
+                                { ...newBranchPipe, subMainPipeId: subMain.id },
+                            ],
                         };
                     }
                     return subMain;
@@ -2909,15 +2920,18 @@ export default function EnhancedHorticulturePlannerPage() {
                     id: generateUniqueId('submain'),
                     zoneId: 'main-area',
                     coordinates: [connectionStartPlant.position, targetPlant.position],
-                    length: calculateDistanceBetweenPoints(connectionStartPlant.position, targetPlant.position),
+                    length: calculateDistanceBetweenPoints(
+                        connectionStartPlant.position,
+                        targetPlant.position
+                    ),
                     diameter: 32,
                     branchPipes: [{ ...newBranchPipe, subMainPipeId: generateUniqueId('submain') }],
                     material: 'pvc',
                     currentAngle: history.present.branchPipeSettings.defaultAngle,
                 };
-                
-                pushToHistory({ 
-                    subMainPipes: [...history.present.subMainPipes, newSubMainPipe] 
+
+                pushToHistory({
+                    subMainPipes: [...history.present.subMainPipes, newSubMainPipe],
                 });
             }
 
@@ -2927,7 +2941,14 @@ export default function EnhancedHorticulturePlannerPage() {
             setDragMode('none');
             setTempConnectionLine(null);
         },
-        [connectionStartPlant, isCreatingConnection, history.present.plants, history.present.subMainPipes, history.present.branchPipeSettings.defaultAngle, pushToHistory]
+        [
+            connectionStartPlant,
+            isCreatingConnection,
+            history.present.plants,
+            history.present.subMainPipes,
+            history.present.branchPipeSettings.defaultAngle,
+            pushToHistory,
+        ]
     );
 
     const handleSearch = useCallback((lat: number, lng: number, placeDetails?: any) => {
@@ -4691,7 +4712,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                 isEditModeEnabled={history.present.isEditModeEnabled}
                             />
 
-                            <DistanceIndicator 
+                            <DistanceIndicator
                                 map={mapRef.current}
                                 isActive={editMode === 'zone'}
                                 editMode={editMode}
@@ -5204,7 +5225,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                                 ${isCreatingConnection && isBranchHighlighted ? '<br/><div style="font-size: 12px; color: #FCD34D;">🔗 คลิกเพื่อเชื่อมต่อ</div>' : ''}
                             </div>
                         `,
-                    }); 
+                    });
 
                     branchPolyline.addListener('click', (event: google.maps.MapMouseEvent) => {
                         if (isCreatingConnection && isBranchHighlighted && event.latLng) {

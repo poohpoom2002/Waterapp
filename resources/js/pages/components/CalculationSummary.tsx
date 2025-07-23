@@ -46,7 +46,8 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
     const actualSecondaryPipe = results.autoSelectedSecondaryPipe;
     const actualMainPipe = results.autoSelectedMainPipe;
 
-    const isMultiZone = selectedZones.length > 1 || (results.allZoneResults && results.allZoneResults.length > 1);
+    const isMultiZone =
+        selectedZones.length > 1 || (results.allZoneResults && results.allZoneResults.length > 1);
 
     const getSprinklerPressureInfo = () => {
         if (!selectedSprinkler) {
@@ -171,7 +172,8 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
             {activeZone && (
                 <div className="rounded-lg bg-purple-900 p-4">
                     <h3 className="mb-2 text-lg font-bold text-purple-300">
-                        {projectMode === 'garden' ? '🏡' : '🌿'} ข้อมูลโซนปัจจุบัน: {activeZone.name}
+                        {projectMode === 'garden' ? '🏡' : '🌿'} ข้อมูลโซนปัจจุบัน:{' '}
+                        {activeZone.name}
                     </h3>
                     <div className="grid grid-cols-2 gap-4 text-sm text-gray-300 md:grid-cols-4">
                         {activeZone.area >= 1600 ? (
@@ -202,7 +204,9 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                 <h2 className="mb-2 text-lg font-bold text-white">
                     🤖 สถานะการเลือกอุปกรณ์อัตโนมัติ
                     {isMultiZone && activeZone && (
-                        <span className="ml-2 text-sm font-normal">(โซนปัจจุบัน: {activeZone.name})</span>
+                        <span className="ml-2 text-sm font-normal">
+                            (โซนปัจจุบัน: {activeZone.name})
+                        </span>
                     )}
                 </h2>
                 <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
@@ -335,7 +339,9 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                 <h2 className="mb-2 text-lg font-bold text-white">
                     🎯 ข้อมูลสำคัญ
                     {isMultiZone && activeZone && (
-                        <span className="ml-2 text-sm font-normal">(โซนปัจจุบัน: {activeZone.name})</span>
+                        <span className="ml-2 text-sm font-normal">
+                            (โซนปัจจุบัน: {activeZone.name})
+                        </span>
                     )}
                 </h2>
                 <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
@@ -369,7 +375,8 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             </p>
                             {isMultiZone && results.projectSummary && (
                                 <p className="text-xs text-purple-100">
-                                    (ตาม {getOperationModeLabel(results.projectSummary.operationMode)})
+                                    (ตาม{' '}
+                                    {getOperationModeLabel(results.projectSummary.operationMode)})
                                 </p>
                             )}
                             <p className="text-xs text-purple-100">
@@ -378,14 +385,14 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         </div>
                     )}
                     <div className="text-center">
-                        <p className="text-pink-200">จำนวน{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}</p>
+                        <p className="text-pink-200">
+                            จำนวน{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}
+                        </p>
                         <p className="text-xl font-bold text-green-300">
                             {results.totalSprinklers} หัว
                         </p>
                         {activeZone && (
-                            <p className="text-xs text-pink-100">
-                                (ในโซน {activeZone.name})
-                            </p>
+                            <p className="text-xs text-pink-100">(ในโซน {activeZone.name})</p>
                         )}
                     </div>
                 </div>
@@ -423,12 +430,18 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             </p>
                         </div>
                     </div>
-                    
+
                     <div className="mt-3 rounded bg-blue-800 p-2">
                         <h4 className="text-sm font-medium text-blue-300">💧 การคำนวณปั๊ม:</h4>
                         <div className="grid grid-cols-2 gap-2 text-xs text-blue-200">
-                            <p>Flow ที่ต้องการ: {results.projectSummary.selectedGroupFlowLPM.toFixed(1)} LPM</p>
-                            <p>Head ที่ต้องการ: {results.projectSummary.selectedGroupHeadM.toFixed(1)} เมตร</p>
+                            <p>
+                                Flow ที่ต้องการ:{' '}
+                                {results.projectSummary.selectedGroupFlowLPM.toFixed(1)} LPM
+                            </p>
+                            <p>
+                                Head ที่ต้องการ:{' '}
+                                {results.projectSummary.selectedGroupHeadM.toFixed(1)} เมตร
+                            </p>
                         </div>
                         {results.projectSummary.criticalGroup && (
                             <p className="mt-1 text-xs text-blue-300">
@@ -442,9 +455,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
             {/* แสดงข้อมูลโซนย่อยสำหรับหลายโซน */}
             {isMultiZone && results.allZoneResults && results.allZoneResults.length > 0 && (
                 <div className="rounded-lg bg-gray-800 p-4">
-                    <h3 className="mb-3 text-lg font-bold text-gray-300">
-                        🔍 รายละเอียดแต่ละโซน
-                    </h3>
+                    <h3 className="mb-3 text-lg font-bold text-gray-300">🔍 รายละเอียดแต่ละโซน</h3>
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         {results.allZoneResults.map((zoneResult, index) => (
                             <div key={zoneResult.zoneId} className="rounded bg-gray-700 p-3">
@@ -452,11 +463,14 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                     <h4 className="font-medium text-white">
                                         {getZoneName(zoneResult.zoneId)}
                                         {zoneResult.zoneId === activeZone?.id && (
-                                            <span className="ml-2 text-xs text-green-400">(กำลังดู)</span>
+                                            <span className="ml-2 text-xs text-green-400">
+                                                (กำลังดู)
+                                            </span>
                                         )}
                                     </h4>
                                     <div className="text-xs text-gray-400">
-                                        {zoneResult.sprinklerCount} {projectMode === 'garden' ? 'หัว' : 'ต้น'}
+                                        {zoneResult.sprinklerCount}{' '}
+                                        {projectMode === 'garden' ? 'หัว' : 'ต้น'}
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2 text-xs text-gray-300">
@@ -466,9 +480,12 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                     </div>
                                     <div>
                                         <p>Head Loss: {zoneResult.headLoss.total.toFixed(1)} ม.</p>
-                                        <p>Total Head: <span className="font-bold text-yellow-300">
-                                            {zoneResult.totalHead.toFixed(1)} ม.
-                                        </span></p>
+                                        <p>
+                                            Total Head:{' '}
+                                            <span className="font-bold text-yellow-300">
+                                                {zoneResult.totalHead.toFixed(1)} ม.
+                                            </span>
+                                        </p>
                                     </div>
                                 </div>
                                 {zoneResult.zoneId === results.projectSummary?.criticalZone && (
@@ -489,7 +506,8 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                     <div className="space-y-1 text-xs text-purple-200">
                         {zoneOperationGroups.map((group, index) => (
                             <p key={group.id}>
-                                • ลำดับที่ {group.order}: {group.zones.map(zoneId => getZoneName(zoneId)).join(', ')}
+                                • ลำดับที่ {group.order}:{' '}
+                                {group.zones.map((zoneId) => getZoneName(zoneId)).join(', ')}
                                 {group.zones.length > 1 && ' (เปิดพร้อมกัน)'}
                             </p>
                         ))}
@@ -778,7 +796,8 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             </div>
                             {isMultiZone && results.projectSummary && (
                                 <p className="mt-2 text-xs text-orange-200">
-                                    คำนวณตาม {getOperationModeLabel(results.projectSummary.operationMode)}
+                                    คำนวณตาม{' '}
+                                    {getOperationModeLabel(results.projectSummary.operationMode)}
                                 </p>
                             )}
                         </div>

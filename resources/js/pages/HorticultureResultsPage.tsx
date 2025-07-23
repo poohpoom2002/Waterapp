@@ -233,7 +233,7 @@ const GoogleMapsResultsOverlays: React.FC<{
         projectData.mainArea.forEach((coord) => {
             bounds.extend(new google.maps.LatLng(coord.lat, coord.lng));
         });
-        
+
         map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
     }, [map, projectData, pipeSize, iconSize, clearOverlays]);
 
@@ -1065,7 +1065,6 @@ function EnhancedHorticultureResultsPageContent() {
                                         scrollwheel: false,
                                         disableDoubleClickZoom: false,
                                         gestureHandling: 'none',
-                                        
                                     }}
                                 >
                                     {mapLoaded && (
@@ -1264,7 +1263,6 @@ function EnhancedHorticultureResultsPageContent() {
                                     </div>
                                 </div>
                             </div>
-
 
                             {projectSummary.zoneDetails.length > 0 && (
                                 <div className="rounded-lg bg-gray-800 p-6">
