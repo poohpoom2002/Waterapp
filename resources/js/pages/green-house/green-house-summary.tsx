@@ -67,21 +67,21 @@ interface GreenhouseSummaryData {
 export default function GreenhouseSummary() {
     const [summaryData, setSummaryData] = useState<GreenhouseSummaryData | null>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    
+
     // Image cache for component icons
-    const [componentImages, setComponentImages] = useState<{[key: string]: HTMLImageElement}>({});
+    const [componentImages, setComponentImages] = useState<{ [key: string]: HTMLImageElement }>({});
 
     // Load component images
     useEffect(() => {
         const imageConfigs = {
             pump: '/generateTree/wtpump.png',
             'solenoid-valve': '/generateTree/solv.png',
-            'ball-valve': '/generateTree/ballv.png'
+            'ball-valve': '/generateTree/ballv.png',
         };
 
         const loadImages = async () => {
-            const images: {[key: string]: HTMLImageElement} = {};
-            
+            const images: { [key: string]: HTMLImageElement } = {};
+
             for (const [type, src] of Object.entries(imageConfigs)) {
                 try {
                     const img = new Image();
@@ -95,7 +95,7 @@ export default function GreenhouseSummary() {
                     console.warn(`Failed to load image for ${type}:`, error);
                 }
             }
-            
+
             setComponentImages(images);
         };
 
@@ -198,30 +198,31 @@ export default function GreenhouseSummary() {
         // Try to use image first
         if (componentImages[type]) {
             const img = componentImages[type];
-            
+
             // Different sizes for different components
             let imgSize, containerSize;
             if (type === 'pump') {
                 imgSize = 18 * scale;
                 containerSize = 24 * scale;
-            } else { // valves
+            } else {
+                // valves
                 imgSize = 12 * scale;
                 containerSize = 18 * scale;
             }
-            
+
             ctx.save();
-            
+
             // Draw circular container background
             ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
             ctx.strokeStyle = '#666666';
             ctx.lineWidth = 1.5 * scale;
             ctx.beginPath();
-            ctx.arc(point.x, point.y, containerSize/2, 0, 2 * Math.PI);
+            ctx.arc(point.x, point.y, containerSize / 2, 0, 2 * Math.PI);
             ctx.fill();
             ctx.stroke();
-            
+
             // Draw the component image
-            ctx.drawImage(img, point.x - imgSize/2, point.y - imgSize/2, imgSize, imgSize);
+            ctx.drawImage(img, point.x - imgSize / 2, point.y - imgSize / 2, imgSize, imgSize);
             ctx.restore();
             return;
         }
@@ -1314,4 +1315,4 @@ export default function GreenhouseSummary() {
             </div>
         </div>
     );
-};
+}

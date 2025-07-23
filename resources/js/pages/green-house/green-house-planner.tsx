@@ -189,7 +189,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
     // Calculate polygon area in square meters
     const calculatePolygonArea = useCallback((points: Point[]): number => {
         if (points.length < 3) return 0;
-        
+
         let area = 0;
         for (let i = 0; i < points.length; i++) {
             const j = (i + 1) % points.length;
@@ -197,22 +197,25 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
             area -= points[j].x * points[i].y;
         }
         area = Math.abs(area) / 2;
-        
+
         // Convert from square pixels to square meters
         return area / (GRID_SIZE * GRID_SIZE);
     }, []);
 
     // Calculate perimeter in meters
-    const calculatePerimeter = useCallback((points: Point[]): number => {
-        if (points.length < 2) return 0;
-        
-        let perimeter = 0;
-        for (let i = 0; i < points.length; i++) {
-            const j = (i + 1) % points.length;
-            perimeter += calculateDistance(points[i], points[j]);
-        }
-        return perimeter;
-    }, [calculateDistance]);
+    const calculatePerimeter = useCallback(
+        (points: Point[]): number => {
+            if (points.length < 2) return 0;
+
+            let perimeter = 0;
+            for (let i = 0; i < points.length; i++) {
+                const j = (i + 1) % points.length;
+                perimeter += calculateDistance(points[i], points[j]);
+            }
+            return perimeter;
+        },
+        [calculateDistance]
+    );
 
     // Add to history
     const addToHistory = useCallback(
@@ -398,7 +401,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
             for (let i = 0; i < shape.points.length; i++) {
                 const point1 = shape.points[i];
                 const point2 = shape.points[(i + 1) % shape.points.length];
-                
+
                 // Skip the last edge if it's not a closed shape
                 if (i === shape.points.length - 1 && shape.points.length < 3) break;
 
@@ -438,10 +441,10 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 // Draw info box near the shape
                 const infoX = centerX - 80;
                 const infoY = centerY - 50;
-                
+
                 ctx.fillStyle = 'rgba(255, 215, 0, 0.9)';
                 ctx.fillRect(infoX, infoY, 160, 45);
-                
+
                 ctx.fillStyle = '#000000';
                 ctx.font = 'bold 11px Inter, sans-serif';
                 ctx.textAlign = 'center';
@@ -634,7 +637,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
 
             // Draw measurements for selected shape
             if (selectedShape) {
-                const shape = shapes.find(s => s.id === selectedShape);
+                const shape = shapes.find((s) => s.id === selectedShape);
                 if (shape && shape.type !== 'measurement') {
                     drawSelectedShapeMeasurements(ctx, shape);
                 }
@@ -719,12 +722,12 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
             if (mousePos && currentPath.length > 0 && isDrawing) {
                 // คำนวณระยะรวมทั้งหมด
                 let totalDistance = 0;
-                
+
                 // ระยะของเส้นที่วาดแล้ว
                 for (let i = 0; i < currentPath.length - 1; i++) {
                     totalDistance += calculateDistance(currentPath[i], currentPath[i + 1]);
                 }
-                
+
                 // ระยะจากจุดสุดท้ายถึงเมาส์ปัจจุบัน
                 const lastPoint = currentPath[currentPath.length - 1];
                 totalDistance += calculateDistance(lastPoint, mousePos);
@@ -755,22 +758,22 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
             if (currentPath.length >= 3) {
                 const tempPoints = [...currentPath];
                 if (mousePos) tempPoints.push(mousePos);
-                
+
                 const perimeter = calculatePerimeter(tempPoints);
                 const area = calculatePolygonArea(tempPoints);
 
                 // Draw info box - ทำให้เด่นขึ้น
                 const infoX = 15;
                 const infoY = 15;
-                
+
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
                 ctx.fillRect(infoX, infoY, 180, 70);
-                
+
                 // Border
                 ctx.strokeStyle = '#3B82F6';
                 ctx.lineWidth = 2;
                 ctx.strokeRect(infoX, infoY, 180, 70);
-                
+
                 ctx.fillStyle = '#FFFFFF';
                 ctx.font = 'bold 13px Inter, sans-serif';
                 ctx.textAlign = 'left';
@@ -778,7 +781,14 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 ctx.fillText(`พื้นที่: ${area.toFixed(1)}m²`, infoX + 10, infoY + 50);
             }
         },
-        [currentPath, mousePos, calculateDistance, calculatePerimeter, calculatePolygonArea, isDrawing]
+        [
+            currentPath,
+            mousePos,
+            calculateDistance,
+            calculatePerimeter,
+            calculatePolygonArea,
+            isDrawing,
+        ]
     );
 
     // Draw current path
@@ -1416,8 +1426,11 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                 ออกแบบพื้นที่โรงเรือน พร้อมระบบวัดระยะ
                             </h1>
                             <p className="text-sm text-gray-400">
-                                วาดโครงสร้างโรงเรือนและแปลงปลูกของคุณ - พื้นที่ 2400x1600 pixels (1 grid = 1 เมตร) 
-                                <span className="ml-2 text-blue-300">แสดงการวัดระยะแบบ Real-time</span>
+                                วาดโครงสร้างโรงเรือนและแปลงปลูกของคุณ - พื้นที่ 2400x1600 pixels (1
+                                grid = 1 เมตร)
+                                <span className="ml-2 text-blue-300">
+                                    แสดงการวัดระยะแบบ Real-time
+                                </span>
                             </p>
                         </div>
                     </div>
@@ -1761,41 +1774,69 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                             <p>
                                                 <strong>จำนวนจุด:</strong> {shape.points.length}
                                             </p>
-                                            {shape.type !== 'measurement' && shape.points.length >= 2 && (
-                                                <>
-                                                    {shape.points.length >= 3 && (
-                                                        <>
-                                                            <p>
-                                                                <strong>เส้นรอบรูป:</strong>{' '}
-                                                                {calculatePerimeter(shape.points).toFixed(1)}m
-                                                            </p>
-                                                            <p>
-                                                                <strong>พื้นที่:</strong>{' '}
-                                                                {calculatePolygonArea(shape.points).toFixed(1)}m²
-                                                            </p>
-                                                        </>
-                                                    )}
-                                                    {shape.points.length === 2 && (
-                                                        <p>
-                                                            <strong>ระยะทาง:</strong>{' '}
-                                                            {calculateDistance(shape.points[0], shape.points[1]).toFixed(1)}m
-                                                        </p>
-                                                    )}
-                                                    <div className="mt-2 space-y-1">
-                                                        <p><strong>ขนาดแต่ละด้าน:</strong></p>
-                                                        {shape.points.map((point, i) => {
-                                                            if (i === shape.points.length - 1 && shape.points.length < 3) return null;
-                                                            const nextPoint = shape.points[(i + 1) % shape.points.length];
-                                                            const distance = calculateDistance(point, nextPoint);
-                                                            return (
-                                                                <p key={i} className="ml-2 text-xs text-gray-400">
-                                                                    ด้านที่ {i + 1}: {distance.toFixed(1)}m
+                                            {shape.type !== 'measurement' &&
+                                                shape.points.length >= 2 && (
+                                                    <>
+                                                        {shape.points.length >= 3 && (
+                                                            <>
+                                                                <p>
+                                                                    <strong>เส้นรอบรูป:</strong>{' '}
+                                                                    {calculatePerimeter(
+                                                                        shape.points
+                                                                    ).toFixed(1)}
+                                                                    m
                                                                 </p>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </>
-                                            )}
+                                                                <p>
+                                                                    <strong>พื้นที่:</strong>{' '}
+                                                                    {calculatePolygonArea(
+                                                                        shape.points
+                                                                    ).toFixed(1)}
+                                                                    m²
+                                                                </p>
+                                                            </>
+                                                        )}
+                                                        {shape.points.length === 2 && (
+                                                            <p>
+                                                                <strong>ระยะทาง:</strong>{' '}
+                                                                {calculateDistance(
+                                                                    shape.points[0],
+                                                                    shape.points[1]
+                                                                ).toFixed(1)}
+                                                                m
+                                                            </p>
+                                                        )}
+                                                        <div className="mt-2 space-y-1">
+                                                            <p>
+                                                                <strong>ขนาดแต่ละด้าน:</strong>
+                                                            </p>
+                                                            {shape.points.map((point, i) => {
+                                                                if (
+                                                                    i === shape.points.length - 1 &&
+                                                                    shape.points.length < 3
+                                                                )
+                                                                    return null;
+                                                                const nextPoint =
+                                                                    shape.points[
+                                                                        (i + 1) %
+                                                                            shape.points.length
+                                                                    ];
+                                                                const distance = calculateDistance(
+                                                                    point,
+                                                                    nextPoint
+                                                                );
+                                                                return (
+                                                                    <p
+                                                                        key={i}
+                                                                        className="ml-2 text-xs text-gray-400"
+                                                                    >
+                                                                        ด้านที่ {i + 1}:{' '}
+                                                                        {distance.toFixed(1)}m
+                                                                    </p>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </>
+                                                )}
                                             <div className="mt-2 text-xs text-yellow-300">
                                                 <p>• ลากเพื่อขยับ (ไม่กด Ctrl)</p>
                                                 <p>• Ctrl+คลิก เพื่อเลื่อนมุมมอง</p>
@@ -1841,33 +1882,58 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                     <span className="text-gray-400">รวม:</span>
                                     <span className="font-bold">{shapes.length}</span>
                                 </div>
-                                
+
                                 {/* Total Area Statistics */}
-                                {shapes.filter(s => s.type !== 'measurement' && s.points.length >= 3).length > 0 && (
+                                {shapes.filter(
+                                    (s) => s.type !== 'measurement' && s.points.length >= 3
+                                ).length > 0 && (
                                     <>
-                                        <div className="border-t border-gray-600 pt-2 mt-2">
-                                            <h5 className="text-xs font-medium text-gray-400 mb-1">พื้นที่รวม (m²)</h5>
-                                            {['greenhouse', 'plot', 'walkway', 'water-source'].map(type => {
-                                                const typeShapes = shapes.filter(s => s.type === type && s.points.length >= 3);
-                                                const totalArea = typeShapes.reduce((sum, shape) => 
-                                                    sum + calculatePolygonArea(shape.points), 0);
-                                                
-                                                if (totalArea === 0) return null;
-                                                
-                                                const typeNames = {
-                                                    greenhouse: 'โรงเรือน',
-                                                    plot: 'แปลงปลูก', 
-                                                    walkway: 'ทางเดิน',
-                                                    'water-source': 'แหล่งน้ำ'
-                                                };
-                                                
-                                                return (
-                                                    <div key={type} className="flex justify-between text-xs">
-                                                        <span className="text-gray-500">{typeNames[type as keyof typeof typeNames]}:</span>
-                                                        <span className="text-blue-300">{totalArea.toFixed(1)}m²</span>
-                                                    </div>
-                                                );
-                                            })}
+                                        <div className="mt-2 border-t border-gray-600 pt-2">
+                                            <h5 className="mb-1 text-xs font-medium text-gray-400">
+                                                พื้นที่รวม (m²)
+                                            </h5>
+                                            {['greenhouse', 'plot', 'walkway', 'water-source'].map(
+                                                (type) => {
+                                                    const typeShapes = shapes.filter(
+                                                        (s) =>
+                                                            s.type === type && s.points.length >= 3
+                                                    );
+                                                    const totalArea = typeShapes.reduce(
+                                                        (sum, shape) =>
+                                                            sum +
+                                                            calculatePolygonArea(shape.points),
+                                                        0
+                                                    );
+
+                                                    if (totalArea === 0) return null;
+
+                                                    const typeNames = {
+                                                        greenhouse: 'โรงเรือน',
+                                                        plot: 'แปลงปลูก',
+                                                        walkway: 'ทางเดิน',
+                                                        'water-source': 'แหล่งน้ำ',
+                                                    };
+
+                                                    return (
+                                                        <div
+                                                            key={type}
+                                                            className="flex justify-between text-xs"
+                                                        >
+                                                            <span className="text-gray-500">
+                                                                {
+                                                                    typeNames[
+                                                                        type as keyof typeof typeNames
+                                                                    ]
+                                                                }
+                                                                :
+                                                            </span>
+                                                            <span className="text-blue-300">
+                                                                {totalArea.toFixed(1)}m²
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                }
+                                            )}
                                         </div>
                                     </>
                                 )}
@@ -1930,4 +1996,4 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
             )}
         </div>
     );
-};
+}
