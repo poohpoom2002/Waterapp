@@ -944,7 +944,8 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
             const { default: html2canvas } = await import('html2canvas');
 
             // Target the specific container
-            let elementId = gardenData.designMode === 'map' ? 'map-container' : 'canvas-container';
+            const elementId =
+                gardenData.designMode === 'map' ? 'map-container' : 'canvas-container';
             const element = document.getElementById(elementId);
 
             if (element) {
@@ -975,7 +976,8 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
     const handlePrintImage = useCallback(() => {
         try {
             // Get the specific container
-            let elementId = gardenData?.designMode === 'map' ? 'map-container' : 'canvas-container';
+            const elementId =
+                gardenData?.designMode === 'map' ? 'map-container' : 'canvas-container';
             const element = document.getElementById(elementId);
 
             if (element) {

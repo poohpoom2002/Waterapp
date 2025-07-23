@@ -16,22 +16,57 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import L from 'leaflet';
 
+// Type definitions
+interface SearchResult {
+    place_id: string;
+    display_name: string;
+    type: string;
+    lat: string;
+    lon: string;
+}
+
+interface DrawEvent {
+    layer: L.Layer;
+    layerType: string;
+    target: L.Map;
+}
+
+interface EditedEvent {
+    layers: L.LayerGroup;
+    target: L.Map;
+}
+
+interface DeletedEvent {
+    layers: L.LayerGroup;
+    target: L.Map;
+}
+
+interface LeafletMouseEvent extends L.LeafletMouseEvent {
+    latlng: L.LatLng;
+}
+
+interface DragEndEvent {
+    target: {
+        getLatLng: () => L.LatLng;
+    };
+}
+
+interface MainPipe {
+    points: Coordinate[];
+}
+
 import {
     Coordinate,
     GardenZone,
     Sprinkler,
     WaterSource,
     Pipe,
-    MainPipe,
     ZONE_TYPES,
-    SPRINKLER_TYPES,
-    DEFAULT_CENTER,
     isPointInPolygon,
     calculateDistance,
     calculatePolygonArea,
     formatArea,
     clipCircleToPolygon,
-    isCornerSprinkler,
 } from '../../utils/homeGardenData';
 
 interface MapDesignerProps {
@@ -48,23 +83,23 @@ interface MapDesignerProps {
     selectedPipes: Set<string>;
     selectedSprinklersForPipe: string[];
     mainPipeDrawing: Coordinate[];
-    onZoneCreated: (e: any) => void;
-    onZoneDeleted: (e: any) => void;
+    onZoneCreated: (e: DrawEvent) => void;
+    onZoneDeleted: (e: DrawEvent) => void;
     onSprinklerPlaced: (position: Coordinate) => void;
     onWaterSourcePlaced: (position: Coordinate) => void;
-    onMainPipeClick: (e: any) => void;
+    onMainPipeClick: (e: LeafletMouseEvent) => void;
     onSprinklerClick: (sprinklerId: string) => void;
     onSprinklerDelete: (sprinklerId: string) => void;
     onSprinklerDragged: (sprinklerId: string, position: Coordinate) => void;
     onWaterSourceDelete: () => void;
     onPipeClick: (pipeId: string) => void;
-    onMapClick: (e: any) => void;
+    onMapClick: (e: LeafletMouseEvent) => void;
     searchQuery: string;
-    searchResults: any[];
+    searchResults: SearchResult[];
     isSearching: boolean;
     showSearchResults: boolean;
     onSearchChange: (value: string) => void;
-    onSearchResultClick: (result: any) => void;
+    onSearchResultClick: (result: SearchResult) => void;
     onClearSearch: () => void;
     mapCenter: [number, number];
 }
@@ -90,11 +125,11 @@ const MapController: React.FC<{ center: [number, number]; zoom?: number }> = ({ 
 
 const MapSearchBox: React.FC<{
     searchQuery: string;
-    searchResults: any[];
+    searchResults: SearchResult[];
     isSearching: boolean;
     showSearchResults: boolean;
     onSearchChange: (value: string) => void;
-    onResultClick: (result: any) => void;
+    onResultClick: (result: SearchResult) => void;
     onClear: () => void;
 }> = ({
     searchQuery,
@@ -217,7 +252,11 @@ const createCircleZoneIntersection = (
     return intersectionPoints;
 };
 
-const createSprinklerIcon = (sprinkler: any, isSelected: boolean = false, orientation?: number) => {
+const createSprinklerIcon = (
+    sprinkler: { color: string; icon: string },
+    isSelected: boolean = false,
+    orientation?: number
+) => {
     const selectedClass = isSelected ? 'ring-4 ring-yellow-400 ring-opacity-80' : '';
     const rotationStyle = orientation ? `transform: rotate(${orientation}deg);` : '';
     const shadowStyle = 'filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6));';
@@ -244,19 +283,13 @@ const MapDesigner: React.FC<MapDesignerProps> = ({
     waterSource,
     pipes,
     mainPipe,
-    selectedZoneType,
     editMode,
-    manualSprinklerType,
-    manualSprinklerRadius,
     selectedSprinkler,
     selectedPipes,
     selectedSprinklersForPipe,
     mainPipeDrawing,
     onZoneCreated,
     onZoneDeleted,
-    onSprinklerPlaced,
-    onWaterSourcePlaced,
-    onMainPipeClick,
     onSprinklerClick,
     onSprinklerDelete,
     onSprinklerDragged,
@@ -541,7 +574,7 @@ const MapDesigner: React.FC<MapDesignerProps> = ({
         const map = mapRef.current;
         if (!map || editMode === 'draw') return;
 
-        const clickHandler = (e: any) => onMapClick(e);
+        const clickHandler = (e: LeafletMouseEvent) => onMapClick(e);
         map.on('click', clickHandler);
 
         return () => {
@@ -549,8 +582,12 @@ const MapDesigner: React.FC<MapDesignerProps> = ({
         };
     }, [onMapClick, editMode]);
 
-    const handleZoneEdited = useCallback((e: any) => {
+    const handleZoneEdited = useCallback((e: EditedEvent) => {
         console.log('Zone edited:', e);
+    }, []);
+
+    const handleZoneDeleted = useCallback((e: DeletedEvent) => {
+        console.log('Zone deleted:', e);
     }, []);
 
     return (
@@ -721,7 +758,7 @@ const MapDesigner: React.FC<MapDesignerProps> = ({
                             click: () => onSprinklerClick(sprinkler.id),
                             contextmenu: () => onSprinklerDelete(sprinkler.id),
                             dragstart: () => onSprinklerClick(sprinkler.id),
-                            dragend: (e: any) => {
+                            dragend: (e: DragEndEvent) => {
                                 const { lat, lng } = e.target.getLatLng();
                                 onSprinklerDragged(sprinkler.id, { lat, lng });
                             },
@@ -742,7 +779,7 @@ const MapDesigner: React.FC<MapDesignerProps> = ({
 
                 {/* Submain Pipes - Enhanced styling */}
                 {pipes
-                    .filter((p) => p.type === 'submain')
+                    .filter((p) => p.type === 'pipe')
                     .map((pipe) => (
                         <Polyline
                             key={pipe.id}
@@ -763,7 +800,7 @@ const MapDesigner: React.FC<MapDesignerProps> = ({
 
                 {/* Lateral Pipes - Enhanced styling */}
                 {pipes
-                    .filter((p) => p.type === 'lateral')
+                    .filter((p) => p.type === 'pipe')
                     .map((pipe) => (
                         <Polyline
                             key={pipe.id}
@@ -789,7 +826,7 @@ const MapDesigner: React.FC<MapDesignerProps> = ({
                             position="topleft"
                             onCreated={onZoneCreated}
                             onEdited={handleZoneEdited}
-                            onDeleted={onZoneDeleted}
+                            onDeleted={handleZoneDeleted}
                             draw={{
                                 rectangle: true,
                                 circle: false,
