@@ -116,6 +116,9 @@ interface FieldMapToolsPanelProps {
     handlePlantSpacingConfirm: (cropValue: string) => void;
     handlePlantSpacingCancel: (cropValue: string) => void;
     handleCaptureMapAndSummary?: () => void;
+    // Fanggy005: Add dripSpacing props for linter fix
+    dripSpacing: Record<string, number>;
+    setDripSpacing: React.Dispatch<React.SetStateAction<Record<string, number>>>;
 }
 
 const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
@@ -197,6 +200,8 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
     handlePlantSpacingConfirm,
     handlePlantSpacingCancel,
     handleCaptureMapAndSummary,
+    dripSpacing,
+    setDripSpacing,
 }) => {
     return (
         <>
