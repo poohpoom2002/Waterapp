@@ -11,9 +11,9 @@ interface PumpSelectorProps {
     zoneInputs?: { [zoneId: string]: IrrigationInput };
 }
 
-const PumpSelector: React.FC<PumpSelectorProps> = ({ 
-    results, 
-    selectedPump, 
+const PumpSelector: React.FC<PumpSelectorProps> = ({
+    results,
+    selectedPump,
     onPumpChange,
     simultaneousZonesCount = 1,
     selectedZones = [],
@@ -36,25 +36,29 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
     const requiredHead = results.pumpHeadRequired;
 
     // Calculate actual flow requirement for simultaneous zones
-const calculateSimultaneousFlow = () => {
-    if (!selectedZones || selectedZones.length <= 1 || !zoneInputs) {
-        return requiredFlow;
-    }
+    const calculateSimultaneousFlow = () => {
+        if (!selectedZones || selectedZones.length <= 1 || !zoneInputs) {
+            return requiredFlow;
+        }
 
-    // Sort zones by flow requirement and take the top simultaneous zones
-    const zoneFlows = selectedZones.map(zoneId => {
-        const zoneInput = zoneInputs[zoneId];
-        if (!zoneInput) return { zoneId, flow: 0 };
-        
-        const flowLPH = (zoneInput.totalTrees * zoneInput.waterPerTreeLiters) / (zoneInput.irrigationTimeMinutes / 60);
-        return { zoneId, flow: flowLPH / 60 }; // Convert to LPM
-    }).sort((a, b) => b.flow - a.flow);
+        // Sort zones by flow requirement and take the top simultaneous zones
+        const zoneFlows = selectedZones
+            .map((zoneId) => {
+                const zoneInput = zoneInputs[zoneId];
+                if (!zoneInput) return { zoneId, flow: 0 };
 
-    const topFlows = zoneFlows.slice(0, simultaneousZonesCount);
-    return topFlows.reduce((sum, zone) => sum + zone.flow, 0);
-};
+                const flowLPH =
+                    (zoneInput.totalTrees * zoneInput.waterPerTreeLiters) /
+                    (zoneInput.irrigationTimeMinutes / 60);
+                return { zoneId, flow: flowLPH / 60 }; // Convert to LPM
+            })
+            .sort((a, b) => b.flow - a.flow);
 
-const actualRequiredFlow = calculateSimultaneousFlow();
+        const topFlows = zoneFlows.slice(0, simultaneousZonesCount);
+        return topFlows.reduce((sum, zone) => sum + zone.flow, 0);
+    };
+
+    const actualRequiredFlow = calculateSimultaneousFlow();
 
     const currentPump = selectedPump || results.autoSelectedPump;
     const autoSelectedPump = results.autoSelectedPump;
@@ -179,11 +183,11 @@ const actualRequiredFlow = calculateSimultaneousFlow();
                     </p>
                 </div>
                 {selectedZones.length > 1 && simultaneousZonesCount > 1 && (
-    <div className="mt-2 text-xs text-purple-200">
-        <p>🔄 คำนวณสำหรับ {simultaneousZonesCount} โซนที่เปิดพร้อมกัน</p>
-        <p>💧 อัตราการไหลรวม: {actualRequiredFlow.toFixed(1)} LPM</p>
-    </div>
-)}
+                    <div className="mt-2 text-xs text-purple-200">
+                        <p>🔄 คำนวณสำหรับ {simultaneousZonesCount} โซนที่เปิดพร้อมกัน</p>
+                        <p>💧 อัตราการไหลรวม: {actualRequiredFlow.toFixed(1)} LPM</p>
+                    </div>
+                )}
             </div>
 
             <div className="mb-4">

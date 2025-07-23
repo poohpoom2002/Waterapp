@@ -74,10 +74,14 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
     const getLabel = (key: string) => {
         if (projectMode === 'garden') {
             switch (key) {
-                case 'sprinkler': return 'หัวฉีด';
-                case 'perHead': return 'ต่อหัวฉีด';
-                case 'totalRequired': return 'จำนวนที่ต้องใช้';
-                default: return key;
+                case 'sprinkler':
+                    return 'หัวฉีด';
+                case 'perHead':
+                    return 'ต่อหัวฉีด';
+                case 'totalRequired':
+                    return 'จำนวนที่ต้องใช้';
+                default:
+                    return key;
             }
         }
         return key;
@@ -131,7 +135,9 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
 
             {projectMode === 'garden' && recommendations.length > 0 && (
                 <div className="mb-4 rounded bg-blue-900 p-3">
-                    <h4 className="mb-2 text-sm font-medium text-blue-300">💡 คำแนะนำการเลือกหัวฉีด:</h4>
+                    <h4 className="mb-2 text-sm font-medium text-blue-300">
+                        💡 คำแนะนำการเลือกหัวฉีด:
+                    </h4>
                     <ul className="space-y-1 text-xs text-blue-200">
                         {recommendations.map((rec, index) => (
                             <li key={index}>• {rec}</li>
@@ -151,7 +157,8 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 className="mb-4 w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
             >
                 <option value="">
-                    -- เลือก{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}{activeZone ? ` สำหรับ ${activeZone.name}` : ''} --
+                    -- เลือก{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}
+                    {activeZone ? ` สำหรับ ${activeZone.name}` : ''} --
                 </option>
                 {sortedSprinklers.map((sprinkler) => (
                     <option key={sprinkler.id} value={sprinkler.id}>
@@ -308,15 +315,30 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
 
                     {projectMode === 'garden' && (
                         <div className="mt-3 rounded bg-green-900 p-2">
-                            <h5 className="text-xs font-medium text-green-300">🏡 ข้อมูลสำหรับสวนบ้าน:</h5>
+                            <h5 className="text-xs font-medium text-green-300">
+                                🏡 ข้อมูลสำหรับสวนบ้าน:
+                            </h5>
                             <div className="grid grid-cols-2 gap-2 text-xs">
                                 <div>
                                     <p>ประเภทหัวฉีด: {selectedSprinkler.type || 'ไม่ระบุ'}</p>
-                                    <p>พื้นที่ครอบคลุม: {(Math.PI * Math.pow(getAverageValue(selectedSprinkler.radiusMeters), 2)).toFixed(1)} ตร.ม./หัว</p>
+                                    <p>
+                                        พื้นที่ครอบคลุม:{' '}
+                                        {(
+                                            Math.PI *
+                                            Math.pow(
+                                                getAverageValue(selectedSprinkler.radiusMeters),
+                                                2
+                                            )
+                                        ).toFixed(1)}{' '}
+                                        ตร.ม./หัว
+                                    </p>
                                 </div>
                                 <div>
                                     <p>เหมาะสำหรับ: {selectedSprinkler.suitable_for || 'ทั่วไป'}</p>
-                                    <p>การติดตั้ง: {selectedSprinkler.installation || 'ฝังดิน/ยกพื้น'}</p>
+                                    <p>
+                                        การติดตั้ง:{' '}
+                                        {selectedSprinkler.installation || 'ฝังดิน/ยกพื้น'}
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -327,7 +349,11 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                             <h5 className="text-xs font-medium text-green-300">ข้อมูลโซน:</h5>
                             <div className="grid grid-cols-2 gap-2 text-xs">
                                 <div>
-                                    {activeZone.area >= 1600 ? <p>พื้นที่โซน: {(activeZone.area / 1600).toFixed(1)} ไร่</p> : <p>พื้นที่โซน: {activeZone.area.toFixed(2)} ตร.ม.</p>}
+                                    {activeZone.area >= 1600 ? (
+                                        <p>พื้นที่โซน: {(activeZone.area / 1600).toFixed(1)} ไร่</p>
+                                    ) : (
+                                        <p>พื้นที่โซน: {activeZone.area.toFixed(2)} ตร.ม.</p>
+                                    )}
                                     <p>จำนวนต้นไม้: {activeZone.plantCount} ต้น</p>
                                 </div>
                                 <div>
