@@ -3,6 +3,29 @@ import { Button } from '@/components/ui/button';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
+// Define proper interfaces for the selected items
+interface SelectedSprinkler {
+    name: string;
+    price: number;
+}
+
+interface SelectedPump {
+    productCode: string;
+    price: number;
+}
+
+interface SelectedPipe {
+    productCode: string;
+    price: number;
+}
+
+interface QuotationResults {
+    totalSprinklers: number;
+    branchPipeRolls: number;
+    secondaryPipeRolls: number;
+    mainPipeRolls: number;
+}
+
 export interface QuotationProps {
     quotationNumber: string;
     projectName: string; // ใช้เป็น Your Reference
@@ -10,12 +33,12 @@ export interface QuotationProps {
     clientName: string; // ชื่อลูกค้า (Address) แสดงใน header ขวา
     salesperson: string;
     paymentTerms: string;
-    selectedSprinkler: any;
-    selectedPump: any;
-    selectedBranchPipe: any;
-    selectedSecondaryPipe: any;
-    selectedMainPipe: any;
-    results: any;
+    selectedSprinkler: SelectedSprinkler;
+    selectedPump: SelectedPump;
+    selectedBranchPipe: SelectedPipe;
+    selectedSecondaryPipe: SelectedPipe;
+    selectedMainPipe: SelectedPipe;
+    results: QuotationResults;
 }
 
 export default function Quotation({

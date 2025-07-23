@@ -894,6 +894,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
         // หา element ที่จะ capture
         let targetElement: HTMLElement | null = null;
 
+<<<<<<< HEAD
         if (gardenData?.designMode === 'map' && mapContainerRef.current) {
             targetElement = mapContainerRef.current;
             console.log('🏡 ใช้ Google Map container');
@@ -908,11 +909,47 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
         if (!targetElement) {
             console.error('🏡 ไม่พบ element สำหรับ capture');
             return null;
+=======
+            // Target the specific container
+            const elementId =
+                gardenData.designMode === 'map' ? 'map-container' : 'canvas-container';
+            const element = document.getElementById(elementId);
+
+            if (element) {
+                const canvas = await html2canvas(element, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    allowTaint: true,
+                    backgroundColor: '#1a1a1a',
+                });
+
+                // Create download link
+                const link = document.createElement('a');
+                link.download = `garden-design-${new Date().toISOString().split('T')[0]}.png`;
+                link.href = canvas.toDataURL('image/png');
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        } catch (err) {
+            console.error('Error saving image:', err);
+            setError('เกิดข้อผิดพลาดในการบันทึกรูปภาพ');
+        } finally {
+            setIsSavingImage(false);
+>>>>>>> main
         }
 
         try {
+<<<<<<< HEAD
             // รอให้ element โหลดเสร็จ
             await new Promise((resolve) => setTimeout(resolve, 2000));
+=======
+            // Get the specific container
+            const elementId =
+                gardenData?.designMode === 'map' ? 'map-container' : 'canvas-container';
+            const element = document.getElementById(elementId);
+>>>>>>> main
 
             const html2canvas = await import('html2canvas');
             const html2canvasLib = html2canvas.default || html2canvas;
