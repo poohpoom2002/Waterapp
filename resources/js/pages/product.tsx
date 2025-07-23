@@ -70,6 +70,10 @@ export default function Product() {
     const [activeZoneId, setActiveZoneId] = useState<string>('');
     const [zoneInputs, setZoneInputs] = useState<{ [zoneId: string]: IrrigationInput }>({});
     const [zoneSprinklers, setZoneSprinklers] = useState<{ [zoneId: string]: any }>({});
+    const [simultaneousZonesCount, setSimultaneousZonesCount] = useState<number>(1);
+    const [showPumpOption, setShowPumpOption] = useState<boolean>(false);
+    const [showFloatingAiChat, setShowFloatingAiChat] = useState<boolean>(false);
+    const [isAiChatMinimized, setIsAiChatMinimized] = useState<boolean>(false);
 
 
 
@@ -111,36 +115,7 @@ export default function Product() {
         return data && data[`${type}Pipes`] && data[`${type}Pipes`].total > 0;
     };
 
-    // Helper function to create single zone input
-    const createSingleZoneInput = (data: HorticultureProjectData, stats: any): IrrigationInput => {
-        const totalArea = data.zones.reduce((sum, zone) => sum + zone.area, 0);
-        const totalPlants = data.zones.reduce((sum, zone) => sum + (zone.plantCount || 0), 0);
-        const totalWater = data.zones.reduce((sum, zone) => sum + zone.totalWaterNeed, 0);
 
-        return {
-            farmSizeRai: formatNumber(totalArea / 1600, 3),
-            totalTrees: totalPlants,
-            waterPerTreeLiters: formatNumber(totalPlants ? totalWater / totalPlants : 50, 3),
-            numberOfZones: 1,
-            sprinklersPerTree: 1,
-            irrigationTimeMinutes: 20,
-            staticHeadM: 0,
-            pressureHeadM: 20,
-            pipeAgeYears: 0,
-            sprinklersPerBranch: 4,
-            branchesPerSecondary: 5,
-            simultaneousZones: 1,
-            sprinklersPerLongestBranch: 6,
-            branchesPerLongestSecondary: 6,
-            secondariesPerLongestMain: 3,
-            longestBranchPipeM: formatNumber(30, 3),
-            totalBranchPipeM: formatNumber(500, 3),
-            longestSecondaryPipeM: formatNumber(0, 3),
-            totalSecondaryPipeM: formatNumber(0, 3),
-            longestMainPipeM: formatNumber(0, 3),
-            totalMainPipeM: formatNumber(0, 3),
-        };
-    };
 
     useEffect(() => {
         return () => {
@@ -319,7 +294,7 @@ export default function Product() {
             farmSizeRai: formatNumber(zone.area / 1600, 3),
             totalTrees: totalTrees,
             waterPerTreeLiters: formatNumber(totalTrees ? zone.totalWaterNeed / totalTrees : 50, 3),
-            numberOfZones: numberOfZones,
+            numberOfZones: selectedZones.length,
             sprinklersPerTree: 1,
             irrigationTimeMinutes: 20,
             staticHeadM: 0,
@@ -514,24 +489,7 @@ export default function Product() {
         console.log('⚡ Pump selected:', pump?.name || 'auto');
     };
 
-    // Handle zone selection
-    const handleZoneSelection = (zoneId: string, checked: boolean) => {
-        if (checked) {
-            setSelectedZones((prev) => [...prev, zoneId]);
-        } else {
-            setSelectedZones((prev) => prev.filter((id) => id !== zoneId));
-        }
-    };
 
-    // Handle input change
-    const handleInputChange = (input: IrrigationInput) => {
-        if (activeZoneId) {
-            setZoneInputs((prev) => ({
-                ...prev,
-                [activeZoneId]: input,
-            }));
-        }
-    };
 
     // สร้าง zone calculation data สำหรับการคำนวณ multi-zone
     const allZoneData = useMemo(() => {
@@ -576,7 +534,7 @@ export default function Product() {
                 [activeZoneId]: input,
             }));
         }
-    }, [selectedBranchPipe, selectedSecondaryPipe, selectedMainPipe, currentInput]);
+    };
 
     const handleQuotationModalConfirm = () => {
         setShowQuotationModal(false);
@@ -1103,14 +1061,12 @@ export default function Product() {
                 gardenData={gardenData}
                 zoneSprinklers={zoneSprinklers}
                 selectedPipes={selectedPipes}
+                projectMode={projectMode}
+                showPump={projectMode === 'horticulture' || showPumpOption}
                 onClose={() => setShowQuotation(false)}
             />
             
-            {/* --- AI Chat Component --- */}
-            {/* วางไว้ที่นี่เพื่อให้เป็น Floating Component ที่แสดงผลทับ UI ทั้งหมด */}
-            <div className="no-print">
-                <AiChatComponent />
-            </div>
+
         </div>
     );
 }

@@ -33,7 +33,7 @@ export const cropTypes: Crop[] = [
         price: 15,
         defaultPlantSpacing: 0.2,
         yieldPerPlant: 0.04, // 800kg/rai, ~200,000 plants/rai
-        pricePerKg: 15
+        pricePerKg: 15,
     },
     {
         value: 'corn',
@@ -49,7 +49,7 @@ export const cropTypes: Crop[] = [
         price: 8,
         defaultPlantSpacing: 0.3,
         yieldPerPlant: 0.2, // 1200kg/rai, ~6000 plants/rai
-        pricePerKg: 8
+        pricePerKg: 8,
     },
     {
         value: 'sorghum',
@@ -65,7 +65,7 @@ export const cropTypes: Crop[] = [
         price: 12,
         defaultPlantSpacing: 0.25,
         yieldPerPlant: 0.1,
-        pricePerKg: 12
+        pricePerKg: 12,
     },
 
     // Root crops (พืชหัว)
@@ -83,7 +83,7 @@ export const cropTypes: Crop[] = [
         price: 2.5,
         defaultPlantSpacing: 0.8,
         yieldPerPlant: 0.01,
-        pricePerKg: 2.5
+        pricePerKg: 2.5,
     },
     {
         value: 'sweet_potato',
@@ -99,7 +99,7 @@ export const cropTypes: Crop[] = [
         price: 8,
         defaultPlantSpacing: 0.4,
         yieldPerPlant: 0.02,
-        pricePerKg: 8
+        pricePerKg: 8,
     },
 
     // Legumes (พืชตระกูลถั่ว)
@@ -117,7 +117,7 @@ export const cropTypes: Crop[] = [
         price: 25,
         defaultPlantSpacing: 0.3,
         yieldPerPlant: 0.003,
-        pricePerKg: 25
+        pricePerKg: 25,
     },
     {
         value: 'mung_bean',
@@ -133,7 +133,7 @@ export const cropTypes: Crop[] = [
         price: 40,
         defaultPlantSpacing: 0.2,
         yieldPerPlant: 0.002,
-        pricePerKg: 40
+        pricePerKg: 40,
     },
     {
         value: 'peanut',
@@ -149,7 +149,7 @@ export const cropTypes: Crop[] = [
         price: 45,
         defaultPlantSpacing: 0.25,
         yieldPerPlant: 0.004,
-        pricePerKg: 45
+        pricePerKg: 45,
     },
     {
         value: 'black_gram',
@@ -165,7 +165,7 @@ export const cropTypes: Crop[] = [
         price: 50,
         defaultPlantSpacing: 0.2,
         yieldPerPlant: 0.003,
-        pricePerKg: 50
+        pricePerKg: 50,
     },
 
     // Industrial crops (พืชอุตสาหกรรม)
@@ -183,7 +183,7 @@ export const cropTypes: Crop[] = [
         price: 1,
         defaultPlantSpacing: 0.5,
         yieldPerPlant: 0.04,
-        pricePerKg: 1
+        pricePerKg: 1,
     },
     {
         value: 'cotton',
@@ -199,7 +199,7 @@ export const cropTypes: Crop[] = [
         price: 80,
         defaultPlantSpacing: 0.45,
         yieldPerPlant: 0.001,
-        pricePerKg: 80
+        pricePerKg: 80,
     },
     {
         value: 'rubber',
@@ -215,7 +215,7 @@ export const cropTypes: Crop[] = [
         price: 50,
         defaultPlantSpacing: 3.0,
         yieldPerPlant: 0.0007,
-        pricePerKg: 50
+        pricePerKg: 50,
     },
     {
         value: 'tobacco',
@@ -231,7 +231,7 @@ export const cropTypes: Crop[] = [
         price: 120,
         defaultPlantSpacing: 0.6,
         yieldPerPlant: 0.008,
-        pricePerKg: 120
+        pricePerKg: 120,
     },
 
     // Oil crops (พืชน้ำมัน)
@@ -249,7 +249,7 @@ export const cropTypes: Crop[] = [
         price: 4,
         defaultPlantSpacing: 9.0,
         yieldPerPlant: 0.03,
-        pricePerKg: 4
+        pricePerKg: 4,
     },
     {
         value: 'sesame',
@@ -265,7 +265,7 @@ export const cropTypes: Crop[] = [
         price: 60,
         defaultPlantSpacing: 0.15,
         yieldPerPlant: 0.002,
-        pricePerKg: 60
+        pricePerKg: 60,
     },
     {
         value: 'sunflower',
@@ -281,7 +281,7 @@ export const cropTypes: Crop[] = [
         price: 35,
         defaultPlantSpacing: 0.4,
         yieldPerPlant: 0.004,
-        pricePerKg: 35
+        pricePerKg: 35,
     },
     {
         value: 'coconut',
@@ -297,8 +297,8 @@ export const cropTypes: Crop[] = [
         price: 8,
         defaultPlantSpacing: 8.0,
         yieldPerPlant: 0.02,
-        pricePerKg: 8
-    }
+        pricePerKg: 8,
+    },
 ];
 
 // Export CROPS as well for backward compatibility
@@ -306,30 +306,40 @@ export const CROPS = cropTypes;
 
 // Helper functions
 export const getCropByValue = (value: string): Crop | undefined => {
-    return cropTypes.find(crop => crop.value === value);
+    return cropTypes.find((crop) => crop.value === value);
 };
 
 export const searchCrops = (query: string): Crop[] => {
     const searchTerm = query.toLowerCase();
-    return cropTypes.filter(crop => 
-        crop.name.toLowerCase().includes(searchTerm) ||
-        crop.value.toLowerCase().includes(searchTerm) ||
-        crop.description.toLowerCase().includes(searchTerm)
+    return cropTypes.filter(
+        (crop) =>
+            crop.name.toLowerCase().includes(searchTerm) ||
+            crop.value.toLowerCase().includes(searchTerm) ||
+            crop.description.toLowerCase().includes(searchTerm)
     );
 };
 
 export const getCropsByCategory = (category: string): Crop[] => {
     if (category === 'all') return cropTypes;
-    return cropTypes.filter(crop => crop.category === category);
+    return cropTypes.filter((crop) => crop.category === category);
 };
 
 export const getCropsByIrrigationNeed = (need: 'low' | 'medium' | 'high'): Crop[] => {
-    return cropTypes.filter(crop => crop.irrigationNeeds === need);
+    return cropTypes.filter((crop) => crop.irrigationNeeds === need);
 };
 
 export const getPopularCrops = (): Crop[] => {
-    const popularValues = ['rice', 'corn', 'cassava', 'sugarcane', 'soybean', 'oil_palm', 'rubber', 'peanut'];
-    return popularValues.map(value => getCropByValue(value)).filter(Boolean) as Crop[];
+    const popularValues = [
+        'rice',
+        'corn',
+        'cassava',
+        'sugarcane',
+        'soybean',
+        'oil_palm',
+        'rubber',
+        'peanut',
+    ];
+    return popularValues.map((value) => getCropByValue(value)).filter(Boolean) as Crop[];
 };
 
 // Irrigation calculation helpers
@@ -389,5 +399,5 @@ export default {
     getIrrigationRecommendation,
     calculateRevenue,
     calculateRevenuePerDay,
-    categoryConfigs
+    categoryConfigs,
 };

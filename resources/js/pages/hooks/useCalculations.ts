@@ -86,10 +86,10 @@ const calculateSprinklerBasedFlow = (sprinkler: any, input: IrrigationInput) => 
 
         // คำนวณจำนวนสปริงเกอร์ที่ต้องใช้
         const totalSprinklers = Math.ceil(input.totalTrees * input.sprinklersPerTree);
-        
+
         // อัตราการไหลรวมจากสปริงเกอร์
         const totalFlowLPH = sprinklerFlowLPH * totalSprinklers;
-        
+
         return {
             totalFlowLPH: formatNumber(totalFlowLPH, 1),
             totalFlowLPM: formatNumber(totalFlowLPH / 60, 1),
@@ -102,7 +102,7 @@ const calculateSprinklerBasedFlow = (sprinkler: any, input: IrrigationInput) => 
         const totalWaterPerDay = input.totalTrees * input.waterPerTreeLiters;
         const irrigationHours = input.irrigationTimeMinutes / 60;
         const totalFlowLPH = totalWaterPerDay / irrigationHours;
-        
+
         return {
             totalFlowLPH: formatNumber(totalFlowLPH, 1),
             totalFlowLPM: formatNumber(totalFlowLPH / 60, 1),
@@ -114,27 +114,31 @@ const calculateSprinklerBasedFlow = (sprinkler: any, input: IrrigationInput) => 
 const calculateFlowRequirements = (input: IrrigationInput, selectedSprinkler: any) => {
     // ใช้การคำนวณจากสปริงเกอร์โดยตรง
     const sprinklerFlow = calculateSprinklerBasedFlow(selectedSprinkler, input);
-    
+
     // จำนวนสปริงเกอร์
-    const totalSprinklers = sprinklerFlow.actualSprinklers || Math.ceil(input.totalTrees * input.sprinklersPerTree);
-    
+    const totalSprinklers =
+        sprinklerFlow.actualSprinklers || Math.ceil(input.totalTrees * input.sprinklersPerTree);
+
     // การไหลต่อสปริงเกอร์
-    const flowPerSprinklerLPH = sprinklerFlow.sprinklerFlowLPH || (sprinklerFlow.totalFlowLPH / totalSprinklers);
+    const flowPerSprinklerLPH =
+        sprinklerFlow.sprinklerFlowLPH || sprinklerFlow.totalFlowLPH / totalSprinklers;
     const flowPerSprinklerLPM = flowPerSprinklerLPH / 60;
 
     // การไหลในท่อแต่ละระดับ
     const branchFlowLPM = flowPerSprinklerLPM * input.sprinklersPerLongestBranch;
-    
-    const secondaryFlowLPM = input.longestSecondaryPipeM > 0 ? 
-        branchFlowLPM * input.branchesPerLongestSecondary : 0;
-    
+
+    const secondaryFlowLPM =
+        input.longestSecondaryPipeM > 0 ? branchFlowLPM * input.branchesPerLongestSecondary : 0;
+
     // Main pipe ไหลน้ำสำหรับโซนที่เปิดพร้อมกัน
-    const mainFlowLPM = input.longestMainPipeM > 0 ? 
-        sprinklerFlow.totalFlowLPM * input.simultaneousZones / input.numberOfZones : 0;
+    const mainFlowLPM =
+        input.longestMainPipeM > 0
+            ? (sprinklerFlow.totalFlowLPM * input.simultaneousZones) / input.numberOfZones
+            : 0;
 
     // การไหลที่ปั๊มต้องรองรับ
     const pumpFlowLPM = Math.max(
-        sprinklerFlow.totalFlowLPM * input.simultaneousZones / input.numberOfZones,
+        (sprinklerFlow.totalFlowLPM * input.simultaneousZones) / input.numberOfZones,
         mainFlowLPM,
         secondaryFlowLPM,
         branchFlowLPM
@@ -158,63 +162,73 @@ const calculateFlowRequirements = (input: IrrigationInput, selectedSprinkler: an
 const calculateMultiZonePumpHead = (
     allZoneData: ZoneCalculationData[],
     simultaneousZones: number,
-    autoSelectedEquipment?: { branchPipe: any; secondaryPipe: any; mainPipe: any; }
+    autoSelectedEquipment?: { branchPipe: any; secondaryPipe: any; mainPipe: any }
 ) => {
     if (!allZoneData || allZoneData.length <= 1) {
         return 0;
     }
 
     // คำนวณ head ของแต่ละโซน
-    const zoneHeads = allZoneData.map(zoneData => {
-        const zonePressure = calculateSprinklerPressure(zoneData.sprinkler, zoneData.input.pressureHeadM);
-        
+    const zoneHeads = allZoneData.map((zoneData) => {
+        const zonePressure = calculateSprinklerPressure(
+            zoneData.sprinkler,
+            zoneData.input.pressureHeadM
+        );
+
         // คำนวณ head loss แต่ละโซน
         let zoneHeadLoss = 0;
         if (autoSelectedEquipment) {
             const sprinklerFlow = calculateSprinklerBasedFlow(zoneData.sprinkler, zoneData.input);
 
             // Branch pipe loss
-            const flowPerSprinklerLPH = sprinklerFlow.sprinklerFlowLPH !== undefined
-                ? sprinklerFlow.sprinklerFlowLPH
-                : (sprinklerFlow.totalFlowLPH / (sprinklerFlow.actualSprinklers || 1));
-            const branchFlow = (flowPerSprinklerLPH / 60) * zoneData.input.sprinklersPerLongestBranch;
-            const branchLoss = autoSelectedEquipment.branchPipe ? 
-                calculateImprovedHeadLoss(
-                    branchFlow,
-                    autoSelectedEquipment.branchPipe.sizeMM,
-                    zoneData.input.longestBranchPipeM,
-                    autoSelectedEquipment.branchPipe.pipeType,
-                    'branch',
-                    zoneData.input.pipeAgeYears || 0
-                ).total : 0;
-            
+            const flowPerSprinklerLPH =
+                sprinklerFlow.sprinklerFlowLPH !== undefined
+                    ? sprinklerFlow.sprinklerFlowLPH
+                    : sprinklerFlow.totalFlowLPH / (sprinklerFlow.actualSprinklers || 1);
+            const branchFlow =
+                (flowPerSprinklerLPH / 60) * zoneData.input.sprinklersPerLongestBranch;
+            const branchLoss = autoSelectedEquipment.branchPipe
+                ? calculateImprovedHeadLoss(
+                      branchFlow,
+                      autoSelectedEquipment.branchPipe.sizeMM,
+                      zoneData.input.longestBranchPipeM,
+                      autoSelectedEquipment.branchPipe.pipeType,
+                      'branch',
+                      zoneData.input.pipeAgeYears || 0
+                  ).total
+                : 0;
+
             // Secondary pipe loss
             const secondaryFlow = branchFlow * zoneData.input.branchesPerLongestSecondary;
-            const secondaryLoss = autoSelectedEquipment.secondaryPipe && zoneData.input.longestSecondaryPipeM > 0 ? 
-                calculateImprovedHeadLoss(
-                    secondaryFlow,
-                    autoSelectedEquipment.secondaryPipe.sizeMM,
-                    zoneData.input.longestSecondaryPipeM,
-                    autoSelectedEquipment.secondaryPipe.pipeType,
-                    'secondary',
-                    zoneData.input.pipeAgeYears || 0
-                ).total : 0;
-            
+            const secondaryLoss =
+                autoSelectedEquipment.secondaryPipe && zoneData.input.longestSecondaryPipeM > 0
+                    ? calculateImprovedHeadLoss(
+                          secondaryFlow,
+                          autoSelectedEquipment.secondaryPipe.sizeMM,
+                          zoneData.input.longestSecondaryPipeM,
+                          autoSelectedEquipment.secondaryPipe.pipeType,
+                          'secondary',
+                          zoneData.input.pipeAgeYears || 0
+                      ).total
+                    : 0;
+
             // Main pipe loss
             const mainFlow = sprinklerFlow.totalFlowLPM;
-            const mainLoss = autoSelectedEquipment.mainPipe && zoneData.input.longestMainPipeM > 0 ? 
-                calculateImprovedHeadLoss(
-                    mainFlow,
-                    autoSelectedEquipment.mainPipe.sizeMM,
-                    zoneData.input.longestMainPipeM,
-                    autoSelectedEquipment.mainPipe.pipeType,
-                    'main',
-                    zoneData.input.pipeAgeYears || 0
-                ).total : 0;
-            
+            const mainLoss =
+                autoSelectedEquipment.mainPipe && zoneData.input.longestMainPipeM > 0
+                    ? calculateImprovedHeadLoss(
+                          mainFlow,
+                          autoSelectedEquipment.mainPipe.sizeMM,
+                          zoneData.input.longestMainPipeM,
+                          autoSelectedEquipment.mainPipe.pipeType,
+                          'main',
+                          zoneData.input.pipeAgeYears || 0
+                      ).total
+                    : 0;
+
             zoneHeadLoss = branchLoss + secondaryLoss + mainLoss;
         }
-        
+
         return {
             zoneId: zoneData.zoneId,
             totalHead: zoneData.input.staticHeadM + zoneHeadLoss + zonePressure,
@@ -224,19 +238,19 @@ const calculateMultiZonePumpHead = (
 
     // เรียงโซนตาม head จากมากไปน้อย
     zoneHeads.sort((a, b) => b.totalHead - a.totalHead);
-    
+
     // เลือกโซนที่มี head สูงสุดตามจำนวนที่เปิดพร้อมกัน
     const selectedZones = zoneHeads.slice(0, simultaneousZones);
-    
+
     // ใช้ head สูงสุดในกลุ่มที่เลือก
     const maxHead = selectedZones.length > 0 ? selectedZones[0].totalHead : 0;
-    
+
     console.log('Multi-zone pump head calculation:', {
         simultaneousZones,
-        selectedZones: selectedZones.map(z => ({ zoneId: z.zoneId, head: z.totalHead })),
-        maxHead
+        selectedZones: selectedZones.map((z) => ({ zoneId: z.zoneId, head: z.totalHead })),
+        maxHead,
     });
-    
+
     return maxHead;
 };
 
@@ -252,7 +266,8 @@ const calculateSystemComplexity = (input: IrrigationInput): string => {
 
     if (input.farmSizeRai > 10 || input.totalTrees > 1000) complexityScore += 1;
 
-    const totalPipeLength = input.totalBranchPipeM + input.totalSecondaryPipeM + input.totalMainPipeM;
+    const totalPipeLength =
+        input.totalBranchPipeM + input.totalSecondaryPipeM + input.totalMainPipeM;
     if (totalPipeLength > 2000) complexityScore += 1;
 
     if (complexityScore >= 4) return 'complex';
@@ -279,7 +294,7 @@ const autoSelectBestPipe = (analyzedPipes: any[], pipeType: string, flowLPM: num
         // ลำดับความสำคัญ: คะแนน > ราคา > ความเร็ว
         if (Math.abs(a.score - b.score) > 10) return b.score - a.score;
         if (Math.abs(a.price - b.price) > a.price * 0.2) return a.price - b.price;
-        
+
         // ความเร็วที่เหมาะสม (0.8-2.0 m/s)
         const aVelScore = Math.abs(1.4 - a.velocity); // ยิ่งใกล้ 1.4 ยิ่งดี
         const bVelScore = Math.abs(1.4 - b.velocity);
@@ -288,10 +303,16 @@ const autoSelectBestPipe = (analyzedPipes: any[], pipeType: string, flowLPM: num
 };
 
 // เลือกปั๊มที่ดีที่สุด
-const autoSelectBestPump = (analyzedPumps: any[], requiredFlowLPM: number, requiredHeadM: number): any => {
+const autoSelectBestPump = (
+    analyzedPumps: any[],
+    requiredFlowLPM: number,
+    requiredHeadM: number
+): any => {
     if (!analyzedPumps || analyzedPumps.length === 0) return null;
 
-    const adequatePumps = analyzedPumps.filter(pump => pump.isFlowAdequate && pump.isHeadAdequate);
+    const adequatePumps = analyzedPumps.filter(
+        (pump) => pump.isFlowAdequate && pump.isHeadAdequate
+    );
 
     if (adequatePumps.length === 0) {
         return analyzedPumps.sort((a, b) => b.score - a.score)[0];
@@ -300,11 +321,11 @@ const autoSelectBestPump = (analyzedPumps: any[], requiredFlowLPM: number, requi
     return adequatePumps.sort((a, b) => {
         // ลำดับความสำคัญ: ความเหมาะสม > ประสิทธิภาพ > คะแนน
         if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
-        
+
         const aEfficiency = a.flowPerBaht || 0;
         const bEfficiency = b.flowPerBaht || 0;
         if (Math.abs(aEfficiency - bEfficiency) > 0.01) return bEfficiency - aEfficiency;
-        
+
         return b.score - a.score;
     })[0];
 };
@@ -352,10 +373,13 @@ export const useCalculations = (
                     const allEquipments = await response.json();
                     data = Array.isArray(allEquipments)
                         ? allEquipments.filter((item) => {
-                            const categoryMatch = item.category?.name === categoryName ||
-                                item.category?.display_name?.toLowerCase().includes(categoryName.toLowerCase());
-                            return categoryMatch;
-                        })
+                              const categoryMatch =
+                                  item.category?.name === categoryName ||
+                                  item.category?.display_name
+                                      ?.toLowerCase()
+                                      .includes(categoryName.toLowerCase());
+                              return categoryMatch;
+                          })
                         : [];
                 }
             }
@@ -368,7 +392,10 @@ export const useCalculations = (
     };
 
     // แปลงข้อมูลอุปกรณ์
-    const transformEquipmentData = (equipment: any[], categoryType: 'sprinkler' | 'pump' | 'pipe') => {
+    const transformEquipmentData = (
+        equipment: any[],
+        categoryType: 'sprinkler' | 'pump' | 'pipe'
+    ) => {
         return equipment
             .map((item) => {
                 try {
@@ -387,7 +414,28 @@ export const useCalculations = (
                     // รวมข้อมูล attributes
                     const allAttributes = {};
                     Object.keys(item).forEach((key) => {
-                        if (!['id', 'category_id', 'product_code', 'productCode', 'name', 'brand', 'image', 'price', 'description', 'is_active', 'created_at', 'updated_at', 'category', 'attributes', 'formatted_attributes', 'attributes_raw', 'pumpAccessories', 'pumpAccessory'].includes(key)) {
+                        if (
+                            ![
+                                'id',
+                                'category_id',
+                                'product_code',
+                                'productCode',
+                                'name',
+                                'brand',
+                                'image',
+                                'price',
+                                'description',
+                                'is_active',
+                                'created_at',
+                                'updated_at',
+                                'category',
+                                'attributes',
+                                'formatted_attributes',
+                                'attributes_raw',
+                                'pumpAccessories',
+                                'pumpAccessory',
+                            ].includes(key)
+                        ) {
                             (allAttributes as any)[key] = item[key];
                         }
                     });
@@ -414,10 +462,14 @@ export const useCalculations = (
                     switch (categoryType) {
                         case 'sprinkler':
                             if (transformed.waterVolumeLitersPerHour !== undefined) {
-                                transformed.waterVolumeLitersPerHour = parseRangeValue(transformed.waterVolumeLitersPerHour);
+                                transformed.waterVolumeLitersPerHour = parseRangeValue(
+                                    transformed.waterVolumeLitersPerHour
+                                );
                             }
                             if (transformed.radiusMeters !== undefined) {
-                                transformed.radiusMeters = parseRangeValue(transformed.radiusMeters);
+                                transformed.radiusMeters = parseRangeValue(
+                                    transformed.radiusMeters
+                                );
                             }
                             if (transformed.pressureBar !== undefined) {
                                 transformed.pressureBar = parseRangeValue(transformed.pressureBar);
@@ -425,7 +477,17 @@ export const useCalculations = (
                             break;
 
                         case 'pump':
-                            const numericFields = ['powerHP', 'powerKW', 'phase', 'inlet_size_inch', 'outlet_size_inch', 'max_head_m', 'max_flow_rate_lpm', 'suction_depth_m', 'weight_kg'];
+                            const numericFields = [
+                                'powerHP',
+                                'powerKW',
+                                'phase',
+                                'inlet_size_inch',
+                                'outlet_size_inch',
+                                'max_head_m',
+                                'max_flow_rate_lpm',
+                                'suction_depth_m',
+                                'weight_kg',
+                            ];
                             numericFields.forEach((field) => {
                                 if (transformed[field] !== undefined) {
                                     transformed[field] = Number(transformed[field]) || 0;
@@ -440,7 +502,8 @@ export const useCalculations = (
                             });
 
                             if (item.pumpAccessories || item.pump_accessories) {
-                                transformed.pumpAccessories = item.pumpAccessories || item.pump_accessories || [];
+                                transformed.pumpAccessories =
+                                    item.pumpAccessories || item.pump_accessories || [];
                             }
                             break;
 
@@ -487,12 +550,18 @@ export const useCalculations = (
                 setPumpData(transformedPumps);
                 setPipeData(transformedPipes);
 
-                if (transformedSprinklers.length === 0 && transformedPumps.length === 0 && transformedPipes.length === 0) {
+                if (
+                    transformedSprinklers.length === 0 &&
+                    transformedPumps.length === 0 &&
+                    transformedPipes.length === 0
+                ) {
                     setError('ไม่พบข้อมูลอุปกรณ์ที่เปิดใช้งานในระบบ');
                 }
             } catch (error) {
                 console.error('Failed to load equipment data:', error);
-                setError(`ไม่สามารถโหลดข้อมูลอุปกรณ์ได้: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                setError(
+                    `ไม่สามารถโหลดข้อมูลอุปกรณ์ได้: ${error instanceof Error ? error.message : 'Unknown error'}`
+                );
                 setSprinklerData([]);
                 setPumpData([]);
                 setPipeData([]);
@@ -512,9 +581,10 @@ export const useCalculations = (
         // คำนวณความต้องการน้ำจากสปริงเกอร์
         const flowData = calculateFlowRequirements(input, selectedSprinkler);
         const systemComplexity = calculateSystemComplexity(input);
-        
+
         // ตรวจสอบว่ามีท่อรองและท่อหลักหรือไม่
-        const hasValidSecondaryPipe = input.longestSecondaryPipeM > 0 && input.totalSecondaryPipeM > 0;
+        const hasValidSecondaryPipe =
+            input.longestSecondaryPipeM > 0 && input.totalSecondaryPipeM > 0;
         const hasValidMainPipe = input.longestMainPipeM > 0 && input.totalMainPipeM > 0;
 
         // วิเคราะห์ sprinkler
@@ -524,30 +594,38 @@ export const useCalculations = (
 
         // วิเคราะห์ท่อย่อย - ลดการเน้นประเภทท่อ
         const analyzedBranchPipes = pipeData
-            .map((pipe) => evaluatePipeOverall(
-                pipe,
-                flowData.branchFlowLPM,
-                input.longestBranchPipeM,
-                'branch',
-                input.pipeAgeYears || 0,
-                [] // ไม่จำกัดประเภทท่อ
-            ))
+            .map((pipe) =>
+                evaluatePipeOverall(
+                    pipe,
+                    flowData.branchFlowLPM,
+                    input.longestBranchPipeM,
+                    'branch',
+                    input.pipeAgeYears || 0,
+                    [] // ไม่จำกัดประเภทท่อ
+                )
+            )
             .sort((a, b) => b.score - a.score);
 
-        const autoSelectedBranchPipe = autoSelectBestPipe(analyzedBranchPipes, 'branch', flowData.branchFlowLPM);
+        const autoSelectedBranchPipe = autoSelectBestPipe(
+            analyzedBranchPipes,
+            'branch',
+            flowData.branchFlowLPM
+        );
 
         // วิเคราะห์ท่อรอง
         const analyzedSecondaryPipes = hasValidSecondaryPipe
             ? pipeData
-                .map((pipe) => evaluatePipeOverall(
-                    pipe,
-                    flowData.secondaryFlowLPM,
-                    input.longestSecondaryPipeM,
-                    'secondary',
-                    input.pipeAgeYears || 0,
-                    [] // ไม่จำกัดประเภทท่อ
-                ))
-                .sort((a, b) => b.score - a.score)
+                  .map((pipe) =>
+                      evaluatePipeOverall(
+                          pipe,
+                          flowData.secondaryFlowLPM,
+                          input.longestSecondaryPipeM,
+                          'secondary',
+                          input.pipeAgeYears || 0,
+                          [] // ไม่จำกัดประเภทท่อ
+                      )
+                  )
+                  .sort((a, b) => b.score - a.score)
             : [];
 
         const autoSelectedSecondaryPipe = hasValidSecondaryPipe
@@ -557,15 +635,17 @@ export const useCalculations = (
         // วิเคราะห์ท่อหลัก
         const analyzedMainPipes = hasValidMainPipe
             ? pipeData
-                .map((pipe) => evaluatePipeOverall(
-                    pipe,
-                    flowData.mainFlowLPM,
-                    input.longestMainPipeM,
-                    'main',
-                    input.pipeAgeYears || 0,
-                    [] // ไม่จำกัดประเภทท่อ
-                ))
-                .sort((a, b) => b.score - a.score)
+                  .map((pipe) =>
+                      evaluatePipeOverall(
+                          pipe,
+                          flowData.mainFlowLPM,
+                          input.longestMainPipeM,
+                          'main',
+                          input.pipeAgeYears || 0,
+                          [] // ไม่จำกัดประเภทท่อ
+                      )
+                  )
+                  .sort((a, b) => b.score - a.score)
             : [];
 
         const autoSelectedMainPipe = hasValidMainPipe
@@ -575,36 +655,38 @@ export const useCalculations = (
         // คำนวณ head loss
         const branchLoss = autoSelectedBranchPipe
             ? calculateImprovedHeadLoss(
-                flowData.branchFlowLPM,
-                autoSelectedBranchPipe.sizeMM,
-                input.longestBranchPipeM,
-                autoSelectedBranchPipe.pipeType,
-                'branch',
-                input.pipeAgeYears || 0
-            )
+                  flowData.branchFlowLPM,
+                  autoSelectedBranchPipe.sizeMM,
+                  input.longestBranchPipeM,
+                  autoSelectedBranchPipe.pipeType,
+                  'branch',
+                  input.pipeAgeYears || 0
+              )
             : { major: 0, minor: 0, total: 0, velocity: 0, C: 135 };
 
-        const secondaryLoss = autoSelectedSecondaryPipe && hasValidSecondaryPipe
-            ? calculateImprovedHeadLoss(
-                flowData.secondaryFlowLPM,
-                autoSelectedSecondaryPipe.sizeMM,
-                input.longestSecondaryPipeM,
-                autoSelectedSecondaryPipe.pipeType,
-                'secondary',
-                input.pipeAgeYears || 0
-            )
-            : { major: 0, minor: 0, total: 0, velocity: 0, C: 140 };
+        const secondaryLoss =
+            autoSelectedSecondaryPipe && hasValidSecondaryPipe
+                ? calculateImprovedHeadLoss(
+                      flowData.secondaryFlowLPM,
+                      autoSelectedSecondaryPipe.sizeMM,
+                      input.longestSecondaryPipeM,
+                      autoSelectedSecondaryPipe.pipeType,
+                      'secondary',
+                      input.pipeAgeYears || 0
+                  )
+                : { major: 0, minor: 0, total: 0, velocity: 0, C: 140 };
 
-        const mainLoss = autoSelectedMainPipe && hasValidMainPipe
-            ? calculateImprovedHeadLoss(
-                flowData.mainFlowLPM,
-                autoSelectedMainPipe.sizeMM,
-                input.longestMainPipeM,
-                autoSelectedMainPipe.pipeType,
-                'main',
-                input.pipeAgeYears || 0
-            )
-            : { major: 0, minor: 0, total: 0, velocity: 0, C: 145 };
+        const mainLoss =
+            autoSelectedMainPipe && hasValidMainPipe
+                ? calculateImprovedHeadLoss(
+                      flowData.mainFlowLPM,
+                      autoSelectedMainPipe.sizeMM,
+                      input.longestMainPipeM,
+                      autoSelectedMainPipe.pipeType,
+                      'main',
+                      input.pipeAgeYears || 0
+                  )
+                : { major: 0, minor: 0, total: 0, velocity: 0, C: 145 };
 
         const totalHeadLoss = branchLoss.total + secondaryLoss.total + mainLoss.total;
         const totalMajorLoss = branchLoss.major + secondaryLoss.major + mainLoss.major;
@@ -614,43 +696,52 @@ export const useCalculations = (
         let basePumpHead;
         if (allZoneData && allZoneData.length > 1) {
             // ใช้การคำนวณ multi-zone ใหม่
-            basePumpHead = calculateMultiZonePumpHead(
-                allZoneData,
-                input.simultaneousZones,
-                {
-                    branchPipe: autoSelectedBranchPipe,
-                    secondaryPipe: autoSelectedSecondaryPipe,
-                    mainPipe: autoSelectedMainPipe,
-                }
-            );
+            basePumpHead = calculateMultiZonePumpHead(allZoneData, input.simultaneousZones, {
+                branchPipe: autoSelectedBranchPipe,
+                secondaryPipe: autoSelectedSecondaryPipe,
+                mainPipe: autoSelectedMainPipe,
+            });
         } else {
             // Single zone
-            const pressureFromSprinkler = calculateSprinklerPressure(selectedSprinkler, input.pressureHeadM);
+            const pressureFromSprinkler = calculateSprinklerPressure(
+                selectedSprinkler,
+                input.pressureHeadM
+            );
             basePumpHead = input.staticHeadM + totalHeadLoss + pressureFromSprinkler;
         }
 
-        const safetyFactor = systemComplexity === 'simple' ? 1.05 : systemComplexity === 'medium' ? 1.08 : 1.12;
+        const safetyFactor =
+            systemComplexity === 'simple' ? 1.05 : systemComplexity === 'medium' ? 1.08 : 1.12;
         const pumpHeadRequired = basePumpHead * safetyFactor;
 
-        const pressureFromSprinkler = calculateSprinklerPressure(selectedSprinkler, input.pressureHeadM);
+        const pressureFromSprinkler = calculateSprinklerPressure(
+            selectedSprinkler,
+            input.pressureHeadM
+        );
 
         // วิเคราะห์ปั๊ม
         const analyzedPumps = pumpData
             .map((pump) => evaluatePumpOverall(pump, flowData.pumpFlowLPM, pumpHeadRequired))
             .sort((a, b) => b.score - a.score);
 
-        const autoSelectedPump = autoSelectBestPump(analyzedPumps, flowData.pumpFlowLPM, pumpHeadRequired);
+        const autoSelectedPump = autoSelectBestPump(
+            analyzedPumps,
+            flowData.pumpFlowLPM,
+            pumpHeadRequired
+        );
 
         // คำนวณจำนวนม้วนท่อ
         const branchRolls = autoSelectedBranchPipe
             ? calculatePipeRolls(input.totalBranchPipeM, autoSelectedBranchPipe.lengthM)
             : 1;
-        const secondaryRolls = autoSelectedSecondaryPipe && hasValidSecondaryPipe
-            ? calculatePipeRolls(input.totalSecondaryPipeM, autoSelectedSecondaryPipe.lengthM)
-            : 0;
-        const mainRolls = autoSelectedMainPipe && hasValidMainPipe
-            ? calculatePipeRolls(input.totalMainPipeM, autoSelectedMainPipe.lengthM)
-            : 0;
+        const secondaryRolls =
+            autoSelectedSecondaryPipe && hasValidSecondaryPipe
+                ? calculatePipeRolls(input.totalSecondaryPipeM, autoSelectedSecondaryPipe.lengthM)
+                : 0;
+        const mainRolls =
+            autoSelectedMainPipe && hasValidMainPipe
+                ? calculatePipeRolls(input.totalMainPipeM, autoSelectedMainPipe.lengthM)
+                : 0;
 
         // ตรวจสอบความเร็วน้ำ
         const velocityWarnings: string[] = [];
@@ -787,11 +878,14 @@ export const useCalculations = (
                     pumpFlow: flowData.pumpFlowLPM,
                     sprinklerBased: !!selectedSprinkler,
                 },
-                multiZoneInfo: allZoneData ? {
-                    totalZones: allZoneData.length,
-                    simultaneousZones: input.simultaneousZones,
-                    calculationMethod: allZoneData.length > 1 ? 'multi-zone-optimized' : 'single-zone',
-                } : undefined,
+                multiZoneInfo: allZoneData
+                    ? {
+                          totalZones: allZoneData.length,
+                          simultaneousZones: input.simultaneousZones,
+                          calculationMethod:
+                              allZoneData.length > 1 ? 'multi-zone-optimized' : 'single-zone',
+                      }
+                    : undefined,
             },
         };
     }, [input, selectedSprinkler, sprinklerData, pumpData, pipeData, loading, error, allZoneData]);

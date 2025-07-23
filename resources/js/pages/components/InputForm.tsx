@@ -107,15 +107,25 @@ const InputForm: React.FC<InputFormProps> = ({
         const messages: string[] = [];
 
         if (input.totalTrees < 1) {
-            messages.push(projectMode === 'garden' ? 'จำนวนหัวฉีดต้องมากกว่า 0' : 'จำนวนต้นไม้ต้องมากกว่า 0');
+            messages.push(
+                projectMode === 'garden' ? 'จำนวนหัวฉีดต้องมากกว่า 0' : 'จำนวนต้นไม้ต้องมากกว่า 0'
+            );
         }
 
         if (input.waterPerTreeLiters < 0.1) {
-            messages.push(projectMode === 'garden' ? 'ปริมาณน้ำต่อหัวฉีดต้องมากกว่า 0.1 ลิตร' : 'ปริมาณน้ำต่อต้นต้องมากกว่า 0.1 ลิตร');
+            messages.push(
+                projectMode === 'garden'
+                    ? 'ปริมาณน้ำต่อหัวฉีดต้องมากกว่า 0.1 ลิตร'
+                    : 'ปริมาณน้ำต่อต้นต้องมากกว่า 0.1 ลิตร'
+            );
         }
 
         if (input.farmSizeRai <= 0) {
-            messages.push(projectMode === 'garden' ? 'ขนาดพื้นที่ต้องมากกว่า 0 ตร.ม.' : 'ขนาดพื้นที่ต้องมากกว่า 0 ไร่');
+            messages.push(
+                projectMode === 'garden'
+                    ? 'ขนาดพื้นที่ต้องมากกว่า 0 ตร.ม.'
+                    : 'ขนาดพื้นที่ต้องมากกว่า 0 ไร่'
+            );
         }
 
         if (input.longestBranchPipeM > input.totalBranchPipeM && input.totalBranchPipeM > 0) {
@@ -134,9 +144,11 @@ const InputForm: React.FC<InputFormProps> = ({
         }
 
         if (input.sprinklersPerLongestBranch > input.totalTrees) {
-            messages.push(projectMode === 'garden' ? 
-                'จำนวนหัวฉีดในท่อย่อยที่ยาวที่สุดไม่ควรมากกว่าจำนวนหัวฉีดทั้งหมด' : 
-                'จำนวนสปริงเกอร์ในท่อย่อยที่ยาวที่สุดไม่ควรมากกว่าจำนวนต้นไม้ทั้งหมด');
+            messages.push(
+                projectMode === 'garden'
+                    ? 'จำนวนหัวฉีดในท่อย่อยที่ยาวที่สุดไม่ควรมากกว่าจำนวนหัวฉีดทั้งหมด'
+                    : 'จำนวนสปริงเกอร์ในท่อย่อยที่ยาวที่สุดไม่ควรมากกว่าจำนวนต้นไม้ทั้งหมด'
+            );
         }
 
         if (input.simultaneousZones > input.numberOfZones) {
@@ -254,9 +266,7 @@ const InputForm: React.FC<InputFormProps> = ({
             // Home garden specific recommendations
             const sprinklersPerRai = input.totalTrees / input.farmSizeRai;
             if (sprinklersPerRai > 50) {
-                recommendations.push(
-                    'ความหนาแน่นหัวฉีดสูง (>50 หัว/ไร่) ควรใช้หัวฉีดรัศมีเล็ก'
-                );
+                recommendations.push('ความหนาแน่นหัวฉีดสูง (>50 หัว/ไร่) ควรใช้หัวฉีดรัศมีเล็ก');
             } else if (sprinklersPerRai < 20) {
                 recommendations.push(
                     'ความหนาแน่นหัวฉีดต่ำ (<20 หัว/ไร่) สามารถใช้หัวฉีดรัศมีใหญ่ได้'
@@ -274,7 +284,9 @@ const InputForm: React.FC<InputFormProps> = ({
             }
 
             if (isMultiZone) {
-                recommendations.push(`ระบบ ${input.numberOfZones} โซน - ควรพิจารณาการเปิดทีละ ${input.simultaneousZones} โซน`);
+                recommendations.push(
+                    `ระบบ ${input.numberOfZones} โซน - ควรพิจารณาการเปิดทีละ ${input.simultaneousZones} โซน`
+                );
             }
         } else {
             // Horticulture recommendations
@@ -308,7 +320,9 @@ const InputForm: React.FC<InputFormProps> = ({
                 } else if (input.simultaneousZones === 1) {
                     recommendations.push('เปิดทีละโซน - ประหยัดขนาดปั๊มแต่ใช้เวลานาน');
                 } else {
-                    recommendations.push(`เปิด ${input.simultaneousZones} โซนพร้อมกัน - สมดุลระหว่างขนาดปั๊มและเวลา`);
+                    recommendations.push(
+                        `เปิด ${input.simultaneousZones} โซนพร้อมกัน - สมดุลระหว่างขนาดปั๊มและเวลา`
+                    );
                 }
             }
         }
@@ -322,11 +336,16 @@ const InputForm: React.FC<InputFormProps> = ({
     const getLabel = (key: string) => {
         if (projectMode === 'garden') {
             switch (key) {
-                case 'totalTrees': return 'จำนวนหัวฉีด (หัว)';
-                case 'waterPerTree': return 'น้ำต่อหัวฉีด (ลิตร/วัน)';
-                case 'sprinklersPerTree': return 'อัตราส่วนหัวฉีด';
-                case 'sprinklersPerBranch': return 'หัวฉีดต่อท่อย่อย';
-                default: return key;
+                case 'totalTrees':
+                    return 'จำนวนหัวฉีด (หัว)';
+                case 'waterPerTree':
+                    return 'น้ำต่อหัวฉีด (ลิตร/วัน)';
+                case 'sprinklersPerTree':
+                    return 'อัตราส่วนหัวฉีด';
+                case 'sprinklersPerBranch':
+                    return 'หัวฉีดต่อท่อย่อย';
+                default:
+                    return key;
             }
         }
         return key;
@@ -348,12 +367,20 @@ const InputForm: React.FC<InputFormProps> = ({
                         <div>
                             <p className="text-blue-200">พื้นที่:</p>
                             <p className="font-medium text-white">
-                                {activeZone.area >= 1600 ? <p>{(activeZone.area / 1600).toFixed(1)} ไร่</p> : <p>{activeZone.area.toFixed(2)} ตร.ม.</p>}
+                                {activeZone.area >= 1600 ? (
+                                    <p>{(activeZone.area / 1600).toFixed(1)} ไร่</p>
+                                ) : (
+                                    <p>{activeZone.area.toFixed(2)} ตร.ม.</p>
+                                )}
                             </p>
                         </div>
                         <div>
-                            <p className="text-blue-200">{projectMode === 'garden' ? 'จำนวนหัวฉีด:' : 'จำนวนต้น:'}</p>
-                            <p className="font-medium text-white">{activeZone.plantCount} {projectMode === 'garden' ? 'หัว' : 'ต้น'}</p>
+                            <p className="text-blue-200">
+                                {projectMode === 'garden' ? 'จำนวนหัวฉีด:' : 'จำนวนต้น:'}
+                            </p>
+                            <p className="font-medium text-white">
+                                {activeZone.plantCount} {projectMode === 'garden' ? 'หัว' : 'ต้น'}
+                            </p>
                         </div>
                         {projectMode === 'horticulture' && activeZone.plantData && (
                             <>
@@ -373,9 +400,16 @@ const InputForm: React.FC<InputFormProps> = ({
                         )}
                     </div>
                     <div className="mt-2 text-xs text-blue-200">
-                        <p>💡 ข้อมูลจากระบบออกแบบ {projectMode === 'garden' ? 'Home Garden' : 'Horticulture'} - สามารถปรับแต่งได้ตามความต้องการ</p>
+                        <p>
+                            💡 ข้อมูลจากระบบออกแบบ{' '}
+                            {projectMode === 'garden' ? 'Home Garden' : 'Horticulture'} -
+                            สามารถปรับแต่งได้ตามความต้องการ
+                        </p>
                         {isMultiZone && (
-                            <p>🔄 ปั๊มคำนวณจาก {input.simultaneousZones} โซนที่ต้องการ head มากที่สุด</p>
+                            <p>
+                                🔄 ปั๊มคำนวณจาก {input.simultaneousZones} โซนที่ต้องการ head
+                                มากที่สุด
+                            </p>
                         )}
                     </div>
                 </div>
@@ -410,17 +444,25 @@ const InputForm: React.FC<InputFormProps> = ({
                         <div>
                             <p className="text-purple-200">ประเภทระบบ:</p>
                             <p className="font-medium text-white">
-                                {input.simultaneousZones === input.numberOfZones ? 'เปิดพร้อมกัน' : 
-                                 input.simultaneousZones === 1 ? 'เปิดทีละโซน' : 'เปิดบางส่วน'}
+                                {input.simultaneousZones === input.numberOfZones
+                                    ? 'เปิดพร้อมกัน'
+                                    : input.simultaneousZones === 1
+                                      ? 'เปิดทีละโซน'
+                                      : 'เปิดบางส่วน'}
                             </p>
                         </div>
                         <div>
                             <p className="text-purple-200">การคำนวณปั๊ม:</p>
-                            <p className="font-medium text-white">Max Head จาก {input.simultaneousZones} โซน</p>
+                            <p className="font-medium text-white">
+                                Max Head จาก {input.simultaneousZones} โซน
+                            </p>
                         </div>
                     </div>
                     <div className="mt-2 text-xs text-purple-200">
-                        <p>💡 การเปิด {input.simultaneousZones} โซนพร้อมกัน หมายถึงปั๊มต้องรองรับ {input.simultaneousZones} โซนที่ต้องการแรงดันมากที่สุด</p>
+                        <p>
+                            💡 การเปิด {input.simultaneousZones} โซนพร้อมกัน หมายถึงปั๊มต้องรองรับ{' '}
+                            {input.simultaneousZones} โซนที่ต้องการแรงดันมากที่สุด
+                        </p>
                     </div>
                 </div>
             )}
@@ -437,9 +479,15 @@ const InputForm: React.FC<InputFormProps> = ({
                     </label>
                     <input
                         type="number"
-                        value={(input.farmSizeRai * (projectMode === 'garden' ? 1600 : 1)).toFixed(2)}
+                        value={(input.farmSizeRai * (projectMode === 'garden' ? 1600 : 1)).toFixed(
+                            2
+                        )}
                         onChange={(e) =>
-                            updateInput('farmSizeRai', parseFloat(e.target.value) / (projectMode === 'garden' ? 1600 : 1) || 0)
+                            updateInput(
+                                'farmSizeRai',
+                                parseFloat(e.target.value) /
+                                    (projectMode === 'garden' ? 1600 : 1) || 0
+                            )
                         }
                         step="0.1"
                         min="0"
@@ -448,7 +496,10 @@ const InputForm: React.FC<InputFormProps> = ({
                     />
                     {activeZone && (
                         <p className="mt-1 text-xs text-green-300">
-                            จากระบบ: {activeZone.area >= 1600 ? (activeZone.area / 1600).toFixed(1) + ' ไร่' : activeZone.area.toFixed(2) + ' ตร.ม.'}
+                            จากระบบ:{' '}
+                            {activeZone.area >= 1600
+                                ? (activeZone.area / 1600).toFixed(1) + ' ไร่'
+                                : activeZone.area.toFixed(2) + ' ตร.ม.'}
                         </p>
                     )}
                 </div>
@@ -473,14 +524,17 @@ const InputForm: React.FC<InputFormProps> = ({
                     />
                     {activeZone && (
                         <p className="mt-1 text-xs text-green-300">
-                            จากระบบ: {activeZone.plantCount} {projectMode === 'garden' ? 'หัว' : 'ต้น'}
+                            จากระบบ: {activeZone.plantCount}{' '}
+                            {projectMode === 'garden' ? 'หัว' : 'ต้น'}
                         </p>
                     )}
                 </div>
 
                 <div>
                     <label className="mb-2 block text-sm font-medium">
-                        {projectMode === 'garden' ? 'น้ำต่อหัวฉีด (ลิตร/วัน)' : 'น้ำต่อต้น (ลิตร/วัน)'}
+                        {projectMode === 'garden'
+                            ? 'น้ำต่อหัวฉีด (ลิตร/วัน)'
+                            : 'น้ำต่อต้น (ลิตร/วัน)'}
                     </label>
                     <input
                         type="number"
@@ -777,7 +831,8 @@ const InputForm: React.FC<InputFormProps> = ({
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <div>
                         <label className="mb-2 block text-sm font-medium">
-                            {projectMode === 'garden' ? 'หัวฉีด' : 'ต้นไม้'}ต่อท่อย่อย 1 เส้น (เส้นที่ยาวที่สุด)
+                            {projectMode === 'garden' ? 'หัวฉีด' : 'ต้นไม้'}ต่อท่อย่อย 1 เส้น
+                            (เส้นที่ยาวที่สุด)
                         </label>
                         <input
                             type="number"
@@ -795,7 +850,8 @@ const InputForm: React.FC<InputFormProps> = ({
                         />
                         {branchStats && (
                             <p className="mt-1 text-xs text-purple-300">
-                                จากระบบ: {branchStats.longestBranchPlantCount} {projectMode === 'garden' ? 'หัว' : 'ต้น'}
+                                จากระบบ: {branchStats.longestBranchPlantCount}{' '}
+                                {projectMode === 'garden' ? 'หัว' : 'ต้น'}
                             </p>
                         )}
                     </div>
@@ -808,7 +864,9 @@ const InputForm: React.FC<InputFormProps> = ({
                             <input
                                 type="number"
                                 min="1"
-                                value={input.branchesPerLongestSecondary || input.branchesPerSecondary}
+                                value={
+                                    input.branchesPerLongestSecondary || input.branchesPerSecondary
+                                }
                                 onChange={(e) =>
                                     updateInput(
                                         'branchesPerLongestSecondary',
@@ -861,11 +919,13 @@ const InputForm: React.FC<InputFormProps> = ({
                         />
                         {sprinklerPressure ? (
                             <p className="mt-1 text-xs text-green-300">
-                                💡 จาก{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}: {sprinklerPressure.pressureM.toFixed(1)} ม.
+                                💡 จาก{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}:{' '}
+                                {sprinklerPressure.pressureM.toFixed(1)} ม.
                             </p>
                         ) : (
                             <p className="mt-1 text-xs text-gray-400">
-                                จะปรับตาม{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}ที่เลือก
+                                จะปรับตาม{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}
+                                ที่เลือก
                             </p>
                         )}
                     </div>
@@ -944,7 +1004,11 @@ const InputForm: React.FC<InputFormProps> = ({
                     <div className="mt-2 text-xs text-green-200">
                         <p>
                             💡 ความหนาแน่น:{' '}
-                            {activeZone.area >= 1600 ? (activeZone.plantCount / (activeZone.area / 1600)).toFixed(0) + ' ต้น/ไร่' : (activeZone.plantCount / activeZone.area).toFixed(0) + ' ต้น/ตร.ม.'}
+                            {activeZone.area >= 1600
+                                ? (activeZone.plantCount / (activeZone.area / 1600)).toFixed(0) +
+                                  ' ต้น/ไร่'
+                                : (activeZone.plantCount / activeZone.area).toFixed(0) +
+                                  ' ต้น/ตร.ม.'}
                         </p>
                     </div>
                 </div>
@@ -958,7 +1022,9 @@ const InputForm: React.FC<InputFormProps> = ({
                     </h3>
                     <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-4">
                         <div>
-                            <p className="text-blue-200">{projectMode === 'garden' ? 'หัวฉีด:' : 'สปริงเกอร์:'}</p>
+                            <p className="text-blue-200">
+                                {projectMode === 'garden' ? 'หัวฉีด:' : 'สปริงเกอร์:'}
+                            </p>
                             <p className="font-bold text-white">
                                 {sprinklerPressure.sprinklerName}
                             </p>
@@ -983,7 +1049,8 @@ const InputForm: React.FC<InputFormProps> = ({
                     <p className="mt-2 text-xs text-blue-200">
                         💡 ระบบใช้แรงดัน 70% ของช่วงสูงสุดเพื่อประสิทธิภาพที่ดี และจะอัพเดทค่า
                         "แรงดันที่หัว{projectMode === 'garden' ? 'ฉีด' : 'สปริงเกอร์'}" อัตโนมัติ
-                        {isMultiZone && ` (คำนวณปั๊มจาก ${input.simultaneousZones} โซนที่ต้องการ head มากที่สุด)`}
+                        {isMultiZone &&
+                            ` (คำนวณปั๊มจาก ${input.simultaneousZones} โซนที่ต้องการ head มากที่สุด)`}
                     </p>
                 </div>
             )}

@@ -97,11 +97,11 @@ const CostSummary: React.FC<CostSummaryProps> = ({
 
                     const key = `${zoneSprinkler.id}`;
                     if (!sprinklerSummary[key]) {
-                        sprinklerSummary[key] = { 
-                            sprinkler: zoneSprinkler, 
-                            quantity: 0, 
-                            zones: [], 
-                            totalCost: 0 
+                        sprinklerSummary[key] = {
+                            sprinkler: zoneSprinkler,
+                            quantity: 0,
+                            zones: [],
+                            totalCost: 0,
                         };
                     }
                     sprinklerSummary[key].quantity += sprinklerQuantity;
@@ -114,12 +114,12 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                     if (branchPipe && zoneInput.totalBranchPipeM > 0) {
                         const key = `${branchPipe.id}`;
                         if (!pipeSummary.branch[key]) {
-                            pipeSummary.branch[key] = { 
-                                pipe: branchPipe, 
-                                totalLength: 0, 
-                                quantity: 0, 
-                                zones: [], 
-                                totalCost: 0 
+                            pipeSummary.branch[key] = {
+                                pipe: branchPipe,
+                                totalLength: 0,
+                                quantity: 0,
+                                zones: [],
+                                totalCost: 0,
                             };
                         }
                         pipeSummary.branch[key].totalLength += zoneInput.totalBranchPipeM;
@@ -130,12 +130,12 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                     if (secondaryPipe && zoneInput.totalSecondaryPipeM > 0) {
                         const key = `${secondaryPipe.id}`;
                         if (!pipeSummary.secondary[key]) {
-                            pipeSummary.secondary[key] = { 
-                                pipe: secondaryPipe, 
-                                totalLength: 0, 
-                                quantity: 0, 
-                                zones: [], 
-                                totalCost: 0 
+                            pipeSummary.secondary[key] = {
+                                pipe: secondaryPipe,
+                                totalLength: 0,
+                                quantity: 0,
+                                zones: [],
+                                totalCost: 0,
                             };
                         }
                         pipeSummary.secondary[key].totalLength += zoneInput.totalSecondaryPipeM;
@@ -146,12 +146,12 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                     if (mainPipe && zoneInput.totalMainPipeM > 0) {
                         const key = `${mainPipe.id}`;
                         if (!pipeSummary.main[key]) {
-                            pipeSummary.main[key] = { 
-                                pipe: mainPipe, 
-                                totalLength: 0, 
-                                quantity: 0, 
-                                zones: [], 
-                                totalCost: 0 
+                            pipeSummary.main[key] = {
+                                pipe: mainPipe,
+                                totalLength: 0,
+                                quantity: 0,
+                                zones: [],
+                                totalCost: 0,
                             };
                         }
                         pipeSummary.main[key].totalLength += zoneInput.totalMainPipeM;
@@ -253,8 +253,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 item.totalCost = item.pipe.price * item.quantity;
                 totalMainPipeCost += item.totalCost;
             });
-
-        } else {    
+        } else {
             // Single zone for both garden and horticulture
             const currentSprinkler = zoneSprinklers[activeZoneId];
             const currentPipes = selectedPipes[activeZoneId] || {};
@@ -346,8 +345,13 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             });
         }
 
-        const pumpCost = showPump ? (selectedPump?.price || results.autoSelectedPump?.price || 0) : 0;
-        const totalCost = totalSprinklerCost + totalBranchPipeCost + totalSecondaryPipeCost + totalMainPipeCost + pumpCost;
+        const pumpCost = showPump ? selectedPump?.price || results.autoSelectedPump?.price || 0 : 0;
+        const totalCost =
+            totalSprinklerCost +
+            totalBranchPipeCost +
+            totalSecondaryPipeCost +
+            totalMainPipeCost +
+            pumpCost;
 
         return {
             totalSprinklerCost,
@@ -392,9 +396,12 @@ const CostSummary: React.FC<CostSummaryProps> = ({
         0
     );
 
-    const systemMode = ((projectMode === 'horticulture' && projectData?.useZones && projectData.zones.length > 1) ||
-                       (projectMode === 'garden' && gardenStats && gardenStats.zones.length > 1)) ? 'หลายโซน' : 'โซนเดียว';
-    
+    const systemMode =
+        (projectMode === 'horticulture' && projectData?.useZones && projectData.zones.length > 1) ||
+        (projectMode === 'garden' && gardenStats && gardenStats.zones.length > 1)
+            ? 'หลายโซน'
+            : 'โซนเดียว';
+
     // Get total area
     const getTotalArea = () => {
         if (projectMode === 'garden' && gardenStats) {
@@ -414,11 +421,30 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                     {projectMode === 'garden' ? '🏡' : '🏗️'} ภาพรวมระบบ ({systemMode}):
                 </h3>
                 <div className="grid grid-cols-2 gap-4 text-xs md:grid-cols-5">
-                    <div><p className="text-blue-200">💧 {projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}: {uniqueSprinklers} ชนิด ({totalSprinklerHeads} หัว)</p></div>
-                    <div><p className="text-blue-200">🔧 ท่อย่อย: {uniqueBranchPipes} ชนิด</p></div>
-                    {uniqueSecondaryPipes > 0 && <div><p className="text-blue-200">🔧 ท่อรอง: {uniqueSecondaryPipes} ชนิด</p></div>}
-                    {uniqueMainPipes > 0 && <div><p className="text-blue-200">🔧 ท่อหลัก: {uniqueMainPipes} ชนิด</p></div>}
-                    {showPump && <div><p className="text-blue-200">⚡ ปั๊ม: 1 ตัว</p></div>}
+                    <div>
+                        <p className="text-blue-200">
+                            💧 {projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}:{' '}
+                            {uniqueSprinklers} ชนิด ({totalSprinklerHeads} หัว)
+                        </p>
+                    </div>
+                    <div>
+                        <p className="text-blue-200">🔧 ท่อย่อย: {uniqueBranchPipes} ชนิด</p>
+                    </div>
+                    {uniqueSecondaryPipes > 0 && (
+                        <div>
+                            <p className="text-blue-200">🔧 ท่อรอง: {uniqueSecondaryPipes} ชนิด</p>
+                        </div>
+                    )}
+                    {uniqueMainPipes > 0 && (
+                        <div>
+                            <p className="text-blue-200">🔧 ท่อหลัก: {uniqueMainPipes} ชนิด</p>
+                        </div>
+                    )}
+                    {showPump && (
+                        <div>
+                            <p className="text-blue-200">⚡ ปั๊ม: 1 ตัว</p>
+                        </div>
+                    )}
                 </div>
                 <div className="mt-2 text-xs text-blue-200">
                     <p>
@@ -433,7 +459,9 @@ const CostSummary: React.FC<CostSummaryProps> = ({
 
             {uniqueSprinklers > 0 && (
                 <div className="mb-4 rounded bg-green-900 p-3">
-                    <h3 className="mb-2 text-sm font-semibold text-green-300">💧 รายละเอียด{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}:</h3>
+                    <h3 className="mb-2 text-sm font-semibold text-green-300">
+                        💧 รายละเอียด{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}:
+                    </h3>
                     <div className="space-y-2">
                         {Object.values(costs.sprinklerSummary).map((item, index) => (
                             <div
@@ -651,13 +679,19 @@ const CostSummary: React.FC<CostSummaryProps> = ({
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <div className="rounded bg-gray-600 p-4">
-                    <h4 className="font-medium text-green-300">💧 {projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}ทั้งหมด</h4>
+                    <h4 className="font-medium text-green-300">
+                        💧 {projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}ทั้งหมด
+                    </h4>
                     <p className="text-sm">
                         {uniqueSprinklers} ชนิด | รวม {totalSprinklerHeads?.toLocaleString()} หัว
                     </p>
                     {systemMode === 'หลายโซน' && (
                         <p className="text-xs text-gray-300">
-                            ({projectMode === 'garden' && gardenStats ? gardenStats.zones.length : projectData?.zones.length || 0} โซน)
+                            (
+                            {projectMode === 'garden' && gardenStats
+                                ? gardenStats.zones.length
+                                : projectData?.zones.length || 0}{' '}
+                            โซน)
                         </p>
                     )}
                     <p className="text-xl font-bold">
@@ -675,12 +709,22 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 {showPump && (
                     <div className="rounded bg-gray-600 p-4">
                         <h4 className="font-medium text-red-300">⚡ ปั๊มน้ำ</h4>
-                        <p className="text-sm">{effectivePump ? effectivePump.name || effectivePump.productCode : 'ไม่มีข้อมูล'}</p>
-                        <p className="text-sm">จำนวน: 1 ตัว ({effectivePump?.powerHP || 'N/A'} HP)</p>
+                        <p className="text-sm">
+                            {effectivePump
+                                ? effectivePump.name || effectivePump.productCode
+                                : 'ไม่มีข้อมูล'}
+                        </p>
+                        <p className="text-sm">
+                            จำนวน: 1 ตัว ({effectivePump?.powerHP || 'N/A'} HP)
+                        </p>
                         <p className="text-xl font-bold">{costs.pumpCost?.toLocaleString()} บาท</p>
                         {effectivePump && (
                             <p className="mt-1 text-xs text-green-300">
-                                {getSelectionStatus(effectivePump, 'ปั๊ม', effectivePump.id === results.autoSelectedPump?.id)}
+                                {getSelectionStatus(
+                                    effectivePump,
+                                    'ปั๊ม',
+                                    effectivePump.id === results.autoSelectedPump?.id
+                                )}
                             </p>
                         )}
                     </div>
@@ -747,24 +791,72 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                     <p className="text-sm text-green-100">ราคาสุทธิ (ไม่รวม VAT)</p>
                     <div className="mt-2 grid grid-cols-2 gap-4">
                         <div>
-                            <p className="text-2xl font-bold text-white">{costs.totalCost?.toLocaleString()} บาท</p>
-                            <p className="mt-1 text-xs text-green-200">* รวมอุปกรณ์ที่เลือกอัตโนมัติและปรับแต่ง</p>
+                            <p className="text-2xl font-bold text-white">
+                                {costs.totalCost?.toLocaleString()} บาท
+                            </p>
+                            <p className="mt-1 text-xs text-green-200">
+                                * รวมอุปกรณ์ที่เลือกอัตโนมัติและปรับแต่ง
+                            </p>
                             {!showPump && projectMode === 'garden' && (
-                                <p className="mt-1 text-xs text-yellow-200">* ไม่รวมปั๊มน้ำ (ใช้แรงดันประปา)</p>
+                                <p className="mt-1 text-xs text-yellow-200">
+                                    * ไม่รวมปั๊มน้ำ (ใช้แรงดันประปา)
+                                </p>
                             )}
                         </div>
                         <div className="text-right">
                             {systemMode === 'หลายโซน' ? (
                                 <div className="text-sm text-green-100">
-                                    <p>ราคาต่อโซน: {(costs.totalCost / (projectMode === 'garden' && gardenStats ? gardenStats.zones.length : projectData?.zones.length || 1))?.toLocaleString()} บาท</p>
-                                    <p>ราคาต่อไร่: {totalArea > 0 ? (costs.totalCost / (totalArea*1600))?.toLocaleString() : 0} บาท</p>
-                                    <p>ราคาต่อ{projectMode === 'garden' ? 'หัวฉีด' : 'ต้น'}: {totalSprinklerHeads > 0 ? (costs.totalCost / totalSprinklerHeads).toFixed(0) : 0} บาท</p>
+                                    <p>
+                                        ราคาต่อโซน:{' '}
+                                        {(
+                                            costs.totalCost /
+                                            (projectMode === 'garden' && gardenStats
+                                                ? gardenStats.zones.length
+                                                : projectData?.zones.length || 1)
+                                        )?.toLocaleString()}{' '}
+                                        บาท
+                                    </p>
+                                    <p>
+                                        ราคาต่อไร่:{' '}
+                                        {totalArea > 0
+                                            ? (
+                                                  costs.totalCost /
+                                                  (totalArea * 1600)
+                                              )?.toLocaleString()
+                                            : 0}{' '}
+                                        บาท
+                                    </p>
+                                    <p>
+                                        ราคาต่อ{projectMode === 'garden' ? 'หัวฉีด' : 'ต้น'}:{' '}
+                                        {totalSprinklerHeads > 0
+                                            ? (costs.totalCost / totalSprinklerHeads).toFixed(0)
+                                            : 0}{' '}
+                                        บาท
+                                    </p>
                                 </div>
                             ) : (
                                 <div className="text-sm text-green-100">
-                                    <p>ราคาต่อไร่: {totalArea > 0 ? (costs.totalCost / totalArea)?.toLocaleString() : 0} บาท</p>
-                                    <p>ราคาต่อ{projectMode === 'garden' ? 'หัวฉีด' : 'ต้น'}: {totalSprinklerHeads > 0 ? (costs.totalCost / totalSprinklerHeads).toFixed(0) : 0} บาท</p>
-                                    <p>ราคาต่อม้วน: {totalPipeRolls > 0 ? (costs.totalCost / totalPipeRolls).toLocaleString() : 0} บาท</p>
+                                    <p>
+                                        ราคาต่อไร่:{' '}
+                                        {totalArea > 0
+                                            ? (costs.totalCost / totalArea)?.toLocaleString()
+                                            : 0}{' '}
+                                        บาท
+                                    </p>
+                                    <p>
+                                        ราคาต่อ{projectMode === 'garden' ? 'หัวฉีด' : 'ต้น'}:{' '}
+                                        {totalSprinklerHeads > 0
+                                            ? (costs.totalCost / totalSprinklerHeads).toFixed(0)
+                                            : 0}{' '}
+                                        บาท
+                                    </p>
+                                    <p>
+                                        ราคาต่อม้วน:{' '}
+                                        {totalPipeRolls > 0
+                                            ? (costs.totalCost / totalPipeRolls).toLocaleString()
+                                            : 0}{' '}
+                                        บาท
+                                    </p>
                                 </div>
                             )}
                         </div>
@@ -779,26 +871,40 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                     <div>
                         <h4 className="mb-1 font-medium text-orange-200">อุปกรณ์ที่แนะนำ:</h4>
                         <ul className="space-y-1 text-green-300">
-                            {Object.values(costs.sprinklerSummary).some((item) => item.sprinkler.score >= 70) && (
-                                <li>• {projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}: มีตัวที่แนะนำ</li>
+                            {Object.values(costs.sprinklerSummary).some(
+                                (item) => item.sprinkler.score >= 70
+                            ) && (
+                                <li>
+                                    • {projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}:
+                                    มีตัวที่แนะนำ
+                                </li>
                             )}
-                            {Object.values(costs.pipeSummary.branch).some((item) => item.pipe.isRecommended) && (
-                                <li>• ท่อย่อย: มีตัวที่แนะนำ</li>
+                            {Object.values(costs.pipeSummary.branch).some(
+                                (item) => item.pipe.isRecommended
+                            ) && <li>• ท่อย่อย: มีตัวที่แนะนำ</li>}
+                            {Object.values(costs.pipeSummary.secondary).some(
+                                (item) => item.pipe.isRecommended
+                            ) && <li>• ท่อรอง: มีตัวที่แนะนำ</li>}
+                            {Object.values(costs.pipeSummary.main).some(
+                                (item) => item.pipe.isRecommended
+                            ) && <li>• ท่อหลัก: มีตัวที่แนะนำ</li>}
+                            {showPump && effectivePump?.isRecommended && (
+                                <li>• ปั๊ม: {effectivePump.productCode}</li>
                             )}
-                            {Object.values(costs.pipeSummary.secondary).some((item) => item.pipe.isRecommended) && (
-                                <li>• ท่อรอง: มีตัวที่แนะนำ</li>
-                            )}
-                            {Object.values(costs.pipeSummary.main).some((item) => item.pipe.isRecommended) && (
-                                <li>• ท่อหลัก: มีตัวที่แนะนำ</li>
-                            )}
-                            {showPump && effectivePump?.isRecommended && <li>• ปั๊ม: {effectivePump.productCode}</li>}
                         </ul>
                     </div>
                     <div>
                         <h4 className="mb-1 font-medium text-orange-200">สถิติการเลือก:</h4>
                         <ul className="space-y-1 text-yellow-300">
-                            <li>• {projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}: {uniqueSprinklers} ชนิด ({totalSprinklerHeads} หัว)</li>
-                            <li>• ท่อทั้งหมด: {uniqueBranchPipes + uniqueSecondaryPipes + uniqueMainPipes} ชนิด ({totalPipeRolls} ม้วน)</li>
+                            <li>
+                                • {projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}:{' '}
+                                {uniqueSprinklers} ชนิด ({totalSprinklerHeads} หัว)
+                            </li>
+                            <li>
+                                • ท่อทั้งหมด:{' '}
+                                {uniqueBranchPipes + uniqueSecondaryPipes + uniqueMainPipes} ชนิด (
+                                {totalPipeRolls} ม้วน)
+                            </li>
                             {showPump && <li>• ปั๊ม: 1 ตัว ({effectivePump?.powerHP || 0} HP)</li>}
                             <li>• ประสิทธิภาพ: {effectivePump?.score || 0}/100 คะแนน</li>
                         </ul>
@@ -815,7 +921,10 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         <p>• การคำนวณจำนวนม้วนใช้สูตร: Math.ceil(ความยาวรวม ÷ ความยาวต่อม้วน)</p>
                         {systemMode === 'หลายโซน' && (
                             <>
-                                <p>• ระบบหลายโซน: ท่อแต่ละโซนคำนวณแยก{showPump && ', ปั๊มใช้ร่วมกัน'}</p>
+                                <p>
+                                    • ระบบหลายโซน: ท่อแต่ละโซนคำนวณแยก
+                                    {showPump && ', ปั๊มใช้ร่วมกัน'}
+                                </p>
                                 <p>• สามารถติดตั้งทีละโซนเพื่อกระจายต้นทุน</p>
                             </>
                         )}
@@ -842,7 +951,10 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                     📋 ออกใบเสนอราคา
                 </button>
                 {costs.totalCost === 0 && (
-                    <p className="mt-2 text-sm text-red-400">กรุณาเลือก{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}เพื่อให้ระบบคำนวณราคา</p>
+                    <p className="mt-2 text-sm text-red-400">
+                        กรุณาเลือก{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}
+                        เพื่อให้ระบบคำนวณราคา
+                    </p>
                 )}
             </div>
         </div>
