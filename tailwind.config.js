@@ -11,28 +11,71 @@ export default {
     theme: {
         extend: {
             colors: {
-                border: 'var(--color-border)',
-                background: 'var(--color-background)',
-                foreground: 'var(--color-foreground)',
+                // Override สีหลักให้เป็น rgb/hsl ที่ html2canvas รองรับ
+                gray: {
+                    50:  '#f9fafb',
+                    100: '#f3f4f6',
+                    200: '#e5e7eb',
+                    300: '#d1d5db',
+                    400: '#9ca3af',
+                    500: '#6b7280',
+                    600: '#4b5563',
+                    700: '#374151',
+                    800: 'rgb(31,41,55)',
+                    900: '#111827',
+                },
+                blue: {
+                    50:  '#eff6ff',
+                    100: '#dbeafe',
+                    200: '#bfdbfe',
+                    300: '#93c5fd',
+                    400: '#60a5fa',
+                    500: '#3b82f6',
+                    600: '#2563eb',
+                    700: '#1d4ed8',
+                    800: '#1e40af',
+                    900: '#1e3a8a',
+                },
+                red: {
+                    500: '#ef4444',
+                    600: '#dc2626',
+                },
+                green: {
+                    400: '#22c55e',
+                    500: '#16a34a',
+                },
+                yellow: {
+                    400: '#facc15',
+                    600: '#ca8a04',
+                },
+                purple: {
+                    600: '#8b5cf6',
+                    900: '#6d28d9',
+                },
+                white: '#ffffff',
+                black: '#000000',
+                border: '#374151',
+                background: 'rgb(31,41,55)',
+                foreground: '#f3f4f6',
                 primary: {
-                    DEFAULT: 'var(--color-primary)',
-                    foreground: 'var(--color-primary-foreground)',
+                    DEFAULT: '#3b82f6',
+                    foreground: '#ffffff',
                 },
                 secondary: {
-                    DEFAULT: 'var(--color-secondary)',
-                    foreground: 'var(--color-secondary-foreground)',
+                    DEFAULT: '#facc15',
+                    foreground: '#000000',
                 },
                 muted: {
-                    DEFAULT: 'var(--color-muted)',
-                    foreground: 'var(--color-muted-foreground)',
+                    DEFAULT: '#9ca3af',
+                    foreground: '#374151',
                 },
                 accent: {
-                    DEFAULT: 'var(--color-accent)',
-                    foreground: 'var(--color-accent-foreground)',
+                    DEFAULT: '#22c55e',
+                    foreground: '#ffffff',
                 },
                 destructive: {
-                    DEFAULT: 'var(--color-destructive)',
-                    foreground: 'var(--color-destructive-foreground)',
+                    DEFAULT: '#ef4444',
+                    foreground: '#ffffff',
                 },
             },
             animation: {

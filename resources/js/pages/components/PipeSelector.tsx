@@ -40,8 +40,10 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 autoSelectedPipe: results.autoSelectedBranchPipe,
                 analyzedPipes: results.analyzedBranchPipes || [],
                 totalPipeLength: input.totalBranchPipeM,
+                longestPipeLength: input.longestBranchPipeM,
                 flow: results.flows.branch,
                 velocity: results.velocity.branch,
+                headLoss: results.headLoss.branch,
             },
             secondary: {
                 title: 'ท่อเมนรอง',
@@ -50,8 +52,10 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 autoSelectedPipe: results.autoSelectedSecondaryPipe,
                 analyzedPipes: results.analyzedSecondaryPipes || [],
                 totalPipeLength: input.totalSecondaryPipeM,
+                longestPipeLength: input.longestSecondaryPipeM,
                 flow: results.flows.secondary,
                 velocity: results.velocity.secondary,
+                headLoss: results.headLoss.secondary,
             },
             main: {
                 title: 'ท่อเมนหลัก',
@@ -60,8 +64,10 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 autoSelectedPipe: results.autoSelectedMainPipe,
                 analyzedPipes: results.analyzedMainPipes || [],
                 totalPipeLength: input.totalMainPipeM,
+                longestPipeLength: input.longestMainPipeM,
                 flow: results.flows.main,
                 velocity: results.velocity.main,
+                headLoss: results.headLoss.main,
             },
         };
         return configs[pipeType];
@@ -105,6 +111,38 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
         return 'อื่นๆ';
     };
 
+    const getHeadLossPer100m = (pipe: any) => {
+        if (!pipe || !config.longestPipeLength || config.longestPipeLength <= 0) return 0;
+
+        let pipeHeadLoss = 0;
+
+        if (pipeType === 'branch') {
+            pipeHeadLoss = pipe.headLoss || config.headLoss.total;
+        } else if (pipeType === 'secondary') {
+            pipeHeadLoss = pipe.headLoss || config.headLoss.total;
+        } else if (pipeType === 'main') {
+            pipeHeadLoss = pipe.headLoss || config.headLoss.total;
+        }
+
+        return (pipeHeadLoss / config.longestPipeLength) * 100;
+    };
+
+    const getPerformanceStatus = (pipe: any) => {
+        const velocity = config.velocity;
+        const headLossPer100m = getHeadLossPer100m(pipe);
+
+        let velocityStatus = 'good';
+        let headLossStatus = 'good';
+
+        if (velocity > 2.5 || velocity < 0.3) velocityStatus = 'critical';
+        else if (velocity > 2.0 || velocity < 0.6) velocityStatus = 'warning';
+
+        if (headLossPer100m > 12) headLossStatus = 'critical';
+        else if (headLossPer100m > 8) headLossStatus = 'warning';
+
+        return { velocityStatus, headLossStatus };
+    };
+
     return (
         <div className="rounded-lg bg-gray-700 p-6">
             <h3 className={`mb-4 text-lg font-semibold ${config.titleColor}`}>
@@ -116,32 +154,115 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
             <p className="mb-3 text-sm text-gray-300">{config.description}</p>
 
             <div className="mb-4 rounded bg-blue-900 p-3">
-                <h4 className="mb-2 text-sm font-medium text-blue-300">📏 ข้อมูลระยะท่อ:</h4>
-                <div className="text-xs text-gray-300">
-                    <p>
-                        ระยะท่อ{config.title}รวม:{' '}
-                        <span className="font-bold text-blue-300">
-                            {config.totalPipeLength.toLocaleString()} เมตร
-                        </span>
-                    </p>
+                <h4 className="mb-2 text-sm font-medium text-blue-300">
+                    📏 ข้อมูลและการวิเคราะห์:
+                </h4>
+                <div className="grid grid-cols-2 gap-4 text-xs text-gray-300 md:grid-cols-4">
+                    <div>
+                        <p>
+                            ระยะท่อรวม:{' '}
+                            <span className="font-bold text-blue-300">
+                                {config.totalPipeLength.toLocaleString()} ม.
+                            </span>
+                        </p>
+                        <p>
+                            ระยะท่อยาวสุด:{' '}
+                            <span className="font-bold text-yellow-300">
+                                {config.longestPipeLength.toLocaleString()} ม.
+                            </span>
+                        </p>
+                    </div>
+                    <div>
+                        <p>
+                            อัตราการไหล:{' '}
+                            <span className="font-bold text-green-300">
+                                {config.flow.toFixed(1)} LPM
+                            </span>
+                        </p>
+                        <p>
+                            ความเร็ว:{' '}
+                            <span
+                                className={`font-bold ${config.velocity > 2.5 ? 'text-red-300' : config.velocity < 0.6 ? 'text-blue-300' : 'text-green-300'}`}
+                            >
+                                {config.velocity.toFixed(2)} m/s
+                            </span>
+                        </p>
+                    </div>
+                    <div>
+                        <p>
+                            Head Loss รวม:{' '}
+                            <span className="font-bold text-orange-300">
+                                {config.headLoss.total.toFixed(2)} ม.
+                            </span>
+                        </p>
+                        <p>
+                            Head Loss/100m:{' '}
+                            <span
+                                className={`font-bold ${getHeadLossPer100m(currentPipe) > 10 ? 'text-red-300' : getHeadLossPer100m(currentPipe) > 6 ? 'text-yellow-300' : 'text-green-300'}{getHeadLossPer100m(currentPipe) > 5 ? 'text-red-300' : 'text-green-300'}`}
+                            >
+                                {getHeadLossPer100m(currentPipe).toFixed(2)} ม.
+                            </span>
+                        </p>
+                    </div>
                     {currentPipe && (
-                        <>
+                        <div>
                             <p>
-                                ความยาวต่อม้วน:{' '}
-                                <span className="font-bold text-yellow-300">
-                                    {currentPipe.lengthM} เมตร/ม้วน
-                                </span>
-                            </p>
-                            <p>
-                                จำนวนม้วนที่ต้องใช้:{' '}
-                                <span className="font-bold text-green-300">
+                                จำนวนม้วน:{' '}
+                                <span className="font-bold text-purple-300">
                                     {currentRolls} ม้วน
                                 </span>
                             </p>
-                        </>
+                            <p>
+                                ประสิทธิภาพ:{' '}
+                                <span className="font-bold text-cyan-300">
+                                    {(
+                                        (config.totalPipeLength /
+                                            (currentPipe.lengthM * currentRolls)) *
+                                        100
+                                    ).toFixed(0)}
+                                    %
+                                </span>
+                            </p>
+                        </div>
                     )}
                 </div>
             </div>
+
+            {results.headLossValidation && (
+                <div
+                    className={`mb-4 rounded p-3 ${
+                        results.headLossValidation.severity === 'critical'
+                            ? 'bg-red-900'
+                            : results.headLossValidation.severity === 'warning'
+                              ? 'bg-yellow-900'
+                              : 'bg-green-900'
+                    }`}
+                >
+                    <h4
+                        className={`mb-1 text-sm font-medium ${
+                            results.headLossValidation.severity === 'critical'
+                                ? 'text-red-300'
+                                : results.headLossValidation.severity === 'warning'
+                                  ? 'text-yellow-300'
+                                  : 'text-green-300'
+                        }`}
+                    >
+                        🎯 การตรวจสอบ Head Loss Ratio (ตามรูปภาพ):
+                    </h4>
+                    <p
+                        className={`text-sm ${
+                            results.headLossValidation.severity === 'critical'
+                                ? 'text-red-200'
+                                : results.headLossValidation.severity === 'warning'
+                                  ? 'text-yellow-200'
+                                  : 'text-green-200'
+                        }`}
+                    >
+                        อัตราส่วน Head Loss: {results.headLossValidation.ratio}% -{' '}
+                        {results.headLossValidation.recommendation}
+                    </p>
+                </div>
+            )}
 
             <div className="mb-4">
                 <label className="mb-2 block text-sm font-medium text-gray-300">
@@ -162,12 +283,14 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                         const group = getPipeGrouping(pipe);
                         const isAuto = pipe.id === config.autoSelectedPipe?.id;
                         const rolls = calculateCurrentPipeRolls(pipe);
+                        const currentHeadLossPer100m = getHeadLossPer100m(pipe);
                         return (
                             <option key={pipe.id} value={pipe.id}>
                                 {isAuto ? '🤖 ' : ''}
                                 {pipe.name || pipe.productCode} - {pipe.sizeMM}mm -{' '}
                                 {pipe.price?.toLocaleString()} บาท/ม้วน ({rolls} ม้วน) | {group} |
-                                คะแนน: {pipe.score}
+                                คะแนน: {pipe.score} | Loss: {currentHeadLossPer100m.toFixed(1)}
+                                m/100m
                             </option>
                         );
                     })}
@@ -254,7 +377,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                     className={`${
                                         config.velocity > 2.5
                                             ? 'text-red-400'
-                                            : config.velocity < 0.3
+                                            : config.velocity < 0.6
                                               ? 'text-blue-400'
                                               : 'text-green-400'
                                     }`}
@@ -263,19 +386,26 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                 </span>
                             </p>
                             <p>
-                                <strong>ระยะท่อรวม:</strong>{' '}
-                                <span className="text-blue-300">
-                                    {config.totalPipeLength.toLocaleString()}
-                                </span>{' '}
-                                ม.
+                                <strong>Head Loss:</strong>{' '}
+                                <span className="text-orange-300">
+                                    {config.headLoss.total.toFixed(2)} ม.
+                                </span>
+                            </p>
+                            <p>
+                                <strong>Loss/100ม:</strong>{' '}
+                                <span
+                                    className={`${
+                                        getHeadLossPer100m(currentPipe) > 5
+                                            ? 'text-red-300'
+                                            : 'text-green-300'
+                                    }`}
+                                >
+                                    {getHeadLossPer100m(currentPipe).toFixed(1)} ม.
+                                </span>
                             </p>
                             <p>
                                 <strong>จำนวนม้วน:</strong>{' '}
                                 <span className="text-yellow-300">{currentRolls}</span> ม้วน
-                            </p>
-                            <p>
-                                <strong>ราคาต่อม้วน:</strong> {currentPipe?.price?.toLocaleString()}{' '}
-                                บาท
                             </p>
                             <p>
                                 <strong>ราคารวม:</strong>{' '}
@@ -287,100 +417,84 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                         </div>
                     </div>
 
-                    <div className="mt-3 rounded bg-purple-900 p-2">
-                        <h5 className="text-xs font-medium text-purple-300">
-                            📊 รายละเอียดการคำนวณ:
+                    <div className="mt-3 rounded bg-gray-500 p-2">
+                        <h5 className="text-xs font-medium text-yellow-300">
+                            🎯 การวิเคราะห์ตามมาตรฐาน (รูปภาพ):
                         </h5>
                         <div className="grid grid-cols-3 gap-2 text-xs">
-                            <p>
-                                ระยะท่อรวม:{' '}
-                                <span className="font-bold text-blue-300">
-                                    {config.totalPipeLength.toLocaleString()} ม.
-                                </span>
-                            </p>
-                            <p>
-                                ความยาวต่อม้วน:{' '}
-                                <span className="font-bold text-yellow-300">
-                                    {currentPipe?.lengthM} ม./ม้วน
-                                </span>
-                            </p>
-                            <p>
-                                จำนวนม้วน:{' '}
-                                <span className="font-bold text-green-300">
-                                    {currentRolls} ม้วน
-                                </span>
-                            </p>
-                        </div>
-                        <p className="mt-1 text-xs text-purple-200">
-                            💡 สูตร: Math.ceil({config.totalPipeLength} ÷ {currentPipe?.lengthM}) ={' '}
-                            {currentRolls} ม้วน
-                        </p>
-                    </div>
-
-                    <div className="mt-3 rounded bg-gray-500 p-2">
-                        <h5 className="text-xs font-medium text-yellow-300">การวิเคราะห์:</h5>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
                             <p>
                                 คะแนนรวม: <span className="font-bold">{currentPipe?.score}</span>
                                 /100
                             </p>
                             <p>
-                                Head Loss:{' '}
-                                <span className="font-bold">
-                                    {currentPipe?.headLoss?.toFixed(2)}
-                                </span>{' '}
-                                m
+                                Major Loss:{' '}
+                                <span className="font-bold text-red-400">
+                                    {config.headLoss.major.toFixed(2)} ม.
+                                </span>
+                            </p>
+                            <p>
+                                Minor Loss:{' '}
+                                <span className="font-bold text-orange-400">
+                                    {config.headLoss.minor.toFixed(2)} ม.
+                                </span>
                             </p>
                         </div>
-                        <div className="mt-1 text-xs">
+                        <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                             <p>
-                                ความเหมาะสม:
-                                <span
-                                    className={`ml-1 font-bold ${
-                                        currentPipe?.isRecommended
-                                            ? 'text-green-300'
-                                            : currentPipe?.isGoodChoice
-                                              ? 'text-yellow-300'
-                                              : currentPipe?.isUsable
-                                                ? 'text-orange-300'
-                                                : 'text-red-300'
-                                    }`}
-                                >
-                                    {currentPipe?.isRecommended
-                                        ? '⭐ แนะนำ'
-                                        : currentPipe?.isGoodChoice
-                                          ? '✅ ดี'
-                                          : currentPipe?.isUsable
-                                            ? '⚡ ใช้ได้'
-                                            : '⚠️ ไม่เหมาะสม'}
+                                Velocity Head:{' '}
+                                <span className="font-bold text-blue-300">
+                                    {(Math.pow(config.velocity, 2) / (2 * 9.81)).toFixed(3)} ม.
+                                </span>
+                            </p>
+                            <p>
+                                C-Factor:{' '}
+                                <span className="font-bold text-purple-300">
+                                    {results.coefficients ? results.coefficients[pipeType] : 140}
                                 </span>
                             </p>
                         </div>
                     </div>
 
                     <div className="mt-3 rounded bg-purple-900 p-2">
-                        <h5 className="text-xs font-medium text-purple-300">การตรวจสอบ:</h5>
+                        <h5 className="text-xs font-medium text-purple-300">
+                            ✅ การตรวจสอบมาตรฐาน:
+                        </h5>
                         <div className="text-xs">
                             <p>
-                                ความเร็วน้ำ:
+                                ความเร็วน้ำ:{' '}
                                 <span
                                     className={`ml-1 font-bold ${
                                         config.velocity >= 0.8 && config.velocity <= 2.0
                                             ? 'text-green-300'
-                                            : config.velocity >= 0.3 && config.velocity <= 2.5
+                                            : config.velocity >= 0.6 && config.velocity <= 2.5
                                               ? 'text-yellow-300'
                                               : 'text-red-300'
                                     }`}
                                 >
                                     {config.velocity >= 0.8 && config.velocity <= 2.0
-                                        ? '✅ อยู่ในช่วงที่เหมาะสม'
-                                        : config.velocity >= 0.3 && config.velocity <= 2.5
-                                          ? '⚠️ ใช้ได้ แต่ควรติดตาม'
+                                        ? '✅ เหมาะสมมาก (0.8-2.0 m/s)'
+                                        : config.velocity >= 0.6 && config.velocity <= 2.5
+                                          ? '⚠️ ใช้ได้ (0.6-2.5 m/s)'
                                           : '❌ อยู่นอกช่วงที่แนะนำ'}
                                 </span>
                             </p>
-                            <p className="mt-1 text-gray-400">
-                                แนะนำ: 0.8-2.0 m/s (ยอมรับได้: 0.3-2.5 m/s)
+                            <p className="mt-1">
+                                Head Loss:{' '}
+                                <span
+                                    className={`ml-1 font-bold ${
+                                        getHeadLossPer100m(currentPipe) <= 3
+                                            ? 'text-green-300'
+                                            : getHeadLossPer100m(currentPipe) <= 6
+                                              ? 'text-yellow-300'
+                                              : 'text-red-300'
+                                    }`}
+                                >
+                                    {getHeadLossPer100m(currentPipe) <= 3
+                                        ? '✅ ต่ำมาก (<3 m/100m)'
+                                        : getHeadLossPer100m(currentPipe) <= 6
+                                          ? '⚠️ ปานกลาง (3-6 m/100m)'
+                                          : '❌ สูงเกินไป (>6 m/100m)'}
+                                </span>
                             </p>
                         </div>
                     </div>
@@ -390,7 +504,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                         config.autoSelectedPipe && (
                             <div className="mt-3 rounded bg-yellow-900 p-2">
                                 <h5 className="text-xs font-medium text-yellow-300">
-                                    เปรียบเทียบกับการเลือกอัตโนมัติ:
+                                    ⚖️ เปรียบเทียบกับการเลือกอัตโนมัติ:
                                 </h5>
                                 <div className="grid grid-cols-2 gap-2 text-xs">
                                     <div>
@@ -420,7 +534,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                 </div>
                                 <div className="mt-1 text-xs">
                                     <p className="text-yellow-200">
-                                        ส่วนต่าง:
+                                        ส่วนต่าง:{' '}
                                         <span
                                             className={`ml-1 font-bold ${
                                                 selectedPipe.score >= config.autoSelectedPipe.score
@@ -438,7 +552,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                         </span>
                                     </p>
                                     <p className="text-yellow-200">
-                                        ราคารวม:
+                                        ราคารวม:{' '}
                                         <span
                                             className={`ml-1 font-bold ${
                                                 selectedPipe.price * currentRolls <=

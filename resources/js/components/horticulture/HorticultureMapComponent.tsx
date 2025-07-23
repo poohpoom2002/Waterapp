@@ -13,6 +13,7 @@ interface HorticultureMapComponentProps {
     zoom: number;
     onMapLoad?: (map: google.maps.Map) => void;
     children?: React.ReactNode;
+    mapOptions?: Partial<google.maps.MapOptions>;
 }
 
 const getGoogleMapsConfig = () => {
@@ -25,19 +26,19 @@ const getGoogleMapsConfig = () => {
             mapTypeId: 'satellite',
             disableDefaultUI: false,
             zoomControl: true,
-            streetViewControl: false,
+            streetViewControl: true,
             fullscreenControl: true,
             mapTypeControl: true,
             mapTypeControlOptions: {
-                position: 'LEFT_BOTTOM' as any,
+                position: 'TOP_CENTER' as any,
                 style: 'HORIZONTAL_BAR' as any,
                 mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain'],
             },
             minZoom: 1,
-            gestureHandling: 'greedy',
-            clickableIcons: false,
+            gestureHandling: 'greedy' as const,
+            clickableIcons: true,
             scrollwheel: true,
-            disableDoubleClickZoom: false,
+            disableDoubleClickZoom: true,
         },
     };
 };
@@ -82,51 +83,46 @@ const MapComponent: React.FC<{
     zoom: number;
     onLoad?: (map: google.maps.Map) => void;
     children?: React.ReactNode;
-}> = ({ center, zoom, onLoad, children }) => {
+    mapOptions?: Partial<google.maps.MapOptions>;
+}> = ({ center, zoom, onLoad, children, mapOptions }) => {
     const ref = useRef<HTMLDivElement>(null);
     const [map, setMap] = useState<google.maps.Map>();
+    const [isMapInitialized, setIsMapInitialized] = useState(false);
 
     useEffect(() => {
         if (ref.current && !map && window.google?.maps) {
             try {
                 const config = getGoogleMapsConfig();
 
-                const mapOptions = {
+                const mergedOptions = {
                     ...config.defaultMapOptions,
-                    mapTypeControlOptions: {
-                        position: google.maps.ControlPosition.LEFT_BOTTOM,
-                        style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-                        mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain'],
-                    },
-                    zoomControlOptions: {
-                        position: google.maps.ControlPosition.RIGHT_CENTER,
-                    },
+                    ...mapOptions,
                 };
-
                 const newMap = new window.google.maps.Map(ref.current, {
                     center,
                     zoom,
-                    ...mapOptions,
+                    ...mergedOptions,
                 });
 
                 setMap(newMap);
+                setIsMapInitialized(true);
                 onLoad?.(newMap);
             } catch (error) {
                 console.error('Error creating Google Map:', error);
             }
         }
-    }, [ref, map, center, zoom, onLoad]);
+    }, [ref, map, center, zoom, onLoad, mapOptions]);
 
     useEffect(() => {
-        if (map) {
+        if (map && !isMapInitialized) {
             map.setCenter(center);
-            map.setZoom(zoom);
         }
-    }, [map, center, zoom]);
+    }, [map, center, isMapInitialized]);
 
     return (
         <>
             <div ref={ref} style={{ width: '100%', height: '100%' }} />
+            
             {React.Children.map(children, (child) => {
                 if (React.isValidElement(child)) {
                     return React.cloneElement(child, { map } as any);
@@ -154,6 +150,7 @@ const HorticultureMapComponent: React.FC<HorticultureMapComponentProps> = ({
     zoom,
     onMapLoad,
     children,
+    mapOptions,
 }) => {
     const config = getGoogleMapsConfig();
 
@@ -172,6 +169,7 @@ const HorticultureMapComponent: React.FC<HorticultureMapComponentProps> = ({
                 center={{ lat: center[0], lng: center[1] }}
                 zoom={zoom}
                 onLoad={onMapLoad}
+                mapOptions={mapOptions}
             >
                 {children}
             </MapComponent>
