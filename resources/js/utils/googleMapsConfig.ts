@@ -3,7 +3,7 @@ export const GOOGLE_MAPS_CONFIG = {
     get apiKey() {
         const sources = [
             import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-            (globalThis as any).GOOGLE_MAPS_API_KEY,
+            (globalThis as unknown as { GOOGLE_MAPS_API_KEY?: string }).GOOGLE_MAPS_API_KEY,
             process.env?.REACT_APP_GOOGLE_MAPS_API_KEY,
         ];
 
@@ -37,8 +37,13 @@ export const GOOGLE_MAPS_CONFIG = {
         fullscreenControl: true,
         mapTypeControl: true,
         mapTypeControlOptions: {
+<<<<<<< HEAD
             position: 'TOP_CENTER' as any,
             style: 'HORIZONTAL_BAR' as any,
+=======
+            position: 'LEFT_BOTTOM' as unknown, // ใช้ string แทน google.maps.ControlPosition.LEFT_BOTTOM
+            style: 'HORIZONTAL_BAR' as unknown, // ใช้ string แทน google.maps.MapTypeControlStyle.HORIZONTAL_BAR
+>>>>>>> main
             mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain'],
         },
         minZoom: 1,
@@ -188,7 +193,7 @@ export const validateGoogleMapsAPI = async (): Promise<{
             suggestions.push('Enable Places API');
             suggestions.push('Remove domain restrictions if testing locally');
         }
-    } catch (error) {
+    } catch {
         issues.push('Network error testing API key');
         suggestions.push('Check internet connection');
         suggestions.push('Check for ad blockers or firewalls');
@@ -281,7 +286,7 @@ export class PlacesServiceWrapper {
         if (!this.placesService) {
             return {
                 results: [],
-                status: 'UNKNOWN_ERROR' as any, // ✅ ใช้ string แทน google.maps.places.PlacesServiceStatus.UNKNOWN_ERROR
+                status: 'UNKNOWN_ERROR' as google.maps.places.PlacesServiceStatus,
                 error: 'Places Service not initialized',
             };
         }
