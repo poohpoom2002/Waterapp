@@ -214,7 +214,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                 drawingMode: drawingMode,
                 drawingControl: true,
                 drawingControlOptions: {
-                    position: google.maps.ControlPosition.TOP_CENTER,
+                    position: google.maps.ControlPosition.BOTTOM_CENTER,
                     drawingModes: drawingModes,
                 },
                 ...shapeOptions,

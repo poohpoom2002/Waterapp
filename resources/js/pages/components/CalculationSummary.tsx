@@ -3,6 +3,13 @@ import React from 'react';
 import { CalculationResults, IrrigationInput } from '../types/interfaces';
 import { Zone } from '../../utils/horticultureUtils';
 
+interface ZoneOperationGroup {
+    id: string;
+    zones: string[];
+    order: number;
+    label: string;
+}
+
 interface CalculationSummaryProps {
     results: CalculationResults;
     input: IrrigationInput;
@@ -17,6 +24,8 @@ interface CalculationSummaryProps {
     projectMode?: 'horticulture' | 'garden';
     showPump?: boolean;
     simultaneousZonesCount?: number;
+    zoneOperationGroups?: ZoneOperationGroup[];
+    getZoneName?: (zoneId: string) => string;
 }
 
 const CalculationSummary: React.FC<CalculationSummaryProps> = ({
@@ -29,56 +38,15 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
     projectMode = 'horticulture',
     showPump = true,
     simultaneousZonesCount = 1,
+    zoneOperationGroups = [],
+    getZoneName = (id) => id,
 }) => {
     const actualPump = results.autoSelectedPump;
     const actualBranchPipe = results.autoSelectedBranchPipe;
     const actualSecondaryPipe = results.autoSelectedSecondaryPipe;
     const actualMainPipe = results.autoSelectedMainPipe;
 
-    const calculateTotalSystemCost = () => {
-        if (selectedZones.length <= 1) {
-            let cost = (selectedSprinkler?.price || 0) * results.totalSprinklers +
-                (actualBranchPipe?.price || 0) * results.branchPipeRolls +
-                (actualSecondaryPipe?.price || 0) * results.secondaryPipeRolls +
-                (actualMainPipe?.price || 0) * results.mainPipeRolls;
-            
-            if (showPump) {
-                cost += (actualPump?.price || 0);
-            }
-            
-            return cost;
-        } else {
-            let totalCost = showPump ? (actualPump?.price || 0) : 0;
-
-            selectedZones.forEach((zoneId) => {
-                const zoneSprinkler = allZoneSprinklers[zoneId];
-                if (zoneSprinkler) {
-                    const estimatedTreesPerZone = Math.ceil(
-                        input.totalTrees / selectedZones.length
-                    );
-                    totalCost += zoneSprinkler.price * estimatedTreesPerZone;
-
-                    totalCost +=
-                        (actualBranchPipe?.price || 0) *
-                        Math.ceil(results.branchPipeRolls / selectedZones.length);
-                    if (actualSecondaryPipe) {
-                        totalCost +=
-                            (actualSecondaryPipe.price || 0) *
-                            Math.ceil(results.secondaryPipeRolls / selectedZones.length);
-                    }
-                    if (actualMainPipe) {
-                        totalCost +=
-                            (actualMainPipe.price || 0) *
-                            Math.ceil(results.mainPipeRolls / selectedZones.length);
-                    }
-                }
-            });
-
-            return totalCost;
-        }
-    };
-
-    const totalCost = calculateTotalSystemCost();
+    const isMultiZone = selectedZones.length > 1 || (results.allZoneResults && results.allZoneResults.length > 1);
 
     const getSprinklerPressureInfo = () => {
         if (!selectedSprinkler) {
@@ -114,29 +82,6 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
 
     const pressureInfo = getSprinklerPressureInfo();
 
-    const getUniqueSprinklersSummary = () => {
-        const sprinklerMap = new Map();
-        Object.entries(allZoneSprinklers).forEach(([zoneId, sprinkler]) => {
-            if (sprinkler) {
-                const key = `${sprinkler.id}`;
-                if (!sprinklerMap.has(key)) {
-                    sprinklerMap.set(key, {
-                        sprinkler,
-                        zones: [],
-                        totalQuantity: 0,
-                    });
-                }
-                sprinklerMap.get(key).zones.push(zoneId);
-                sprinklerMap.get(key).totalQuantity += Math.ceil(
-                    input.totalTrees / Object.keys(allZoneSprinklers).length
-                );
-            }
-        });
-        return Array.from(sprinklerMap.values());
-    };
-
-    const uniqueSprinklers = getUniqueSprinklersSummary();
-
     const getSystemPerformance = () => {
         const performance = {
             velocityStatus: 'good' as 'good' | 'warning' | 'critical',
@@ -149,15 +94,18 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
             results.velocity.branch,
             results.velocity.secondary,
             results.velocity.main,
-        ];
+        ].filter((v) => v > 0);
+
         const hasHighVelocity = velocities.some((v) => v > 2.5);
-        const hasLowVelocity = velocities.some((v) => v < 0.3 && v > 0);
+        const hasLowVelocity = velocities.some((v) => v < 0.6);
+        const hasOptimalVelocity = velocities.some((v) => v >= 0.8 && v <= 2.0);
 
         if (hasHighVelocity) performance.velocityStatus = 'critical';
-        else if (hasLowVelocity) performance.velocityStatus = 'warning';
+        else if (hasLowVelocity && !hasOptimalVelocity) performance.velocityStatus = 'warning';
 
-        if (results.headLoss.total > 20) performance.headLossStatus = 'critical';
-        else if (results.headLoss.total > 15) performance.headLossStatus = 'warning';
+        const headLossRatio = results.headLossValidation?.ratio || 0;
+        if (headLossRatio > 25) performance.headLossStatus = 'critical';
+        else if (headLossRatio > 20) performance.headLossStatus = 'warning';
 
         if (showPump && actualPump) {
             if (!actualPump.isFlowAdequate || !actualPump.isHeadAdequate) {
@@ -167,15 +115,9 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
             }
         }
 
-        const statuses = [
-            performance.velocityStatus,
-            performance.headLossStatus,
-        ];
-        
-        if (showPump) {
-            statuses.push(performance.pumpStatus);
-        }
-        
+        const statuses = [performance.velocityStatus, performance.headLossStatus];
+        if (showPump) statuses.push(performance.pumpStatus);
+
         if (statuses.includes('critical')) performance.overallStatus = 'critical';
         else if (statuses.includes('warning')) performance.overallStatus = 'warning';
 
@@ -210,135 +152,58 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
         }
     };
 
-    // Labels based on project mode
-    const getLabel = (key: string) => {
-        if (projectMode === 'garden') {
-            switch (key) {
-                case 'trees': return 'หัวฉีด';
-                case 'tree': return 'หัวฉีด';
-                case 'waterPerTree': return 'น้ำต่อหัวฉีด';
-                case 'treeDensity': return 'ความหนาแน่นหัวฉีด';
-                default: return key;
-            }
+    const getOperationModeLabel = (mode: string) => {
+        switch (mode) {
+            case 'sequential':
+                return 'เปิดทีละโซน';
+            case 'simultaneous':
+                return 'เปิดพร้อมกันทุกโซน';
+            case 'custom':
+                return 'เปิดแบบกำหนดเอง';
+            default:
+                return 'โซนเดียว';
         }
-        return key;
     };
 
     return (
         <div className="space-y-6">
+            {/* แสดงข้อมูลโซนปัจจุบัน */}
             {activeZone && (
                 <div className="rounded-lg bg-purple-900 p-4">
                     <h3 className="mb-2 text-lg font-bold text-purple-300">
-                        {projectMode === 'garden' ? '🏡' : '🌿'} ข้อมูลโซน: {activeZone.name}
+                        {projectMode === 'garden' ? '🏡' : '🌿'} ข้อมูลโซนปัจจุบัน: {activeZone.name}
                     </h3>
                     <div className="grid grid-cols-2 gap-4 text-sm text-gray-300 md:grid-cols-4">
-                        {activeZone.area >= 1600 ? <p>พื้นที่: {(activeZone.area / 1600).toFixed(1)} ไร่</p> : <p>พื้นที่: {activeZone.area.toFixed(2)} ตร.ม.</p>}
-                        <p>จำนวน{projectMode === 'garden' ? 'หัวฉีด' : 'ต้น'}: {activeZone.plantCount.toLocaleString()} {projectMode === 'garden' ? 'หัว' : 'ต้น'}</p>
+                        {activeZone.area >= 1600 ? (
+                            <p>พื้นที่: {(activeZone.area / 1600).toFixed(1)} ไร่</p>
+                        ) : (
+                            <p>พื้นที่: {activeZone.area.toFixed(2)} ตร.ม.</p>
+                        )}
+                        <p>
+                            จำนวน{projectMode === 'garden' ? 'หัวฉีด' : 'ต้น'}:{' '}
+                            {activeZone.plantCount.toLocaleString()}{' '}
+                            {projectMode === 'garden' ? 'หัว' : 'ต้น'}
+                        </p>
                         <p>ความต้องการน้ำ: {activeZone.totalWaterNeed.toFixed(0)} ลิตร/วัน</p>
                         {projectMode === 'horticulture' && (
                             <p>พืชที่ปลูก: {activeZone.plantData?.name || 'ไม่ระบุ'}</p>
                         )}
                     </div>
-                    {selectedZones.length > 1 && (
-                        <div className="mt-2 rounded bg-purple-800 p-2">
-                            <p className="text-sm text-yellow-300">
-                                ⚠️ กำลังคำนวณสำหรับ {selectedZones.length} โซนพร้อมกัน
-                            </p>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            <div className="rounded-lg bg-gradient-to-r from-gray-800 to-gray-700 p-4">
-                <h3 className="mb-3 text-lg font-bold text-white">
-                    📊 ประสิทธิภาพระบบ
-                    <span className={`ml-2 ${getStatusColor(systemPerformance.overallStatus)}`}>
-                        {getStatusIcon(systemPerformance.overallStatus)}
-                    </span>
-                </h3>
-                <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                    <div className="text-center">
-                        <div
-                            className={`text-xl font-bold ${getStatusColor(systemPerformance.velocityStatus)}`}
-                        >
-                            {getStatusIcon(systemPerformance.velocityStatus)}
-                        </div>
-                        <p className="text-sm text-gray-300">ความเร็วน้ำ</p>
-                        <p className="text-xs text-gray-400">0.3-2.5 m/s</p>
-                    </div>
-                    <div className="text-center">
-                        <div
-                            className={`text-xl font-bold ${getStatusColor(systemPerformance.headLossStatus)}`}
-                        >
-                            {getStatusIcon(systemPerformance.headLossStatus)}
-                        </div>
-                        <p className="text-sm text-gray-300">Head Loss</p>
-                        <p className="text-xs text-gray-400">
-                            {results.headLoss.total.toFixed(1)} m
+                    <div className="mt-2 rounded bg-purple-800 p-2">
+                        <p className="text-xs text-purple-200">
+                            💡 ข้อมูลข้างต้นเป็นของโซน {activeZone.name} ที่กำลังตั้งค่า
                         </p>
                     </div>
-                    {showPump && (
-                        <div className="text-center">
-                            <div
-                                className={`text-xl font-bold ${getStatusColor(systemPerformance.pumpStatus)}`}
-                            >
-                                {getStatusIcon(systemPerformance.pumpStatus)}
-                            </div>
-                            <p className="text-sm text-gray-300">ปั๊มน้ำ</p>
-                            <p className="text-xs text-gray-400">{actualPump?.powerHP || 'N/A'} HP</p>
-                        </div>
-                    )}
-                    <div className="text-center">
-                        <div className="text-xl font-bold text-blue-400">💰</div>
-                        <p className="text-sm text-gray-300">ประมาณการ</p>
-                        <p className="text-xs text-gray-400">{totalCost.toLocaleString()} ฿</p>
-                    </div>
-                </div>
-            </div>
-
-            {Object.keys(allZoneSprinklers).length > 1 && (
-                <div className="rounded-lg bg-indigo-900 p-4">
-                    <h3 className="mb-2 text-lg font-bold text-indigo-300">
-                        💧 สรุป{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}ทั้งระบบ ({uniqueSprinklers.length} ชนิด)
-                    </h3>
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        {uniqueSprinklers.map((item, index) => (
-                            <div key={index} className="rounded bg-indigo-800 p-3">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="font-medium text-white">
-                                            {item.sprinkler.name}
-                                        </p>
-                                        <p className="text-sm text-indigo-200">
-                                            {item.sprinkler.productCode} | {item.sprinkler.price}{' '}
-                                            บาท/หัว
-                                        </p>
-                                        <p className="text-xs text-indigo-300">
-                                            ใช้ใน {item.zones.length} โซน | ประมาณ{' '}
-                                            {item.totalQuantity} หัว
-                                        </p>
-                                        <p className="text-xs text-indigo-300">
-                                            คะแนน: {item.sprinkler.score || 'N/A'}/100
-                                        </p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-sm font-bold text-green-300">
-                                            {(
-                                                item.sprinkler.price * item.totalQuantity
-                                            ).toLocaleString()}{' '}
-                                            ฿
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
                 </div>
             )}
 
+            {/* แสดงสถานะการเลือกอุปกรณ์อัตโนมัติของโซนปัจจุบันก่อน */}
             <div className="rounded-lg bg-gradient-to-r from-green-600 to-blue-600 p-4">
                 <h2 className="mb-2 text-lg font-bold text-white">
                     🤖 สถานะการเลือกอุปกรณ์อัตโนมัติ
+                    {isMultiZone && activeZone && (
+                        <span className="ml-2 text-sm font-normal">(โซนปัจจุบัน: {activeZone.name})</span>
+                    )}
                 </h2>
                 <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
                     <div className="text-center">
@@ -428,7 +293,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
 
                     {showPump && (
                         <div className="text-center">
-                            <p className="text-red-200">ปั๊ม</p>
+                            <p className="text-red-200">ปั๊ม (ทั้งโปรเจค)</p>
                             <p
                                 className={`text-xl font-bold ${
                                     actualPump?.isRecommended
@@ -457,16 +322,22 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                 </div>
                 <div className="mt-3 text-center text-sm text-white">
                     <p>🎛️ สามารถปรับแต่งการเลือกได้ในแต่ละส่วน</p>
-                    {selectedZones.length > 1 && (
+                    {isMultiZone && (
                         <p className="text-yellow-200">
-                            ท่อคำนวณแยกตามโซน {showPump && '| ปั๊มใช้ตัวเดียวทั้งระบบ'}
+                            ท่อคำนวณแยกตามโซน {showPump && '| ปั๊มคำนวณตาม operation mode ที่เลือก'}
                         </p>
                     )}
                 </div>
             </div>
 
+            {/* แสดงข้อมูลสำคัญของโซนปัจจุบันก่อน */}
             <div className="rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 p-4">
-                <h2 className="mb-2 text-lg font-bold text-white">🎯 ข้อมูลสำคัญ</h2>
+                <h2 className="mb-2 text-lg font-bold text-white">
+                    🎯 ข้อมูลสำคัญ
+                    {isMultiZone && activeZone && (
+                        <span className="ml-2 text-sm font-normal">(โซนปัจจุบัน: {activeZone.name})</span>
+                    )}
+                </h2>
                 <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
                     <div className="text-center">
                         <p className="text-blue-200">ความต้องการน้ำ</p>
@@ -474,11 +345,6 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             {results.totalWaterRequiredLPM.toFixed(1)} LPM
                         </p>
                         {activeZone && <p className="text-xs text-blue-100">({activeZone.name})</p>}
-                        {selectedZones.length > 1 && (
-                            <p className="text-xs text-blue-100">
-                                ({selectedZones.length} โซนพร้อมกัน)
-                            </p>
-                        )}
                     </div>
                     <div className="text-center">
                         <p className="text-green-200">Head Loss รวม</p>
@@ -501,8 +367,10 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             <p className="text-xl font-bold text-orange-300">
                                 {results.pumpHeadRequired.toFixed(1)} m
                             </p>
-                            {selectedZones.length > 1 && (
-                                <p className="text-xs text-purple-100">({selectedZones.length} โซน)</p>
+                            {isMultiZone && results.projectSummary && (
+                                <p className="text-xs text-purple-100">
+                                    (ตาม {getOperationModeLabel(results.projectSummary.operationMode)})
+                                </p>
                             )}
                             <p className="text-xs text-purple-100">
                                 Safety Factor: {results.safetyFactor.toFixed(2)}x
@@ -510,22 +378,178 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         </div>
                     )}
                     <div className="text-center">
-                        <p className="text-pink-200">ประมาณการ</p>
+                        <p className="text-pink-200">จำนวน{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}</p>
                         <p className="text-xl font-bold text-green-300">
-                            {totalCost.toLocaleString()} ฿
+                            {results.totalSprinklers} หัว
                         </p>
-                        {selectedZones.length > 1 && (
+                        {activeZone && (
                             <p className="text-xs text-pink-100">
-                                ({uniqueSprinklers.length} ชนิด{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'})
+                                (ในโซน {activeZone.name})
                             </p>
                         )}
-                        <p className="text-xs text-pink-100">
-                            ({(totalCost / (results.totalSprinklers || 1)).toFixed(0)} ฿/หัว)
-                        </p>
                     </div>
                 </div>
             </div>
 
+            {/* แสดงข้อมูลสรุปโปรเจคสำหรับหลายโซน */}
+            {isMultiZone && results.projectSummary && (
+                <div className="rounded-lg bg-blue-900 p-4">
+                    <h3 className="mb-3 text-lg font-bold text-blue-300">
+                        📊 สรุปโปรเจคทั้งหมด ({results.allZoneResults?.length || 0} โซน)
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm text-gray-300 md:grid-cols-4">
+                        <div>
+                            <p className="text-blue-200">รูปแบบการเปิด:</p>
+                            <p className="font-bold text-white">
+                                {getOperationModeLabel(results.projectSummary.operationMode)}
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-blue-200">อัตราการไหลรวม:</p>
+                            <p className="font-bold text-white">
+                                {results.projectSummary.totalFlowLPM.toFixed(1)} LPM
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-blue-200">Head สูงสุด:</p>
+                            <p className="font-bold text-white">
+                                {results.projectSummary.maxHeadM.toFixed(1)} เมตร
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-blue-200">โซนที่ต้องการ Head สูงสุด:</p>
+                            <p className="font-bold text-white">
+                                {getZoneName(results.projectSummary.criticalZone)}
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div className="mt-3 rounded bg-blue-800 p-2">
+                        <h4 className="text-sm font-medium text-blue-300">💧 การคำนวณปั๊ม:</h4>
+                        <div className="grid grid-cols-2 gap-2 text-xs text-blue-200">
+                            <p>Flow ที่ต้องการ: {results.projectSummary.selectedGroupFlowLPM.toFixed(1)} LPM</p>
+                            <p>Head ที่ต้องการ: {results.projectSummary.selectedGroupHeadM.toFixed(1)} เมตร</p>
+                        </div>
+                        {results.projectSummary.criticalGroup && (
+                            <p className="mt-1 text-xs text-blue-300">
+                                จากกลุ่ม: {results.projectSummary.criticalGroup.label}
+                            </p>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* แสดงข้อมูลโซนย่อยสำหรับหลายโซน */}
+            {isMultiZone && results.allZoneResults && results.allZoneResults.length > 0 && (
+                <div className="rounded-lg bg-gray-800 p-4">
+                    <h3 className="mb-3 text-lg font-bold text-gray-300">
+                        🔍 รายละเอียดแต่ละโซน
+                    </h3>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        {results.allZoneResults.map((zoneResult, index) => (
+                            <div key={zoneResult.zoneId} className="rounded bg-gray-700 p-3">
+                                <div className="mb-2 flex items-center justify-between">
+                                    <h4 className="font-medium text-white">
+                                        {getZoneName(zoneResult.zoneId)}
+                                        {zoneResult.zoneId === activeZone?.id && (
+                                            <span className="ml-2 text-xs text-green-400">(กำลังดู)</span>
+                                        )}
+                                    </h4>
+                                    <div className="text-xs text-gray-400">
+                                        {zoneResult.sprinklerCount} {projectMode === 'garden' ? 'หัว' : 'ต้น'}
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 text-xs text-gray-300">
+                                    <div>
+                                        <p>Flow: {zoneResult.totalFlowLPM.toFixed(1)} LPM</p>
+                                        <p>Static Head: {zoneResult.staticHead.toFixed(1)} ม.</p>
+                                    </div>
+                                    <div>
+                                        <p>Head Loss: {zoneResult.headLoss.total.toFixed(1)} ม.</p>
+                                        <p>Total Head: <span className="font-bold text-yellow-300">
+                                            {zoneResult.totalHead.toFixed(1)} ม.
+                                        </span></p>
+                                    </div>
+                                </div>
+                                {zoneResult.zoneId === results.projectSummary?.criticalZone && (
+                                    <div className="mt-1 text-xs text-red-300">
+                                        ⭐ โซนที่ต้องการ Head สูงสุด
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* การเปิดโซน */}
+            {zoneOperationGroups && zoneOperationGroups.length > 0 && (
+                <div className="rounded bg-purple-900 p-3">
+                    <h4 className="mb-2 text-sm font-medium text-purple-300">🔄 การเปิดโซน:</h4>
+                    <div className="space-y-1 text-xs text-purple-200">
+                        {zoneOperationGroups.map((group, index) => (
+                            <p key={group.id}>
+                                • ลำดับที่ {group.order}: {group.zones.map(zoneId => getZoneName(zoneId)).join(', ')}
+                                {group.zones.length > 1 && ' (เปิดพร้อมกัน)'}
+                            </p>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <div className="rounded-lg bg-gradient-to-r from-gray-800 to-gray-700 p-4">
+                <h3 className="mb-3 text-lg font-bold text-white">
+                    📊 ประสิทธิภาพระบบ
+                    <span className={`ml-2 ${getStatusColor(systemPerformance.overallStatus)}`}>
+                        {getStatusIcon(systemPerformance.overallStatus)}
+                    </span>
+                    {isMultiZone && activeZone && (
+                        <span className="ml-2 text-sm font-normal">({activeZone.name})</span>
+                    )}
+                </h3>
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                    <div className="text-center">
+                        <div
+                            className={`text-xl font-bold ${getStatusColor(systemPerformance.velocityStatus)}`}
+                        >
+                            {getStatusIcon(systemPerformance.velocityStatus)}
+                        </div>
+                        <p className="text-sm text-gray-300">ความเร็วน้ำ</p>
+                        <p className="text-xs text-gray-400">0.3-2.5 m/s</p>
+                    </div>
+                    <div className="text-center">
+                        <div
+                            className={`text-xl font-bold ${getStatusColor(systemPerformance.headLossStatus)}`}
+                        >
+                            {getStatusIcon(systemPerformance.headLossStatus)}
+                        </div>
+                        <p className="text-sm text-gray-300">Head Loss</p>
+                        <p className="text-xs text-gray-400">
+                            {results.headLoss.total.toFixed(1)} m
+                        </p>
+                    </div>
+                    {showPump && (
+                        <div className="text-center">
+                            <div
+                                className={`text-xl font-bold ${getStatusColor(systemPerformance.pumpStatus)}`}
+                            >
+                                {getStatusIcon(systemPerformance.pumpStatus)}
+                            </div>
+                            <p className="text-sm text-gray-300">ปั๊มน้ำ</p>
+                            <p className="text-xs text-gray-400">
+                                {actualPump?.powerHP || 'N/A'} HP
+                            </p>
+                        </div>
+                    )}
+                    <div className="text-center">
+                        <div className="text-xl font-bold text-blue-400">💰</div>
+                        <p className="text-sm text-gray-300">ประมาณการ</p>
+                        <p className="text-xs text-gray-400">ตามโซนปัจจุบัน</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* แสดงข้อมูลรายละเอียดโซนปัจจุบัน */}
             <div className="rounded-lg bg-gray-700 p-6">
                 <h2 className="mb-4 text-xl font-semibold text-yellow-400">
                     📊 สรุปการคำนวณรายละเอียด
@@ -534,9 +558,9 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             - {activeZone.name}
                         </span>
                     )}
-                    {selectedZones.length > 1 && (
+                    {isMultiZone && (
                         <span className="ml-2 text-sm font-normal text-green-400">
-                            (หลายโซน: {selectedZones.length} โซน)
+                            (โซนปัจจุบันที่กำลังตั้งค่า)
                         </span>
                     )}
                 </h2>
@@ -553,22 +577,17 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         <p className="text-sm font-bold text-green-300">
                             {results.adjustedFlow.toFixed(1)} ลิตร/นาที
                         </p>
-                        {selectedZones.length > 1 && (
+                        {activeZone && (
                             <p className="mt-1 text-xs text-blue-200">
-                                สำหรับ {selectedZones.length} โซนพร้อมกัน
+                                สำหรับโซน {activeZone.name}
                             </p>
                         )}
-                        <p className="mt-1 text-xs text-gray-400">
-                            ต่อโซน:{' '}
-                            {(results.totalWaterRequiredLPM / (selectedZones.length || 1)).toFixed(
-                                1
-                            )}{' '}
-                            LPM
-                        </p>
                     </div>
 
                     <div className="rounded bg-gray-600 p-4">
-                        <h3 className="mb-2 font-medium text-purple-300">🚰 น้ำต่อหัว{projectMode === 'garden' ? 'ฉีด' : 'สปริงเกอร์'}</h3>
+                        <h3 className="mb-2 font-medium text-purple-300">
+                            🚰 น้ำต่อหัว{projectMode === 'garden' ? 'ฉีด' : 'สปริงเกอร์'}
+                        </h3>
                         <p className="text-lg font-bold">
                             {results.waterPerSprinklerLPH.toFixed(1)} ลิตร/ชั่วโมง
                         </p>
@@ -583,9 +602,10 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         </p>
                     </div>
 
-                    {/* Number of Sprinklers */}
                     <div className="rounded bg-gray-600 p-4">
-                        <h3 className="mb-2 font-medium text-green-300">🔢 จำนวน{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}</h3>
+                        <h3 className="mb-2 font-medium text-green-300">
+                            🔢 จำนวน{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}
+                        </h3>
                         <p className="text-lg font-bold">{results.totalSprinklers} หัว</p>
                         <p className="text-sm text-gray-300">
                             {results.sprinklersPerZone.toFixed(1)} หัว/โซน
@@ -593,17 +613,12 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         {activeZone && (
                             <p className="mt-1 text-xs text-green-200">ในโซน {activeZone.name}</p>
                         )}
-                        {Object.keys(allZoneSprinklers).length > 1 && (
-                            <p className="mt-1 text-xs text-green-200">
-                                รวม {uniqueSprinklers.length} ชนิด
-                            </p>
-                        )}
                         <p className="mt-1 text-xs text-gray-400">
-                            อัตราส่วน: {input.sprinklersPerTree} หัว/{projectMode === 'garden' ? 'จุด' : 'ต้น'}
+                            อัตราส่วน: {input.sprinklersPerTree} หัว/
+                            {projectMode === 'garden' ? 'จุด' : 'ต้น'}
                         </p>
                     </div>
 
-                    {/* Flow Rates */}
                     <div className="rounded bg-gray-600 p-4">
                         <h3 className="mb-2 font-medium text-yellow-300">⚡ อัตราการไหลแต่ละท่อ</h3>
                         <div className="text-sm">
@@ -631,20 +646,8 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             )}
                         </div>
                         <p className="mt-1 text-xs text-gray-400">ตามการออกแบบระบบ</p>
-                        {showPump && (
-                            <p className="mt-1 text-xs text-yellow-300">
-                                ปั๊ม:{' '}
-                                {Math.max(
-                                    results.flows.branch,
-                                    results.flows.secondary,
-                                    results.flows.main
-                                ).toFixed(1)}{' '}
-                                LPM
-                            </p>
-                        )}
                     </div>
 
-                    {/* Head Loss Details */}
                     <div className="rounded bg-gray-600 p-4">
                         <h3 className="mb-2 font-medium text-red-300">📉 Head Loss รายละเอียด</h3>
                         <div className="text-sm">
@@ -678,18 +681,8 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                 <p>หลัก: {results.headLoss.main.total.toFixed(1)}m</p>
                             )}
                         </div>
-                        <p className="mt-1 text-xs text-red-200">
-                            อัตราส่วน Minor/Major:{' '}
-                            {(
-                                (results.headLoss.totalMinor /
-                                    Math.max(results.headLoss.totalMajor, 0.1)) *
-                                100
-                            ).toFixed(0)}
-                            %
-                        </p>
                     </div>
 
-                    {/* Water Velocity */}
                     <div className="rounded bg-gray-600 p-4">
                         <h3 className="mb-2 font-medium text-cyan-300">🌊 ความเร็วน้ำ (m/s)</h3>
                         <div className="text-sm">
@@ -751,7 +744,6 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         </p>
                     </div>
 
-                    {/* Pump Head Requirements */}
                     {showPump && (
                         <div className="rounded bg-gray-600 p-4">
                             <h3 className="mb-2 font-medium text-orange-300">
@@ -784,15 +776,14 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                     %
                                 </p>
                             </div>
-                            {selectedZones.length > 1 && (
+                            {isMultiZone && results.projectSummary && (
                                 <p className="mt-2 text-xs text-orange-200">
-                                    สำหรับ {selectedZones.length} โซนพร้อมกัน
+                                    คำนวณตาม {getOperationModeLabel(results.projectSummary.operationMode)}
                                 </p>
                             )}
                         </div>
                     )}
 
-                    {/* Auto-Selected Equipment Performance */}
                     <div className="rounded bg-gray-600 p-4">
                         <h3 className="mb-2 font-medium text-pink-300">🤖 ประสิทธิภาพอุปกรณ์</h3>
                         <div className="text-sm">
@@ -840,19 +831,10 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             )}
                         </div>
                         <p className="mt-1 text-xs text-gray-400">คะแนน 70+ = แนะนำ</p>
-                        <p className="mt-1 text-xs text-pink-200">
-                            เฉลี่ย:{' '}
-                            {((actualBranchPipe?.score || 0) +
-                                (actualSecondaryPipe?.score || 0) +
-                                (actualMainPipe?.score || 0) +
-                                (showPump ? (actualPump?.score || 0) : 0)) /
-                                (showPump ? 4 : 3)}
-                            /100
-                        </p>
                     </div>
                 </div>
 
-                {/* ===== SPRINKLER PRESSURE INFO ===== */}
+                {/* แสดงข้อมูลแรงดันจากสปริงเกอร์ */}
                 {selectedSprinkler && (
                     <div className="mt-6 rounded bg-blue-900 p-4">
                         <h3 className="mb-2 font-medium text-blue-300">
@@ -860,7 +842,10 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         </h3>
                         <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-3">
                             <p>
-                                <strong>{projectMode === 'garden' ? 'หัวฉีด:' : 'สปริงเกอร์:'}</strong> {selectedSprinkler.productCode}
+                                <strong>
+                                    {projectMode === 'garden' ? 'หัวฉีด:' : 'สปริงเกอร์:'}
+                                </strong>{' '}
+                                {selectedSprinkler.productCode}
                             </p>
                             <p>
                                 <strong>ช่วงแรงดัน:</strong> {pressureInfo.pressureBar?.toFixed(1)}{' '}
@@ -877,25 +862,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                     </div>
                 )}
 
-                {/* ===== MULTI-ZONE NOTE ===== */}
-                {activeZone && selectedZones.length > 1 && (
-    <div className="mt-6 rounded bg-yellow-900 p-4">
-        <h3 className="mb-2 font-medium text-yellow-300">
-            ⚠️ หมายเหตุการคำนวณหลายโซน
-        </h3>
-        <p className="text-sm text-yellow-200">
-            การคำนวณขนาดท่อจะแยกตามแต่ละโซน {showPump && `แต่ปั๊มจะคำนวณสำหรับการเปิด ${simultaneousZonesCount} โซนพร้อมกัน`}
-        </p>
-        <div className="mt-2 text-xs text-yellow-100">
-            <p>• ท่อย่อย: คำนวณแยกตามโซนที่กำลังดู ({activeZone.name})</p>
-            <p>• ท่อรอง/หลัก: คำนวณแยกตามแต่ละโซน</p>
-            {showPump && <p>• ปั๊ม: คำนวณตาม {simultaneousZonesCount} โซนที่มีความต้องการสูงสุด</p>}
-            <p>• {projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}: แต่ละโซนเลือกได้อิสระ ({uniqueSprinklers.length} ชนิดที่เลือก)</p>
-        </div>
-    </div>
-)}
-
-                {/* ===== VELOCITY WARNINGS ===== */}
+                {/* แสดงข้อมูลการตรวจสอบ velocity */}
                 {results.velocityWarnings.length > 0 && (
                     <div className="mt-6 rounded bg-red-900 p-4">
                         <h3 className="mb-2 font-medium text-red-300">⚠️ การตรวจสอบความเร็วน้ำ</h3>
@@ -912,7 +879,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                     </div>
                 )}
 
-                {/* ===== SYSTEM EFFICIENCY INDICATORS ===== */}
+                {/* แสดงข้อมูลประสิทธิภาพระบบ */}
                 <div className="mt-6 rounded bg-green-900 p-4">
                     <h3 className="mb-2 font-medium text-green-300">🎯 ประสิทธิภาพระบบ</h3>
                     <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
