@@ -55,10 +55,6 @@ export default function Product() {
     const [activeZoneId, setActiveZoneId] = useState<string>('');
     const [zoneInputs, setZoneInputs] = useState<{ [zoneId: string]: IrrigationInput }>({});
     const [zoneSprinklers, setZoneSprinklers] = useState<{ [zoneId: string]: any }>({});
-    const [simultaneousZonesCount, setSimultaneousZonesCount] = useState<number>(1);
-    const [showPumpOption, setShowPumpOption] = useState<boolean>(false);
-    const [showFloatingAiChat, setShowFloatingAiChat] = useState<boolean>(false);
-    const [isAiChatMinimized, setIsAiChatMinimized] = useState<boolean>(false);
 
     const [zoneOperationMode, setZoneOperationMode] = useState<
         'sequential' | 'simultaneous' | 'custom'
@@ -1365,8 +1361,6 @@ export default function Product() {
                 gardenData={gardenData}
                 zoneSprinklers={zoneSprinklers}
                 selectedPipes={selectedPipes}
-                projectMode={projectMode}
-                showPump={projectMode === 'horticulture' || showPumpOption}
                 onClose={() => setShowQuotation(false)}
                 projectMode={projectMode}
                 showPump={projectMode === 'horticulture' || showPumpOption}
