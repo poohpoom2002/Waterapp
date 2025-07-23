@@ -1014,9 +1014,21 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                     ctx.fillStyle = '#FFFFFF';
                     ctx.font = '24px Arial';
                     ctx.textAlign = 'center';
-                    ctx.fillText('🏡 แผนผังสวนบ้าน', fallbackCanvas.width / 2, fallbackCanvas.height / 2 - 40);
-                    ctx.fillText('(ไม่สามารถสร้างภาพแผนที่ได้)', fallbackCanvas.width / 2, fallbackCanvas.height / 2);
-                    ctx.fillText('กรุณาใช้ screenshot แทน', fallbackCanvas.width / 2, fallbackCanvas.height / 2 + 40);
+                    ctx.fillText(
+                        '🏡 แผนผังสวนบ้าน',
+                        fallbackCanvas.width / 2,
+                        fallbackCanvas.height / 2 - 40
+                    );
+                    ctx.fillText(
+                        '(ไม่สามารถสร้างภาพแผนที่ได้)',
+                        fallbackCanvas.width / 2,
+                        fallbackCanvas.height / 2
+                    );
+                    ctx.fillText(
+                        'กรุณาใช้ screenshot แทน',
+                        fallbackCanvas.width / 2,
+                        fallbackCanvas.height / 2 + 40
+                    );
 
                     return fallbackCanvas.toDataURL('image/jpeg', 0.8);
                 }
@@ -1083,25 +1095,25 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                 localStorage.setItem('projectMapImage', imageUrl);
                 localStorage.setItem('projectType', 'home-garden');
                 console.log('🏡 บันทึกภาพแผนที่สำเร็จ');
-                
+
                 // ลบหน้าต่างโหลด
                 document.body.removeChild(loadingDiv);
-                
+
                 // ไปหน้า product
                 window.location.href = '/product?mode=garden';
             } else {
                 // ลบหน้าต่างโหลด
                 document.body.removeChild(loadingDiv);
-                
+
                 console.log('🏡 ไม่สามารถสร้างภาพได้ แต่จะไปหน้า product ต่อไป');
-                
+
                 // ไปหน้า product แม้ไม่มีรูป
                 router.visit('/product?mode=garden');
             }
         } catch (error) {
             console.error('🏡 Error navigating to equipment calculation:', error);
             setError('เกิดข้อผิดพลาดในการไปยังหน้าคำนวณอุปกรณ์');
-            
+
             // ลบหน้าต่างโหลดถ้าไม่ได้ลบแล้ว
             const loadingDiv = document.getElementById('garden-image-loading');
             if (loadingDiv) {
@@ -1237,9 +1249,9 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                             </h3>
                             <div className="h-[600px] overflow-hidden rounded-lg border border-gray-600 bg-gray-900">
                                 {gardenData.designMode === 'map' && (
-                                    <div 
-                                        ref={mapContainerRef} 
-                                        id="map-container" 
+                                    <div
+                                        ref={mapContainerRef}
+                                        id="map-container"
                                         className="h-full"
                                     >
                                         <GoogleMapSummary

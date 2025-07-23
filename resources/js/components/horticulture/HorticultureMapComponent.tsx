@@ -122,7 +122,7 @@ const MapComponent: React.FC<{
     return (
         <>
             <div ref={ref} style={{ width: '100%', height: '100%' }} />
-            
+
             {React.Children.map(children, (child) => {
                 if (React.isValidElement(child)) {
                     return React.cloneElement(child, { map } as any);

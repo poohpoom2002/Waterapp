@@ -497,7 +497,7 @@ export default function Product() {
 
                     setZoneInputs(initialZoneInputs);
                     setSelectedPipes(initialSelectedPipes);
-                    setActiveZoneId(stats.zones[0].zoneId); 
+                    setActiveZoneId(stats.zones[0].zoneId);
                     handleZoneOperationModeChange('sequential');
                 } else {
                     const singleInput = createSingleGardenInput(stats);

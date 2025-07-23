@@ -27,8 +27,6 @@ export interface IrrigationInput {
     };
 }
 
-
-
 export interface AnalyzedPipe {
     product_code: string;
     id: number;
@@ -185,7 +183,7 @@ export interface CalculationResults {
     hasValidMainPipe?: boolean;
 
     allZoneResults?: ZoneResults[];
-projectSummary?: ProjectSummary;
+    projectSummary?: ProjectSummary;
 }
 
 export interface ZoneResults {

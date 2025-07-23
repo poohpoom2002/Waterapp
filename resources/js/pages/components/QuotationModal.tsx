@@ -141,7 +141,7 @@ const QuotationModal: React.FC<QuotationModalProps> = ({
                                 placeholder="ชื่อ - นามสกุล"
                             />
                         </div>
-                        
+
                         <div>
                             <label className="mb-2 block text-sm font-medium">Address:</label>
                             <input
