@@ -1,16 +1,18 @@
-// resources/js/pages/home-garden-planner.tsx
+// resources/js/pages/home-garden-planner.tsx - Enhanced with pipe editing and Google Map fixes
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { MapContainer, TileLayer, FeatureGroup, LayersControl, useMap } from 'react-leaflet';
-import { EditControl } from 'react-leaflet-draw';
-import 'leaflet/dist/leaflet.css';
-import 'leaflet-draw/dist/leaflet.draw.css';
 import { router } from '@inertiajs/react';
-import L from 'leaflet';
+
+import GoogleMapDesigner from '../components/homegarden/GoogleMapDesigner';
+import CanvasDesigner from '../components/homegarden/CanvasDesigner';
+import ImageDesigner from '../components/homegarden/ImageDesigner';
+import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 
 import {
     Coordinate,
     CanvasCoordinate,
     GardenZone,
+    SprinklerType,
     Sprinkler,
     WaterSource,
     Pipe,
@@ -22,21 +24,23 @@ import {
     CANVAS_DEFAULT_HEIGHT,
     CANVAS_DEFAULT_SCALE,
     CANVAS_GRID_SIZE,
-    calculatePolygonArea,
-    calculateDistance,
-    formatArea,
     isPointInPolygon,
-    canvasToGPS,
-    getValidScale,
+    calculateDistance,
+    calculatePolygonArea,
+    formatDistance,
+    formatArea,
+    saveGardenData,
     loadGardenData,
     clearGardenData,
+    createInitialData,
+    validateGardenData,
+    canvasToGPS,
+    getValidScale,
+    generateSmartPipeNetwork,
+    addCustomPipe,
+    removePipeById,
+    findPipesBetweenSprinklers,
 } from '../utils/homeGardenData';
-
-// Types
-type LatLng = {
-    lat: number;
-    lng: number;
-};
 
 interface HistoryState {
     gardenZones: GardenZone[];
@@ -46,93 +50,82 @@ interface HistoryState {
     timestamp: number;
 }
 
-// Constants
-const DEFAULT_MAP_CENTER: [number, number] = [13.7563, 100.5018];
-
-// Components
-const SearchControl: React.FC<{ onSearch: (lat: number, lng: number) => void }> = ({
-    onSearch,
-}) => {
-    const [searchQuery, setSearchQuery] = useState('');
-    const [suggestions, setSuggestions] = useState<any[]>([]);
-
-    const handleSearchChange = async (query: string) => {
-        setSearchQuery(query);
-        if (query.length < 3) {
-            setSuggestions([]);
-            return;
-        }
-
-        try {
-            const response = await fetch(
-                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`
-            );
-            const data = await response.json();
-            setSuggestions(data);
-        } catch (err) {
-            console.error('Suggestion fetch error:', err);
-        }
-    };
-
-    const handleSuggestionClick = (lat: number, lon: number, displayName: string) => {
-        setSearchQuery(displayName);
-        setSuggestions([]);
-        onSearch(lat, lon);
-    };
+const ModeSelection: React.FC<{
+    onSelectMode: (mode: 'map' | 'canvas' | 'image') => void;
+}> = ({ onSelectMode }) => {
+    const modes = [
+        {
+            id: 'map',
+            icon: '🗺️',
+            title: 'Google Map',
+            desc: 'ใช้แผนที่ดาวเทียมเพื่อดูพื้นที่จริงของบ้านคุณ',
+            features: ['เห็นพื้นที่จริงจากดาวเทียม', 'วัดระยะทางแม่นยำ', 'ค้นหาตำแหน่งได้ง่าย'],
+            color: 'blue',
+        },
+        {
+            id: 'canvas',
+            icon: '✏️',
+            title: 'วาดเอง',
+            desc: 'วาดแผนผังบ้านด้วยตัวเอง มีเครื่องมือช่วยวาด ตาราง และไม้บรรทัด',
+            features: [
+                'ไม่ต้องใช้อินเทอร์เน็ต',
+                'มีตารางและไม้บรรทัดช่วย',
+                'วาดได้อิสระตามต้องการ',
+            ],
+            color: 'green',
+        },
+        {
+            id: 'image',
+            icon: '🖼️',
+            title: 'ใช้รูปแบบแปลน',
+            desc: 'อัปโหลดรูปแบบแปลนบ้านที่มีอยู่แล้ว และวางระบบน้ำบนรูป',
+            features: ['ใช้แบบแปลนที่มีอยู่แล้ว', 'วางระบบบนรูปได้ทันที', 'รองรับไฟล์ JPG, PNG'],
+            color: 'purple',
+        },
+    ];
 
     return (
-        <div className="absolute left-[60px] top-4 z-[1000] w-80">
-            <div className="relative">
-                <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => handleSearchChange(e.target.value)}
-                    placeholder="ค้นหาสถานที่..."
-                    className="w-full rounded-t-lg bg-white p-3 text-gray-900 shadow-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                {suggestions.length > 0 && (
-                    <ul className="absolute max-h-60 w-full overflow-y-auto rounded-b-lg bg-white shadow-lg">
-                        {suggestions.map((item) => (
-                            <li
-                                key={item.place_id}
-                                onClick={() =>
-                                    handleSuggestionClick(
-                                        parseFloat(item.lat),
-                                        parseFloat(item.lon),
-                                        item.display_name
-                                    )
-                                }
-                                className="cursor-pointer p-3 text-sm text-gray-800 hover:bg-gray-200"
-                            >
-                                {item.display_name}
-                            </li>
-                        ))}
-                    </ul>
-                )}
+        <div className="flex min-h-screen w-full items-center justify-center bg-gray-900 p-6">
+            <div className="w-full max-w-4xl">
+                <h1 className="mb-8 text-center text-3xl font-bold text-white">
+                    🏡 เลือกวิธีการออกแบบระบบน้ำ
+                </h1>
+
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                    {modes.map((mode) => (
+                        <div
+                            key={mode.id}
+                            onClick={() => onSelectMode(mode.id as any)}
+                            className={`cursor-pointer rounded-xl border-2 border-transparent bg-gray-800 p-6 transition-all hover:scale-105 hover:border-${mode.color}-500 hover:bg-gray-700`}
+                        >
+                            <div className="mb-4 text-center">
+                                <div className="mb-3 text-5xl">{mode.icon}</div>
+                                <h3 className="mb-2 text-xl font-semibold text-white">
+                                    {mode.title}
+                                </h3>
+                            </div>
+                            <p className="text-sm text-gray-300">{mode.desc}</p>
+                            <ul className="mt-4 space-y-1 text-xs text-gray-400">
+                                {mode.features.map((feature, i) => (
+                                    <li key={i}>✓ {feature}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="mt-8 text-center text-sm text-gray-400">
+                    เลือกวิธีที่เหมาะสมกับคุณ • ข้อมูลทั้งหมดจะถูกบันทึกอัตโนมัติ
+                </div>
             </div>
         </div>
     );
 };
 
-const MapController: React.FC<{ center: [number, number] }> = ({ center }) => {
-    const map = useMap();
-
-    useEffect(() => {
-        if (map && center) {
-            map.flyTo(center, map.getZoom(), {
-                animate: false,
-                duration: 0.1,
-            });
-        }
-    }, [center, map]);
-
-    return null;
-};
-
 export default function HomeGardenPlanner() {
     const [designMode, setDesignMode] = useState<'map' | 'canvas' | 'image' | null>(null);
     const [activeTab, setActiveTab] = useState<'zones' | 'sprinklers' | 'pipes'>('zones');
-    const [mapCenter, setMapCenter] = useState<[number, number]>(DEFAULT_MAP_CENTER);
+    const [mapCenter, setMapCenter] = useState<[number, number]>(DEFAULT_CENTER);
     const [selectedZoneType, setSelectedZoneType] = useState<string>('grass');
     const [selectedZoneForConfig, setSelectedZoneForConfig] = useState<string | null>(null);
     const [editMode, setEditMode] = useState<
@@ -170,12 +163,6 @@ export default function HomeGardenPlanner() {
     // Loading and error states for pipe generation
     const [isGeneratingPipes, setIsGeneratingPipes] = useState(false);
     const [pipeGenerationError, setPipeGenerationError] = useState<string | null>(null);
-
-    // Additional state variables
-    const [area, setArea] = useState<Coordinate[]>([]);
-    const [sprinklerRadius, setSprinklerRadius] = useState<number>(4);
-    const [error, setError] = useState<string | null>(null);
-    const featureGroupRef = useRef<L.FeatureGroup>(null);
 
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -504,23 +491,51 @@ export default function HomeGardenPlanner() {
         [selectedZoneType, gardenZones, findParentGrassZone]
     );
 
-    const onEdited = (e: any) => {
-        const layers = e.layers;
-        layers.eachLayer((layer: any) => {
-            const coordinates = layer
-                .getLatLngs()[0]
-                .map((latLng: { lat: number; lng: number }) => ({
-                    lat: latLng.lat,
-                    lng: latLng.lng,
-                }));
-            setArea(coordinates);
-        });
-    };
+    const handleZoneDeleted = useCallback((e: any) => {
+        const deletedLayers = e.layers.getLayers();
 
-    const onDeleted = () => {
-        setArea([]);
-        setError(null);
-    };
+        deletedLayers.forEach((layer: any) => {
+            const layerCoords = layer.getLatLngs()[0].map((latLng: any) => ({
+                lat: latLng.lat,
+                lng: latLng.lng,
+            }));
+
+            setGardenZones((prevZones) => {
+                const zoneToDelete = prevZones.find((zone) => {
+                    if (zone.coordinates.length !== layerCoords.length) return false;
+
+                    return zone.coordinates.every((coord, index) => {
+                        const tolerance = 0.000001;
+                        return (
+                            Math.abs(coord.lat - layerCoords[index].lat) < tolerance &&
+                            Math.abs(coord.lng - layerCoords[index].lng) < tolerance
+                        );
+                    });
+                });
+
+                if (zoneToDelete) {
+                    const zonesToDelete = [
+                        zoneToDelete.id,
+                        ...prevZones
+                            .filter((z) => z.parentZoneId === zoneToDelete.id)
+                            .map((z) => z.id),
+                    ];
+
+                    setSprinklers((prevSprinklers) =>
+                        prevSprinklers.filter((s) => !zonesToDelete.includes(s.zoneId))
+                    );
+
+                    setPipes((prevPipes) =>
+                        prevPipes.filter((p) => !zonesToDelete.includes(p.zoneId || ''))
+                    );
+
+                    return prevZones.filter((z) => !zonesToDelete.includes(z.id));
+                }
+
+                return prevZones;
+            });
+        });
+    }, []);
 
     const handleCanvasSprinklerPlaced = useCallback(
         (position: CanvasCoordinate) => {
@@ -529,7 +544,7 @@ export default function HomeGardenPlanner() {
 
             const sprinklerType = { ...selectedSprinklerType, radius: manualSprinklerRadius };
 
-            const targetZone = gardenZones.find((zone) => {
+            let targetZone = gardenZones.find((zone) => {
                 if (zone.type === 'forbidden') return false;
                 return zone.canvasCoordinates && isPointInPolygon(position, zone.canvasCoordinates);
             });
@@ -620,7 +635,7 @@ export default function HomeGardenPlanner() {
     );
 
     const placeCornerSprinklers = useCallback(
-        (zone: GardenZone, sprinklerType: any) => {
+        (zone: GardenZone, sprinklerType: SprinklerType) => {
             const cornerSprinklers: Sprinkler[] = [];
             let sprinklerCounter = 0;
 
@@ -868,27 +883,137 @@ export default function HomeGardenPlanner() {
         if (!waterSource) {
             return;
         }
-        if (sprinklerRadius < 0.5 || sprinklerRadius > 20) {
-            setError('รัศมี Sprinkler ควรอยู่ระหว่าง 0.5 - 20 เมตร');
+
+        if (sprinklers.length === 0) {
             return;
         }
-        setError(null);
 
-        router.post(
-            '/home-garden/generate-sprinkler',
-            {
-                area: JSON.stringify(area),
-                sprinkler_radius: sprinklerRadius,
-            },
-            {
-                preserveState: false,
-                preserveScroll: true,
-                onError: (errors: any) => {
-                    setError(errors.message || 'เกิดข้อผิดพลาดในการส่งข้อมูล');
-                },
+        setPipeGenerationError(null);
+        setIsGeneratingPipes(true);
+
+        try {
+            const pipeNetwork = generateSmartPipeNetwork({
+                waterSource,
+                sprinklers,
+                gardenZones,
+                designMode,
+                canvasData,
+                imageData,
+            });
+
+            if (pipeNetwork.length === 0) {
+                throw new Error('ไม่สามารถสร้างระบบท่อได้ กรุณาตรวจสอบตำแหน่งแหล่งน้ำและหัวฉีด');
             }
+
+            setPipes(pipeNetwork);
+        } catch (error) {
+            let errorMessage = 'เกิดข้อผิดพลาดในการสร้างระบบท่อ';
+
+            if (error instanceof Error) {
+                errorMessage = error.message;
+            }
+
+            setPipeGenerationError(errorMessage);
+        } finally {
+            setIsGeneratingPipes(false);
+        }
+    }, [waterSource, sprinklers, gardenZones, designMode, canvasData, imageData]);
+
+    const clearPipes = useCallback(() => {
+        setPipes([]);
+        setSelectedPipes(new Set());
+        setSelectedSprinklersForPipe([]);
+        setPipeEditMode('view');
+        setPipeGenerationError(null);
+    }, []);
+
+    // ===== PIPE EDITING FUNCTIONS =====
+    const handleSprinklerClickForPipe = useCallback(
+        (sprinklerId: string) => {
+            if (pipeEditMode === 'add') {
+                setSelectedSprinklersForPipe((prev) => {
+                    if (prev.includes(sprinklerId)) {
+                        return prev.filter((id) => id !== sprinklerId);
+                    } else if (prev.length < 2) {
+                        return [...prev, sprinklerId];
+                    } else {
+                        // Replace second sprinkler if already 2 selected
+                        return [prev[0], sprinklerId];
+                    }
+                });
+            } else if (pipeEditMode === 'remove') {
+                setSelectedSprinklersForPipe((prev) => {
+                    if (prev.includes(sprinklerId)) {
+                        return prev.filter((id) => id !== sprinklerId);
+                    } else {
+                        return [...prev, sprinklerId];
+                    }
+                });
+            } else {
+                // Normal sprinkler selection
+                setSelectedSprinkler((prev) => (prev === sprinklerId ? null : sprinklerId));
+            }
+        },
+        [pipeEditMode]
+    );
+
+    const addPipeBetweenSprinklers = useCallback(() => {
+        if (selectedSprinklersForPipe.length !== 2) {
+            return;
+        }
+
+        const [sprinkler1Id, sprinkler2Id] = selectedSprinklersForPipe;
+        const isCanvasMode = designMode === 'canvas' || designMode === 'image';
+        const scale = isCanvasMode ? canvasData?.scale || imageData?.scale || 20 : 20;
+
+        const newPipe = addCustomPipe(
+            sprinkler1Id,
+            sprinkler2Id,
+            sprinklers,
+            isCanvasMode,
+            scale,
+            canvasData,
+            imageData
         );
-    }, [waterSource, sprinklerRadius, area]);
+
+        if (newPipe) {
+            setPipes((prev) => [...prev, newPipe]);
+            setSelectedSprinklersForPipe([]);
+        }
+    }, [selectedSprinklersForPipe, sprinklers, designMode, canvasData, imageData]);
+
+    const removePipesBetweenSprinklers = useCallback(() => {
+        if (selectedSprinklersForPipe.length !== 2) {
+            return;
+        }
+
+        const [sprinkler1Id, sprinkler2Id] = selectedSprinklersForPipe;
+        const pipesToRemove = findPipesBetweenSprinklers(
+            sprinkler1Id,
+            sprinkler2Id,
+            pipes,
+            sprinklers
+        );
+
+        if (pipesToRemove.length > 0) {
+            const pipeIdsToRemove = pipesToRemove.map((p) => p.id);
+            setPipes((prev) => prev.filter((p) => !pipeIdsToRemove.includes(p.id)));
+        }
+
+        setSelectedSprinklersForPipe([]);
+    }, [selectedSprinklersForPipe, pipes, sprinklers]);
+
+    const handlePipeClick = useCallback((pipeId: string) => {
+        setSelectedPipes((prev) => {
+            const newSet = new Set(prev);
+            if (newSet.has(pipeId)) {
+                newSet.delete(pipeId);
+            } else {
+                newSet.add(pipeId);
+            }
+            return newSet;
+        });
+    }, []);
 
     const deleteSelectedPipes = useCallback(() => {
         if (selectedPipes.size === 0) {
@@ -927,46 +1052,315 @@ export default function HomeGardenPlanner() {
         [gardenZones]
     );
 
-    // Additional handlers
-    const handleCalculate = useCallback(() => {
-        // Implementation for handleCalculate
-        console.log('Calculate clicked');
-    }, []);
-
-    const handleSearch = useCallback((lat: number, lng: number) => {
-        setMapCenter([lat, lng]);
-    }, []);
-
-    const onCreated = useCallback(
-        (e: any) => {
-            handleZoneCreated(e);
+    const deleteSprinklersByZone = useCallback(
+        (zoneId: string) => {
+            const selectedSprinklerInZone = sprinklers.find(
+                (s) => s.id === selectedSprinkler && s.zoneId === zoneId
+            );
+            if (selectedSprinklerInZone) {
+                setSelectedSprinkler(null);
+            }
+            setSprinklers((prev) => prev.filter((s) => s.zoneId !== zoneId));
         },
-        [handleZoneCreated]
+        [sprinklers, selectedSprinkler]
     );
 
-    const areaInSquareMeters =
-        area.length > 0
-            ? L.GeometryUtil.geodesicArea(area.map((c) => new L.LatLng(c.lat, c.lng)))
-            : 0;
-    const areaInRai = areaInSquareMeters / 1600;
-    const estimatedSprinklers =
-        areaInSquareMeters > 0
-            ? Math.ceil(areaInSquareMeters / (Math.PI * Math.pow(sprinklerRadius, 2) * 0.8))
-            : 0;
+    // Enhanced map click handler that allows water source placement anywhere
+    const handleMapClick = useCallback(
+        (e: any) => {
+            const { lat, lng } = e.latlng;
+
+            if (editMode === 'place') {
+                const selectedSprinklerType = SPRINKLER_TYPES.find(
+                    (s) => s.id === manualSprinklerType
+                );
+                if (!selectedSprinklerType) return;
+
+                const sprinklerType = { ...selectedSprinklerType, radius: manualSprinklerRadius };
+
+                let targetZone = gardenZones.find((zone) => {
+                    if (zone.type === 'forbidden') return false;
+                    return isPointInPolygon({ lat, lng }, zone.coordinates);
+                });
+
+                let zoneId = 'virtual_zone';
+                if (targetZone) {
+                    if (targetZone.parentZoneId) {
+                        return;
+                    }
+
+                    if (
+                        targetZone.type === 'grass' &&
+                        isPointInAvoidanceZone({ lat, lng }, targetZone.id)
+                    ) {
+                        return;
+                    }
+                    zoneId = targetZone.id;
+                }
+
+                const orientation = targetZone ? findLongestEdgeAngle(targetZone.coordinates) : 0;
+
+                const newSprinkler: Sprinkler = {
+                    id: `sprinkler_${Date.now()}`,
+                    position: { lat, lng },
+                    type: sprinklerType,
+                    zoneId: zoneId,
+                    orientation: orientation,
+                };
+
+                setSprinklers((prev) => [...prev, newSprinkler]);
+            } else if (editMode === 'edit') {
+                // Allow water source placement anywhere (no zone restriction)
+                setWaterSource({
+                    id: `source_${Date.now()}`,
+                    position: { lat, lng },
+                    type: 'main',
+                });
+            }
+        },
+        [
+            editMode,
+            gardenZones,
+            findLongestEdgeAngle,
+            isPointInAvoidanceZone,
+            manualSprinklerType,
+            manualSprinklerRadius,
+        ]
+    );
+
+    const handleCanvasSprinklerDragged = useCallback(
+        (sprinklerId: string, newPos: CanvasCoordinate) => {
+            setSprinklers((prev) =>
+                prev.map((s) =>
+                    s.id === sprinklerId
+                        ? {
+                              ...s,
+                              position: canvasToGPS(newPos, canvasData),
+                              canvasPosition: newPos,
+                          }
+                        : s
+                )
+            );
+        },
+        [canvasData]
+    );
+
+    const handleCanvasSprinklerClick = useCallback(
+        (sprinklerId: string) => {
+            handleSprinklerClickForPipe(sprinklerId);
+        },
+        [handleSprinklerClickForPipe]
+    );
+
+    const handleCanvasWaterSourcePlaced = useCallback(
+        (position: CanvasCoordinate) => {
+            setWaterSource({
+                id: `source_${Date.now()}`,
+                position: canvasToGPS(position, canvasData),
+                canvasPosition: position,
+                type: 'main',
+            });
+        },
+        [canvasData]
+    );
+
+    const handleWaterSourceDelete = useCallback(() => {
+        setWaterSource(null);
+    }, []);
+
+    const handleImageUpload = useCallback((file: File) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                setImageData({
+                    url: e.target?.result as string,
+                    width: img.width,
+                    height: img.height,
+                    scale: 20,
+                    isScaleSet: false,
+                });
+            };
+            img.src = e.target?.result as string;
+        };
+        reader.readAsDataURL(file);
+    }, []);
+
+    const statistics = useMemo(() => {
+        const activeZones = Object.keys(
+            sprinklers.reduce((acc, s) => ({ ...acc, [s.zoneId]: true }), {})
+        ).length;
+
+        return { activeZones };
+    }, [sprinklers]);
+
+    const navigateToSummary = useCallback(() => {
+        const data: GardenPlannerData = {
+            gardenZones,
+            sprinklers,
+            waterSource,
+            pipes,
+            designMode,
+            imageData,
+            canvasData,
+        };
+
+        const errors = validateGardenData(data);
+        if (errors.length > 0) {
+            setValidationErrors(errors);
+            setShowValidationErrors(true);
+            return;
+        }
+
+        saveGardenData(data);
+        router.visit('/home-garden/summary');
+    }, [gardenZones, sprinklers, waterSource, pipes, designMode, imageData, canvasData]);
+
+    React.useEffect(() => {
+        setSelectedSprinkler(null);
+        setSelectedSprinklersForPipe([]);
+        setPipeEditMode('view');
+    }, [editMode]);
+
+    React.useEffect(() => {
+        return () => {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        if (designMode && (gardenZones.length > 0 || sprinklers.length > 0)) {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+            }
+
+            saveTimeoutRef.current = setTimeout(() => {
+                const data: GardenPlannerData = {
+                    gardenZones,
+                    sprinklers,
+                    waterSource,
+                    pipes,
+                    designMode,
+                    imageData,
+                    canvasData,
+                };
+                saveGardenData(data);
+            }, 1000);
+        }
+    }, [gardenZones, sprinklers, waterSource, pipes, designMode, imageData, canvasData]);
+
+    // เพิ่ม useEffect สำหรับ pipe edit mode
+    useEffect(() => {
+        if (pipeEditMode === 'add' && selectedSprinklersForPipe.length === 2) {
+            addPipeBetweenSprinklers();
+        }
+        if (pipeEditMode === 'remove' && selectedSprinklersForPipe.length === 2) {
+            removePipesBetweenSprinklers();
+        }
+        // eslint-disable-next-line
+    }, [selectedSprinklersForPipe, pipeEditMode]);
+
+    if (!designMode) {
+        return <ModeSelection onSelectMode={setDesignMode} />;
+    }
 
     return (
-        <div className="min-h-screen bg-gray-900 p-6 text-white">
-            <div className="mx-auto max-w-screen-xl">
-                <h1 className="mb-4 text-3xl font-bold">🏡 Home Garden Sprinkler Calculator</h1>
-                <p className="mb-6 text-gray-400">
-                    วาดพื้นที่สวน → กำหนดรัศมี Sprinkler → ดูผลการคำนวณ
-                </p>
-
-                {error && (
-                    <div className="mb-4 rounded border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
-                        {error}
+        <div className="min-h-screen w-full overflow-hidden bg-gray-900">
+            {showValidationErrors && (
+                <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black bg-opacity-50">
+                    <div className="mx-4 w-full max-w-md rounded-lg bg-gray-800 p-6">
+                        <h3 className="mb-4 text-xl font-bold text-red-400">
+                            ❌ ไม่สามารถดูสรุปผลได้
+                        </h3>
+                        <div className="mb-4 text-gray-200">
+                            <p className="mb-2">กรุณาแก้ไขปัญหาต่อไปนี้ก่อน:</p>
+                            <ul className="list-inside list-disc space-y-1">
+                                {validationErrors.map((error, index) => (
+                                    <li key={index} className="text-sm text-gray-300">
+                                        {error}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                        <button
+                            onClick={() => setShowValidationErrors(false)}
+                            className="w-full rounded-lg bg-blue-600 py-2 text-white transition-colors hover:bg-blue-700"
+                        >
+                            ตกลง
+                        </button>
                     </div>
-                )}
+                </div>
+            )}
+
+            <div className="container mx-auto w-full px-4 py-6">
+                <div className="mb-6 text-left">
+                    <div className="flex items-center justify-between">
+                        <h1 className="text-2xl font-bold text-white">
+                            🏡 ระบบออกแบบระบบน้ำสำหรับสวนบ้าน
+                            <span className="ml-2 text-sm font-normal text-gray-400">
+                                (
+                                {designMode === 'map'
+                                    ? 'Google Map'
+                                    : designMode === 'canvas'
+                                      ? 'วาดเอง'
+                                      : 'รูปแบบแปลน'}
+                                )
+                            </span>
+                        </h1>
+
+                        <div className="flex items-center gap-4">
+                            <div className="flex rounded-lg bg-gray-800 p-1">
+                                {[
+                                    { id: 'zones', name: 'กำหนดโซน', icon: '🗺️' },
+                                    { id: 'sprinklers', name: 'วางหัวฉีด', icon: '💧' },
+                                    { id: 'pipes', name: 'ระบบท่อ', icon: '🔧' },
+                                ].map((tab) => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id as any)}
+                                        className={`rounded-md px-6 py-3 text-sm font-medium transition-all ${
+                                            activeTab === tab.id
+                                                ? 'bg-blue-600 text-white shadow-lg'
+                                                : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                                        }`}
+                                    >
+                                        {tab.icon} {tab.name}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <UndoRedoButtons />
+
+                            <button
+                                onClick={navigateToSummary}
+                                className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 text-sm font-medium text-white shadow-lg transition-all hover:from-purple-700 hover:to-blue-700"
+                            >
+                                📊 ดูสรุปผล
+                            </button>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => {
+                                    resetAllData();
+                                    setDesignMode(null);
+                                }}
+                                className="rounded-lg bg-gray-700 px-4 py-2 text-sm text-gray-300 transition-colors hover:bg-gray-600"
+                            >
+                                เปลี่ยนวิธี
+                            </button>
+                            <button
+                                onClick={() => {
+                                    resetAllData();
+                                }}
+                                className="rounded-lg bg-red-600 px-4 py-2 text-sm text-white transition-colors hover:bg-red-700"
+                            >
+                                🗑️ ลบทั้งหมด
+                            </button>
+                        </div>
+                    </div>
+                </div>
 
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
                     <div className="space-y-6 lg:col-span-1">
@@ -1122,7 +1516,7 @@ export default function HomeGardenPlanner() {
                                                                                         zone
                                                                                             .sprinklerConfig!
                                                                                             .type
-                                                                                )?.name
+                                                                                )?.nameEN
                                                                             }
                                                                             • รัศมี{' '}
                                                                             {
@@ -1240,7 +1634,7 @@ export default function HomeGardenPlanner() {
                                                                                         </span>
                                                                                         <span className="font-medium text-gray-100">
                                                                                             {
-                                                                                                sprinkler.name
+                                                                                                sprinkler.nameEN
                                                                                             }
                                                                                         </span>
                                                                                     </div>
@@ -1365,7 +1759,7 @@ export default function HomeGardenPlanner() {
                                                                 <div className="flex items-center space-x-2">
                                                                     <span>{sprinkler.icon}</span>
                                                                     <span className="font-medium text-gray-100">
-                                                                        {sprinkler.name}
+                                                                        {sprinkler.nameEN}
                                                                     </span>
                                                                 </div>
                                                             </button>
@@ -1499,7 +1893,7 @@ export default function HomeGardenPlanner() {
                                                                                             zone
                                                                                                 .sprinklerConfig!
                                                                                                 .type
-                                                                                    )?.name
+                                                                                    )?.nameEN
                                                                                 }
                                                                             </div>
                                                                         )}
@@ -1798,50 +2192,157 @@ export default function HomeGardenPlanner() {
                     </div>
 
                     <div className="lg:col-span-3">
-                        <div className="h-[700px] w-full overflow-hidden rounded-lg border border-gray-700">
-                            <MapContainer
-                                center={mapCenter}
-                                zoom={16}
-                                maxZoom={22}
-                                style={{ height: '100%', width: '100%' }}
-                            >
-                                <SearchControl onSearch={handleSearch} />
-                                <MapController center={mapCenter} />
-                                <LayersControl position="topright">
-                                    <LayersControl.BaseLayer checked name="ภาพถ่ายดาวเทียม">
-                                        <TileLayer
-                                            url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
-                                            attribution="Google Maps"
-                                        />
-                                    </LayersControl.BaseLayer>
-                                    <LayersControl.BaseLayer name="แผนที่ถนน">
-                                        <TileLayer
-                                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                            attribution="OpenStreetMap"
-                                        />
-                                    </LayersControl.BaseLayer>
-                                </LayersControl>
-                                <FeatureGroup ref={featureGroupRef}>
-                                    <EditControl
-                                        position="topleft"
-                                        onCreated={onCreated}
-                                        onDeleted={onDeleted}
-                                        onEdited={onEdited}
-                                        draw={{
-                                            rectangle: true,
-                                            circle: false,
-                                            circlemarker: false,
-                                            marker: false,
-                                            polyline: false,
-                                            polygon: true,
+                        <div className="relative h-[83vh] overflow-hidden rounded-xl border border-gray-600 shadow-2xl">
+                            {designMode === 'map' && (
+                                <GoogleMapDesigner
+                                    gardenZones={gardenZones}
+                                    sprinklers={sprinklers}
+                                    waterSource={waterSource}
+                                    pipes={pipes}
+                                    selectedZoneType={selectedZoneType}
+                                    editMode={editMode}
+                                    manualSprinklerType={manualSprinklerType}
+                                    manualSprinklerRadius={manualSprinklerRadius}
+                                    selectedSprinkler={selectedSprinkler}
+                                    selectedPipes={selectedPipes}
+                                    selectedSprinklersForPipe={selectedSprinklersForPipe}
+                                    mainPipeDrawing={[]}
+                                    onZoneCreated={handleZoneCreated}
+                                    onZoneDeleted={handleZoneDeleted}
+                                    onSprinklerPlaced={(position) => {
+                                        const { lat, lng } = position;
+                                        handleMapClick({ latlng: { lat, lng } });
+                                    }}
+                                    onWaterSourcePlaced={(position) => {
+                                        setWaterSource({
+                                            id: `source_${Date.now()}`,
+                                            position,
+                                            type: 'main',
+                                        });
+                                    }}
+                                    onMainPipeClick={() => {}}
+                                    onSprinklerClick={handleSprinklerClickForPipe}
+                                    onSprinklerDelete={(sprinklerId) => {
+                                        setSprinklers((prev) =>
+                                            prev.filter((s) => s.id !== sprinklerId)
+                                        );
+                                        if (selectedSprinkler === sprinklerId) {
+                                            setSelectedSprinkler(null);
+                                        }
+                                        setSelectedSprinklersForPipe((prev) =>
+                                            prev.filter((id) => id !== sprinklerId)
+                                        );
+                                    }}
+                                    onSprinklerDragged={(sprinklerId, position) => {
+                                        setSprinklers((prev) =>
+                                            prev.map((s) =>
+                                                s.id === sprinklerId ? { ...s, position } : s
+                                            )
+                                        );
+                                    }}
+                                    onWaterSourceDelete={() => setWaterSource(null)}
+                                    onPipeClick={handlePipeClick}
+                                    onMapClick={handleMapClick}
+                                    mapCenter={mapCenter}
+                                    pipeEditMode={pipeEditMode}
+                                />
+                            )}
+
+                            {designMode === 'canvas' && (
+                                <div className="flex h-full w-full items-center justify-center bg-gray-900">
+                                    <CanvasDesigner
+                                        gardenZones={gardenZones}
+                                        sprinklers={sprinklers}
+                                        waterSource={waterSource}
+                                        pipes={pipes}
+                                        selectedZoneType={selectedZoneType}
+                                        editMode={editMode}
+                                        manualSprinklerType={manualSprinklerType}
+                                        manualSprinklerRadius={manualSprinklerRadius}
+                                        selectedSprinkler={selectedSprinkler}
+                                        selectedPipes={selectedPipes}
+                                        selectedSprinklersForPipe={selectedSprinklersForPipe}
+                                        mainPipeDrawing={[]}
+                                        canvasData={canvasData}
+                                        onZoneCreated={handleCanvasZoneCreated}
+                                        onSprinklerPlaced={handleCanvasSprinklerPlaced}
+                                        onWaterSourcePlaced={handleCanvasWaterSourcePlaced}
+                                        onMainPipePoint={() => {}}
+                                        onSprinklerDragged={handleCanvasSprinklerDragged}
+                                        onSprinklerClick={handleCanvasSprinklerClick}
+                                        onSprinklerDelete={(id) => {
+                                            setSprinklers((prev) =>
+                                                prev.filter((s) => s.id !== id)
+                                            );
+                                            if (selectedSprinkler === id) {
+                                                setSelectedSprinkler(null);
+                                            }
+                                            setSelectedSprinklersForPipe((prev) =>
+                                                prev.filter((sprinklerId) => sprinklerId !== id)
+                                            );
                                         }}
+                                        onWaterSourceDelete={handleWaterSourceDelete}
+                                        onPipeClick={handlePipeClick}
+                                        hasMainArea={true}
+                                        pipeEditMode={pipeEditMode}
                                     />
-                                </FeatureGroup>
-                            </MapContainer>
+                                </div>
+                            )}
+
+                            {designMode === 'image' && (
+                                <div className="h-full w-full items-center justify-center bg-gray-900 p-4">
+                                    <ImageDesigner
+                                        imageData={imageData}
+                                        gardenZones={gardenZones}
+                                        sprinklers={sprinklers}
+                                        waterSource={waterSource}
+                                        pipes={pipes}
+                                        selectedZoneType={selectedZoneType}
+                                        editMode={editMode}
+                                        manualSprinklerType={manualSprinklerType}
+                                        manualSprinklerRadius={manualSprinklerRadius}
+                                        selectedSprinkler={selectedSprinkler}
+                                        selectedPipes={selectedPipes}
+                                        selectedSprinklersForPipe={selectedSprinklersForPipe}
+                                        mainPipeDrawing={[]}
+                                        onImageUpload={handleImageUpload}
+                                        onZoneCreated={handleCanvasZoneCreated}
+                                        onSprinklerPlaced={handleCanvasSprinklerPlaced}
+                                        onWaterSourcePlaced={handleCanvasWaterSourcePlaced}
+                                        onMainPipePoint={() => {}}
+                                        onSprinklerDragged={handleCanvasSprinklerDragged}
+                                        onSprinklerClick={handleCanvasSprinklerClick}
+                                        onSprinklerDelete={(id) => {
+                                            setSprinklers((prev) =>
+                                                prev.filter((s) => s.id !== id)
+                                            );
+                                            if (selectedSprinkler === id) {
+                                                setSelectedSprinkler(null);
+                                            }
+                                            setSelectedSprinklersForPipe((prev) =>
+                                                prev.filter((sprinklerId) => sprinklerId !== id)
+                                            );
+                                        }}
+                                        onWaterSourceDelete={handleWaterSourceDelete}
+                                        onPipeClick={handlePipeClick}
+                                        onScaleChange={(scale) => {
+                                            setImageData((prev: any) => ({
+                                                ...prev,
+                                                scale,
+                                                isScaleSet: true,
+                                            }));
+                                        }}
+                                        pipeEditMode={pipeEditMode}
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
             </div>
+
+            {/* Footer */}
+            <Footer />
         </div>
     );
 }
