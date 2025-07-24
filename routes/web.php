@@ -6,6 +6,7 @@ use App\Http\Controllers\FarmController;
 use App\Http\Controllers\HomeGardenController;
 use App\Http\Controllers\ProfilePhotoController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SuperUserController;
 
 /*
 |--------------------------------------------------------------------------
@@ -241,9 +242,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/api/fields/{fieldId}', [FarmController::class, 'updateField'])->name('update-field');
     Route::delete('/api/fields/{fieldId}', [FarmController::class, 'deleteField'])->name('delete-field');
     
+    // Folder Management Routes
+    Route::get('/api/folders', [FarmController::class, 'getFolders'])->name('get-folders');
+    Route::post('/api/folders', [FarmController::class, 'createFolder'])->name('create-folder');
+    Route::put('/api/folders/{folderId}', [FarmController::class, 'updateFolder'])->name('update-folder');
+    Route::delete('/api/folders/{folderId}', [FarmController::class, 'deleteFolder'])->name('delete-folder');
+    
+    // Field Status Management
+    Route::put('/api/fields/{fieldId}/status', [FarmController::class, 'updateFieldStatus'])->name('update-field-status');
+    
     // Profile Photo Routes
     Route::post('/api/profile-photo/upload', [ProfilePhotoController::class, 'upload'])->name('profile-photo.upload');
     Route::delete('/api/profile-photo/delete', [ProfilePhotoController::class, 'delete'])->name('profile-photo.delete');
+
+    // Super User Routes
+    Route::prefix('super')->name('super.')->group(function () {
+        Route::get('/dashboard', function () {
+            return Inertia::render('SuperUserDashboard');
+        })->name('dashboard');
+        Route::get('/users', [SuperUserController::class, 'getUsers'])->name('users');
+        Route::post('/users', [SuperUserController::class, 'createUser'])->name('create-user');
+        Route::put('/users/{userId}', [SuperUserController::class, 'updateUser'])->name('update-user');
+        Route::delete('/users/{userId}', [SuperUserController::class, 'deleteUser'])->name('delete-user');
+        Route::get('/users/{userId}', [SuperUserController::class, 'getUserDetails'])->name('user-details');
+        Route::get('/fields', [SuperUserController::class, 'getFields'])->name('fields');
+        Route::delete('/fields/{fieldId}', [SuperUserController::class, 'deleteField'])->name('delete-field');
+        Route::get('/folders', [SuperUserController::class, 'getFolders'])->name('folders');
+        Route::post('/folders', [SuperUserController::class, 'createFolderForUser'])->name('create-folder');
+        Route::delete('/folders/{folderId}', [SuperUserController::class, 'deleteFolder'])->name('delete-folder');
+    });
 });
 
 // Include other route files
