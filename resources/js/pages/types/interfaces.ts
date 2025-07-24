@@ -21,6 +21,10 @@ export interface IrrigationInput {
     sprinklersPerLongestBranch: number;
     branchesPerLongestSecondary: number;
     secondariesPerLongestMain: number;
+    extraPipePerSprinkler?: {
+        pipeId: number | null; // id ของท่อที่เลือกจาก database
+        lengthPerHead: number; // ความยาวต่อหัว (เมตร)
+    };
 }
 
 export interface AnalyzedPipe {
@@ -105,6 +109,7 @@ export interface AnalyzedPump {
 }
 
 export interface CalculationResults {
+    headLossValidation: any;
     calculationMetadata: any;
     totalWaterRequiredLPH: number;
     totalWaterRequiredLPM: number;
@@ -176,6 +181,40 @@ export interface CalculationResults {
     velocityWarnings: string[];
     hasValidSecondaryPipe?: boolean;
     hasValidMainPipe?: boolean;
+
+    allZoneResults?: ZoneResults[];
+    projectSummary?: ProjectSummary;
+}
+
+export interface ZoneResults {
+    zoneId: string;
+    zoneName: string;
+    totalFlowLPM: number;
+    headLoss: {
+        branch: number;
+        secondary: number;
+        main: number;
+        total: number;
+    };
+    staticHead: number;
+    pressureHead: number;
+    totalHead: number;
+    autoSelectedPipes: {
+        branch?: any;
+        secondary?: any;
+        main?: any;
+    };
+    sprinklerCount: number;
+}
+
+export interface ProjectSummary {
+    totalFlowLPM: number;
+    maxHeadM: number;
+    criticalZone: string;
+    operationMode: string;
+    selectedGroupFlowLPM: number;
+    selectedGroupHeadM: number;
+    criticalGroup?: any;
 }
 
 export interface QuotationData {
@@ -187,8 +226,8 @@ export interface QuotationData {
 
 export interface QuotationDataCustomer {
     name: string;
-    address1: string;
-    address2: string;
+    projectName: string;
+    address: string;
     phone: string;
 }
 
