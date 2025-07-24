@@ -364,6 +364,25 @@ const translations = {
         pipe_system: 'Pipe System',
         longest_pipe: 'Longest',
         total_pipe: 'Total',
+        
+        // Folder management
+        folders: 'Folders',
+        create_folder: 'Create Folder',
+        edit_folder: 'Edit Folder',
+        delete_folder: 'Delete Folder',
+        folder_name: 'Folder Name',
+        folder_icon: 'Folder Icon',
+        folder_color: 'Folder Color',
+        enter_folder_name: 'Enter folder name',
+        create_folder_in: 'Create folder in',
+        all_folders: 'All Folders',
+        finished: 'Finished',
+        unfinished: 'Unfinished',
+        click_folder_view: 'Click a folder to view its contents',
+        delete_folder_confirm: 'Are you sure you want to delete the folder',
+        delete_folder_warning: 'Fields in this folder will be moved to Unfinished',
+        mark_as_finished: 'Mark as Finished',
+        mark_as_unfinished: 'Mark as Unfinished',
     },
     th: {
         // Home page
@@ -712,6 +731,25 @@ const translations = {
         pipe_system: 'ระบบท่อ',
         longest_pipe: 'ยาวที่สุด',
         total_pipe: 'รวม',
+        
+        // Folder management
+        folders: 'โฟลเดอร์',
+        create_folder: 'สร้างโฟลเดอร์',
+        edit_folder: 'แก้ไขโฟลเดอร์',
+        delete_folder: 'ลบโฟลเดอร์',
+        folder_name: 'ชื่อโฟลเดอร์',
+        folder_icon: 'ไอคอนโฟลเดอร์',
+        folder_color: 'สีโฟลเดอร์',
+        enter_folder_name: 'ใส่ชื่อโฟลเดอร์',
+        create_folder_in: 'สร้างโฟลเดอร์ใน',
+        all_folders: 'โฟลเดอร์ทั้งหมด',
+        finished: 'เสร็จแล้ว',
+        unfinished: 'ยังไม่เสร็จ',
+        click_folder_view: 'คลิกโฟลเดอร์เพื่อดูเนื้อหา',
+        delete_folder_confirm: 'คุณแน่ใจหรือไม่ที่จะลบโฟลเดอร์',
+        delete_folder_warning: 'แปลงในโฟลเดอร์นี้จะถูกย้ายไปยังไม่จัดหมวดหมู่',
+        mark_as_finished: 'ทำเสร็จแล้ว',
+        mark_as_unfinished: 'ยังไม่เสร็จ',
     },
 };
 
