@@ -1,6 +1,16 @@
 // components/horticulture/EnhancedHorticultureSearchControl.tsx
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { FaSearch, FaSpinner, FaTimes, FaMapMarkerAlt, FaStar, FaClock, FaPhone, FaGlobe, FaDirections } from 'react-icons/fa';
+import {
+    FaSearch,
+    FaSpinner,
+    FaTimes,
+    FaMapMarkerAlt,
+    FaStar,
+    FaClock,
+    FaPhone,
+    FaGlobe,
+    FaDirections,
+} from 'react-icons/fa';
 
 interface SearchResult {
     place_id: string;
@@ -57,7 +67,7 @@ const DEFAULT_CATEGORIES: SearchCategory[] = [
 
 const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchControlProps> = ({
     onPlaceSelect,
-    placeholder = "ค้นหาสถานที่ในพื้นที่...",
+    placeholder = 'ค้นหาสถานที่ในพื้นที่...',
     defaultCategories = DEFAULT_CATEGORIES,
 }) => {
     const inputRef = useRef<HTMLInputElement>(null);
@@ -68,7 +78,9 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
 
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-    const [autocompletePredictions, setAutocompletePredictions] = useState<google.maps.places.AutocompletePrediction[]>([]);
+    const [autocompletePredictions, setAutocompletePredictions] = useState<
+        google.maps.places.AutocompletePrediction[]
+    >([]);
     const [isLoading, setIsLoading] = useState(false);
     const [showResults, setShowResults] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(-1);
@@ -94,9 +106,11 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
     // Check if Google Maps is ready
     useEffect(() => {
         const checkGoogleMapsReady = () => {
-            if (window.google?.maps?.places?.PlacesService && 
+            if (
+                window.google?.maps?.places?.PlacesService &&
                 window.google?.maps?.places?.AutocompleteService &&
-                window.google?.maps?.Geocoder) {
+                window.google?.maps?.Geocoder
+            ) {
                 setIsGoogleMapsReady(true);
                 return true;
             }
@@ -145,18 +159,24 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
     }, [isGoogleMapsReady]);
 
     // Save to recent searches
-    const saveToRecentSearches = useCallback((result: SearchResult) => {
-        const newRecent: RecentSearch = {
-            place_id: result.place_id,
-            name: result.name,
-            address: result.formatted_address || result.vicinity || '',
-            timestamp: Date.now(),
-        };
+    const saveToRecentSearches = useCallback(
+        (result: SearchResult) => {
+            const newRecent: RecentSearch = {
+                place_id: result.place_id,
+                name: result.name,
+                address: result.formatted_address || result.vicinity || '',
+                timestamp: Date.now(),
+            };
 
-        const updated = [newRecent, ...recentSearches.filter(r => r.place_id !== result.place_id)].slice(0, 5);
-        setRecentSearches(updated);
-        localStorage.setItem('recentMapSearches', JSON.stringify(updated));
-    }, [recentSearches]);
+            const updated = [
+                newRecent,
+                ...recentSearches.filter((r) => r.place_id !== result.place_id),
+            ].slice(0, 5);
+            setRecentSearches(updated);
+            localStorage.setItem('recentMapSearches', JSON.stringify(updated));
+        },
+        [recentSearches]
+    );
 
     // Get place type icon
     const getPlaceIcon = (types: string[]): string => {
@@ -304,7 +324,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
             setIsLoading(false);
 
             if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-                const detailedResults = results.slice(0, 10).map(place => ({
+                const detailedResults = results.slice(0, 10).map((place) => ({
                     place_id: place.place_id || '',
                     name: place.name || '',
                     formatted_address: place.formatted_address || place.vicinity || '',
@@ -350,7 +370,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
             setIsLoading(false);
 
             if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-                const detailedResults = results.slice(0, 20).map(place => ({
+                const detailedResults = results.slice(0, 20).map((place) => ({
                     place_id: place.place_id || '',
                     name: place.name || '',
                     formatted_address: place.formatted_address || place.vicinity || '',
@@ -374,142 +394,173 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
     }, []);
 
     // Get place details
-    const getPlaceDetails = useCallback(async (placeId: string) => {
-        if (!searchServiceRef.current) return;
+    const getPlaceDetails = useCallback(
+        async (placeId: string) => {
+            if (!searchServiceRef.current) return;
 
-        const request: google.maps.places.PlaceDetailsRequest = {
-            placeId: placeId,
-            fields: [
-                'place_id',
-                'name',
-                'formatted_address',
-                'geometry',
-                'types',
-                'rating',
-                'user_ratings_total',
-                'photos',
-                'opening_hours',
-                'formatted_phone_number',
-                'website',
-                'price_level',
-                'vicinity',
-            ],
-            language: 'th',
-        };
+            const request: google.maps.places.PlaceDetailsRequest = {
+                placeId: placeId,
+                fields: [
+                    'place_id',
+                    'name',
+                    'formatted_address',
+                    'geometry',
+                    'types',
+                    'rating',
+                    'user_ratings_total',
+                    'photos',
+                    'opening_hours',
+                    'formatted_phone_number',
+                    'website',
+                    'price_level',
+                    'vicinity',
+                ],
+                language: 'th',
+            };
 
-        searchServiceRef.current.getDetails(request, (place, status) => {
-            if (status === google.maps.places.PlacesServiceStatus.OK && place && place.geometry?.location) {
-                const result: SearchResult = {
-                    place_id: place.place_id || '',
-                    name: place.name || '',
-                    formatted_address: place.formatted_address || '',
-                    geometry: place.geometry,
-                    types: place.types || [],
-                    rating: place.rating,
-                    user_ratings_total: place.user_ratings_total,
-                    photos: place.photos,
-                    opening_hours: place.opening_hours,
-                    formatted_phone_number: place.formatted_phone_number,
-                    website: place.website,
-                    price_level: place.price_level,
-                    vicinity: place.vicinity,
-                };
+            searchServiceRef.current.getDetails(request, (place, status) => {
+                if (
+                    status === google.maps.places.PlacesServiceStatus.OK &&
+                    place &&
+                    place.geometry?.location
+                ) {
+                    const result: SearchResult = {
+                        place_id: place.place_id || '',
+                        name: place.name || '',
+                        formatted_address: place.formatted_address || '',
+                        geometry: place.geometry,
+                        types: place.types || [],
+                        rating: place.rating,
+                        user_ratings_total: place.user_ratings_total,
+                        photos: place.photos,
+                        opening_hours: place.opening_hours,
+                        formatted_phone_number: place.formatted_phone_number,
+                        website: place.website,
+                        price_level: place.price_level,
+                        vicinity: place.vicinity,
+                    };
 
+                    saveToRecentSearches(result);
+                    onPlaceSelect(
+                        place.geometry.location.lat(),
+                        place.geometry.location.lng(),
+                        result
+                    );
+                    setShowResults(false);
+                    setSearchQuery(place.name || '');
+                }
+            });
+        },
+        [onPlaceSelect, saveToRecentSearches]
+    );
+
+    // Handle search input change
+    const handleSearchChange = useCallback(
+        (value: string) => {
+            setSearchQuery(value);
+            setError(null);
+            setSelectedIndex(-1);
+
+            if (searchTimeoutRef.current) {
+                clearTimeout(searchTimeoutRef.current);
+            }
+
+            if (!value.trim()) {
+                setSearchResults([]);
+                setAutocompletePredictions([]);
+                setShowResults(false);
+                setActiveCategory(null);
+                return;
+            }
+
+            // Get predictions immediately
+            searchWithPredictions(value);
+
+            // Debounce full search
+            searchTimeoutRef.current = setTimeout(() => {
+                performTextSearch(value);
+            }, 500);
+        },
+        [searchWithPredictions, performTextSearch]
+    );
+
+    // Handle prediction selection
+    const handlePredictionSelect = useCallback(
+        (prediction: google.maps.places.AutocompletePrediction) => {
+            getPlaceDetails(prediction.place_id);
+        },
+        [getPlaceDetails]
+    );
+
+    // Handle result selection
+    const handleResultSelect = useCallback(
+        (result: SearchResult) => {
+            if (result.geometry?.location) {
                 saveToRecentSearches(result);
                 onPlaceSelect(
-                    place.geometry.location.lat(),
-                    place.geometry.location.lng(),
+                    result.geometry.location.lat(),
+                    result.geometry.location.lng(),
                     result
                 );
                 setShowResults(false);
-                setSearchQuery(place.name || '');
+                setSearchQuery(result.name);
             }
-        });
-    }, [onPlaceSelect, saveToRecentSearches]);
-
-    // Handle search input change
-    const handleSearchChange = useCallback((value: string) => {
-        setSearchQuery(value);
-        setError(null);
-        setSelectedIndex(-1);
-
-        if (searchTimeoutRef.current) {
-            clearTimeout(searchTimeoutRef.current);
-        }
-
-        if (!value.trim()) {
-            setSearchResults([]);
-            setAutocompletePredictions([]);
-            setShowResults(false);
-            setActiveCategory(null);
-            return;
-        }
-
-        // Get predictions immediately
-        searchWithPredictions(value);
-
-        // Debounce full search
-        searchTimeoutRef.current = setTimeout(() => {
-            performTextSearch(value);
-        }, 500);
-    }, [searchWithPredictions, performTextSearch]);
-
-    // Handle prediction selection
-    const handlePredictionSelect = useCallback((prediction: google.maps.places.AutocompletePrediction) => {
-        getPlaceDetails(prediction.place_id);
-    }, [getPlaceDetails]);
-
-    // Handle result selection
-    const handleResultSelect = useCallback((result: SearchResult) => {
-        if (result.geometry?.location) {
-            saveToRecentSearches(result);
-            onPlaceSelect(
-                result.geometry.location.lat(),
-                result.geometry.location.lng(),
-                result
-            );
-            setShowResults(false);
-            setSearchQuery(result.name);
-        }
-    }, [onPlaceSelect, saveToRecentSearches]);
+        },
+        [onPlaceSelect, saveToRecentSearches]
+    );
 
     // Handle recent search selection
-    const handleRecentSearchSelect = useCallback((recent: RecentSearch) => {
-        getPlaceDetails(recent.place_id);
-    }, [getPlaceDetails]);
+    const handleRecentSearchSelect = useCallback(
+        (recent: RecentSearch) => {
+            getPlaceDetails(recent.place_id);
+        },
+        [getPlaceDetails]
+    );
 
     // Handle keyboard navigation
-    const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-        const totalItems = autocompletePredictions.length + searchResults.length;
+    const handleKeyDown = useCallback(
+        (e: React.KeyboardEvent) => {
+            const totalItems = autocompletePredictions.length + searchResults.length;
 
-        if (!showResults || totalItems === 0) return;
+            if (!showResults || totalItems === 0) return;
 
-        switch (e.key) {
-            case 'ArrowDown':
-                e.preventDefault();
-                setSelectedIndex((prev) => (prev + 1) % totalItems);
-                break;
-            case 'ArrowUp':
-                e.preventDefault();
-                setSelectedIndex((prev) => (prev - 1 + totalItems) % totalItems);
-                break;
-            case 'Enter':
-                e.preventDefault();
-                if (selectedIndex >= 0) {
-                    if (selectedIndex < autocompletePredictions.length) {
-                        handlePredictionSelect(autocompletePredictions[selectedIndex]);
-                    } else {
-                        handleResultSelect(searchResults[selectedIndex - autocompletePredictions.length]);
+            switch (e.key) {
+                case 'ArrowDown':
+                    e.preventDefault();
+                    setSelectedIndex((prev) => (prev + 1) % totalItems);
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    setSelectedIndex((prev) => (prev - 1 + totalItems) % totalItems);
+                    break;
+                case 'Enter':
+                    e.preventDefault();
+                    if (selectedIndex >= 0) {
+                        if (selectedIndex < autocompletePredictions.length) {
+                            handlePredictionSelect(autocompletePredictions[selectedIndex]);
+                        } else {
+                            handleResultSelect(
+                                searchResults[selectedIndex - autocompletePredictions.length]
+                            );
+                        }
                     }
-                }
-                break;
-            case 'Escape':
-                setShowResults(false);
-                setSelectedIndex(-1);
-                inputRef.current?.blur();
-                break;
-        }
-    }, [autocompletePredictions, searchResults, selectedIndex, showResults, handlePredictionSelect, handleResultSelect]);
+                    break;
+                case 'Escape':
+                    setShowResults(false);
+                    setSelectedIndex(-1);
+                    inputRef.current?.blur();
+                    break;
+            }
+        },
+        [
+            autocompletePredictions,
+            searchResults,
+            selectedIndex,
+            showResults,
+            handlePredictionSelect,
+            handleResultSelect,
+        ]
+    );
 
     // Clear search
     const handleClearSearch = useCallback(() => {
@@ -614,7 +665,9 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                 {showCategories && (
                     <div className="absolute mt-2 w-full rounded-lg border border-gray-200 bg-white shadow-xl">
                         <div className="p-3">
-                            <h3 className="mb-2 text-sm font-semibold text-gray-700">หมวดหมู่สถานที่</h3>
+                            <h3 className="mb-2 text-sm font-semibold text-gray-700">
+                                หมวดหมู่สถานที่
+                            </h3>
                             <div className="grid grid-cols-2 gap-2">
                                 {defaultCategories.map((category) => (
                                     <button
@@ -660,7 +713,9 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                         {/* Recent Searches */}
                         {!searchQuery && recentSearches.length > 0 && (
                             <div className="border-b border-gray-200 p-3">
-                                <h3 className="mb-2 text-sm font-semibold text-gray-700">ค้นหาล่าสุด</h3>
+                                <h3 className="mb-2 text-sm font-semibold text-gray-700">
+                                    ค้นหาล่าสุด
+                                </h3>
                                 {recentSearches.map((recent, index) => (
                                     <div
                                         key={recent.place_id}
@@ -670,8 +725,12 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                                         <div className="flex items-start gap-2">
                                             <FaClock className="mt-1 text-gray-400" size={12} />
                                             <div className="flex-1">
-                                                <div className="font-medium text-gray-900">{recent.name}</div>
-                                                <div className="text-xs text-gray-600">{recent.address}</div>
+                                                <div className="font-medium text-gray-900">
+                                                    {recent.name}
+                                                </div>
+                                                <div className="text-xs text-gray-600">
+                                                    {recent.address}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -697,7 +756,10 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                                                     {prediction.structured_formatting.main_text}
                                                 </div>
                                                 <div className="text-sm text-gray-600">
-                                                    {prediction.structured_formatting.secondary_text}
+                                                    {
+                                                        prediction.structured_formatting
+                                                            .secondary_text
+                                                    }
                                                 </div>
                                             </div>
                                         </div>
@@ -731,7 +793,9 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                                                     />
                                                 ) : (
                                                     <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-gray-200">
-                                                        <span className="text-2xl">{getPlaceIcon(result.types)}</span>
+                                                        <span className="text-2xl">
+                                                            {getPlaceIcon(result.types)}
+                                                        </span>
                                                     </div>
                                                 )}
 
@@ -739,31 +803,42 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                                                 <div className="flex-1">
                                                     <div className="flex items-start justify-between">
                                                         <div>
-                                                            <h4 className="font-medium text-gray-900">{result.name}</h4>
+                                                            <h4 className="font-medium text-gray-900">
+                                                                {result.name}
+                                                            </h4>
                                                             <p className="text-sm text-gray-600">
                                                                 {getPlaceTypeName(result.types)}
                                                                 {result.price_level && (
                                                                     <span className="ml-2">
-                                                                        {getPriceLevelDisplay(result.price_level)}
+                                                                        {getPriceLevelDisplay(
+                                                                            result.price_level
+                                                                        )}
                                                                     </span>
                                                                 )}
                                                             </p>
                                                         </div>
                                                         {result.rating && (
                                                             <div className="flex items-center gap-1 text-sm">
-                                                                <FaStar className="text-yellow-500" size={14} />
-                                                                <span className="font-medium">{result.rating}</span>
+                                                                <FaStar
+                                                                    className="text-yellow-500"
+                                                                    size={14}
+                                                                />
+                                                                <span className="font-medium">
+                                                                    {result.rating}
+                                                                </span>
                                                                 {result.user_ratings_total && (
                                                                     <span className="text-gray-500">
-                                                                        ({result.user_ratings_total})
+                                                                        ({result.user_ratings_total}
+                                                                        )
                                                                     </span>
                                                                 )}
                                                             </div>
                                                         )}
                                                     </div>
 
-                                                    <p className="mt-1 text-xs text-gray-600 line-clamp-2">
-                                                        {result.formatted_address || result.vicinity}
+                                                    <p className="mt-1 line-clamp-2 text-xs text-gray-600">
+                                                        {result.formatted_address ||
+                                                            result.vicinity}
                                                     </p>
 
                                                     {/* Open Status */}
@@ -776,7 +851,9 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                                                                         : 'text-red-600'
                                                                 }`}
                                                             >
-                                                                {result.opening_hours.open_now ? 'เปิดอยู่' : 'ปิดแล้ว'}
+                                                                {result.opening_hours.open_now
+                                                                    ? 'เปิดอยู่'
+                                                                    : 'ปิดแล้ว'}
                                                             </span>
                                                         </div>
                                                     )}
@@ -787,7 +864,9 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    window.open(`tel:${result.formatted_phone_number}`);
+                                                                    window.open(
+                                                                        `tel:${result.formatted_phone_number}`
+                                                                    );
                                                                 }}
                                                                 className="flex items-center gap-1 rounded bg-blue-100 px-2 py-1 text-xs text-blue-700 hover:bg-blue-200"
                                                             >
@@ -799,7 +878,10 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    window.open(result.website, '_blank');
+                                                                    window.open(
+                                                                        result.website,
+                                                                        '_blank'
+                                                                    );
                                                                 }}
                                                                 className="flex items-center gap-1 rounded bg-green-100 px-2 py-1 text-xs text-green-700 hover:bg-green-200"
                                                             >
@@ -811,8 +893,10 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 if (result.geometry?.location) {
-                                                                    const lat = result.geometry.location.lat();
-                                                                    const lng = result.geometry.location.lng();
+                                                                    const lat =
+                                                                        result.geometry.location.lat();
+                                                                    const lng =
+                                                                        result.geometry.location.lng();
                                                                     window.open(
                                                                         `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
                                                                         '_blank'
@@ -834,11 +918,16 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                         )}
 
                         {/* No Results */}
-                        {searchQuery && !isLoading && searchResults.length === 0 && autocompletePredictions.length === 0 && (
-                            <div className="p-8 text-center">
-                                <p className="text-gray-500">ไม่พบผลการค้นหาสำหรับ "{searchQuery}"</p>
-                            </div>
-                        )}
+                        {searchQuery &&
+                            !isLoading &&
+                            searchResults.length === 0 &&
+                            autocompletePredictions.length === 0 && (
+                                <div className="p-8 text-center">
+                                    <p className="text-gray-500">
+                                        ไม่พบผลการค้นหาสำหรับ "{searchQuery}"
+                                    </p>
+                                </div>
+                            )}
                     </div>
                 )}
             </div>

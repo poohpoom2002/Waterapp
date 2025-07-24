@@ -1,5 +1,4 @@
 // resources/js/pages/product.tsx
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { IrrigationInput, QuotationData, QuotationDataCustomer } from './types/interfaces';
 import { useCalculations, ZoneCalculationData } from './hooks/useCalculations';
@@ -19,16 +18,8 @@ import {
     SubMainPipe,
 } from '../utils/horticultureUtils';
 
-// Import Home Garden utilities
-import { 
-    loadGardenData, 
-    GardenPlannerData,
-    GardenZone 
-} from '../utils/homeGardenData';
-import { 
-    calculateGardenStatistics, 
-    GardenStatistics 
-} from '../utils/gardenStatistics';
+import { loadGardenData, GardenPlannerData, GardenZone } from '../utils/homeGardenData';
+import { calculateGardenStatistics, GardenStatistics } from '../utils/gardenStatistics';
 
 import InputForm from './components/InputForm';
 import CalculationSummary from './components/CalculationSummary';
@@ -44,41 +35,37 @@ import { useLanguage } from '../contexts/LanguageContext';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { router } from '@inertiajs/react';
 import FloatingAiChat from '@/components/FloatingAiChat';
-import { getFarmData } from '@/utils/farmData';
-import { getPipeLengthData } from '@/utils/pipeData';
 
-// Type for project mode
 type ProjectMode = 'horticulture' | 'garden';
 
-// Zone combination interface
-interface ZoneCombination {
+interface ZoneOperationGroup {
+    id: string;
     zones: string[];
+    order: number;
     label: string;
-    description: string;
 }
 
 export default function Product() {
-    // State for project mode
     const [projectMode, setProjectMode] = useState<ProjectMode>('horticulture');
     const [gardenData, setGardenData] = useState<GardenPlannerData | null>(null);
     const [gardenStats, setGardenStats] = useState<GardenStatistics | null>(null);
-    
-    // Existing states
+
     const [projectData, setProjectData] = useState<HorticultureProjectData | null>(null);
     const [projectStats, setProjectStats] = useState<any>(null);
-    const [selectedZones, setSelectedZones] = useState<string[]>([]);
     const [activeZoneId, setActiveZoneId] = useState<string>('');
     const [zoneInputs, setZoneInputs] = useState<{ [zoneId: string]: IrrigationInput }>({});
     const [zoneSprinklers, setZoneSprinklers] = useState<{ [zoneId: string]: any }>({});
 
+    const [zoneOperationMode, setZoneOperationMode] = useState<
+        'sequential' | 'simultaneous' | 'custom'
+    >('sequential');
+    const [zoneOperationGroups, setZoneOperationGroups] = useState<ZoneOperationGroup[]>([]);
 
+    const [showFloatingAiChat, setShowFloatingAiChat] = useState(false);
+    const [isAiChatMinimized, setIsAiChatMinimized] = useState(false);
 
     const { t } = useLanguage();
-    const [farmData, setFarmData] = useState(() => getFarmData());
-    const [pipeLengthData, setPipeLengthData] = useState(() => getPipeLengthData());
 
-
-    // NEW: State for manual equipment selection (override auto-selection)
     const [selectedPipes, setSelectedPipes] = useState<{
         [zoneId: string]: {
             branch?: any;
@@ -87,6 +74,7 @@ export default function Product() {
         };
     }>({});
     const [selectedPump, setSelectedPump] = useState<any>(null);
+    const [showPumpOption, setShowPumpOption] = useState(true);
 
     const [projectImage, setProjectImage] = useState<string | null>(null);
     const [showImageModal, setShowImageModal] = useState(false);
@@ -106,42 +94,6 @@ export default function Product() {
         setProjectImage(null);
     };
 
-    // Helper function to check if pipe data is valid
-    const isValidPipeData = (data: any, type: string) => {
-        return data && data[`${type}Pipes`] && data[`${type}Pipes`].total > 0;
-    };
-
-    // Helper function to create single zone input
-    const createSingleZoneInput = (data: HorticultureProjectData, stats: any): IrrigationInput => {
-        const totalArea = data.zones.reduce((sum, zone) => sum + zone.area, 0);
-        const totalPlants = data.zones.reduce((sum, zone) => sum + (zone.plantCount || 0), 0);
-        const totalWater = data.zones.reduce((sum, zone) => sum + zone.totalWaterNeed, 0);
-
-        return {
-            farmSizeRai: formatNumber(totalArea / 1600, 3),
-            totalTrees: totalPlants,
-            waterPerTreeLiters: formatNumber(totalPlants ? totalWater / totalPlants : 50, 3),
-            numberOfZones: 1,
-            sprinklersPerTree: 1,
-            irrigationTimeMinutes: 20,
-            staticHeadM: 0,
-            pressureHeadM: 20,
-            pipeAgeYears: 0,
-            sprinklersPerBranch: 4,
-            branchesPerSecondary: 5,
-            simultaneousZones: 1,
-            sprinklersPerLongestBranch: 6,
-            branchesPerLongestSecondary: 6,
-            secondariesPerLongestMain: 3,
-            longestBranchPipeM: formatNumber(30, 3),
-            totalBranchPipeM: formatNumber(500, 3),
-            longestSecondaryPipeM: formatNumber(0, 3),
-            totalSecondaryPipeM: formatNumber(0, 3),
-            longestMainPipeM: formatNumber(0, 3),
-            totalMainPipeM: formatNumber(0, 3),
-        };
-    };
-
     useEffect(() => {
         return () => {
             if (projectImage && projectImage.startsWith('blob:')) {
@@ -150,75 +102,83 @@ export default function Product() {
         };
     }, [projectImage]);
 
-    // Get zone name
     const getZoneName = (zoneId: string): string => {
         if (projectMode === 'garden' && gardenStats) {
-            const zone = gardenStats.zones.find(z => z.zoneId === zoneId);
+            const zone = gardenStats.zones.find((z) => z.zoneId === zoneId);
             return zone?.zoneName || zoneId;
         }
-        const zone = projectData?.zones.find(z => z.id === zoneId);
+        const zone = projectData?.zones.find((z) => z.id === zoneId);
         return zone?.name || zoneId;
     };
 
-    // Create zone calculation data for multi-zone pump calculation
     const createZoneCalculationData = (): ZoneCalculationData[] => {
         const zoneCalcData: ZoneCalculationData[] = [];
-        
-        selectedZones.forEach(zoneId => {
+        const allZoneIds =
+            projectMode === 'garden' && gardenStats
+                ? gardenStats.zones.map((z) => z.zoneId)
+                : projectData?.zones.map((z) => z.id) || [];
+
+        allZoneIds.forEach((zoneId) => {
             const zoneInput = zoneInputs[zoneId];
             const zoneSprinkler = zoneSprinklers[zoneId];
-            
+
             if (zoneInput && zoneSprinkler) {
+                let simultaneousZonesForCalc = 1;
+                if (zoneOperationMode === 'simultaneous') {
+                    simultaneousZonesForCalc = allZoneIds.length;
+                } else if (zoneOperationMode === 'custom') {
+                    const group = zoneOperationGroups.find((g) => g.zones.includes(zoneId));
+                    simultaneousZonesForCalc = group ? group.zones.length : 1;
+                }
+
+                const adjustedInput = {
+                    ...zoneInput,
+                    simultaneousZones: simultaneousZonesForCalc,
+                    numberOfZones: allZoneIds.length,
+                };
+
                 zoneCalcData.push({
                     zoneId,
-                    input: {
-                        ...zoneInput,
-                        simultaneousZones: simultaneousZonesCount, // ใช้ค่าที่เลือก
-                        numberOfZones: selectedZones.length,
-                    },
+                    input: adjustedInput,
                     sprinkler: zoneSprinkler,
                 });
             }
         });
-        
+
         return zoneCalcData;
     };
 
-    // Convert Garden Statistics to IrrigationInput
     const createGardenZoneInput = (
         zone: any,
         gardenStats: GardenStatistics,
         totalZones: number
     ): IrrigationInput => {
-        const zoneStats = gardenStats.zones.find(z => z.zoneId === zone.zoneId);
-        
+        const zoneStats = gardenStats.zones.find((z) => z.zoneId === zone.zoneId);
+
         if (!zoneStats) {
             throw new Error(`Zone statistics not found for zone ${zone.zoneId}`);
         }
 
-        // Convert area from sq.m to rai (1 rai = 1600 sq.m)
         const areaInRai = zoneStats.area / 1600;
-        
-        // For home garden, we use sprinkler count instead of trees
+
         const sprinklerCount = zoneStats.sprinklerCount || 10;
-        
-        // Water per sprinkler (estimated for home garden)
-        const waterPerSprinkler = 50; // liters per day
-        
+
+        const waterPerSprinkler = 50;
+
         return {
             farmSizeRai: formatNumber(areaInRai, 3),
-            totalTrees: sprinklerCount, // Using sprinkler count as "trees" for compatibility
+            totalTrees: sprinklerCount,
             waterPerTreeLiters: formatNumber(waterPerSprinkler, 3),
             numberOfZones: totalZones,
             sprinklersPerTree: 1,
-            irrigationTimeMinutes: 30, // Default 30 minutes for home garden
+            irrigationTimeMinutes: 30,
             staticHeadM: 0,
             pressureHeadM: 20,
             pipeAgeYears: 0,
 
-            sprinklersPerBranch: Math.max(1, Math.ceil(sprinklerCount / 5)), // Estimate
+            sprinklersPerBranch: Math.max(1, Math.ceil(sprinklerCount / 5)),
             branchesPerSecondary: 1,
-            simultaneousZones: simultaneousZonesCount,
+            simultaneousZones: 1,
 
             sprinklersPerLongestBranch: Math.max(1, Math.ceil(sprinklerCount / 5)),
             branchesPerLongestSecondary: 1,
@@ -226,23 +186,22 @@ export default function Product() {
 
             longestBranchPipeM: formatNumber(zoneStats.longestPipeFromSource || 20, 3),
             totalBranchPipeM: formatNumber(zoneStats.totalPipeLength || 100, 3),
-            longestSecondaryPipeM: 0, // Home gardens typically don't have secondary pipes
+            longestSecondaryPipeM: 0,
             totalSecondaryPipeM: 0,
-            longestMainPipeM: 0, // Home gardens typically have direct connections
+            longestMainPipeM: 0,
             totalMainPipeM: 0,
         };
     };
 
     const createSingleGardenInput = (stats: GardenStatistics): IrrigationInput => {
         const summary = stats.summary;
-        
-        // Convert area from sq.m to rai
+
         const areaInRai = summary.totalArea / 1600;
-        
+
         return {
             farmSizeRai: formatNumber(areaInRai, 3),
-            totalTrees: summary.totalSprinklers, // Using sprinkler count
-            waterPerTreeLiters: formatNumber(50, 3), // Default for home garden
+            totalTrees: summary.totalSprinklers,
+            waterPerTreeLiters: formatNumber(50, 3),
             numberOfZones: 1,
             sprinklersPerTree: 1,
             irrigationTimeMinutes: 30,
@@ -275,28 +234,33 @@ export default function Product() {
         branchPipes: any[],
         totalZones: number
     ): IrrigationInput => {
-        const longestBranch = branchPipes.length > 0 ? Math.max(...branchPipes.map((b) => b.length)) : 30;
+        const longestBranch =
+            branchPipes.length > 0 ? Math.max(...branchPipes.map((b) => b.length)) : 30;
         const totalBranchLength = branchPipes.reduce((sum, b) => sum + b.length, 0) || 500;
-    
-        const longestSubMain = subMainPipes.length > 0 ? Math.max(...subMainPipes.map((s) => s.length)) : 0;
+
+        const longestSubMain =
+            subMainPipes.length > 0 ? Math.max(...subMainPipes.map((s) => s.length)) : 0;
         const totalSubMainLength = subMainPipes.reduce((sum, s) => sum + s.length, 0) || 0;
-    
+
         const longestMain = mainPipes.length > 0 ? Math.max(...mainPipes.map((m) => m.length)) : 0;
         const totalMainLength = mainPipes.reduce((sum, m) => sum + m.length, 0) || 0;
 
-        // Calculate sprinklers configuration
         const totalTrees = zone.plantCount || 100;
-        const waterPerTree = zone.totalWaterNeed / totalTrees || 50;
+        const waterPerTree = zone.plantData?.waterNeed || 50;
 
-        // Get actual branch pipe statistics from horticulture data
         const branchStats = getLongestBranchPipeStats();
         const subMainStats = getSubMainPipeBranchCount();
 
-        let actualSprinklersPerLongestBranch = 4; // default
-        let actualBranchesPerLongestSecondary = 5; // default
+        let actualSprinklersPerLongestBranch = Math.max(
+            1,
+            Math.ceil(totalTrees / Math.max(branchPipes.length, 1))
+        );
+        let actualBranchesPerLongestSecondary = Math.max(
+            1,
+            Math.ceil(branchPipes.length / Math.max(subMainPipes.length, 1))
+        );
 
         if (branchStats) {
-            // Find the zone-specific data
             const zoneBranchStats = branchStats.find((stat) => stat.zoneId === zone.id);
             if (zoneBranchStats) {
                 actualSprinklersPerLongestBranch = zoneBranchStats.longestBranchPipe.plantCount;
@@ -304,10 +268,8 @@ export default function Product() {
         }
 
         if (subMainStats) {
-            // Find the zone-specific data
             const zoneSubMainStats = subMainStats.find((stat) => stat.zoneId === zone.id);
             if (zoneSubMainStats && zoneSubMainStats.subMainPipes.length > 0) {
-                // Find the sub-main pipe with the most branches
                 const maxBranchSubMain = zoneSubMainStats.subMainPipes.reduce((max, current) =>
                     current.branchCount > max.branchCount ? current : max
                 );
@@ -318,16 +280,22 @@ export default function Product() {
         return {
             farmSizeRai: formatNumber(zone.area / 1600, 3),
             totalTrees: totalTrees,
-            waterPerTreeLiters: formatNumber(totalTrees ? zone.totalWaterNeed / totalTrees : 50, 3),
-            numberOfZones: numberOfZones,
+            waterPerTreeLiters: formatNumber(waterPerTree, 3),
+            numberOfZones: totalZones,
             sprinklersPerTree: 1,
             irrigationTimeMinutes: 20,
             staticHeadM: 0,
             pressureHeadM: 20,
             pipeAgeYears: 0,
 
-            sprinklersPerBranch: Math.max(1, Math.ceil(totalTrees / 10)),
-            branchesPerSecondary: Math.max(1, Math.ceil(totalTrees / 50)),
+            sprinklersPerBranch: Math.max(
+                1,
+                Math.ceil(totalTrees / Math.max(branchPipes.length, 1))
+            ),
+            branchesPerSecondary: Math.max(
+                1,
+                Math.ceil(branchPipes.length / Math.max(subMainPipes.length, 1))
+            ),
             simultaneousZones: 1,
 
             sprinklersPerLongestBranch: actualSprinklersPerLongestBranch,
@@ -343,24 +311,20 @@ export default function Product() {
         };
     };
 
-    // Helper function for single zone
     const createSingleZoneInput = (data: HorticultureProjectData, stats: any): IrrigationInput => {
-        const totalStats = stats.zoneDetails[0]; // Main area stats
+        const totalStats = stats.zoneDetails[0];
 
-        // Get actual branch pipe statistics from horticulture data
         const branchStats = getLongestBranchPipeStats();
         const subMainStats = getSubMainPipeBranchCount();
 
-        let actualSprinklersPerLongestBranch = 4; // default
-        let actualBranchesPerLongestSecondary = 5; // default
+        let actualSprinklersPerLongestBranch = 4;
+        let actualBranchesPerLongestSecondary = 5;
 
         if (branchStats && branchStats.length > 0) {
-            // For single zone, use the first (and only) zone data
             actualSprinklersPerLongestBranch = branchStats[0].longestBranchPipe.plantCount;
         }
 
         if (subMainStats && subMainStats.length > 0) {
-            // For single zone, find the sub-main pipe with the most branches
             const zoneSubMainStats = subMainStats[0];
             if (zoneSubMainStats.subMainPipes.length > 0) {
                 const maxBranchSubMain = zoneSubMainStats.subMainPipes.reduce((max, current) =>
@@ -370,10 +334,13 @@ export default function Product() {
             }
         }
 
+        const plantData = data.selectedPlantType || data.plants?.[0]?.plantData;
+        const waterPerTree = plantData?.waterNeed || totalStats.waterPerPlant || 50;
+
         return {
             farmSizeRai: formatNumber(data.totalArea / 1600, 3),
             totalTrees: data.plants?.length || 100,
-            waterPerTreeLiters: formatNumber(totalStats.waterPerPlant || 50, 3),
+            waterPerTreeLiters: formatNumber(waterPerTree, 3),
             numberOfZones: 1,
             sprinklersPerTree: 1,
             irrigationTimeMinutes: 20,
@@ -398,89 +365,207 @@ export default function Product() {
         };
     };
 
-    // สร้าง input สำหรับการคำนวณ - แก้ไขการจัดการ multi-zone
     const currentInput = useMemo(() => {
         if (!activeZoneId || !zoneInputs[activeZoneId]) {
             return null;
         }
 
-        // If multiple zones selected, calculate combined input
-        if (selectedZones.length > 1) {
-            // Calculate combined input for pump sizing
-            let combinedInput = { ...zoneInputs[activeZoneId] };
+        const baseInput = zoneInputs[activeZoneId];
 
-            // Sum up total trees and water requirements
-            let totalTrees = 0;
-            let totalWater = 0;
-            let maxLongestBranch = 0;
-            let maxLongestSecondary = 0;
-            let maxLongestMain = 0;
+        let simultaneousZonesForCalc = 1;
+        const allZoneIds =
+            projectMode === 'garden' && gardenStats
+                ? gardenStats.zones.map((z) => z.zoneId)
+                : projectData?.zones.map((z) => z.id) || [];
 
-            selectedZones.forEach((zoneId) => {
-                const zoneInput = zoneInputs[zoneId];
-                if (zoneInput) {
-                    totalTrees += zoneInput.totalTrees;
-                    totalWater += zoneInput.totalTrees * zoneInput.waterPerTreeLiters;
-                    maxLongestBranch = Math.max(maxLongestBranch, zoneInput.longestBranchPipeM);
-                    maxLongestSecondary = Math.max(
-                        maxLongestSecondary,
-                        zoneInput.longestSecondaryPipeM
-                    );
-                    maxLongestMain = Math.max(maxLongestMain, zoneInput.longestMainPipeM);
-                }
-            });
-
-            // Get actual branch pipe statistics for combined zones
-            const branchStats = getLongestBranchPipeStats();
-            const subMainStats = getSubMainPipeBranchCount();
-
-            let maxSprinklersPerLongestBranch = 4; // default
-            let maxBranchesPerLongestSecondary = 5; // default
-
-            if (branchStats) {
-                // Find the maximum plant count across all selected zones
-                selectedZones.forEach((zoneId) => {
-                    const zoneBranchStats = branchStats.find((stat) => stat.zoneId === zoneId);
-                    if (zoneBranchStats) {
-                        maxSprinklersPerLongestBranch = Math.max(
-                            maxSprinklersPerLongestBranch,
-                            zoneBranchStats.longestBranchPipe.plantCount
-                        );
-                    }
-                });
-            }
-
-            if (subMainStats) {
-                // Find the maximum branch count across all selected zones
-                selectedZones.forEach((zoneId) => {
-                    const zoneSubMainStats = subMainStats.find((stat) => stat.zoneId === zoneId);
-                    if (zoneSubMainStats && zoneSubMainStats.subMainPipes.length > 0) {
-                        const maxBranchSubMain = zoneSubMainStats.subMainPipes.reduce(
-                            (max, current) =>
-                                current.branchCount > max.branchCount ? current : max
-                        );
-                        maxBranchesPerLongestSecondary = Math.max(
-                            maxBranchesPerLongestSecondary,
-                            maxBranchSubMain.branchCount
-                        );
-                    }
-                });
-            }
-
-            combinedInput.simultaneousZones = selectedZones.length;
-            combinedInput.longestBranchPipeM = maxLongestBranch;
-            combinedInput.longestSecondaryPipeM = maxLongestSecondary;
-            combinedInput.longestMainPipeM = maxLongestMain;
-            combinedInput.sprinklersPerLongestBranch = maxSprinklersPerLongestBranch;
-            combinedInput.branchesPerLongestSecondary = maxBranchesPerLongestSecondary;
-
-            return combinedInput;
+        if (zoneOperationMode === 'simultaneous') {
+            simultaneousZonesForCalc = allZoneIds.length;
+        } else if (zoneOperationMode === 'custom') {
+            const group = zoneOperationGroups.find((g) => g.zones.includes(activeZoneId));
+            simultaneousZonesForCalc = group ? group.zones.length : 1;
         }
 
-        return zoneInputs[activeZoneId];
-    }, [activeZoneId, zoneInputs, selectedZones]);
+        const updatedInput = {
+            ...baseInput,
+            simultaneousZones: simultaneousZonesForCalc,
+            numberOfZones: allZoneIds.length,
+        };
 
-    // Get current sprinkler for active zone
+        return updatedInput;
+    }, [
+        activeZoneId,
+        zoneInputs,
+        zoneOperationMode,
+        zoneOperationGroups,
+        projectMode,
+        gardenStats,
+        projectData,
+    ]);
+
+    const handleZoneOperationModeChange = (mode: 'sequential' | 'simultaneous' | 'custom') => {
+        setZoneOperationMode(mode);
+
+        const allZoneIds =
+            projectMode === 'garden' && gardenStats
+                ? gardenStats.zones.map((z) => z.zoneId)
+                : projectData?.zones.map((z) => z.id) || [];
+
+        if (mode === 'sequential') {
+            const groups = allZoneIds.map((zoneId, index) => ({
+                id: `group-${index}`,
+                zones: [zoneId],
+                order: index + 1,
+                label: `${getZoneName(zoneId)}`,
+            }));
+            setZoneOperationGroups(groups);
+        } else if (mode === 'simultaneous') {
+            setZoneOperationGroups([
+                {
+                    id: 'group-all',
+                    zones: allZoneIds,
+                    order: 1,
+                    label: 'เปิดทุกโซนพร้อมกัน',
+                },
+            ]);
+        }
+    };
+
+    const addOperationGroup = () => {
+        const newGroup: ZoneOperationGroup = {
+            id: `group-${Date.now()}`,
+            zones: [],
+            order: zoneOperationGroups.length + 1,
+            label: `กลุ่มที่ ${zoneOperationGroups.length + 1}`,
+        };
+        setZoneOperationGroups([...zoneOperationGroups, newGroup]);
+    };
+
+    const updateOperationGroup = (groupId: string, zones: string[]) => {
+        setZoneOperationGroups((groups) =>
+            groups.map((g) => (g.id === groupId ? { ...g, zones } : g))
+        );
+    };
+
+    const removeOperationGroup = (groupId: string) => {
+        setZoneOperationGroups((groups) =>
+            groups
+                .filter((g) => g.id !== groupId)
+                .map((g, index) => ({ ...g, order: index + 1, label: `กลุ่มที่ ${index + 1}` }))
+        );
+    };
+
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        let mode = urlParams.get('mode') as ProjectMode;
+        const storedType = localStorage.getItem('projectType');
+
+        if (!mode && storedType === 'home-garden') {
+            mode = 'garden';
+        }
+
+        const mapImage = localStorage.getItem('projectMapImage');
+        if (mapImage) {
+            setProjectImage(mapImage);
+        }
+
+        if (mode === 'garden') {
+            setProjectMode('garden');
+            const gardenPlannerData = loadGardenData();
+            if (gardenPlannerData) {
+                setGardenData(gardenPlannerData);
+                const stats = calculateGardenStatistics(gardenPlannerData);
+                setGardenStats(stats);
+
+                const initialZoneInputs: { [zoneId: string]: IrrigationInput } = {};
+                const initialSelectedPipes: {
+                    [zoneId: string]: { branch?: any; secondary?: any; main?: any };
+                } = {};
+
+                if (stats.zones.length > 1) {
+                    stats.zones.forEach((zone) => {
+                        initialZoneInputs[zone.zoneId] = createGardenZoneInput(
+                            zone,
+                            stats,
+                            stats.zones.length
+                        );
+                        initialSelectedPipes[zone.zoneId] = {
+                            branch: undefined,
+                            secondary: undefined,
+                            main: undefined,
+                        };
+                    });
+
+                    setZoneInputs(initialZoneInputs);
+                    setSelectedPipes(initialSelectedPipes);
+                    setActiveZoneId(stats.zones[0].zoneId);
+                    handleZoneOperationModeChange('sequential');
+                } else {
+                    const singleInput = createSingleGardenInput(stats);
+                    setZoneInputs({ 'main-area': singleInput });
+                    setSelectedPipes({
+                        'main-area': { branch: undefined, secondary: undefined, main: undefined },
+                    });
+                    setActiveZoneId('main-area');
+                }
+            }
+        } else {
+            setProjectMode('horticulture');
+            const data = loadProjectData();
+            const stats = getProjectStats();
+
+            if (data && stats) {
+                setProjectData(data);
+                setProjectStats(stats);
+
+                if (data.useZones && data.zones.length > 0) {
+                    const initialZoneInputs: { [zoneId: string]: IrrigationInput } = {};
+                    const initialSelectedPipes: {
+                        [zoneId: string]: { branch?: any; secondary?: any; main?: any };
+                    } = {};
+
+                    data.zones.forEach((zone) => {
+                        const zoneStats = stats.zoneDetails.find((z: any) => z.zoneId === zone.id);
+                        const zoneMainPipes = data.mainPipes.filter((p) => p.toZone === zone.id);
+                        const zoneSubMainPipes = data.subMainPipes.filter(
+                            (p) => p.zoneId === zone.id
+                        );
+                        const zoneBranchPipes = zoneSubMainPipes.flatMap(
+                            (s) => s.branchPipes || []
+                        );
+
+                        initialZoneInputs[zone.id] = createZoneInput(
+                            zone,
+                            zoneStats,
+                            zoneMainPipes,
+                            zoneSubMainPipes,
+                            zoneBranchPipes,
+                            data.zones.length
+                        );
+
+                        initialSelectedPipes[zone.id] = {
+                            branch: undefined,
+                            secondary: undefined,
+                            main: undefined,
+                        };
+                    });
+
+                    setZoneInputs(initialZoneInputs);
+                    setSelectedPipes(initialSelectedPipes);
+                    setActiveZoneId(data.zones[0].id);
+
+                    handleZoneOperationModeChange('sequential');
+                } else {
+                    const singleInput = createSingleZoneInput(data, stats);
+                    setZoneInputs({ 'main-area': singleInput });
+                    setSelectedPipes({
+                        'main-area': { branch: undefined, secondary: undefined, main: undefined },
+                    });
+                    setActiveZoneId('main-area');
+                }
+            }
+        }
+    }, []);
+
     const currentSprinkler = zoneSprinklers[activeZoneId] || null;
 
     const handleSprinklerChange = (sprinkler: any) => {
@@ -489,7 +574,6 @@ export default function Product() {
                 ...prev,
                 [activeZoneId]: sprinkler,
             }));
-            console.log(`💧 Sprinkler selected for zone ${activeZoneId}:`, sprinkler.name);
         }
     };
 
@@ -502,44 +586,23 @@ export default function Product() {
                     [pipeType]: pipe,
                 },
             }));
-            console.log(
-                `🔧 ${pipeType} pipe selected for zone ${activeZoneId}:`,
-                pipe?.name || 'auto'
-            );
         }
     };
 
     const handlePumpChange = (pump: any) => {
         setSelectedPump(pump);
-        console.log('⚡ Pump selected:', pump?.name || 'auto');
     };
 
-    // Handle zone selection
-    const handleZoneSelection = (zoneId: string, checked: boolean) => {
-        if (checked) {
-            setSelectedZones((prev) => [...prev, zoneId]);
-        } else {
-            setSelectedZones((prev) => prev.filter((id) => id !== zoneId));
-        }
-    };
-
-    // Handle input change
-    const handleInputChange = (input: IrrigationInput) => {
-        if (activeZoneId) {
-            setZoneInputs((prev) => ({
-                ...prev,
-                [activeZoneId]: input,
-            }));
-        }
-    };
-
-    // สร้าง zone calculation data สำหรับการคำนวณ multi-zone
     const allZoneData = useMemo(() => {
         return createZoneCalculationData();
-    }, [selectedZones, zoneInputs, zoneSprinklers, simultaneousZonesCount]);
+    }, [zoneInputs, zoneSprinklers, zoneOperationMode, zoneOperationGroups]);
 
-    // ใช้ useCalculations พร้อม zone data
-    const results = useCalculations(currentInput as IrrigationInput, currentSprinkler, allZoneData);
+    const results = useCalculations(
+        currentInput as IrrigationInput,
+        currentSprinkler,
+        allZoneData,
+        zoneOperationGroups
+    );
 
     const hasValidMainPipeData = results?.hasValidMainPipe ?? false;
     const hasValidSubmainPipeData = results?.hasValidSecondaryPipe ?? false;
@@ -554,21 +617,11 @@ export default function Product() {
     });
     const [quotationDataCustomer, setQuotationDataCustomer] = useState<QuotationDataCustomer>({
         name: '',
-        address1: '',
-        address2: '',
+        projectName: '',
+        address: '',
         phone: '',
     });
 
-    // Handle zone selection
-    const handleZoneSelection = (zoneId: string, selected: boolean) => {
-        if (selected) {
-            setSelectedZones((prev) => [...prev, zoneId]);
-        } else {
-            setSelectedZones((prev) => prev.filter((id) => id !== zoneId));
-        }
-    };
-
-    // Handle input change for specific zone
     const handleInputChange = (input: IrrigationInput) => {
         if (activeZoneId) {
             setZoneInputs((prev) => ({
@@ -576,7 +629,7 @@ export default function Product() {
                 [activeZoneId]: input,
             }));
         }
-    }, [selectedBranchPipe, selectedSecondaryPipe, selectedMainPipe, currentInput]);
+    };
 
     const handleQuotationModalConfirm = () => {
         setShowQuotationModal(false);
@@ -594,25 +647,32 @@ export default function Product() {
         };
     };
 
-    // Get zones data based on mode
     const getZonesData = () => {
         if (projectMode === 'garden' && gardenStats) {
-            return gardenStats.zones.map(z => ({
+            return gardenStats.zones.map((z) => ({
                 id: z.zoneId,
                 name: z.zoneName,
                 area: z.area,
                 plantCount: z.sprinklerCount,
-                totalWaterNeed: z.sprinklerCount * 50, // Estimated
+                totalWaterNeed: z.sprinklerCount * 50,
                 plantData: null,
             }));
         }
         return projectData?.zones || [];
     };
 
-    // Get active zone based on mode
+    const getZoneNameForSummary = (zoneId: string): string => {
+        if (projectMode === 'garden' && gardenStats) {
+            const zone = gardenStats.zones.find((z) => z.zoneId === zoneId);
+            return zone?.zoneName || zoneId;
+        }
+        const zone = projectData?.zones.find((z) => z.id === zoneId);
+        return zone?.name || zoneId;
+    };
+
     const getActiveZone = () => {
         if (projectMode === 'garden' && gardenStats) {
-            const zone = gardenStats.zones.find(z => z.zoneId === activeZoneId);
+            const zone = gardenStats.zones.find((z) => z.zoneId === activeZoneId);
             if (zone) {
                 return {
                     id: zone.zoneId,
@@ -627,8 +687,9 @@ export default function Product() {
         return projectData?.zones.find((z) => z.id === activeZoneId);
     };
 
-    const hasEssentialData = (projectMode === 'horticulture' && projectData && projectStats) || 
-                            (projectMode === 'garden' && gardenData && gardenStats);
+    const hasEssentialData =
+        (projectMode === 'horticulture' && projectData && projectStats) ||
+        (projectMode === 'garden' && gardenData && gardenStats);
 
     if (!hasEssentialData) {
         return (
@@ -636,11 +697,19 @@ export default function Product() {
                 <div className="text-center">
                     <div className="mb-6 text-6xl">{projectMode === 'garden' ? '🏡' : '🌱'}</div>
                     <h1 className="mb-4 text-2xl font-bold text-blue-400">
-                        {projectMode === 'garden' ? 'Chaiyo Irrigation System' : 'Chaiyo Irrigation System'}
+                        {projectMode === 'garden'
+                            ? 'Chaiyo Irrigation System'
+                            : 'Chaiyo Irrigation System'}
                     </h1>
                     <p className="mb-6 text-gray-300">ไม่พบข้อมูลโครงการ</p>
                     <button
-                        onClick={() => router.visit(projectMode === 'garden' ? '/garden/planner' : '/horticulture/planner')}
+                        onClick={() =>
+                            router.visit(
+                                projectMode === 'garden'
+                                    ? '/home-garden-planner'
+                                    : '/horticulture/planner'
+                            )
+                        }
                         className="rounded-lg bg-blue-600 px-6 py-3 font-medium text-white transition-colors hover:bg-blue-700"
                     >
                         📐 ไปหน้าวางแผน
@@ -665,6 +734,51 @@ export default function Product() {
     const zones = getZonesData();
     const activeZone = getActiveZone();
 
+    const extraPipeInput = zoneInputs[activeZoneId]?.extraPipePerSprinkler;
+    let selectedExtraPipe: any = null;
+    if (extraPipeInput && extraPipeInput.pipeId && extraPipeInput.lengthPerHead > 0) {
+        let pipe: any = null;
+        const pipes = selectedPipes[activeZoneId] || {};
+        if (pipes.branch && pipes.branch.id === extraPipeInput.pipeId) pipe = pipes.branch;
+        if (pipes.secondary && pipes.secondary.id === extraPipeInput.pipeId) pipe = pipes.secondary;
+        if (pipes.main && pipes.main.id === extraPipeInput.pipeId) pipe = pipes.main;
+        if (!pipe && results) {
+            if (
+                results.autoSelectedBranchPipe &&
+                results.autoSelectedBranchPipe.id === extraPipeInput.pipeId
+            )
+                pipe = results.autoSelectedBranchPipe;
+            if (
+                results.autoSelectedSecondaryPipe &&
+                results.autoSelectedSecondaryPipe.id === extraPipeInput.pipeId
+            )
+                pipe = results.autoSelectedSecondaryPipe;
+            if (
+                results.autoSelectedMainPipe &&
+                results.autoSelectedMainPipe.id === extraPipeInput.pipeId
+            )
+                pipe = results.autoSelectedMainPipe;
+        }
+        if (pipe) {
+            selectedExtraPipe = {
+                pipe,
+                lengthPerHead: extraPipeInput.lengthPerHead,
+                totalLength: (results?.totalSprinklers || 0) * extraPipeInput.lengthPerHead,
+            };
+        }
+    }
+
+    const handleOpenQuotationModal = () => {
+        if (projectData) {
+            setQuotationDataCustomer((prev) => ({
+                ...prev,
+                projectName: projectData.projectName || prev.projectName,
+                name: projectData.customerName || prev.name,
+            }));
+        }
+        setShowQuotationModal(true);
+    };
+
     return (
         <div className="min-h-screen bg-gray-900 text-white">
             <div className="border-b border-gray-700 bg-gray-800 p-4">
@@ -677,7 +791,9 @@ export default function Product() {
                         />
                         <div>
                             <h1 className="text-xl font-bold text-blue-400">
-                                {projectMode === 'garden' ? '🏡 Chaiyo Irrigation System' : '🌱 Chaiyo Irrigation System'}
+                                {projectMode === 'garden'
+                                    ? '🏡 Chaiyo Irrigation System'
+                                    : '🌱 Chaiyo Irrigation System'}
                             </h1>
                             <p className="text-sm text-gray-400">กนกโปรดักส์</p>
                         </div>
@@ -705,17 +821,23 @@ export default function Product() {
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
                     <div className="lg:col-span-4">
                         <div className="sticky top-6">
-                            <div className="h-[350px] rounded-lg bg-gray-800 p-4">
-                                <h2 className="mb-3 text-lg font-semibold text-blue-400">
-                                    📐 แผนผัง
-                                </h2>
+                            <div className="rounded-lg bg-gray-800 p-4">
+                                <div className="mb-3 flex items-center justify-between">
+                                    <h2 className="text-lg font-semibold text-blue-400">
+                                        📐 แผนผัง
+                                    </h2>
+                                </div>
 
                                 {projectImage ? (
-                                    <div className="group relative">
+                                    <div
+                                        className="group relative flex items-center justify-center"
+                                        style={{ minHeight: 0 }}
+                                    >
                                         <img
                                             src={projectImage}
-                                            alt="Project"
-                                            className="w-full cursor-pointer rounded-lg transition-transform hover:scale-105"
+                                            alt={`${projectMode === 'garden' ? 'สวนบ้าน' : 'พืชสวน'} Project`}
+                                            className="aspect-video max-h-[500px] w-full cursor-pointer rounded-lg object-contain transition-transform hover:scale-105"
+                                            style={{ maxHeight: '500px', minHeight: '300px' }}
                                             onClick={() => setShowImageModal(true)}
                                         />
                                         <div className="absolute right-2 top-2 flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
@@ -739,7 +861,16 @@ export default function Product() {
                                 ) : (
                                     <label className="flex h-[280px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-600 hover:border-blue-500">
                                         <div className="text-4xl text-gray-500">📷</div>
-                                        <p className="mt-2 text-sm text-gray-400">เพิ่มรูปแผนผัง</p>
+                                        <p className="mt-2 text-sm text-gray-400">
+                                            {projectMode === 'garden'
+                                                ? 'เพิ่มรูปแผนผังสวนบ้าน'
+                                                : 'เพิ่มรูปแผนผังพืชสวน'}
+                                        </p>
+                                        <p className="mt-1 text-xs text-gray-500">
+                                            {projectMode === 'garden'
+                                                ? 'หรือส่งออกจากหน้าสรุปผลสวนบ้าน'
+                                                : 'หรือส่งออกจากหน้าสรุปผลพืชสวน'}
+                                        </p>
                                         <input
                                             type="file"
                                             accept="image/*"
@@ -752,98 +883,197 @@ export default function Product() {
                         </div>
                     </div>
 
-                    <div className="lg:col-span-8 space-y-6">
+                    <div className="space-y-6 lg:col-span-8">
                         {zones.length > 1 && (
                             <div className="mb-6 rounded-lg bg-gray-800 p-4">
                                 <h3 className="mb-3 text-lg font-semibold text-yellow-400">
-                                    🏗️ เลือกโซนสำหรับการคำนวณ
+                                    🏗️ การเปิดโซนสำหรับการทำงาน
                                 </h3>
-                                <div className="mb-3 rounded bg-blue-900 p-3">
+
+                                <div className="mb-4 rounded bg-blue-900 p-3">
                                     <h4 className="mb-2 text-sm font-medium text-blue-300">
-                                        💡 วิธีการทำงาน:
+                                        🎯 เลือกรูปแบบการเปิดโซน:
                                     </h4>
-                                    <ul className="space-y-1 text-xs text-blue-200">
-                                        <li>• เลือกโซนที่ต้องการคำนวณ (สามารถเลือกหลายโซนได้)</li>
-                                        <li>• คลิกที่แท็บโซนเพื่อดูรายละเอียดและเลือกอุปกรณ์</li>
-                                        <li>• ระบบจะคำนวณปั๊มตามโซนที่ต้องการ Head สูงสุด</li>
-                                        <li>• อุปกรณ์อื่นๆ คำนวณแยกตามแต่ละโซน</li>
-                                    </ul>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                                    {zones.map((zone) => (
-                                        <label
-                                            key={zone.id}
-                                            className="flex cursor-pointer items-center gap-2 rounded bg-gray-700 p-2 hover:bg-gray-600"
-                                        >
+                                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                                        <label className="flex cursor-pointer items-center gap-2 rounded bg-blue-800 p-3 hover:bg-blue-700">
                                             <input
-                                                type="checkbox"
-                                                checked={selectedZones.includes(zone.id)}
-                                                onChange={(e) =>
-                                                    handleZoneSelection(zone.id, e.target.checked)
+                                                type="radio"
+                                                name="zoneOperation"
+                                                value="sequential"
+                                                checked={zoneOperationMode === 'sequential'}
+                                                onChange={() =>
+                                                    handleZoneOperationModeChange('sequential')
                                                 }
                                                 className="rounded"
                                             />
-                                            <div className="flex-1">
-                                                <span className="text-sm font-medium">
-                                                    {zone.name}
-                                                </span>
-                                                <div className="text-xs text-gray-400">
-                                                    {zone.area >= 1600 ? <p>{(zone.area / 1600).toFixed(1)} ไร่</p> : <p>{zone.area.toFixed(2)} ตร.ม.</p>}
-                                                    <p>{zone.plantCount} {projectMode === 'garden' ? 'หัวฉีด' : 'ต้น'}</p>
-                                                </div>
+                                            <div>
+                                                <p className="font-medium">เปิดทีละโซน</p>
+                                                <p className="text-xs text-blue-200">
+                                                    ปั๊มขนาดเล็ก ประหยัดพลังงาน
+                                                </p>
                                             </div>
-                                            {zoneSprinklers[zone.id] && (
-                                                <span className="text-lg text-green-400">✓</span>
-                                            )}
                                         </label>
-                                    ))}
+                                        <label className="flex cursor-pointer items-center gap-2 rounded bg-blue-800 p-3 hover:bg-blue-700">
+                                            <input
+                                                type="radio"
+                                                name="zoneOperation"
+                                                value="simultaneous"
+                                                checked={zoneOperationMode === 'simultaneous'}
+                                                onChange={() =>
+                                                    handleZoneOperationModeChange('simultaneous')
+                                                }
+                                                className="rounded"
+                                            />
+                                            <div>
+                                                <p className="font-medium">เปิดพร้อมกันทุกโซน</p>
+                                                <p className="text-xs text-blue-200">
+                                                    ปั๊มขนาดใหญ่ รดน้ำเร็ว
+                                                </p>
+                                            </div>
+                                        </label>
+                                        <label className="flex cursor-pointer items-center gap-2 rounded bg-blue-800 p-3 hover:bg-blue-700">
+                                            <input
+                                                type="radio"
+                                                name="zoneOperation"
+                                                value="custom"
+                                                checked={zoneOperationMode === 'custom'}
+                                                onChange={() =>
+                                                    handleZoneOperationModeChange('custom')
+                                                }
+                                                className="rounded"
+                                            />
+                                            <div>
+                                                <p className="font-medium">กำหนดเอง</p>
+                                                <p className="text-xs text-blue-200">
+                                                    จัดกลุ่มโซนตามต้องการ
+                                                </p>
+                                            </div>
+                                        </label>
+                                    </div>
                                 </div>
-                                
-                                {/* Simultaneous Zone Selection */}
-                                {selectedZones.length > 1 && (
+
+                                {zoneOperationMode === 'custom' && (
                                     <div className="mt-4 rounded bg-purple-900 p-3">
-                                        <h4 className="mb-2 text-sm font-medium text-purple-300">
-                                            ⚡ การเปิดน้ำพร้อมกัน (สำหรับคำนวณปั๊ม):
-                                        </h4>
-                                        <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-                                            {Array.from({ length: selectedZones.length }, (_, i) => i + 1).map(
-                                                (count) => (
-                                                    <label
-                                                        key={count}
-                                                        className="flex cursor-pointer items-center gap-2 rounded bg-purple-800 p-2 hover:bg-purple-700"
-                                                    >
-                                                        <input
-                                                            type="radio"
-                                                            name="simultaneousZones"
-                                                            value={count}
-                                                            checked={simultaneousZonesCount === count}
-                                                            onChange={(e) =>
-                                                                setSimultaneousZonesCount(parseInt(e.target.value))
-                                                            }
-                                                            className="rounded"
-                                                        />
-                                                        <span className="text-sm text-purple-200">
-                                                            เปิด {count} โซนพร้อมกัน
-                                                        </span>
-                                                    </label>
-                                                )
-                                            )}
+                                        <div className="mb-3 flex items-center justify-between">
+                                            <h4 className="text-sm font-medium text-purple-300">
+                                                📋 จัดการกลุ่มการเปิดโซน:
+                                            </h4>
+                                            <button
+                                                onClick={addOperationGroup}
+                                                className="rounded bg-purple-600 px-3 py-1 text-xs hover:bg-purple-700"
+                                            >
+                                                + เพิ่มกลุ่ม
+                                            </button>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {zoneOperationGroups.map((group) => (
+                                                <div
+                                                    key={group.id}
+                                                    className="rounded bg-purple-800 p-2"
+                                                >
+                                                    <div className="mb-2 flex items-center justify-between">
+                                                        <p className="text-sm font-medium text-purple-200">
+                                                            {group.label} (ลำดับที่ {group.order})
+                                                            {group.zones.length === 0 && (
+                                                                <span className="ml-2 text-red-300">
+                                                                    (ไม่มีโซน)
+                                                                </span>
+                                                            )}
+                                                        </p>
+                                                        {zoneOperationGroups.length > 1 && (
+                                                            <button
+                                                                onClick={() =>
+                                                                    removeOperationGroup(group.id)
+                                                                }
+                                                                className="text-xs text-red-400 hover:text-red-300"
+                                                            >
+                                                                ลบ
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                                                        {zones.map((zone) => (
+                                                            <label
+                                                                key={zone.id}
+                                                                className="flex cursor-pointer items-center gap-1 text-xs"
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={group.zones.includes(
+                                                                        zone.id
+                                                                    )}
+                                                                    onChange={(e) => {
+                                                                        if (e.target.checked) {
+                                                                            const otherGroups =
+                                                                                zoneOperationGroups.filter(
+                                                                                    (g) =>
+                                                                                        g.id !==
+                                                                                        group.id
+                                                                                );
+                                                                            otherGroups.forEach(
+                                                                                (g) => {
+                                                                                    updateOperationGroup(
+                                                                                        g.id,
+                                                                                        g.zones.filter(
+                                                                                            (z) =>
+                                                                                                z !==
+                                                                                                zone.id
+                                                                                        )
+                                                                                    );
+                                                                                }
+                                                                            );
+                                                                            updateOperationGroup(
+                                                                                group.id,
+                                                                                [
+                                                                                    ...group.zones,
+                                                                                    zone.id,
+                                                                                ]
+                                                                            );
+                                                                        } else {
+                                                                            updateOperationGroup(
+                                                                                group.id,
+                                                                                group.zones.filter(
+                                                                                    (z) =>
+                                                                                        z !==
+                                                                                        zone.id
+                                                                                )
+                                                                            );
+                                                                        }
+                                                                    }}
+                                                                    className="rounded"
+                                                                />
+                                                                <span>{zone.name}</span>
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
                                         <div className="mt-2 text-xs text-purple-200">
-                                            <p>💡 เลือกจำนวนโซนสูงสุดที่จะเปิดน้ำพร้อมกัน</p>
-                                            <p>🔧 ปั๊มจะคำนวณตามโซนที่ต้องการ Head สูงสุดจาก {simultaneousZonesCount} โซน</p>
+                                            💡 โซนที่อยู่ในกลุ่มเดียวกันจะเปิดพร้อมกัน
                                         </div>
                                     </div>
                                 )}
-                                
-                                {selectedZones.length > 1 && (
-                                    <div className="mt-3 rounded bg-yellow-900 p-2">
-                                        <p className="text-sm text-yellow-300">
-                                            ⚠️ เลือก {selectedZones.length} โซน - 
-                                            ปั๊มจะคำนวณสำหรับ {simultaneousZonesCount} โซนที่ต้องการ Head สูงสุด
-                                        </p>
+
+                                <div className="mt-4 rounded bg-yellow-800 p-3">
+                                    <h4 className="mb-2 text-sm font-medium text-yellow-300">
+                                        📊 สรุปการเปิดโซน:
+                                    </h4>
+                                    <div className="space-y-1 text-xs text-yellow-200">
+                                        {zoneOperationGroups.map((group) => (
+                                            <p key={group.id}>
+                                                • ลำดับที่ {group.order}:{' '}
+                                                {group.zones
+                                                    .map((zoneId) => getZoneName(zoneId))
+                                                    .join(', ')}
+                                                {group.zones.length > 1 && ' (เปิดพร้อมกัน)'}
+                                            </p>
+                                        ))}
                                     </div>
-                                )}
+                                    <p className="mt-2 text-xs text-yellow-300">
+                                        ⚡ ปั๊มจะคำนวณจากกลุ่มที่ต้องการ Head สูงสุด
+                                    </p>
+                                </div>
                             </div>
                         )}
 
@@ -851,20 +1081,16 @@ export default function Product() {
                             <div className="mb-6 flex flex-wrap gap-2">
                                 {zones.map((zone) => {
                                     const isActive = activeZoneId === zone.id;
-                                    const isSelected = selectedZones.includes(zone.id);
                                     const hasSprinkler = !!zoneSprinklers[zone.id];
 
                                     return (
                                         <button
                                             key={zone.id}
                                             onClick={() => setActiveZoneId(zone.id)}
-                                            disabled={!isSelected}
                                             className={`relative rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                                                isActive && isSelected
+                                                isActive
                                                     ? 'bg-blue-600 text-white'
-                                                    : isSelected
-                                                      ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                                      : 'cursor-not-allowed bg-gray-800 text-gray-500'
+                                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                             }`}
                                         >
                                             <div className="flex items-center gap-2">
@@ -874,13 +1100,15 @@ export default function Product() {
                                                         ✓
                                                     </span>
                                                 )}
-                                                {!isSelected && (
-                                                    <span className="text-xs text-gray-500">○</span>
-                                                )}
                                             </div>
                                             <div className="text-xs opacity-75">
-                                                {zone.area >= 1600 ? <p>{(zone.area / 1600).toFixed(1)} ไร่</p> : <p>{zone.area.toFixed(2)} ตร.ม.</p>}
-                                                {zone.plantCount}{projectMode === 'garden' ? 'หัวฉีด' : 'ต้น'}
+                                                {zone.area >= 1600 ? (
+                                                    <p>{(zone.area / 1600).toFixed(1)} ไร่</p>
+                                                ) : (
+                                                    <p>{zone.area.toFixed(2)} ตร.ม.</p>
+                                                )}
+                                                {zone.plantCount}
+                                                {projectMode === 'garden' ? 'หัวฉีด' : 'ต้น'}
                                             </div>
                                         </button>
                                     );
@@ -888,7 +1116,6 @@ export default function Product() {
                             </div>
                         )}
 
-                        {/* Home Garden specific pump option */}
                         {projectMode === 'garden' && (
                             <div className="mb-6 rounded-lg bg-gray-800 p-4">
                                 <h3 className="mb-3 text-lg font-semibold text-purple-400">
@@ -921,9 +1148,6 @@ export default function Product() {
                             selectedSprinkler={currentSprinkler}
                             activeZone={activeZone}
                             projectMode={projectMode}
-                            simultaneousZonesCount={simultaneousZonesCount}
-                            onSimultaneousZonesChange={setSimultaneousZonesCount}
-                            maxZones={selectedZones.length}
                         />
 
                         <div className="mb-6 rounded-lg bg-yellow-800 p-4">
@@ -932,14 +1156,10 @@ export default function Product() {
                                 <div>
                                     <p className="font-medium">เลือกสปริงเกอร์ก่อน</p>
                                     <p className="text-sm">ระบบจะเลือกอุปกรณ์อื่นให้อัตโนมัติ</p>
-                                    {selectedZones.length > 1 && (
+                                    {zones.length > 1 && (
                                         <p className="mt-1 text-xs text-yellow-300">
                                             💡 เลือกสปริงเกอร์สำหรับโซน{' '}
-                                            {
-                                                zones.find(
-                                                    (z) => z.id === activeZoneId
-                                                )?.name
-                                            }
+                                            {zones.find((z) => z.id === activeZoneId)?.name}
                                         </p>
                                     )}
                                 </div>
@@ -966,11 +1186,23 @@ export default function Product() {
                                     selectedSecondaryPipe={effectiveEquipment.secondaryPipe}
                                     selectedMainPipe={effectiveEquipment.mainPipe}
                                     activeZone={activeZone}
-                                    selectedZones={selectedZones}
+                                    selectedZones={zones.map((z) => z.id)}
                                     allZoneSprinklers={zoneSprinklers}
                                     projectMode={projectMode}
                                     showPump={projectMode === 'horticulture' || showPumpOption}
-                                    simultaneousZonesCount={simultaneousZonesCount}
+                                    simultaneousZonesCount={
+                                        zoneOperationMode === 'simultaneous'
+                                            ? zones.length
+                                            : zoneOperationMode === 'custom'
+                                              ? Math.max(
+                                                    ...zoneOperationGroups.map(
+                                                        (g) => g.zones.length
+                                                    )
+                                                )
+                                              : 1
+                                    }
+                                    zoneOperationGroups={zoneOperationGroups}
+                                    getZoneName={getZoneNameForSummary}
                                 />
 
                                 <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -1021,9 +1253,20 @@ export default function Product() {
                                         results={results}
                                         selectedPump={effectiveEquipment.pump}
                                         onPumpChange={handlePumpChange}
-                                        simultaneousZonesCount={simultaneousZonesCount}
-                                        selectedZones={selectedZones}
+                                        zoneOperationGroups={zoneOperationGroups}
                                         zoneInputs={zoneInputs}
+                                        simultaneousZonesCount={
+                                            zoneOperationMode === 'simultaneous'
+                                                ? zones.length
+                                                : zoneOperationMode === 'custom'
+                                                  ? Math.max(
+                                                        ...zoneOperationGroups.map(
+                                                            (g) => g.zones.length
+                                                        )
+                                                    )
+                                                  : 1
+                                        }
+                                        selectedZones={zones.map((z) => z.id)}
                                     />
                                 )}
 
@@ -1037,7 +1280,7 @@ export default function Product() {
                                     gardenData={gardenData}
                                     gardenStats={gardenStats}
                                     zoneInputs={zoneInputs}
-                                    onQuotationClick={() => setShowQuotationModal(true)}
+                                    onQuotationClick={handleOpenQuotationModal}
                                     projectMode={projectMode}
                                     showPump={projectMode === 'horticulture' || showPumpOption}
                                 />
@@ -1062,11 +1305,25 @@ export default function Product() {
                         >
                             ×
                         </button>
-                        <img
-                            src={projectImage}
-                            alt="Project"
-                            className="max-h-full max-w-full rounded-lg"
-                        />
+                        <div className="relative">
+                            <img
+                                src={projectImage}
+                                alt={`${projectMode === 'garden' ? 'สวนบ้าน' : 'พืชสวน'} Project`}
+                                className="max-h-full max-w-full rounded-lg"
+                            />
+                            {/* แสดงข้อมูลประเภทของโปรเจคใน Modal */}
+                            <div className="absolute left-4 top-4">
+                                <div
+                                    className={`rounded-lg px-3 py-1 text-sm font-medium ${
+                                        projectMode === 'garden'
+                                            ? 'bg-green-600 text-white'
+                                            : 'bg-orange-600 text-white'
+                                    }`}
+                                >
+                                    {projectMode === 'garden' ? '🏡 สวนบ้าน' : '🌱 พืชสวน'}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
@@ -1098,19 +1355,16 @@ export default function Product() {
                 selectedBranchPipe={effectiveEquipment.branchPipe}
                 selectedSecondaryPipe={effectiveEquipment.secondaryPipe}
                 selectedMainPipe={effectiveEquipment.mainPipe}
+                selectedExtraPipe={selectedExtraPipe}
                 projectImage={projectImage}
                 projectData={projectData}
                 gardenData={gardenData}
                 zoneSprinklers={zoneSprinklers}
                 selectedPipes={selectedPipes}
                 onClose={() => setShowQuotation(false)}
+                projectMode={projectMode}
+                showPump={projectMode === 'horticulture' || showPumpOption}
             />
-            
-            {/* --- AI Chat Component --- */}
-            {/* วางไว้ที่นี่เพื่อให้เป็น Floating Component ที่แสดงผลทับ UI ทั้งหมด */}
-            <div className="no-print">
-                <AiChatComponent />
-            </div>
         </div>
     );
 }

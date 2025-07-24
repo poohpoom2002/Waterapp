@@ -39,6 +39,7 @@ interface QuotationDocumentProps {
     selectedBranchPipe: any;
     selectedSecondaryPipe: any;
     selectedMainPipe: any;
+    selectedExtraPipe?: any;
     projectImage?: string | null;
     projectMode: 'horticulture' | 'garden';
     gardenData: any;
@@ -59,6 +60,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     selectedBranchPipe,
     selectedSecondaryPipe,
     selectedMainPipe,
+    selectedExtraPipe,
     projectImage,
     projectData,
     projectMode,
@@ -494,7 +496,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         }
 
         if (selectedPump && results) {
-            const pumpDescription = `${selectedPump.productCode || selectedPump.product_code || ''} - ปั๊มน้ำ ${selectedPump.name || ''} ${selectedPump.powerHP || ''}HP ${selectedPump.phase || ''}เฟส (${selectedPump.brand || ''})`;
+            const pumpDescription = `${selectedPump.productCode || selectedPump.product_code || ''} - ${selectedPump.name || ''} ${selectedPump.powerHP || ''}HP ${selectedPump.phase || ''}เฟส (${selectedPump.brand || ''})`;
 
             initialItems.push({
                 id: 'pump',
@@ -563,6 +565,23 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             }
         }
 
+        if (selectedExtraPipe && selectedExtraPipe.pipe) {
+            initialItems.push({
+                id: 'extraPipe',
+                seq: seq++,
+                image: selectedExtraPipe.pipe.image_url || selectedExtraPipe.pipe.image || '',
+                date: '',
+                description: `${selectedExtraPipe.pipe.productCode || selectedExtraPipe.pipe.product_code || ''} - ท่อเสริม (Riser/แขนง) ${selectedExtraPipe.pipe.sizeMM || ''}mm ยาว ${selectedExtraPipe.pipe.lengthM || ''} ม./ม้วน`,
+                quantity: Math.ceil(
+                    selectedExtraPipe.totalLength / (selectedExtraPipe.pipe.lengthM || 1)
+                ),
+                unitPrice: selectedExtraPipe.pipe.price || 0,
+                discount: 30.0,
+                taxes: 'Output\nVAT\n7%',
+                originalData: selectedExtraPipe.pipe,
+            });
+        }
+
         setItems(initialItems);
         setCurrentPage(hasProjectImagePage ? 1 : 1);
     }, [
@@ -576,6 +595,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         zoneSprinklers,
         selectedPipes,
         projectData,
+        selectedExtraPipe,
     ]);
 
     const calculateItemAmount = (item: QuotationItem) => {
@@ -880,8 +900,8 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     ? `
                 <div class="print-customer-info mb-6 self-end text-left text-sm">
                     <p class="font-semibold">[1234] ${quotationDataCustomer.name || '-'}</p>
-                    <p>${quotationDataCustomer.address1 || '-'}</p>
-                    <p>${quotationDataCustomer.address2 || '-'}</p>
+                    <p>${quotationDataCustomer.projectName || '-'}</p>
+                    <p>${quotationDataCustomer.address || '-'}</p>
                     <p>${quotationDataCustomer.phone || '-'}</p>
                 </div>
             `
@@ -1045,8 +1065,8 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     const renderCustomerInfo = () => (
         <div className="print-customer-info mb-6 self-end text-left text-sm">
             <p className="font-semibold">[1234] {quotationDataCustomer.name || '-'}</p>
-            <p>{quotationDataCustomer.address1 || '-'}</p>
-            <p>{quotationDataCustomer.address2 || '-'}</p>
+            <p>{quotationDataCustomer.projectName || '-'}</p>
+            <p>{quotationDataCustomer.address || '-'}</p>
             <p>{quotationDataCustomer.phone || '-'}</p>
         </div>
     );
