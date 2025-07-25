@@ -116,7 +116,6 @@ interface FieldMapToolsPanelProps {
     handlePlantSpacingConfirm: (cropValue: string) => void;
     handlePlantSpacingCancel: (cropValue: string) => void;
     handleCaptureMapAndSummary?: () => void;
-    // Fanggy005: Add dripSpacing props for linter fix
     dripSpacing: Record<string, number>;
     setDripSpacing: React.Dispatch<React.SetStateAction<Record<string, number>>>;
 }
@@ -203,6 +202,14 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
     dripSpacing,
     setDripSpacing,
 }) => {
+
+    // Fanggy005 EDIT: Configuration for radius-based irrigation systems
+    const irrigationRadiusConfig = {
+        sprinkler: { min: 3, max: 15, step: 0.5, defaultValue: 8 },
+        mini_sprinkler: { min: 0.5, max: 3, step: 0.1, defaultValue: 1.5 },
+        micro_spray: { min: 3, max: 8, step: 0.5, defaultValue: 5 },
+    };
+
     return (
         <>
             {/* Current Active Step - Display Only Current Step */}
@@ -695,9 +702,9 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
 
                             <div className="grid gap-3">
                                 {zones.map((zone: any, index: number) => {
-                                    const assignedIrrigation = irrigationAssignments[zone.id];
-                                    const zoneRadius = irrigationRadius[zone.id] || 5;
-                                    const zoneOverlap = sprinklerOverlap[zone.id] || false;
+                                    const irrigationType = irrigationAssignments[zone.id];
+                                    const dripPointCount = zoneSummaries[zone.id]?.dripPointCount || 0;
+                                    const currentRadiusConfig = irrigationRadiusConfig[irrigationType as keyof typeof irrigationRadiusConfig];
 
                                     return (
                                         <div
@@ -713,7 +720,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                     <span className="font-medium text-white">
                                                         Zone {index + 1}
                                                     </span>
-                                                    {assignedIrrigation && (
+                                                    {irrigationType && (
                                                         <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-xs text-cyan-300">
                                                             ✓ Assigned
                                                         </span>
@@ -722,7 +729,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                             </div>
 
                                             <select
-                                                value={assignedIrrigation || ''}
+                                                value={irrigationType || ''}
                                                 onChange={(e) => {
                                                     if (e.target.value) {
                                                         setIrrigationAssignments((prev: any) => ({
@@ -739,195 +746,100 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                     Select irrigation system...
                                                 </option>
                                                 <option value="sprinkler">🌿 Sprinkler</option>
-                                                <option value="mini_sprinkler">
-                                                    🌱 Mini Sprinkler
-                                                </option>
-                                                <option value="micro_spray">💦 Micro Spray</option>
-                                                <option value="drip_tape">💧 Drip Tape</option>
+                                                <option value="mini_sprinkler">🌱 Mini Sprinkler</option>
+                                                <option value="micro_spray">💦 Micro Spray & Jet</option>
+                                                <option value="drip-tape">💧 Drip Tape</option>
                                             </select>
 
                                             {/* Irrigation Settings */}
-                                            {assignedIrrigation && (
+                                            {irrigationType && (
                                                 <div className="mt-3 rounded-lg border border-gray-600 bg-gray-800 p-3">
                                                     <div className="mb-2 text-xs text-gray-300">
                                                         Settings:
                                                     </div>
 
-                                                    <div className="space-y-2">
-                                                        {/* แยก Controls ตามประเภทระบบน้ำ */}
-                                                        {assignedIrrigation === 'drip_tape' ? (
-                                                            // Controls สำหรับเทปน้ำหยด - ไม่มี overlap
-                                                            <div className="space-y-2">
-                                                                <div className="flex items-center justify-between">
-                                                                    <span className="text-xs text-gray-400">
-                                                                        ระยะห่างจุดน้ำหยด (m):
+                                                    {/* Fanggy005 EDIT: Conditional rendering for settings */}
+                                                    {irrigationType === 'drip-tape' ? (
+                                                        <div className="space-y-2">
+                                                            <div>
+                                                                <label htmlFor={`drip-spacing-${zone.id}`} className="block text-xs font-medium text-gray-400">
+                                                                    ระยะห่างจุดน้ำหยด (m):
+                                                                </label>
+                                                                <div className="flex items-center space-x-2">
+                                                                    <input
+                                                                        id={`drip-spacing-${zone.id}`}
+                                                                        type="range"
+                                                                        min={0.2}
+                                                                        max={0.5}
+                                                                        step={0.05}
+                                                                        value={dripSpacing[zone.id] || 0.3}
+                                                                        onChange={(e) => setDripSpacing({ ...dripSpacing, [zone.id]: parseFloat(e.target.value) })}
+                                                                        className="w-full"
+                                                                    />
+                                                                    <span className="text-sm font-semibold text-white">
+                                                                        {(dripSpacing[zone.id] || 0.3).toFixed(2)}m
                                                                     </span>
-                                                                    <div className="flex items-center space-x-2">
-                                                                        <input
-                                                                            type="range"
-                                                                            min="0.2"
-                                                                            max="2.0"
-                                                                            step="0.1"
-                                                                            value={
-                                                                                irrigationSettings[
-                                                                                    zone.id
-                                                                                ]?.dripSpacing ||
-                                                                                1.0
-                                                                            }
-                                                                            onChange={(e) => {
-                                                                                const newSpacing =
-                                                                                    parseFloat(
-                                                                                        e.target
-                                                                                            .value
-                                                                                    );
-                                                                                setIrrigationSettings(
-                                                                                    (
-                                                                                        prev: any
-                                                                                    ) => ({
-                                                                                        ...prev,
-                                                                                        [zone.id]: {
-                                                                                            ...prev[
-                                                                                                zone
-                                                                                                    .id
-                                                                                            ],
-                                                                                            dripSpacing:
-                                                                                                newSpacing,
-                                                                                        },
-                                                                                    })
-                                                                                );
-                                                                            }}
-                                                                            className="w-20"
-                                                                        />
-                                                                        <span className="w-12 text-xs text-white">
-                                                                            {irrigationSettings[
-                                                                                zone.id
-                                                                            ]?.dripSpacing?.toFixed(
-                                                                                1
-                                                                            ) || '1.0'}
-                                                                            m
-                                                                        </span>
-                                                                    </div>
                                                                 </div>
                                                                 <div className="text-xs text-gray-500">
                                                                     ระยะห่างระหว่างจุดหยดน้ำบนเทป
                                                                 </div>
                                                             </div>
-                                                        ) : (
-                                                            // Controls สำหรับสปริงเกลอร์ - มี radius และ overlap
-                                                            <div className="space-y-2">
-                                                                <div className="flex items-center justify-between">
-                                                                    <span className="text-xs text-gray-400">
-                                                                        รัศมีการฉีด (m):
-                                                                    </span>
-                                                                    <div className="flex items-center space-x-2">
-                                                                        <input
-                                                                            type="range"
-                                                                            min={
-                                                                                assignedIrrigation ===
-                                                                                'sprinkler'
-                                                                                    ? 8
-                                                                                    : assignedIrrigation ===
-                                                                                        'mini_sprinkler'
-                                                                                      ? 0.5
-                                                                                      : assignedIrrigation ===
-                                                                                          'micro_spray'
-                                                                                        ? 3
-                                                                                        : 0
-                                                                            }
-                                                                            max={
-                                                                                assignedIrrigation ===
-                                                                                'sprinkler'
-                                                                                    ? 12
-                                                                                    : assignedIrrigation ===
-                                                                                        'mini_sprinkler'
-                                                                                      ? 3
-                                                                                      : assignedIrrigation ===
-                                                                                          'micro_spray'
-                                                                                        ? 8
-                                                                                        : 0
-                                                                            }
-                                                                            step="0.5"
-                                                                            value={zoneRadius}
-                                                                            onChange={(e) => {
-                                                                                const newRadius =
-                                                                                    parseFloat(
-                                                                                        e.target
-                                                                                            .value
-                                                                                    );
-                                                                                setIrrigationRadius(
-                                                                                    (
-                                                                                        prev: any
-                                                                                    ) => ({
-                                                                                        ...prev,
-                                                                                        [zone.id]:
-                                                                                            newRadius,
-                                                                                    })
-                                                                                );
-                                                                            }}
-                                                                            className="w-20"
-                                                                        />
-                                                                        <span className="w-12 text-xs text-white">
-                                                                            {zoneRadius.toFixed(1)}m
-                                                                        </span>
-                                                                    </div>
+                                                            {dripPointCount > 0 && (
+                                                                <div className="text-xs text-cyan-300">
+                                                                    คำนวณได้ประมาณ {dripPointCount.toLocaleString()} จุด
                                                                 </div>
-
-                                                                {/* Overlap control - เฉพาะ sprinkler เท่านั้น */}
-                                                                {assignedIrrigation ===
-                                                                    'sprinkler' && (
-                                                                    <div className="flex items-center justify-between">
-                                                                        <span className="text-xs text-gray-400">
-                                                                            รูปแบบทับซ้อน:
-                                                                        </span>
-                                                                        <label className="flex items-center space-x-2">
-                                                                            <input
-                                                                                type="checkbox"
-                                                                                checked={
-                                                                                    zoneOverlap
-                                                                                }
-                                                                                onChange={(e) => {
-                                                                                    setSprinklerOverlap(
-                                                                                        (
-                                                                                            prev: any
-                                                                                        ) => ({
-                                                                                            ...prev,
-                                                                                            [zone.id]:
-                                                                                                e
-                                                                                                    .target
-                                                                                                    .checked,
-                                                                                        })
-                                                                                    );
-                                                                                }}
-                                                                                className="h-3 w-3 rounded border-gray-600 bg-gray-700 text-cyan-600 focus:ring-cyan-500"
-                                                                            />
-                                                                            <span className="text-xs text-white">
-                                                                                {zoneOverlap
-                                                                                    ? 'เปิด'
-                                                                                    : 'ปิด'}
-                                                                            </span>
-                                                                        </label>
-                                                                    </div>
-                                                                )}
+                                                            )}
+                                                        </div>
+                                                    ) : irrigationType && currentRadiusConfig ? (
+                                                        <div className="space-y-2">
+                                                            <div>
+                                                                <label htmlFor={`radius-${zone.id}`} className="block text-xs font-medium text-gray-400">
+                                                                    รัศมีการฉีด (m):
+                                                                </label>
+                                                                <div className="flex items-center space-x-2">
+                                                                    <input
+                                                                        id={`radius-${zone.id}`}
+                                                                        type="range"
+                                                                        min={currentRadiusConfig.min}
+                                                                        max={currentRadiusConfig.max}
+                                                                        step={currentRadiusConfig.step}
+                                                                        value={irrigationRadius[zone.id] || currentRadiusConfig.defaultValue}
+                                                                        onChange={(e) => setIrrigationRadius({ ...irrigationRadius, [zone.id]: parseFloat(e.target.value) })}
+                                                                        className="w-full"
+                                                                    />
+                                                                    <span className="text-sm font-semibold text-white">
+                                                                        {(irrigationRadius[zone.id] || currentRadiusConfig.defaultValue).toFixed(2)}m
+                                                                    </span>
+                                                                </div>
                                                             </div>
-                                                        )}
-                                                    </div>
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-xs text-gray-400">
+                                                                    รูปแบบทับซ้อน:
+                                                                </span>
+                                                                <label className="flex items-center space-x-2">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={sprinklerOverlap[zone.id] || false}
+                                                                        onChange={(e) => setSprinklerOverlap({ ...sprinklerOverlap, [zone.id]: e.target.checked })}
+                                                                        className="h-3 w-3 rounded border-gray-600 bg-gray-700 text-cyan-600 focus:ring-cyan-500"
+                                                                    />
+                                                                    <span className="text-xs text-white">
+                                                                        {sprinklerOverlap[zone.id] ? 'เปิด' : 'ปิด'}
+                                                                    </span>
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                    ) : null}
 
                                                     <div className="mt-3 flex space-x-2">
                                                         <button
-                                                            onClick={() =>
-                                                                generateIrrigationForZone(
-                                                                    zone,
-                                                                    assignedIrrigation
-                                                                )
-                                                            }
+                                                            onClick={() => generateIrrigationForZone(zone, irrigationType)}
                                                             className="flex-1 rounded bg-cyan-600 px-3 py-1 text-xs text-white transition-colors hover:bg-cyan-700"
                                                         >
-                                                            🚿 สร้างระบบน้ำ
+                                                            🚿 สร้าง/อัปเดตระบบน้ำ
                                                         </button>
                                                         <button
-                                                            onClick={() =>
-                                                                clearIrrigationForZone(zone.id)
-                                                            }
+                                                            onClick={() => clearIrrigationForZone(zone.id.toString())}
                                                             className="rounded bg-red-600 px-3 py-1 text-xs text-white transition-colors hover:bg-red-700"
                                                         >
                                                             🗑️ ลบ
@@ -938,168 +850,6 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                         </div>
                                     );
                                 })}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Summary Section */}
-                    <div className="rounded-lg border border-green-500/20 bg-green-500/10 p-3">
-                        <div className="mb-3 flex items-center justify-between">
-                            <span className="text-sm font-medium text-green-300">
-                                📊 Zone Summary
-                            </span>
-                        </div>
-                        <div className="space-y-3">
-                            {zones.length > 0 ? (
-                                zones.map((zone) => {
-                                    const summary = zoneSummaries[zone.id];
-                                    const assignedCrop = summary
-                                        ? getCropByValue(zoneAssignments[zone.id])
-                                        : null;
-
-                                    if (!summary || !assignedCrop) {
-                                        return (
-                                            <div
-                                                key={zone.id}
-                                                className="rounded bg-gray-700/50 p-2 text-center text-xs text-gray-400"
-                                            >
-                                                Generate irrigation for{' '}
-                                                <span
-                                                    style={{
-                                                        color: zone.color,
-                                                        fontWeight: 'bold',
-                                                    }}
-                                                >
-                                                    {zone.name}
-                                                </span>{' '}
-                                                to see summary.
-                                            </div>
-                                        );
-                                    }
-
-                                    return (
-                                        <div key={zone.id} className="rounded bg-gray-700 p-3">
-                                            <div className="mb-2 flex items-center justify-between">
-                                                <div className="flex items-center space-x-2">
-                                                    <span
-                                                        className="h-3 w-3 rounded-full"
-                                                        style={{ backgroundColor: zone.color }}
-                                                    ></span>
-                                                    <h4 className="font-bold text-white">
-                                                        {zone.name}
-                                                    </h4>
-                                                </div>
-                                                <span className="text-lg">{assignedCrop.icon}</span>
-                                            </div>
-                                            <div className="space-y-1 text-xs">
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-400">
-                                                        Total Planting Points:
-                                                    </span>
-                                                    <span className="font-medium text-white">
-                                                        {summary.totalPlantingPoints.toLocaleString()}{' '}
-                                                        points
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-400">
-                                                        Est. Yield:
-                                                    </span>
-                                                    <span className="font-medium text-white">
-                                                        {summary.estimatedYield.toLocaleString(
-                                                            undefined,
-                                                            { maximumFractionDigits: 0 }
-                                                        )}{' '}
-                                                        kg
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-400">
-                                                        Est. Income:
-                                                    </span>
-                                                    <span className="font-bold text-green-400">
-                                                        ฿
-                                                        {summary.estimatedPrice.toLocaleString(
-                                                            undefined,
-                                                            { maximumFractionDigits: 0 }
-                                                        )}
-                                                    </span>
-                                                </div>
-                                                <div className="mt-1 border-t border-gray-600 pt-1">
-                                                    <Tooltip
-                                                        content={summary.plantingPointsByRow
-                                                            .map(
-                                                                (r: any) =>
-                                                                    `Row ${r.row}: ${r.count} points`
-                                                            )
-                                                            .join('\n')}
-                                                    >
-                                                        <span className="cursor-help text-gray-500">
-                                                            Points per row:{' '}
-                                                            {summary.plantingPointsByRow
-                                                                .map((r: any) => r.count)
-                                                                .join(', ')}
-                                                        </span>
-                                                    </Tooltip>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })
-                            ) : (
-                                <div className="py-2 text-center text-xs text-gray-500">
-                                    No zones created yet.
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Irrigation Statistics */}
-                    {(irrigationPoints.length > 0 || irrigationLines.length > 0) && (
-                        <div className="rounded-lg bg-gray-700 p-3">
-                            <div className="mb-2 text-sm text-gray-300">📊 Irrigation Summary</div>
-                            <div className="grid grid-cols-2 gap-2 text-xs">
-                                <div className="flex items-center">
-                                    <div className="mr-2 h-3 w-3 rounded-full bg-green-500"></div>
-                                    <span className="text-gray-300">Sprinkler:</span>
-                                    <span className="ml-1 font-semibold text-white">
-                                        {
-                                            irrigationPoints.filter((p) => p.type === 'sprinkler')
-                                                .length
-                                        }
-                                    </span>
-                                </div>
-                                <div className="flex items-center">
-                                    <div className="mr-2 h-3 w-3 rounded-full bg-blue-500"></div>
-                                    <span className="text-gray-300">Mini Sprinkler:</span>
-                                    <span className="ml-1 font-semibold text-white">
-                                        {
-                                            irrigationPoints.filter(
-                                                (p) => p.type === 'mini_sprinkler'
-                                            ).length
-                                        }
-                                    </span>
-                                </div>
-                                <div className="flex items-center">
-                                    <div className="mr-2 h-3 w-3 rounded-full bg-orange-500"></div>
-                                    <span className="text-gray-300">Micro Spray:</span>
-                                    <span className="ml-1 font-semibold text-white">
-                                        {
-                                            irrigationPoints.filter((p) => p.type === 'micro_spray')
-                                                .length
-                                        }
-                                    </span>
-                                </div>
-                                <div className="flex items-center">
-                                    <div className="mr-2 h-3 w-3 rounded-full bg-cyan-500"></div>
-                                    <span className="text-gray-300">Drip Lines:</span>
-                                    <span className="ml-1 font-semibold text-white">
-                                        {
-                                            irrigationLines.filter((l) => l.type === 'drip_tape')
-                                                .length
-                                        }
-                                    </span>
-                                </div>
                             </div>
                         </div>
                     )}
