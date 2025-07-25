@@ -734,7 +734,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         equipment: google.maps.Marker[];
         irrigation: google.maps.Marker[];
         irrigationCircles: google.maps.Circle[];
-        irrigationLines: google.maps.Polyline[];
+        irrigationLines: google.maps.Polyline[]; // For drip tapes
         plantMarkers: google.maps.Marker[];
         zoneLabels: google.maps.Marker[];
     }>({
@@ -774,6 +774,8 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     if (parsedData.mapType) setMapType(parsedData.mapType);
                     // Fanggy005 EDIT: Restore drip spacing
                     if (parsedData.dripSpacing) setDripSpacing(parsedData.dripSpacing);
+                    // Fanggy005 EDIT: Restore zone summaries which might contain drip counts
+                    if (parsedData.zoneSummaries) setZoneSummaries(parsedData.zoneSummaries);
 
 
                     // Set step completed status for all previous steps
@@ -1372,7 +1374,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             setIrrigationSettings({});
             setIrrigationRadius({});
             setSprinklerOverlap({});
-            setDripSpacing({}); // Fanggy005 EDIT: Reset drip spacing
+            setDripSpacing({});
             setZoneSummaries({});
             setPlantingPoints([]);
             setError(null);
@@ -2221,29 +2223,31 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             try {
                 const zoneId = zone.id.toString();
     
-                // Clear existing irrigation points and circles for this zone
-                const existingIrrigation = irrigationPoints.filter(
-                    (point) => point.zoneId.toString() === zoneId
-                );
-                if (existingIrrigation.length > 0) {
-                    existingIrrigation.forEach((point) => {
+                // Clear existing irrigation for this zone
+                const existingPoints = irrigationPoints.filter((p) => p.zoneId.toString() === zoneId);
+                const existingLines = irrigationLines.filter((l: any) => l.zoneId.toString() === zoneId);
+    
+                if (existingPoints.length > 0) {
+                    existingPoints.forEach((point) => {
                         if (point.marker) point.marker.setMap(null);
                         if (point.circle) point.circle.setMap(null);
                     });
-    
-                    setIrrigationPoints((prev) =>
-                        prev.filter((point) => point.zoneId.toString() !== zoneId)
-                    );
-                    setMapObjects((prev) => ({
-                        ...prev,
-                        irrigation: prev.irrigation.filter((marker) => 
-                            !existingIrrigation.some((p) => p.marker === marker)
-                        ),
-                        irrigationCircles: prev.irrigationCircles.filter((circle) =>
-                            !existingIrrigation.some((p) => p.circle === circle)
-                        ),
-                    }));
+                    setIrrigationPoints((prev) => prev.filter((p) => p.zoneId.toString() !== zoneId));
                 }
+    
+                if (existingLines.length > 0) {
+                    existingLines.forEach((line: any) => {
+                        if (line.polyline) line.polyline.setMap(null);
+                    });
+                    setIrrigationLines((prev) => prev.filter((l: any) => l.zoneId.toString() !== zoneId));
+                }
+    
+                setMapObjects((prev) => ({
+                    ...prev,
+                    irrigation: prev.irrigation.filter((m) => !existingPoints.some((p) => p.marker === m)),
+                    irrigationCircles: prev.irrigationCircles.filter((c) => !existingPoints.some((p) => p.circle === c)),
+                    irrigationLines: prev.irrigationLines.filter((pl) => !existingLines.some((l: any) => l.polyline === pl)),
+                }));
     
                 const zoneLateralPipes = pipes.filter(
                     (pipe) => pipe.type === 'lateral' && pipe.zoneId.toString() === zoneId
@@ -2251,62 +2255,64 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
     
                 const newIrrigationPoints: any[] = [];
                 const newIrrigationCircles: google.maps.Circle[] = [];
+                const newIrrigationLines: any[] = [];
     
                 // --- DRIP TAPE LOGIC ---
                 if (irrigationType === 'drip-tape') {
                     const settings = DEFAULT_IRRIGATION_SETTINGS['drip-tape'];
                     const spacingMeters = dripSpacing[zoneId] || settings.defaultSpacing;
+                    let totalDripPoints = 0;
     
-                    zoneLateralPipes.forEach((pipe, pipeIndex) => {
+                    zoneLateralPipes.forEach((pipe) => {
                         if (pipe.coordinates && pipe.coordinates.length >= 2) {
+                            // สร้างเส้นประสีฟ้าทับแนวท่อย่อย
+                            const lineSymbol = {
+                                path: 'M 0,-1 0,1',
+                                strokeOpacity: 1,
+                                scale: 4,
+                            };
+    
+                            const polyline = new google.maps.Polyline({
+                                path: pipe.coordinates,
+                                strokeColor: '#3b82f6', // Blue color
+                                strokeOpacity: 0,
+                                icons: [{
+                                    icon: lineSymbol,
+                                    offset: '0',
+                                    repeat: '20px'
+                                }],
+                                map: map,
+                                zIndex: 3,
+                            });
+    
+                            newIrrigationLines.push({
+                                id: `drip-line-${pipe.id}`,
+                                polyline: polyline,
+                                zoneId: zone.id,
+                            });
+    
+                            // คำนวณจำนวนจุดน้ำหยดโดยไม่แสดงผล
                             for (let i = 0; i < pipe.coordinates.length - 1; i++) {
                                 const start = pipe.coordinates[i];
-                                const end = pipe.coordinates[i+1];
+                                const end = pipe.coordinates[i + 1];
                                 const segmentStart = new google.maps.LatLng(start.lat, start.lng);
                                 const segmentEnd = new google.maps.LatLng(end.lat, end.lng);
     
                                 const totalDistance = google.maps.geometry.spherical.computeDistanceBetween(segmentStart, segmentEnd);
-                                if (totalDistance < spacingMeters) continue;
-    
-                                const numPoints = Math.floor(totalDistance / spacingMeters);
-    
-                                for (let j = 0; j <= numPoints; j++) {
-                                    const fraction = totalDistance > 0 ? (j * spacingMeters) / totalDistance : 0;
-                                    if (fraction > 1) continue;
-    
-                                    const point = google.maps.geometry.spherical.interpolate(segmentStart, segmentEnd, fraction);
-    
-                                    if (google.maps.geometry.poly.containsLocation(point, zone.polygon)) {
-                                        const dripPoint = {
-                                            id: Date.now() + Math.random() + pipeIndex * 1000 + j,
-                                            lat: point.lat(),
-                                            lng: point.lng(),
-                                            type: irrigationType,
-                                            radius: 0, // Drip points don't have a radius
-                                            zoneId: zone.id,
-                                        };
-    
-                                        const marker = new google.maps.Marker({
-                                            position: point,
-                                            map: map,
-                                            title: `Drip Point - ${zone.name}`,
-                                            icon: {
-                                                path: google.maps.SymbolPath.CIRCLE,
-                                                scale: 2.5,
-                                                fillColor: '#3b82f6', // Blue color
-                                                fillOpacity: 1,
-                                                strokeColor: 'white',
-                                                strokeWeight: 0.5,
-                                            },
-                                        });
-    
-                                        (dripPoint as any).marker = marker;
-                                        newIrrigationPoints.push(dripPoint);
-                                    }
+                                if (totalDistance > 0) {
+                                    const numPoints = Math.floor(totalDistance / spacingMeters) + 1;
+                                    totalDripPoints += numPoints;
                                 }
                             }
                         }
                     });
+    
+                    // อัปเดต state สำหรับจำนวนจุดน้ำหยดใน zoneSummaries
+                    setZoneSummaries(prev => ({ 
+                        ...prev, 
+                        [zoneId]: { ...prev[zoneId], dripPointCount: totalDripPoints }
+                    }));
+                    console.log(`Zone ${zone.name}: Total Drip Points Calculated: ${totalDripPoints}`);
                 } 
                 // --- SPRINKLER LOGIC (Existing logic) ---
                 else {
@@ -2397,15 +2403,14 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     }
                 }
     
-                // Update state with new points
+                // Update state with new points and lines
                 setIrrigationPoints((prev) => [...prev, ...newIrrigationPoints]);
+                setIrrigationLines((prev) => [...prev, ...newIrrigationLines]);
                 setMapObjects((prev) => ({
                     ...prev,
-                    irrigation: [
-                        ...prev.irrigation,
-                        ...newIrrigationPoints.map((p: any) => p.marker).filter((marker): marker is google.maps.Marker => marker !== undefined),
-                    ],
+                    irrigation: [...prev.irrigation, ...newIrrigationPoints.map((p: any) => p.marker).filter(Boolean)],
                     irrigationCircles: [...prev.irrigationCircles, ...newIrrigationCircles],
+                    irrigationLines: [...prev.irrigationLines, ...newIrrigationLines.map((l: any) => l.polyline).filter(Boolean)],
                 }));
     
                 setIrrigationAssignments((prev) => ({
@@ -2422,13 +2427,16 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             map,
             irrigationRadius,
             sprinklerOverlap,
-            dripSpacing, // Fanggy005 EDIT: Add dependency
+            dripSpacing,
             irrigationPoints,
+            irrigationLines,
             pipes,
             setIrrigationRadius,
             setIrrigationPoints,
+            setIrrigationLines,
             setMapObjects,
             setIrrigationAssignments,
+            setZoneSummaries,
             handleError,
         ]
     );
@@ -2439,8 +2447,11 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             const zoneIrrigationPoints = irrigationPoints.filter(
                 (point) => point.zoneId.toString() === zoneId
             );
+            const zoneIrrigationLines = irrigationLines.filter(
+                (line: any) => line.zoneId.toString() === zoneId
+            );
 
-            if (zoneIrrigationPoints.length === 0) {
+            if (zoneIrrigationPoints.length === 0 && zoneIrrigationLines.length === 0) {
                 handleError('No irrigation points found for this zone');
                 return;
             }
@@ -2457,9 +2468,15 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     if (point.marker) point.marker.setMap(null);
                     if (point.circle) point.circle.setMap(null);
                 });
+                zoneIrrigationLines.forEach((line: any) => {
+                    if (line.polyline) line.polyline.setMap(null);
+                });
 
                 setIrrigationPoints((prev) =>
                     prev.filter((point) => point.zoneId.toString() !== zoneId)
+                );
+                setIrrigationLines((prev) =>
+                    prev.filter((line: any) => line.zoneId.toString() !== zoneId)
                 );
                 setMapObjects((prev) => ({
                     ...prev,
@@ -2469,6 +2486,9 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     irrigationCircles: prev.irrigationCircles.filter((circle) => {
                         return !zoneIrrigationPoints.some((point) => point.circle === circle);
                     }),
+                    irrigationLines: prev.irrigationLines.filter((polyline) => {
+                        return !zoneIrrigationLines.some((line: any) => line.polyline === polyline);
+                    }),
                 }));
 
                 setIrrigationAssignments((prev) => {
@@ -2476,14 +2496,25 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     delete newAssignments[zoneId];
                     return newAssignments;
                 });
+                // Fanggy005 EDIT: Clear drip point count from summary
+                setZoneSummaries(prev => {
+                    const newSummaries = { ...prev };
+                    if (newSummaries[zoneId]) {
+                        delete newSummaries[zoneId].dripPointCount;
+                    }
+                    return newSummaries;
+                });
             }
         },
         [
             irrigationPoints,
+            irrigationLines,
             zones,
             setIrrigationPoints,
+            setIrrigationLines,
             setMapObjects,
             setIrrigationAssignments,
+            setZoneSummaries,
             handleError,
         ]
     );
@@ -2581,7 +2612,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 pipes: pipes.map((pipe) => ({ id: pipe.id, name: pipe.name, type: pipe.type, color: pipe.color, coordinates: pipe.coordinates, zoneId: pipe.zoneId })),
                 equipmentIcons: equipmentIcons.map((eq) => ({ id: eq.id, type: eq.type, name: eq.name, lat: eq.lat, lng: eq.lng, config: eq.config })),
                 irrigationPoints: irrigationPoints.map((point) => ({ id: point.id, lat: point.lat, lng: point.lng, type: point.type, radius: point.radius, zoneId: point.zoneId })),
-                irrigationLines: irrigationLines,
+                irrigationLines: irrigationLines.map((line: any) => ({ id: line.id, zoneId: line.zoneId, coordinates: line.polyline.getPath().getArray().map((p: any) => ({ lat: p.lat(), lng: p.lng() })) })),
                 irrigationAssignments: irrigationAssignments,
                 irrigationSettings: irrigationSettings,
                 rowSpacing: rowSpacing,
@@ -2589,7 +2620,8 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 mapCenter: mapCenter,
                 mapZoom: mapZoom,
                 mapType: mapType,
-                dripSpacing: dripSpacing, // Fanggy005 EDIT: Save drip spacing
+                dripSpacing: dripSpacing,
+                zoneSummaries: zoneSummaries, // Fanggy005 EDIT: Save zone summaries
             };
 
             try {
@@ -2801,58 +2833,68 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                             setMapObjects((prev) => ({ ...prev, equipment: equipmentMarkers }));
                         }
 
-                        // Restore irrigation points
+                        // Fanggy005 EDIT: Fix logic for restoring irrigation points and lines
+                        // Restore irrigation points (Sprinklers, etc.)
                         if (parsedData.irrigationPoints && Array.isArray(parsedData.irrigationPoints)) {
                             const restoredIrrigationPoints: IrrigationPoint[] = [];
                             const irrigationMarkers: google.maps.Marker[] = [];
                             const irrigationCircles: google.maps.Circle[] = [];
 
-                            parsedData.irrigationPoints.forEach((pointData: any) => {
-                                if (pointData.lat && pointData.lng) {
-                                    let markerIcon;
-                                    // Fanggy005 EDIT: Differentiate drip tape markers
-                                    if (pointData.type === 'drip-tape') {
-                                        markerIcon = {
-                                            path: google.maps.SymbolPath.CIRCLE, scale: 2.5,
-                                            fillColor: '#3b82f6', fillOpacity: 1,
-                                            strokeColor: 'white', strokeWeight: 0.5,
-                                        };
-                                    } else {
-                                        markerIcon = {
-                                            path: google.maps.SymbolPath.CIRCLE, scale: 4,
-                                            fillColor: '#0099ff', fillOpacity: 1,
-                                            strokeColor: 'white', strokeWeight: 1,
-                                        };
-                                    }
-
-                                    const marker = new google.maps.Marker({
-                                        position: { lat: pointData.lat, lng: pointData.lng }, map: map,
-                                        title: `${pointData.type} - Zone ${pointData.zoneId}`, icon: markerIcon,
-                                    });
-                                    
-                                    let circle: google.maps.Circle | undefined = undefined;
-                                    if (pointData.radius > 0) {
-                                        circle = new google.maps.Circle({
-                                            center: { lat: pointData.lat, lng: pointData.lng }, radius: pointData.radius,
-                                            map: map, fillColor: '#0099ff', fillOpacity: 0.1,
-                                            strokeColor: '#0099ff', strokeWeight: 1, strokeOpacity: 0.3,
+                            parsedData.irrigationPoints
+                                .filter((pointData: any) => pointData.type !== 'drip-tape') // Filter out drip-tape data
+                                .forEach((pointData: any) => {
+                                    if (pointData.lat && pointData.lng) {
+                                        const marker = new google.maps.Marker({
+                                            position: { lat: pointData.lat, lng: pointData.lng }, map: map,
+                                            title: `${pointData.type} - Zone ${pointData.zoneId}`,
+                                            icon: { path: google.maps.SymbolPath.CIRCLE, scale: 4, fillColor: '#0099ff', fillOpacity: 1, strokeColor: 'white', strokeWeight: 1 },
                                         });
-                                        irrigationCircles.push(circle);
-                                    }
+                                        
+                                        let circle: google.maps.Circle | undefined = undefined;
+                                        if (pointData.radius > 0) {
+                                            circle = new google.maps.Circle({
+                                                center: { lat: pointData.lat, lng: pointData.lng }, radius: pointData.radius,
+                                                map: map, fillColor: '#0099ff', fillOpacity: 0.1,
+                                                strokeColor: '#0099ff', strokeWeight: 1, strokeOpacity: 0.3,
+                                            });
+                                            irrigationCircles.push(circle);
+                                        }
 
-                                    restoredIrrigationPoints.push({
-                                        id: pointData.id, lat: pointData.lat, lng: pointData.lng,
-                                        type: pointData.type, radius: pointData.radius, zoneId: pointData.zoneId,
-                                        marker: marker, circle: circle,
+                                        restoredIrrigationPoints.push({
+                                            id: pointData.id, lat: pointData.lat, lng: pointData.lng,
+                                            type: pointData.type, radius: pointData.radius, zoneId: pointData.zoneId,
+                                            marker: marker, circle: circle,
+                                        });
+                                        irrigationMarkers.push(marker);
+                                    }
+                                });
+                            setIrrigationPoints(restoredIrrigationPoints);
+                            setMapObjects((prev) => ({ ...prev, irrigation: irrigationMarkers, irrigationCircles: irrigationCircles }));
+                        }
+                        
+                        // Restore irrigation lines (Drip Tapes)
+                        if (parsedData.irrigationLines && Array.isArray(parsedData.irrigationLines)) {
+                            const restoredIrrigationLines: any[] = [];
+                            const irrigationPolylines: google.maps.Polyline[] = [];
+                            const lineSymbol = { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 4 };
+
+                            parsedData.irrigationLines.forEach((lineData: any) => {
+                                if (lineData.coordinates) {
+                                    const polyline = new google.maps.Polyline({
+                                        path: lineData.coordinates,
+                                        strokeColor: '#3b82f6',
+                                        strokeOpacity: 0,
+                                        icons: [{ icon: lineSymbol, offset: '0', repeat: '20px' }],
+                                        map: map, zIndex: 3,
                                     });
-                                    irrigationMarkers.push(marker);
+                                    restoredIrrigationLines.push({ id: lineData.id, polyline: polyline, zoneId: lineData.zoneId });
+                                    irrigationPolylines.push(polyline);
                                 }
                             });
-                            setIrrigationPoints(restoredIrrigationPoints);
-                            setMapObjects((prev) => ({
-                                ...prev, irrigation: irrigationMarkers, irrigationCircles: irrigationCircles,
-                            }));
+                            setIrrigationLines(restoredIrrigationLines);
+                            setMapObjects((prev) => ({ ...prev, irrigationLines: irrigationPolylines }));
                         }
+
 
                         setHasRestoredOnce(true);
                         console.log('✅ Successfully restored all map objects for editing');
