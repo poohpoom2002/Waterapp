@@ -293,6 +293,15 @@ export default function GreenhouseMap() {
         return hasMainPipe && hasSubPipe;
     }, [irrigationElements]);
 
+    // Check if all plots have crops assigned
+    const plotsWithoutCrops = useMemo(() => {
+        return shapes.filter((shape) => shape.type === 'plot' && !shape.cropType);
+    }, [shapes]);
+
+    const canGoToSummary = useMemo(() => {
+        return plotsWithoutCrops.length === 0 && shapes.some((shape) => shape.type === 'plot');
+    }, [plotsWithoutCrops, shapes]);
+
     // Canvas utility functions
     const snapToGrid = useCallback(
         (point: Point): Point => ({
@@ -1297,11 +1306,83 @@ export default function GreenhouseMap() {
     // Utility functions
     const deleteElement = useCallback(() => {
         if (selectedElement) {
-            setShapes((prev) => prev.filter((s) => s.id !== selectedElement));
-            setIrrigationElements((prev) => prev.filter((el) => el.id !== selectedElement));
+            // หาองค์ประกอบที่จะลบ
+            const elementToDelete = irrigationElements.find((el) => el.id === selectedElement);
+            
+            // หากเป็นท่อย่อย ให้หาและลบสปริงเกลอร์ที่เกี่ยวข้องด้วย
+            if (elementToDelete && elementToDelete.type === 'sub-pipe') {
+                const relatedSprinklers: string[] = [];
+                
+                // หาสปริงเกลอร์ที่อยู่ใกล้กับท่อย่อยนี้
+                irrigationElements
+                    .filter((el) => el.type === 'sprinkler')
+                    .forEach((sprinkler) => {
+                        const sprinklerPoint = sprinkler.points[0];
+                        
+                        // ตรวจสอบว่าสปริงเกลอร์อยู่ใกล้กับท่อย่อยหรือไม่
+                        for (let i = 0; i < elementToDelete.points.length - 1; i++) {
+                            const p1 = elementToDelete.points[i];
+                            const p2 = elementToDelete.points[i + 1];
+
+                            // คำนวณระยะห่างจากจุดสปริงเกลอร์ไปยังส่วนของท่อ
+                            const A = sprinklerPoint.x - p1.x;
+                            const B = sprinklerPoint.y - p1.y;
+                            const C = p2.x - p1.x;
+                            const D = p2.y - p1.y;
+
+                            const dot = A * C + B * D;
+                            const lenSq = C * C + D * D;
+                            let param = -1;
+                            if (lenSq !== 0) param = dot / lenSq;
+
+                            let xx, yy;
+                            if (param < 0) {
+                                xx = p1.x;
+                                yy = p1.y;
+                            } else if (param > 1) {
+                                xx = p2.x;
+                                yy = p2.y;
+                            } else {
+                                xx = p1.x + param * C;
+                                yy = p1.y + param * D;
+                            }
+
+                            const distanceToLine = Math.sqrt(
+                                Math.pow(sprinklerPoint.x - xx, 2) + Math.pow(sprinklerPoint.y - yy, 2)
+                            );
+
+                            // หากระยะห่างน้อยกว่า 30 pixels ถือว่าเกี่ยวข้องกัน
+                            if (distanceToLine < 30) {
+                                relatedSprinklers.push(sprinkler.id);
+                                break;
+                            }
+                        }
+                    });
+
+                // ลบท่อย่อยและสปริงเกลอร์ที่เกี่ยวข้อง
+                setIrrigationElements((prev) => 
+                    prev.filter((el) => 
+                        el.id !== selectedElement && 
+                        !relatedSprinklers.includes(el.id)
+                    )
+                );
+                
+                // แสดงข้อความแจ้งเตือน
+                if (relatedSprinklers.length > 0) {
+                    alert(`ลบท่อย่อยและสปริงเกลอร์ ${relatedSprinklers.length} ตัวที่เกี่ยวข้องเรียบร้อยแล้ว`);
+                }
+            } else if (elementToDelete && elementToDelete.type === 'drip-line') {
+                // หากเป็นสายน้ำหยด ให้ลบเฉพาะสายน้ำหยดนั้น
+                setIrrigationElements((prev) => prev.filter((el) => el.id !== selectedElement));
+            } else {
+                // สำหรับองค์ประกอบอื่นๆ ลบตามปกติ
+                setShapes((prev) => prev.filter((s) => s.id !== selectedElement));
+                setIrrigationElements((prev) => prev.filter((el) => el.id !== selectedElement));
+            }
+            
             setSelectedElement(null);
         }
-    }, [selectedElement]);
+    }, [selectedElement, irrigationElements]);
 
     const autoGenerateSprinklers = useCallback(() => {
         if (!canAutoGenerate) {
@@ -1736,6 +1817,44 @@ export default function GreenhouseMap() {
                             </div>
                         </div>
 
+                        {/* Crop Assignment Status */}
+                        {shapes.filter((s) => s.type === 'plot').length > 0 && (
+                            <div className="mb-4">
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">
+                                    สถานะการเลือกพืช
+                                </h3>
+                                <div className="space-y-1 text-xs">
+                                    <div
+                                        className={`flex items-center space-x-2 ${
+                                            plotsWithoutCrops.length === 0
+                                                ? 'text-green-400'
+                                                : 'text-yellow-400'
+                                        }`}
+                                    >
+                                        <span>
+                                            {plotsWithoutCrops.length === 0 ? '✓' : '⚠️'}
+                                        </span>
+                                        <span>
+                                            เลือกพืชครบทุกแปลง ({shapes.filter((s) => s.type === 'plot' && s.cropType).length}/{shapes.filter((s) => s.type === 'plot').length})
+                                        </span>
+                                    </div>
+                                    <div
+                                        className={`flex items-center space-x-2 ${
+                                            canGoToSummary ? 'text-green-400' : 'text-red-400'
+                                        }`}
+                                    >
+                                        <span>{canGoToSummary ? '✓' : '✗'}</span>
+                                        <span>พร้อมไปดูสรุป</span>
+                                    </div>
+                                </div>
+                                {plotsWithoutCrops.length > 0 && (
+                                    <div className="mt-2 text-xs text-yellow-400">
+                                        แปลงที่ยังไม่เลือก: {plotsWithoutCrops.map(plot => plot.name).join(', ')}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {/* Canvas Info */}
                         <div className="mb-4">
                             <h3 className="mb-2 text-sm font-medium text-gray-300">
@@ -2156,17 +2275,26 @@ export default function GreenhouseMap() {
                                                             className={`cursor-pointer rounded p-2 text-sm transition-colors ${
                                                                 selectedCrops.length === 0
                                                                     ? 'cursor-not-allowed bg-gray-700 text-gray-500'
-                                                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                                    : plot.cropType
+                                                                    ? 'bg-green-700 text-gray-300 hover:bg-green-600'
+                                                                    : 'bg-yellow-700 text-gray-300 hover:bg-yellow-600'
                                                             }`}
                                                             title={
                                                                 selectedCrops.length === 0
                                                                     ? 'กรุณาเลือกพืชในขั้นตอนแรก'
-                                                                    : 'คลิกเพื่อเลือกพืช'
+                                                                    : plot.cropType
+                                                                    ? 'คลิกเพื่อเปลี่ยนพืช'
+                                                                    : 'คลิกเพื่อเลือกพืช (จำเป็น)'
                                                             }
                                                         >
                                                             <div className="flex items-center justify-between">
                                                                 <span className="truncate">
                                                                     {plot.name}
+                                                                    {!plot.cropType && (
+                                                                        <span className="ml-1 text-yellow-400">
+                                                                            ⚠️
+                                                                        </span>
+                                                                    )}
                                                                 </span>
                                                                 <div className="flex items-center space-x-2">
                                                                     {crop ? (
@@ -2174,7 +2302,7 @@ export default function GreenhouseMap() {
                                                                             {crop.icon}
                                                                         </span>
                                                                     ) : (
-                                                                        <span className="text-xs text-gray-500">
+                                                                        <span className="text-xs text-yellow-400">
                                                                             {selectedCrops.length ===
                                                                             0
                                                                                 ? 'ไม่มีพืชให้เลือก'
@@ -2347,6 +2475,18 @@ export default function GreenhouseMap() {
 
             {/* Bottom Bar */}
             <div className="flex-shrink-0 border-t border-gray-700 bg-gray-800 px-6 py-3">
+                {/* Warning Message */}
+                {plotsWithoutCrops.length > 0 && (
+                    <div className="mb-3 rounded-lg border border-yellow-600 bg-yellow-900/30 p-3">
+                        <div className="text-sm text-yellow-300">
+                            ⚠️ กรุณาเลือกพืชให้ครบทุกแปลงปลูกก่อนไปดูสรุป
+                        </div>
+                        <div className="mt-1 text-xs text-yellow-400">
+                            แปลงที่ยังไม่เลือกพืช: {plotsWithoutCrops.map(plot => plot.name).join(', ')}
+                        </div>
+                    </div>
+                )}
+
                 <div className="flex justify-between">
                     <button
                         onClick={() => {
@@ -2396,6 +2536,11 @@ export default function GreenhouseMap() {
 
                     <button
                         onClick={() => {
+                            if (!canGoToSummary) {
+                                alert('กรุณาเลือกพืชให้ครบทุกแปลงปลูกก่อนไปดูสรุป');
+                                return;
+                            }
+
                             const summaryData = {
                                 selectedCrops: selectedCrops,
                                 planningMethod: 'draw',
@@ -2413,7 +2558,13 @@ export default function GreenhouseMap() {
 
                             window.location.href = '/green-house-summary';
                         }}
-                        className="flex items-center rounded bg-blue-600 px-6 py-2 text-white transition-colors hover:bg-blue-700"
+                        disabled={!canGoToSummary}
+                        className={`flex items-center rounded px-6 py-2 transition-colors ${
+                            canGoToSummary
+                                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                : 'cursor-not-allowed bg-gray-600 text-gray-400'
+                        }`}
+                        title={!canGoToSummary ? 'กรุณาเลือกพืชให้ครบทุกแปลงปลูกก่อน' : ''}
                     >
                         📊 ดูสรุป
                         <svg

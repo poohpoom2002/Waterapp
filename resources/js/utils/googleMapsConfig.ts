@@ -37,13 +37,8 @@ export const GOOGLE_MAPS_CONFIG = {
         fullscreenControl: true,
         mapTypeControl: true,
         mapTypeControlOptions: {
-<<<<<<< HEAD
             position: 'TOP_CENTER' as any,
             style: 'HORIZONTAL_BAR' as any,
-=======
-            position: 'LEFT_BOTTOM' as unknown, // ใช้ string แทน google.maps.ControlPosition.LEFT_BOTTOM
-            style: 'HORIZONTAL_BAR' as unknown, // ใช้ string แทน google.maps.MapTypeControlStyle.HORIZONTAL_BAR
->>>>>>> main
             mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain'],
         },
         minZoom: 1,
