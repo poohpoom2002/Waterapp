@@ -9,6 +9,7 @@ use App\Models\FieldZone;
 use App\Models\PlantType;
 use App\Models\PlantingPoint;
 use App\Models\Pipe;
+use App\Models\Folder;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -977,6 +978,9 @@ class FarmController extends Controller
                     'customerName' => $field->customer_name,
                     'userName' => $field->user ? $field->user->name : 'Unknown',
                     'category' => $field->category ?? 'horticulture',
+                    'status' => $field->status,
+                    'isCompleted' => $field->is_completed,
+                    'folderId' => $field->folder_id,
                     'area' => $field->area_coordinates,
                     'plantType' => [
                         'id' => $field->plantType->id,
@@ -987,7 +991,8 @@ class FarmController extends Controller
                         'water_needed' => $field->plantType->water_needed
                     ],
                     'totalPlants' => $field->total_plants,
-                    'totalArea' => $field->total_area,
+                    'totalArea' => (float) $field->total_area,
+                    'total_water_need' => (float) $field->total_water_need,
                     'createdAt' => $field->created_at->toISOString(),
                     'layers' => $field->layers->map(function ($layer) {
                         return [
@@ -1799,6 +1804,205 @@ class FarmController extends Controller
         }
         
         return $analysis;
+    }
+
+    // Folder Management Methods
+    public function getFolders(): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+            $folders = Folder::where('user_id', $user->id)
+                ->orderBy('name')
+                ->get();
+
+            // Create default system folders if they don't exist
+            $systemFolders = [
+                [
+                    'name' => 'Finished',
+                    'type' => 'finished',
+                    'color' => '#10b981',
+                    'icon' => '✅',
+                ],
+                [
+                    'name' => 'Unfinished',
+                    'type' => 'unfinished',
+                    'color' => '#f59e0b',
+                    'icon' => '⏳',
+                ],
+            ];
+
+            foreach ($systemFolders as $systemFolder) {
+                $exists = $folders->where('name', $systemFolder['name'])->first();
+                if (!$exists) {
+                    Folder::create([
+                        ...$systemFolder,
+                        'user_id' => $user->id,
+                    ]);
+                }
+            }
+
+            // Refresh the folders list
+            $folders = Folder::where('user_id', $user->id)
+                ->orderBy('name')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'folders' => $folders
+            ]);
+        } catch (Exception $e) {
+            \Log::error('Error fetching folders: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching folders'
+            ], 500);
+        }
+    }
+
+    public function createFolder(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'type' => 'required|in:finished,unfinished,custom,customer,category',
+                'parent_id' => 'nullable|exists:folders,id',
+                'color' => 'nullable|string|max:7',
+                'icon' => 'nullable|string|max:10',
+            ]);
+
+            $user = auth()->user();
+            $folder = Folder::create([
+                ...$validated,
+                'user_id' => $user->id,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'folder' => $folder
+            ]);
+        } catch (Exception $e) {
+            \Log::error('Error creating folder: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error creating folder'
+            ], 500);
+        }
+    }
+
+    public function updateFolder(Request $request, $folderId): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+            $folder = Folder::where('user_id', $user->id)
+                ->findOrFail($folderId);
+
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'color' => 'nullable|string|max:7',
+                'icon' => 'nullable|string|max:10',
+            ]);
+
+            $folder->update($validated);
+
+            return response()->json([
+                'success' => true,
+                'folder' => $folder
+            ]);
+        } catch (Exception $e) {
+            \Log::error('Error updating folder: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error updating folder'
+            ], 500);
+        }
+    }
+
+    public function deleteFolder($folderId): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+            
+            // Check if folderId is numeric
+            if (!is_numeric($folderId)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid folder ID provided'
+                ], 400);
+            }
+            
+            $folder = Folder::where('user_id', $user->id)
+                ->findOrFail($folderId);
+
+            // Check if it's a system folder
+            if ($folder && $folder->isSystemFolder()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot delete system folders'
+                ], 400);
+            }
+
+            // Move fields to unfinished folder
+            $unfinishedFolder = Folder::where('user_id', $user->id)
+                ->where('name', 'Unfinished')
+                ->first();
+
+            if ($unfinishedFolder) {
+                Field::where('folder_id', $folder->id)
+                    ->update(['folder_id' => $unfinishedFolder->id]);
+            } else {
+                // Create unfinished folder if it doesn't exist
+                $unfinishedFolder = Folder::create([
+                    'name' => 'Unfinished',
+                    'type' => 'unfinished',
+                    'color' => '#f59e0b',
+                    'icon' => '⏳',
+                    'user_id' => $user->id,
+                ]);
+
+                Field::where('folder_id', $folder->id)
+                    ->update(['folder_id' => $unfinishedFolder->id]);
+            }
+
+            $folder->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Folder deleted successfully'
+            ]);
+        } catch (Exception $e) {
+            \Log::error('Error deleting folder: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error deleting folder'
+            ], 500);
+        }
+    }
+
+    public function updateFieldStatus(Request $request, $fieldId): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+            $field = Field::where('user_id', $user->id)
+                ->findOrFail($fieldId);
+
+            $validated = $request->validate([
+                'status' => 'required|in:finished,unfinished',
+                'is_completed' => 'required|boolean',
+            ]);
+
+            $field->update($validated);
+
+            return response()->json([
+                'success' => true,
+                'field' => $field
+            ]);
+        } catch (Exception $e) {
+            \Log::error('Error updating field status: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error updating field status'
+            ], 500);
+        }
     }
 }
 
