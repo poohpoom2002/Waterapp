@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import Navbar from '../../components/Navbar';
+import Footer from '../../components/Footer';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface GreenhousePlannerProps {
     crops?: string;
@@ -146,6 +149,7 @@ const GRID_SIZE = 25;
 const CANVAS_SIZE = { width: 2400, height: 1600 };
 
 export default function GreenhousePlanner({ crops, method, irrigation }: GreenhousePlannerProps) {
+    const { t } = useLanguage();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [selectedTool, setSelectedTool] = useState<string>('select');
     const [shapes, setShapes] = useState<Shape[]>([]);
@@ -1416,22 +1420,23 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
     };
 
     return (
-        <div className="flex h-screen flex-col overflow-hidden bg-gray-900 text-white">
-            {/* Header */}
-            <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-3">
+        <div className="min-h-screen flex flex-col bg-gray-900 text-white">
+            <Navbar />
+            <div className="flex flex-1 flex-col overflow-hidden">
+                {/* Header */}
+                <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-3">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                         <div>
-                            <h1 className="text-xl font-bold">
-                                ออกแบบพื้นที่โรงเรือน พร้อมระบบวัดระยะ
-                            </h1>
-                            <p className="text-sm text-gray-400">
-                                วาดโครงสร้างโรงเรือนและแปลงปลูกของคุณ - พื้นที่ 2400x1600 pixels (1
-                                grid = 1 เมตร)
-                                <span className="ml-2 text-blue-300">
-                                    แสดงการวัดระยะแบบ Real-time
-                                </span>
-                            </p>
+                                                    <h1 className="text-xl font-bold">
+                            {t('greenhouse_design_title')}
+                        </h1>
+                        <p className="text-sm text-gray-400">
+                            {t('greenhouse_design_description')}
+                            <span className="ml-2 text-blue-300">
+                                แสดงการวัดระยะแบบ Real-time
+                            </span>
+                        </p>
                         </div>
                     </div>
 
@@ -1994,6 +1999,8 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                     <div className="text-center text-sm text-gray-300">{hoveredInstruction}</div>
                 </div>
             )}
+            </div>
+            <Footer />
         </div>
     );
 }

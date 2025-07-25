@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { cropTypes, getCropByValue, searchCrops, type Crop } from '@/pages/utils/cropData';
+import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 
 interface FieldCropProps {
     cropType?: string;
@@ -53,8 +55,9 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
     }, [selectedCrops.length]);
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white">
-            <div className="flex h-screen">
+        <div className="min-h-screen flex flex-col bg-gray-900 text-white">
+            <Navbar />
+            <div className="flex-1 flex">
                 {/* Sidebar - Fixed Summary Panel */}
                 <div className="flex w-80 flex-col overflow-hidden border-r border-gray-700 bg-gray-800">
                     {/* Header */}
@@ -275,6 +278,7 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
                     </div>
                 </div>
             </div>
+            <Footer />
         </div>
     );
 }

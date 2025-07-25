@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react';
+import Navbar from '../../components/Navbar';
+import Footer from '../../components/Footer';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 // --- คำจำกัดความของตัวเลือกระบบน้ำ ---
 interface IrrigationOption {
@@ -21,7 +24,7 @@ const irrigationOptions: IrrigationOption[] = [
         id: 'drip',
         name: 'น้ำหยด',
         icon: '💧🌱',
-        description: 'ประหยัดน้ำสูงสุด โดยให้น้ำโดยตรงที่โคนต้นพืช',
+        description: 'ประหยดน้ำสูงสุด โดยให้น้ำโดยตรงที่โคนต้นพืช',
     },
     {
         id: 'mixed',
@@ -35,6 +38,7 @@ const irrigationOptions: IrrigationOption[] = [
 
 // --- คอมโพเนนต์ React ---
 export default function ChooseIrrigationMethod() {
+    const { t } = useLanguage();
     const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
     const [crops, setCrops] = useState<string>('');
     const [shapes, setShapes] = useState<string>('');
@@ -112,13 +116,15 @@ export default function ChooseIrrigationMethod() {
     };
 
     return (
-        <div className="flex min-h-screen flex-col items-center justify-center bg-gray-900 p-4 text-white">
-            <div className="w-full max-w-4xl">
+        <div className="min-h-screen flex flex-col bg-gray-900 text-white">
+            <Navbar />
+            <div className="flex-1 flex flex-col items-center justify-center p-4">
+                <div className="w-full max-w-4xl">
                 {/* Header */}
                 <div className="mb-10 text-center">
-                    <h1 className="text-3xl font-bold text-white">เลือกระบบการให้น้ำ</h1>
+                    <h1 className="text-3xl font-bold text-white">{t('greenhouse_irrigation_selection')}</h1>
                     <p className="text-md mt-2 text-gray-400">
-                        โปรดเลือกวิธีการให้น้ำที่เหมาะสมกับความต้องการของคุณ
+                        {t('greenhouse_irrigation_description')}
                     </p>
 
                     {/* Progress indicator */}
@@ -139,11 +145,11 @@ export default function ChooseIrrigationMethod() {
                 {(crops || shapes) && (
                     <div className="mb-8 rounded-lg border border-gray-700 bg-gray-800 p-4">
                         <h3 className="mb-2 text-lg font-medium text-green-400">
-                            ข้อมูลที่เลือกไว้
+                            {t('greenhouse_selected_data')}
                         </h3>
                         {crops && (
                             <div className="mb-2">
-                                <span className="text-sm text-gray-400">พืชที่เลือก: </span>
+                                <span className="text-sm text-gray-400">{t('greenhouse_selected_crops')}: </span>
                                 <div className="mt-1 flex flex-wrap gap-1">
                                     {crops.split(',').map((crop, index) => (
                                         <span
@@ -158,7 +164,7 @@ export default function ChooseIrrigationMethod() {
                         )}
                         {shapes && (
                             <div className="text-sm text-gray-400">
-                                ✓ มีแบบโรงเรือนที่วาดไว้แล้ว (
+                                ✓ {t('greenhouse_greenhouse_plans')} (
                                 {(() => {
                                     try {
                                         return JSON.parse(decodeURIComponent(shapes)).length;
@@ -170,7 +176,7 @@ export default function ChooseIrrigationMethod() {
                             </div>
                         )}
                         {method && (
-                            <div className="text-sm text-gray-400">วิธีการวางแผน: {method}</div>
+                            <div className="text-sm text-gray-400">{t('greenhouse_planning_method')}: {method}</div>
                         )}
                     </div>
                 )}
@@ -261,7 +267,7 @@ export default function ChooseIrrigationMethod() {
                                 d="M10 19l-7-7m0 0l7-7m-7 7h18"
                             />
                         </svg>
-                        กลับไปออกแบบพื้นที่
+                        {t('greenhouse_back_to_planning')}
                     </button>
 
                     <button
@@ -273,7 +279,7 @@ export default function ChooseIrrigationMethod() {
                                 : 'bg-green-600 hover:bg-green-700'
                         }`}
                     >
-                        ไปออกแบบระบบน้ำ
+                        {t('greenhouse_proceed_to_irrigation')}
                         <svg
                             className="ml-2 h-5 w-5"
                             fill="none"
@@ -290,6 +296,8 @@ export default function ChooseIrrigationMethod() {
                     </button>
                 </div>
             </div>
+            </div>
+            <Footer />
         </div>
     );
 }
