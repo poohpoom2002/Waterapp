@@ -15,6 +15,7 @@ interface User {
     email_verified_at?: string;
     created_at?: string;
     profile_photo_url?: string;
+    is_super_user?: boolean;
 }
 
 interface ProfileProps {
@@ -104,11 +105,18 @@ export default function Profile() {
                                             {user.name}
                                         </h2>
                                         <p className="text-gray-400">{user.email}</p>
-                                        {user.email_verified_at && (
-                                            <span className="inline-flex items-center gap-1 rounded-full bg-green-900/30 px-2 py-1 text-xs text-green-400">
-                                                ✓ Verified Email
-                                            </span>
-                                        )}
+                                        <div className="flex gap-2">
+                                            {user.email_verified_at && (
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-green-900/30 px-2 py-1 text-xs text-green-400">
+                                                    ✓ Verified Email
+                                                </span>
+                                            )}
+                                            {user.is_super_user && (
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-yellow-900/30 px-2 py-1 text-xs text-yellow-400">
+                                                    👑 Super User
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 
