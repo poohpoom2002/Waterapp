@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
+import Navbar from '../../components/Navbar';
+import Footer from '../../components/Footer';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface AreaInputMethodProps {
     crops?: string;
 }
 
 export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
+    const { t } = useLanguage();
     const [selectedCrops, setSelectedCrops] = useState<string[]>([]);
     const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
 
@@ -50,8 +54,9 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
     };
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white">
-            <div className="mx-auto max-w-6xl p-6">
+        <div className="min-h-screen flex flex-col bg-gray-900 text-white">
+            <Navbar />
+            <div className="flex-1 mx-auto max-w-6xl p-6">
                 {/* Header */}
                 <div className="mb-8">
                     <div className="mb-4 flex items-center justify-between">
@@ -87,9 +92,9 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                         </div>
                     </div>
 
-                    <h1 className="mb-2 text-3xl font-bold">📐 เลือกวิธีการวางแผนพื้นที่</h1>
+                    <h1 className="mb-2 text-3xl font-bold">📐 {t('greenhouse_planning_method')}</h1>
                     <p className="text-gray-400">
-                        เลือกวิธีการที่คุณต้องการใช้ในการกำหนดพื้นที่โรงเรือน
+                        {t('greenhouse_planning_description')}
                     </p>
                 </div>
 
@@ -125,9 +130,9 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                     >
                         <div className="text-center">
                             <div className="mb-4 text-6xl">✏️</div>
-                            <h3 className="mb-3 text-xl font-bold text-white">วาดพื้นที่เอง</h3>
+                            <h3 className="mb-3 text-xl font-bold text-white">{t('greenhouse_draw_method')}</h3>
                             <p className="mb-4 text-gray-400">
-                                ใช้เครื่องมือวาดในระบบเพื่อกำหนดรูปร่างและขนาดโรงเรือน
+                                {t('greenhouse_draw_description')}
                             </p>
 
                             <div className="space-y-2 text-left">
@@ -210,9 +215,9 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                     >
                         <div className="text-center">
                             <div className="mb-4 text-6xl">📁</div>
-                            <h3 className="mb-3 text-xl font-bold text-white">นำเข้าไฟล์แบบแปลน</h3>
+                            <h3 className="mb-3 text-xl font-bold text-white">{t('greenhouse_import_method')}</h3>
                             <p className="mb-4 text-gray-400">
-                                อัปโหลดไฟล์แบบแปลนที่มีอยู่แล้วเพื่อวาดทับและปรับแต่ง
+                                {t('greenhouse_import_description')}
                             </p>
 
                             <div className="space-y-2 text-left">
@@ -390,6 +395,7 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                     </div>
                 )}
             </div>
+            <Footer />
         </div>
     );
 }

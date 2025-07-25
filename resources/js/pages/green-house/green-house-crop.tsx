@@ -6,8 +6,12 @@ import {
     categories,
     type Crop,
 } from '../components/Greenhouse/CropData';
+import Navbar from '../../components/Navbar';
+import Footer from '../../components/Footer';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function GreenhouseCrop({ cropType, crops }) {
+    const { t } = useLanguage();
     const [selectedCrops, setSelectedCrops] = useState<string[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
@@ -68,8 +72,9 @@ export default function GreenhouseCrop({ cropType, crops }) {
     const canProceed = selectedCrops.length > 0;
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white">
-            <div className="flex h-screen">
+        <div className="min-h-screen flex flex-col bg-gray-900 text-white">
+            <Navbar />
+            <div className="flex flex-1">
                 {/* Sidebar - Fixed Summary Panel */}
                 <div className="flex w-80 flex-col overflow-hidden border-r border-gray-700 bg-gray-800">
                     {/* Header */}
@@ -95,8 +100,8 @@ export default function GreenhouseCrop({ cropType, crops }) {
                                 กลับ
                             </a>
                         </div>
-                        <h1 className="mb-2 text-2xl font-bold">🏠 โรงเรือน</h1>
-                        <p className="text-sm text-gray-400">เลือกพืชสำหรับโรงเรือนของคุณ</p>
+                        <h1 className="mb-2 text-2xl font-bold">🏠 {t('greenhouse_title')}</h1>
+                        <p className="text-sm text-gray-400">{t('greenhouse_subtitle')}</p>
                     </div>
 
                     {/* Selected Items Summary */}
@@ -221,10 +226,10 @@ export default function GreenhouseCrop({ cropType, crops }) {
                 <div className="flex-1 overflow-y-auto">
                     <div className="p-8">
                         <div className="mb-6">
-                            <h2 className="mb-2 text-3xl font-bold">เลือกพืชในโรงเรือน</h2>
-                            <p className="text-gray-400">
-                                เลือกพืชที่คุณต้องการปลูกในโรงเรือน สามารถเลือกได้หลายชนิด
-                            </p>
+                                                <h2 className="mb-2 text-3xl font-bold">{t('greenhouse_crop_selection')}</h2>
+                    <p className="text-gray-400">
+                        {t('greenhouse_crop_description')}
+                    </p>
                         </div>
 
                         {/* Search and Filter */}
@@ -340,6 +345,7 @@ export default function GreenhouseCrop({ cropType, crops }) {
                     </div>
                 </div>
             </div>
+            <Footer />
         </div>
     );
 }

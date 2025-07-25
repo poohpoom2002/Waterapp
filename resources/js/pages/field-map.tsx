@@ -25,6 +25,8 @@ import FieldMapSmartControls from '@/pages/components/Fieldcrop/FieldMapSmartCon
 import ErrorBoundary from '@/pages/components/ErrorBoundary';
 import ErrorMessage from '@/pages/components/ErrorMessage';
 import LoadingSpinner from '@/pages/components/LoadingSpinner';
+import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 
 interface Coordinate {
     lat: number;
@@ -2958,7 +2960,8 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
 
     return (
         <ErrorBoundary>
-            <div className="min-h-screen bg-gray-900 text-white">
+            <div className="min-h-screen flex flex-col bg-gray-900 text-white">
+                <Navbar />
                 <Head title="Field Map - Irrigation Planning" />
 
                 {/* Error Message Display */}
@@ -3661,6 +3664,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     </div>
                 )}
             </div>
+            <Footer />
         </ErrorBoundary>
     );
 }

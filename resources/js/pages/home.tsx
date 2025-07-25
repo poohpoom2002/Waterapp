@@ -177,7 +177,7 @@ const FieldCard = ({
 
     return (
         <div className="group relative overflow-hidden rounded-lg border border-gray-700 bg-gray-800 p-6 transition-all duration-200 hover:border-blue-500 hover:bg-blue-900/10">
-            {/* Status Badge */}
+            {/* Status Badge */} 
             <div className="absolute right-3 top-3">
                 <button
                     onClick={(e) => {

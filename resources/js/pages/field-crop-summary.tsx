@@ -24,6 +24,8 @@ import {
     type EquipmentType,
     type ObstacleType,
 } from '@/pages/utils/fieldMapConstants';
+import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 
 // Fix leaflet icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -605,7 +607,8 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
     }
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white print:bg-white print:text-black">
+        <div className="min-h-screen flex flex-col bg-gray-900 text-white print:bg-white print:text-black">
+            <Navbar />
             <Head title="Field Crop Summary - Irrigation Planning" />
 
             {/* Header */}
@@ -1351,6 +1354,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                     </div>
                 </div>
             </div>
+            <Footer />
         </div>
     );
 }
