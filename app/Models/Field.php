@@ -13,7 +13,10 @@ class Field extends Model
         'name',
         'customer_name',
         'user_id',
+        'folder_id',
         'category',
+        'status',
+        'is_completed',
         'area_coordinates',
         'plant_type_id',
         'total_plants',
@@ -24,13 +27,18 @@ class Field extends Model
 
     protected $casts = [
         'area_coordinates' => 'array',
-        'total_area' => 'decimal:2',
-        'total_water_need' => 'decimal:2'
+        'total_area' => 'float',
+        'total_water_need' => 'float'
     ];
 
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function folder()
+    {
+        return $this->belongsTo(Folder::class);
     }
 
     public function plantType()

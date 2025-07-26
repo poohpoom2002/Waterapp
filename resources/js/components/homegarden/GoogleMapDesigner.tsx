@@ -884,11 +884,11 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                                     lng: sprinkler.position.lng,
                                 },
                                 icon: createSprinklerIcon(
-                                    sprinkler.type,
+                                    sprinkler,
                                     isSelected,
                                     sprinkler.orientation
                                 ),
-                                title: `หัวฉีด: ${sprinkler.type.name} (รัศมี ${sprinkler.type.radius}ม.)`,
+                                title: `หัวฉีด: ${sprinkler.type.nameTH} (รัศมี ${sprinkler.type.radius}ม.)`,
                                 draggable: props.editMode === 'drag-sprinkler',
                                 map: props.map,
                             });
