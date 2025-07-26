@@ -403,7 +403,7 @@ const Pagination: React.FC<{
         const maxVisiblePages = 5;
 
         let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-        let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+        const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
 
         if (endPage - startPage + 1 < maxVisiblePages) {
             startPage = Math.max(1, endPage - maxVisiblePages + 1);
@@ -1326,6 +1326,7 @@ const EquipmentForm: React.FC<{
             newErrors.price = 'กรุณากรอกราคาที่ถูกต้อง';
         }
 
+        // Attribute validation
         attributes.forEach((attr) => {
             if (attr.is_required) {
                 const value = formData.attributes?.[attr.attribute_name];
@@ -2033,9 +2034,19 @@ const EquipmentDetailModal: React.FC<{
 
     const getThaiDisplayName = (attributeName: string) => {
         const thaiDisplayMap: { [key: string]: string } = {
+            // สปริงเกอร์
+            flow_rate: 'อัตราการไหล',
+            pressure: 'ความดัน',
+            radius: 'รัศมีการพ่น',
+            waterVolumeLitersPerHour: 'อัตราการไหล',
             pressureBar: 'ความดัน',
             radiusMeters: 'รัศมีการพ่น',
 
+            // ปั๊มน้ำ
+            power_hp: 'กำลัง',
+            powerHP: 'กำลัง',
+            powerKW: 'กำลัง',
+            phase: 'เฟส',
             inlet_size_inch: 'ขนาดท่อดูด',
             outlet_size_inch: 'ขนาดท่อส่ง',
             flow_rate_lpm: 'อัตราการไหล',
@@ -2045,10 +2056,21 @@ const EquipmentDetailModal: React.FC<{
             suction_depth_m: 'ความลึกดูด',
             weight_kg: 'น้ำหนัก',
 
+            // ท่อ
+            size_mm: 'ขนาด',
+            size_inch: 'ขนาด',
+            sizeMM: 'ขนาด',
+            sizeInch: 'ขนาด',
             lengthM: 'ความยาว',
             dimensions_cm: 'ขนาด',
             material: 'วัสดุ',
 
+            // ไฟฟ้า
+            voltage: 'แรงดันไฟฟ้า',
+            current: 'กระแสไฟฟ้า',
+            frequency: 'ความถี่',
+
+            // ทั่วไป
             brand: 'แบรนด์',
             model: 'รุ่น',
             color: 'สี',
@@ -2537,12 +2559,20 @@ const ImageModal: React.FC<{
                     <X className="h-4 w-4" />
                 </button>
 
+                {/* รูปภาพ */}
                 <img
                     src={imageSrc}
                     alt={imageAlt}
                     className="max-h-full max-w-full rounded-lg shadow-2xl"
                     onClick={(e) => e.stopPropagation()}
                 />
+
+                {/* ชื่อรูป */}
+                <div className="mt-2 text-center">
+                    <p className="inline-block rounded bg-black bg-opacity-50 px-2 py-1 text-sm text-white">
+                        {imageAlt}
+                    </p>
+                </div>
             </div>
         </div>
     );
@@ -2553,7 +2583,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
     const [equipments, setEquipments] = useState<Equipment[]>([]);
     const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(10);
+    const [itemsPerPage] = useState(10); // 10 รายการต่อหน้า
 
     const [filters, setFilters] = useState<FilterOptions>({
         search: '',
@@ -2652,7 +2682,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
     }, []);
 
     const filteredAndSortedEquipments = useMemo(() => {
-        let result = equipments.filter((equipment) => {
+        const result = equipments.filter((equipment) => {
             const searchFields = [
                 equipment.name,
                 equipment.product_code || equipment.productCode,
@@ -3319,7 +3349,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                             สถานะ:
                                                         </span>
                                                         <span
-                                                            className={`font-semibold ${Boolean(equipment.is_active) ? 'text-green-400' : 'text-red-400'}`}
+                                                            className={`font-semibold ${equipment.is_active ? 'text-green-400' : 'text-red-400'}`}
                                                         >
                                                             {equipment.is_active
                                                                 ? 'ใช้งาน'
