@@ -39,7 +39,7 @@ export const OBSTACLE_TYPES = {
 
 export const PIPE_TYPES = {
     main: {
-        name: 'ท่อเมน (Main Pipe)',
+        name: 'ท่อเมน',
         icon: '🔵',
         color: '#2563eb',
         weight: 8,
@@ -48,7 +48,7 @@ export const PIPE_TYPES = {
         manual: true,
     },
     submain: {
-        name: 'ท่อเมนย่อย (Sub-main Pipe)',
+        name: 'ท่อเมนย่อย',
         icon: '🟢',
         color: '#16a34a',
         weight: 5,
@@ -57,7 +57,7 @@ export const PIPE_TYPES = {
         manual: true,
     },
     lateral: {
-        name: 'ท่อย่อย (Lateral Pipe)',
+        name: 'ท่อย่อย',
         icon: '🟡',
         color: '#ca8a04',
         weight: 2,
