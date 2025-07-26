@@ -13,6 +13,11 @@ export const GOOGLE_MAPS_CONFIG = {
             console.error(
                 '❌ Google Maps API Key not found. Please set VITE_GOOGLE_MAPS_API_KEY in .env file'
             );
+            console.error('Available sources:', {
+                'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': import.meta.env.VITE_GOOGLE_MAPS_API_KEY ? 'Found' : 'Missing',
+                'globalThis.GOOGLE_MAPS_API_KEY': (globalThis as unknown as { GOOGLE_MAPS_API_KEY?: string }).GOOGLE_MAPS_API_KEY ? 'Found' : 'Missing',
+                'process.env.REACT_APP_GOOGLE_MAPS_API_KEY': process.env?.REACT_APP_GOOGLE_MAPS_API_KEY ? 'Found' : 'Missing',
+            });
             return '';
         }
 
