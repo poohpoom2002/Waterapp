@@ -73,6 +73,7 @@ interface CanvasDesignerProps {
     onWaterSourceDelete: () => void;
     onPipeClick: (pipeId: string) => void;
     pipeEditMode?: string;
+    hasMainArea: boolean;
 }
 
 const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
@@ -99,6 +100,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
     onWaterSourceDelete,
     onPipeClick,
     pipeEditMode,
+    hasMainArea,
 }) => {
     const { t } = useLanguage();
     const canvasRef = useRef<HTMLCanvasElement>(null);
