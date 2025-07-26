@@ -549,7 +549,7 @@ export const createMapImage = async (
         quality = 0.9,
         scale = 2,
         backgroundColor = '#1F2937',
-        filename = 'horticulture-layout',
+        filename: _finalFilename = 'horticulture-layout',
     } = options;
 
     try {
@@ -965,7 +965,7 @@ export const debugProjectStats = (): void => {
 
 // ทำให้ฟังก์ชันเหล่านี้สามารถเรียกใช้จาก window ได้ (สำหรับ debugging)
 if (typeof window !== 'undefined') {
-    (window as any).horticultureStats = {
+    (window as unknown as { horticultureStats: unknown }).horticultureStats = {
         getProjectStats,
         getOverallStats,
         getPipeStats,

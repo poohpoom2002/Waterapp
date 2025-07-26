@@ -1,6 +1,10 @@
 // resources/js/pages/HorticulturePlannerPage.tsx
 import React, { useState, useEffect, useRef, useMemo, useCallback, useReducer } from 'react';
 import axios from 'axios';
+import L from 'leaflet';
+import { useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Polygon, Popup, Marker, Polyline, LayersControl, FeatureGroup } from 'react-leaflet';
+import { EditControl } from 'react-leaflet-draw';
 
 import HorticultureMapComponent from '../components/horticulture/HorticultureMapComponent';
 import HorticultureDrawingManager from '../components/horticulture/HorticultureDrawingManager';
@@ -120,7 +124,7 @@ const calculateDistanceBetweenPoints = (
 const generateUniqueId = (prefix: string = 'id'): string => {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substr(2, 9);
-    return `${prefix}-${timestamp}-${random}`;
+    return `${prefix}_${timestamp}_${random}`;
 };
 
 const calculateAreaFromCoordinates = (coordinates: { lat: number; lng: number }[]): number => {
@@ -1934,6 +1938,7 @@ export default function EnhancedHorticulturePlannerPage() {
     const markersRef = useRef<Map<string, google.maps.Marker>>(new Map());
     const polygonsRef = useRef<Map<string, google.maps.Polygon>>(new Map());
     const polylinesRef = useRef<Map<string, google.maps.Polyline>>(new Map());
+    const featureGroupRef = useRef<any>(null);
 
     const initialState: ProjectState = {
         mainArea: [],
@@ -5430,4 +5435,30 @@ const EnhancedGoogleMapsOverlays: React.FC<{
     }, [clearOverlays]);
 
     return null;
+};
+
+const extractCoordinatesFromLayer = (layer: any): Coordinate[] => {
+    if (!layer) return [];
+    
+    try {
+        if (layer.getLatLngs) {
+            const latlngs = layer.getLatLngs();
+            if (Array.isArray(latlngs)) {
+                return latlngs.map((latlng: any) => ({
+                    lat: latlng.lat,
+                    lng: latlng.lng
+                }));
+            }
+        }
+        
+        if (layer.getLatLng) {
+            const latlng = layer.getLatLng();
+            return [{ lat: latlng.lat, lng: latlng.lng }];
+        }
+        
+        return [];
+    } catch (error) {
+        console.error('Error extracting coordinates from layer:', error);
+        return [];
+    }
 };

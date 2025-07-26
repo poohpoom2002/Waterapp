@@ -3,7 +3,7 @@ export const GOOGLE_MAPS_CONFIG = {
     get apiKey() {
         const sources = [
             import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-            (globalThis as any).GOOGLE_MAPS_API_KEY,
+            (globalThis as unknown as { GOOGLE_MAPS_API_KEY?: string }).GOOGLE_MAPS_API_KEY,
             process.env?.REACT_APP_GOOGLE_MAPS_API_KEY,
         ];
 
@@ -186,7 +186,7 @@ export const validateGoogleMapsAPI = async (): Promise<{
             suggestions.push('Enable Places API');
             suggestions.push('Remove domain restrictions if testing locally');
         }
-    } catch (error) {
+    } catch {
         issues.push('Network error testing API key');
         suggestions.push('Check internet connection');
         suggestions.push('Check for ad blockers or firewalls');

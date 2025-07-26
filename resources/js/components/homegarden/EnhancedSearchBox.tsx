@@ -16,7 +16,7 @@ interface SearchResult {
     };
     types: string[];
     rating?: number;
-    photos?: any[];
+    photos?: unknown[];
     vicinity?: string;
     business_status?: string;
 }
@@ -277,31 +277,6 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
-
-    const getPlaceIcon = (types: string[]) => {
-        const iconMap: { [key: string]: string } = {
-            country: '🌍',
-            administrative_area_level_1: '🗾',
-            locality: '🏙️',
-            sublocality: '🏘️',
-            political: '🏛️',
-            establishment: '🏢',
-            point_of_interest: '📍',
-            hospital: '🏥',
-            school: '🏫',
-            restaurant: '🍽️',
-            airport: '✈️',
-            university: '🎓',
-            bank: '🏦',
-            park: '🌳',
-            route: '🛣️',
-        };
-
-        for (const type of types) {
-            if (iconMap[type]) return iconMap[type];
-        }
-        return '📍';
-    };
 
     if (!isGoogleMapsReady) {
         return (

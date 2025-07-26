@@ -26,7 +26,7 @@ export default function ProfilePhotoModal({
     });
     const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
     const [isUploading, setIsUploading] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState(0);
+    const [uploadProgress] = useState(0);
     const [error, setError] = useState<string>('');
     const imgRef = useRef<HTMLImageElement>(null);
 
@@ -45,8 +45,7 @@ export default function ProfilePhotoModal({
         }
     };
 
-    const onImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
-        const { width, height } = e.currentTarget;
+    const onImageLoad = useCallback((_e: React.SyntheticEvent<HTMLImageElement>) => {
         const crop: Crop = {
             unit: '%',
             width: 90,
@@ -143,7 +142,7 @@ export default function ProfilePhotoModal({
             } else {
                 setError(result.message || 'Upload failed');
             }
-        } catch (err) {
+        } catch {
             setError('Upload failed. Please try again.');
         } finally {
             setIsUploading(false);
@@ -176,7 +175,7 @@ export default function ProfilePhotoModal({
             } else {
                 setError(result.message || 'Delete failed');
             }
-        } catch (err) {
+        } catch {
             setError('Delete failed. Please try again.');
         } finally {
             setIsUploading(false);
