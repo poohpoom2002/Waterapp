@@ -713,6 +713,29 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
     const [plantingPoints, setPlantingPoints] = useState<any[]>([]);
     const [zoneSummaries, setZoneSummaries] = useState<Record<string, any>>({});
     
+    // Create equipment marker icon with container
+    const createEquipmentMarkerIcon = useCallback((equipmentType: EquipmentType, equipmentConfig: any) => {
+        // Use icons for all equipment types instead of images
+        const svg = `
+            <svg width="50" height="50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">
+                <defs>
+                    <filter id="equipment-shadow-${Date.now()}" x="-20%" y="-20%" width="140%" height="140%">
+                        <feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.3)"/>
+                    </filter>
+                </defs>
+                <circle cx="25" cy="25" r="23" fill="white" stroke="${equipmentConfig.color || '#4F46E5'}" stroke-width="3" filter="url(#equipment-shadow-${Date.now()})"/>
+                <text x="25" y="32" text-anchor="middle" font-size="24" fill="${equipmentConfig.color || '#4F46E5'}" font-family="Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif">${equipmentConfig.icon || '🔧'}</text>
+            </svg>
+        `;
+
+        const encodedSvg = encodeURIComponent(svg).replace(/'/g, '%27').replace(/"/g, '%22');
+
+        return {
+            url: `data:image/svg+xml;charset=UTF-8,${encodedSvg}`,
+            scaledSize: new google.maps.Size(50, 50),
+            anchor: new google.maps.Point(25, 25),
+        };
+    }, []);
 
     // Error handling and loading states
     const [error, setError] = useState<string | null>(null);
@@ -968,32 +991,6 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         setSelectedEquipmentType(null);
     }, [setIsPlacingEquipment, setSelectedEquipmentType]);
 
-    // Fanggy005 EDIT: แก้ไขฟังก์ชันสร้างไอคอนให้ถูกต้อง
-    const createEquipmentMarkerIcon = useCallback((equipmentType: EquipmentType, equipmentConfig: any, equipmentId: string) => {
-        // Fanggy005 EDIT: Temporarily disable image loading and use emoji icons as requested.
-        const innerContent = `<text x="25" y="32" text-anchor="middle" font-size="24" fill="${equipmentConfig.color || '#4F46E5'}" font-family="Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif">${equipmentConfig.icon || '🔧'}</text>`;
-
-        const svg = `
-            <svg width="50" height="50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">
-                <defs>
-                    <filter id="shadow-${equipmentId}" x="-20%" y="-20%" width="140%" height="140%">
-                        <feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.3)"/>
-                    </filter>
-                </defs>
-                <circle cx="25" cy="25" r="23" fill="white" stroke="${equipmentConfig.color || '#4F46E5'}" stroke-width="3" filter="url(#shadow-${equipmentId})"/>
-                ${innerContent}
-            </svg>
-        `;
-
-        const encodedSvg = encodeURIComponent(svg).replace(/'/g, '%27').replace(/"/g, '%22');
-
-        return {
-            url: `data:image/svg+xml;charset=UTF-8,${encodedSvg}`,
-            scaledSize: new google.maps.Size(50, 50),
-            anchor: new google.maps.Point(25, 25),
-        };
-    }, []);
-
     // Equipment placement function
     const placeEquipmentAtPosition = useCallback(
         (lat: number, lng: number) => {
@@ -1013,12 +1010,11 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 };
 
                 // Create marker
-                // Fanggy005 EDIT: ส่ง equipmentId ไปยังฟังก์ชันสร้างไอคอน
                 const marker = new google.maps.Marker({
                     position: { lat, lng },
                     map: map,
                     title: equipmentConfig.name,
-                    icon: createEquipmentMarkerIcon(selectedEquipmentType, equipmentConfig, equipmentId),
+                    icon: createEquipmentMarkerIcon(selectedEquipmentType, equipmentConfig),
                     clickable: true,
                     optimized: false,
                     visible: true,
@@ -1302,6 +1298,17 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         ]
     );
 
+    // Clear all zone labels efficiently
+    const clearAllZoneLabels = useCallback(() => {
+        zoneLabelsRef.current.forEach((marker) => {
+            if (marker && typeof marker.setMap === 'function') {
+                marker.setMap(null);
+            }
+        });
+        zoneLabelsRef.current = [];
+        setMapObjects((prev) => ({ ...prev, zoneLabels: [] }));
+    }, []);
+
     // Clear all Google Maps objects - optimized
     const clearAllMapObjects = useCallback(() => {
         // Clear zone labels using ref
@@ -1329,7 +1336,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             plantMarkers: [],
             zoneLabels: [],
         });
-    }, []);
+    }, [clearAllZoneLabels]);
 
     const resetAll = useCallback(() => {
         if (confirm('⚠️ Reset all data? All drawn elements will be lost.')) {
@@ -1450,8 +1457,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             restoredEquipment.forEach((equipment: Equipment) => {
                 if (map && equipment.lat && equipment.lng) {
                     const equipmentConfig = EQUIPMENT_TYPES[equipment.type as EquipmentType];
-                    // Fanggy005 EDIT: ส่ง equipment.id ไปยังฟังก์ชันสร้างไอคอน
-                    const markerIcon = createEquipmentMarkerIcon(equipment.type as EquipmentType, equipmentConfig, equipment.id);
+                    const markerIcon = createEquipmentMarkerIcon(equipment.type as EquipmentType, equipmentConfig);
 
                     const marker = new google.maps.Marker({
                         position: { lat: equipment.lat, lng: equipment.lng },
@@ -1478,7 +1484,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         setEquipmentIcons,
         setEquipmentHistoryIndex,
         setMapObjects,
-        createEquipmentMarkerIcon, // เพิ่ม dependency
+        createEquipmentMarkerIcon,
     ]);
 
     // Redo equipment placement
@@ -1498,8 +1504,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             restoredEquipment.forEach((equipment: Equipment) => {
                 if (map && equipment.lat && equipment.lng) {
                     const equipmentConfig = EQUIPMENT_TYPES[equipment.type as EquipmentType];
-                    // Fanggy005 EDIT: ส่ง equipment.id ไปยังฟังก์ชันสร้างไอคอน
-                    const markerIcon = createEquipmentMarkerIcon(equipment.type as EquipmentType, equipmentConfig, equipment.id);
+                    const markerIcon = createEquipmentMarkerIcon(equipment.type as EquipmentType, equipmentConfig);
 
                     const marker = new google.maps.Marker({
                         position: { lat: equipment.lat, lng: equipment.lng },
@@ -1526,7 +1531,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         setEquipmentIcons,
         setEquipmentHistoryIndex,
         setMapObjects,
-        createEquipmentMarkerIcon, // เพิ่ม dependency
+        createEquipmentMarkerIcon,
     ]);
 
     // Make removeEquipment available globally for InfoWindow buttons
@@ -1788,7 +1793,6 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
     const zoneLabelsRef = useRef<google.maps.Marker[]>([]);
 
     // Memoized SVG creation function
-    // Fanggy005 EDIT: แก้ไขการสร้าง ID ของ filter ให้ไม่ซ้ำกัน
     const createZoneLabelSVG = useCallback((zoneId: string, zoneColor: string, cropIcon: string) => {
         return `<svg width="50" height="50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">
             <defs>
@@ -1881,16 +1885,32 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         [zones, map, createZoneLabelSVG]
     );
 
-    // Clear all zone labels efficiently
-    const clearAllZoneLabels = useCallback(() => {
-        zoneLabelsRef.current.forEach((marker) => {
-            if (marker && typeof marker.setMap === 'function') {
-                marker.setMap(null);
-            }
-        });
-        zoneLabelsRef.current = [];
-        setMapObjects((prev) => ({ ...prev, zoneLabels: [] }));
-    }, []);
+    // Restore zone labels function
+    const restoreZoneLabels = useCallback((zoneAssignments: any, restoredZones: Zone[]) => {
+        if (!map) return;
+
+        try {
+            // Clear existing zone labels
+            zoneLabelsRef.current.forEach((marker) => {
+                if (marker && typeof marker.setMap === 'function') {
+                    marker.setMap(null);
+                }
+            });
+            zoneLabelsRef.current = [];
+
+            // Create new zone labels for restored zones
+            restoredZones.forEach((zone) => {
+                const zoneId = zone.id.toString();
+                const cropValue = zoneAssignments[zoneId];
+                
+                if (cropValue) {
+                    updateZoneLabel(zoneId, cropValue);
+                }
+            });
+        } catch (error) {
+            console.error('Error restoring zone labels:', error);
+        }
+    }, [map, updateZoneLabel]);
 
     // Debounced zone assignment handler
     const assignPlantToZone = useCallback(
@@ -2660,65 +2680,6 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
     };
 
 
-    // Optimized restore zone labels
-    const restoreZoneLabels = useCallback((zoneAssignments: any, restoredZones: Zone[]) => {
-        if (!map || !zoneAssignments) return;
-
-        setTimeout(() => {
-            Object.entries(zoneAssignments).forEach(([zoneId, cropValue]: [string, any]) => {
-                const zone = restoredZones.find((z) => z.id.toString() === zoneId);
-                const crop = getCropByValue(cropValue);
-                if (zone && crop) {
-                    try {
-                        const bounds = new google.maps.LatLngBounds();
-                        zone.coordinates.forEach((coord: Coordinate) => {
-                            bounds.extend(new google.maps.LatLng(coord.lat, coord.lng));
-                        });
-                        const center = bounds.getCenter();
-                        
-                        const svgIcon = createZoneLabelSVG(`restore-${zoneId}`, zone.color, crop.icon);
-                        const encodedSvg = encodeURIComponent(svgIcon).replace(/'/g, '%27').replace(/"/g, '%22');
-                        
-                        const labelMarker = new google.maps.Marker({
-                            position: center, 
-                            map: map, 
-                            title: `${zone.name} - ${crop.name}`,
-                            icon: {
-                                url: `data:image/svg+xml;charset=UTF-8,${encodedSvg}`,
-                                scaledSize: new google.maps.Size(50, 50),
-                                anchor: new google.maps.Point(25, 25),
-                            },
-                            zIndex: 10,
-                            clickable: true,
-                        });
-
-                        labelMarker.addListener('click', () => {
-                            const infoWindow = new google.maps.InfoWindow({
-                                content: `
-                                    <div style="text-align: center; padding: 10px; min-width: 150px;">
-                                        <div style="font-size: 24px; margin-bottom: 8px;">${crop.icon}</div>
-                                        <h4 style="margin: 0 0 4px 0; color: #333;">${zone.name}</h4>
-                                        <p style="margin: 0; color: #666; font-size: 14px;">${crop.name}</p>
-                                    </div>
-                                `,
-                            });
-                            infoWindow.open(map, labelMarker);
-                        });
-
-                        (labelMarker as any).zoneId = zoneId;
-                        (labelMarker as any).cropValue = cropValue;
-                        zoneLabelsRef.current.push(labelMarker);
-                    } catch (error) {
-                        console.error(`Error restoring zone label for zone ${zoneId}:`, error);
-                    }
-                }
-            });
-            
-            // Update mapObjects state once after all labels are created
-            setMapObjects((prev) => ({ ...prev, zoneLabels: [...zoneLabelsRef.current] }));
-        }, 200);
-    }, [map, createZoneLabelSVG]);
-
     // Load and restore Google Maps objects when in edit mode
     useEffect(() => {
         if (isEditMode && map && !isRestoring && !hasRestoredOnce && !isResetting) {
@@ -2820,8 +2781,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                 if (equipmentData.lat && equipmentData.lng && equipmentData.type) {
                                     const equipmentConfig = EQUIPMENT_TYPES[equipmentData.type as EquipmentType];
                                     if (equipmentConfig) {
-                                        // Fanggy005 EDIT: ส่ง equipmentData.id ไปยังฟังก์ชันสร้างไอคอน
-                                        const markerIcon = createEquipmentMarkerIcon(equipmentData.type as EquipmentType, equipmentConfig, equipmentData.id);
+                                        const markerIcon = createEquipmentMarkerIcon(equipmentData.type as EquipmentType, equipmentConfig);
 
                                         const marker = new google.maps.Marker({
                                             position: { lat: equipmentData.lat, lng: equipmentData.lng },
@@ -2957,6 +2917,8 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             return () => clearTimeout(timeoutId);
         }
     }, [map, zones.length, Object.keys(zoneAssignments).length, isEditMode, isRestoring, hasRestoredOnce, isResetting]);
+
+
 
     // Auto-update zone configuration based on step changes (modified for edit mode)
     useEffect(() => {
@@ -3506,15 +3468,15 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                     </div>
                                 )}
 
-                                {/* Map Controls - Bottom Left */}
-                                <div className="absolute bottom-3 left-3 z-10 flex space-x-2">
+                                {/* Map Controls - Bottom Center-Left */}
+                                <div className="absolute bottom-3 left-20 z-10 flex space-x-2">
                                     <Tooltip content="Center map view">
                                         <button
                                             onClick={() => {
                                                 setMapCenter([14.5995, 120.9842]);
                                                 setMapZoom(13);
                                             }}
-                                            className="rounded border border-white px-3 py-2 text-sm text-gray-700 shadow-md transition-colors hover:bg-gray-50"
+                                            className="flex h-12 w-12 items-center justify-center rounded border border-white text-gray-700 shadow-md transition-colors hover:bg-gray-50"
                                             style={{backgroundColor: '#ffffff'}}
                                         >
                                             📍
@@ -3523,7 +3485,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                     <Tooltip content="Get your current location">
                                         <button
                                             onClick={getCurrentLocation}
-                                            className="rounded border border-white px-3 py-2 text-sm text-gray-700 shadow-md transition-colors hover:bg-gray-50"
+                                            className="flex h-12 w-12 items-center justify-center rounded border border-white text-gray-700 shadow-md transition-colors hover:bg-gray-50"
                                             style={{backgroundColor: '#ffffff'}}
                                         >
                                             🎯
@@ -3538,15 +3500,19 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                                     onClick={() =>
                                                         startPlacingEquipment('pump')
                                                     }
-                                                    className={`flex items-center justify-center rounded border border-white px-3 py-2 text-sm text-gray-700 shadow-md transition-colors hover:bg-gray-50 ${
+                                                    className={`flex h-12 w-12 items-center justify-center rounded border border-white text-gray-700 shadow-md transition-colors hover:bg-gray-50 ${
                                                         isPlacingEquipment &&
                                                         selectedEquipmentType === 'pump'
                                                             ? 'ring-2 ring-blue-500'
                                                             : ''
                                                     }`}
-                                                    style={{backgroundColor: '#ffffff', width: '44px', height: '44px'}}
+                                                    style={{backgroundColor: '#ffffff'}}
                                                 >
-                                                    <span className="text-2xl">{EQUIPMENT_TYPES['pump'].icon}</span>
+                                                    <img
+                                                        src="./generateTree/wtpump.png"
+                                                        alt="Pump"
+                                                        className="h-8 w-8 object-contain"
+                                                    />
                                                 </button>
                                             </Tooltip>
                                             <Tooltip content="Place Solenoid Valve">
@@ -3554,15 +3520,19 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                                     onClick={() =>
                                                         startPlacingEquipment('solenoid')
                                                     }
-                                                    className={`flex items-center justify-center rounded border border-white px-3 py-2 text-sm text-gray-700 shadow-md transition-colors hover:bg-gray-50 ${
+                                                    className={`flex h-12 w-12 items-center justify-center rounded border border-white text-gray-700 shadow-md transition-colors hover:bg-gray-50 ${
                                                         isPlacingEquipment &&
                                                         selectedEquipmentType === 'solenoid'
                                                             ? 'ring-2 ring-blue-500'
                                                             : ''
                                                     }`}
-                                                    style={{backgroundColor: '#ffffff', width: '44px', height: '44px'}}
+                                                    style={{backgroundColor: '#ffffff'}}
                                                 >
-                                                    <span className="text-2xl">{EQUIPMENT_TYPES['solenoid'].icon}</span>
+                                                    <img
+                                                        src="./generateTree/solv.png"
+                                                        alt="Solenoid Valve"
+                                                        className="h-8 w-8 object-contain"
+                                                    />
                                                 </button>
                                             </Tooltip>
                                             <Tooltip content="Place Ball Valve">
@@ -3570,16 +3540,20 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                                     onClick={() =>
                                                         startPlacingEquipment('ballvalve')
                                                     }
-                                                    className={`flex items-center justify-center rounded border border-white px-3 py-2 text-sm text-gray-700 shadow-md transition-colors hover:bg-gray-50 ${
+                                                    className={`flex h-12 w-12 items-center justify-center rounded border border-white text-gray-700 shadow-md transition-colors hover:bg-gray-50 ${
                                                         isPlacingEquipment &&
                                                         selectedEquipmentType ===
                                                             'ballvalve'
                                                             ? 'ring-2 ring-blue-500'
                                                             : ''
                                                     }`}
-                                                    style={{backgroundColor: '#ffffff', width: '44px', height: '44px'}}
+                                                    style={{backgroundColor: '#ffffff'}}
                                                 >
-                                                    <span className="text-2xl">{EQUIPMENT_TYPES['ballvalve'].icon}</span>
+                                                    <img
+                                                        src="./generateTree/ballv.png"
+                                                        alt="Ball Valve"
+                                                        className="h-8 w-8 object-contain"
+                                                    />
                                                 </button>
                                             </Tooltip>
 
@@ -3588,7 +3562,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                                 <Tooltip content="Cancel Equipment Placement">
                                                     <button
                                                         onClick={cancelPlacingEquipment}
-                                                        className="rounded border border-white bg-red-500 px-3 py-2 text-sm text-white shadow-md transition-colors hover:bg-red-600"
+                                                        className="flex h-12 w-12 items-center justify-center rounded border border-white bg-red-500 text-white shadow-md transition-colors hover:bg-red-600"
                                                     >
                                                         ❌
                                                     </button>
