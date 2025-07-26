@@ -5,6 +5,7 @@ import {
     GOOGLE_MAPS_CONFIG,
     GOOGLE_MAPS_ERRORS,
 } from '../../utils/googleMapsConfig';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface SearchResult {
     place_id: string;
@@ -38,7 +39,7 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
     const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
     const placesServiceRef = useRef<PlacesServiceWrapper | null>(null);
     const debounceTimeoutRef = useRef<NodeJS.Timeout>();
-
+    const { t } = useLanguage();
     const [searchQuery, setSearchQuery] = useState(initialValue);
     const [suggestions, setSuggestions] = useState<SearchResult[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -51,7 +52,6 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
         const checkGoogleMapsReady = () => {
             if (window.google?.maps?.places?.PlacesService) {
                 setIsGoogleMapsReady(true);
-                console.log('✅ Google Maps and Places API are ready');
                 return true;
             }
             return false;
@@ -67,7 +67,7 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
             setTimeout(() => {
                 clearInterval(pollInterval);
                 if (!isGoogleMapsReady) {
-                    setError('ไม่สามารถโหลด Google Maps API ได้');
+                    setError(t('ไม่สามารถโหลด Google Maps API ได้'));
                 }
             }, 30000);
 
@@ -79,7 +79,6 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
         if (!isGoogleMapsReady || !inputRef.current) return;
 
         try {
-            console.log('🔄 Initializing Google Places...');
 
             placesServiceRef.current = new PlacesServiceWrapper();
 
@@ -101,7 +100,6 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
 
             autocompleteRef.current.addListener('place_changed', () => {
                 const place = autocompleteRef.current?.getPlace();
-                console.log('📍 Place selected:', place);
 
                 if (place && place.geometry && place.geometry.location) {
                     const result: SearchResult = {
@@ -121,14 +119,13 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
                     setError(null);
                     setSelectedIndex(-1);
                 } else {
-                    setError('ไม่สามารถเลือกสถานที่นี้ได้');
+                    setError(t('ไม่สามารถเลือกสถานที่นี้ได้'));
                 }
             });
 
-            console.log('✅ Google Places initialized successfully');
         } catch (error) {
             console.error('❌ Error initializing Google Places:', error);
-            setError('ไม่สามารถเริ่มต้นระบบค้นหาได้');
+            setError(t('ไม่สามารถเริ่มต้นระบบค้นหาได้'));
         }
 
         return () => {
@@ -153,7 +150,6 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
         setError(null);
 
         try {
-            console.log('🔍 Searching globally:', query);
 
             const searchResult = await placesServiceRef.current.textSearch(query, {
                 maxResults: 6,
@@ -179,14 +175,13 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
                 setSuggestions(processedResults);
                 setShowSuggestions(true);
                 setSelectedIndex(-1);
-                console.log(`✅ Found ${processedResults.length} places`);
             } else {
                 setSuggestions([]);
                 setShowSuggestions(true);
             }
         } catch (error) {
             console.error('❌ Places search error:', error);
-            setError('เกิดข้อผิดพลาดในการค้นหา');
+            setError(t('เกิดข้อผิดพลาดในการค้นหา'));
             setSuggestions([]);
             setShowSuggestions(false);
         } finally {
@@ -314,7 +309,7 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
                 <div className="rounded-lg border border-white/20 bg-white/95 p-3 text-sm text-gray-700 shadow-xl backdrop-blur">
                     <div className="flex items-center gap-2">
                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent"></div>
-                        <span>กำลังโหลด Google Maps...</span>
+                        <span>{t('กำลังโหลด Google Maps...')}</span>
                     </div>
                 </div>
             </div>
@@ -349,7 +344,7 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
                     <button
                         onClick={handleClear}
                         className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-500 transition-colors hover:text-gray-700"
-                        title="ล้างการค้นหา"
+                        title={t('ล้างการค้นหา')}
                     >
                         ✕
                     </button>

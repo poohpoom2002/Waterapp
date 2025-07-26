@@ -1,4 +1,4 @@
-// resources/js/pages/home-garden-planner.tsx - Enhanced with pipe editing and Google Map fixes
+// resources/js/pages/home-garden-planner.tsx
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { router } from '@inertiajs/react';
 
@@ -6,7 +6,7 @@ import GoogleMapDesigner from '../components/homegarden/GoogleMapDesigner';
 import CanvasDesigner from '../components/homegarden/CanvasDesigner';
 import ImageDesigner from '../components/homegarden/ImageDesigner';
 import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
+import { useLanguage } from '../contexts/LanguageContext';
 
 import {
     Coordinate,
@@ -53,69 +53,81 @@ interface HistoryState {
 const ModeSelection: React.FC<{
     onSelectMode: (mode: 'map' | 'canvas' | 'image') => void;
 }> = ({ onSelectMode }) => {
+    const { t } = useLanguage();
     const modes = [
         {
             id: 'map',
             icon: '🗺️',
-            title: 'Google Map',
-            desc: 'ใช้แผนที่ดาวเทียมเพื่อดูพื้นที่จริงของบ้านคุณ',
-            features: ['เห็นพื้นที่จริงจากดาวเทียม', 'วัดระยะทางแม่นยำ', 'ค้นหาตำแหน่งได้ง่าย'],
+            title: t('Google Map'),
+            desc: t('ใช้แผนที่ดาวเทียมเพื่อดูพื้นที่จริงของบ้านคุณ (แนะนำสำหรับบ้านหลังใหญ่)'),
+            features: [
+                t('เห็นพื้นที่จริงจากดาวเทียม'),
+                t('วัดระยะทางแม่นยำ'),
+                t('ค้นหาตำแหน่งได้ง่าย'),
+            ],
             color: 'blue',
         },
         {
             id: 'canvas',
             icon: '✏️',
-            title: 'วาดเอง',
-            desc: 'วาดแผนผังบ้านด้วยตัวเอง มีเครื่องมือช่วยวาด ตาราง และไม้บรรทัด',
+            title: t('วาดเอง'),
+            desc: t('วาดแผนผังบ้านด้วยตัวเอง มีเครื่องมือช่วยวาด ตาราง และไม้บรรทัด'),
             features: [
-                'ไม่ต้องใช้อินเทอร์เน็ต',
-                'มีตารางและไม้บรรทัดช่วย',
-                'วาดได้อิสระตามต้องการ',
+                t('ไม่ต้องใช้อินเทอร์เน็ต'),
+                t('มีตารางและไม้บรรทัดช่วย'),
+                t('วาดได้อิสระตามต้องการ'),
             ],
             color: 'green',
         },
         {
             id: 'image',
             icon: '🖼️',
-            title: 'ใช้รูปแบบแปลน',
-            desc: 'อัปโหลดรูปแบบแปลนบ้านที่มีอยู่แล้ว และวางระบบน้ำบนรูป',
-            features: ['ใช้แบบแปลนที่มีอยู่แล้ว', 'วางระบบบนรูปได้ทันที', 'รองรับไฟล์ JPG, PNG'],
+            title: t('ใช้รูปแบบแปลน'),
+            desc: t('อัปโหลดรูปแบบแปลนบ้านที่มีอยู่แล้ว และวางระบบน้ำบนรูป'),
+            features: [
+                t('ใช้แบบแปลนที่มีอยู่แล้ว'),
+                t('วางระบบบนรูปได้ทันที'),
+                t('รองรับไฟล์ JPG, PNG'),
+            ],
             color: 'purple',
         },
     ];
 
     return (
-        <div className="flex min-h-screen w-full items-center justify-center bg-gray-900 p-6">
-            <div className="w-full max-w-4xl">
-                <h1 className="mb-8 text-center text-3xl font-bold text-white">
-                    🏡 เลือกวิธีการออกแบบระบบน้ำ
-                </h1>
+        <div className="min-h-screen w-full overflow-hidden bg-gray-900">
+            <Navbar />
+            <div className="flex h-[calc(100vh-64px)] w-full items-center justify-center bg-gray-900 p-6">
+                <div className="w-full max-w-4xl">
+                    <h1 className="mb-8 text-center text-3xl font-bold text-white">
+                        🏡 {t('เลือกวิธีการออกแบบระบบน้ำ')}
+                    </h1>
 
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                    {modes.map((mode) => (
-                        <div
-                            key={mode.id}
-                            onClick={() => onSelectMode(mode.id as any)}
-                            className={`cursor-pointer rounded-xl border-2 border-transparent bg-gray-800 p-6 transition-all hover:scale-105 hover:border-${mode.color}-500 hover:bg-gray-700`}
-                        >
-                            <div className="mb-4 text-center">
-                                <div className="mb-3 text-5xl">{mode.icon}</div>
-                                <h3 className="mb-2 text-xl font-semibold text-white">
-                                    {mode.title}
-                                </h3>
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                        {modes.map((mode) => (
+                            <div
+                                key={mode.id}
+                                onClick={() => onSelectMode(mode.id as any)}
+                                className={`cursor-pointer rounded-xl border-2 border-transparent bg-gray-800 p-6 transition-all hover:scale-105 hover:border-${mode.color}-500 hover:bg-gray-700`}
+                            >
+                                <div className="mb-4 text-center">
+                                    <div className="mb-3 text-5xl">{mode.icon}</div>
+                                    <h3 className="mb-2 text-xl font-semibold text-white">
+                                        {mode.title}
+                                    </h3>
+                                </div>
+                                <p className="text-sm text-gray-300">{mode.desc}</p>
+                                <ul className="mt-4 space-y-1 text-xs text-gray-400">
+                                    {mode.features.map((feature, i) => (
+                                        <li key={i}>✓ {feature}</li>
+                                    ))}
+                                </ul>
                             </div>
-                            <p className="text-sm text-gray-300">{mode.desc}</p>
-                            <ul className="mt-4 space-y-1 text-xs text-gray-400">
-                                {mode.features.map((feature, i) => (
-                                    <li key={i}>✓ {feature}</li>
-                                ))}
-                            </ul>
-                        </div>
-                    ))}
-                </div>
+                        ))}
+                    </div>
 
-                <div className="mt-8 text-center text-sm text-gray-400">
-                    เลือกวิธีที่เหมาะสมกับคุณ • ข้อมูลทั้งหมดจะถูกบันทึกอัตโนมัติ
+                    <div className="mt-8 text-center text-sm text-gray-400">
+                        {t('เลือกวิธีที่เหมาะสมกับคุณ • ข้อมูลทั้งหมดจะถูกบันทึกอัตโนมัติ')}
+                    </div>
                 </div>
             </div>
         </div>
@@ -139,7 +151,6 @@ export default function HomeGardenPlanner() {
     const [selectedSprinkler, setSelectedSprinkler] = useState<string | null>(null);
     const [selectedPipes, setSelectedPipes] = useState<Set<string>>(new Set());
 
-    // New state for pipe editing
     const [pipeEditMode, setPipeEditMode] = useState<'add' | 'remove' | 'view'>('view');
     const [selectedSprinklersForPipe, setSelectedSprinklersForPipe] = useState<string[]>([]);
 
@@ -160,11 +171,11 @@ export default function HomeGardenPlanner() {
         gridSize: CANVAS_GRID_SIZE,
     });
 
-    // Loading and error states for pipe generation
     const [isGeneratingPipes, setIsGeneratingPipes] = useState(false);
     const [pipeGenerationError, setPipeGenerationError] = useState<string | null>(null);
 
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const { t } = useLanguage();
 
     const currentScale = useMemo(() => {
         const currentData: GardenPlannerData = {
@@ -287,7 +298,7 @@ export default function HomeGardenPlanner() {
                 title={`Undo (${historyIndex}/${history.length})`}
             >
                 <span className="text-base">↶</span>
-                <span>Undo</span>
+                <span>{t('Undo')}</span>
             </button>
             <div className="h-4 w-px bg-gray-600"></div>
             <button
@@ -297,7 +308,7 @@ export default function HomeGardenPlanner() {
                 title={`Redo (${historyIndex + 1}/${history.length})`}
             >
                 <span className="text-base">↷</span>
-                <span>Redo</span>
+                <span>{t('Redo')}</span>
             </button>
         </div>
     );
@@ -390,7 +401,15 @@ export default function HomeGardenPlanner() {
             const area = calculatePolygonArea(coordinates, currentScale);
             if (area > 300) {
                 alert(
-                    `❌ ขนาดพื้นที่เกินกำหนด!\n\nขนาดที่วาด: ${formatArea(area)}\nขนาดสูงสุดที่อนุญาต: 300 ตร.ม.\n\nกรุณาวาดพื้นที่ให้มีขนาดเล็กลง`
+                    t('ขนาดพื้นที่เกินกำหนด!') +
+                        '\n\n' +
+                        t('ขนาดที่วาด:') +
+                        ' ' +
+                        formatArea(area) +
+                        '\n\n' +
+                        t('ขนาดสูงสุดที่อนุญาต:') +
+                        ' 300 ตร.ม.\n\n' +
+                        t('กรุณาวาดพื้นที่ให้มีขนาดเล็กลง')
                 );
                 return;
             }
@@ -422,7 +441,7 @@ export default function HomeGardenPlanner() {
                 coordinates: gpsCoordinates,
                 canvasCoordinates: coordinates,
                 name: parentZoneId
-                    ? `${zoneTypeInfo?.name} (ใน ${gardenZones.find((z) => z.id === parentZoneId)?.name}) ${baseNameCount}`
+                    ? `${zoneTypeInfo?.name} (${t('ใน')} ${gardenZones.find((z) => z.id === parentZoneId)?.name}) ${baseNameCount}`
                     : `${zoneTypeInfo?.name} ${baseNameCount}`,
                 parentZoneId,
                 sprinklerConfig:
@@ -477,7 +496,7 @@ export default function HomeGardenPlanner() {
                 type: selectedZoneType as any,
                 coordinates,
                 name: parentZoneId
-                    ? `${zoneTypeInfo?.name} (ใน ${gardenZones.find((z) => z.id === parentZoneId)?.name}) ${baseNameCount}`
+                    ? `${zoneTypeInfo?.name} (${t('ใน')} ${gardenZones.find((z) => z.id === parentZoneId)?.name}) ${baseNameCount}`
                     : `${zoneTypeInfo?.name} ${baseNameCount}`,
                 parentZoneId,
                 sprinklerConfig:
@@ -552,7 +571,7 @@ export default function HomeGardenPlanner() {
             let zoneId = 'virtual_zone';
             if (targetZone) {
                 if (targetZone.parentZoneId) {
-                    alert('ไม่สามารถวางหัวฉีดในพื้นที่ย่อยได้ กรุณาวางในพื้นที่หลักเท่านั้น');
+                    alert(t('ไม่สามารถวางหัวฉีดในพื้นที่ย่อยได้ กรุณาวางในพื้นที่หลักเท่านั้น'));
                     return;
                 }
 
@@ -560,7 +579,7 @@ export default function HomeGardenPlanner() {
                     targetZone.type === 'grass' &&
                     isPointInAvoidanceZone(position, targetZone.id)
                 ) {
-                    alert('ไม่สามารถวางหัวฉีดในพื้นที่ดอกไม้ ต้นไม้ หรือพื้นที่ต้องห้าม');
+                    alert(t('ไม่สามารถวางหัวฉีดในพื้นที่ดอกไม้ ต้นไม้ หรือพื้นที่ต้องห้าม'));
                     return;
                 }
                 zoneId = targetZone.id;
@@ -878,7 +897,6 @@ export default function HomeGardenPlanner() {
         });
     }, [gardenZones, autoPlaceSprinklersInZone]);
 
-    // ===== ENHANCED PIPE GENERATION FUNCTION =====
     const generatePipeNetwork = useCallback(async () => {
         if (!waterSource) {
             return;
@@ -902,12 +920,12 @@ export default function HomeGardenPlanner() {
             });
 
             if (pipeNetwork.length === 0) {
-                throw new Error('ไม่สามารถสร้างระบบท่อได้ กรุณาตรวจสอบตำแหน่งแหล่งน้ำและหัวฉีด');
+                throw new Error(t('ไม่สามารถสร้างระบบท่อได้ กรุณาตรวจสอบตำแหน่งแหล่งน้ำและหัวฉีด'));
             }
 
             setPipes(pipeNetwork);
         } catch (error) {
-            let errorMessage = 'เกิดข้อผิดพลาดในการสร้างระบบท่อ';
+            let errorMessage = t('เกิดข้อผิดพลาดในการสร้างระบบท่อ');
 
             if (error instanceof Error) {
                 errorMessage = error.message;
@@ -927,7 +945,6 @@ export default function HomeGardenPlanner() {
         setPipeGenerationError(null);
     }, []);
 
-    // ===== PIPE EDITING FUNCTIONS =====
     const handleSprinklerClickForPipe = useCallback(
         (sprinklerId: string) => {
             if (pipeEditMode === 'add') {
@@ -937,7 +954,6 @@ export default function HomeGardenPlanner() {
                     } else if (prev.length < 2) {
                         return [...prev, sprinklerId];
                     } else {
-                        // Replace second sprinkler if already 2 selected
                         return [prev[0], sprinklerId];
                     }
                 });
@@ -950,7 +966,6 @@ export default function HomeGardenPlanner() {
                     }
                 });
             } else {
-                // Normal sprinkler selection
                 setSelectedSprinkler((prev) => (prev === sprinklerId ? null : sprinklerId));
             }
         },
@@ -1065,7 +1080,6 @@ export default function HomeGardenPlanner() {
         [sprinklers, selectedSprinkler]
     );
 
-    // Enhanced map click handler that allows water source placement anywhere
     const handleMapClick = useCallback(
         (e: any) => {
             const { lat, lng } = e.latlng;
@@ -1110,7 +1124,6 @@ export default function HomeGardenPlanner() {
 
                 setSprinklers((prev) => [...prev, newSprinkler]);
             } else if (editMode === 'edit') {
-                // Allow water source placement anywhere (no zone restriction)
                 setWaterSource({
                     id: `source_${Date.now()}`,
                     position: { lat, lng },
@@ -1251,7 +1264,6 @@ export default function HomeGardenPlanner() {
         }
     }, [gardenZones, sprinklers, waterSource, pipes, designMode, imageData, canvasData]);
 
-    // เพิ่ม useEffect สำหรับ pipe edit mode
     useEffect(() => {
         if (pipeEditMode === 'add' && selectedSprinklersForPipe.length === 2) {
             addPipeBetweenSprinklers();
@@ -1259,7 +1271,6 @@ export default function HomeGardenPlanner() {
         if (pipeEditMode === 'remove' && selectedSprinklersForPipe.length === 2) {
             removePipesBetweenSprinklers();
         }
-        // eslint-disable-next-line
     }, [selectedSprinklersForPipe, pipeEditMode]);
 
     if (!designMode) {
@@ -1268,14 +1279,15 @@ export default function HomeGardenPlanner() {
 
     return (
         <div className="min-h-screen w-full overflow-hidden bg-gray-900">
+            <Navbar />
             {showValidationErrors && (
                 <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black bg-opacity-50">
                     <div className="mx-4 w-full max-w-md rounded-lg bg-gray-800 p-6">
                         <h3 className="mb-4 text-xl font-bold text-red-400">
-                            ❌ ไม่สามารถดูสรุปผลได้
+                            ❌ {t('ไม่สามารถดูสรุปผลได้')}
                         </h3>
                         <div className="mb-4 text-gray-200">
-                            <p className="mb-2">กรุณาแก้ไขปัญหาต่อไปนี้ก่อน:</p>
+                            <p className="mb-2">{t('กรุณาแก้ไขปัญหาต่อไปนี้ก่อน:')}</p>
                             <ul className="list-inside list-disc space-y-1">
                                 {validationErrors.map((error, index) => (
                                     <li key={index} className="text-sm text-gray-300">
@@ -1288,39 +1300,58 @@ export default function HomeGardenPlanner() {
                             onClick={() => setShowValidationErrors(false)}
                             className="w-full rounded-lg bg-blue-600 py-2 text-white transition-colors hover:bg-blue-700"
                         >
-                            ตกลง
+                            {t('ตกลง')}
                         </button>
                     </div>
                 </div>
             )}
 
-            <div className="container mx-auto w-full px-4 py-6">
-                <div className="mb-6 text-left">
+            <div className="mx-auto h-[calc(100vh-65px)] w-full overflow-auto px-4 py-2">
+                <div className="mb-2 text-left">
                     <div className="flex items-center justify-between">
-                        <h1 className="text-2xl font-bold text-white">
-                            🏡 ระบบออกแบบระบบน้ำสำหรับสวนบ้าน
-                            <span className="ml-2 text-sm font-normal text-gray-400">
+                        <h1 className="text-lg font-bold text-white">
+                            🏡 {t('ระบบออกแบบระบบน้ำสำหรับสวนบ้าน')}
+                            <span className="ml-2 text-xs font-normal text-gray-400">
                                 (
                                 {designMode === 'map'
                                     ? 'Google Map'
                                     : designMode === 'canvas'
-                                      ? 'วาดเอง'
-                                      : 'รูปแบบแปลน'}
+                                      ? t('วาดเอง')
+                                      : t('รูปแบบแปลน')}
                                 )
                             </span>
                         </h1>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => {
+                                    resetAllData();
+                                    setDesignMode(null);
+                                }}
+                                className="rounded-lg bg-gray-700 px-4 py-2 text-sm text-gray-300 transition-colors hover:bg-gray-600"
+                            >
+                                {t('เปลี่ยนวิธี')}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    resetAllData();
+                                }}
+                                className="rounded-lg bg-red-600 px-4 py-2 text-xs text-white transition-colors hover:bg-red-700"
+                            >
+                                🗑️ {t('ลบทั้งหมด')}
+                            </button>
+                        </div>
 
                         <div className="flex items-center gap-4">
                             <div className="flex rounded-lg bg-gray-800 p-1">
                                 {[
-                                    { id: 'zones', name: 'กำหนดโซน', icon: '🗺️' },
-                                    { id: 'sprinklers', name: 'วางหัวฉีด', icon: '💧' },
-                                    { id: 'pipes', name: 'ระบบท่อ', icon: '🔧' },
+                                    { id: 'zones', name: t('กำหนดโซน'), icon: '🗺️' },
+                                    { id: 'sprinklers', name: t('วางหัวฉีด'), icon: '💧' },
+                                    { id: 'pipes', name: t('ระบบท่อ'), icon: '🔧' },
                                 ].map((tab) => (
                                     <button
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id as any)}
-                                        className={`rounded-md px-6 py-3 text-sm font-medium transition-all ${
+                                        className={`rounded-md px-6 py-3 text-xs font-medium transition-all ${
                                             activeTab === tab.id
                                                 ? 'bg-blue-600 text-white shadow-lg'
                                                 : 'text-gray-300 hover:bg-gray-700 hover:text-white'
@@ -1335,44 +1366,26 @@ export default function HomeGardenPlanner() {
 
                             <button
                                 onClick={navigateToSummary}
-                                className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 text-sm font-medium text-white shadow-lg transition-all hover:from-purple-700 hover:to-blue-700"
+                                className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 text-xs font-medium text-white shadow-lg transition-all hover:from-purple-700 hover:to-blue-700"
                             >
-                                📊 ดูสรุปผล
-                            </button>
-                        </div>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => {
-                                    resetAllData();
-                                    setDesignMode(null);
-                                }}
-                                className="rounded-lg bg-gray-700 px-4 py-2 text-sm text-gray-300 transition-colors hover:bg-gray-600"
-                            >
-                                เปลี่ยนวิธี
-                            </button>
-                            <button
-                                onClick={() => {
-                                    resetAllData();
-                                }}
-                                className="rounded-lg bg-red-600 px-4 py-2 text-sm text-white transition-colors hover:bg-red-700"
-                            >
-                                🗑️ ลบทั้งหมด
+                                📊 {t('ดูสรุปผล')}
                             </button>
                         </div>
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
-                    <div className="space-y-6 lg:col-span-1">
+                    {/* <div className="space-y-6 lg:col-span-1"> */}
+                    <div className="order-2 space-y-6 overflow-auto lg:order-1 lg:col-span-1">
                         {activeTab === 'zones' && (
                             <div className="rounded-xl bg-gray-800/90 p-6 shadow-2xl backdrop-blur">
                                 <h3 className="mb-4 text-xl font-semibold text-blue-400">
-                                    🗺️ จัดการโซนพื้นที่
+                                    🗺️ {t('จัดการโซนพื้นที่')}
                                 </h3>
 
                                 <div className="mb-4">
                                     <label className="mb-2 block text-sm font-medium text-gray-100">
-                                        เลือกประเภทโซน:
+                                        {t('เลือกประเภทโซน:')}
                                     </label>
                                     <div className="grid grid-cols-2 gap-2 text-gray-100">
                                         {ZONE_TYPES.map((zone) => (
@@ -1406,13 +1419,13 @@ export default function HomeGardenPlanner() {
                                             onClick={() => setEditMode('draw')}
                                             className="w-full rounded-lg bg-blue-600 py-3 font-medium text-white shadow-lg transition-all hover:bg-blue-700"
                                         >
-                                            ✏️ เริ่มวาดโซนพื้นที่
+                                            ✏️ {t('เริ่มวาดโซนพื้นที่')}
                                         </button>
                                     ) : (
                                         <div className="space-y-2">
                                             <div className="rounded-lg bg-blue-900/30 p-3 text-center">
                                                 <div className="text-sm font-medium text-blue-300">
-                                                    🎯 กำลังวาดโซน:{' '}
+                                                    🎯 {t('กำลังวาดโซน:')}
                                                     {
                                                         ZONE_TYPES.find(
                                                             (z) => z.id === selectedZoneType
@@ -1421,8 +1434,8 @@ export default function HomeGardenPlanner() {
                                                 </div>
                                                 <div className="mt-1 text-xs text-blue-200">
                                                     {designMode === 'map'
-                                                        ? 'คลิกและลากในแผนที่เพื่อวาดโซน'
-                                                        : 'คลิกเพื่อวาดจุดต่าง ๆ ของโซน'}
+                                                        ? t('คลิกและลากในแผนที่เพื่อวาดโซน')
+                                                        : t('คลิกเพื่อวาดจุดต่าง ๆ ของโซน')}
                                                 </div>
                                             </div>
                                             <button
@@ -1440,7 +1453,7 @@ export default function HomeGardenPlanner() {
                                                 }}
                                                 className="w-full rounded-lg bg-red-600 py-2 font-medium text-white transition-all hover:bg-red-700"
                                             >
-                                                ❌ ยกเลิกการวาด
+                                                ❌ {t('ยกเลิกการวาด')}
                                             </button>
                                         </div>
                                     )}
@@ -1449,7 +1462,7 @@ export default function HomeGardenPlanner() {
                                 {gardenZones.length > 0 && (
                                     <div>
                                         <h4 className="mb-2 text-sm font-medium text-gray-300">
-                                            โซนที่สร้างแล้ว:
+                                            {t('โซนที่สร้างแล้ว:')}
                                         </h4>
                                         <div className="max-h-96 space-y-3 overflow-y-auto">
                                             {gardenZones.map((zone) => {
@@ -1495,7 +1508,7 @@ export default function HomeGardenPlanner() {
                                                                         {isNestedZone &&
                                                                             parentZone && (
                                                                                 <span className="block text-xs text-gray-400">
-                                                                                    ↳ ใน{' '}
+                                                                                    ↳ {t('ใน')}
                                                                                     {
                                                                                         parentZone.name
                                                                                     }
@@ -1504,7 +1517,7 @@ export default function HomeGardenPlanner() {
                                                                     </div>
                                                                     <div className="text-xs text-gray-200">
                                                                         {zoneSprinklers.length}{' '}
-                                                                        หัวฉีด •{' '}
+                                                                        {t('หัวฉีด')} •{' '}
                                                                         {formatArea(zoneArea)}
                                                                     </div>
                                                                     {zone.sprinklerConfig && (
@@ -1518,12 +1531,12 @@ export default function HomeGardenPlanner() {
                                                                                             .type
                                                                                 )?.nameEN
                                                                             }
-                                                                            • รัศมี{' '}
+                                                                            • {t('รัศมี')}
                                                                             {
                                                                                 zone.sprinklerConfig
                                                                                     .radius
                                                                             }
-                                                                            ม.
+                                                                            {t('ม.')}
                                                                         </div>
                                                                     )}
                                                                 </div>
@@ -1540,7 +1553,9 @@ export default function HomeGardenPlanner() {
                                                                                 )
                                                                             }
                                                                             className="text-blue-400 hover:text-blue-300"
-                                                                            title="ตั้งค่าหัวฉีด"
+                                                                            title={t(
+                                                                                'ตั้งค่าหัวฉีด'
+                                                                            )}
                                                                         >
                                                                             ⚙️
                                                                         </button>
@@ -1554,7 +1569,9 @@ export default function HomeGardenPlanner() {
                                                                                 !zone.sprinklerConfig
                                                                             }
                                                                             className="text-green-400 hover:text-green-300 disabled:cursor-not-allowed disabled:text-gray-500"
-                                                                            title="วางหัวฉีดในโซนนี้"
+                                                                            title={t(
+                                                                                'วางหัวฉีดในโซนนี้'
+                                                                            )}
                                                                         >
                                                                             🤖
                                                                         </button>
@@ -1569,7 +1586,9 @@ export default function HomeGardenPlanner() {
                                                                                 0
                                                                             }
                                                                             className="text-yellow-400 hover:text-yellow-300 disabled:cursor-not-allowed disabled:text-gray-500"
-                                                                            title="ลบหัวฉีดในโซนนี้"
+                                                                            title={t(
+                                                                                'ลบหัวฉีดในโซนนี้'
+                                                                            )}
                                                                         >
                                                                             💧
                                                                         </button>
@@ -1580,7 +1599,7 @@ export default function HomeGardenPlanner() {
                                                                         deleteZone(zone.id)
                                                                     }
                                                                     className="text-red-400 hover:text-red-300"
-                                                                    title="ลบโซน"
+                                                                    title={t('ลบโซน')}
                                                                 >
                                                                     🗑️
                                                                 </button>
@@ -1592,7 +1611,9 @@ export default function HomeGardenPlanner() {
                                                                 <div className="mt-3 space-y-3 border-t border-gray-600 pt-3">
                                                                     <div>
                                                                         <label className="mb-2 block text-xs font-medium text-gray-300">
-                                                                            เลือกประเภทหัวฉีด:
+                                                                            {t(
+                                                                                'เลือกประเภทหัวฉีด:'
+                                                                            )}
                                                                         </label>
                                                                         <div className="grid grid-cols-1 gap-1">
                                                                             {SPRINKLER_TYPES.filter(
@@ -1646,8 +1667,7 @@ export default function HomeGardenPlanner() {
                                                                     {zone.sprinklerConfig && (
                                                                         <div>
                                                                             <label className="mb-2 block text-xs font-medium text-gray-300">
-                                                                                รัศมีการฉีดน้ำ
-                                                                                (เมตร):
+                                                                                {t('รัศมีการฉีดน้ำ (เมตร):')}
                                                                             </label>
                                                                             <div className="flex items-center space-x-3">
                                                                                 <input
@@ -1681,7 +1701,7 @@ export default function HomeGardenPlanner() {
                                                                                             .sprinklerConfig
                                                                                             .radius
                                                                                     }
-                                                                                    ม.
+                                                                                    {t('ม.')}
                                                                                 </span>
                                                                             </div>
                                                                         </div>
@@ -1700,7 +1720,7 @@ export default function HomeGardenPlanner() {
                         {activeTab === 'sprinklers' && (
                             <div className="rounded-xl bg-gray-800/90 p-6 shadow-2xl backdrop-blur">
                                 <h3 className="mb-4 text-xl font-semibold text-blue-400">
-                                    💧 จัดการหัวฉีดน้ำ
+                                    💧 {t('จัดการหัวฉีดน้ำ')}
                                 </h3>
 
                                 <div className="space-y-4">
@@ -1715,7 +1735,7 @@ export default function HomeGardenPlanner() {
                                             }
                                             className="w-full rounded-lg bg-purple-600 py-3 font-medium text-white transition-all hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-600"
                                         >
-                                            🤖 วางหัวฉีดอัตโนมัติ (ทุกโซน)
+                                            🤖 {t('วางหัวฉีดอัตโนมัติ (ทุกโซน)')}
                                         </button>
 
                                         <button
@@ -1729,16 +1749,16 @@ export default function HomeGardenPlanner() {
                                             📍{' '}
                                             {editMode === 'place'
                                                 ? designMode === 'map'
-                                                    ? 'กำลังวางหัวฉีด - คลิกในแผนที่'
-                                                    : 'กำลังวางหัวฉีด - คลิกในพื้นที่'
-                                                : 'วางหัวฉีดเอง'}
+                                                    ? t('กำลังวางหัวฉีด - คลิกในแผนที่')
+                                                    : t('กำลังวางหัวฉีด - คลิกในพื้นที่')
+                                                : t('วางหัวฉีดเอง')}
                                         </button>
 
                                         {editMode === 'place' && (
                                             <div className="mt-3 space-y-3 border-t border-gray-600 pt-3">
                                                 <div>
                                                     <label className="mb-2 block text-xs font-medium text-gray-300">
-                                                        เลือกประเภทหัวฉีด:
+                                                        {t('เลือกประเภทหัวฉีด:')}
                                                     </label>
                                                     <div className="grid grid-cols-1 gap-1">
                                                         {SPRINKLER_TYPES.map((sprinkler) => (
@@ -1769,7 +1789,7 @@ export default function HomeGardenPlanner() {
 
                                                 <div>
                                                     <label className="mb-2 block text-xs font-medium text-gray-300">
-                                                        รัศมีการฉีดน้ำ (เมตร):
+                                                        {t('รัศมีการฉีดน้ำ (เมตร):')}
                                                     </label>
                                                     <div className="flex items-center space-x-3">
                                                         <input
@@ -1786,7 +1806,7 @@ export default function HomeGardenPlanner() {
                                                             className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-gray-600"
                                                         />
                                                         <span className="min-w-[3rem] text-sm font-bold text-blue-400">
-                                                            {manualSprinklerRadius}ม.
+                                                            {manualSprinklerRadius} {t('ม.')}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -1804,9 +1824,9 @@ export default function HomeGardenPlanner() {
                                             🚰{' '}
                                             {editMode === 'edit'
                                                 ? designMode === 'map'
-                                                    ? 'กำลังวางแหล่งน้ำ - คลิกแผนที่'
-                                                    : 'กำลังวางแหล่งน้ำ - คลิกในพื้นที่'
-                                                : 'วางแหล่งน้ำ'}
+                                                    ? t('กำลังวางแหล่งน้ำ - คลิกแผนที่')
+                                                    : t('กำลังวางแหล่งน้ำ - คลิกในพื้นที่')
+                                                : t('วางแหล่งน้ำ')}
                                         </button>
 
                                         <button
@@ -1819,8 +1839,8 @@ export default function HomeGardenPlanner() {
                                         >
                                             ↔️{' '}
                                             {editMode === 'drag-sprinkler'
-                                                ? 'กำลังปรับตำแหน่ง - ลากหัวฉีด'
-                                                : 'ปรับตำแหน่งหัวฉีด'}
+                                                ? t('กำลังปรับตำแหน่ง - ลากหัวฉีด')
+                                                : t('ปรับตำแหน่งหัวฉีด')}
                                         </button>
 
                                         {sprinklers.length > 0 && (
@@ -1831,7 +1851,7 @@ export default function HomeGardenPlanner() {
                                                 }}
                                                 className="w-full rounded-lg bg-red-600 py-3 font-medium text-white transition-all hover:bg-red-700"
                                             >
-                                                🗑️ ลบหัวฉีดทั้งหมด
+                                                🗑️ {t('ลบหัวฉีดทั้งหมด')}
                                             </button>
                                         )}
                                     </div>
@@ -1839,7 +1859,7 @@ export default function HomeGardenPlanner() {
                                     {sprinklers.length > 0 && (
                                         <div className="space-y-2">
                                             <h4 className="text-sm font-medium text-gray-300">
-                                                สรุปหัวฉีด: {sprinklers.length} ตัว
+                                                {t('สรุปหัวฉีด:')} {sprinklers.length} {t('ตัว')}
                                             </h4>
                                             <div className="max-h-40 space-y-2 overflow-y-auto">
                                                 {gardenZones
@@ -1882,7 +1902,7 @@ export default function HomeGardenPlanner() {
                                                                     <div className="text-right">
                                                                         <div className="font-bold text-blue-400">
                                                                             {zoneSprinklers.length}{' '}
-                                                                            หัว
+                                                                            {t('หัว')}
                                                                         </div>
                                                                         {zone.sprinklerConfig && (
                                                                             <div className="text-gray-400">
@@ -1911,7 +1931,7 @@ export default function HomeGardenPlanner() {
                                                             <div className="flex items-center space-x-2">
                                                                 <span>⚙️</span>
                                                                 <span className="font-medium text-gray-100">
-                                                                    หัวฉีดแบบกำหนดเอง
+                                                                    {t('หัวฉีดแบบกำหนดเอง')}
                                                                 </span>
                                                             </div>
                                                             <div className="text-right">
@@ -1923,10 +1943,10 @@ export default function HomeGardenPlanner() {
                                                                                 'virtual_zone'
                                                                         ).length
                                                                     }{' '}
-                                                                    หัว
+                                                                    {t('หัว')}
                                                                 </div>
                                                                 <div className="text-gray-400">
-                                                                    หัวฉีดผสม
+                                                                    {t('หัวฉีดผสม')}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -1942,7 +1962,7 @@ export default function HomeGardenPlanner() {
                         {activeTab === 'pipes' && (
                             <div className="rounded-xl bg-gray-800/90 p-6 shadow-2xl backdrop-blur">
                                 <h3 className="mb-4 text-xl font-semibold text-blue-400">
-                                    🔧 ระบบท่อน้ำ
+                                    🔧 {t('ระบบท่อน้ำ')}
                                 </h3>
 
                                 <div className="space-y-4">
@@ -1951,12 +1971,11 @@ export default function HomeGardenPlanner() {
                                             <div className="mb-2 flex items-center gap-2">
                                                 <span className="text-lg">⚠️</span>
                                                 <span className="font-semibold">
-                                                    ต้องวางแหล่งน้ำก่อน
+                                                    {t('ต้องวางแหล่งน้ำก่อน')}
                                                 </span>
                                             </div>
                                             <p className="text-sm">
-                                                กรุณาไปแท็บ "วางหัวฉีด" และกดปุ่ม "วางแหล่งน้ำ"
-                                                ก่อนสร้างระบบท่อ
+                                                {t('กรุณาไปแท็บ "วางหัวฉีด" และกดปุ่ม "วางแหล่งน้ำ" ก่อนสร้างระบบท่อ')}
                                             </p>
                                         </div>
                                     ) : sprinklers.length === 0 ? (
@@ -1964,22 +1983,23 @@ export default function HomeGardenPlanner() {
                                             <div className="mb-2 flex items-center gap-2">
                                                 <span className="text-lg">⚠️</span>
                                                 <span className="font-semibold">
-                                                    ต้องวางหัวฉีดก่อน
+                                                    {t('ต้องวางหัวฉีดก่อน')}
                                                 </span>
                                             </div>
                                             <p className="text-sm">
-                                                กรุณาไปแท็บ "วางหัวฉีด" และวางหัวฉีดก่อนสร้างระบบท่อ
+                                                {t('กรุณาไปแท็บ')} {t('"วางหัวฉีด"')}{' '}
+                                                {t('และวางหัวฉีดก่อนสร้างระบบท่อ')}
                                             </p>
                                         </div>
                                     ) : (
                                         <div className="space-y-3">
                                             <div className="rounded-lg bg-green-900/30 p-3 text-xs text-green-300">
                                                 <div className="mb-1 font-medium">
-                                                    ✅ พร้อมสร้างระบบท่อแล้ว
+                                                    ✅ {t('พร้อมสร้างระบบท่อแล้ว')}
                                                 </div>
                                                 <div>
-                                                    แหล่งน้ำ: 1 จุด • หัวฉีด: {sprinklers.length}{' '}
-                                                    ตัว
+                                                    {t('แหล่งน้ำ:')} 1 {t('จุด')} • {t('หัวฉีด:')}{' '}
+                                                    {sprinklers.length} {t('ตัว')}
                                                 </div>
                                             </div>
 
@@ -1995,10 +2015,10 @@ export default function HomeGardenPlanner() {
                                                 {isGeneratingPipes ? (
                                                     <div className="flex items-center justify-center gap-2">
                                                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                                                        🔧 กำลังสร้างระบบท่อ...
+                                                        🔧 {t('กำลังสร้างระบบท่อ...')}
                                                     </div>
                                                 ) : (
-                                                    '🚀 สร้างระบบท่ออัตโนมัติ'
+                                                    '🚀 ' + t('สร้างระบบท่ออัตโนมัติ')
                                                 )}
                                             </button>
 
@@ -2007,7 +2027,7 @@ export default function HomeGardenPlanner() {
                                                     <div className="mb-1 flex items-center gap-2">
                                                         <span className="text-lg">❌</span>
                                                         <span className="font-semibold">
-                                                            เกิดข้อผิดพลาด
+                                                            {t('เกิดข้อผิดพลาด')}
                                                         </span>
                                                     </div>
                                                     <p className="text-sm">{pipeGenerationError}</p>
@@ -2018,13 +2038,14 @@ export default function HomeGardenPlanner() {
                                                 <div className="space-y-3">
                                                     <div className="rounded-lg bg-purple-900/30 p-3 text-sm text-purple-300">
                                                         <div className="mb-1 font-medium">
-                                                            📊 สถิติระบบท่อ (สีเหลือง):
+                                                            📊 {t('สถิติระบบท่อ (สีม่วง):')}
                                                         </div>
                                                         <div>
-                                                            จำนวนท่อทั้งหมด: {pipes.length} เส้น
+                                                            {t('จำนวนท่อทั้งหมด:')} {pipes.length}{' '}
+                                                            {t('เส้น')}
                                                         </div>
                                                         <div>
-                                                            ความยาวรวม:{' '}
+                                                            {t('ความยาวรวม:')}
                                                             {formatDistance(
                                                                 pipes.reduce(
                                                                     (sum, p) => sum + p.length,
@@ -2037,7 +2058,7 @@ export default function HomeGardenPlanner() {
                                                     {/* Pipe editing controls */}
                                                     <div className="rounded-lg bg-blue-900/30 p-3">
                                                         <div className="mb-2 text-sm font-medium text-blue-300">
-                                                            🔧 แก้ไขระบบท่อ:
+                                                            🔧 {t('แก้ไขระบบท่อ:')}
                                                         </div>
 
                                                         <div className="mb-3 flex gap-2">
@@ -2058,7 +2079,7 @@ export default function HomeGardenPlanner() {
                                                                         : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                                                 }`}
                                                             >
-                                                                ➕ เพิ่มท่อ
+                                                                ➕ {t('เพิ่มท่อ')}
                                                             </button>
                                                             <button
                                                                 onClick={() => {
@@ -2077,15 +2098,15 @@ export default function HomeGardenPlanner() {
                                                                         : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                                                 }`}
                                                             >
-                                                                ➖ ลบท่อ
+                                                                ➖ {t('ลบท่อ')}
                                                             </button>
                                                         </div>
 
                                                         {pipeEditMode === 'add' && (
                                                             <div className="space-y-2">
                                                                 <div className="text-xs text-blue-200">
-                                                                    เลือกหัวฉีด 2
-                                                                    ตัวเพื่อเชื่อมต่อท่อ (
+                                                                    {t('เลือกหัวฉีด')} 2
+                                                                    {t('ตัวเพื่อเชื่อมต่อท่อ')} (
                                                                     {
                                                                         selectedSprinklersForPipe.length
                                                                     }
@@ -2099,7 +2120,7 @@ export default function HomeGardenPlanner() {
                                                                         }
                                                                         className="w-full rounded bg-green-700 py-2 text-xs font-medium text-white hover:bg-green-600"
                                                                     >
-                                                                        ✅ เชื่อมต่อท่อ
+                                                                        ✅ {t('เชื่อมต่อท่อ')}
                                                                     </button>
                                                                 )}
                                                             </div>
@@ -2108,8 +2129,8 @@ export default function HomeGardenPlanner() {
                                                         {pipeEditMode === 'remove' && (
                                                             <div className="space-y-2">
                                                                 <div className="text-xs text-red-200">
-                                                                    เลือกหัวฉีด 2
-                                                                    ตัวเพื่อลบท่อระหว่างกัน (
+                                                                    {t('เลือกหัวฉีด')} 2
+                                                                    {t('ตัวเพื่อลบท่อระหว่างกัน')} (
                                                                     {
                                                                         selectedSprinklersForPipe.length
                                                                     }
@@ -2124,7 +2145,9 @@ export default function HomeGardenPlanner() {
                                                                         className="w-full rounded bg-red-700 py-2 text-xs font-medium text-white hover:bg-red-600"
                                                                     >
                                                                         🗑️
-                                                                        ลบท่อระหว่างหัวฉีดที่เลือก
+                                                                        {t(
+                                                                            'ลบท่อระหว่างหัวฉีดที่เลือก'
+                                                                        )}
                                                                     </button>
                                                                 )}
                                                             </div>
@@ -2133,14 +2156,14 @@ export default function HomeGardenPlanner() {
                                                         {selectedPipes.size > 0 && (
                                                             <div className="mt-2 space-y-2">
                                                                 <div className="text-xs text-yellow-200">
-                                                                    เลือกแล้ว: {selectedPipes.size}{' '}
-                                                                    ท่อ
+                                                                    {t('เลือกแล้ว:')}{' '}
+                                                                    {selectedPipes.size} {t('ท่อ')}
                                                                 </div>
                                                                 <button
                                                                     onClick={deleteSelectedPipes}
                                                                     className="w-full rounded bg-red-700 py-2 text-xs font-medium text-white hover:bg-red-600"
                                                                 >
-                                                                    🗑️ ลบท่อที่เลือก
+                                                                    🗑️ {t('ลบท่อที่เลือก')}
                                                                 </button>
                                                             </div>
                                                         )}
@@ -2150,48 +2173,20 @@ export default function HomeGardenPlanner() {
                                                         onClick={clearPipes}
                                                         className="w-full rounded-lg bg-red-600 py-3 font-medium text-white transition-all hover:bg-red-700"
                                                     >
-                                                        🗑️ ลบระบบท่อทั้งหมด
+                                                        🗑️ {t('ลบระบบท่อทั้งหมด')}
                                                     </button>
                                                 </div>
                                             )}
                                         </div>
                                     )}
 
-                                    <div className="border-t border-gray-600 pt-4">
-                                        <h4 className="mb-2 text-sm font-semibold text-gray-300">
-                                            💡 วิธีการทำงาน (ระบบใหม่):
-                                        </h4>
-                                        <div className="space-y-2 text-xs text-gray-400">
-                                            <div className="flex items-start gap-2">
-                                                <span className="text-blue-400">1.</span>
-                                                <span>วิเคราะห์จำนวนหัวฉีดและตำแหน่ง</span>
-                                            </div>
-                                            <div className="flex items-start gap-2">
-                                                <span className="text-blue-400">2.</span>
-                                                <span>เชื่อมต่อตรงสำหรับ ≤3 หัวฉีด</span>
-                                            </div>
-                                            <div className="flex items-start gap-2">
-                                                <span className="text-blue-400">3.</span>
-                                                <span>ใช้ MST algorithm สำหรับ &gt;3 หัวฉีด</span>
-                                            </div>
-                                            <div className="flex items-start gap-2">
-                                                <span className="text-blue-400">4.</span>
-                                                <span>
-                                                    ท่อทุกเส้นมีขนาดเดียวกัน (ไม่แบ่งหลัก/สาขา)
-                                                </span>
-                                            </div>
-                                            <div className="flex items-start gap-2">
-                                                <span className="text-green-400">5.</span>
-                                                <span>สามารถแก้ไขเพิ่ม/ลบท่อได้หลังสร้างแล้ว</span>
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                         )}
                     </div>
 
-                    <div className="lg:col-span-3">
+                    {/* <div className="lg:col-span-3"> */}
+                    <div className="order-1 lg:order-2 lg:col-span-3">
                         <div className="relative h-[83vh] overflow-hidden rounded-xl border border-gray-600 shadow-2xl">
                             {designMode === 'map' && (
                                 <GoogleMapDesigner
@@ -2340,9 +2335,6 @@ export default function HomeGardenPlanner() {
                     </div>
                 </div>
             </div>
-
-            {/* Footer */}
-            <Footer />
         </div>
     );
 }

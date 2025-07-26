@@ -153,13 +153,13 @@ const CostSummary: React.FC<CostSummaryProps> = ({
 
                 let pipe: AnalyzedPipe | undefined;
                 if (results.analyzedBranchPipes) {
-                    pipe = results.analyzedBranchPipes.find(p => p.id === extraPipeId);
+                    pipe = results.analyzedBranchPipes.find((p) => p.id === extraPipeId);
                 }
                 if (!pipe && results.analyzedSecondaryPipes) {
-                    pipe = results.analyzedSecondaryPipes.find(p => p.id === extraPipeId);
+                    pipe = results.analyzedSecondaryPipes.find((p) => p.id === extraPipeId);
                 }
                 if (!pipe && results.analyzedMainPipes) {
-                    pipe = results.analyzedMainPipes.find(p => p.id === extraPipeId);
+                    pipe = results.analyzedMainPipes.find((p) => p.id === extraPipeId);
                 }
 
                 if (pipe) {
@@ -435,13 +435,14 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             extraPipeCost = extraPipeSummary.totalCost;
         }
 
-        if ((!projectData?.useZones || projectData.zones.length === 1) && 
-            (!gardenStats || gardenStats.zones.length === 1)) {
-            
+        if (
+            (!projectData?.useZones || projectData.zones.length === 1) &&
+            (!gardenStats || gardenStats.zones.length === 1)
+        ) {
             totalBranchPipeCost = 0;
             totalSecondaryPipeCost = 0;
             totalMainPipeCost = 0;
-            
+
             Object.values(pipeSummary.branch).forEach((item) => {
                 const totalLength = item.totalLength + (item.extraLength || 0);
                 item.quantity = calculatePipeRolls(totalLength, item.pipe.lengthM);
@@ -568,9 +569,8 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 </div>
                 <div className="mt-2 text-xs text-blue-200">
                     <p>
-                        📊 รวมท่อทั้งหมด: {totalPipeRolls} ม้วน 
-                        {(costs as any).extraPipeSummary && ' (รวมท่อเสริม)'}
-                         | ราคาเฉลี่ย:{' '}
+                        📊 รวมท่อทั้งหมด: {totalPipeRolls} ม้วน
+                        {(costs as any).extraPipeSummary && ' (รวมท่อเสริม)'}| ราคาเฉลี่ย:{' '}
                         {totalSprinklerHeads > 0
                             ? (costs.totalCost / totalSprinklerHeads).toLocaleString()
                             : 0}{' '}
@@ -668,7 +668,10 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                     {item.extraLength && item.extraLength > 0 && (
                                                         <span className="text-yellow-300">
                                                             {' '}
-                                                            (+ Riser {item.extraLength.toFixed(1)} ม.)
+                                                            (+ Riser {item.extraLength.toFixed(
+                                                                1
+                                                            )}{' '}
+                                                            ม.)
                                                         </span>
                                                     )}{' '}
                                                     | ประสิทธิภาพ:{' '}

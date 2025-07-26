@@ -567,7 +567,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             }
         }
 
-        
         if (selectedExtraPipe && selectedExtraPipe.pipe) {
             initialItems.push({
                 id: 'extraPipe',
@@ -575,7 +574,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 image: selectedExtraPipe.pipe.image_url || selectedExtraPipe.pipe.image || '',
                 date: '',
                 description: `${selectedExtraPipe.pipe.productCode || selectedExtraPipe.pipe.product_code || ''} - ท่อเสริม (Riser/แขนง) ${selectedExtraPipe.pipe.sizeMM || ''}mm ยาว ${selectedExtraPipe.pipe.lengthM || ''} ม./ม้วน`,
-                quantity: Math.ceil(selectedExtraPipe.totalLength / (selectedExtraPipe.pipe.lengthM || 1)),
+                quantity: Math.ceil(
+                    selectedExtraPipe.totalLength / (selectedExtraPipe.pipe.lengthM || 1)
+                ),
                 unitPrice: selectedExtraPipe.pipe.price || 0,
                 discount: 30.0,
                 taxes: 'Output\nVAT\n7%',

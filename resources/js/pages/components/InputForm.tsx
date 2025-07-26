@@ -63,7 +63,9 @@ const InputForm: React.FC<InputFormProps> = ({
                             data = Array.isArray(result) ? result : [];
                             break;
                         }
-                    } catch (error) { continue; }
+                    } catch (error) {
+                        continue;
+                    }
                 }
                 if (data.length === 0) {
                     const response = await fetch('/api/equipments');
@@ -71,11 +73,11 @@ const InputForm: React.FC<InputFormProps> = ({
                         const allEquipments = await response.json();
                         data = Array.isArray(allEquipments)
                             ? allEquipments.filter((item) => {
-                                const categoryMatch =
-                                    item.category?.name === 'pipe' ||
-                                    item.category?.display_name?.toLowerCase().includes('pipe');
-                                return categoryMatch;
-                            })
+                                  const categoryMatch =
+                                      item.category?.name === 'pipe' ||
+                                      item.category?.display_name?.toLowerCase().includes('pipe');
+                                  return categoryMatch;
+                              })
                             : [];
                     }
                 }
@@ -144,39 +146,39 @@ const InputForm: React.FC<InputFormProps> = ({
         });
     };
 
-
-    
     useEffect(() => {
         const messages: string[] = [];
-    
+
         if (input.totalTrees < 1) {
             messages.push(
                 projectMode === 'garden' ? 'จำนวนหัวฉีดต้องมากกว่า 0' : 'จำนวนต้นไม้ต้องมากกว่า 0'
             );
         }
-    
+
         const estimatedVelocity = calculateEstimatedVelocity(input);
         if (estimatedVelocity > 2.5) {
             messages.push('⚠️ ความเร็วน้ำอาจสูงเกินไป - ควรใช้ท่อขนาดใหญ่ขึ้น');
         } else if (estimatedVelocity < 0.6) {
             messages.push('⚠️ ความเร็วน้ำอาจต่ำเกินไป - อาจมีการตกตะกอน');
         }
-    
+
         if (input.longestBranchPipeM > 200 || input.longestSecondaryPipeM > 300) {
             messages.push('⚠️ ระยะท่อยาวมาก - อาจมี Head Loss สูง (>20%)');
         }
-    
+
         setValidationMessages(messages);
     }, [input, projectMode]);
-    
-    
+
     const calculateEstimatedVelocity = (input: IrrigationInput): number => {
-        const estimatedFlow = (input.totalTrees * input.waterPerTreeLiters) / (input.irrigationTimeMinutes || 30) / 60;
-        const estimatedDiameter = Math.sqrt(4 * (estimatedFlow / 60000) / (Math.PI * 1.5)); 
+        const estimatedFlow =
+            (input.totalTrees * input.waterPerTreeLiters) /
+            (input.irrigationTimeMinutes || 30) /
+            60;
+        const estimatedDiameter = Math.sqrt((4 * (estimatedFlow / 60000)) / (Math.PI * 1.5));
         const recommendedSize = estimatedDiameter * 1000;
-        
+
         const pipeArea = Math.PI * Math.pow(0.032 / 2, 2);
-        return (estimatedFlow / 60000) / pipeArea;
+        return estimatedFlow / 60000 / pipeArea;
     };
 
     const getSprinklerPressureInfo = (): SprinklerPressureInfo | null => {
@@ -333,9 +335,7 @@ const InputForm: React.FC<InputFormProps> = ({
             }
 
             if (isMultiZone) {
-                recommendations.push(
-                    `ระบบ ${input.numberOfZones} โซน - การเปิดโซนกำหนดในหน้าหลัก`
-                );
+                recommendations.push(`ระบบ ${input.numberOfZones} โซน - การเปิดโซนกำหนดในหน้าหลัก`);
             }
         }
 
@@ -460,9 +460,7 @@ const InputForm: React.FC<InputFormProps> = ({
                         </div>
                     </div>
                     <div className="mt-2 text-xs text-purple-200">
-                    <p>
-    💡 ปั๊มจะคำนวณตามการตั้งค่าการเปิดโซนที่กำหนดไว้ในหน้าหลัก
-</p>
+                        <p>💡 ปั๊มจะคำนวณตามการตั้งค่าการเปิดโซนที่กำหนดไว้ในหน้าหลัก</p>
                     </div>
                 </div>
             )}
@@ -1069,12 +1067,14 @@ const InputForm: React.FC<InputFormProps> = ({
 
             <h3 className="mb-4 mt-6 text-lg font-semibold text-blue-400">🔧 ข้อมูลท่อเสริม</h3>
             <div className="space-y-4 rounded-lg bg-gray-800 p-4 shadow-lg">
-                <h4 className="text-md font-medium text-blue-300">ท่อเสริมต่อหัวสปริงเกอร์ (Riser/แขนง)</h4>
+                <h4 className="text-md font-medium text-blue-300">
+                    ท่อเสริมต่อหัวสปริงเกอร์ (Riser/แขนง)
+                </h4>
                 <div>
                     <label className="mb-2 block text-sm font-medium">เลือกชนิดท่อ</label>
                     <select
                         value={input.extraPipePerSprinkler?.pipeId || ''}
-                        onChange={e => {
+                        onChange={(e) => {
                             const pipeId = e.target.value ? parseInt(e.target.value) : null;
                             onInputChange({
                                 ...input,
@@ -1087,11 +1087,13 @@ const InputForm: React.FC<InputFormProps> = ({
                         className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                     >
                         <option value="">-- ไม่ใช้ท่อเสริม --</option>
-                        {pipeData && pipeData.map(pipe => (
-                            <option key={pipe.id} value={pipe.id}>
-                                {pipe.name || pipe.productCode} - {pipe.sizeMM}mm - {pipe.price?.toLocaleString()} บาท/ม้วน
-                            </option>
-                        ))}
+                        {pipeData &&
+                            pipeData.map((pipe) => (
+                                <option key={pipe.id} value={pipe.id}>
+                                    {pipe.name || pipe.productCode} - {pipe.sizeMM}mm -{' '}
+                                    {pipe.price?.toLocaleString()} บาท/ม้วน
+                                </option>
+                            ))}
                     </select>
                 </div>
                 <div>
@@ -1101,7 +1103,7 @@ const InputForm: React.FC<InputFormProps> = ({
                         min="0"
                         step="0.1"
                         value={input.extraPipePerSprinkler?.lengthPerHead || ''}
-                        onChange={e => {
+                        onChange={(e) => {
                             const lengthPerHead = parseFloat(e.target.value) || 0;
                             onInputChange({
                                 ...input,
