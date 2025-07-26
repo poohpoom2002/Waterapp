@@ -1,4 +1,4 @@
-// resources/js/utils/homeGardenData.ts - Updated Pipe System without branch classification
+// resources/js/utils/homeGardenData.ts
 
 export interface Coordinate {
     lat: number;
@@ -59,7 +59,6 @@ export interface Pipe {
     length: number;
     connectedSprinklers?: string[];
     zoneId?: string;
-    // Removed isBranch - all pipes are now the same type
 }
 
 export interface GardenPlannerData {
@@ -138,7 +137,7 @@ export const SPRINKLER_TYPES: SprinklerType[] = [
         nameTH: 'หัวฉีดด้านเดียวปรับมุม',
         icon: '🟤',
         radius: 4,
-        suitableFor: ['grass', 'flowers'], // เหมาะสำหรับพื้นที่แคบ แปลงดอกไม้ หรือสนามหญ้าริมทางเดิน
+        suitableFor: ['grass', 'flowers'], 
         color: '#33CCFF',
     },
     {
@@ -147,7 +146,7 @@ export const SPRINKLER_TYPES: SprinklerType[] = [
         nameTH: 'หัวฉีดผีเสื้อ',
         icon: '🟤',
         radius: 1,
-        suitableFor: ['flowers'], // เหมาะสำหรับแปลงดอกไม้ขนาดเล็ก หรือกระถางที่ต้องการน้ำแบบฝอยละเอียด
+        suitableFor: ['flowers'],
         color: '#33CCFF',
     },
     {
@@ -156,7 +155,7 @@ export const SPRINKLER_TYPES: SprinklerType[] = [
         nameTH: 'หัวพ่นหมอก – แบบเสียบท่อ PE',
         icon: '🟤',
         radius: 1,
-        suitableFor: ['flowers'], // เหมาะสำหรับดอกไม้ที่ต้องการความชื้นสูง หรือไม้ประดับในเรือนเพาะชำ
+        suitableFor: ['flowers'],
         color: '#33CCFF',
     },
     {
@@ -165,7 +164,7 @@ export const SPRINKLER_TYPES: SprinklerType[] = [
         nameTH: 'สปริงเกอร์ชนิดกระแทก',
         icon: '🟤',
         radius: 15,
-        suitableFor: ['trees', 'grass'], // เหมาะสำหรับไม้ผล ไม้ยืนต้น หรือพื้นที่สนามหญ้ากว้างขนาดใหญ่
+        suitableFor: ['trees', 'grass'],
         color: '#33CCFF',
     },
     {
@@ -174,7 +173,7 @@ export const SPRINKLER_TYPES: SprinklerType[] = [
         nameTH: 'หัวฉีดเกียร์ไดร์ฟ ปรับแรงและมุม',
         icon: '🟤',
         radius: 10,
-        suitableFor: ['grass', 'trees'], // เหมาะกับพื้นที่สนามหญ้า และไม้ผลขนาดกลางที่ต้องการการกระจายน้ำแม่นยำ
+        suitableFor: ['grass', 'trees'],
         color: '#33CCFF',
     },
     {
@@ -183,7 +182,7 @@ export const SPRINKLER_TYPES: SprinklerType[] = [
         nameTH: 'เทปน้ำหยดหรือสเปรย์ แบบม้วน',
         icon: '🟤',
         radius: 0.3,
-        suitableFor: ['flowers', 'trees'], // เหมาะกับไม้ผล พืชผัก ดอกไม้ขนาดเล็กที่ต้องการน้ำตรงโคนต้นแบบประหยัดน้ำ
+        suitableFor: ['flowers', 'trees'],
         color: '#33CCFF',
     },
 ];
@@ -197,7 +196,6 @@ export const CANVAS_GRID_SIZE = 20;
 
 export function validateScale(scale: number, context: 'image' | 'canvas' = 'image'): boolean {
     if (!scale || isNaN(scale) || scale <= 0) {
-        console.warn('Invalid scale: must be a positive number');
         return false;
     }
 
@@ -208,9 +206,6 @@ export function validateScale(scale: number, context: 'image' | 'canvas' = 'imag
 
     const range = ranges[context];
     if (scale < range.min || scale > range.max) {
-        console.warn(
-            `Scale ${scale} out of valid range [${range.min}, ${range.max}] for ${context}`
-        );
         return false;
     }
 
@@ -232,7 +227,6 @@ export function getValidScale(data: GardenPlannerData): number {
     }
 
     if (!validateScale(scale, isImageMode ? 'image' : 'canvas')) {
-        console.warn(`Using default scale ${defaultScale} due to invalid scale ${scale}`);
         return defaultScale;
     }
 
@@ -371,7 +365,6 @@ export function canvasToGPS(
     centerPoint?: Coordinate
 ): Coordinate {
     if (!canvasPoint || !canvasData) {
-        console.warn('Invalid canvas point or canvas data');
         return { lat: DEFAULT_CENTER[0], lng: DEFAULT_CENTER[1] };
     }
 
@@ -383,7 +376,6 @@ export function canvasToGPS(
 
     const scale = canvasData.scale || CANVAS_DEFAULT_SCALE;
     if (!validateScale(scale, 'canvas')) {
-        console.warn('Invalid scale in canvasToGPS, using default');
     }
 
     const offsetX = (canvasPoint.x - centerX) / scale;
@@ -407,10 +399,6 @@ export function clipCircleToPolygon(
     if (!center || !polygon || polygon.length < 3) return 'NO_COVERAGE';
     if (radius <= 0) return 'NO_COVERAGE';
 
-    console.log(
-        `🎯 Enhanced Circle Masking: radius=${radius}m, polygon=${polygon.length} vertices`
-    );
-
     if ('x' in center && polygon.length > 0 && 'x' in polygon[0]) {
         const validScale = scale && validateScale(scale, 'image') ? scale : 20;
         return clipCircleToPolygonCanvas(
@@ -431,9 +419,6 @@ function clipCircleToPolygonCanvas(
     scale: number
 ): ClipResult {
     const radiusInPixels = radius * scale;
-    console.log(
-        `🔍 Enhanced Canvas masking: radius=${radius}m (${radiusInPixels}px), scale=${scale}`
-    );
 
     const centerInside = isPointInPolygon(center, polygon);
 
@@ -444,27 +429,22 @@ function clipCircleToPolygonCanvas(
             polygon
         );
         if (circleCompletelyInside) {
-            console.log('✅ Circle completely inside polygon');
             return 'FULL_CIRCLE';
         }
     }
 
     const hasIntersection = circleIntersectsPolygon(center, radiusInPixels, polygon);
     if (!hasIntersection) {
-        console.log('❌ Circle does not intersect polygon');
         return 'NO_COVERAGE';
     }
 
     if (centerInside) {
-        console.log('🎭 Circle extends beyond polygon boundary - using MASKED_CIRCLE');
         return 'MASKED_CIRCLE';
     } else {
         const clippedPolygon = createClippedPolygon(center, radiusInPixels, polygon);
         if (clippedPolygon.length >= 3) {
-            console.log(`🎨 Created clipped polygon with ${clippedPolygon.length} points`);
             return clippedPolygon;
         } else {
-            console.log('🎭 Using MASKED_CIRCLE for complex intersection');
             return 'MASKED_CIRCLE';
         }
     }
@@ -811,8 +791,6 @@ export function isCornerSprinkler(
     });
 }
 
-// ===== SIMPLIFIED PIPE SYSTEM - All pipes are same type =====
-
 export interface SmartPipeNetworkOptions {
     waterSource: WaterSource;
     sprinklers: Sprinkler[];
@@ -825,13 +803,7 @@ export interface SmartPipeNetworkOptions {
 export function generateSmartPipeNetwork(options: SmartPipeNetworkOptions): Pipe[] {
     const { waterSource, sprinklers, gardenZones, designMode, canvasData, imageData } = options;
 
-    console.log('🚀 Generating SIMPLIFIED pipe network (uniform pipe type)...');
-    console.log(
-        `Source: ${waterSource.id}, Sprinklers: ${sprinklers.length}, Zones: ${gardenZones.length}`
-    );
-
     if (!waterSource || sprinklers.length === 0) {
-        console.warn('Cannot generate pipes: missing water source or sprinklers');
         return [];
     }
 
@@ -852,11 +824,7 @@ export function generateSmartPipeNetwork(options: SmartPipeNetworkOptions): Pipe
             imageData
         );
 
-        console.log(`✅ Generated ${pipes.length} uniform pipe segments successfully`);
-
         const totalLength = pipes.reduce((sum, pipe) => sum + pipe.length, 0);
-        console.log(`📏 Total pipe length: ${formatDistance(totalLength)}`);
-
         return pipes;
     } catch (error) {
         console.error('Error generating pipe network:', error);
@@ -873,19 +841,14 @@ function createUniformPipeNetwork(
     canvasData?: any,
     imageData?: any
 ): Pipe[] {
-    console.log('🔧 Creating uniform pipe network (no branch classification)...');
-
     const pipes: Pipe[] = [];
     const sourcePos = isCanvasMode ? waterSource.canvasPosition! : waterSource.position;
 
     if (sprinklers.length === 0) {
-        console.log('No sprinklers to connect');
         return pipes;
     }
 
-    // Strategy 1: Direct connections for small networks (≤ 3 sprinklers)
     if (sprinklers.length <= 3) {
-        console.log('Using direct connection strategy for small network');
         return createDirectConnections(
             sourcePos,
             sprinklers,
@@ -896,8 +859,6 @@ function createUniformPipeNetwork(
         );
     }
 
-    // Strategy 2: Minimum Spanning Tree for larger networks
-    console.log('Using MST strategy for larger network');
     return createMSTNetwork(sourcePos, sprinklers, isCanvasMode, scale, canvasData, imageData);
 }
 
@@ -944,11 +905,8 @@ function createMSTNetwork(
     canvasData?: any,
     imageData?: any
 ): Pipe[] {
-    console.log('Creating MST-based uniform pipe network');
-
     const pipes: Pipe[] = [];
 
-    // Create list of all points (source + sprinklers)
     const allPoints: {
         pos: Coordinate | CanvasCoordinate;
         id: string;
@@ -969,11 +927,9 @@ function createMSTNetwork(
     });
 
     if (allPoints.length < 2) {
-        console.warn('Not enough points for MST');
         return pipes;
     }
 
-    // Calculate distance matrix
     const distances: number[][] = [];
     for (let i = 0; i < allPoints.length; i++) {
         distances[i] = [];
@@ -990,15 +946,13 @@ function createMSTNetwork(
         }
     }
 
-    // Prim's MST algorithm
     const inMST = new Array(allPoints.length).fill(false);
     const key = new Array(allPoints.length).fill(Infinity);
     const parent = new Array(allPoints.length).fill(-1);
 
-    key[0] = 0; // Start from source
+    key[0] = 0;
 
     for (let count = 0; count < allPoints.length - 1; count++) {
-        // Find minimum key vertex not yet in MST
         let u = -1;
         for (let v = 0; v < allPoints.length; v++) {
             if (!inMST[v] && (u === -1 || key[v] < key[u])) {
@@ -1008,7 +962,6 @@ function createMSTNetwork(
 
         inMST[u] = true;
 
-        // Update key values of adjacent vertices
         for (let v = 0; v < allPoints.length; v++) {
             if (!inMST[v] && distances[u][v] < key[v]) {
                 parent[v] = u;
@@ -1017,7 +970,6 @@ function createMSTNetwork(
         }
     }
 
-    // Create uniform pipes from MST
     for (let i = 1; i < allPoints.length; i++) {
         if (parent[i] !== -1) {
             const fromPoint = allPoints[parent[i]];
@@ -1057,7 +1009,6 @@ function createUniformPipe(
         const canvasStart = start as CanvasCoordinate;
         const canvasEnd = end as CanvasCoordinate;
 
-        // Convert to GPS coordinates
         const gpsStart = canvasToGPS(canvasStart, canvasData || imageData);
         const gpsEnd = canvasToGPS(canvasEnd, canvasData || imageData);
 
@@ -1070,7 +1021,6 @@ function createUniformPipe(
             type: 'pipe',
             length,
             zoneId,
-            // Removed isBranch - all pipes are uniform
         };
     } else {
         return {
@@ -1080,12 +1030,10 @@ function createUniformPipe(
             type: 'pipe',
             length,
             zoneId,
-            // Removed isBranch - all pipes are uniform
         };
     }
 }
 
-// Pipe editing functions
 export function addCustomPipe(
     fromSprinklerId: string,
     toSprinklerId: string,
@@ -1099,7 +1047,6 @@ export function addCustomPipe(
     const toSprinkler = sprinklers.find((s) => s.id === toSprinklerId);
 
     if (!fromSprinkler || !toSprinkler) {
-        console.warn('Cannot create pipe: sprinkler not found');
         return null;
     }
 
@@ -1107,7 +1054,6 @@ export function addCustomPipe(
     const toPos = isCanvasMode ? toSprinkler.canvasPosition! : toSprinkler.position;
 
     if (!fromPos || !toPos) {
-        console.warn('Cannot create pipe: sprinkler position missing');
         return null;
     }
 
@@ -1147,7 +1093,7 @@ export function findPipesBetweenSprinklers(
         const pipeStart = pipe.canvasStart || pipe.start;
         const pipeEnd = pipe.canvasEnd || pipe.end;
 
-        const tolerance = 0.1; // Small tolerance for floating point comparison
+        const tolerance = 0.1;
 
         const startMatchesPos1 =
             Math.abs(getCoordValue(pipeStart, 'x') - getCoordValue(pos1, 'x')) < tolerance &&
@@ -1175,7 +1121,6 @@ function getCoordValue(coord: Coordinate | CanvasCoordinate, axis: 'x' | 'y'): n
     }
 }
 
-// Storage functions
 let inMemoryData: GardenPlannerData | null = null;
 const STORAGE_KEY = 'gardenPlannerData';
 
@@ -1199,8 +1144,7 @@ export function createInitialData(): GardenPlannerData {
 export function saveGardenData(data: GardenPlannerData): boolean {
     try {
         if (data.imageData?.scale) {
-            if (!validateScale(data.imageData.scale, 'image')) {
-                console.warn('Invalid image scale detected during save, resetting to default');
+            if (!validateScale(data.imageData.scale, 'image')) {    
                 data.imageData.scale = 20;
                 data.imageData.isScaleSet = false;
             }
@@ -1208,7 +1152,6 @@ export function saveGardenData(data: GardenPlannerData): boolean {
 
         if (data.canvasData?.scale) {
             if (!validateScale(data.canvasData.scale, 'canvas')) {
-                console.warn('Invalid canvas scale detected during save, resetting to default');
                 data.canvasData.scale = CANVAS_DEFAULT_SCALE;
             }
         }
@@ -1219,7 +1162,6 @@ export function saveGardenData(data: GardenPlannerData): boolean {
             try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
             } catch (e) {
-                console.warn('localStorage not available, using in-memory storage only');
             }
         }
         return true;
@@ -1266,7 +1208,6 @@ function validateAndFixLoadedData(data: GardenPlannerData): GardenPlannerData {
 
     if (fixedData.imageData?.scale) {
         if (!validateScale(fixedData.imageData.scale, 'image')) {
-            console.warn('Fixing invalid image scale in loaded data');
             fixedData.imageData.scale = 20;
             fixedData.imageData.isScaleSet = false;
         }
@@ -1274,12 +1215,10 @@ function validateAndFixLoadedData(data: GardenPlannerData): GardenPlannerData {
 
     if (fixedData.canvasData?.scale) {
         if (!validateScale(fixedData.canvasData.scale, 'canvas')) {
-            console.warn('Fixing invalid canvas scale in loaded data');
             fixedData.canvasData.scale = CANVAS_DEFAULT_SCALE;
         }
     }
 
-    // Remove isBranch property from existing pipes (backward compatibility)
     if (fixedData.pipes) {
         fixedData.pipes = fixedData.pipes.map((pipe) => {
             const { isBranch, ...cleanPipe } = pipe as any;
@@ -1306,7 +1245,6 @@ export function clearGardenData(): boolean {
     }
 }
 
-// Statistics functions
 export interface ZoneStatistics {
     zoneId: string;
     zoneName: string;
@@ -1326,7 +1264,6 @@ export interface GardenStatistics {
     zoneStatistics: ZoneStatistics[];
 }
 
-// แก้ไข interface ZoneStatistics ใน homeGardenData.ts
 export interface ZoneStatistics {
     zoneId: string;
     zoneName: string;
@@ -1348,7 +1285,6 @@ export interface GardenStatistics {
     zoneStatistics: ZoneStatistics[];
 }
 
-// แก้ไขฟังก์ชัน calculateStatistics ใน homeGardenData.ts
 export function calculateStatistics(data: GardenPlannerData): GardenStatistics {
     const { gardenZones = [], sprinklers = [], pipes = [] } = data || {};
     const mainZones = gardenZones.filter((z) => z.type !== 'forbidden' && !z.parentZoneId);
@@ -1397,7 +1333,7 @@ export function calculateStatistics(data: GardenPlannerData): GardenStatistics {
             zoneType: zoneType?.name || zone.type,
             area: zoneArea,
             sprinklerCount: zoneSprinklers.length,
-            sprinklerTypes, // เพิ่ม
+            sprinklerTypes,
             sprinklerRadius: sprinklerRadius,
             pipeLength: zonePipeLength,
             longestPipe: zoneLongestPipe,

@@ -248,8 +248,6 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         </div>
                     </div>
 
-                   
-
                     {selectedSprinkler.description && (
                         <div className="mt-3 rounded bg-gray-800 p-2">
                             <p className="text-xs text-gray-300">

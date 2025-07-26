@@ -1,8 +1,9 @@
 // resources/js/pages/home-garden-summary.tsx
 import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import { router } from '@inertiajs/react';
-
+import Navbar from '../components/Navbar';
 import GoogleMapSummary from '../components/homegarden/GoogleMapSummary';
+import { useLanguage } from '../contexts/LanguageContext';
 
 import {
     Coordinate,
@@ -21,7 +22,6 @@ import {
     canvasToGPS,
     calculateDistance,
 } from '../utils/homeGardenData';
-
 interface HomeGardenSummaryProps {
     data?: GardenPlannerData;
 }
@@ -35,8 +35,14 @@ interface DimensionLine {
     direction: 'auto' | 'left' | 'right' | 'top' | 'bottom';
 }
 
+interface ViewportState {
+    zoom: number;
+    panX: number;
+    panY: number;
+}
+
 class SummaryErrorBoundary extends React.Component<
-    { children: React.ReactNode },
+    { children: React.ReactNode; t: (key: string) => string },
     { hasError: boolean; error?: Error }
 > {
     constructor(props: any) {
@@ -53,17 +59,19 @@ class SummaryErrorBoundary extends React.Component<
     }
 
     render() {
+        const { t } = this.props;
         if (this.state.hasError) {
             return (
                 <div className="flex min-h-screen items-center justify-center bg-gray-900 p-6">
+                    <Navbar />
                     <div className="rounded-lg bg-red-900 p-6 text-center text-white">
-                        <h2 className="mb-4 text-xl font-bold">เกิดข้อผิดพลาดในการแสดงสรุปผล</h2>
-                        <p className="mb-4">ไม่สามารถโหลดข้อมูลการออกแบบได้</p>
+                        <h2 className="mb-4 text-xl font-bold">{t('เกิดข้อผิดพลาดในการแสดงสรุปผล')}</h2>
+                        <p className="mb-4">{t('ไม่สามารถโหลดข้อมูลการออกแบบได้')}</p>
                         <button
                             onClick={() => router.visit('/home-garden-planner')}
                             className="rounded bg-red-600 px-4 py-2 hover:bg-red-700"
                         >
-                            กลับไปหน้าออกแบบ
+                            {t('กลับไปหน้าออกแบบ')}
                         </button>
                     </div>
                 </div>
@@ -80,6 +88,17 @@ const CanvasRenderer: React.FC<{
 }> = ({ gardenData, canvasRef }) => {
     const internalCanvasRef = useRef<HTMLCanvasElement>(null);
     const activeCanvasRef = canvasRef || internalCanvasRef;
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const [viewport, setViewport] = useState<ViewportState>({
+        zoom: 1,
+        panX: 0,
+        panY: 0,
+    });
+
+    const [isDragging, setIsDragging] = useState(false);
+    const [lastMousePos, setLastMousePos] = useState<{ x: number; y: number } | null>(null);
+    const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
 
     const dimensionLines = useMemo(() => {
         try {
@@ -94,50 +113,22 @@ const CanvasRenderer: React.FC<{
     }, []);
 
     const canvasBounds = useMemo(() => {
-        const allPoints: CanvasCoordinate[] = [];
+        const zonePoints: CanvasCoordinate[] = [];
 
         gardenData.gardenZones?.forEach((zone) => {
-            if (zone.canvasCoordinates) {
-                allPoints.push(...zone.canvasCoordinates);
+            if (zone.canvasCoordinates && zone.canvasCoordinates.length > 0) {
+                zonePoints.push(...zone.canvasCoordinates);
             }
         });
 
-        gardenData.sprinklers?.forEach((sprinkler) => {
-            if (sprinkler.canvasPosition) {
-                allPoints.push(sprinkler.canvasPosition);
-            }
-        });
-
-        gardenData.pipes?.forEach((pipe) => {
-            if (pipe.canvasStart) allPoints.push(pipe.canvasStart);
-            if (pipe.canvasEnd) allPoints.push(pipe.canvasEnd);
-        });
-
-        dimensionLines.forEach((dim) => {
-            allPoints.push(dim.start, dim.end);
-        });
-
-        if (gardenData.waterSource?.canvasPosition) {
-            allPoints.push(gardenData.waterSource.canvasPosition);
+        if (zonePoints.length === 0) {
+            return { minX: 0, maxX: 0, minY: 0, maxY: 0, width: 0, height: 0, centerX: 0, centerY: 0 };
         }
 
-        if (allPoints.length === 0) {
-            return {
-                minX: 0,
-                maxX: 800,
-                minY: 0,
-                maxY: 600,
-                width: 800,
-                height: 600,
-                centerX: 400,
-                centerY: 300,
-            };
-        }
-
-        const minX = Math.min(...allPoints.map((p) => p.x));
-        const maxX = Math.max(...allPoints.map((p) => p.x));
-        const minY = Math.min(...allPoints.map((p) => p.y));
-        const maxY = Math.max(...allPoints.map((p) => p.y));
+        const minX = Math.min(...zonePoints.map((p) => p.x));
+        const maxX = Math.max(...zonePoints.map((p) => p.x));
+        const minY = Math.min(...zonePoints.map((p) => p.y));
+        const maxY = Math.max(...zonePoints.map((p) => p.y));
 
         const width = maxX - minX;
         const height = maxY - minY;
@@ -145,27 +136,31 @@ const CanvasRenderer: React.FC<{
         const centerY = (minY + maxY) / 2;
 
         return { minX, maxX, minY, maxY, width, height, centerX, centerY };
-    }, [gardenData, dimensionLines]);
+    }, [gardenData]);
 
-    const transform = useMemo(() => {
-        const canvas = activeCanvasRef.current;
-        if (!canvas) return { scale: 1, offsetX: 0, offsetY: 0 };
+    const baseTransform = useMemo(() => {
+        if (canvasBounds.width === 0 || canvasBounds.height === 0) {
+            return { scale: 1, offsetX: 0, offsetY: 0 };
+        }
 
-        const canvasWidth = canvas.width;
-        const canvasHeight = canvas.height;
         const padding = 50;
-
-        const scaleX = (canvasWidth - 2 * padding) / Math.max(canvasBounds.width, 1);
-        const scaleY = (canvasHeight - 2 * padding) / Math.max(canvasBounds.height, 1);
+        const scaleX = (canvasSize.width - 2 * padding) / canvasBounds.width;
+        const scaleY = (canvasSize.height - 2 * padding) / canvasBounds.height;
         const scale = Math.min(scaleX, scaleY, 2);
 
-        const scaledWidth = canvasBounds.width * scale;
-        const scaledHeight = canvasBounds.height * scale;
-        const offsetX = (canvasWidth - scaledWidth) / 2 - canvasBounds.minX * scale;
-        const offsetY = (canvasHeight - scaledHeight) / 2 - canvasBounds.minY * scale;
+        const offsetX = canvasSize.width / 2 - canvasBounds.centerX * scale;
+        const offsetY = canvasSize.height / 2 - canvasBounds.centerY * scale;
 
         return { scale, offsetX, offsetY };
-    }, [canvasBounds, activeCanvasRef]);
+    }, [canvasBounds, canvasSize]);
+
+    const transform = useMemo(() => {
+        return {
+            scale: baseTransform.scale * viewport.zoom,
+            offsetX: baseTransform.offsetX * viewport.zoom + viewport.panX,
+            offsetY: baseTransform.offsetY * viewport.zoom + viewport.panY,
+        };
+    }, [baseTransform, viewport]);
 
     const transformPoint = useCallback(
         (point: CanvasCoordinate) => {
@@ -176,6 +171,74 @@ const CanvasRenderer: React.FC<{
         },
         [transform]
     );
+
+    const handleZoom = useCallback(
+        (delta: number, centerX: number, centerY: number) => {
+            setViewport((prev) => {
+                const zoomFactor = delta > 0 ? 1.1 : 0.9;
+                const newZoom = Math.max(0.1, Math.min(5, prev.zoom * zoomFactor));
+
+                const worldX = (centerX - prev.panX - baseTransform.offsetX * prev.zoom) / (baseTransform.scale * prev.zoom);
+                const worldY = (centerY - prev.panY - baseTransform.offsetY * prev.zoom) / (baseTransform.scale * prev.zoom);
+
+                const newPanX = centerX - (worldX * baseTransform.scale * newZoom + baseTransform.offsetX * newZoom);
+                const newPanY = centerY - (worldY * baseTransform.scale * newZoom + baseTransform.offsetY * newZoom);
+
+                return {
+                    zoom: newZoom,
+                    panX: newPanX,
+                    panY: newPanY,
+                };
+            });
+        },
+        [baseTransform]
+    );
+
+    const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+        setIsDragging(true);
+        setLastMousePos({ x: e.clientX, y: e.clientY });
+    }, []);
+
+    const handleMouseMove = useCallback(
+        (e: React.MouseEvent<HTMLCanvasElement>) => {
+            if (isDragging && lastMousePos) {
+                const deltaX = e.clientX - lastMousePos.x;
+                const deltaY = e.clientY - lastMousePos.y;
+
+                setViewport((prev) => ({
+                    ...prev,
+                    panX: prev.panX + deltaX,
+                    panY: prev.panY + deltaY,
+                }));
+
+                setLastMousePos({ x: e.clientX, y: e.clientY });
+            }
+        },
+        [isDragging, lastMousePos]
+    );
+
+    const handleMouseUp = useCallback(() => {
+        setIsDragging(false);
+        setLastMousePos(null);
+    }, []);
+
+    const handleWheel = useCallback(
+        (e: React.WheelEvent<HTMLCanvasElement>) => {
+            e.preventDefault();
+            const rect = activeCanvasRef.current?.getBoundingClientRect();
+            if (!rect) return;
+
+            const centerX = e.clientX - rect.left;
+            const centerY = e.clientY - rect.top;
+
+            handleZoom(-e.deltaY, centerX, centerY);
+        },
+        [handleZoom, activeCanvasRef]
+    );
+
+    const resetView = useCallback(() => {
+        setViewport({ zoom: 1, panX: 0, panY: 0 });
+    }, []);
 
     const drawDimensionLines = useCallback(
         (ctx: CanvasRenderingContext2D) => {
@@ -195,7 +258,7 @@ const CanvasRenderer: React.FC<{
 
                 const unitX = dx / length;
                 const unitY = dy / length;
-                const offsetDistance = 30 * transform.scale;
+                const offsetDistance = 30 * transform.scale / baseTransform.scale;
 
                 let offsetX = 0;
                 let offsetY = 0;
@@ -227,15 +290,15 @@ const CanvasRenderer: React.FC<{
                 };
 
                 ctx.strokeStyle = '#FFD700';
-                ctx.lineWidth = 2 * transform.scale;
+                ctx.lineWidth = 2 * Math.max(0.5, transform.scale / baseTransform.scale);
                 ctx.beginPath();
                 ctx.moveTo(dimStart.x, dimStart.y);
                 ctx.lineTo(dimEnd.x, dimEnd.y);
                 ctx.stroke();
 
                 ctx.strokeStyle = '#FFD700';
-                ctx.lineWidth = 1 * transform.scale;
-                ctx.setLineDash([3 * transform.scale, 3 * transform.scale]);
+                ctx.lineWidth = 1 * Math.max(0.5, transform.scale / baseTransform.scale);
+                ctx.setLineDash([3 * Math.max(0.5, transform.scale / baseTransform.scale), 3 * Math.max(0.5, transform.scale / baseTransform.scale)]);
 
                 ctx.beginPath();
                 ctx.moveTo(startScreen.x, startScreen.y);
@@ -249,7 +312,7 @@ const CanvasRenderer: React.FC<{
 
                 ctx.setLineDash([]);
 
-                const arrowSize = 8 * transform.scale;
+                const arrowSize = 8 * Math.max(0.5, transform.scale / baseTransform.scale);
                 const angle1 = Math.atan2(dimEnd.y - dimStart.y, dimEnd.x - dimStart.x);
                 const angle2 = angle1 + Math.PI;
 
@@ -283,15 +346,15 @@ const CanvasRenderer: React.FC<{
                 const midY = (dimStart.y + dimEnd.y) / 2;
 
                 ctx.fillStyle = 'rgba(0,0,0,0.8)';
-                ctx.font = `bold ${12 * transform.scale}px Arial`;
+                ctx.font = `bold ${12 * Math.max(0.8, transform.scale / baseTransform.scale)}px Arial`;
                 const textMetrics = ctx.measureText(dimension.label);
                 const textWidth = textMetrics.width;
-                const textHeight = 16 * transform.scale;
+                const textHeight = 16 * Math.max(0.8, transform.scale / baseTransform.scale);
 
                 ctx.fillRect(
-                    midX - textWidth / 2 - 4 * transform.scale,
+                    midX - textWidth / 2 - 4 * Math.max(0.5, transform.scale / baseTransform.scale),
                     midY - textHeight / 2,
-                    textWidth + 8 * transform.scale,
+                    textWidth + 8 * Math.max(0.5, transform.scale / baseTransform.scale),
                     textHeight
                 );
 
@@ -303,7 +366,7 @@ const CanvasRenderer: React.FC<{
 
             ctx.restore();
         },
-        [dimensionLines, transformPoint, transform]
+        [dimensionLines, transformPoint, transform, baseTransform]
     );
 
     const draw = useCallback(() => {
@@ -319,23 +382,12 @@ const CanvasRenderer: React.FC<{
             let scale: number;
             if (isImageMode) {
                 scale = gardenData.imageData?.scale || 20;
-                console.log(
-                    'Image mode scale:',
-                    scale,
-                    'isScaleSet:',
-                    gardenData.imageData?.isScaleSet
-                );
             } else {
                 scale = gardenData.canvasData?.scale || 20;
-                console.log('Canvas mode scale:', scale);
             }
 
             ctx.fillStyle = '#1a1a1a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            ctx.save();
-            ctx.scale(transform.scale, transform.scale);
-            ctx.translate(transform.offsetX / transform.scale, transform.offsetY / transform.scale);
 
             if (isImageMode && gardenData.imageData?.url) {
                 const img = new Image();
@@ -343,20 +395,20 @@ const CanvasRenderer: React.FC<{
                     const ctx = canvas.getContext('2d');
                     if (!ctx) return;
                     try {
-                        ctx.save();
-                        ctx.scale(transform.scale, transform.scale);
-                        ctx.translate(
-                            transform.offsetX / transform.scale,
-                            transform.offsetY / transform.scale
-                        );
+                        const imgWidth = gardenData.imageData?.width || img.width;
+                        const imgHeight = gardenData.imageData?.height || img.height;
+                        
+                        const imgStart = transformPoint({ x: 0, y: 0 });
+                        const imgEnd = transformPoint({ x: imgWidth, y: imgHeight });
+                        
                         ctx.drawImage(
                             img,
-                            0,
-                            0,
-                            canvas.width / transform.scale,
-                            canvas.height / transform.scale
+                            imgStart.x,
+                            imgStart.y,
+                            imgEnd.x - imgStart.x,
+                            imgEnd.y - imgStart.y
                         );
-                        ctx.restore();
+                        
                         drawElements(ctx, scale);
                     } catch (error) {
                         console.error('Error drawing image:', error);
@@ -374,21 +426,16 @@ const CanvasRenderer: React.FC<{
 
             function drawElements(ctx: CanvasRenderingContext2D, scale: number) {
                 try {
-                    console.log('Drawing with scale:', scale);
-
-                    ctx.restore();
-                    ctx.save();
-
                     gardenData.gardenZones?.forEach((zone) => {
                         if (!zone.canvasCoordinates || zone.canvasCoordinates.length < 3) return;
 
                         const zoneType = ZONE_TYPES.find((z) => z.id === zone.type);
                         ctx.fillStyle = zoneType?.color + '33' || '#66666633';
                         ctx.strokeStyle = zoneType?.color || '#666666';
-                        ctx.lineWidth = (zone.parentZoneId ? 3 : 2) * transform.scale;
+                        ctx.lineWidth = (zone.parentZoneId ? 3 : 2) * Math.max(0.5, transform.scale / baseTransform.scale);
 
                         if (zone.type === 'forbidden' || zone.parentZoneId) {
-                            ctx.setLineDash([5 * transform.scale, 5 * transform.scale]);
+                            ctx.setLineDash([5 * Math.max(0.5, transform.scale / baseTransform.scale), 5 * Math.max(0.5, transform.scale / baseTransform.scale)]);
                         }
 
                         ctx.beginPath();
@@ -412,7 +459,7 @@ const CanvasRenderer: React.FC<{
                         const centerPoint = transformPoint({ x: centerX, y: centerY });
 
                         ctx.fillStyle = '#fff';
-                        ctx.font = `bold ${12 * transform.scale}px Arial`;
+                        ctx.font = `bold ${12 * Math.max(0.8, transform.scale / baseTransform.scale)}px Arial`;
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
                         ctx.fillText(zone.name, centerPoint.x, centerPoint.y);
@@ -432,12 +479,12 @@ const CanvasRenderer: React.FC<{
                                       2 /
                                       (scale * scale)
                                     : 0;
-                            ctx.font = `${10 * transform.scale}px Arial`;
+                            ctx.font = `${10 * Math.max(0.8, transform.scale / baseTransform.scale)}px Arial`;
                             ctx.fillStyle = '#ddd';
                             ctx.fillText(
                                 formatArea(Math.abs(area)),
                                 centerPoint.x,
-                                centerPoint.y + 15 * transform.scale
+                                centerPoint.y + 15 * Math.max(0.8, transform.scale / baseTransform.scale)
                             );
                         } catch (error) {
                             console.error('Error drawing zone area:', error);
@@ -452,8 +499,8 @@ const CanvasRenderer: React.FC<{
 
                         ctx.lineCap = 'round';
                         ctx.lineJoin = 'round';
-                        ctx.strokeStyle = '#FFFF00';
-                        ctx.lineWidth = 3 * transform.scale;
+                        ctx.strokeStyle = '#8B5CF6';
+                        ctx.lineWidth = 3 * Math.max(0.5, transform.scale / baseTransform.scale);
 
                         ctx.beginPath();
                         ctx.moveTo(startPoint.x, startPoint.y);
@@ -463,18 +510,9 @@ const CanvasRenderer: React.FC<{
 
                     gardenData.sprinklers?.forEach((sprinkler) => {
                         if (!sprinkler.canvasPosition) return;
-
                         const zone = gardenData.gardenZones?.find((z) => z.id === sprinkler.zoneId);
                         const sprinklerPoint = transformPoint(sprinkler.canvasPosition);
-
-                        console.log(`Sprinkler ${sprinkler.id}:`, {
-                            radius: sprinkler.type.radius,
-                            scale: scale,
-                            radiusPixels: sprinkler.type.radius * scale * transform.scale,
-                            zoneId: sprinkler.zoneId,
-                            hasZone: !!zone,
-                        });
-
+                        
                         if (zone && zone.canvasCoordinates && zone.canvasCoordinates.length >= 3) {
                             if (zone.type === 'forbidden') {
                                 return;
@@ -488,18 +526,12 @@ const CanvasRenderer: React.FC<{
                                     scale
                                 );
 
-                                const radiusPixels =
-                                    sprinkler.type.radius * scale * transform.scale;
-                                console.log(
-                                    `Drawing full circle with radius: ${radiusPixels}px (${sprinkler.type.radius}m * ${scale} * ${transform.scale})`
-                                );
-
-                                ctx.save();
+                                const radiusPixels = sprinkler.type.radius * scale * transform.scale / baseTransform.scale;
 
                                 if (clipResult === 'FULL_CIRCLE') {
                                     ctx.fillStyle = sprinkler.type.color + '33';
                                     ctx.strokeStyle = sprinkler.type.color + '99';
-                                    ctx.lineWidth = 2 * transform.scale;
+                                    ctx.lineWidth = 2 * Math.max(0.5, transform.scale / baseTransform.scale);
                                     ctx.beginPath();
                                     ctx.arc(
                                         sprinklerPoint.x,
@@ -511,15 +543,9 @@ const CanvasRenderer: React.FC<{
                                     ctx.fill();
                                     ctx.stroke();
                                 } else if (clipResult === 'MASKED_CIRCLE') {
-                                    console.log(
-                                        `Drawing masked circle with radius: ${radiusPixels}px`
-                                    );
-
                                     ctx.save();
                                     ctx.beginPath();
-                                    const firstZonePoint = transformPoint(
-                                        zone.canvasCoordinates[0]
-                                    );
+                                    const firstZonePoint = transformPoint(zone.canvasCoordinates[0]);
                                     ctx.moveTo(firstZonePoint.x, firstZonePoint.y);
                                     for (let i = 1; i < zone.canvasCoordinates.length; i++) {
                                         const zonePoint = transformPoint(zone.canvasCoordinates[i]);
@@ -541,8 +567,8 @@ const CanvasRenderer: React.FC<{
                                     ctx.restore();
 
                                     ctx.strokeStyle = sprinkler.type.color + '66';
-                                    ctx.lineWidth = 1 * transform.scale;
-                                    ctx.setLineDash([3 * transform.scale, 3 * transform.scale]);
+                                    ctx.lineWidth = 1 * Math.max(0.5, transform.scale / baseTransform.scale);
+                                    ctx.setLineDash([3 * Math.max(0.5, transform.scale / baseTransform.scale), 3 * Math.max(0.5, transform.scale / baseTransform.scale)]);
                                     ctx.beginPath();
                                     ctx.arc(
                                         sprinklerPoint.x,
@@ -555,13 +581,9 @@ const CanvasRenderer: React.FC<{
                                     ctx.setLineDash([]);
                                 } else if (Array.isArray(clipResult) && clipResult.length >= 3) {
                                     const canvasResult = clipResult as CanvasCoordinate[];
-                                    console.log(
-                                        `Drawing clipped polygon with ${canvasResult.length} points`
-                                    );
-
                                     ctx.fillStyle = sprinkler.type.color + '33';
                                     ctx.strokeStyle = sprinkler.type.color + '99';
-                                    ctx.lineWidth = 2 * transform.scale;
+                                    ctx.lineWidth = 2 * Math.max(0.5, transform.scale / baseTransform.scale);
                                     ctx.beginPath();
                                     const firstClipPoint = transformPoint(canvasResult[0]);
                                     ctx.moveTo(firstClipPoint.x, firstClipPoint.y);
@@ -573,16 +595,13 @@ const CanvasRenderer: React.FC<{
                                     ctx.fill();
                                     ctx.stroke();
                                 }
-
-                                ctx.restore();
                             } catch (error) {
                                 console.error('Error drawing sprinkler radius:', error);
 
-                                const radiusPixels =
-                                    sprinkler.type.radius * scale * transform.scale;
+                                const radiusPixels = sprinkler.type.radius * scale * transform.scale / baseTransform.scale;
                                 ctx.fillStyle = sprinkler.type.color + '26';
                                 ctx.strokeStyle = sprinkler.type.color + '80';
-                                ctx.lineWidth = 1 * transform.scale;
+                                ctx.lineWidth = 1 * Math.max(0.5, transform.scale / baseTransform.scale);
                                 ctx.beginPath();
                                 ctx.arc(
                                     sprinklerPoint.x,
@@ -595,15 +614,12 @@ const CanvasRenderer: React.FC<{
                                 ctx.stroke();
                             }
                         } else if (sprinkler.zoneId === 'virtual_zone') {
-                            const radiusPixels = sprinkler.type.radius * scale * transform.scale;
-                            console.log(
-                                `Drawing virtual zone circle with radius: ${radiusPixels}px`
-                            );
+                            const radiusPixels = sprinkler.type.radius * scale * transform.scale / baseTransform.scale;
 
                             ctx.fillStyle = sprinkler.type.color + '26';
                             ctx.strokeStyle = sprinkler.type.color + '80';
-                            ctx.lineWidth = 1 * transform.scale;
-                            ctx.setLineDash([8 * transform.scale, 4 * transform.scale]);
+                            ctx.lineWidth = 1 * Math.max(0.5, transform.scale / baseTransform.scale);
+                            ctx.setLineDash([8 * Math.max(0.5, transform.scale / baseTransform.scale), 4 * Math.max(0.5, transform.scale / baseTransform.scale)]);
                             ctx.beginPath();
                             ctx.arc(
                                 sprinklerPoint.x,
@@ -626,12 +642,12 @@ const CanvasRenderer: React.FC<{
                         ctx.save();
 
                         ctx.shadowColor = 'rgba(0,0,0,0.8)';
-                        ctx.shadowBlur = 3 * transform.scale;
-                        ctx.shadowOffsetX = 1 * transform.scale;
-                        ctx.shadowOffsetY = 1 * transform.scale;
+                        ctx.shadowBlur = 3 * Math.max(0.5, transform.scale / baseTransform.scale);
+                        ctx.shadowOffsetX = 1 * Math.max(0.5, transform.scale / baseTransform.scale);
+                        ctx.shadowOffsetY = 1 * Math.max(0.5, transform.scale / baseTransform.scale);
 
                         ctx.fillStyle = sprinkler.type.color;
-                        ctx.font = `bold ${8 * transform.scale}px Arial`;
+                        ctx.font = `bold ${8 * Math.max(0.8, transform.scale / baseTransform.scale)}px Arial`;
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
 
@@ -647,32 +663,24 @@ const CanvasRenderer: React.FC<{
                     });
 
                     if (gardenData.waterSource?.canvasPosition) {
-                        const waterSourcePoint = transformPoint(
-                            gardenData.waterSource.canvasPosition
-                        );
+                        const waterSourcePoint = transformPoint(gardenData.waterSource.canvasPosition);
 
                         ctx.save();
 
                         ctx.shadowColor = 'rgba(0,0,0,0.6)';
-                        ctx.shadowBlur = 8 * transform.scale;
-                        ctx.shadowOffsetX = 2 * transform.scale;
-                        ctx.shadowOffsetY = 2 * transform.scale;
+                        ctx.shadowBlur = 8 * Math.max(0.5, transform.scale / baseTransform.scale);
+                        ctx.shadowOffsetX = 2 * Math.max(0.5, transform.scale / baseTransform.scale);
+                        ctx.shadowOffsetY = 2 * Math.max(0.5, transform.scale / baseTransform.scale);
 
                         ctx.fillStyle =
                             gardenData.waterSource.type === 'pump' ? '#EF4444' : '#3B82F6';
                         ctx.beginPath();
-                        ctx.arc(
-                            waterSourcePoint.x,
-                            waterSourcePoint.y,
-                            8 * transform.scale,
-                            0,
-                            Math.PI * 2
-                        );
+                        ctx.arc(waterSourcePoint.x, waterSourcePoint.y, 8 * Math.max(0.5, transform.scale / baseTransform.scale), 0, Math.PI * 2);
                         ctx.fill();
 
                         ctx.shadowColor = 'transparent';
                         ctx.fillStyle = '#fff';
-                        ctx.font = `bold ${10 * transform.scale}px Arial`;
+                        ctx.font = `bold ${10 * Math.max(0.8, transform.scale / baseTransform.scale)}px Arial`;
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
                         ctx.fillText(
@@ -684,8 +692,6 @@ const CanvasRenderer: React.FC<{
                         ctx.restore();
                     }
 
-                    ctx.restore();
-
                     drawDimensionLines(ctx);
                 } catch (error) {
                     console.error('Error drawing canvas elements:', error);
@@ -694,34 +700,100 @@ const CanvasRenderer: React.FC<{
         } catch (error) {
             console.error('Error in canvas draw function:', error);
         }
-    }, [gardenData, activeCanvasRef, transform, transformPoint, drawDimensionLines]);
+    }, [gardenData, activeCanvasRef, transform, transformPoint, drawDimensionLines, baseTransform]);
+
+    useEffect(() => {
+        const updateCanvasSize = () => {
+            if (containerRef.current) {
+                const rect = containerRef.current.getBoundingClientRect();
+                setCanvasSize({
+                    width: Math.max(800, rect.width - 32),
+                    height: Math.max(600, rect.height - 32),
+                });
+            }
+        };
+
+        updateCanvasSize();
+        window.addEventListener('resize', updateCanvasSize);
+
+        return () => {
+            window.removeEventListener('resize', updateCanvasSize);
+        };
+    }, []);
 
     useEffect(() => {
         draw();
     }, [draw]);
 
-    const width = gardenData.imageData?.width || gardenData.canvasData?.width || 800;
-    const height = gardenData.imageData?.height || gardenData.canvasData?.height || 600;
+    useEffect(() => {
+        const handleGlobalMouseUp = () => {
+            setIsDragging(false);
+            setLastMousePos(null);
+        };
+
+        const handleGlobalMouseMove = (e: MouseEvent) => {
+            if (isDragging && lastMousePos) {
+                const deltaX = e.clientX - lastMousePos.x;
+                const deltaY = e.clientY - lastMousePos.y;
+
+                setViewport((prev) => ({
+                    ...prev,
+                    panX: prev.panX + deltaX,
+                    panY: prev.panY + deltaY,
+                }));
+
+                setLastMousePos({ x: e.clientX, y: e.clientY });
+            }
+        };
+
+        if (isDragging) {
+            window.addEventListener('mousemove', handleGlobalMouseMove);
+            window.addEventListener('mouseup', handleGlobalMouseUp);
+        }
+
+        return () => {
+            window.removeEventListener('mousemove', handleGlobalMouseMove);
+            window.removeEventListener('mouseup', handleGlobalMouseUp);
+        };
+    }, [isDragging, lastMousePos]);
 
     return (
-        <div className="flex h-full w-full items-center justify-center bg-gray-900 p-4">
+        <div ref={containerRef} className="relative flex h-full w-full items-center justify-center bg-gray-900 p-4">
+            <div className="absolute left-4 top-4 z-10 flex gap-2">
+                <button
+                    onClick={resetView}
+                    className="rounded bg-gray-700 px-3 py-1 text-sm text-white hover:bg-gray-600"
+                    title="รีเซ็ตตำแหน่ง"
+                >
+                    🔄 รีเซ็ต
+                </button>
+                <div className="rounded bg-gray-800 px-2 py-1 text-xs text-white">
+                    ซูม: {(viewport.zoom * 100).toFixed(0)}%
+                </div>
+            </div>
             <canvas
                 ref={activeCanvasRef}
-                width={width}
-                height={height}
+                width={canvasSize.width}
+                height={canvasSize.height}
                 className="rounded-lg border border-gray-600 bg-gray-900 shadow-xl"
                 style={{
+                    cursor: isDragging ? 'grabbing' : 'grab',
                     maxWidth: '100%',
                     maxHeight: '100%',
                     objectFit: 'contain',
                 }}
                 id="canvas-container"
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onWheel={handleWheel}
             />
         </div>
     );
 };
 
 export default function HomeGardenSummary({ data: propsData }: HomeGardenSummaryProps) {
+    const { t } = useLanguage();
     const [gardenData, setGardenData] = useState<GardenPlannerData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -887,22 +959,16 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
         }
     }, [gardenData]);
 
-    // ฟังก์ชันสร้างภาพแผนที่ เหมือนใน HorticultureResultsPage.tsx
     const createMapImage = async () => {
-        console.log('🏡 เริ่มสร้างภาพแผนที่สวนบ้าน...');
-
-        // หา element ที่จะ capture
         let targetElement: HTMLElement | null = null;
 
         if (gardenData?.designMode === 'map' && mapContainerRef.current) {
             targetElement = mapContainerRef.current;
-            console.log('🏡 ใช้ Google Map container');
         } else if (
             (gardenData?.designMode === 'canvas' || gardenData?.designMode === 'image') &&
             canvasRef.current
         ) {
             targetElement = canvasRef.current;
-            console.log('🏡 ใช้ Canvas element');
         }
 
         if (!targetElement) {
@@ -911,14 +977,10 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
         }
 
         try {
-            // รอให้ element โหลดเสร็จ
             await new Promise((resolve) => setTimeout(resolve, 2000));
 
             const html2canvas = await import('html2canvas');
             const html2canvasLib = html2canvas.default || html2canvas;
-
-            console.log('🏡 เริ่ม capture element:', targetElement);
-
             const canvas = await html2canvasLib(targetElement, {
                 useCORS: true,
                 allowTaint: true,
@@ -929,13 +991,11 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                 height: targetElement.offsetHeight,
                 onclone: (clonedDoc) => {
                     try {
-                        // ลบ controls ที่ไม่ต้องการออกจากภาพ
                         const controls = clonedDoc.querySelectorAll(
                             '.leaflet-control-container, .gm-control-active, .gm-style-cc'
                         );
                         controls.forEach((el) => el.remove());
 
-                        // ปรับสีที่อาจมีปัญหา
                         const elements = clonedDoc.querySelectorAll('*');
                         elements.forEach((el: Element) => {
                             const htmlEl = el as HTMLElement;
@@ -971,7 +1031,6 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                             }
                         });
 
-                        // ลบ element ที่อาจมีปัญหา
                         const problematicElements = clonedDoc.querySelectorAll(
                             '[style*="oklch"], [style*="hsl"]'
                         );
@@ -989,7 +1048,6 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
             });
 
             const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-            console.log('🏡 สร้างภาพสำเร็จ, ขนาด:', dataUrl.length, 'characters');
 
             if (dataUrl && dataUrl !== 'data:,' && dataUrl.length > 100) {
                 return dataUrl;
@@ -999,7 +1057,6 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
         } catch (error) {
             console.error('🏡 Error creating map image:', error);
 
-            // สร้างภาพ fallback
             try {
                 const fallbackCanvas = document.createElement('canvas');
                 const ctx = fallbackCanvas.getContext('2d');
@@ -1014,9 +1071,21 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                     ctx.fillStyle = '#FFFFFF';
                     ctx.font = '24px Arial';
                     ctx.textAlign = 'center';
-                    ctx.fillText('🏡 แผนผังสวนบ้าน', fallbackCanvas.width / 2, fallbackCanvas.height / 2 - 40);
-                    ctx.fillText('(ไม่สามารถสร้างภาพแผนที่ได้)', fallbackCanvas.width / 2, fallbackCanvas.height / 2);
-                    ctx.fillText('กรุณาใช้ screenshot แทน', fallbackCanvas.width / 2, fallbackCanvas.height / 2 + 40);
+                    ctx.fillText(
+                        '🏡 แผนผังสวนบ้าน',
+                        fallbackCanvas.width / 2,
+                        fallbackCanvas.height / 2 - 40
+                    );
+                    ctx.fillText(
+                        '(ไม่สามารถสร้างภาพแผนที่ได้)',
+                        fallbackCanvas.width / 2,
+                        fallbackCanvas.height / 2
+                    );
+                    ctx.fillText(
+                        'กรุณาใช้ screenshot แทน',
+                        fallbackCanvas.width / 2,
+                        fallbackCanvas.height / 2 + 40
+                    );
 
                     return fallbackCanvas.toDataURL('image/jpeg', 0.8);
                 }
@@ -1030,10 +1099,8 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
 
     const handleEquipmentCalculation = useCallback(async () => {
         try {
-            console.log('🏡 กดปุ่มคำนวณอุปกรณ์ Home Garden');
             setIsCreatingImage(true);
 
-            // สร้างหน้าต่างโหลด
             const loadingDiv = document.createElement('div');
             loadingDiv.id = 'garden-image-loading';
             loadingDiv.style.cssText = `
@@ -1049,60 +1116,36 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                 text-align: center;
             `;
             loadingDiv.innerHTML = `
-                <div>🏡 กำลังเตรียมข้อมูลสวนบ้าน...</div>
-                <div style="margin-top: 10px; font-size: 12px;">กรุณารอสักครู่</div>
+                <div>🏡 ${t('กำลังเตรียมข้อมูลสวนบ้าน...')}</div>
+                <div style="margin-top: 10px; font-size: 12px;">${t('กรุณารอสักครู่')}</div>
             `;
             document.body.appendChild(loadingDiv);
 
-            console.log('🏡 ข้อมูลสวน:', {
-                hasData: !!gardenData,
-                zones: gardenData?.gardenZones?.length || 0,
-                sprinklers: gardenData?.sprinklers?.length || 0,
-                designMode: gardenData?.designMode,
-            });
-
-            // บันทึกข้อมูลลง localStorage
             if (gardenData) {
                 localStorage.setItem('garden_planner_data', JSON.stringify(gardenData));
-                console.log('🏡 บันทึกข้อมูลสวนแล้ว');
             }
 
             if (statistics) {
                 localStorage.setItem('garden_statistics', JSON.stringify(statistics));
-                console.log('🏡 บันทึกสถิติแล้ว:', {
-                    totalArea: statistics.totalArea,
-                    zones: statistics.totalZones,
-                    sprinklers: statistics.totalSprinklers,
-                });
             }
 
-            // สร้างภาพแผนที่
             const imageUrl = await createMapImage();
 
             if (imageUrl) {
                 localStorage.setItem('projectMapImage', imageUrl);
                 localStorage.setItem('projectType', 'home-garden');
-                console.log('🏡 บันทึกภาพแผนที่สำเร็จ');
-                
-                // ลบหน้าต่างโหลด
+
                 document.body.removeChild(loadingDiv);
-                
-                // ไปหน้า product
+
                 window.location.href = '/product?mode=garden';
-            } else {
-                // ลบหน้าต่างโหลด
+            } else {    
                 document.body.removeChild(loadingDiv);
-                
-                console.log('🏡 ไม่สามารถสร้างภาพได้ แต่จะไปหน้า product ต่อไป');
-                
-                // ไปหน้า product แม้ไม่มีรูป
                 router.visit('/product?mode=garden');
             }
         } catch (error) {
             console.error('🏡 Error navigating to equipment calculation:', error);
             setError('เกิดข้อผิดพลาดในการไปยังหน้าคำนวณอุปกรณ์');
-            
-            // ลบหน้าต่างโหลดถ้าไม่ได้ลบแล้ว
+
             const loadingDiv = document.getElementById('garden-image-loading');
             if (loadingDiv) {
                 document.body.removeChild(loadingDiv);
@@ -1124,7 +1167,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
             <div className="flex min-h-screen w-full items-center justify-center bg-gray-900 p-6">
                 <div className="text-center">
                     <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-white"></div>
-                    <p className="text-white">กำลังโหลดข้อมูล...</p>
+                    <p className="text-white">{t('กำลังโหลดข้อมูล...')}</p>
                 </div>
             </div>
         );
@@ -1133,15 +1176,16 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
     if (error || !gardenData || !statistics) {
         return (
             <div className="flex min-h-screen w-full items-center justify-center bg-gray-900 p-6">
+                <Navbar />
                 <div className="text-center">
                     <h1 className="mb-4 text-2xl font-bold text-white">
-                        {error || 'ไม่พบข้อมูลการออกแบบ'}
+                        {error || t('ไม่พบข้อมูลการออกแบบ')}
                     </h1>
                     <button
                         onClick={() => router.visit('/home-garden-planner')}
                         className="rounded-lg bg-blue-600 px-6 py-3 text-white transition-colors hover:bg-blue-700"
                     >
-                        กลับไปหน้าออกแบบ
+                        {t('กลับไปหน้าออกแบบ')}
                     </button>
                 </div>
             </div>
@@ -1149,7 +1193,8 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
     }
 
     return (
-        <SummaryErrorBoundary>
+        <SummaryErrorBoundary t={t}>
+            <Navbar />
             <div className="min-h-screen w-full bg-gray-900 p-6">
                 {error && (
                     <div className="fixed left-4 top-4 z-50 rounded-lg bg-red-600 p-4 text-white shadow-lg">
@@ -1168,30 +1213,33 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                 <div className="mb-6 flex items-start justify-between">
                     <div>
                         <h1 className="mb-2 text-2xl font-bold text-white">
-                            📊 สรุปผลการออกแบบระบบน้ำ
+                            📊 {t('สรุปผลการออกแบบระบบน้ำ')}
                             <span className="ml-2 text-sm font-normal text-gray-400">
                                 (
                                 {gardenData.designMode === 'map'
-                                    ? 'Google Map'
+                                    ? t('Google Map')
                                     : gardenData.designMode === 'canvas'
-                                      ? 'วาดเอง'
-                                      : 'รูปแบบแปลน'}
+                                      ? t('วาดเอง')
+                                      : t('รูปแบบแปลน')}
                                 )
                             </span>
                         </h1>
-                        <div className="flex gap-2">
+                        
+                    </div>
+                    <div className="text-right text-sm text-gray-400">
+                    <div className="flex gap-2">
                             <button
                                 onClick={() => router.visit('/home-garden-planner')}
                                 className="rounded-lg bg-gray-700 px-4 py-2 text-gray-300 transition-colors hover:bg-gray-600"
                             >
-                                ← กลับไปหน้าออกแบบ
+                                ← {t('กลับไปหน้าออกแบบ')}
                             </button>
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={handleEquipmentCalculation}
                                     disabled={isCreatingImage}
                                     className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
-                                    title="คำนวณอุปกรณ์สำหรับสวนบ้าน"
+                                    title={t('คำนวณอุปกรณ์สำหรับสวนบ้าน')}
                                 >
                                     {isCreatingImage ? (
                                         <>
@@ -1214,18 +1262,14 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                                                 ></path>
                                             </svg>
-                                            กำลังเตรียม...
+                                            {t('กำลังเตรียม...')}
                                         </>
                                     ) : (
-                                        '💰 คำนวณอุปกรณ์'
+                                        '💰 ' + t('คำนวณอุปกรณ์')
                                     )}
                                 </button>
                             </div>
                         </div>
-                    </div>
-                    <div className="text-right text-sm text-gray-400">
-                        <div>วันที่: {new Date().toLocaleDateString('th-TH')}</div>
-                        <div>เวลา: {new Date().toLocaleTimeString('th-TH')}</div>
                     </div>
                 </div>
 
@@ -1233,13 +1277,13 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                     <div className="lg:col-span-2">
                         <div className="rounded-xl bg-gray-800 p-6">
                             <h3 className="mb-4 text-lg font-semibold text-blue-400">
-                                🗺️ แผนผังโครงการ
+                                🗺️ {t('แผนผังโครงการ')}
                             </h3>
                             <div className="h-[600px] overflow-hidden rounded-lg border border-gray-600 bg-gray-900">
                                 {gardenData.designMode === 'map' && (
-                                    <div 
-                                        ref={mapContainerRef} 
-                                        id="map-container" 
+                                    <div
+                                        ref={mapContainerRef}
+                                        id="map-container"
                                         className="h-full"
                                     >
                                         <GoogleMapSummary
@@ -1261,11 +1305,11 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                     <div className="space-y-4">
                         <div className="rounded-xl bg-gray-800 p-6">
                             <h3 className="mb-4 text-lg font-semibold text-blue-400">
-                                📊 ข้อมูลรวม
+                                📊 {t('ข้อมูลรวม')}
                             </h3>
                             <div className="space-y-3 text-sm">
                                 <div className="rounded-lg bg-gray-700 p-3">
-                                    <div className="mb-1 text-gray-400">พื้นที่รวมทั้งหมด</div>
+                                    <div className="mb-1 text-gray-400">{t('พื้นที่รวมทั้งหมด')}</div>
                                     <div className="text-xl font-bold text-white">
                                         {formatArea(statistics.totalArea)}
                                     </div>
@@ -1273,33 +1317,33 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
 
                                 <div className="rounded-lg bg-gray-700 p-3">
                                     <div className="mb-1 text-gray-400">
-                                        จำนวนโซน (ไม่รวมพื้นที่ห้าม)
+                                        {t('จำนวนโซน (ไม่รวมพื้นที่ห้าม)')}
                                     </div>
                                     <div className="text-xl font-bold text-green-400">
-                                        {statistics.totalZones} โซน
+                                        {statistics.totalZones} {t('โซน')}
                                     </div>
                                 </div>
 
                                 <div className="rounded-lg bg-gray-700 p-3">
-                                    <div className="mb-1 text-gray-400">จำนวนหัวฉีดทั้งหมด</div>
+                                    <div className="mb-1 text-gray-400">{t('จำนวนหัวฉีดทั้งหมด')}</div>
                                     <div className="text-xl font-bold text-blue-400">
-                                        {statistics.totalSprinklers} ตัว
+                                        {statistics.totalSprinklers} {t('ตัว')}
                                     </div>
                                 </div>
 
                                 <div className="rounded-lg bg-gray-700 p-3">
-                                    <div className="mb-1 text-gray-400">ระบบท่อ</div>
+                                    <div className="mb-1 text-gray-400">{t('ระบบท่อ')}</div>
                                     <div className="mt-1 grid grid-cols-2 gap-2">
                                         <div>
                                             <div className="text-xs text-gray-500">
-                                                ท่อที่ยาวที่สุด
+                                                {t('ท่อที่ยาวที่สุด')}
                                             </div>
                                             <div className="font-bold text-yellow-400">
                                                 {formatDistance(statistics.longestPipe)}
                                             </div>
                                         </div>
                                         <div>
-                                            <div className="text-xs text-gray-500">ความยาวรวม</div>
+                                            <div className="text-xs text-gray-500">{t('ความยาวรวม')}</div>
                                             <div className="font-bold text-yellow-400">
                                                 {formatDistance(statistics.totalPipeLength)}
                                             </div>
@@ -1314,49 +1358,49 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                 {statistics.zoneStatistics.length > 0 && (
                     <div className="mt-6 rounded-xl bg-gray-800 p-6">
                         <h3 className="mb-4 text-lg font-semibold text-green-400">
-                            📍 ข้อมูลแยกตามโซน
+                            📍 {t('ข้อมูลแยกตามโซน')}
                         </h3>
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                             {statistics.zoneStatistics.map((zone, index) => (
                                 <div key={zone.zoneId} className="rounded-lg bg-gray-700 p-4">
                                     <div className="mb-3 flex items-center justify-between">
                                         <h4 className="font-semibold text-white">
-                                            {index + 1}. {zone.zoneName}
+                                            {index + 1}. {t(zone.zoneName)}
                                         </h4>
                                         <span
                                             className={`rounded bg-gray-600 px-2 py-1 text-xs ${
-                                                zone.zoneType === 'สนามหญ้า'
+                                                zone.zoneType === t('สนามหญ้า')
                                                     ? 'bg-green-200 text-green-600'
-                                                    : zone.zoneType === 'แปลงดอกไม้'
+                                                    : zone.zoneType === t('แปลงดอกไม้')
                                                       ? 'bg-pink-200 text-pink-600'
-                                                      : zone.zoneType === 'ต้นไม้'
+                                                      : zone.zoneType === t('ต้นไม้')
                                                         ? 'bg-green-300 text-green-800'
                                                         : ''
                                             }`}
                                         >
-                                            {zone.zoneType}
+                                            {t(zone.zoneType)}
                                         </span>
                                     </div>
 
                                     <div className="space-y-2 text-sm">
                                         <div className="flex justify-between">
-                                            <span className="text-gray-400">พื้นที่:</span>
+                                            <span className="text-gray-400">{t('พื้นที่:')}</span>
                                             <span className="font-medium text-white">
                                                 {formatArea(zone.area)}
                                             </span>
                                         </div>
 
                                         <div className="flex justify-between">
-                                            <span className="text-gray-400">จำนวนหัวฉีด:</span>
+                                            <span className="text-gray-400">{t('จำนวนหัวฉีด:')}</span>
                                             <span className="font-medium text-blue-400">
-                                                {zone.sprinklerCount} ตัว
+                                                {zone.sprinklerCount} {t('ตัว')}
                                             </span>
                                         </div>
                                         {zone.sprinklerCount > 0 && (
                                             <>
                                                 <div className="flex justify-between">
                                                     <span className="text-gray-400">
-                                                        ประเภทหัวฉีด:
+                                                        {t('ประเภทหัวฉีด:')}
                                                     </span>
                                                     <div className="text-right">
                                                         {zone.sprinklerTypes.length > 0 ? (
@@ -1381,10 +1425,10 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                                 </div>
 
                                                 <div className="flex justify-between">
-                                                    <span className="text-gray-400">รัศมี:</span>
+                                                    <span className="text-gray-400">{t('รัศมี:')}</span>
                                                     <span className="font-medium text-cyan-400">
                                                         {zone.sprinklerRadius > 0
-                                                            ? `${zone.sprinklerRadius.toFixed(1)} ม.`
+                                                            ? `${zone.sprinklerRadius.toFixed(1)} ${t('ม.')}`
                                                             : '-'}
                                                     </span>
                                                 </div>
@@ -1393,18 +1437,18 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
 
                                         {zone.pipeLength > 0 && (
                                             <div className="border-t border-gray-600 pt-2">
-                                                <div className="mb-1 text-gray-400">ระบบท่อ:</div>
+                                                <div className="mb-1 text-gray-400">{t('ระบบท่อ:')}</div>
                                                 <div className="grid grid-cols-2 gap-2 text-xs">
                                                     <div>
                                                         <span className="text-gray-500">
-                                                            ยาวที่สุด:{' '}
+                                                            {t('ยาวที่สุด:')}{' '}
                                                         </span>
                                                         <span className="text-yellow-400">
                                                             {formatDistance(zone.longestPipe)}
                                                         </span>
                                                     </div>
                                                     <div>
-                                                        <span className="text-gray-500">รวม: </span>
+                                                        <span className="text-gray-500">{t('รวม:')}{' '}</span>
                                                         <span className="text-yellow-400">
                                                             {formatDistance(zone.pipeLength)}
                                                         </span>
@@ -1419,23 +1463,6 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                     </div>
                 )}
 
-                <style>{`   
-                    @media print {
-                        .bg-gray-900 { background-color: white !important; }
-                        .bg-gray-800 { background-color: #f3f4f6 !important; border: 1px solid #d1d5db !important; }
-                        .bg-gray-700 { background-color: #e5e7eb !important; }
-                        .bg-orange-700 { background-color: #fed7aa !important; }
-                        .text-white { color: black !important; }
-                        .text-gray-300, .text-gray-400, .text-gray-500 { color: #374151 !important; }
-                        .text-gray-200 { color: #1f2937 !important; }
-                        .text-blue-400 { color: #2563eb !important; }
-                        .text-green-400 { color: #16a34a !important; }
-                        .text-purple-400 { color: #7c3aed !important; }
-                        .text-yellow-400 { color: #ca8a04 !important; }
-                        .text-orange-400 { color: #ea580c !important; }
-                        button { display: none !important; }
-                    }
-                `}</style>
             </div>
         </SummaryErrorBoundary>
     );
