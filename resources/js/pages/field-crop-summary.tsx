@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react'; // Fanggy005 EDIT: Import router
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
 import { useState, useEffect, useRef } from 'react';
 import {
@@ -15,6 +15,8 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import * as turf from '@turf/turf';
 import { getCropByValue } from '@/pages/utils/cropData';
+// Fanggy005 EDIT: Import helpers from fieldCropData
+import { calculateAllFieldStats, saveFieldCropData, FieldCropData } from '@/utils/fieldCropData';
 import {
     ZONE_COLORS,
     OBSTACLE_TYPES,
@@ -641,6 +643,29 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
             console.log('✅ Zone calculations completed with cropData (per irrigation):', newZoneSummaries);
         }
     }, [summaryData, zones, zoneAssignments, rowSpacing, plantSpacing, irrigationAssignments]);
+    
+    // Fanggy005 EDIT: Add handler for the calculation button
+    const handleCalculateEquipment = () => {
+        if (!summaryData) {
+            alert("ไม่พบข้อมูลโปรเจกต์สำหรับคำนวณ");
+            return;
+        }
+
+        console.log("🚀 Preparing data for product page...");
+
+        // ใช้ฟังก์ชัน calculateAllFieldStats เพื่อสร้างออบเจกต์ FieldCropData ที่สมบูรณ์
+        const fieldData: FieldCropData = calculateAllFieldStats(summaryData);
+
+        // บันทึกข้อมูลที่จัดโครงสร้างแล้วลง localStorage
+        saveFieldCropData(fieldData);
+        
+        // ตั้งค่าประเภทโปรเจกต์เพื่อให้หน้า product รู้ว่าต้องโหลดข้อมูลอะไร
+        localStorage.setItem('projectType', 'field-crop');
+
+        // นำทางไปยังหน้า product
+        console.log("Navigating to /product?mode=field-crop");
+        router.visit('/product?mode=field-crop');
+    };
 
     // Handle case where zones might be just a number (from minimal data)
     const actualZones = Array.isArray(zones) ? zones : [];
@@ -886,29 +911,59 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
             <div className="border-b border-gray-700 bg-gray-800 print:hidden">
                 <div className="container mx-auto px-4 py-4">
                     <div className="mx-auto max-w-7xl">
-                        <Link
-                            href="/field-map?edit=true&step=4"
-                            className="mb-2 inline-flex items-center text-blue-400 hover:text-blue-300"
-                        >
-                            <svg
-                                className="mr-2 h-5 w-5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                                />
-                            </svg>
-                            Back to Field Map
-                        </Link>
-                        <h1 className="mb-1 text-3xl font-bold">📊 Field Crop Summary</h1>
-                        <p className="mb-2 text-gray-400">
-                            Complete overview of your irrigation planning project
-                        </p>
+                        {/* Enhanced Header with Equipment Calculator Button */}
+                        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                            {/* Left side: Back button and title */}
+                            <div className="flex-1">
+                                <Link
+                                    href="/field-map?edit=true&step=4"
+                                    className="mb-2 inline-flex items-center text-blue-400 hover:text-blue-300"
+                                >
+                                    <svg
+                                        className="mr-2 h-5 w-5"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                                        />
+                                    </svg>
+                                    Back to Field Map
+                                </Link>
+                                <h1 className="mb-1 text-3xl font-bold">📊 Field Crop Summary</h1>
+                                <p className="mb-2 text-gray-400">
+                                    Complete overview of your irrigation planning project
+                                </p>
+                            </div>
+
+                            {/* Right side: Equipment Calculator Button */}
+                            <div className="flex-shrink-0">
+                                {/* Fanggy005 EDIT: Changed Link to button with onClick handler */}
+                                <button
+                                    onClick={handleCalculateEquipment}
+                                    className="inline-flex items-center rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 text-white font-semibold transition-all duration-200 hover:from-purple-700 hover:to-blue-700 hover:shadow-lg transform hover:scale-105"
+                                >
+                                    <svg 
+                                        className="mr-2 h-5 w-5" 
+                                        fill="none" 
+                                        stroke="currentColor" 
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path 
+                                            strokeLinecap="round" 
+                                            strokeLinejoin="round" 
+                                            strokeWidth={2} 
+                                            d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" 
+                                        />
+                                    </svg>
+                                    🧮 คำนวณอุปกรณ์
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

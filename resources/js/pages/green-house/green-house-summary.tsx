@@ -1086,31 +1086,58 @@ export default function GreenhouseSummary() {
                 <div className="border-b border-gray-700 bg-gray-800">
                     <div className="container mx-auto px-4 py-6">
                         <div className="mx-auto max-w-7xl">
-                            {/* Back Navigation */}
-                            <button
-                                onClick={handleBackNavigation}
-                                className="mb-4 inline-flex cursor-pointer items-center border-none bg-transparent text-blue-400 hover:text-blue-300"
-                            >
-                                <svg
-                                    className="mr-2 h-5 w-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                                    />
-                                </svg>
-                                Back to Greenhouse Map
-                            </button>
-                            {/* Main Title */}
-                            <h1 className="mb-2 text-4xl font-bold">🏠 Greenhouse Summary</h1>
-                            <p className="mb-6 text-gray-400">
-                                Complete overview of your greenhouse system planning project
-                            </p>
+                            {/* Enhanced Header with Equipment Calculator Button */}
+                            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                                {/* Left side: Back button and title */}
+                                <div className="flex-1">
+                                    <button
+                                        onClick={handleBackNavigation}
+                                        className="mb-4 inline-flex cursor-pointer items-center border-none bg-transparent text-blue-400 hover:text-blue-300"
+                                    >
+                                        <svg
+                                            className="mr-2 h-5 w-5"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                                            />
+                                        </svg>
+                                        Back to Greenhouse Map
+                                    </button>
+                                    <h1 className="mb-2 text-4xl font-bold">🏠 Greenhouse Summary</h1>
+                                    <p className="mb-6 text-gray-400">
+                                        Complete overview of your greenhouse system planning project
+                                    </p>
+                                </div>
+
+                                {/* Right side: Equipment Calculator Button */}
+                                <div className="flex-shrink-0">
+                                    <a
+                                        href="/equipment-calculator"
+                                        className="inline-flex items-center rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 text-white font-semibold transition-all duration-200 hover:from-purple-700 hover:to-blue-700 hover:shadow-lg transform hover:scale-105"
+                                    >
+                                        <svg 
+                                            className="mr-2 h-5 w-5" 
+                                            fill="none" 
+                                            stroke="currentColor" 
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path 
+                                                strokeLinecap="round" 
+                                                strokeLinejoin="round" 
+                                                strokeWidth={2} 
+                                                d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" 
+                                            />
+                                        </svg>
+                                        🧮 คำนวณอุปกรณ์
+                                    </a>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1167,32 +1194,59 @@ export default function GreenhouseSummary() {
             <div className="border-b border-gray-700 bg-gray-800 print:hidden print:border-gray-300 print:bg-white">
                 <div className="container mx-auto px-4 py-4">
                     <div className="mx-auto max-w-7xl">
-                        {/* Back Navigation */}
-                        <button
-                            onClick={handleBackNavigation}
-                            className="mb-2 inline-flex cursor-pointer items-center border-none bg-transparent text-blue-400 hover:text-blue-300"
-                        >
-                            <svg
-                                className="mr-2 h-5 w-5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                                />
-                            </svg>
-                            Back to Greenhouse Map
-                        </button>
+                        {/* Enhanced Header with Equipment Calculator Button */}
+                        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                            {/* Left side: Back button and title */}
+                            <div className="flex-1">
+                                <button
+                                    onClick={handleBackNavigation}
+                                    className="mb-2 inline-flex cursor-pointer items-center border-none bg-transparent text-blue-400 hover:text-blue-300"
+                                >
+                                    <svg
+                                        className="mr-2 h-5 w-5"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                                        />
+                                    </svg>
+                                    Back to Greenhouse Map
+                                </button>
 
-                        {/* Main Title */}
-                        <h1 className="mb-1 text-3xl font-bold">🏠 สรุปการวางแผนโรงเรือน</h1>
-                        <p className="mb-4 text-gray-400">
-                            ภาพรวมการออกแบบโรงเรือนและระบบการให้น้ำ
-                        </p>
+                                <h1 className="mb-1 text-3xl font-bold">🏠 สรุปการวางแผนโรงเรือน</h1>
+                                <p className="mb-4 text-gray-400">
+                                    ภาพรวมการออกแบบโรงเรือนและระบบการให้น้ำ
+                                </p>
+                            </div>
+
+                            {/* Right side: Equipment Calculator Button */}
+                            <div className="flex-shrink-0">
+                                <a
+                                    href="/equipment-calculator"
+                                    className="inline-flex items-center rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 text-white font-semibold transition-all duration-200 hover:from-purple-700 hover:to-blue-700 hover:shadow-lg transform hover:scale-105"
+                                >
+                                    <svg 
+                                        className="mr-2 h-5 w-5" 
+                                        fill="none" 
+                                        stroke="currentColor" 
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path 
+                                            strokeLinecap="round" 
+                                            strokeLinejoin="round" 
+                                            strokeWidth={2} 
+                                            d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" 
+                                            />
+                                    </svg>
+                                    🧮 คำนวณอุปกรณ์
+                                </a>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
