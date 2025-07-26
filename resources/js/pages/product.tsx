@@ -1305,7 +1305,7 @@ export default function Product() {
                         >
                             ×
                         </button>
-                        <div className="relative">
+                        <div className="relative h-[90vh] w-[90vw] flex items-center justify-center">
                             <img
                                 src={projectImage}
                                 alt={`${projectMode === 'garden' ? 'สวนบ้าน' : 'พืชสวน'} Project`}

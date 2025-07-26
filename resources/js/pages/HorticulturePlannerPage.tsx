@@ -783,13 +783,13 @@ const DEFAULT_PLANT_TYPES = (t: (key: string) => string): PlantData[] => [
     { id: 1, name: t('มะม่วง'), plantSpacing: 8, rowSpacing: 8, waterNeed: 50 },
     { id: 2, name: t('ทุเรียน'), plantSpacing: 10, rowSpacing: 10, waterNeed: 80 },
     { id: 3, name: t('สับปะรด'), plantSpacing: 1, rowSpacing: 1.2, waterNeed: 3 },
-    { id: 4, name: 'กล้วย', plantSpacing: 2.5, rowSpacing: 3, waterNeed: 25 },
-    { id: 5, name: 'มะละกอ', plantSpacing: 2.5, rowSpacing: 2.5, waterNeed: 15 },
-    { id: 6, name: 'มะพร้าว', plantSpacing: 9, rowSpacing: 9, waterNeed: 100 },
-    { id: 7, name: 'กาแฟอาราบิก้า', plantSpacing: 2, rowSpacing: 2, waterNeed: 5 },
-    { id: 8, name: 'โกโก้', plantSpacing: 3, rowSpacing: 3, waterNeed: 15 },
-    { id: 9, name: 'ปาล์มน้ำมัน', plantSpacing: 9, rowSpacing: 9, waterNeed: 150 },
-    { id: 10, name: 'ยางพารา', plantSpacing: 7, rowSpacing: 3, waterNeed: 0 },
+    { id: 4, name: t('กล้วย'), plantSpacing: 2.5, rowSpacing: 3, waterNeed: 25 },
+    { id: 5, name: t('มะละกอ'), plantSpacing: 2.5, rowSpacing: 2.5, waterNeed: 15 },
+    { id: 6, name: t('มะพร้าว'), plantSpacing: 9, rowSpacing: 9, waterNeed: 100 },
+    { id: 7, name: t('กาแฟอาราบิก้า'), plantSpacing: 2, rowSpacing: 2, waterNeed: 5 },
+    { id: 8, name: t('โกโก้'), plantSpacing: 3, rowSpacing: 3, waterNeed: 15 },
+    { id: 9, name: t('ปาล์มน้ำมัน'), plantSpacing: 9, rowSpacing: 9, waterNeed: 150 },
+    { id: 10, name: t('ยางพารา'), plantSpacing: 7, rowSpacing: 3, waterNeed: 0 },
 ];
 
 const ZONE_COLORS = [
@@ -1056,7 +1056,6 @@ const CustomPlantModal = ({
                 <h3 className="mb-4 text-xl font-semibold text-white">🌱 {t('กำหนดพืชใหม่')}</h3>
 
                 <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="mb-2 block text-sm font-medium text-white">
                                 {t('ชื่อพืช *')}
@@ -1067,11 +1066,10 @@ const CustomPlantModal = ({
                                 onChange={(e) =>
                                     setPlantData({ ...plantData, name: e.target.value })
                                 }
-                                className="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="w-full rounded border text-black border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 placeholder={t('เช่น มะม่วงพันธุ์ใหม่')}
                             />
                         </div>
-                    </div>
 
                     <div>
                         <label className="mb-2 block text-sm font-medium text-white">
@@ -1088,7 +1086,7 @@ const CustomPlantModal = ({
                                     waterNeed: parseFloat(e.target.value) || 0,
                                 })
                             }
-                            className="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-full rounded border text-black border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                     </div>
 
@@ -1108,7 +1106,7 @@ const CustomPlantModal = ({
                                         plantSpacing: parseFloat(e.target.value) || 0,
                                     })
                                 }
-                                className="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="w-full rounded border text-black border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                             />
                         </div>
 
@@ -1127,7 +1125,7 @@ const CustomPlantModal = ({
                                         rowSpacing: parseFloat(e.target.value) || 0,
                                     })
                                 }
-                                className="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="w-full rounded border text-black border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                             />
                         </div>
                     </div>
@@ -1136,7 +1134,7 @@ const CustomPlantModal = ({
                 <div className="mt-6 flex gap-3">
                     <button
                         onClick={onClose}
-                        className="flex-1 rounded bg-gray-100 px-4 py-2 text-white transition-colors hover:bg-gray-200"
+                        className="flex-1 rounded bg-gray-100 px-4 py-2 text-black transition-colors hover:bg-gray-200"
                     >
                         {t('ยกเลิก')}
                     </button>
@@ -1189,14 +1187,14 @@ const ZonePlantSelectionModal = ({
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black bg-opacity-50">
             <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white p-6 shadow-2xl">
                 <h3 className="mb-4 text-xl font-semibold text-gray-900">
-                    🌱 เลือกพืชสำหรับ {zone.name}
+                    🌱 {t('เลือกพืชสำหรับ')} {t(zone.name)}
                 </h3>
 
                 <div className="mb-4 rounded bg-blue-50 p-3 text-sm">
-                    <div className="text-gray-700">📐 ข้อมูลโซน:</div>
-                    <div className="text-gray-600">• พื้นที่: {formatArea(zone.area, t)}</div>
+                    <div className="text-gray-700">📐 {t('ข้อมูลโซน')}:</div>
+                    <div className="text-gray-600">• {t('พื้นที่')}: {formatArea(zone.area, t)}</div>
                     <div className="flex items-center">
-                        <span className="text-gray-600">• สี: </span>
+                        <span className="text-gray-600">• {t('สี')}: </span>
                         <span
                             className="ml-2 inline-block h-4 w-4 rounded"
                             style={{ backgroundColor: zone.color }}
@@ -1215,10 +1213,10 @@ const ZonePlantSelectionModal = ({
                                     : 'border border-gray-200 bg-gray-50 hover:bg-gray-100'
                             }`}
                         >
-                            <div className="font-medium text-gray-900">{plant.name}</div>
-                            <div className="text-sm text-gray-600">
-                                ระยะ: {plant.plantSpacing}×{plant.rowSpacing}ม. | น้ำ:{' '}
-                                {plant.waterNeed}ล./ครั้ง
+                                <div className="font-medium text-gray-900">{t(plant.name)}</div>
+                                <div className="text-sm text-gray-600">
+                                {t('ระยะ')}: {plant.plantSpacing}×{plant.rowSpacing}{t('ม.')} | {t('น้ำ')}:{' '}
+                                {plant.waterNeed} {t('ล./ครั้ง')}
                             </div>
                         </div>
                     ))}
@@ -1229,7 +1227,7 @@ const ZonePlantSelectionModal = ({
                         onClick={onCreateCustomPlant}
                         className="w-full rounded border border-purple-300 bg-purple-100 px-4 py-2 text-sm text-purple-700 transition-colors hover:bg-purple-200"
                     >
-                        ➕ เพิ่มพืชใหม่
+                        ➕ {t('เพิ่มพืชใหม่')}
                     </button>
                 </div>
 
@@ -1238,7 +1236,7 @@ const ZonePlantSelectionModal = ({
                         onClick={onClose}
                         className="flex-1 rounded bg-gray-100 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-200"
                     >
-                        ยกเลิก
+                        {t('ยกเลิก')}
                     </button>
                     <button
                         onClick={handleSave}
@@ -1249,7 +1247,7 @@ const ZonePlantSelectionModal = ({
                                 : 'cursor-not-allowed bg-gray-300 text-gray-500'
                         }`}
                     >
-                        บันทึก
+                        {t('บันทึก')}
                     </button>
                 </div>
             </div>
@@ -1299,16 +1297,16 @@ const SimpleMousePlantEditModal = ({
     return (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black bg-opacity-50">
             <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-gray-900 p-6 shadow-2xl">
-                <h3 className="mb-4 text-xl font-semibold text-white">🌱 แก้ไขต้นไม้</h3>
+                <h3 className="mb-4 text-xl font-semibold text-white">� {t('แก้ไขต้นไม้')}</h3>
 
                 <div className="mb-4 rounded-lg border border-blue-200 bg-gray-900 p-3 text-sm text-white">
-                    💡 <strong>การปรับตำแหน่ง:</strong> ลากต้นไม้บนแผนที่ได้โดยตรง
-                    (เฉพาะในโหมดแก้ไข)
+                    💡 <strong>{t('การปรับตำแหน่ง')}:</strong> {t('ลากต้นไม้บนแผนที่ได้โดยตรง')}
+                    ({t('เฉพาะในโหมดแก้ไข')})
                 </div>
 
                 <div className="space-y-4">
                     <div>
-                        <label className="mb-2 block text-sm font-medium text-white">ชนิดพืช</label>
+                        <label className="mb-2 block text-sm font-medium text-white">{t('ชนิดพืช')}</label>
                         <select
                             value={selectedPlantData?.id || ''}
                             onChange={(e) => {
@@ -1321,7 +1319,7 @@ const SimpleMousePlantEditModal = ({
                         >
                             {availablePlants.map((plant) => (
                                 <option key={plant.id} value={plant.id}>
-                                    {plant.name}
+                                    {t(plant.name)}
                                 </option>
                             ))}
                         </select>
@@ -1330,16 +1328,16 @@ const SimpleMousePlantEditModal = ({
                     {selectedPlantData && (
                         <div className="rounded-lg border border-green-200 bg-gray-900 p-3 text-sm">
                             <div className="text-white">
-                                <strong>พืช:</strong> {selectedPlantData.name}
+                                <strong>{t('พืช')}:</strong> {t(selectedPlantData.name)}
                             </div>
                             <div className="text-white">
-                                <strong>ระยะห่างต้น:</strong> {selectedPlantData.plantSpacing} ม.
+                                <strong>{t('ระยะห่างต้น')}:</strong> {selectedPlantData.plantSpacing} {t('ม.')}
                             </div>
                             <div className="text-white">
-                                <strong>ระยะห่างแถว:</strong> {selectedPlantData.rowSpacing} ม.
+                                <strong>{t('ระยะห่างแถว')}:</strong> {selectedPlantData.rowSpacing} {t('ม.')}
                             </div>
                             <div className="text-white">
-                                <strong>น้ำต่อต้น:</strong> {selectedPlantData.waterNeed} ลิตร/ครั้ง
+                                <strong>{t('น้ำต่อต้น')}:</strong> {selectedPlantData.waterNeed} {t('ลิตร/ครั้ง')}
                             </div>
                         </div>
                     )}
@@ -1350,20 +1348,20 @@ const SimpleMousePlantEditModal = ({
                         onClick={onClose}
                         className="flex-1 rounded bg-gray-600 px-4 py-2 text-white transition-colors hover:bg-gray-700"
                     >
-                        ยกเลิก
+                        {t('ยกเลิก')}
                     </button>
                     <button
                         onClick={handleDelete}
                         className="flex-1 rounded bg-red-600 px-4 py-2 text-white transition-colors hover:bg-red-700"
                     >
                         <FaTrash className="mr-2 inline" />
-                        ลบ
+                        {t('ลบ')}
                     </button>
                     <button
                         onClick={handleSave}
                         className="flex-1 rounded bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700"
                     >
-                        บันทึก
+                        {t('บันทึก')}
                     </button>
                 </div>
             </div>
@@ -1431,21 +1429,21 @@ const PipeSegmentSelectionModal = ({
             <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-gray-900 p-6 shadow-2xl">
                 <h3 className="mb-4 text-xl font-semibold text-white">
                     <FaCut className="mr-2 inline" />
-                    ลบท่อย่อยระหว่างต้นไม้
+                    {t('ลบท่อย่อยระหว่างต้นไม้')}
                 </h3>
 
                 <div className="mb-4 rounded-lg border border-blue-200 bg-gray-900 p-3 text-sm text-white">
-                    <div className="font-medium">ข้อมูลท่อ:</div>
-                    <div>• ความยาวรวม: {branchPipe.length.toFixed(2)} ม.</div>
-                    <div>• จำนวนต้นไม้: {branchPipe.plants.length} ต้น</div>
-                    <div>• จำนวนส่วนที่ตัดได้: {segments.length} ส่วน</div>
+                    <div className="font-medium">{t('ข้อมูลท่อ')}:</div>
+                    <div>• {t('ความยาวรวม')}: {branchPipe.length.toFixed(2)} {t('ม.')}</div>
+                    <div>• {t('จำนวนต้นไม้')}: {branchPipe.plants.length} {t('ต้น')}</div>
+                    <div>• {t('จำนวนส่วนที่ตัดได้')}: {segments.length} {t('ส่วน')}</div>
                 </div>
 
                 {segments.length > 0 ? (
                     <div className="space-y-4">
                         <div>
                             <label className="mb-2 block text-sm font-medium text-white">
-                                เลือกส่วนท่อที่ต้องการลบ:
+                                {t('เลือกส่วนท่อที่ต้องการลบ')}:
                             </label>
                             <div className="max-h-40 space-y-2 overflow-y-auto">
                                 {segments.map((segment, index) => (
@@ -1462,10 +1460,10 @@ const PipeSegmentSelectionModal = ({
                                             {segment.label}
                                         </div>
                                         <div className="text-sm text-gray-300">
-                                            ความยาวส่วน: {segment.length.toFixed(2)} ม.
+                                            {t('ความยาวส่วน')}: {segment.length.toFixed(2)} {t('ม.')}
                                         </div>
                                         <div className="text-xs text-yellow-300">
-                                            💡 ลบท่อระหว่างต้นไม้ - ต้นไม้ยังอยู่
+                                            💡 {t('ลบท่อระหว่างต้นไม้')} - {t('ต้นไม้ยังอยู่')}
                                         </div>
                                     </div>
                                 ))}
@@ -1473,11 +1471,11 @@ const PipeSegmentSelectionModal = ({
                         </div>
 
                         <div className="rounded-lg border border-yellow-200 bg-gray-900 p-3 text-sm text-white">
-                            <div className="mb-2 font-medium text-yellow-400">💡 วิธีการทำงาน:</div>
-                            <div>• เลือกส่วนท่อระหว่างต้นไม้ที่ต้องการลบ</div>
-                            <div>• ต้นไม้จะไม่ถูกลบ แต่ท่อเชื่อมต่อจะหาย</div>
-                            <div>• ท่อย่อยจะแยกเป็นส่วนๆ หรือสั้นลง</div>
-                            <div>• สามารถลบทั้งเส้นได้ถ้าต้องการ</div>
+                            <div className="mb-2 font-medium text-yellow-400">💡 {t('วิธีการทำงาน')}:</div>
+                            <div>• {t('เลือกส่วนท่อระหว่างต้นไม้ที่ต้องการลบ')}</div>
+                            <div>• {t('ต้นไม้จะไม่ถูกลบ แต่ท่อเชื่อมต่อจะหาย')}</div>
+                            <div>• {t('ท่อย่อยจะแยกเป็นส่วนๆ หรือสั้นลง')}</div>
+                            <div>• {t('สามารถลบทั้งเส้นได้ถ้าต้องการ')}</div>
                         </div>
 
                         <div className="flex gap-3">
@@ -1485,14 +1483,14 @@ const PipeSegmentSelectionModal = ({
                                 onClick={onClose}
                                 className="flex-1 rounded bg-gray-600 px-4 py-2 text-white transition-colors hover:bg-gray-700"
                             >
-                                ยกเลิก
+                                {t('ยกเลิก')}
                             </button>
                             <button
                                 onClick={handleDeleteWhole}
                                 className="flex-1 rounded bg-red-600 px-4 py-2 text-white transition-colors hover:bg-red-700"
                             >
                                 <FaTrash className="mr-1 inline" />
-                                ลบทั้งเส้น
+                                {t('ลบทั้งเส้น')}
                             </button>
                             <button
                                 onClick={handleDeleteSegment}
@@ -1504,28 +1502,28 @@ const PipeSegmentSelectionModal = ({
                                 }`}
                             >
                                 <FaCut className="mr-1 inline" />
-                                ลบส่วนนี้
+                                {t('ลบส่วนนี้')}
                             </button>
                         </div>
                     </div>
                 ) : (
                     <div className="space-y-4">
                         <div className="rounded-lg border border-gray-300 bg-gray-800 p-3 text-center text-gray-300">
-                            ไม่สามารถแยกส่วนได้ - มีต้นไม้น้อยเกินไป
+                            {t('ไม่สามารถแยกส่วนได้')} - {t('มีต้นไม้น้อยเกินไป')}
                         </div>
                         <div className="flex gap-3">
                             <button
                                 onClick={onClose}
                                 className="flex-1 rounded bg-gray-600 px-4 py-2 text-white transition-colors hover:bg-gray-700"
                             >
-                                ยกเลิก
+                                {t('ยกเลิก')}
                             </button>
                             <button
                                 onClick={handleDeleteWhole}
                                 className="flex-1 rounded bg-red-600 px-4 py-2 text-white transition-colors hover:bg-red-700"
                             >
                                 <FaTrash className="mr-1 inline" />
-                                ลบทั้งเส้น
+                                {t('ลบทั้งเส้น')}
                             </button>
                         </div>
                     </div>
@@ -1573,43 +1571,43 @@ const BatchOperationsModal = ({
     return (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black bg-opacity-50">
             <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-gray-900 p-6 shadow-2xl">
-                <h3 className="mb-4 text-xl font-semibold text-white">🔧 การดำเนินการแบบกลุ่ม</h3>
+                <h3 className="mb-4 text-xl font-semibold text-white">🔧 {t('การดำเนินการแบบกลุ่ม')}</h3>
 
                 <div className="mb-4 rounded-lg border border-blue-200 bg-gray-900 p-3">
                     <div className="text-sm text-white">
-                        <div className="font-medium">รายการที่เลือก:</div>
-                        <div>• ต้นไม้: {selectedItems.plants.length} ต้น</div>
-                        <div>• ท่อ: {selectedItems.pipes.length} เส้น</div>
-                        <div>• โซน: {selectedItems.zones.length} โซน</div>
-                        <div className="mt-1 font-medium">รวม: {totalSelected} รายการ</div>
+                        <div className="font-medium">{t('รายการที่เลือก')}:</div>
+                        <div>• {t('ต้นไม้')}: {selectedItems.plants.length} {t('ต้น')}</div>
+                        <div>• {t('ท่อ')}: {selectedItems.pipes.length} {t('เส้น')}</div>
+                        <div>• {t('โซน')}: {selectedItems.zones.length} {t('โซน')}</div>
+                        <div className="mt-1 font-medium">{t('รวม')}: {totalSelected} {t('รายการ')}</div>
                     </div>
                 </div>
 
                 <div className="space-y-4">
                     {selectedItems.plants.length > 0 && onDeleteSpecificPlants && (
                         <div className="rounded-lg border border-orange-200 bg-gray-900 p-4">
-                            <h4 className="mb-3 font-medium text-white">🌱 จัดการต้นไม้</h4>
+                            <h4 className="mb-3 font-medium text-white">🌱 {t('จัดการต้นไม้')}</h4>
                             <button
                                 onClick={() => onDeleteSpecificPlants(selectedItems.plants)}
                                 className="w-full rounded bg-orange-600 px-3 py-2 text-sm text-white transition-colors hover:bg-orange-700"
                             >
-                                🗑️ ลบต้นไม้ที่เลือก ({selectedItems.plants.length} ต้น)
+                                🗑️ {t('ลบต้นไม้ที่เลือก')} ({selectedItems.plants.length} {t('ต้น')})
                             </button>
                             <div className="mt-2 text-xs text-orange-300">
-                                * ลบเฉพาะต้นไม้ ไม่ลบท่อย่อยทั้งเส้น
+                                * {t('ลบเฉพาะต้นไม้')} {t('ไม่ลบท่อย่อยทั้งเส้น')}
                             </div>
                         </div>
                     )}
 
                     {selectedItems.pipes.length > 0 && onDeleteBranchPipe && (
                         <div className="rounded-lg border border-red-200 bg-gray-900 p-4">
-                            <h4 className="mb-3 font-medium text-white">🚰 จัดการท่อ</h4>
+                            <h4 className="mb-3 font-medium text-white">🚰 {t('จัดการท่อ')}</h4>
                             <div className="space-y-2">
                                 <button
                                     onClick={() => onDeleteBranchPipe(selectedItems.pipes)}
                                     className="w-full rounded bg-red-600 px-3 py-2 text-sm text-white transition-colors hover:bg-red-700"
                                 >
-                                    🗑️ ลบท่อที่เลือก ({selectedItems.pipes.length} เส้น)
+                                    🗑️ {t('ลบท่อที่เลือก')} ({selectedItems.pipes.length} {t('เส้น')})
                                 </button>
 
                                 {selectedItems.pipes.length === 1 && onSegmentedPipeDeletion && (
@@ -1620,44 +1618,44 @@ const BatchOperationsModal = ({
                                         className="w-full rounded bg-orange-600 px-3 py-2 text-sm text-white transition-colors hover:bg-orange-700"
                                     >
                                         <FaCut className="mr-1 inline" />
-                                        ลบท่อระหว่างต้นไม้
+                                        {t('ลบท่อระหว่างต้นไม้')}
                                     </button>
                                 )}
                             </div>
                             <div className="mt-2 text-xs text-red-300">
-                                * ลบท่อย่อยโดยไม่ลบต้นไม้ หรือลบแค่ส่วนระหว่างต้นไม้
+                                * {t('ลบท่อย่อยโดยไม่ลบต้นไม้')} {t('หรือลบแค่ส่วนระหว่างต้นไม้')}
                             </div>
                         </div>
                     )}
 
                     <div className="rounded-lg border border-green-200 bg-gray-900 p-4">
-                        <h4 className="mb-3 font-medium text-white">📋 คัดลอกและวาง</h4>
+                        <h4 className="mb-3 font-medium text-white">📋 {t('คัดลอกและวาง')}</h4>
                         <div className="flex gap-2">
                             <button
                                 onClick={onBatchCopy}
                                 className="flex-1 rounded bg-green-600 px-3 py-2 text-sm text-white transition-colors hover:bg-green-700"
                             >
                                 <FaCopy className="mr-1 inline" />
-                                คัดลอก
+                                {t('คัดลอก')}
                             </button>
                             <button
                                 onClick={onBatchPaste}
                                 className="flex-1 rounded bg-blue-600 px-3 py-2 text-sm text-white transition-colors hover:bg-blue-700"
                             >
                                 <FaPaste className="mr-1 inline" />
-                                วาง
+                                {t('วาง')}
                             </button>
                         </div>
                     </div>
 
                     <div className="rounded-lg border border-purple-200 bg-gray-900 p-4">
-                        <h4 className="mb-3 font-medium text-white">📄 สร้างแม่แบบ</h4>
+                        <h4 className="mb-3 font-medium text-white">📄 {t('สร้างแม่แบบ')}</h4>
                         <div className="mb-3">
                             <input
                                 type="text"
                                 value={templateName}
                                 onChange={(e) => setTemplateName(e.target.value)}
-                                placeholder="ชื่อแม่แบบ"
+                                placeholder={t('ชื่อแม่แบบ')}
                                 className="w-full rounded border border-gray-300 bg-gray-900 px-3 py-2 text-sm text-white"
                             />
                         </div>
@@ -1672,18 +1670,18 @@ const BatchOperationsModal = ({
                             className="w-full rounded bg-purple-600 px-3 py-2 text-sm text-white transition-colors hover:bg-purple-700 disabled:opacity-50"
                         >
                             <FaMagic className="mr-1 inline" />
-                            สร้างแม่แบบ
+                            {t('สร้างแม่แบบ')}
                         </button>
                     </div>
 
                     <div className="rounded-lg border border-red-200 bg-gray-900 p-4">
-                        <h4 className="mb-3 font-medium text-white">🗑️ ลบรายการ</h4>
+                        <h4 className="mb-3 font-medium text-white">🗑️ {t('ลบรายการ')}</h4>
                         <button
                             onClick={onBatchDelete}
                             className="w-full rounded bg-red-600 px-3 py-2 text-sm text-white transition-colors hover:bg-red-700"
                         >
                             <FaTrash className="mr-1 inline" />
-                            ลบรายการที่เลือก ({totalSelected} รายการ)
+                            {t('ลบรายการที่เลือก')} ({totalSelected} {t('รายการ')})
                         </button>
                     </div>
                 </div>
@@ -1693,7 +1691,7 @@ const BatchOperationsModal = ({
                         onClick={onClose}
                         className="flex-1 rounded bg-gray-600 px-4 py-2 text-white transition-colors hover:bg-gray-700"
                     >
-                        ปิด
+                        {t('ปิด')}
                     </button>
                 </div>
             </div>
@@ -1731,26 +1729,26 @@ const RealTimeBranchControlModal = ({
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black bg-opacity-50">
             <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-gray-900 p-6 shadow-2xl">
                 <h3 className="mb-4 text-xl font-semibold text-white">
-                    🎛️ ปรับมุมท่อย่อยแบบเรียลไทม์
+                    🎛️ {t('ปรับมุมท่อย่อยแบบเรียลไทม์')}
                 </h3>
 
                 <div className="mb-4 rounded-lg border border-blue-200 bg-gray-900 p-3 text-sm text-white">
                     <div>
-                        <strong>ท่อเมนรอง:</strong> {subMainPipe.id}
+                        <strong>{t('ท่อเมนรอง')}:</strong> {subMainPipe.id}
                     </div>
                     <div>
-                        <strong>จำนวนท่อย่อย:</strong> {subMainPipe.branchPipes.length} เส้น
+                        <strong>{t('จำนวนท่อย่อย')}:</strong> {subMainPipe.branchPipes.length} {t('เส้น')}
                     </div>
                     <div>
-                        <strong>จำนวนต้นไม้:</strong>{' '}
-                        {subMainPipe.branchPipes.reduce((sum, bp) => sum + bp.plants.length, 0)} ต้น
+                        <strong>{t('จำนวนต้นไม้')}:</strong>{' '}
+                        {subMainPipe.branchPipes.reduce((sum, bp) => sum + bp.plants.length, 0)} {t('ต้น')}
                     </div>
                 </div>
 
                 <div className="space-y-4">
                     <div>
                         <label className="mb-2 block text-sm font-medium text-white">
-                            มุมท่อย่อย: {currentAngle}°
+                            {t('มุมท่อย่อย')}: {currentAngle}°
                         </label>
                         <input
                             type="range"
@@ -1769,10 +1767,10 @@ const RealTimeBranchControlModal = ({
                     </div>
 
                     <div className="rounded-lg border border-yellow-200 bg-gray-900 p-3 text-sm text-white">
-                        <div className="mb-2 font-medium">💡 การใช้งาน:</div>
-                        <div>• ลากแถบเลื่อนเพื่อดูผลแบบเรียลไทม์</div>
-                        <div>• คลิก "ยืนยัน" เพื่อบันทึกการเปลี่ยนแปลง</div>
-                        <div>• ท่อย่อยและต้นไม้จะปรับตำแหน่งตามมุมใหม่</div>
+                        <div className="mb-2 font-medium">💡 {t('การใช้งาน')}:</div>
+                        <div>• {t('ลากแถบเลื่อนเพื่อดูผลแบบเรียลไทม์')}</div>
+                        <div>• {t('คลิก "ยืนยัน" เพื่อบันทึกการเปลี่ยนแปลง')}</div>
+                        <div>• {t('ท่อย่อยและต้นไม้จะปรับตำแหน่งตามมุมใหม่')}</div>
                     </div>
                 </div>
 
@@ -1781,14 +1779,14 @@ const RealTimeBranchControlModal = ({
                         onClick={onClose}
                         className="flex-1 rounded bg-gray-600 px-4 py-2 text-white transition-colors hover:bg-gray-700"
                     >
-                        ยกเลิก
+                        {t('ยกเลิก')}
                     </button>
                     <button
                         onClick={onApply}
                         className="flex-1 rounded bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700"
                     >
                         <FaCheck className="mr-2 inline" />
-                        ยืนยัน
+                        {t('ยืนยัน')}
                     </button>
                 </div>
             </div>
@@ -1809,6 +1807,7 @@ const DistanceIndicator = ({
     const [startPoint, setStartPoint] = useState<Coordinate | null>(null);
     const [mousePosition, setMousePosition] = useState<Coordinate | null>(null);
     const indicatorRef = useRef<HTMLDivElement | null>(null);
+    const { t } = useLanguage();
 
     useEffect(() => {
         if (!map || !isActive || editMode !== 'zone') return;
@@ -1882,7 +1881,7 @@ const DistanceIndicator = ({
             className="absolute z-50 rounded bg-black bg-opacity-75 px-2 py-1 text-xs text-white"
             style={{ display: 'none', pointerEvents: 'none' }}
         >
-            📏 {currentDistance.toFixed(2)} ม.
+            📏 {currentDistance.toFixed(2)} {t('ม')}
         </div>
     );
 };
@@ -1890,7 +1889,7 @@ const DistanceIndicator = ({
 export default function EnhancedHorticulturePlannerPage() {
     const { t } = useLanguage();
 
-    const [projectName, setProjectName] = useState<string>(t('โครงการระบบน้ำพืชสวน จ.จันทบุรี'));
+    const [projectName, setProjectName] = useState<string>('');
     const [customerName, setCustomerName] = useState<string>('');
 
     const [showCustomPlantModal, setShowCustomPlantModal] = useState(false);
@@ -2059,33 +2058,33 @@ export default function EnhancedHorticulturePlannerPage() {
     const tabs = [
         {
             id: 'area',
-            name: 'พื้นที่',
+            name: t('พื้นที่'),
             icon: '🗺️',
-            description: 'จัดการพื้นที่หลักและโซน',
+            description: t('จัดการพื้นที่หลักและโซน'),
         },
         {
             id: 'water',
-            name: 'ระบบน้ำ',
+            name: t('ระบบน้ำ'),
             icon: '🚰',
-            description: 'ปั๊มและท่อน้ำ',
+            description: t('ปั๊มและท่อน้ำ'),
         },
         {
             id: 'advanced',
-            name: 'แก้ไข',
+            name: t('แก้ไข'),
             icon: '⚙️',
-            description: 'เครื่องมือแก้ไข',
+            description: t('เครื่องมือแก้ไข'),
         },
         {
             id: 'summary',
-            name: 'สรุป',
+            name: t('สรุป'),
             icon: '📊',
-            description: 'สถิติและบันทึก',
+            description: t('สถิติและบันทึก'),
         },
     ];
 
     const handleToggleEditMode = useCallback(() => {
         if (!canEnableEditMode) {
-            alert(t('กรุณาสร้างพื้นที่หลัก ปั๊ม และสร้างท่อพร้อมต้นไม้ก่อนเข้าสู่โหมดแก้ไข'));
+            alert(t('กรุณาสร้างพื้นที่หลัก ปั๊ม และสร้างท่อพร้อมต้นไม้ก่อนเข้าสู่โหมดแก้ไข')); 
             return;
         }
 
@@ -2575,7 +2574,7 @@ export default function EnhancedHorticulturePlannerPage() {
             }
 
             if (!canPlace) {
-                alert('❌ ไม่สามารถวางต้นไม้นอกพื้นที่หลักหรือโซนได้');
+                alert('❌ ' + t('ไม่สามารถวางต้นไม้นอกพื้นที่หลักหรือโซนได้'));
                 setIsDragging(false);
                 setDragTarget(null);
                 return;
@@ -3042,7 +3041,7 @@ export default function EnhancedHorticulturePlannerPage() {
 
                 const newZone: Zone = {
                     id: generateUniqueId('zone'),
-                    name: `โซน ${history.present.zones.length + 1}`,
+                    name: `${t('โซน')} ${history.present.zones.length + 1}`,
                     coordinates,
                     plantData: plantDataForZone,
                     plantCount: estimatedPlantCount,
@@ -3109,7 +3108,7 @@ export default function EnhancedHorticulturePlannerPage() {
                 } else {
                     targetZone = {
                         id: 'main-area',
-                        name: 'พื้นที่หลัก',
+                        name: t('พื้นที่หลัก'),
                         coordinates: history.present.mainArea,
                         plantData: history.present.selectedPlantType,
                         plantCount: 0,
@@ -3186,7 +3185,7 @@ export default function EnhancedHorticulturePlannerPage() {
                     const isInMainArea = isPointInPolygon(clickPoint, history.present.mainArea);
                     if (!isInMainArea) {
                         console.warn('⚠️ Pump placement outside main area');
-                        alert('กรุณาวางปั๊มภายในพื้นที่หลัก');
+                        alert(t('กรุณาวางปั๊มภายในพื้นที่หลัก'));
                         return;
                     }
                 }
@@ -3231,7 +3230,7 @@ export default function EnhancedHorticulturePlannerPage() {
                 }
 
                 if (!canPlacePlant) {
-                    alert('❌ กรุณาวางต้นไม้ภายในพื้นที่หลักหรือโซนที่กำหนด');
+                    alert('❌ ' + t('กรุณาวางต้นไม้ภายในพื้นที่หลักหรือโซนที่กำหนด'));
                     return;
                 }
 
@@ -3246,7 +3245,6 @@ export default function EnhancedHorticulturePlannerPage() {
                 };
 
                 pushToHistory({ plants: [...history.present.plants, newPlant] });
-                setEditMode(null);
                 return;
             }
 
@@ -3331,7 +3329,7 @@ export default function EnhancedHorticulturePlannerPage() {
                 <div className="flex h-screen items-center justify-center">
                     <div className="mx-auto max-w-md rounded-lg bg-gray-800 p-8 text-center">
                         <div className="mb-4 text-6xl">⚠️</div>
-                        <h2 className="mb-4 text-xl font-semibold text-red-400">เกิดข้อผิดพลาด</h2>
+                        <h2 className="mb-4 text-xl font-semibold text-red-400">{t('เกิดข้อผิดพลาด')}</h2>
                         <p className="mb-6 text-gray-300">{error}</p>
                         <div className="space-y-3">
                             <button
@@ -3411,19 +3409,19 @@ export default function EnhancedHorticulturePlannerPage() {
                                     {history.present.pump && (
                                         <div className="flex items-center space-x-1 text-green-600">
                                             <span>🚰</span>
-                                            <span>ปั๊มพร้อม</span>
+                                            <span>{t('ปั๊มพร้อม')}</span>
                                         </div>
                                     )}
                                     {history.present.isEditModeEnabled && (
                                         <div className="flex items-center space-x-1 text-yellow-400">
                                             <span>⚙️</span>
-                                            <span>โหมดแก้ไข</span>
+                                            <span>{t('โหมดแก้ไข')}</span>
                                         </div>
                                     )}
                                     {isDragging && (
                                         <div className="flex items-center space-x-1 text-blue-400">
                                             <span>🖱️</span>
-                                            <span>กำลังลาก</span>
+                                            <span>{t('กำลังลาก')}</span>
                                         </div>
                                     )}
                                 </div>
@@ -3443,12 +3441,12 @@ export default function EnhancedHorticulturePlannerPage() {
                                 {editMode === 'plant' ? (
                                     <>
                                         <FaTimes className="mr-1 inline" />
-                                        หยุดเพิ่ม
+                                        {t('หยุดเพิ่ม')}
                                     </>
                                 ) : (
                                     <>
                                         <FaPlus className="mr-1 inline" />
-                                        เพิ่มต้นไม้
+                                        {t('เพิ่มต้นไม้')}
                                     </>
                                 )}
                             </button>
@@ -3460,7 +3458,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                             setShowQuickActionPanel(!showQuickActionPanel)
                                         }
                                         className="rounded p-1 text-yellow-700 hover:bg-yellow-100"
-                                        title="แผงเครื่องมือด่วน"
+                                        title={t('แผงเครื่องมือด่วน')}
                                     >
                                         <FaBars />
                                     </button>
@@ -3469,14 +3467,14 @@ export default function EnhancedHorticulturePlannerPage() {
                                         <>
                                             <div className="mx-2 h-4 w-px bg-yellow-300"></div>
                                             <span className="text-xs text-yellow-700">
-                                                เลือก: {selectedItemsCount}
+                                                {t('เลือก')}: {selectedItemsCount}
                                             </span>
                                             <button
                                                 onClick={() => setShowBatchModal(true)}
                                                 className="ml-1 rounded bg-yellow-200 px-2 py-1 text-xs text-yellow-800 hover:bg-yellow-300"
                                             >
                                                 <FaCog className="mr-1 inline" />
-                                                จัดการ
+                                                {t('จัดการ')}
                                             </button>
                                             <button
                                                 onClick={handleClearSelection}
@@ -3498,7 +3496,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                             ? 'cursor-not-allowed text-gray-400'
                                             : 'text-gray-600 hover:bg-gray-100'
                                     }`}
-                                    title="ย้อนกลับ"
+                                    title={t('ย้อนกลับ')}
                                 >
                                     <FaUndo />
                                 </button>
@@ -3511,7 +3509,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                             ? 'cursor-not-allowed text-gray-400'
                                             : 'text-gray-600 hover:bg-gray-100'
                                     }`}
-                                    title="ไปข้างหน้า"
+                                    title={t('ไปข้างหน้า')}
                                 >
                                     <FaRedo />
                                 </button>
@@ -3582,13 +3580,13 @@ export default function EnhancedHorticulturePlannerPage() {
                                 <div className="p-4">
                                     <h3 className="mb-4 flex items-center font-semibold text-white">
                                         <span className="mr-2">🗺️</span>
-                                        จัดการพื้นที่
+                                        {t('จัดการพื้นที่')}
                                     </h3>
 
                                     <div className="space-y-4">
                                         <div className="rounded-lg border border-gray-200 bg-gray-900 p-4">
                                             <h4 className="mb-3 font-medium text-white">
-                                                พื้นที่หลัก
+                                                {t('พื้นที่หลัก')}
                                             </h4>
 
                                             <button
@@ -3606,7 +3604,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                 {editMode === 'mainArea' ? (
                                                     <>
                                                         <FaTimes className="mr-2 inline" />
-                                                        หยุดวาดพื้นที่
+                                                        {t('หยุดวาดพื้นที่')}
                                                     </>
                                                 ) : (
                                                     <>🗺️ {t('วาดพื้นที่หลัก')}</>
@@ -3618,11 +3616,11 @@ export default function EnhancedHorticulturePlannerPage() {
                                                     <div className="flex items-center text-sm text-green-700">
                                                         <span className="mr-1">✅</span>
                                                         <span className="font-medium">
-                                                            สร้างพื้นที่หลักแล้ว
+                                                            {t('สร้างพื้นที่หลักแล้ว')}
                                                         </span>
                                                     </div>
                                                     <div className="mt-1 text-xs text-green-600">
-                                                        ขนาด: {formatArea(totalArea, t)}
+                                                        {t('ขนาด')}: {formatArea(totalArea, t)}
                                                     </div>
                                                 </div>
                                             )}
@@ -3630,7 +3628,7 @@ export default function EnhancedHorticulturePlannerPage() {
 
                                         <div className="rounded-lg border border-gray-200 bg-gray-900 p-4">
                                             <h4 className="mb-3 font-medium text-white">
-                                                พื้นที่หลีกเลี่ยง
+                                                {t('พื้นที่หลีกเลี่ยง')}
                                             </h4>
 
                                             <div className="space-y-2">
@@ -3644,11 +3642,11 @@ export default function EnhancedHorticulturePlannerPage() {
                                                     }
                                                     className="w-full rounded-lg border border-gray-300 bg-gray-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
                                                 >
-                                                    <option value="building">สิ่งก่อสร้าง</option>
-                                                    <option value="powerplant">โรงไฟฟ้า</option>
-                                                    <option value="river">แหล่งน้ำ</option>
-                                                    <option value="road">ถนน</option>
-                                                    <option value="other">อื่นๆ</option>
+                                                    <option value="building">{t('สิ่งก่อสร้าง')}</option>
+                                                    <option value="powerplant">{t('โรงไฟฟ้า')}</option>
+                                                    <option value="river">{t('แหล่งน้ำ')}</option>
+                                                    <option value="road">{t('ถนน')}</option>
+                                                    <option value="other">{t('อื่นๆ')}</option>
                                                 </select>
 
                                                 <button
@@ -3668,10 +3666,10 @@ export default function EnhancedHorticulturePlannerPage() {
                                                     {editMode === 'exclusion' ? (
                                                         <>
                                                             <FaTimes className="mr-2 inline" />
-                                                            หยุดวาด
+                                                            {t('หยุดวาด')}
                                                         </>
                                                     ) : (
-                                                        <>🚫 วาดพื้นที่หลีกเลี่ยง</>
+                                                        <>🚫 {t('วาดพื้นที่หลีกเลี่ยง')}</>
                                                     )}
                                                 </button>
                                             </div>
@@ -3702,7 +3700,7 @@ export default function EnhancedHorticulturePlannerPage() {
 
                                         <div className="rounded-lg border border-gray-200 bg-gray-900 p-4">
                                             <h4 className="mb-3 font-medium text-white">
-                                                โซนพื้นที่
+                                                {t('โซนพื้นที่')}
                                             </h4>
 
                                             <div className="mb-3">
@@ -3718,7 +3716,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                         className="h-4 w-4 rounded border-gray-300"
                                                     />
                                                     <span className="text-lg text-white">
-                                                        แบ่งเป็นหลายโซน
+                                                        {t('แบ่งเป็นหลายโซน')}
                                                     </span>
                                                 </label>
                                             </div>
@@ -3745,10 +3743,10 @@ export default function EnhancedHorticulturePlannerPage() {
                                                         {editMode === 'zone' ? (
                                                             <>
                                                                 <FaTimes className="mr-2 inline" />
-                                                                หยุดวาดโซน
+                                                                {t('หยุดวาดโซน')}
                                                             </>
                                                         ) : (
-                                                            <>🏞️ วาดโซน</>
+                                                            <>🏞️ {t('วาดโซน')}</>
                                                         )}
                                                     </button>
 
@@ -3770,7 +3768,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                                     }}
                                                                                 ></div>
                                                                                 <span className="text-sm font-medium">
-                                                                                    {zone.name}
+                                                                                    {t(zone.name)}
                                                                                 </span>
                                                                             </div>
                                                                             <button
@@ -3789,7 +3787,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                                 zone.area,
                                                                                 t
                                                                             )}{' '}
-                                                                            | {zone.plantData.name}
+                                                                            | {t(zone.plantData.name)}
                                                                         </div>
                                                                     </div>
                                                                 )
@@ -3799,7 +3797,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                 </div>
                                             ) : (
                                                 <div className="rounded-lg border border-blue-200 bg-gray-900 p-3 text-sm text-white">
-                                                    ℹ️ จะใช้พื้นที่ทั้งหมดเป็นโซนเดียว
+                                                    ℹ️ {t('จะใช้พื้นที่ทั้งหมดเป็นโซนเดียว')}
                                                 </div>
                                             )}
                                         </div>
@@ -3808,7 +3806,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                             {history.present.zones.length < 1 ? (
                                                 <div className="rounded-lg border border-gray-200 bg-gray-900 p-4">
                                                     <h4 className="mb-3 font-medium text-white">
-                                                        เลือกชนิดพืช
+                                                        {t('เลือกชนิดพืช')}
                                                     </h4>
 
                                                     <select
@@ -3834,7 +3832,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                     key={plant.id}
                                                                     value={plant.id}
                                                                 >
-                                                                    {plant.name}
+                                                                    {t(plant.name)}
                                                                 </option>
                                                             )
                                                         )}
@@ -3844,7 +3842,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                         <div className="space-y-1 text-sm">
                                                             <div className="flex justify-between">
                                                                 <span className="text-white">
-                                                                    ระยะห่างต้น:
+                                                                    {t('ระยะห่างต้น')}:
                                                                 </span>
                                                                 <span className="font-medium">
                                                                     {
@@ -3852,12 +3850,12 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                             .selectedPlantType
                                                                             .plantSpacing
                                                                     }{' '}
-                                                                    ม.
+                                                                    {t('ม')}
                                                                 </span>
                                                             </div>
                                                             <div className="flex justify-between">
                                                                 <span className="text-white">
-                                                                    ระยะห่างแถว:
+                                                                    {t('ระยะห่างแถว')}:
                                                                 </span>
                                                                 <span className="font-medium">
                                                                     {
@@ -3865,12 +3863,12 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                             .selectedPlantType
                                                                             .rowSpacing
                                                                     }{' '}
-                                                                    ม.
+                                                                    {t('ม')}
                                                                 </span>
                                                             </div>
                                                             <div className="flex justify-between">
                                                                 <span className="text-white">
-                                                                    น้ำต่อต้น:
+                                                                    {t('น้ำต่อต้น')}:
                                                                 </span>
                                                                 <span className="font-medium">
                                                                     {
@@ -3878,7 +3876,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                             .selectedPlantType
                                                                             .waterNeed
                                                                     }{' '}
-                                                                    ล./ครั้ง
+                                                                    {t('ล./ครั้ง')}
                                                                 </span>
                                                             </div>
                                                         </div>
@@ -3889,7 +3887,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                         className="mt-3 w-full rounded-lg border border-purple-300 bg-purple-50 px-4 py-2 text-purple-700 transition-colors hover:bg-purple-100"
                                                     >
                                                         <FaPlus className="mr-2 inline" />
-                                                        เพิ่มพืชใหม่
+                                                        {t('เพิ่มพืชใหม่')}
                                                     </button>
                                                 </div>
                                             ) : (
@@ -3899,20 +3897,20 @@ export default function EnhancedHorticulturePlannerPage() {
                                             {actualTotalPlants > 0 && (
                                                 <div className="rounded-lg border border-green-200 bg-gray-900 p-4">
                                                     <h4 className="mb-2 font-medium text-green-800">
-                                                        สถิติพืช
+                                                        {t('สถิติพืช')}
                                                     </h4>
                                                     <div className="space-y-1 text-sm">
                                                         <div className="flex justify-between">
                                                             <span className="text-green-700">
-                                                                จำนวนต้น:
+                                                                {t('จำนวนต้น')}:
                                                             </span>
                                                             <span className="font-bold text-green-800">
-                                                                {actualTotalPlants} ต้น
+                                                                {actualTotalPlants} {t('ต้น')}
                                                             </span>
                                                         </div>
                                                         <div className="flex justify-between">
                                                             <span className="text-green-700">
-                                                                น้ำรวม:
+                                                                {t('น้ำรวม')}:
                                                             </span>
                                                             <span className="font-bold text-blue-800">
                                                                 {formatWaterVolume(
@@ -3933,12 +3931,12 @@ export default function EnhancedHorticulturePlannerPage() {
                                 <div className="p-4">
                                     <h3 className="mb-4 flex items-center font-semibold text-white">
                                         <span className="mr-2">🚰</span>
-                                        ระบบน้ำ
+                                        {t('ระบบน้ำ')}
                                     </h3>
 
                                     <div className="space-y-4">
                                         <div className="rounded-lg border border-gray-200 bg-gray-900 p-4">
-                                            <h4 className="mb-3 font-medium text-white">ปั๊มน้ำ</h4>
+                                            <h4 className="mb-3 font-medium text-white">{t('ปั๊มน้ำ')}</h4>
 
                                             <button
                                                 onClick={() =>
@@ -3954,21 +3952,21 @@ export default function EnhancedHorticulturePlannerPage() {
                                                     editMode === 'pump' ? (
                                                         <>
                                                             <FaTimes className="mr-2 inline" />
-                                                            หยุดวางปั๊ม
+                                                            {t('หยุดวางปั๊ม')}
                                                         </>
                                                     ) : (
                                                         <>
                                                             <FaEdit className="mr-2 inline" />
-                                                            เปลี่ยนตำแหน่งปั๊ม
+                                                            {t('เปลี่ยนตำแหน่งปั๊ม')}
                                                         </>
                                                     )
                                                 ) : editMode === 'pump' ? (
                                                     <>
                                                         <FaTimes className="mr-2 inline" />
-                                                        หยุดวางปั๊ม
+                                                        {t('หยุดวางปั๊ม')}
                                                     </>
                                                 ) : (
-                                                    <>🚰 วางปั๊มน้ำ</>
+                                                    <>🚰 {t('วางปั๊มน้ำ')}</>
                                                 )}
                                             </button>
 
@@ -3977,12 +3975,12 @@ export default function EnhancedHorticulturePlannerPage() {
                                                     <div className="flex items-center text-sm text-blue-700">
                                                         <span className="mr-1">✅</span>
                                                         <span className="font-medium">
-                                                            ปั๊มพร้อมใช้งาน
+                                                            {t('ปั๊มพร้อมใช้งาน')}
                                                         </span>
                                                     </div>
                                                     <div className="mt-1 text-xs text-blue-600">
-                                                        ประเภท: {history.present.pump.type} | กำลัง:{' '}
-                                                        {history.present.pump.capacity} L/min
+                                                        {t('ประเภท')}: {history.present.pump.type} | {t('กำลัง')}:{' '}
+                                                        {history.present.pump.capacity} {t('L/min')}
                                                     </div>
                                                 </div>
                                             )}
@@ -3990,13 +3988,13 @@ export default function EnhancedHorticulturePlannerPage() {
 
                                         <div className="rounded-lg border border-gray-200 bg-gray-900 p-4">
                                             <h4 className="mb-3 font-medium text-white">
-                                                🎛️ การตั้งค่าท่อย่อย
+                                                🎛️ {t('การตั้งค่าท่อย่อย')}
                                             </h4>
 
                                             <div className="space-y-3">
                                                 <div>
                                                     <label className="mb-1 block text-sm text-white">
-                                                        มุมเริ่มต้น:{' '}
+                                                        {t('มุมเริ่มต้น')}:{' '}
                                                         {
                                                             history.present.branchPipeSettings
                                                                 .defaultAngle
@@ -4034,7 +4032,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                 {history.present.subMainPipes.length > 0 && (
                                                     <div className="rounded-lg border border-yellow-200 bg-gray-900 p-3">
                                                         <div className="mb-2 text-sm font-medium text-white">
-                                                            ⚡ ปรับมุมแบบเรียลไทม์
+                                                            ⚡ {t('ปรับมุมแบบเรียลไทม์')}
                                                         </div>
                                                         <div className="space-y-2">
                                                             {history.present.subMainPipes.map(
@@ -4045,13 +4043,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                     >
                                                                         <div className="text-xs text-white">
                                                                             <div>
-                                                                                ท่อ:{' '}
-                                                                                {subMain.id.slice(
-                                                                                    -8
-                                                                                )}
-                                                                            </div>
-                                                                            <div>
-                                                                                มุม:{' '}
+                                                                                {t('มุม')}:{' '}
                                                                                 {subMain.currentAngle ||
                                                                                     history.present
                                                                                         .branchPipeSettings
@@ -4064,7 +4056,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                                         .branchPipes
                                                                                         .length
                                                                                 }{' '}
-                                                                                ท่อย่อย
+                                                                                {t('ท่อย่อย')}
                                                                             </div>
                                                                         </div>
                                                                         <button
@@ -4076,7 +4068,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                             className="rounded bg-yellow-600 px-2 py-1 text-xs text-white hover:bg-yellow-700"
                                                                         >
                                                                             <FaAdjust className="mr-1 inline" />
-                                                                            ปรับ
+                                                                            {t('ปรับ')}
                                                                         </button>
                                                                     </div>
                                                                 )
@@ -4088,7 +4080,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                         </div>
 
                                         <div className="rounded-lg border border-gray-200 bg-gray-900 p-4">
-                                            <h4 className="mb-3 font-medium text-white">ท่อน้ำ</h4>
+                                            <h4 className="mb-3 font-medium text-white">{t('ท่อน้ำ')}</h4>
 
                                             <div className="space-y-2">
                                                 <button
@@ -4117,10 +4109,10 @@ export default function EnhancedHorticulturePlannerPage() {
                                                     {editMode === 'mainPipe' ? (
                                                         <>
                                                             <FaTimes className="mr-2 inline" />
-                                                            หยุดวางท่อเมน
+                                                            {t('หยุดวางท่อเมน')}
                                                         </>
                                                     ) : (
-                                                        <>🔧 วางท่อเมน</>
+                                                        <>🔧 {t('วางท่อเมน')}</>
                                                     )}
                                                 </button>
 
@@ -4152,17 +4144,17 @@ export default function EnhancedHorticulturePlannerPage() {
                                                     {editMode === 'subMainPipe' ? (
                                                         <>
                                                             <FaTimes className="mr-2 inline" />
-                                                            หยุดวางท่อเมนรอง
+                                                            {t('หยุดวางท่อเมนรอง')}
                                                         </>
                                                     ) : (
-                                                        <>🔧 วางท่อเมนรอง + ท่อย่อย</>
+                                                        <>🔧 {t('วางท่อเมนรอง + ท่อย่อย')}</>
                                                     )}
                                                 </button>
                                             </div>
 
                                             {!history.present.pump && (
                                                 <div className="mt-3 rounded-lg border border-amber-200 bg-gray-900 p-3 text-sm text-white">
-                                                    ⚠️ ต้องวางปั๊มก่อนจึงจะสร้างท่อได้
+                                                    ⚠️ {t('ต้องวางปั๊มก่อนจึงจะสร้างท่อได้')}
                                                 </div>
                                             )}
 
@@ -4171,31 +4163,31 @@ export default function EnhancedHorticulturePlannerPage() {
                                                 <div className="mt-3 rounded-lg border bg-gray-900 p-3">
                                                     <div className="text-sm text-white">
                                                         <div className="flex justify-between">
-                                                            <span>ท่อเมน:</span>
+                                                            <span>{t('ท่อเมน')}:</span>
                                                             <span className="font-medium">
                                                                 {history.present.mainPipes.length}{' '}
-                                                                เส้น
+                                                                {t('เส้น')}
                                                             </span>
                                                         </div>
                                                         <div className="flex justify-between">
-                                                            <span>ท่อเมนรอง:</span>
+                                                            <span>{t('ท่อเมนรอง')}:</span>
                                                             <span className="font-medium">
                                                                 {
                                                                     history.present.subMainPipes
                                                                         .length
                                                                 }{' '}
-                                                                เส้น
+                                                                {t('เส้น')}
                                                             </span>
                                                         </div>
                                                         <div className="flex justify-between">
-                                                            <span>ท่อย่อย:</span>
+                                                            <span>{t('ท่อย่อย')}:</span>
                                                             <span className="font-medium">
                                                                 {history.present.subMainPipes.reduce(
                                                                     (sum, sm) =>
                                                                         sum + sm.branchPipes.length,
                                                                     0
                                                                 )}{' '}
-                                                                เส้น
+                                                                {t('เส้น')}
                                                             </span>
                                                         </div>
                                                     </div>
@@ -4206,7 +4198,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                         {editMode === 'subMainPipe' && history.present.useZones && (
                                             <div className="rounded-lg border border-purple-200 bg-gray-900 p-4">
                                                 <h4 className="mb-3 font-medium text-white">
-                                                    🔧 เลือกโซนสำหรับท่อเมนรอง
+                                                    🔧 {t('เลือกโซนสำหรับท่อเมนรอง')}
                                                 </h4>
                                                 <select
                                                     value={selectedZone?.id || ''}
@@ -4218,7 +4210,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                     }}
                                                     className="w-full rounded-lg border border-gray-300 bg-gray-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
                                                 >
-                                                    <option value="">เลือกโซน</option>
+                                                    <option value="">{t('เลือกโซน')}</option>
                                                     {history.present.zones.map((zone) => (
                                                         <option key={zone.id} value={zone.id}>
                                                             {zone.name} ({zone.plantData.name})
@@ -4227,18 +4219,16 @@ export default function EnhancedHorticulturePlannerPage() {
                                                 </select>
                                                 {!selectedZone && (
                                                     <p className="mt-2 rounded bg-gray-900 p-2 text-xs text-white">
-                                                        ⚠️ ต้องเลือกโซนก่อนวาดท่อเมนรอง (หรือจะ
-                                                        AUTO-DETECT จากที่วาด)
+                                                        ⚠️ {t('ต้องเลือกโซนก่อนวาดท่อเมนรอง')}
                                                     </p>
                                                 )}
                                                 {selectedZone && (
                                                     <div className="mt-2 rounded bg-gray-900 p-2 text-xs text-white">
-                                                        ✅ พร้อมสร้างท่อครอบคลุมในโซน{' '}
-                                                        {selectedZone.name}
+                                                        ✅ {t('พร้อมสร้างท่อครอบคลุมในโซน')} {selectedZone.name}
                                                         <br />
-                                                        พืช: {selectedZone.plantData.name}
+                                                        {t('พืช')}: {selectedZone.plantData.name}
                                                         <br />
-                                                        มุมเริ่มต้น:{' '}
+                                                        {t('มุมเริ่มต้น')}:{' '}
                                                         {
                                                             history.present.branchPipeSettings
                                                                 .defaultAngle
@@ -4256,13 +4246,13 @@ export default function EnhancedHorticulturePlannerPage() {
                                 <div className="p-4">
                                     <h3 className="mb-4 flex items-center font-semibold text-white">
                                         <span className="mr-2">⚙️</span>
-                                        แก้ไข
+                                        {t('แก้ไข')}
                                     </h3>
 
                                     <div className="space-y-4">
                                         <div className="rounded-lg border border-gray-200 bg-gray-900 p-4">
                                             <h4 className="mb-3 font-medium text-white">
-                                                โหมดแก้ไข
+                                                {t('โหมดแก้ไข')}
                                             </h4>
 
                                             <button
@@ -4279,20 +4269,19 @@ export default function EnhancedHorticulturePlannerPage() {
                                                 {history.present.isEditModeEnabled ? (
                                                     <>
                                                         <FaTimes className="mr-2 inline" />
-                                                        ออกจากโหมดแก้ไข
+                                                        {t('ออกจากโหมดแก้ไข')}
                                                     </>
                                                 ) : (
                                                     <>
                                                         <FaEdit className="mr-2 inline" />
-                                                        เข้าสู่โหมดแก้ไข
+                                                        {t('เข้าสู่โหมดแก้ไข')}
                                                     </>
                                                 )}
                                             </button>
 
                                             {!canEnableEditMode && (
                                                 <div className="mt-3 rounded-lg border border-amber-200 bg-gray-900 p-3 text-sm text-white">
-                                                    ⚠️ ต้องมีพื้นที่หลัก, ปั๊ม, ท่อ
-                                                    และต้นไม้ก่อนเข้าโหมดแก้ไข
+                                                    ⚠️ {t('ต้องมีพื้นที่หลัก, ปั๊ม, ท่อและต้นไม้ก่อนเข้าโหมดแก้ไข')}
                                                 </div>
                                             )}
                                         </div>
@@ -4301,13 +4290,13 @@ export default function EnhancedHorticulturePlannerPage() {
                                             <>
                                                 <div className="rounded-lg border border-blue-200 bg-gray-900 p-4">
                                                     <h4 className="mb-3 font-medium text-white">
-                                                        🎯 การเลือก
+                                                        🎯 {t('การเลือก')}
                                                     </h4>
 
                                                     <div className="space-y-3">
                                                         <div>
                                                             <label className="mb-2 block text-sm text-white">
-                                                                โหมดการเลือก
+                                                                {t('โหมดการเลือก')}
                                                             </label>
                                                             <select
                                                                 value={
@@ -4326,13 +4315,13 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                 className="w-full rounded border border-gray-300 bg-gray-900 px-3 py-2 text-white"
                                                             >
                                                                 <option value="single">
-                                                                    เลือกทีละตัว
+                                                                    {t('เลือกทีละตัว')}
                                                                 </option>
                                                                 <option value="multi">
-                                                                    เลือกหลายตัว
+                                                                    {t('เลือกหลายตัว')}
                                                                 </option>
                                                                 <option value="rectangle">
-                                                                    เลือกโดยพื้นที่
+                                                                    {t('เลือกโดยพื้นที่')}   
                                                                 </option>
                                                             </select>
                                                         </div>
@@ -4345,7 +4334,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                 className="rounded bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700"
                                                             >
                                                                 <FaObjectGroup className="mr-1 inline" />
-                                                                เลือกต้นไม้ทั้งหมด
+                                                                {t('เลือกต้นไม้ทั้งหมด')}
                                                             </button>
                                                             <button
                                                                 onClick={() =>
@@ -4354,7 +4343,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                 className="rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700"
                                                             >
                                                                 <FaObjectGroup className="mr-1 inline" />
-                                                                เลือกท่อทั้งหมด
+                                                                {t('เลือกท่อทั้งหมด')}
                                                             </button>
                                                         </div>
 
@@ -4363,29 +4352,29 @@ export default function EnhancedHorticulturePlannerPage() {
                                                             className="w-full rounded bg-gray-600 px-3 py-2 text-sm text-white hover:bg-gray-700"
                                                         >
                                                             <FaObjectUngroup className="mr-1 inline" />
-                                                            ยกเลิกการเลือก
+                                                            {t('ยกเลิกการเลือก')}
                                                         </button>
 
                                                         {selectedItemsCount > 0 && (
                                                             <div className="rounded border border-yellow-300 bg-gray-900 p-3 text-sm">
                                                                 <div className="font-medium text-yellow-400">
-                                                                    เลือกแล้ว: {selectedItemsCount}{' '}
-                                                                    รายการ
+                                                                    {t('เลือกแล้ว')}: {selectedItemsCount}{' '}
+                                                                    {t('รายการ')}
                                                                 </div>
                                                                 <div className="text-yellow-300">
-                                                                    • ต้นไม้:{' '}
+                                                                    • {t('ต้นไม้')}:{' '}
                                                                     {
                                                                         history.present
                                                                             .selectedItems.plants
                                                                             .length
                                                                     }
-                                                                    • ท่อ:{' '}
+                                                                    • {t('ท่อ')}:{' '}
                                                                     {
                                                                         history.present
                                                                             .selectedItems.pipes
                                                                             .length
                                                                     }
-                                                                    • โซน:{' '}
+                                                                    • {t('โซน')}:{' '}
                                                                     {
                                                                         history.present
                                                                             .selectedItems.zones
@@ -4398,7 +4387,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                     }
                                                                     className="mt-2 rounded bg-yellow-600 px-3 py-1 text-sm text-white hover:bg-yellow-700"
                                                                 >
-                                                                    จัดการแบบกลุ่ม
+                                                                    {t('จัดการแบบกลุ่ม')}
                                                                 </button>
                                                             </div>
                                                         )}
@@ -4407,7 +4396,7 @@ export default function EnhancedHorticulturePlannerPage() {
 
                                                 <div className="rounded-lg border border-purple-200 bg-gray-900 p-4">
                                                     <h4 className="mb-3 font-medium text-white">
-                                                        👁️ การแสดงผล
+                                                        👁️ {t('การแสดงผล')}
                                                     </h4>
 
                                                     <div className="space-y-2">
@@ -4443,12 +4432,12 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                             <FaEyeSlash className="mr-1 inline" />
                                                                         )}
                                                                         {key === 'plants' &&
-                                                                            'ต้นไม้'}
+                                                                            t('ต้นไม้')}
                                                                         {key === 'pipes' &&
-                                                                            'ท่อน้ำ'}
-                                                                        {key === 'zones' && 'โซน'}
+                                                                            t('ท่อน้ำ')}
+                                                                        {key === 'zones' && t('โซน')}
                                                                         {key === 'exclusions' &&
-                                                                            'พื้นที่หลีกเลี่ยง'}
+                                                                            t('พื้นที่หลีกเลี่ยง')}
                                                                     </span>
                                                                 </label>
                                                             ))}
@@ -4457,7 +4446,7 @@ export default function EnhancedHorticulturePlannerPage() {
 
                                                 <div className="rounded-lg border border-green-200 bg-gray-900 p-4">
                                                     <h4 className="mb-3 font-medium text-white">
-                                                        🛠️ การตั้งค่าแก้ไข
+                                                        🛠️ {t('การตั้งค่าแก้ไข')}
                                                     </h4>
 
                                                     <div className="space-y-3">
@@ -4478,7 +4467,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                             />
                                                             <span className="text-sm text-white">
                                                                 <FaLink className="mr-1 inline" />
-                                                                เชื่อมต่ออัตโนมัติ
+                                                                {t('เชื่อมต่ออัตโนมัติ')}
                                                             </span>
                                                         </label>
                                                     </div>
@@ -4489,10 +4478,10 @@ export default function EnhancedHorticulturePlannerPage() {
                                         {isCreatingConnection && (
                                             <div className="rounded-lg border border-blue-200 bg-gray-900 p-4">
                                                 <h4 className="mb-2 font-medium text-white">
-                                                    🔗 โหมดเชื่อมต่อท่อ
+                                                    🔗 {t('โหมดเชื่อมต่อท่อ')}
                                                 </h4>
                                                 <p className="mb-3 text-sm text-white">
-                                                    คลิกที่ท่อเมนรองหรือท่อย่อยหรือต้นไม้เพื่อเชื่อมต่อ
+                                                    {t('คลิกที่ท่อเมนรองหรือท่อย่อยหรือต้นไม้เพื่อเชื่อมต่อ')}
                                                 </p>
                                                 <button
                                                     onClick={() => {
@@ -4503,7 +4492,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                     }}
                                                     className="w-full rounded bg-red-100 px-3 py-2 text-red-700 transition-colors hover:bg-red-200"
                                                 >
-                                                    ยกเลิกการเชื่อมต่อ
+                                                    {t('ยกเลิกการเชื่อมต่อ')}
                                                 </button>
                                             </div>
                                         )}
@@ -4515,14 +4504,14 @@ export default function EnhancedHorticulturePlannerPage() {
                                 <div className="p-4">
                                     <h3 className="mb-4 flex items-center font-semibold text-white">
                                         <span className="mr-2">📊</span>
-                                        สรุปโครงการ
+                                        {t('สรุปโครงการ')}
                                     </h3>
 
                                     <div className="mb-4 rounded-lg border border-gray-100 bg-gray-900 p-4">
                                         <div className="space-y-3">
                                             <div>
                                                 <label className="mb-1 block text-sm font-medium text-white">
-                                                    {t('ชื่อโครงการ')}
+                                                    {t('ชื่อโครงการ')}:
                                                 </label>
                                                 <input
                                                     type="text"
@@ -4530,6 +4519,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                     onChange={(e) => setProjectName(e.target.value)}
                                                     className="w-full rounded-lg border border-gray-300 bg-gray-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                     disabled={history.present.isEditModeEnabled}
+                                                    placeholder={t('ชื่อโครงการ')}
                                                 />
                                             </div>
                                             <div>
@@ -4550,28 +4540,28 @@ export default function EnhancedHorticulturePlannerPage() {
 
                                             <div className="grid grid-cols-2 gap-2 text-xs">
                                                 <div className="rounded border bg-gray-900 p-2">
-                                                    <div className="text-white">พื้นที่รวม</div>
+                                                    <div className="text-white">{t('พื้นที่รวม')}</div>
                                                     <div className="font-semibold text-green-600">
                                                         {formatArea(totalArea, t)}
                                                     </div>
                                                 </div>
                                                 <div className="rounded border bg-gray-900 p-2">
-                                                    <div className="text-white">ต้นไม้</div>
+                                                    <div className="text-white">{t('ต้นไม้')}</div>
                                                     <div className="font-semibold text-green-600">
-                                                        {actualTotalPlants} ต้น
+                                                        {actualTotalPlants} {t('ต้น')}
                                                     </div>
                                                 </div>
                                                 <div className="rounded border bg-gray-900 p-2">
-                                                    <div className="text-white">โซน</div>
+                                                    <div className="text-white">{t('โซน')}</div>
                                                     <div className="font-semibold text-blue-600">
                                                         {history.present.useZones
                                                             ? history.present.zones.length
                                                             : 1}{' '}
-                                                        โซน
+                                                        {t('โซน')}
                                                     </div>
                                                 </div>
                                                 <div className="rounded border bg-gray-900 p-2">
-                                                    <div className="text-white">น้ำ/ครั้ง</div>
+                                                    <div className="text-white">{t('น้ำ/ครั้ง')}</div>
                                                     <div className="font-semibold text-blue-600">
                                                         {formatWaterVolume(actualTotalWaterNeed, t)}
                                                     </div>
@@ -4583,45 +4573,45 @@ export default function EnhancedHorticulturePlannerPage() {
                                     <div className="space-y-4">
                                         <div className="rounded-lg border border-gray-200 bg-gray-900 p-4">
                                             <h4 className="mb-3 font-medium text-white">
-                                                ข้อมูลโครงการ
+                                                {t('ข้อมูลโครงการ')}
                                             </h4>
 
                                             <div className="space-y-2 text-sm">
                                                 <div className="flex justify-between">
-                                                    <span className="text-white">พื้นที่รวม:</span>
+                                                    <span className="text-white">{t('พื้นที่รวม')}:</span>
                                                     <span className="font-medium">
                                                         {formatArea(totalArea, t)}
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span className="text-white">จำนวนโซน:</span>
+                                                    <span className="text-white">{t('จำนวนโซน')}:</span>
                                                     <span className="font-medium">
                                                         {history.present.useZones
                                                             ? history.present.zones.length
                                                             : 1}{' '}
-                                                        โซน
+                                                        {t('โซน')}
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span className="text-white">จำนวนต้นไม้:</span>
+                                                    <span className="text-white">{t('จำนวนต้นไม้')}:</span>
                                                     <span className="font-medium text-green-600">
-                                                        {actualTotalPlants} ต้น
+                                                        {actualTotalPlants} {t('ต้น')}
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span className="text-white">น้ำต่อครั้ง:</span>
+                                                    <span className="text-white">{t('น้ำต่อครั้ง')}:</span>
                                                     <span className="font-medium text-blue-600">
                                                         {formatWaterVolume(actualTotalWaterNeed, t)}
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span className="text-white">สถานะปั๊ม:</span>
+                                                    <span className="text-white">{t('สถานะปั๊ม')}:</span>
                                                     <span
                                                         className={`font-medium ${history.present.pump ? 'text-green-600' : 'text-red-600'}`}
                                                     >
                                                         {history.present.pump
-                                                            ? 'พร้อมใช้งาน'
-                                                            : 'ยังไม่ได้วาง'}
+                                                            ? t('พร้อมใช้งาน')
+                                                            : t('ยังไม่ได้วาง')}
                                                     </span>
                                                 </div>
                                             </div>
@@ -4630,49 +4620,49 @@ export default function EnhancedHorticulturePlannerPage() {
                                         {history.present.isEditModeEnabled && (
                                             <div className="rounded-lg border border-yellow-200 bg-gray-900 p-4">
                                                 <h4 className="mb-3 font-medium text-white">
-                                                    📈 สถิติการแก้ไข (FIXED)
+                                                    📈 {t('สถิติการแก้ไข')}
                                                 </h4>
                                                 <div className="space-y-2 text-sm">
                                                     <div className="flex justify-between">
                                                         <span className="text-white">
-                                                            รายการที่เลือก:
+                                                            {t('รายการที่เลือก')}:
                                                         </span>
                                                         <span className="font-medium text-yellow-600">
-                                                            {selectedItemsCount} รายการ
+                                                            {selectedItemsCount} {t('รายการ')}
                                                         </span>
                                                     </div>
                                                     <div className="flex justify-between">
                                                         <span className="text-white">
-                                                            โหมดการเลือก:
+                                                            {t('โหมดการเลือก')}:
                                                         </span>
                                                         <span className="font-medium">
                                                             {history.present.editModeSettings
                                                                 .selectionMode === 'single' &&
-                                                                'เลือกทีละตัว'}
+                                                                t('เลือกทีละตัว')}
                                                             {history.present.editModeSettings
                                                                 .selectionMode === 'multi' &&
-                                                                'เลือกหลายตัว'}
+                                                                t('เลือกหลายตัว')}
                                                             {history.present.editModeSettings
                                                                 .selectionMode === 'rectangle' &&
-                                                                'เลือกโดยพื้นที่'}
+                                                                t('เลือกโดยพื้นที่')}
                                                         </span>
                                                     </div>
                                                     <div className="flex justify-between">
                                                         <span className="text-white">
-                                                            ประวัติการแก้ไข:
+                                                            {t('ประวัติการแก้ไข')}:
                                                         </span>
                                                         <span className="font-medium text-blue-600">
-                                                            {history.past.length} ขั้นตอน
+                                                            {history.past.length} {t('ขั้นตอน')}
                                                         </span>
                                                     </div>
                                                     <div className="flex justify-between">
                                                         <span className="text-white">
-                                                            การลากวัตถุ:
+                                                            {t('การลากวัตถุ')}:
                                                         </span>
                                                         <span
                                                             className={`font-medium ${isDragging ? 'text-orange-400' : 'text-gray-400'}`}
                                                         >
-                                                            {isDragging ? 'กำลังลาง' : 'พร้อม'}
+                                                            {isDragging ? t('กำลังลาง') : t('พร้อม')}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -4747,9 +4737,10 @@ export default function EnhancedHorticulturePlannerPage() {
                                 t={t}
                             />
 
+
                             <div className="absolute right-16 top-2 rounded-lg border border-gray-200 bg-gray-900 p-3 shadow-lg">
                                 <div className="mb-2 text-sm font-medium text-white">
-                                    สถานะปัจจุบัน
+                                    {t('สถานะปัจจุบัน')}
                                 </div>
                                 <div className="space-y-1 text-xs">
                                     <div
@@ -4758,7 +4749,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                         <span className="mr-1">
                                             {history.present.mainArea.length > 0 ? '✅' : '○'}
                                         </span>
-                                        พื้นที่หลัก
+                                        {t('พื้นที่หลัก')}
                                     </div>
                                     <div
                                         className={`flex items-center ${history.present.pump ? 'text-green-600' : 'text-gray-400'}`}
@@ -4766,7 +4757,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                         <span className="mr-1">
                                             {history.present.pump ? '✅' : '○'}
                                         </span>
-                                        ปั๊มน้ำ
+                                        {t('ปั๊มน้ำ')}
                                     </div>
                                     <div
                                         className={`flex items-center ${actualTotalPlants > 0 ? 'text-green-600' : 'text-gray-400'}`}
@@ -4774,24 +4765,24 @@ export default function EnhancedHorticulturePlannerPage() {
                                         <span className="mr-1">
                                             {actualTotalPlants > 0 ? '✅' : '○'}
                                         </span>
-                                        ต้นไม้ ({actualTotalPlants} ต้น)
+                                        {t('ต้นไม้')} ({actualTotalPlants} {t('ต้น')})
                                     </div>
                                     {history.present.isEditModeEnabled && (
                                         <div className="flex items-center text-yellow-400">
                                             <span className="mr-1">⚙️</span>
-                                            โหมดแก้ไข
+                                            {t('โหมดแก้ไข')}
                                         </div>
                                     )}
                                     {selectedItemsCount > 0 && (
                                         <div className="flex items-center text-blue-400">
                                             <span className="mr-1">🎯</span>
-                                            เลือก: {selectedItemsCount}
+                                            {t('เลือก')}: {selectedItemsCount}
                                         </div>
                                     )}
                                     {isDragging && (
                                         <div className="flex items-center text-orange-400">
                                             <span className="mr-1">🖱️</span>
-                                            กำลังลาก
+                                            {t('กำลังลาก')}
                                         </div>
                                     )}
                                 </div>
@@ -5061,7 +5052,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                     content: `
                         <div style="color: black; text-align: center;">
                             <strong>${area.name}</strong><br/>
-                            ประเภท: ${area.type}
+                            ${t('ประเภท')}: ${area.type}
                         </div>
                     `,
                 });
@@ -5093,7 +5084,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                     scaledSize: new google.maps.Size(32, 32),
                     anchor: new google.maps.Point(16, 16),
                 },
-                title: 'ปั๊มน้ำ',
+                title: t('ปั๊มน้ำ'),
             });
 
             overlaysRef.current.markers.set(data.pump.id, pumpMarker);
@@ -5101,7 +5092,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
             const infoWindow = new google.maps.InfoWindow({
                 content: `
                     <div style="color: black; text-align: center;">
-                        <strong>ปั๊มน้ำ</strong><br/>
+                        <strong>${t('ปั๊มน้ำ')}</strong><br/>
                     </div>
                 `,
             });
@@ -5131,12 +5122,11 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                 const infoWindow = new google.maps.InfoWindow({
                     content: `
                         <div style="color: black; text-align: center;">
-                            <strong>ท่อเมน</strong><br/>
-                            ความยาว: ${pipe.length.toFixed(2)} ม.<br/>
-                            เส้นผ่านศูนย์กลาง: ${pipe.diameter} มม.<br/>
-                            ไปยังโซน: ${pipe.toZone}<br/>
-                            <div style="font-size: 12px; color: #22C55E;">✅ ไม่ Snap กับปั๊มแล้ว</div>
-                            ${data.isEditModeEnabled ? '<br/><button onclick="window.selectPipe(\'' + pipe.id + '\')" style="background: #9333EA; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">' + (isSelected ? 'ยกเลิกเลือก' : 'เลือกท่อ') + '</button>' : ''}
+                            <strong>${t('ท่อเมน')}</strong><br/>
+                            ${t('ความยาว')}: ${pipe.length.toFixed(2)} ${t('ม.')}<br/>
+                            ${t('เส้นผ่านศูนย์กลาง')}: ${pipe.diameter} ${t('มม.')}<br/>
+                            ${t('ไปยังโซน')}: ${pipe.toZone}<br/>
+                            ${data.isEditModeEnabled ? '<br/><button onclick="window.selectPipe(\'' + pipe.id + '\')" style="background: #9333EA; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">' + (isSelected ? t('ยกเลิกเลือก') : t('เลือกท่อ')) + '</button>' : ''}
                         </div>
                     `,
                 });
@@ -5220,14 +5210,14 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                     const branchInfoWindow = new google.maps.InfoWindow({
                         content: `
                             <div style="color: black; text-align: center;">
-                                <strong>ท่อย่อย</strong><br/>
-                                ความยาว: ${branchPipe.length.toFixed(2)} ม.<br/>
-                                ต้นไม้: ${branchPipe.plants.length} ต้น<br/>
-                                ${branchPipe.angle ? `มุม: ${branchPipe.angle}°<br/>` : ''}
-                                ${branchPipe.connectionPoint ? `จุดต่อ: ${(branchPipe.connectionPoint * 100).toFixed(1)}%<br/>` : ''}
-                                ${data.isEditModeEnabled ? '<br/><button onclick="window.segmentedPipeDeletion(\'' + branchPipe.id + '\')" style="background: #F97316; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">✂️ ลบท่อระหว่างต้นไม้</button>' : ''}
-                                ${data.isEditModeEnabled ? '<br/><button onclick="window.selectPipe(\'' + branchPipe.id + '\')" style="background: #9333EA; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">' + (isBranchSelected ? 'ยกเลิกเลือก' : 'เลือกท่อ') + '</button>' : ''}
-                                ${isCreatingConnection && isBranchHighlighted ? '<br/><div style="font-size: 12px; color: #FCD34D;">🔗 คลิกเพื่อเชื่อมต่อ</div>' : ''}
+                                <strong>${t('ท่อย่อย')}</strong><br/>
+                                ${t('ความยาว')}: ${branchPipe.length.toFixed(2)} ${t('ม.')}<br/>
+                                ${t('ต้นไม้')}: ${branchPipe.plants.length} ${t('ต้น')}<br/>
+                                ${branchPipe.angle ? `${t('มุม')}: ${branchPipe.angle}°<br/>` : ''}
+                                ${branchPipe.connectionPoint ? `${t('จุดต่อ')}: ${(branchPipe.connectionPoint * 100).toFixed(1)}%<br/>` : ''}
+                                ${data.isEditModeEnabled ? '<br/><button onclick="window.segmentedPipeDeletion(\'' + branchPipe.id + '\')" style="background: #F97316; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">✂️ ' + t('ลบท่อระหว่างต้นไม้') + '</button>' : ''}
+                                ${data.isEditModeEnabled ? '<br/><button onclick="window.selectPipe(\'' + branchPipe.id + '\')" style="background: #9333EA; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">' + (isBranchSelected ? t('ยกเลิกเลือก') : t('เลือกท่อ')) + '</button>' : ''}
+                                ${isCreatingConnection && isBranchHighlighted ? '<br/><div style="font-size: 12px; color: #FCD34D;">🔗 ' + t('คลิกเพื่อเชื่อมต่อ') + '</div>' : ''}
                             </div>
                         `,
                     });
@@ -5297,19 +5287,19 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                 const infoWindow = new google.maps.InfoWindow({
                     content: `
                         <div style="color: black; text-align: center;">
-                            <strong>${plant.plantData.name}</strong><br/>
-                            น้ำ: ${plant.plantData.waterNeed} ล./ครั้ง<br/>
-                            ระยะปลูก: ${plant.plantData.plantSpacing}×${plant.plantData.rowSpacing} ม.<br/>
-                            ${plant.zoneId ? `โซน: ${plant.zoneId}<br/>` : ''}
-                            ${data.isEditModeEnabled ? '<div style="font-size: 12px; color: #22C55E;">🖱️ ลากเพื่อเปลี่ยนตำแหน่ง</div>' : ''}
+                            <strong>${t(plant.plantData.name)}</strong><br/>
+                            ${t('น้ำ')}: ${plant.plantData.waterNeed} ${t('ล./ครั้ง')}<br/>
+                            ${t('ระยะปลูก')}: ${plant.plantData.plantSpacing}×${plant.plantData.rowSpacing} ${t('ม.')}<br/>
+                            ${plant.zoneId ? `${t('โซน')}: ${plant.zoneId}<br/>` : ''}
+                            ${data.isEditModeEnabled ? `<div style="font-size: 12px; color: #22C55E;">🖱️ ${t('ลากเพื่อเปลี่ยนตำแหน่ง')}</div>` : ''}
                             ${
                                 data.isEditModeEnabled
                                     ? `
                                 <br/>
-                                <button onclick="window.editPlant('${plant.id}')" style="background: #F59E0B; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; margin: 2px;">✏️ แก้ไข</button>
-                                <button onclick="window.createPlantConnection('${plant.id}')" style="background: #3B82F6; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; margin: 2px;">🔗 เชื่อมต่อ</button>
+                                <button onclick="window.editPlant('${plant.id}')" style="background: #F59E0B; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; margin: 2px;">✏️ ${t('แก้ไข')}</button>
+                                <button onclick="window.createPlantConnection('${plant.id}')" style="background: #3B82F6; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; margin: 2px;">🔗 ${t('เชื่อมต่อ')}</button>
                                 <br/>
-                                <button onclick="window.selectPlant('${plant.id}')" style="background: #9333EA; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; margin: 2px;">${isSelected ? 'ยกเลิกเลือก' : 'เลือกต้นไม้'}</button>
+                                <button onclick="window.selectPlant('${plant.id}')" style="background: #9333EA; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; margin: 2px;">${isSelected ? t('ยกเลิกเลือก') : t('เลือกต้นไม้')}</button>
                             `
                                     : ''
                             }
