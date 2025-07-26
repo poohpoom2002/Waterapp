@@ -21,7 +21,7 @@ interface CalculationSummaryProps {
     activeZone?: Zone;
     selectedZones?: string[];
     allZoneSprinklers: { [zoneId: string]: any };
-    projectMode?: 'horticulture' | 'garden';
+    projectMode?: 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
     showPump?: boolean;
     simultaneousZonesCount?: number;
     zoneOperationGroups?: ZoneOperationGroup[];
