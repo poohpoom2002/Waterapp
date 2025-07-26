@@ -7,7 +7,7 @@ import UserAvatar from './UserAvatar';
 const Navbar: React.FC = () => {
     useLanguage();
     const page = usePage();
-    const auth = (page.props as { auth: unknown }).auth;
+    const auth = (page.props as any).auth;
 
     return (
         <nav className="border-b border-gray-700 bg-gray-800 shadow-lg">
@@ -30,6 +30,17 @@ const Navbar: React.FC = () => {
 
                     {/* Right side - Language Switcher and User Avatar */}
                     <div className="flex items-center space-x-4">
+                        {/* Super User Dashboard Link */}
+                        {auth?.user?.is_super_user && (
+                            <Link
+                                href="/super/dashboard"
+                                className="flex items-center gap-2 rounded-lg bg-yellow-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-yellow-700"
+                            >
+                                <span className="text-lg">👑</span>
+                                Super Dashboard
+                            </Link>
+                        )}
+                        
                         <LanguageSwitcher />
 
                         {/* User Avatar - Only show if authenticated */}

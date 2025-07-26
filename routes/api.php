@@ -90,6 +90,15 @@ Route::post('/save-field', [FarmController::class, 'saveField']);
 Route::put('/fields/{fieldId}', [FarmController::class, 'updateField']);
 Route::delete('/fields/{fieldId}', [FarmController::class, 'deleteField']);
 
+// Folder Management API Routes
+Route::get('/folders', [FarmController::class, 'getFolders']);
+Route::post('/folders', [FarmController::class, 'createFolder']);
+Route::put('/folders/{folderId}', [FarmController::class, 'updateFolder']);
+Route::delete('/folders/{folderId}', [FarmController::class, 'deleteFolder']);
+
+// Field Status Management
+Route::put('/fields/{fieldId}/status', [FarmController::class, 'updateFieldStatus']);
+
 // Plant management
 Route::get('/api/plant-types', [FarmController::class, 'getPlantTypes']);
 Route::post('/api/get-elevation', [FarmController::class, 'getElevation']);

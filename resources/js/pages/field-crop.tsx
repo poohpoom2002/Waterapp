@@ -61,7 +61,7 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
                     <div className="border-b border-gray-700 p-6">
                         <div className="mb-4 flex items-center justify-between">
                             <button
-                                onClick={() => window.history.back()}
+                                onClick={() => (window.location.href = "/planner")}
                                 className="flex items-center text-sm text-blue-400 hover:text-blue-300"
                             >
                                 <svg

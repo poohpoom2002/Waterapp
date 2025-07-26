@@ -977,12 +977,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
         }
 
         try {
-            // รอให้ element โหลดเสร็จ
             await new Promise((resolve) => setTimeout(resolve, 2000));
-            // Get the specific container
-            const elementId =
-                gardenData?.designMode === 'map' ? 'map-container' : 'canvas-container';
-            const element = document.getElementById(elementId);
 
             const html2canvas = await import('html2canvas');
             const html2canvasLib = html2canvas.default || html2canvas;

@@ -1,6 +1,7 @@
 import { Head } from '@inertiajs/react';
 import { useState, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
+import { greenhouseCrops, getCropByValue } from '../components/Greenhouse/CropData';
 
 interface Point {
     x: number;
@@ -141,6 +142,7 @@ export default function GreenhouseSummary() {
     };
 
     useEffect(() => {
+        console.log('=== useEffect START ===');
         // Get data from URL parameters
         const urlParams = new URLSearchParams(window.location.search);
         const crops = urlParams.get('crops');
@@ -148,20 +150,35 @@ export default function GreenhouseSummary() {
         const shapesParam = urlParams.get('shapes');
         const irrigationParam = urlParams.get('irrigation');
 
+        console.log('URL Parameters:', { crops, method, shapesParam, irrigationParam });
+
         // Try to get complete data from localStorage
         const savedData = localStorage.getItem('greenhousePlanningData');
+        console.log('Raw localStorage data:', savedData);
 
         if (savedData) {
             try {
                 const parsedData = JSON.parse(savedData);
                 console.log('Summary: Loaded data from localStorage:', parsedData);
                 console.log('Summary: Irrigation elements:', parsedData.irrigationElements);
+                console.log('Summary: Irrigation elements length:', parsedData.irrigationElements?.length || 'undefined');
+                console.log('Summary: Keys in parsedData:', Object.keys(parsedData));
+                
+                // Check if irrigationElements exists and is an array
+                if (parsedData.irrigationElements) {
+                    console.log('irrigationElements is array:', Array.isArray(parsedData.irrigationElements));
+                    console.log('irrigationElements type:', typeof parsedData.irrigationElements);
+                } else {
+                    console.log('irrigationElements is missing or falsy');
+                }
+                
                 setSummaryData(parsedData);
             } catch (error) {
                 console.error('Error parsing saved data:', error);
 
                 // Fallback to URL parameters
                 if (crops || shapesParam) {
+                    console.log('Falling back to URL parameters');
                     const newData: GreenhouseSummaryData = {
                         selectedCrops: crops ? crops.split(',') : [],
                         planningMethod: (method as 'draw' | 'import') || 'draw',
@@ -170,10 +187,12 @@ export default function GreenhouseSummary() {
                         irrigationElements: [], // Initialize empty array for irrigation elements
                         createdAt: new Date().toISOString(),
                     };
+                    console.log('Created fallback data:', newData);
                     setSummaryData(newData);
                 }
             }
         } else if (crops || shapesParam) {
+            console.log('No localStorage data, creating from URL parameters');
             // Create new data from URL parameters
             const newData: GreenhouseSummaryData = {
                 selectedCrops: crops ? crops.split(',') : [],
@@ -183,11 +202,424 @@ export default function GreenhouseSummary() {
                 irrigationElements: [], // Initialize empty array for irrigation elements
                 createdAt: new Date().toISOString(),
             };
+            console.log('Created new data from URL:', newData);
             setSummaryData(newData);
+        } else {
+            console.log('No data source available');
         }
+        console.log('=== useEffect END ===');
     }, []);
 
-    // Helper function to draw component shapes (irrigation equipment) - ปรับปรุงใหม่
+    // Helper function to check if a point is inside a polygon (Ray casting algorithm)
+    const isPointInPolygon = (point: Point, polygon: Point[]): boolean => {
+        if (polygon.length < 3) return false;
+        
+        let isInside = false;
+        let j = polygon.length - 1;
+        
+        for (let i = 0; i < polygon.length; i++) {
+            const xi = polygon[i].x;
+            const yi = polygon[i].y;
+            const xj = polygon[j].x;
+            const yj = polygon[j].y;
+            
+            if (((yi > point.y) !== (yj > point.y)) && 
+                (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi)) {
+                isInside = !isInside;
+            }
+            j = i;
+        }
+        
+        return isInside;
+    };
+
+    // Helper function to calculate distance between two points
+    const distanceBetweenPoints = (p1: Point, p2: Point): number => {
+        return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+    };
+
+    // Helper function to find closest point on line segment
+    const closestPointOnLineSegment = (point: Point, lineStart: Point, lineEnd: Point): { point: Point; distance: number; t: number } => {
+        const A = point.x - lineStart.x;
+        const B = point.y - lineStart.y;
+        const C = lineEnd.x - lineStart.x;
+        const D = lineEnd.y - lineStart.y;
+
+        const dot = A * C + B * D;
+        const lenSq = C * C + D * D;
+        
+        let t = 0;
+        if (lenSq !== 0) {
+            t = Math.max(0, Math.min(1, dot / lenSq));
+        }
+
+        const closestPoint = {
+            x: lineStart.x + t * C,
+            y: lineStart.y + t * D
+        };
+
+        const distance = distanceBetweenPoints(point, closestPoint);
+        
+        return { point: closestPoint, distance, t };
+    };
+
+    // Helper function to get crop icon based on crop name using CropData
+    const getCropIcon = (cropType: string): string => {
+        // หากเป็น "ยังไม่ได้เลือกพืช" ให้ใช้ไอคอนเริ่มต้น
+        if (cropType === 'ยังไม่ได้เลือกพืช') {
+            return '🌱';
+        }
+
+        // ค้นหาจาก value ก่อน
+        let crop = getCropByValue(cropType);
+        
+        // หากไม่พบ ให้ค้นหาจากชื่อไทย
+        if (!crop) {
+            crop = greenhouseCrops.find(c => c.name === cropType);
+        }
+        
+        // หากยังไม่พบ ให้ค้นหาจากชื่ออังกฤษ
+        if (!crop) {
+            crop = greenhouseCrops.find(c => c.nameEn.toLowerCase() === cropType.toLowerCase());
+        }
+        
+        // หากยังไม่พบ ให้ค้นหาแบบ partial match
+        if (!crop) {
+            const lowerCropType = cropType.toLowerCase();
+            crop = greenhouseCrops.find(c => 
+                c.name.toLowerCase().includes(lowerCropType) || 
+                c.nameEn.toLowerCase().includes(lowerCropType) ||
+                lowerCropType.includes(c.name.toLowerCase()) ||
+                lowerCropType.includes(c.nameEn.toLowerCase())
+            );
+        }
+
+        // คืนไอคอนหากพบ หรือไอคอนเริ่มต้นหากไม่พบ
+        return crop ? crop.icon : '🌿';
+    };
+
+    // Calculate cumulative pipe lengths for each plot (Enhanced version)
+    const calculatePipeInPlots = () => {
+        console.log('=== calculatePipeInPlots START ===');
+        console.log('summaryData:', summaryData);
+        console.log('summaryData?.irrigationElements:', summaryData?.irrigationElements);
+        console.log('irrigationElements length:', summaryData?.irrigationElements?.length);
+        
+        if (!summaryData?.shapes || !summaryData?.irrigationElements) {
+            console.log('Missing data - shapes or irrigationElements');
+            return [];
+        }
+
+        const plots = summaryData.shapes.filter((s) => s.type === 'plot');
+        const elements = summaryData.irrigationElements;
+
+        // Sort plots by position (top to bottom, then left to right)
+        const sortedPlots = plots.map((plot, originalIndex) => ({
+            ...plot,
+            originalIndex,
+            // Calculate plot center for sorting
+            centerY: plot.points.reduce((sum, p) => sum + p.y, 0) / plot.points.length,
+            centerX: plot.points.reduce((sum, p) => sum + p.x, 0) / plot.points.length,
+        })).sort((a, b) => {
+            // Sort by Y first (top to bottom), then by X (left to right)
+            const yDiff = a.centerY - b.centerY;
+            if (Math.abs(yDiff) > 50) { // If Y difference is significant
+                return yDiff;
+            }
+            return a.centerX - b.centerX; // Otherwise sort by X
+        });
+
+        return sortedPlots.map((plot, sortedIndex) => {
+            const plotPipeData = {
+                plotName: plot.name || `แปลงปลูกที่ ${sortedIndex + 1}`,
+                cropType: plot.cropType || 
+                    (summaryData.selectedCrops && summaryData.selectedCrops[plot.originalIndex]) || 
+                    'ยังไม่ได้เลือกพืช',
+                maxMainPipeLength: 0,
+                maxSubPipeLength: 0,
+                maxTotalPipeLength: 0,
+                totalMainPipeLength: 0,
+                totalSubPipeLength: 0,
+                totalPipeLength: 0,
+                hasPipes: false
+            };
+
+            // Find main pipes and sub pipes
+            const mainPipes = elements.filter(e => e.type === 'main-pipe');
+            const subPipes = elements.filter(e => e.type === 'sub-pipe');
+
+            if (mainPipes.length === 0) return plotPipeData;
+
+            let maxMainDistanceForThisPlot = 0;
+
+            // For each main pipe, find sub pipes that connect to it and serve this plot
+            mainPipes.forEach(mainPipe => {
+                if (mainPipe.points.length < 2) return;
+
+                // Create cumulative distance array for this main pipe
+                const cumulativeDistances = [0];
+                let totalDistance = 0;
+                
+                for (let i = 1; i < mainPipe.points.length; i++) {
+                    const segmentLength = distanceBetweenPoints(mainPipe.points[i-1], mainPipe.points[i]);
+                    totalDistance += segmentLength;
+                    cumulativeDistances.push(totalDistance);
+                }
+
+                // Find sub pipes that connect to this main pipe and serve this plot
+                subPipes.forEach(subPipe => {
+                    if (subPipe.points.length < 1) return;
+
+                    // Check if this sub pipe serves this plot (any point in plot)
+                    const servesThisPlot = subPipe.points.some(point => 
+                        isPointInPolygon(point, plot.points)
+                    );
+
+                    if (!servesThisPlot) return;
+
+                    const subPipeStart = subPipe.points[0];
+                    
+                    // Find the closest connection point on the main pipe
+                    let closestDistance = Infinity;
+                    let connectionCumulativeDistance = 0;
+                    let connectionFound = false;
+
+                    for (let i = 0; i < mainPipe.points.length - 1; i++) {
+                        const result = closestPointOnLineSegment(
+                            subPipeStart, 
+                            mainPipe.points[i], 
+                            mainPipe.points[i + 1]
+                        );
+
+                        if (result.distance < closestDistance) {
+                            closestDistance = result.distance;
+                            // Calculate cumulative distance to this connection point
+                            connectionCumulativeDistance = cumulativeDistances[i] + 
+                                result.t * distanceBetweenPoints(mainPipe.points[i], mainPipe.points[i + 1]);
+                            connectionFound = true;
+                        }
+                    }
+
+                    // If connection is found within reasonable tolerance
+                    if (connectionFound && closestDistance < 50) { // 50 pixels tolerance
+                        // Convert to meters and update distance for this plot
+                        const connectionDistanceInMeters = connectionCumulativeDistance / 25;
+                        maxMainDistanceForThisPlot = Math.max(maxMainDistanceForThisPlot, connectionDistanceInMeters);
+                        plotPipeData.hasPipes = true;
+                    }
+                });
+            });
+
+            // Set the main pipe lengths (both max and total should be the same for cumulative calculation)
+            plotPipeData.maxMainPipeLength = maxMainDistanceForThisPlot;
+            plotPipeData.totalMainPipeLength = maxMainDistanceForThisPlot;
+
+            // Calculate sub pipe lengths in this plot
+            let maxSubPipeLength = 0;
+            let totalSubLengthInPlot = 0;
+
+            subPipes.forEach(subPipe => {
+                let subPipeLengthInPlot = 0;
+                let hasSegmentInPlot = false;
+                
+                for (let i = 0; i < subPipe.points.length - 1; i++) {
+                    const p1 = subPipe.points[i];
+                    const p2 = subPipe.points[i + 1];
+                    
+                    // Check if this segment is in the plot
+                    const midPoint = {
+                        x: (p1.x + p2.x) / 2,
+                        y: (p1.y + p2.y) / 2
+                    };
+                    
+                    if (isPointInPolygon(p1, plot.points) || 
+                        isPointInPolygon(p2, plot.points) || 
+                        isPointInPolygon(midPoint, plot.points)) {
+                        
+                        const segmentLength = distanceBetweenPoints(p1, p2) / 25; // Convert to meters
+                        subPipeLengthInPlot += segmentLength;
+                        hasSegmentInPlot = true;
+                    }
+                }
+
+                if (hasSegmentInPlot) {
+                    totalSubLengthInPlot += subPipeLengthInPlot;
+                    maxSubPipeLength = Math.max(maxSubPipeLength, subPipeLengthInPlot);
+                    plotPipeData.hasPipes = true;
+                }
+            });
+
+            // Set final values
+            plotPipeData.maxSubPipeLength = Math.round(maxSubPipeLength * 100) / 100;
+            plotPipeData.maxTotalPipeLength = Math.round((plotPipeData.maxMainPipeLength + maxSubPipeLength) * 100) / 100;
+            plotPipeData.totalSubPipeLength = Math.round(totalSubLengthInPlot * 100) / 100;
+            plotPipeData.totalPipeLength = Math.round((plotPipeData.totalMainPipeLength + totalSubLengthInPlot) * 100) / 100;
+            plotPipeData.maxMainPipeLength = Math.round(plotPipeData.maxMainPipeLength * 100) / 100;
+            plotPipeData.totalMainPipeLength = Math.round(plotPipeData.totalMainPipeLength * 100) / 100;
+
+            // Debug logging
+            console.log(`=== ${plotPipeData.plotName} ===`);
+            console.log(`ความยาวท่อเมนสูงสุด: ${plotPipeData.maxMainPipeLength} ม.`);
+            console.log(`ความยาวท่อเมนทั้งหมด: ${plotPipeData.totalMainPipeLength} ม.`);
+            console.log(`ความยาวท่อย่อยสูงสุด: ${plotPipeData.maxSubPipeLength} ม.`);
+            console.log(`ความยาวท่อย่อยทั้งหมด: ${plotPipeData.totalSubPipeLength} ม.`);
+            console.log(`มีระบบท่อ: ${plotPipeData.hasPipes}`);
+            console.log(`พืชที่ปลูก: ${plotPipeData.cropType}`);
+            console.log('---');
+
+            return plotPipeData;
+        });
+    };
+
+    const plotPipeData = calculatePipeInPlots();
+    console.log('=== plotPipeData RESULT ===');
+    console.log('plotPipeData:', plotPipeData);
+
+    // Calculate metrics from shapes data
+    const calculateMetrics = () => {
+        if (!summaryData?.shapes)
+            return {
+                shapeTypeCount: 0,
+                greenhouseArea: 0,
+                plotArea: 0,
+                plotCount: 0,
+                waterSourceCount: 0,
+                walkwayArea: 0,
+            };
+
+        const shapes = summaryData.shapes;
+        const greenhouses = shapes.filter((s) => s.type === 'greenhouse');
+        const plots = shapes.filter((s) => s.type === 'plot');
+        const walkways = shapes.filter((s) => s.type === 'walkway');
+        const waterSources = shapes.filter((s) => s.type === 'water-source');
+
+        // Get unique shape types
+        const shapeTypes = new Set(shapes.map((s) => s.type));
+        const shapeTypeCount = shapeTypes.size;
+
+        // Calculate polygon area using Shoelace formula (1 grid = 25 pixels = 1 meter)
+        const calculatePolygonArea = (points: { x: number; y: number }[]) => {
+            if (points.length < 3) return 0;
+            let area = 0;
+            for (let i = 0; i < points.length; i++) {
+                const j = (i + 1) % points.length;
+                area += points[i].x * points[j].y;
+                area -= points[j].x * points[i].y;
+            }
+            // Convert from pixels to square meters (25 pixels = 1 meter, so 625 pixels² = 1 m²)
+            return Math.abs(area / 2) / 625;
+        };
+
+        const greenhouseArea = greenhouses.reduce(
+            (sum, gh) => sum + calculatePolygonArea(gh.points),
+            0
+        );
+        const plotArea = plots.reduce((sum, plot) => sum + calculatePolygonArea(plot.points), 0);
+        const walkwayArea = walkways.reduce(
+            (sum, walkway) => sum + calculatePolygonArea(walkway.points),
+            0
+        );
+
+        return {
+            shapeTypeCount,
+            greenhouseArea: Math.round(greenhouseArea * 100) / 100,
+            plotArea: Math.round(plotArea * 100) / 100,
+            plotCount: plots.length,
+            waterSourceCount: waterSources.length,
+            walkwayArea: Math.round(walkwayArea * 100) / 100,
+        };
+    };
+
+    const metrics = calculateMetrics();
+
+    // Enhanced Calculate irrigation equipment from irrigationElements 
+    const calculateIrrigationMetrics = () => {
+        console.log('=== calculateIrrigationMetrics START ===');
+        console.log('summaryData in calculateIrrigationMetrics:', summaryData);
+        console.log('summaryData?.irrigationElements in calculateIrrigationMetrics:', summaryData?.irrigationElements);
+        console.log('irrigationElements exists?', !!summaryData?.irrigationElements);
+        console.log('irrigationElements is array?', Array.isArray(summaryData?.irrigationElements));
+        console.log('irrigationElements length:', summaryData?.irrigationElements?.length);
+        
+        if (!summaryData?.irrigationElements || summaryData.irrigationElements.length === 0) {
+            console.log('Summary: No irrigation elements found or empty array');
+            console.log('Reason: irrigationElements =', summaryData?.irrigationElements);
+            return {
+                maxMainPipeLength: 0,
+                maxSubPipeLength: 0,
+                maxTotalPipeLength: 0,
+                totalMainPipeLength: 0,
+                totalSubPipeLength: 0,
+                totalPipeLength: 0,
+                pumps: 0,
+                solenoidValves: 0,
+                ballValves: 0,
+                sprinklers: 0,
+                dripLines: 0,
+            };
+        }
+
+        const elements = summaryData.irrigationElements;
+        console.log('Summary: Calculating metrics for irrigation elements:', elements);
+
+        // Calculate pipe length
+        const calculatePipeLength = (points: Point[]) => {
+            if (points.length < 2) return 0;
+            let totalLength = 0;
+            for (let i = 0; i < points.length - 1; i++) {
+                const p1 = points[i];
+                const p2 = points[i + 1];
+                const segmentLength = Math.sqrt(
+                    Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2)
+                );
+                totalLength += segmentLength;
+            }
+            // Convert from pixels to meters (25 pixels = 1 meter)
+            return totalLength / 25;
+        };
+
+        // Calculate for main pipes
+        const mainPipes = elements.filter((e) => e.type === 'main-pipe');
+        let maxMainPipeLength = 0;
+        let totalMainPipeLength = 0;
+        if (mainPipes.length > 0) {
+            const mainPipeLengths = mainPipes.map((pipe) => calculatePipeLength(pipe.points));
+            maxMainPipeLength = Math.max(...mainPipeLengths);
+            totalMainPipeLength = mainPipeLengths.reduce((sum, length) => sum + length, 0);
+        }
+
+        // Calculate for sub pipes
+        const subPipes = elements.filter((e) => e.type === 'sub-pipe');
+        let maxSubPipeLength = 0;
+        let totalSubPipeLength = 0;
+        if (subPipes.length > 0) {
+            const subPipeLengths = subPipes.map((pipe) => calculatePipeLength(pipe.points));
+            maxSubPipeLength = Math.max(...subPipeLengths);
+            totalSubPipeLength = subPipeLengths.reduce((sum, length) => sum + length, 0);
+        }
+
+        // Calculate combined metrics
+        const maxTotalPipeLength = maxMainPipeLength + maxSubPipeLength;
+        const totalPipeLength = totalMainPipeLength + totalSubPipeLength;
+
+        return {
+            maxMainPipeLength: Math.round(maxMainPipeLength * 100) / 100,
+            maxSubPipeLength: Math.round(maxSubPipeLength * 100) / 100,
+            maxTotalPipeLength: Math.round(maxTotalPipeLength * 100) / 100,
+            totalMainPipeLength: Math.round(totalMainPipeLength * 100) / 100,
+            totalSubPipeLength: Math.round(totalSubPipeLength * 100) / 100,
+            totalPipeLength: Math.round(totalPipeLength * 100) / 100,
+            pumps: elements.filter((e) => e.type === 'pump').length,
+            solenoidValves: elements.filter((e) => e.type === 'solenoid-valve').length,
+            ballValves: elements.filter((e) => e.type === 'ball-valve').length,
+            sprinklers: elements.filter((e) => e.type === 'sprinkler').length,
+            dripLines: elements.filter((e) => e.type === 'drip-line').length,
+        };
+    };
+
+    const irrigationMetrics = calculateIrrigationMetrics();
+
+    // Helper function to draw component shapes (irrigation equipment)
     const drawComponentShape = (
         ctx: CanvasRenderingContext2D,
         type: string,
@@ -440,126 +872,6 @@ export default function GreenhouseSummary() {
         });
     };
 
-    // Calculate metrics from shapes data (ปรับปรุงใหม่)
-    const calculateMetrics = () => {
-        if (!summaryData?.shapes)
-            return {
-                shapeTypeCount: 0,
-                greenhouseArea: 0,
-                plotArea: 0,
-                plotCount: 0,
-                waterSourceCount: 0,
-                walkwayArea: 0,
-            };
-
-        const shapes = summaryData.shapes;
-        const greenhouses = shapes.filter((s) => s.type === 'greenhouse');
-        const plots = shapes.filter((s) => s.type === 'plot');
-        const walkways = shapes.filter((s) => s.type === 'walkway');
-        const waterSources = shapes.filter((s) => s.type === 'water-source');
-
-        // Get unique shape types
-        const shapeTypes = new Set(shapes.map((s) => s.type));
-        const shapeTypeCount = shapeTypes.size;
-
-        // Calculate polygon area using Shoelace formula (1 grid = 25 pixels = 1 meter)
-        const calculatePolygonArea = (points: { x: number; y: number }[]) => {
-            if (points.length < 3) return 0;
-            let area = 0;
-            for (let i = 0; i < points.length; i++) {
-                const j = (i + 1) % points.length;
-                area += points[i].x * points[j].y;
-                area -= points[j].x * points[i].y;
-            }
-            // Convert from pixels to square meters (25 pixels = 1 meter, so 625 pixels² = 1 m²)
-            return Math.abs(area / 2) / 625;
-        };
-
-        const greenhouseArea = greenhouses.reduce(
-            (sum, gh) => sum + calculatePolygonArea(gh.points),
-            0
-        );
-        const plotArea = plots.reduce((sum, plot) => sum + calculatePolygonArea(plot.points), 0);
-        const walkwayArea = walkways.reduce(
-            (sum, walkway) => sum + calculatePolygonArea(walkway.points),
-            0
-        );
-
-        return {
-            shapeTypeCount,
-            greenhouseArea: Math.round(greenhouseArea * 100) / 100, // Round to 2 decimal places
-            plotArea: Math.round(plotArea * 100) / 100,
-            plotCount: plots.length,
-            waterSourceCount: waterSources.length,
-            walkwayArea: Math.round(walkwayArea * 100) / 100,
-        };
-    };
-
-    const metrics = calculateMetrics();
-
-    // Calculate irrigation equipment from irrigationElements (ปรับปรุงใหม่)
-    const calculateIrrigationMetrics = () => {
-        if (!summaryData?.irrigationElements) {
-            console.log('Summary: No irrigation elements found');
-            return {
-                maxMainPipeLength: 0,
-                maxSubPipeLength: 0,
-                pumps: 0,
-                solenoidValves: 0,
-                ballValves: 0,
-                sprinklers: 0,
-                dripLines: 0,
-            };
-        }
-
-        const elements = summaryData.irrigationElements;
-        console.log('Summary: Calculating metrics for irrigation elements:', elements);
-
-        // Calculate pipe length
-        const calculatePipeLength = (points: Point[]) => {
-            if (points.length < 2) return 0;
-            let totalLength = 0;
-            for (let i = 0; i < points.length - 1; i++) {
-                const p1 = points[i];
-                const p2 = points[i + 1];
-                const segmentLength = Math.sqrt(
-                    Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2)
-                );
-                totalLength += segmentLength;
-            }
-            // Convert from pixels to meters (25 pixels = 1 meter)
-            return totalLength / 25;
-        };
-
-        // Find longest main pipe
-        const mainPipes = elements.filter((e) => e.type === 'main-pipe');
-        let maxMainPipeLength = 0;
-        if (mainPipes.length > 0) {
-            const mainPipeLengths = mainPipes.map((pipe) => calculatePipeLength(pipe.points));
-            maxMainPipeLength = Math.max(...mainPipeLengths);
-        }
-
-        // Find longest sub pipe
-        const subPipes = elements.filter((e) => e.type === 'sub-pipe');
-        let maxSubPipeLength = 0;
-        if (subPipes.length > 0) {
-            const subPipeLengths = subPipes.map((pipe) => calculatePipeLength(pipe.points));
-            maxSubPipeLength = Math.max(...subPipeLengths);
-        }
-
-        return {
-            maxMainPipeLength: Math.round(maxMainPipeLength * 100) / 100, // Round to 2 decimal places
-            maxSubPipeLength: Math.round(maxSubPipeLength * 100) / 100,
-            pumps: elements.filter((e) => e.type === 'pump').length,
-            solenoidValves: elements.filter((e) => e.type === 'solenoid-valve').length,
-            ballValves: elements.filter((e) => e.type === 'ball-valve').length,
-            sprinklers: elements.filter((e) => e.type === 'sprinkler').length,
-            dripLines: elements.filter((e) => e.type === 'drip-line').length,
-        };
-    };
-
-    const irrigationMetrics = calculateIrrigationMetrics();
-
     // Simple print function that shows browser print dialog
     const handlePrint = () => {
         // Simply trigger the browser's print dialog
@@ -571,7 +883,7 @@ export default function GreenhouseSummary() {
         alert('ฟีเจอร์การบันทึกข้อมูลยังอยู่ระหว่างการพัฒนา กรุณารอการอัพเดทในเวอร์ชันถัดไป');
     };
 
-    // Update canvas when data changes (ปรับปรุงใหม่)
+    // Update canvas when data changes
     useEffect(() => {
         const canvas = canvasRef.current;
         if (canvas && summaryData) {
@@ -580,8 +892,8 @@ export default function GreenhouseSummary() {
                 canvas.width = 600;
                 canvas.height = 400;
 
-                // Clear canvas
-                ctx.fillStyle = '#F3F4F6';
+                // Clear canvas with black background
+                ctx.fillStyle = '#000000';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
                 // Calculate bounds of all elements
@@ -762,7 +1074,7 @@ export default function GreenhouseSummary() {
                 }
             }
         }
-    }, [summaryData, componentImages]); // เพิ่ม componentImages เป็น dependency
+    }, [summaryData, componentImages]);
 
     // Show loading or no data message
     if (!summaryData) {
@@ -902,7 +1214,7 @@ export default function GreenhouseSummary() {
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 print:grid-cols-1 print:gap-4">
                         {/* Project Overview & Equipment Info - หน้าที่ 1 สำหรับการพิมพ์ */}
                         <div className="print:page-break-after-avoid space-y-4 print:space-y-4">
-                            {/* Project Overview - ปรับปรุงใหม่ */}
+                            {/* Project Overview */}
                             <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-4">
                                 <h2 className="mb-3 text-lg font-bold text-green-400 print:text-lg print:text-black">
                                     🏠 ภาพรวมโครงการ
@@ -1012,24 +1324,25 @@ export default function GreenhouseSummary() {
                                 </div>
                             </div>
 
-                            {/* Equipment Summary - ปรับปรุงใหม่ */}
+                            {/* Enhanced Equipment Summary */}
                             <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-4">
                                 <h2 className="mb-3 text-lg font-bold text-purple-400 print:text-lg print:text-black">
                                     ⚙️ สรุปอุปกรณ์การให้น้ำ
                                 </h2>
 
-                                {/* Pipe System - ปรับปรุงใหม่ */}
+                                {/* Pipe System - Enhanced with 6 rows */}
                                 <div className="mb-3">
                                     <h3 className="mb-2 text-sm font-semibold text-orange-400 print:text-sm print:text-black">
                                         🔵 ระบบท่อ
                                     </h3>
-                                    <div className="grid grid-cols-1 gap-2 print:gap-3">
+                                    {/* First row: Max pipe lengths */}
+                                    <div className="grid grid-cols-3 gap-1 mb-2 print:gap-2">
                                         <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                             <div className="text-sm font-bold text-blue-400 print:text-sm print:text-black">
                                                 {irrigationMetrics.maxMainPipeLength.toFixed(1)} ม.
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                ความยาวท่อเมนสูงสุด
+                                                ท่อเมนสูงสุด
                                             </div>
                                         </div>
                                         <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
@@ -1037,7 +1350,42 @@ export default function GreenhouseSummary() {
                                                 {irrigationMetrics.maxSubPipeLength.toFixed(1)} ม.
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                ความยาวท่อย่อยสูงสุด
+                                                ท่อย่อยสูงสุด
+                                            </div>
+                                        </div>
+                                        <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
+                                            <div className="text-sm font-bold text-purple-400 print:text-sm print:text-black">
+                                                {irrigationMetrics.maxTotalPipeLength.toFixed(1)} ม.
+                                            </div>
+                                            <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
+                                                ความยาวสูงสุดรวม
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {/* Second row: Total pipe lengths */}
+                                    <div className="grid grid-cols-3 gap-1 print:gap-2">
+                                        <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
+                                            <div className="text-sm font-bold text-cyan-400 print:text-sm print:text-black">
+                                                {irrigationMetrics.totalMainPipeLength.toFixed(1)} ม.
+                                            </div>
+                                            <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
+                                                ท่อเมนทั้งหมด
+                                            </div>
+                                        </div>
+                                        <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
+                                            <div className="text-sm font-bold text-yellow-400 print:text-sm print:text-black">
+                                                {irrigationMetrics.totalSubPipeLength.toFixed(1)} ม.
+                                            </div>
+                                            <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
+                                                ท่อย่อยทั้งหมด
+                                            </div>
+                                        </div>
+                                        <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
+                                            <div className="text-sm font-bold text-pink-400 print:text-sm print:text-black">
+                                                {irrigationMetrics.totalPipeLength.toFixed(1)} ม.
+                                            </div>
+                                            <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
+                                                ความยาวรวมทั้งหมด
                                             </div>
                                         </div>
                                     </div>
@@ -1182,6 +1530,7 @@ export default function GreenhouseSummary() {
                                             วาล์ว สปริงเกลอร์
                                         </p>
                                         <p>• ขนาดและตำแหน่งอาจต้องปรับตามสภาพพื้นที่จริง</p>
+                                        <p>• ความยาวท่อทั้งหมด: {irrigationMetrics.totalPipeLength.toFixed(1)} เมตร</p>
                                     </div>
                                 </div>
                             </div>
@@ -1192,23 +1541,106 @@ export default function GreenhouseSummary() {
                                     <h3 className="mb-3 text-sm font-bold text-black">
                                         🌱 ข้อมูลการปลูก
                                     </h3>
-                                    <div className="space-y-2">
-                                        {summaryData?.selectedCrops?.map((crop, index) => (
-                                            <div
-                                                key={index}
-                                                className="flex items-center justify-between border-b border-gray-200 pb-1"
-                                            >
-                                                <span className="text-sm text-gray-700">
-                                                    🌿 {crop}
-                                                </span>
-                                                <span className="text-xs text-gray-500">
-                                                    สภาพแวดล้อมควบคุม
-                                                </span>
-                                            </div>
-                                        )) || (
-                                            <p className="text-sm text-gray-500">
-                                                ยังไม่ได้เลือกพืช
-                                            </p>
+                                    <div className="space-y-3">
+                                        {plotPipeData.length > 0 ? (
+                                            plotPipeData.map((plot, index) => (
+                                                <div key={index} className="border-b border-gray-200 pb-3">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <span className="text-sm font-semibold text-gray-700">
+                                                            {getCropIcon(plot.cropType)} {plot.plotName}
+                                                        </span>
+                                                        <span className="text-xs text-gray-500">
+                                                            สภาพแวดล้อมควบคุม
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-xs text-gray-600 mb-2">
+                                                        พืชที่ปลูก: {plot.cropType}
+                                                    </p>
+                                                    
+                                                    {plot.hasPipes ? (
+                                                        <div className="space-y-2">
+                                                            <div className="grid grid-cols-3 gap-2">
+                                                                <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                                    <div className="text-xs font-bold text-black">
+                                                                        {plot.maxMainPipeLength.toFixed(1)} ม.
+                                                                    </div>
+                                                                    <div className="text-xs text-gray-600">
+                                                                        ท่อเมนสูงสุด
+                                                                    </div>
+                                                                </div>
+                                                                <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                                    <div className="text-xs font-bold text-black">
+                                                                        {plot.maxSubPipeLength.toFixed(1)} ม.
+                                                                    </div>
+                                                                    <div className="text-xs text-gray-600">
+                                                                        ท่อย่อยสูงสุด
+                                                                    </div>
+                                                                </div>
+                                                                <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                                    <div className="text-xs font-bold text-black">
+                                                                        {plot.maxTotalPipeLength.toFixed(1)} ม.
+                                                                    </div>
+                                                                    <div className="text-xs text-gray-600">
+                                                                        รวมสูงสุด
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="grid grid-cols-3 gap-2">
+                                                                <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                                    <div className="text-xs font-bold text-black">
+                                                                        {plot.totalMainPipeLength.toFixed(1)} ม.
+                                                                    </div>
+                                                                    <div className="text-xs text-gray-600">
+                                                                        ท่อเมนทั้งหมด
+                                                                    </div>
+                                                                </div>
+                                                                <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                                    <div className="text-xs font-bold text-black">
+                                                                        {plot.totalSubPipeLength.toFixed(1)} ม.
+                                                                    </div>
+                                                                    <div className="text-xs text-gray-600">
+                                                                        ท่อย่อยทั้งหมด
+                                                                    </div>
+                                                                </div>
+                                                                <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                                    <div className="text-xs font-bold text-black">
+                                                                        {plot.totalPipeLength.toFixed(1)} ม.
+                                                                    </div>
+                                                                    <div className="text-xs text-gray-600">
+                                                                        รวมทั้งหมด
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-center p-2 bg-gray-50 border border-gray-200">
+                                                            <span className="text-xs text-gray-600">
+                                                                ไม่มีระบบท่อในแปลงนี้
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <>
+                                                {summaryData?.selectedCrops?.map((crop, index) => (
+                                                    <div
+                                                        key={index}
+                                                        className="flex items-center justify-between border-b border-gray-200 pb-1"
+                                                    >
+                                                        <span className="text-sm text-gray-700">
+                                                            {getCropIcon(crop)} {crop}
+                                                        </span>
+                                                        <span className="text-xs text-gray-500">
+                                                            สภาพแวดล้อมควบคุม
+                                                        </span>
+                                                    </div>
+                                                )) || (
+                                                    <p className="text-sm text-gray-500">
+                                                        ยังไม่ได้เลือกพืช
+                                                    </p>
+                                                )}
+                                            </>
                                         )}
                                     </div>
                                 </div>
@@ -1219,80 +1651,122 @@ export default function GreenhouseSummary() {
                                 <h2 className="mb-3 text-lg font-bold text-yellow-400">
                                     🌱 ข้อมูลการปลูก
                                 </h2>
-                                <div className="space-y-2">
-                                    {summaryData?.selectedCrops?.map((crop, index) => (
-                                        <div key={index} className="rounded-lg bg-gray-700 p-2">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center space-x-2">
-                                                    <span className="text-lg">🌿</span>
-                                                    <div>
-                                                        <h3 className="text-sm font-semibold text-white">
-                                                            {crop}
-                                                        </h3>
+                                <div className="space-y-3">
+                                    {plotPipeData.length > 0 ? (
+                                        plotPipeData.map((plot, index) => (
+                                            <div key={index} className="rounded-lg bg-gray-700 p-3">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <div className="flex items-center space-x-2">
+                                                        <span className="text-lg">{getCropIcon(plot.cropType)}</span>
+                                                        <div>
+                                                            <h3 className="text-sm font-semibold text-white">
+                                                                {plot.plotName}
+                                                            </h3>
+                                                            <p className="text-xs text-gray-400">
+                                                                พืชที่ปลูก: {plot.cropType}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className="text-xs text-gray-400">
+                                                            สภาพแวดล้อมควบคุม
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div className="text-right">
-                                                    <div className="text-xs text-gray-400">
-                                                        สภาพแวดล้อมควบคุม
+                                                
+                                                {plot.hasPipes ? (
+                                                    <div className="mt-2 space-y-2">
+                                                        <div className="grid grid-cols-3 gap-2">
+                                                            <div className="rounded bg-gray-600 p-2 text-center">
+                                                                <div className="text-xs font-bold text-blue-400">
+                                                                    {plot.maxMainPipeLength.toFixed(1)} ม.
+                                                                </div>
+                                                                <div className="text-xs text-gray-400">
+                                                                    ท่อเมนสูงสุด
+                                                                </div>
+                                                            </div>
+                                                            <div className="rounded bg-gray-600 p-2 text-center">
+                                                                <div className="text-xs font-bold text-green-400">
+                                                                    {plot.maxSubPipeLength.toFixed(1)} ม.
+                                                                </div>
+                                                                <div className="text-xs text-gray-400">
+                                                                    ท่อย่อยสูงสุด
+                                                                </div>
+                                                            </div>
+                                                            <div className="rounded bg-gray-600 p-2 text-center">
+                                                                <div className="text-xs font-bold text-purple-400">
+                                                                    {plot.maxTotalPipeLength.toFixed(1)} ม.
+                                                                </div>
+                                                                <div className="text-xs text-gray-400">
+                                                                    รวมสูงสุด
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="grid grid-cols-3 gap-2">
+                                                            <div className="rounded bg-gray-600 p-2 text-center">
+                                                                <div className="text-xs font-bold text-cyan-400">
+                                                                    {plot.totalMainPipeLength.toFixed(1)} ม.
+                                                                </div>
+                                                                <div className="text-xs text-gray-400">
+                                                                    ท่อเมนทั้งหมด
+                                                                </div>
+                                                            </div>
+                                                            <div className="rounded bg-gray-600 p-2 text-center">
+                                                                <div className="text-xs font-bold text-yellow-400">
+                                                                    {plot.totalSubPipeLength.toFixed(1)} ม.
+                                                                </div>
+                                                                <div className="text-xs text-gray-400">
+                                                                    ท่อย่อยทั้งหมด
+                                                                </div>
+                                                            </div>
+                                                            <div className="rounded bg-gray-600 p-2 text-center">
+                                                                <div className="text-xs font-bold text-pink-400">
+                                                                    {plot.totalPipeLength.toFixed(1)} ม.
+                                                                </div>
+                                                                <div className="text-xs text-gray-400">
+                                                                    รวมทั้งหมด
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                </div>
+                                                ) : (
+                                                    <div className="mt-2 text-center p-2 bg-gray-600 rounded">
+                                                        <span className="text-xs text-gray-400">
+                                                            ไม่มีระบบท่อในแปลงนี้
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
-                                        </div>
-                                    ))}
-                                    {(!summaryData?.selectedCrops ||
-                                        summaryData.selectedCrops.length === 0) && (
-                                        <div className="rounded-lg bg-gray-700 p-2 text-center">
-                                            <span className="text-sm text-gray-400">
-                                                ยังไม่ได้เลือกพืช
-                                            </span>
-                                        </div>
+                                        ))
+                                    ) : (
+                                        <>
+                                            {summaryData?.selectedCrops?.map((crop, index) => (
+                                                <div key={index} className="rounded-lg bg-gray-700 p-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center space-x-2">
+                                                            <span className="text-lg">{getCropIcon(crop)}</span>
+                                                            <div>
+                                                                <h3 className="text-sm font-semibold text-white">
+                                                                    {crop}
+                                                                </h3>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className="text-xs text-gray-400">
+                                                                สภาพแวดล้อมควบคุม
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )) || (
+                                                <div className="rounded-lg bg-gray-700 p-2 text-center">
+                                                    <span className="text-sm text-gray-400">
+                                                        ยังไม่ได้เลือกพืช
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </>
                                     )}
-                                </div>
-                            </div>
-
-                            {/* System Specifications - แสดงในหน้าจอปกติ */}
-                            <div className="rounded-lg bg-gray-800 p-4 print:hidden">
-                                <h2 className="mb-3 text-lg font-bold text-orange-400">
-                                    🔧 สรุปรายละเอียดระบบ
-                                </h2>
-                                <div className="space-y-2">
-                                    <div className="rounded-lg bg-gray-700 p-2">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm text-gray-400">
-                                                โครงสร้างโรงเรือน
-                                            </span>
-                                            <span className="text-sm font-bold text-blue-400">
-                                                {summaryData?.shapes?.filter(
-                                                    (s) => s.type === 'greenhouse'
-                                                ).length || 0}{' '}
-                                                หลัง
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div className="rounded-lg bg-gray-700 p-2">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm text-gray-400">
-                                                จำนวนแปลงปลูก
-                                            </span>
-                                            <span className="text-sm font-bold text-green-400">
-                                                {metrics.plotCount} แปลง
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div className="rounded-lg bg-gray-700 p-2">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm text-gray-400">
-                                                อุปกรณ์ทั้งหมด
-                                            </span>
-                                            <span className="text-sm font-bold text-yellow-400">
-                                                {Object.values(irrigationMetrics).reduce(
-                                                    (sum, count) => sum + count,
-                                                    0
-                                                )}{' '}
-                                                ชิ้น
-                                            </span>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
 

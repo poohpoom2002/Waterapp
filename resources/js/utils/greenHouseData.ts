@@ -438,22 +438,25 @@ export const calculatePaybackPeriod = (totalCost: number, annualProfit: number):
 export const convertLegacyData = (legacyData: unknown): GreenhousePlanningData => {
     const now = new Date().toISOString();
     const data = legacyData as Record<string, unknown>;
+    const safePlanningMethod = (val: any): 'draw' | 'import' => (val === 'draw' || val === 'import') ? val : 'draw';
+    const safeIrrigationMethod = (val: any): 'mini-sprinkler' | 'drip' | 'mixed' =>
+        val === 'mini-sprinkler' || val === 'drip' || val === 'mixed' ? val : 'mini-sprinkler';
 
     return {
         projectInfo: {
             name: (data.projectName as string) || 'Greenhouse Project',
             description: (data.description as string) || 'Greenhouse planning project',
-            planningMethod: (data.planningMethod as string) || 'draw',
+            planningMethod: safePlanningMethod(data.planningMethod),
             createdAt: (data.createdAt as string) || now,
             updatedAt: now,
         },
         crops: {
-            selectedCrops: (data.selectedCrops as unknown[]) || [],
-            assignments: (data.assignments as unknown[]) || [],
-            totalCropTypes: (data.selectedCrops as unknown[])?.length || 0,
+            selectedCrops: (data.selectedCrops as string[]) || [],
+            assignments: (data.assignments as CropAssignment[]) || [],
+            totalCropTypes: ((data.selectedCrops as string[])?.length) || 0,
         },
         structures: {
-            shapes: (data.shapes as unknown[]) || [],
+            shapes: (data.shapes as Shape[]) || [],
             area: {
                 totalArea: (data.totalArea as number) || 0,
                 greenhouseArea: (data.greenhouseArea as number) || 0,
@@ -462,17 +465,17 @@ export const convertLegacyData = (legacyData: unknown): GreenhousePlanningData =
                 waterSourceArea: (data.waterSourceArea as number) || 0,
                 utilizationRate: (data.utilizationRate as number) || 0,
             },
-            totalStructures: (data.shapes as unknown[])?.length || 0,
+            totalStructures: ((data.shapes as Shape[])?.length) || 0,
         },
         irrigation: {
             systemInfo: {
-                method: (data.irrigationMethod as string) || 'mini-sprinkler',
+                method: safeIrrigationMethod(data.irrigationMethod),
                 totalWaterFlow: (data.totalWaterFlow as number) || 0,
                 operatingPressure: (data.operatingPressure as number) || 2.0,
                 coverage: (data.coverage as number) || 0,
                 efficiency: (data.efficiency as number) || 85,
             },
-            elements: (data.irrigationElements as unknown[]) || [],
+            elements: (data.irrigationElements as IrrigationElement[]) || [],
             equipment: {
                 mainPipes: 0,
                 subPipes: 0,
@@ -486,25 +489,25 @@ export const convertLegacyData = (legacyData: unknown): GreenhousePlanningData =
             },
         },
         financial: {
-            materialCost: legacyData.materialCost || 0,
-            laborCost: legacyData.laborCost || 0,
-            equipmentCost: legacyData.equipmentCost || 0,
-            installationCost: legacyData.installationCost || 0,
-            totalCost: legacyData.totalCost || 0,
-            estimatedRevenue: legacyData.estimatedRevenue || 0,
-            estimatedProfit: legacyData.estimatedProfit || 0,
-            paybackPeriod: legacyData.paybackPeriod || 0,
+            materialCost: (legacyData as any).materialCost || 0,
+            laborCost: (legacyData as any).laborCost || 0,
+            equipmentCost: (legacyData as any).equipmentCost || 0,
+            installationCost: (legacyData as any).installationCost || 0,
+            totalCost: (legacyData as any).totalCost || 0,
+            estimatedRevenue: (legacyData as any).estimatedRevenue || 0,
+            estimatedProfit: (legacyData as any).estimatedProfit || 0,
+            paybackPeriod: (legacyData as any).paybackPeriod || 0,
         },
         production: {
-            totalPlants: legacyData.totalPlants || 0,
-            estimatedYield: legacyData.estimatedYield || 0,
-            harvestsPerYear: legacyData.harvestsPerYear || 1,
-            annualProduction: legacyData.annualProduction || 0,
-            productionValue: legacyData.productionValue || 0,
+            totalPlants: (legacyData as any).totalPlants || 0,
+            estimatedYield: (legacyData as any).estimatedYield || 0,
+            harvestsPerYear: (legacyData as any).harvestsPerYear || 1,
+            annualProduction: (legacyData as any).annualProduction || 0,
+            productionValue: (legacyData as any).productionValue || 0,
         },
         visualization: {
-            canvasData: legacyData.canvasData,
-            irrigationCanvasData: legacyData.irrigationCanvasData,
+            canvasData: (legacyData as any).canvasData,
+            irrigationCanvasData: (legacyData as any).irrigationCanvasData,
         },
     };
 };
