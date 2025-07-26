@@ -1,7 +1,7 @@
 // @/pages/utils/fieldCropData.ts
 
 import * as turf from '@turf/turf';
-import { getCropByValue, type Crop } from '@/pages/utils/cropData'; // สมมติว่ามีการ export Crop type
+import { getCropByValue, type Crop } from '@/pages/utils/cropData'; // FIXED: Use relative path
 
 // --- Interfaces and Type Definitions ---
 

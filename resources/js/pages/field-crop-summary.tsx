@@ -15,7 +15,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import * as turf from '@turf/turf';
 import { getCropByValue } from '@/pages/utils/cropData';
-// Fanggy005 EDIT: Import helpers from fieldCropData
+// FIXED: Import helpers from fieldCropData with correct path
 import { calculateAllFieldStats, saveFieldCropData, FieldCropData } from '@/utils/fieldCropData';
 import {
     ZONE_COLORS,
