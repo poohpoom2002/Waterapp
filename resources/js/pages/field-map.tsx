@@ -436,17 +436,17 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
             <div ref={ref} style={{ width: '100%', height: '100%' }} />
 
             {/* Drawing Controls Overlay */}
-            <div className="absolute left-2 top-2 z-10 max-w-xs rounded-md bg-white p-2 shadow-md">
+            <div className="absolute left-2 top-2 z-10 max-w-xs rounded-md border border-white p-2 shadow-md" style={{backgroundColor: '#000005'}}>
                 {/* Step 1: Field Drawing */}
                 {drawingStage === 'field' && (
                     <div className="flex flex-col space-y-1">
-                        <div className="text-xs font-semibold text-gray-700">
+                        <div className="text-xs font-semibold text-white">
                             Step 1: Draw Field
                         </div>
                         <button
                             onClick={() => startDrawing('polygon')}
                             disabled={currentDrawingMode !== null}
-                            className={`rounded px-2 py-1 text-xs ${
+                            className={`rounded border border-white px-2 py-1 text-xs transition-colors ${
                                 currentDrawingMode === google.maps.drawing.OverlayType.POLYGON
                                     ? 'bg-green-600 text-white'
                                     : 'bg-green-500 text-white hover:bg-green-600'
@@ -460,7 +460,7 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                         {currentDrawingMode && (
                             <button
                                 onClick={stopDrawing}
-                                className="rounded bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
+                                className="rounded border border-white bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
                             >
                                 ❌ Cancel
                             </button>
@@ -471,7 +471,7 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                 {/* Step 2: Zones & Obstacles */}
                 {drawingStage === 'zones' && (
                     <div className="flex flex-col space-y-1">
-                        <div className="text-xs font-semibold text-gray-700">
+                        <div className="text-xs font-semibold text-white">
                             Step 2: Zones & Obstacles
                         </div>
 
@@ -479,7 +479,7 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                             <button
                                 onClick={() => startDrawing('polygon')}
                                 disabled={currentDrawingMode !== null}
-                                className={`rounded px-2 py-1 text-xs ${
+                                className={`rounded border border-white px-2 py-1 text-xs transition-colors ${
                                     currentDrawingMode === google.maps.drawing.OverlayType.POLYGON
                                         ? 'bg-blue-600 text-white'
                                         : 'bg-blue-500 text-white hover:bg-blue-600'
@@ -496,7 +496,7 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                             <button
                                 onClick={() => startDrawing('polygon')}
                                 disabled={currentDrawingMode !== null}
-                                className={`rounded px-2 py-1 text-xs ${
+                                className={`rounded border border-white px-2 py-1 text-xs transition-colors ${
                                     currentDrawingMode === google.maps.drawing.OverlayType.POLYGON
                                         ? 'bg-red-600 text-white'
                                         : 'bg-red-500 text-white hover:bg-red-600'
@@ -512,7 +512,7 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                         {currentDrawingMode && (
                             <button
                                 onClick={stopDrawing}
-                                className="rounded bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
+                                className="rounded border border-white bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
                             >
                                 ❌ Cancel
                             </button>
@@ -523,13 +523,13 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                 {/* Step 3: Pipes */}
                 {drawingStage === 'pipes' && canDrawPipe && (
                     <div className="flex flex-col space-y-1">
-                        <div className="text-xs font-semibold text-gray-700">
+                        <div className="text-xs font-semibold text-white">
                             Step 3: Pipe System
                         </div>
                         <button
                             onClick={() => startDrawing('polyline')}
                             disabled={currentDrawingMode !== null}
-                            className={`rounded px-2 py-1 text-xs ${
+                            className={`rounded border border-white px-2 py-1 text-xs transition-colors ${
                                 currentDrawingMode === google.maps.drawing.OverlayType.POLYLINE
                                     ? 'bg-purple-600 text-white'
                                     : 'bg-purple-500 text-white hover:bg-purple-600'
@@ -543,7 +543,7 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                         {currentDrawingMode && (
                             <button
                                 onClick={stopDrawing}
-                                className="rounded bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
+                                className="rounded border border-white bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
                             >
                                 ❌ Cancel
                             </button>
@@ -554,10 +554,10 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                 {/* Equipment Placement Mode */}
                 {isPlacingEquipment && selectedEquipmentType && (
                     <div className="flex flex-col space-y-1">
-                        <div className="text-xs font-semibold text-gray-700">
+                        <div className="text-xs font-semibold text-white">
                             Equipment Placement
                         </div>
-                        <div className="rounded bg-yellow-100 px-2 py-1 text-xs text-yellow-800">
+                        <div className="rounded border border-white bg-yellow-100 px-2 py-1 text-xs text-yellow-800">
                             {EQUIPMENT_TYPES[selectedEquipmentType].icon} Click to place{' '}
                             {EQUIPMENT_TYPES[selectedEquipmentType].name}
                         </div>
@@ -713,6 +713,29 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
     const [plantingPoints, setPlantingPoints] = useState<any[]>([]);
     const [zoneSummaries, setZoneSummaries] = useState<Record<string, any>>({});
     
+    // Create equipment marker icon with container
+    const createEquipmentMarkerIcon = useCallback((equipmentType: EquipmentType, equipmentConfig: any) => {
+        // Use icons for all equipment types instead of images
+        const svg = `
+            <svg width="50" height="50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">
+                <defs>
+                    <filter id="equipment-shadow-${Date.now()}" x="-20%" y="-20%" width="140%" height="140%">
+                        <feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.3)"/>
+                    </filter>
+                </defs>
+                <circle cx="25" cy="25" r="23" fill="white" stroke="${equipmentConfig.color || '#4F46E5'}" stroke-width="3" filter="url(#equipment-shadow-${Date.now()})"/>
+                <text x="25" y="32" text-anchor="middle" font-size="24" fill="${equipmentConfig.color || '#4F46E5'}" font-family="Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif">${equipmentConfig.icon || '🔧'}</text>
+            </svg>
+        `;
+
+        const encodedSvg = encodeURIComponent(svg).replace(/'/g, '%27').replace(/"/g, '%22');
+
+        return {
+            url: `data:image/svg+xml;charset=UTF-8,${encodedSvg}`,
+            scaledSize: new google.maps.Size(50, 50),
+            anchor: new google.maps.Point(25, 25),
+        };
+    }, []);
 
     // Error handling and loading states
     const [error, setError] = useState<string | null>(null);
@@ -986,53 +1009,12 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     config: equipmentConfig,
                 };
 
-                // Create marker icon
-                const createMarkerIcon = () => {
-                    if (
-                        selectedEquipmentType === 'pump' ||
-                        selectedEquipmentType === 'ballvalve' ||
-                        selectedEquipmentType === 'solenoid'
-                    ) {
-                        let imgSrc = '';
-                        if (selectedEquipmentType === 'pump') {
-                            imgSrc = './generateTree/wtpump.png';
-                        }
-                        if (selectedEquipmentType === 'ballvalve') {
-                            imgSrc = './generateTree/ballv.png';
-                        }
-                        if (selectedEquipmentType === 'solenoid') {
-                            imgSrc = './generateTree/solv.png';
-                        }
-
-                        return {
-                            url: imgSrc,
-                            scaledSize: new google.maps.Size(40, 40),
-                            anchor: new google.maps.Point(20, 20),
-                            optimized: false,
-                        };
-                    } else {
-                        const svg = `
-                        <svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="20" cy="20" r="18" fill="white" stroke="${equipmentConfig.color || '#4F46E5'}" stroke-width="2"/>
-                            <text x="20" y="26" text-anchor="middle" font-size="20" fill="${equipmentConfig.color || '#4F46E5'}">${equipmentConfig.icon || '🔧'}</text>
-                        </svg>
-                    `;
-
-                        return {
-                            url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-                            scaledSize: new google.maps.Size(40, 40),
-                            anchor: new google.maps.Point(20, 20),
-                            optimized: false,
-                        };
-                    }
-                };
-
                 // Create marker
                 const marker = new google.maps.Marker({
                     position: { lat, lng },
                     map: map,
                     title: equipmentConfig.name,
-                    icon: createMarkerIcon(),
+                    icon: createEquipmentMarkerIcon(selectedEquipmentType, equipmentConfig),
                     clickable: true,
                     optimized: false,
                     visible: true,
@@ -1096,6 +1078,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             setEquipmentHistoryIndex,
             equipmentHistoryIndex,
             handleError,
+            createEquipmentMarkerIcon,
         ]
     );
 
@@ -1315,15 +1298,32 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         ]
     );
 
-    // Clear all Google Maps objects
+    // Clear all zone labels efficiently
+    const clearAllZoneLabels = useCallback(() => {
+        zoneLabelsRef.current.forEach((marker) => {
+            if (marker && typeof marker.setMap === 'function') {
+                marker.setMap(null);
+            }
+        });
+        zoneLabelsRef.current = [];
+        setMapObjects((prev) => ({ ...prev, zoneLabels: [] }));
+    }, []);
+
+    // Clear all Google Maps objects - optimized
     const clearAllMapObjects = useCallback(() => {
-        Object.values(mapObjects)
-            .flat()
-            .forEach((obj: any) => {
-                if (obj && typeof obj.setMap === 'function') {
-                    obj.setMap(null);
-                }
-            });
+        // Clear zone labels using ref
+        clearAllZoneLabels();
+
+        // Clear other map objects
+        Object.entries(mapObjects).forEach(([key, objects]) => {
+            if (key !== 'zoneLabels' && Array.isArray(objects)) {
+                objects.forEach((obj: any) => {
+                    if (obj && typeof obj.setMap === 'function') {
+                        obj.setMap(null);
+                    }
+                });
+            }
+        });
 
         setMapObjects({
             zones: [],
@@ -1336,7 +1336,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             plantMarkers: [],
             zoneLabels: [],
         });
-    }, [mapObjects, setMapObjects]);
+    }, [clearAllZoneLabels]);
 
     const resetAll = useCallback(() => {
         if (confirm('⚠️ Reset all data? All drawn elements will be lost.')) {
@@ -1347,6 +1347,9 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             }
 
             clearAllMapObjects();
+            
+            // Clear zone labels ref
+            zoneLabelsRef.current = [];
 
             setMainField(null);
             setZones([]);
@@ -1454,39 +1457,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             restoredEquipment.forEach((equipment: Equipment) => {
                 if (map && equipment.lat && equipment.lng) {
                     const equipmentConfig = EQUIPMENT_TYPES[equipment.type as EquipmentType];
-                    let markerIcon;
-
-                    if (
-                        equipment.type === 'pump' ||
-                        equipment.type === 'ballvalve' ||
-                        equipment.type === 'solenoid'
-                    ) {
-                        let imgSrc = '';
-                        if (equipment.type === 'pump') imgSrc = './generateTree/wtpump.png';
-                        if (equipment.type === 'ballvalve') imgSrc = './generateTree/ballv.png';
-                        if (equipment.type === 'solenoid') imgSrc = './generateTree/solv.png';
-
-                        markerIcon = {
-                            url: imgSrc,
-                            scaledSize: new google.maps.Size(40, 40),
-                            anchor: new google.maps.Point(20, 20),
-                            optimized: false,
-                        };
-                    } else {
-                        const svg = `
-                            <svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="20" cy="20" r="18" fill="white" stroke="${equipmentConfig.color}" stroke-width="2"/>
-                                <text x="20" y="26" text-anchor="middle" font-size="20" fill="${equipmentConfig.color}">${equipmentConfig.icon}</text>
-                            </svg>
-                        `;
-
-                        markerIcon = {
-                            url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-                            scaledSize: new google.maps.Size(40, 40),
-                            anchor: new google.maps.Point(20, 20),
-                            optimized: false,
-                        };
-                    }
+                    const markerIcon = createEquipmentMarkerIcon(equipment.type as EquipmentType, equipmentConfig);
 
                     const marker = new google.maps.Marker({
                         position: { lat: equipment.lat, lng: equipment.lng },
@@ -1513,6 +1484,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         setEquipmentIcons,
         setEquipmentHistoryIndex,
         setMapObjects,
+        createEquipmentMarkerIcon,
     ]);
 
     // Redo equipment placement
@@ -1532,39 +1504,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             restoredEquipment.forEach((equipment: Equipment) => {
                 if (map && equipment.lat && equipment.lng) {
                     const equipmentConfig = EQUIPMENT_TYPES[equipment.type as EquipmentType];
-                    let markerIcon;
-
-                    if (
-                        equipment.type === 'pump' ||
-                        equipment.type === 'ballvalve' ||
-                        equipment.type === 'solenoid'
-                    ) {
-                        let imgSrc = '';
-                        if (equipment.type === 'pump') imgSrc = './generateTree/wtpump.png';
-                        if (equipment.type === 'ballvalve') imgSrc = './generateTree/ballv.png';
-                        if (equipment.type === 'solenoid') imgSrc = './generateTree/solv.png';
-
-                        markerIcon = {
-                            url: imgSrc,
-                            scaledSize: new google.maps.Size(40, 40),
-                            anchor: new google.maps.Point(20, 20),
-                            optimized: false,
-                        };
-                    } else {
-                        const svg = `
-                            <svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="20" cy="20" r="18" fill="white" stroke="${equipmentConfig.color}" stroke-width="2"/>
-                                <text x="20" y="26" text-anchor="middle" font-size="20" fill="${equipmentConfig.color}">${equipmentConfig.icon}</text>
-                            </svg>
-                        `;
-
-                        markerIcon = {
-                            url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-                            scaledSize: new google.maps.Size(40, 40),
-                            anchor: new google.maps.Point(20, 20),
-                            optimized: false,
-                        };
-                    }
+                    const markerIcon = createEquipmentMarkerIcon(equipment.type as EquipmentType, equipmentConfig);
 
                     const marker = new google.maps.Marker({
                         position: { lat: equipment.lat, lng: equipment.lng },
@@ -1591,6 +1531,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         setEquipmentIcons,
         setEquipmentHistoryIndex,
         setMapObjects,
+        createEquipmentMarkerIcon,
     ]);
 
     // Make removeEquipment available globally for InfoWindow buttons
@@ -1848,72 +1789,146 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         handleError,
     ]);
 
-    // Update zone label with crop icon
+    // Use ref to store zone labels to avoid re-renders
+    const zoneLabelsRef = useRef<google.maps.Marker[]>([]);
+
+    // Memoized SVG creation function
+    const createZoneLabelSVG = useCallback((zoneId: string, zoneColor: string, cropIcon: string) => {
+        return `<svg width="50" height="50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">
+            <defs>
+                <filter id="shadow-${zoneId}" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.3)"/>
+                </filter>
+            </defs>
+            <circle cx="25" cy="25" r="23" fill="white" stroke="${zoneColor}" stroke-width="3" filter="url(#shadow-${zoneId})"/>
+            <text x="25" y="32" text-anchor="middle" font-size="24" font-family="Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif">${cropIcon}</text>
+        </svg>`;
+    }, []);
+
+    // Update zone label with crop icon - optimized version
     const updateZoneLabel = useCallback(
         (zoneId: string, cropValue: string | null) => {
-            const zone = zones.find((z) => z.id.toString() === zoneId);
-            if (!zone || !zone.polygon || !map) return;
+            if (!map) return;
 
-            const existingLabel = mapObjects.zoneLabels.find(
-                (marker: any) => marker.zoneId === zoneId
+            const zone = zones.find((z) => z.id.toString() === zoneId);
+            if (!zone || !zone.polygon) return;
+
+            // Clear existing label first
+            const existingIndex = zoneLabelsRef.current.findIndex(
+                (marker: any) => marker?.zoneId === zoneId
             );
-            if (existingLabel) {
-                existingLabel.setMap(null);
-                setMapObjects((prev) => ({
-                    ...prev,
-                    zoneLabels: prev.zoneLabels.filter((m: any) => m.zoneId !== zoneId),
-                }));
+            if (existingIndex !== -1) {
+                const existingMarker = zoneLabelsRef.current[existingIndex];
+                if (existingMarker) {
+                    existingMarker.setMap(null);
+                    zoneLabelsRef.current.splice(existingIndex, 1);
+                }
             }
 
             if (cropValue) {
                 const crop = getCropByValue(cropValue);
-                if (crop) {
+                if (!crop) return;
+
+                try {
                     const bounds = new google.maps.LatLngBounds();
                     zone.coordinates.forEach((coord: Coordinate) => {
                         bounds.extend(new google.maps.LatLng(coord.lat, coord.lng));
                     });
                     const center = bounds.getCenter();
 
+                    const svgIcon = createZoneLabelSVG(zoneId, zone.color, crop.icon);
+                    const encodedSvg = encodeURIComponent(svgIcon).replace(/'/g, '%27').replace(/"/g, '%22');
+                    
                     const marker = new google.maps.Marker({
                         position: center,
                         map: map,
                         title: `${zone.name} - ${crop.name}`,
                         icon: {
-                            url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                            <svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="20" cy="20" r="18" fill="white" stroke="${zone.color}" stroke-width="2"/>
-                                <text x="20" y="26" text-anchor="middle" font-size="20">${crop.icon}</text>
-                            </svg>
-                        `)}`,
-                            scaledSize: new google.maps.Size(40, 40),
-                            anchor: new google.maps.Point(20, 20),
+                            url: `data:image/svg+xml;charset=UTF-8,${encodedSvg}`,
+                            scaledSize: new google.maps.Size(50, 50),
+                            anchor: new google.maps.Point(25, 25),
                         },
                         zIndex: 10,
+                        clickable: true,
+                    });
+
+                    // Add click listener for marker
+                    marker.addListener('click', () => {
+                        const infoWindow = new google.maps.InfoWindow({
+                            content: `
+                                <div style="text-align: center; padding: 10px; min-width: 150px;">
+                                    <div style="font-size: 24px; margin-bottom: 8px;">${crop.icon}</div>
+                                    <h4 style="margin: 0 0 4px 0; color: #333;">${zone.name}</h4>
+                                    <p style="margin: 0; color: #666; font-size: 14px;">${crop.name}</p>
+                                </div>
+                            `,
+                        });
+                        infoWindow.open(map, marker);
                     });
 
                     (marker as any).zoneId = zoneId;
+                    (marker as any).cropValue = cropValue;
 
+                    zoneLabelsRef.current.push(marker);
+
+                    // Update mapObjects state only when necessary
                     setMapObjects((prev) => ({
                         ...prev,
-                        zoneLabels: [...prev.zoneLabels, marker],
+                        zoneLabels: [...zoneLabelsRef.current],
                     }));
+
+                } catch (error) {
+                    console.error('Error creating zone label:', error);
                 }
             }
         },
-        [zones, map, mapObjects.zoneLabels, setMapObjects]
+        [zones, map, createZoneLabelSVG]
     );
 
+    // Restore zone labels function
+    const restoreZoneLabels = useCallback((zoneAssignments: any, restoredZones: Zone[]) => {
+        if (!map) return;
+
+        try {
+            // Clear existing zone labels
+            zoneLabelsRef.current.forEach((marker) => {
+                if (marker && typeof marker.setMap === 'function') {
+                    marker.setMap(null);
+                }
+            });
+            zoneLabelsRef.current = [];
+
+            // Create new zone labels for restored zones
+            restoredZones.forEach((zone) => {
+                const zoneId = zone.id.toString();
+                const cropValue = zoneAssignments[zoneId];
+                
+                if (cropValue) {
+                    updateZoneLabel(zoneId, cropValue);
+                }
+            });
+        } catch (error) {
+            console.error('Error restoring zone labels:', error);
+        }
+    }, [map, updateZoneLabel]);
+
+    // Debounced zone assignment handler
     const assignPlantToZone = useCallback(
         (zoneId: string, cropValue: string) => {
             setZoneAssignments((prev) => ({
                 ...prev,
                 [zoneId]: cropValue,
             }));
-            updateZoneLabel(zoneId, cropValue);
+            
+            // Use setTimeout to batch the zone label update
+            setTimeout(() => {
+                updateZoneLabel(zoneId, cropValue);
+            }, 50);
+            
             setShowPlantSelector(false);
             setSelectedZone(null);
         },
-        [setZoneAssignments, updateZoneLabel, setShowPlantSelector, setSelectedZone]
+        [updateZoneLabel, setZoneAssignments, setShowPlantSelector, setSelectedZone]
     );
 
     const removePlantFromZone = useCallback(
@@ -1923,9 +1938,13 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 delete newAssignments[zoneId];
                 return newAssignments;
             });
-            updateZoneLabel(zoneId, null);
+            
+            // Use setTimeout to batch the zone label update
+            setTimeout(() => {
+                updateZoneLabel(zoneId, null);
+            }, 50);
         },
-        [setZoneAssignments, updateZoneLabel]
+        [updateZoneLabel, setZoneAssignments]
     );
 
     const deleteZone = useCallback(
@@ -1938,7 +1957,17 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     zoneToDelete.polygon.setMap(null);
                 }
 
-                updateZoneLabel(zoneId, null);
+                // Remove zone label efficiently
+                const labelIndex = zoneLabelsRef.current.findIndex(
+                    (marker: any) => marker?.zoneId === zoneId
+                );
+                if (labelIndex !== -1) {
+                    const labelMarker = zoneLabelsRef.current[labelIndex];
+                    if (labelMarker) {
+                        labelMarker.setMap(null);
+                        zoneLabelsRef.current.splice(labelIndex, 1);
+                    }
+                }
 
                 setZones((prev) => prev.filter((zone) => zone.id.toString() !== zoneId));
                 setZoneAssignments((prev) => {
@@ -1948,9 +1977,15 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 });
 
                 setUsedColors((prev) => prev.filter((color) => color !== zoneToDelete.color));
+                
+                // Update mapObjects state
+                setMapObjects((prev) => ({
+                    ...prev,
+                    zoneLabels: [...zoneLabelsRef.current],
+                }));
             }
         },
-        [zones, setZones, setZoneAssignments, setUsedColors, updateZoneLabel]
+        [zones, setZones, setZoneAssignments, setUsedColors]
     );
 
     // Generate lateral pipes for specific zone
@@ -2709,39 +2744,9 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                             else { setCanDrawZone(false); }
                             setMapObjects((prev) => ({ ...prev, zones: zonePolygons }));
 
-                            // Restore Zone Labels
+                            // Restore Zone Labels - optimized
                             if (parsedData.zoneAssignments) {
-                                setTimeout(() => {
-                                    const zoneLabelsMarkers: google.maps.Marker[] = [];
-                                    Object.entries(parsedData.zoneAssignments).forEach(([zoneId, cropValue]: [string, any]) => {
-                                        const zone = restoredZones.find((z) => z.id.toString() === zoneId);
-                                        const crop = getCropByValue(cropValue);
-                                        if (zone && crop) {
-                                            const bounds = new google.maps.LatLngBounds();
-                                            zone.coordinates.forEach((coord: Coordinate) => {
-                                                bounds.extend(new google.maps.LatLng(coord.lat, coord.lng));
-                                            });
-                                            const center = bounds.getCenter();
-                                            const labelMarker = new google.maps.Marker({
-                                                position: center, map: map, title: `${zone.name} - ${crop.name}`,
-                                                icon: {
-                                                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                                                        <svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
-                                                            <circle cx="20" cy="20" r="18" fill="white" stroke="${zone.color}" stroke-width="2"/>
-                                                            <text x="20" y="26" text-anchor="middle" font-size="20">${crop.icon}</text>
-                                                        </svg>
-                                                    `)}`,
-                                                    scaledSize: new google.maps.Size(40, 40),
-                                                    anchor: new google.maps.Point(20, 20),
-                                                },
-                                                zIndex: 10,
-                                            });
-                                            (labelMarker as any).zoneId = zoneId;
-                                            zoneLabelsMarkers.push(labelMarker);
-                                        }
-                                    });
-                                    setMapObjects((prev) => ({ ...prev, zoneLabels: zoneLabelsMarkers }));
-                                }, 300);
+                                restoreZoneLabels(parsedData.zoneAssignments, restoredZones);
                             }
                         }
 
@@ -2776,27 +2781,8 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                 if (equipmentData.lat && equipmentData.lng && equipmentData.type) {
                                     const equipmentConfig = EQUIPMENT_TYPES[equipmentData.type as EquipmentType];
                                     if (equipmentConfig) {
-                                        let markerIcon;
-                                        if (equipmentData.type === 'pump' || equipmentData.type === 'ballvalve' || equipmentData.type === 'solenoid') {
-                                            let imgSrc = '';
-                                            if (equipmentData.type === 'pump') imgSrc = './generateTree/wtpump.png';
-                                            if (equipmentData.type === 'ballvalve') imgSrc = './generateTree/ballv.png';
-                                            if (equipmentData.type === 'solenoid') imgSrc = './generateTree/solv.png';
-                                            markerIcon = {
-                                                url: imgSrc, scaledSize: new google.maps.Size(40, 40),
-                                                anchor: new google.maps.Point(20, 20), optimized: false,
-                                            };
-                                        } else {
-                                            const svg = `<svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
-                                                <circle cx="20" cy="20" r="18" fill="white" stroke="${equipmentConfig.color}" stroke-width="2"/>
-                                                <text x="20" y="26" text-anchor="middle" font-size="20" fill="${equipmentConfig.color}">${equipmentConfig.icon}</text>
-                                            </svg>`;
-                                            markerIcon = {
-                                                url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-                                                scaledSize: new google.maps.Size(40, 40),
-                                                anchor: new google.maps.Point(20, 20), optimized: false,
-                                            };
-                                        }
+                                        const markerIcon = createEquipmentMarkerIcon(equipmentData.type as EquipmentType, equipmentConfig);
+
                                         const marker = new google.maps.Marker({
                                             position: { lat: equipmentData.lat, lng: equipmentData.lng },
                                             map: map, title: equipmentData.name, icon: markerIcon,
@@ -2907,23 +2893,32 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 }, 500);
             }
         }
-    }, [isEditMode, map, isRestoring, hasRestoredOnce, isResetting, clearAllMapObjects, placeEquipmentAtPosition, currentStep, isPlacingEquipment, selectedEquipmentType, setSelectedZone, setShowPlantSelector, handleError, setCanDrawZone, setCurrentZoneColor, setEquipmentHistory, setEquipmentHistoryIndex, setEquipmentIcons, setFieldAreaSize, setMainField, setMapObjects, setObstacles, setPipes, setUsedColors, setZones]);
+    }, [isEditMode, map, isRestoring, hasRestoredOnce, isResetting, clearAllMapObjects, placeEquipmentAtPosition, currentStep, isPlacingEquipment, selectedEquipmentType, setSelectedZone, setShowPlantSelector, handleError, setCanDrawZone, setCurrentZoneColor, setEquipmentHistory, setEquipmentHistoryIndex, setEquipmentIcons, setFieldAreaSize, setMainField, setMapObjects, setObstacles, setPipes, setUsedColors, setZones, createEquipmentMarkerIcon, restoreZoneLabels]);
 
-    // Load existing zone labels when map is ready
+    // Load existing zone labels when map is ready - optimized
     useEffect(() => {
         if (isEditMode || isRestoring || hasRestoredOnce || isResetting) {
             return;
         }
 
-        if (map && zones.length > 0) {
-            mapObjects.zoneLabels.forEach((marker) => marker.setMap(null));
-            setMapObjects((prev) => ({ ...prev, zoneLabels: [] }));
+        if (map && zones.length > 0 && Object.keys(zoneAssignments).length > 0) {
+            // Clear existing labels first
+            clearAllZoneLabels();
 
-            Object.entries(zoneAssignments).forEach(([zoneId, cropValue]) => {
-                updateZoneLabel(zoneId, cropValue as string);
-            });
+            // Batch zone label updates
+            const timeoutId = setTimeout(() => {
+                Object.entries(zoneAssignments).forEach(([zoneId, cropValue]) => {
+                    if (cropValue) {
+                        updateZoneLabel(zoneId, cropValue as string);
+                    }
+                });
+            }, 150);
+
+            return () => clearTimeout(timeoutId);
         }
-    }, [map, zones.length, zoneAssignments, isEditMode, isRestoring, hasRestoredOnce, isResetting, mapObjects.zoneLabels, setMapObjects, updateZoneLabel]);
+    }, [map, zones.length, Object.keys(zoneAssignments).length, isEditMode, isRestoring, hasRestoredOnce, isResetting]);
+
+
 
     // Auto-update zone configuration based on step changes (modified for edit mode)
     useEffect(() => {
@@ -3000,7 +2995,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
 
     return (
         <ErrorBoundary>
-            <div className="min-h-screen bg-gray-900 text-white">
+            <div className="min-h-screen text-white" style={{backgroundColor: '#000005'}}>
                 <Head title="Field Map - Irrigation Planning" />
 
                 {/* Error Message Display */}
@@ -3020,17 +3015,18 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     <LoadingSpinner size="lg" color="blue" text="Processing..." fullScreen={true} />
                 )}
 
-                {/* Top Header Section */}
-                <div className="border-b border-gray-700 bg-gray-800">
-                    <div className="container mx-auto px-4 py-3">
+                {/* Fixed Layout Container */}
+                <div className="flex h-screen flex-col">
+                    {/* Top Header Section - Compact */}
+                    <div className="border-b border-white p-3" style={{backgroundColor: '#000005'}}>
                         <div className="mx-auto max-w-7xl">
                             {/* Back Navigation */}
                             <Link
                                 href="/field-crop"
-                                className="mb-4 inline-flex items-center text-blue-400 hover:text-blue-300"
+                                className="mb-2 inline-flex items-center text-blue-400 hover:text-blue-300"
                             >
                                 <svg
-                                    className="mr-2 h-5 w-5"
+                                    className="mr-2 h-4 w-4"
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"
@@ -3046,95 +3042,84 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                             </Link>
 
                             {/* Main Title */}
-                            <h1 className="mb-2 text-3xl font-bold">🗺️ Field Map Planning</h1>
-                            <p className="mb-6 text-gray-400">
-                                View and plan irrigation systems for your selected crops
-                            </p>
-
-                            {/* Step Wizard Navigation */}
-                            <div className="rounded-lg bg-gray-700 p-4">
-                                <h3 className="mb-3 text-lg font-semibold">🎨 Planning Wizard</h3>
-                                <div className="grid grid-cols-4 gap-4">
-                                    {[
-                                        {
-                                            step: 1,
-                                            title: 'Field & Crops',
-                                            subtitle: 'Draw field + set spacing',
-                                            icon: '1️⃣',
-                                            color: 'green',
-                                        },
-                                        {
-                                            step: 2,
-                                            title: 'Zones & Obstacles',
-                                            subtitle: 'Zones + assign crops',
-                                            icon: '2️⃣',
-                                            color: 'blue',
-                                        },
-                                        {
-                                            step: 3,
-                                            title: 'Pipe System',
-                                            subtitle: 'Main + sub + laterals',
-                                            icon: '3️⃣',
-                                            color: 'purple',
-                                        },
-                                        {
-                                            step: 4,
-                                            title: 'Irrigation System',
-                                            subtitle: 'Sprinklers + drip + micro',
-                                            icon: '4️⃣',
-                                            color: 'cyan',
-                                        },
-                                    ].map((stepInfo) => (
-                                        <button
-                                            key={stepInfo.step}
-                                            onClick={() => goToStep(stepInfo.step)}
-                                            className={`flex flex-col items-center rounded-lg border-2 p-3 transition-all ${
-                                                currentStep === stepInfo.step
-                                                    ? `border-${stepInfo.color}-500 bg-${stepInfo.color}-500/20 text-${stepInfo.color}-300`
-                                                    : stepCompleted[stepInfo.step]
-                                                      ? `border-${stepInfo.color}-500/50 bg-${stepInfo.color}-500/10 text-${stepInfo.color}-400 hover:bg-${stepInfo.color}-500/20`
-                                                      : 'border-gray-600 bg-gray-700 text-gray-400 hover:border-gray-500'
-                                            }`}
-                                        >
-                                            <span className="mb-1 text-lg">
-                                                {stepCompleted[stepInfo.step]
-                                                    ? '✅'
-                                                    : stepInfo.icon}
-                                            </span>
-                                            <div className="text-center">
-                                                <div className="text-sm font-medium">
-                                                    {stepInfo.title}
-                                                </div>
-                                                <div className="text-xs opacity-75">
-                                                    {stepInfo.subtitle}
-                                                </div>
-                                            </div>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
+                            <h1 className="text-xl font-bold">🗺️ Field Map Planning</h1>
                         </div>
                     </div>
-                </div>
 
-                {/* Main Content Area */}
-                <div className="w-full px-4 py-4">
-                    <div className="w-full">
-                        <div className="grid h-[calc(100vh-100px)] grid-cols-12 gap-6">
-                            {/* Left Tools Panel */}
-                            <div className="col-span-4 overflow-hidden rounded-lg bg-gray-800">
-                                <div className="flex h-full flex-col">
-                                    {/* Tools Header */}
-                                    <div className="border-b border-gray-600 bg-gray-700 p-4">
-                                        <h3 className="text-lg font-semibold text-white">
-                                            🛠️ Tools & Settings
-                                        </h3>
+                    {/* Main Content Area - Flexible Height */}
+                    <div className="flex flex-1 overflow-hidden">
+                        {/* Left Tools Panel - Wider */}
+                        <div className="w-96 border-r border-white" style={{backgroundColor: '#000005'}}>
+                            <div className="flex h-full flex-col">
+                                {/* Tools Header */}
+                                <div className="border-b border-white p-3" style={{backgroundColor: '#000005'}}>
+                                    <h3 className="text-sm font-semibold text-white">
+                                        🛠️ Tools & Settings
+                                    </h3>
+                                </div>
+
+                                {/* Scrollable Tools Content */}
+                                <div className="flex-1 space-y-3 overflow-y-auto p-3">
+                                    {/* Step Wizard Navigation - Now inside Tools Panel */}
+                                    <div className="rounded-lg border border-white p-3" style={{backgroundColor: '#000005'}}>
+                                        <div className="mb-2 text-xs font-semibold text-white">Planning Steps</div>
+                                        <div className="grid grid-cols-4 gap-1">
+                                            {[
+                                                {
+                                                    step: 1,
+                                                    title: 'Field',
+                                                    icon: '1️⃣',
+                                                    color: 'green',
+                                                },
+                                                {
+                                                    step: 2,
+                                                    title: 'Zones',
+                                                    icon: '2️⃣',
+                                                    color: 'blue',
+                                                },
+                                                {
+                                                    step: 3,
+                                                    title: 'Pipes',
+                                                    icon: '3️⃣',
+                                                    color: 'purple',
+                                                },
+                                                {
+                                                    step: 4,
+                                                    title: 'Irrigation',
+                                                    icon: '4️⃣',
+                                                    color: 'cyan',
+                                                },
+                                            ].map((stepInfo) => (
+                                                <button
+                                                    key={stepInfo.step}
+                                                    onClick={() => goToStep(stepInfo.step)}
+                                                    className={`flex flex-col items-center rounded-lg border border-white p-1.5 transition-all ${
+                                                        currentStep === stepInfo.step
+                                                            ? `bg-${stepInfo.color}-600 text-white`
+                                                            : stepCompleted[stepInfo.step]
+                                                              ? `bg-${stepInfo.color}-500/20 text-${stepInfo.color}-300 hover:bg-${stepInfo.color}-500/30`
+                                                              : 'text-gray-400 hover:bg-gray-800'
+                                                    }`}
+                                                    style={{backgroundColor: currentStep === stepInfo.step ? undefined : '#000005'}}
+                                                >
+                                                    <span className="mb-0.5 text-xs">
+                                                        {stepCompleted[stepInfo.step]
+                                                            ? '✅'
+                                                            : stepInfo.icon}
+                                                    </span>
+                                                    <div className="text-center">
+                                                        <div className="text-xs font-medium">
+                                                            {stepInfo.title}
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
 
-                                    {/* Scrollable Tools Content */}
-                                    <div className="flex-1 space-y-4 overflow-y-auto p-4">
-                                        {/* Smart Controls - Hidden in Step 4 */}
-                                        {currentStep !== 4 && (
+                                    {/* Smart Controls - Hidden in Step 4 */}
+                                    {currentStep !== 4 && (
+                                        <div className="rounded border border-white p-2" style={{backgroundColor: '#000005'}}>
                                             <FieldMapSmartControls
                                                 snapEnabled={snapEnabled}
                                                 setSnapEnabled={setSnapEnabled}
@@ -3144,443 +3129,447 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                                 setPipeSnapEnabled={setPipeSnapEnabled}
                                                 drawingStage={drawingStage}
                                             />
-                                        )}
-
-                                        {/* Tools Panel */}
-                                        <div className="border-t border-gray-600 pt-4">
-                                            <FieldMapToolsPanel
-                                                currentStep={currentStep}
-                                                setCurrentStep={goToStep}
-                                                validateStep={validateStep}
-                                                nextStep={nextStep}
-                                                previousStep={previousStep}
-                                                resetAll={resetAll}
-                                                mainField={mainField}
-                                                fieldAreaSize={fieldAreaSize}
-                                                selectedCrops={selectedCrops}
-                                                zones={zones}
-                                                pipes={pipes}
-                                                obstacles={obstacles}
-                                                snapEnabled={snapEnabled}
-                                                setSnapEnabled={setSnapEnabled}
-                                                gridEnabled={gridEnabled}
-                                                setGridEnabled={setGridEnabled}
-                                                pipeSnapEnabled={pipeSnapEnabled}
-                                                setPipeSnapEnabled={setPipeSnapEnabled}
-                                                mapType={mapType}
-                                                setMapType={setMapType}
-                                                drawingStage={drawingStage}
-                                                setDrawingStage={setDrawingStage}
-                                                drawingMode={drawingMode}
-                                                setDrawingMode={setDrawingMode}
-                                                currentZoneColor={currentZoneColor}
-                                                setCurrentZoneColor={setCurrentZoneColor}
-                                                currentObstacleType={currentObstacleType}
-                                                setCurrentObstacleType={setCurrentObstacleType}
-                                                currentPipeType={currentPipeType}
-                                                setCurrentPipeType={setCurrentPipeType}
-                                                isPlacingEquipment={isPlacingEquipment}
-                                                selectedEquipmentType={selectedEquipmentType}
-                                                startPlacingEquipment={startPlacingEquipment}
-                                                cancelPlacingEquipment={cancelPlacingEquipment}
-                                                clearAllEquipment={clearAllEquipment}
-                                                undoEquipment={undoEquipment}
-                                                redoEquipment={redoEquipment}
-                                                equipmentIcons={equipmentIcons}
-                                                equipmentHistory={equipmentHistory}
-                                                equipmentHistoryIndex={equipmentHistoryIndex}
-                                                usedColors={usedColors}
-                                                addNewZone={addNewZone}
-                                                zoneAssignments={zoneAssignments}
-                                                assignPlantToZone={assignPlantToZone}
-                                                removePlantFromZone={removePlantFromZone}
-                                                deleteZone={deleteZone}
-                                                generateLateralPipes={generateLateralPipes}
-                                                clearLateralPipes={clearLateralPipes}
-                                                isGeneratingPipes={isGeneratingPipes}
-                                                generateLateralPipesForZone={
-                                                    generateLateralPipesForZone
-                                                }
-                                                irrigationAssignments={irrigationAssignments}
-                                                setIrrigationAssignments={setIrrigationAssignments}
-                                                irrigationPoints={irrigationPoints}
-                                                irrigationLines={irrigationLines}
-                                                irrigationRadius={irrigationRadius}
-                                                setIrrigationRadius={setIrrigationRadius}
-                                                sprinklerOverlap={sprinklerOverlap}
-                                                setSprinklerOverlap={setSprinklerOverlap}
-                                                generateIrrigationForZone={
-                                                    generateIrrigationForZone
-                                                }
-                                                clearIrrigationForZone={clearIrrigationForZone}
-                                                zoneSummaries={zoneSummaries}
-                                                plantingPoints={plantingPoints}
-                                                selectedCropObjects={selectedCropObjects}
-                                                rowSpacing={rowSpacing}
-                                                tempRowSpacing={tempRowSpacing}
-                                                setTempRowSpacing={setTempRowSpacing}
-                                                editingRowSpacingForCrop={editingRowSpacingForCrop}
-                                                setEditingRowSpacingForCrop={
-                                                    setEditingRowSpacingForCrop
-                                                }
-                                                handleRowSpacingConfirm={handleRowSpacingConfirm}
-                                                handleRowSpacingCancel={handleRowSpacingCancel}
-                                                plantSpacing={plantSpacing}
-                                                tempPlantSpacing={tempPlantSpacing}
-                                                setTempPlantSpacing={setTempPlantSpacing}
-                                                editingPlantSpacingForCrop={
-                                                    editingPlantSpacingForCrop
-                                                }
-                                                setEditingPlantSpacingForCrop={
-                                                    setEditingPlantSpacingForCrop
-                                                }
-                                                handlePlantSpacingConfirm={
-                                                    handlePlantSpacingConfirm
-                                                }
-                                                handlePlantSpacingCancel={handlePlantSpacingCancel}
-                                                handleCaptureMapAndSummary={
-                                                    handleCaptureMapAndSummary
-                                                }
-                                                irrigationSettings={irrigationSettings}
-                                                setIrrigationSettings={setIrrigationSettings}
-                                                dripSpacing={dripSpacing}
-                                                setDripSpacing={setDripSpacing}
-                                            />
                                         </div>
+                                    )}
+
+                                    {/* Tools Panel */}
+                                    <div className="rounded border border-white p-2" style={{backgroundColor: '#000005'}}>
+                                        <FieldMapToolsPanel
+                                            currentStep={currentStep}
+                                            setCurrentStep={goToStep}
+                                            validateStep={validateStep}
+                                            nextStep={nextStep}
+                                            previousStep={previousStep}
+                                            resetAll={resetAll}
+                                            mainField={mainField}
+                                            fieldAreaSize={fieldAreaSize}
+                                            selectedCrops={selectedCrops}
+                                            zones={zones}
+                                            pipes={pipes}
+                                            obstacles={obstacles}
+                                            snapEnabled={snapEnabled}
+                                            setSnapEnabled={setSnapEnabled}
+                                            gridEnabled={gridEnabled}
+                                            setGridEnabled={setGridEnabled}
+                                            pipeSnapEnabled={pipeSnapEnabled}
+                                            setPipeSnapEnabled={setPipeSnapEnabled}
+                                            mapType={mapType}
+                                            setMapType={setMapType}
+                                            drawingStage={drawingStage}
+                                            setDrawingStage={setDrawingStage}
+                                            drawingMode={drawingMode}
+                                            setDrawingMode={setDrawingMode}
+                                            currentZoneColor={currentZoneColor}
+                                            setCurrentZoneColor={setCurrentZoneColor}
+                                            currentObstacleType={currentObstacleType}
+                                            setCurrentObstacleType={setCurrentObstacleType}
+                                            currentPipeType={currentPipeType}
+                                            setCurrentPipeType={setCurrentPipeType}
+                                            isPlacingEquipment={isPlacingEquipment}
+                                            selectedEquipmentType={selectedEquipmentType}
+                                            startPlacingEquipment={startPlacingEquipment}
+                                            cancelPlacingEquipment={cancelPlacingEquipment}
+                                            clearAllEquipment={clearAllEquipment}
+                                            undoEquipment={undoEquipment}
+                                            redoEquipment={redoEquipment}
+                                            equipmentIcons={equipmentIcons}
+                                            equipmentHistory={equipmentHistory}
+                                            equipmentHistoryIndex={equipmentHistoryIndex}
+                                            usedColors={usedColors}
+                                            addNewZone={addNewZone}
+                                            zoneAssignments={zoneAssignments}
+                                            assignPlantToZone={assignPlantToZone}
+                                            removePlantFromZone={removePlantFromZone}
+                                            deleteZone={deleteZone}
+                                            generateLateralPipes={generateLateralPipes}
+                                            clearLateralPipes={clearLateralPipes}
+                                            isGeneratingPipes={isGeneratingPipes}
+                                            generateLateralPipesForZone={
+                                                generateLateralPipesForZone
+                                            }
+                                            irrigationAssignments={irrigationAssignments}
+                                            setIrrigationAssignments={setIrrigationAssignments}
+                                            irrigationPoints={irrigationPoints}
+                                            irrigationLines={irrigationLines}
+                                            irrigationRadius={irrigationRadius}
+                                            setIrrigationRadius={setIrrigationRadius}
+                                            sprinklerOverlap={sprinklerOverlap}
+                                            setSprinklerOverlap={setSprinklerOverlap}
+                                            generateIrrigationForZone={
+                                                generateIrrigationForZone
+                                            }
+                                            clearIrrigationForZone={clearIrrigationForZone}
+                                            zoneSummaries={zoneSummaries}
+                                            plantingPoints={plantingPoints}
+                                            selectedCropObjects={selectedCropObjects}
+                                            rowSpacing={rowSpacing}
+                                            tempRowSpacing={tempRowSpacing}
+                                            setTempRowSpacing={setTempRowSpacing}
+                                            editingRowSpacingForCrop={editingRowSpacingForCrop}
+                                            setEditingRowSpacingForCrop={
+                                                setEditingRowSpacingForCrop
+                                            }
+                                            handleRowSpacingConfirm={handleRowSpacingConfirm}
+                                            handleRowSpacingCancel={handleRowSpacingCancel}
+                                            plantSpacing={plantSpacing}
+                                            tempPlantSpacing={tempPlantSpacing}
+                                            setTempPlantSpacing={setTempPlantSpacing}
+                                            editingPlantSpacingForCrop={
+                                                editingPlantSpacingForCrop
+                                            }
+                                            setEditingPlantSpacingForCrop={
+                                                setEditingPlantSpacingForCrop
+                                            }
+                                            handlePlantSpacingConfirm={
+                                                handlePlantSpacingConfirm
+                                            }
+                                            handlePlantSpacingCancel={handlePlantSpacingCancel}
+                                            handleCaptureMapAndSummary={
+                                                handleCaptureMapAndSummary
+                                            }
+                                            irrigationSettings={irrigationSettings}
+                                            setIrrigationSettings={setIrrigationSettings}
+                                            dripSpacing={dripSpacing}
+                                            setDripSpacing={setDripSpacing}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Right Map Panel - Flexible Width */}
+                        <div className="flex flex-1 flex-col">
+                            {/* Map Header */}
+                            <div className="border-b border-white p-3" style={{backgroundColor: '#000005'}}>
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-sm font-semibold text-white">
+                                        📍 Interactive Map
+                                    </h3>
+
+                                    <div className="flex space-x-2">
+                                        {[
+                                            { id: 'street', name: '🗺️' },
+                                            { id: 'satellite', name: '🛰️' },
+                                            { id: 'hybrid', name: '🔄' },
+                                        ].map((type) => (
+                                            <button
+                                                key={type.id}
+                                                onClick={() =>
+                                                    setMapType(
+                                                        type.id as 'street' | 'satellite' | 'hybrid'
+                                                    )
+                                                }
+                                                className={`rounded border border-white px-2 py-1 text-xs transition-colors ${
+                                                    mapType === type.id
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'text-white hover:bg-gray-800'
+                                                }`}
+                                                style={{backgroundColor: mapType === type.id ? undefined : '#000005'}}
+                                            >
+                                                {type.name}
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Right Map Panel */}
-                            <div className="col-span-8 overflow-hidden rounded-lg bg-gray-800">
-                                <div className="flex h-full flex-col">
-                                    {/* Map Header */}
-                                    <div className="border-b border-gray-600 bg-gray-700 p-4">
-                                        <div className="flex items-center justify-between">
-                                            <h3 className="text-lg font-semibold text-white">
-                                                📍 Interactive Map
-                                            </h3>
+                            {/* Map Container */}
+                            <div className="relative flex-1">
+                                <Wrapper
+                                    apiKey={getGoogleMapsConfig().apiKey}
+                                    render={(status: Status) => {
+                                        if (status === Status.LOADING) {
+                                            return (
+                                                <div className="flex h-full items-center justify-center">
+                                                    <LoadingSpinner
+                                                        size="lg"
+                                                        color="blue"
+                                                        text="Loading Map..."
+                                                    />
+                                                </div>
+                                            );
+                                        }
+                                        if (status === Status.FAILURE) {
+                                            return (
+                                                <div className="flex h-full items-center justify-center">
+                                                    <div className="text-center text-red-400">
+                                                        <p>Error loading Google Maps</p>
+                                                        <p className="text-sm">
+                                                            Please check your API key
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+                                        return (
+                                            <div
+                                                style={{ width: '100%', height: '100%' }}
+                                            />
+                                        );
+                                    }}
+                                    libraries={['drawing', 'geometry', 'places']}
+                                >
+                                    <GoogleMapComponent
+                                        center={{ lat: mapCenter[0], lng: mapCenter[1] }}
+                                        zoom={mapZoom}
+                                        onLoad={setMap}
+                                        onDrawCreated={handleDrawCreated}
+                                        drawingStage={drawingStage}
+                                        currentZoneColor={currentZoneColor}
+                                        drawingMode={drawingMode}
+                                        canDrawZone={canDrawZone}
+                                        canDrawPipe={canDrawPipe}
+                                        currentObstacleType={currentObstacleType}
+                                        currentPipeType={currentPipeType}
+                                        isPlacingEquipment={isPlacingEquipment}
+                                        selectedEquipmentType={selectedEquipmentType}
+                                        onMapClick={handleMapClick}
+                                        mapType={mapType}
+                                        onCenterChanged={handleCenterChanged}
+                                        onZoomChanged={handleZoomChanged}
+                                    />
+                                </Wrapper>
 
-                                            <div className="flex space-x-2">
-                                                {[
-                                                    { id: 'street', name: '🗺️ Road' },
-                                                    { id: 'satellite', name: '🛰️ Satellite' },
-                                                    { id: 'hybrid', name: '🔄 Hybrid' },
-                                                ].map((type) => (
-                                                    <button
-                                                        key={type.id}
-                                                        onClick={() =>
-                                                            setMapType(
-                                                                type.id as 'street' | 'satellite' | 'hybrid'
-                                                            )
-                                                        }
-                                                        className={`rounded px-3 py-1 text-xs transition-colors ${
-                                                            mapType === type.id
-                                                                ? 'bg-blue-600 text-white'
-                                                                : 'bg-gray-600 text-white hover:bg-gray-500'
-                                                        }`}
+                                {/* Location Search Overlay - Top Right */}
+                                <div className="absolute right-2 top-2 z-10 w-80">
+                                    <div className="relative">
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                placeholder="🔍 Search places..."
+                                                value={searchQuery}
+                                                onChange={(e) =>
+                                                    setSearchQuery(e.target.value)
+                                                }
+                                                onFocus={() => {
+                                                    if (searchResults.length > 0) {
+                                                        setShowDropdown(true);
+                                                    }
+                                                }}
+                                                onBlur={() => {
+                                                    blurTimeoutRef.current = setTimeout(
+                                                        () => {
+                                                            setShowDropdown(false);
+                                                        },
+                                                        150
+                                                    );
+                                                }}
+                                                className="w-full rounded-md border border-white bg-white px-3 py-2 pr-10 text-sm text-gray-900 shadow-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                            />
+                                            {searchQuery && (
+                                                <button
+                                                    onClick={clearSearch}
+                                                    className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                >
+                                                    <svg
+                                                        className="h-4 w-4"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        viewBox="0 0 24 24"
                                                     >
-                                                        {type.name}
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            strokeWidth={2}
+                                                            d="M6 18L18 6M6 6l12 12"
+                                                        />
+                                                    </svg>
+                                                </button>
+                                            )}
+                                            {isSearching && (
+                                                <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                                                    <div className="h-3 w-3 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Search Results Dropdown */}
+                                        {showDropdown && searchResults.length > 0 && (
+                                            <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
+                                                {searchResults.map((result, index) => (
+                                                    <button
+                                                        key={index}
+                                                        onMouseDown={(e) => {
+                                                            e.preventDefault();
+                                                            goToLocation(result);
+                                                        }}
+                                                        className="w-full border-b border-gray-100 px-3 py-2 text-left text-sm text-gray-900 last:border-b-0 hover:bg-blue-50"
+                                                    >
+                                                        <div className="flex items-start space-x-2">
+                                                            <div className="mt-0.5 text-blue-500">
+                                                                <svg
+                                                                    className="h-3 w-3"
+                                                                    fill="none"
+                                                                    stroke="currentColor"
+                                                                    viewBox="0 0 24 24"
+                                                                >
+                                                                    <path
+                                                                        strokeLinecap="round"
+                                                                        strokeLinejoin="round"
+                                                                        strokeWidth={2}
+                                                                        d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                                                                    />
+                                                                    <path
+                                                                        strokeLinecap="round"
+                                                                        strokeLinejoin="round"
+                                                                        strokeWidth={2}
+                                                                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                                                                    />
+                                                                </svg>
+                                                            </div>
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className="truncate text-xs font-medium text-gray-900">
+                                                                    {result.label}
+                                                                </div>
+                                                                {result.address &&
+                                                                    result.address !==
+                                                                        result.label && (
+                                                                        <div className="mt-0.5 truncate text-xs text-gray-500">
+                                                                            {result.address}
+                                                                        </div>
+                                                                    )}
+                                                            </div>
+                                                        </div>
                                                     </button>
                                                 ))}
                                             </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Map Container */}
-                                    <div className="relative flex-1">
-                                        <Wrapper
-                                            apiKey={getGoogleMapsConfig().apiKey}
-                                            render={(status: Status) => {
-                                                if (status === Status.LOADING) {
-                                                    return (
-                                                        <div className="flex h-full items-center justify-center">
-                                                            <LoadingSpinner
-                                                                size="lg"
-                                                                color="blue"
-                                                                text="Loading Map..."
-                                                            />
-                                                        </div>
-                                                    );
-                                                }
-                                                if (status === Status.FAILURE) {
-                                                    return (
-                                                        <div className="flex h-full items-center justify-center">
-                                                            <div className="text-center text-red-400">
-                                                                <p>Error loading Google Maps</p>
-                                                                <p className="text-sm">
-                                                                    Please check your API key
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                }
-                                                return (
-                                                    <div
-                                                        style={{ width: '100%', height: '100%' }}
-                                                    />
-                                                );
-                                            }}
-                                            libraries={['drawing', 'geometry', 'places']}
-                                        >
-                                            <GoogleMapComponent
-                                                center={{ lat: mapCenter[0], lng: mapCenter[1] }}
-                                                zoom={mapZoom}
-                                                onLoad={setMap}
-                                                onDrawCreated={handleDrawCreated}
-                                                drawingStage={drawingStage}
-                                                currentZoneColor={currentZoneColor}
-                                                drawingMode={drawingMode}
-                                                canDrawZone={canDrawZone}
-                                                canDrawPipe={canDrawPipe}
-                                                currentObstacleType={currentObstacleType}
-                                                currentPipeType={currentPipeType}
-                                                isPlacingEquipment={isPlacingEquipment}
-                                                selectedEquipmentType={selectedEquipmentType}
-                                                onMapClick={handleMapClick}
-                                                mapType={mapType}
-                                                onCenterChanged={handleCenterChanged}
-                                                onZoomChanged={handleZoomChanged}
-                                            />
-                                        </Wrapper>
-
-                                        {/* Location Search Overlay - Top Right */}
-                                        <div className="absolute right-2 top-2 z-10 w-80">
-                                            <div className="relative">
-                                                <div className="relative">
-                                                    <input
-                                                        type="text"
-                                                        placeholder="🔍 Search places..."
-                                                        value={searchQuery}
-                                                        onChange={(e) =>
-                                                            setSearchQuery(e.target.value)
-                                                        }
-                                                        onFocus={() => {
-                                                            if (searchResults.length > 0) {
-                                                                setShowDropdown(true);
-                                                            }
-                                                        }}
-                                                        onBlur={() => {
-                                                            blurTimeoutRef.current = setTimeout(
-                                                                () => {
-                                                                    setShowDropdown(false);
-                                                                },
-                                                                150
-                                                            );
-                                                        }}
-                                                        className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 pr-10 text-sm text-gray-900 shadow-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                                                    />
-                                                    {searchQuery && (
-                                                        <button
-                                                            onClick={clearSearch}
-                                                            className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                                        >
-                                                            <svg
-                                                                className="h-4 w-4"
-                                                                fill="none"
-                                                                stroke="currentColor"
-                                                                viewBox="0 0 24 24"
-                                                            >
-                                                                <path
-                                                                    strokeLinecap="round"
-                                                                    strokeLinejoin="round"
-                                                                    strokeWidth={2}
-                                                                    d="M6 18L18 6M6 6l12 12"
-                                                                />
-                                                            </svg>
-                                                        </button>
-                                                    )}
-                                                    {isSearching && (
-                                                        <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                                                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* Search Results Dropdown */}
-                                                {showDropdown && searchResults.length > 0 && (
-                                                    <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
-                                                        {searchResults.map((result, index) => (
-                                                            <button
-                                                                key={index}
-                                                                onMouseDown={(e) => {
-                                                                    e.preventDefault();
-                                                                    goToLocation(result);
-                                                                }}
-                                                                className="w-full border-b border-gray-100 px-3 py-2 text-left text-sm text-gray-900 last:border-b-0 hover:bg-blue-50"
-                                                            >
-                                                                <div className="flex items-start space-x-2">
-                                                                    <div className="mt-0.5 text-blue-500">
-                                                                        <svg
-                                                                            className="h-3 w-3"
-                                                                            fill="none"
-                                                                            stroke="currentColor"
-                                                                            viewBox="0 0 24 24"
-                                                                        >
-                                                                            <path
-                                                                                strokeLinecap="round"
-                                                                                strokeLinejoin="round"
-                                                                                strokeWidth={2}
-                                                                                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                                                                            />
-                                                                            <path
-                                                                                strokeLinecap="round"
-                                                                                strokeLinejoin="round"
-                                                                                strokeWidth={2}
-                                                                                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                                                                            />
-                                                                        </svg>
-                                                                    </div>
-                                                                    <div className="min-w-0 flex-1">
-                                                                        <div className="truncate text-xs font-medium text-gray-900">
-                                                                            {result.label}
-                                                                        </div>
-                                                                        {result.address &&
-                                                                            result.address !==
-                                                                                result.label && (
-                                                                                <div className="mt-0.5 truncate text-xs text-gray-500">
-                                                                                    {result.address}
-                                                                                </div>
-                                                                            )}
-                                                                    </div>
-                                                                </div>
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                )}
-
-                                                {/* No Results Message */}
-                                                {showDropdown &&
-                                                    searchResults.length === 0 &&
-                                                    !isSearching &&
-                                                    searchQuery.trim() && (
-                                                        <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-md border border-gray-200 bg-white p-3 text-center text-xs text-gray-500 shadow-lg">
-                                                            No places found for "{searchQuery}"
-                                                        </div>
-                                                    )}
-                                            </div>
-                                        </div>
-
-                                        {/* Equipment Placement Overlay */}
-                                        {isPlacingEquipment && selectedEquipmentType && (
-                                            <div className="pointer-events-none absolute left-1/2 top-4 z-[1000] -translate-x-1/2 transform rounded-lg bg-black bg-opacity-75 px-4 py-2 text-sm text-white">
-                                                <div className="flex items-center space-x-2">
-                                                    <span className="text-lg">
-                                                        {
-                                                            EQUIPMENT_TYPES[selectedEquipmentType]
-                                                                .icon
-                                                        }
-                                                    </span>
-                                                    <span>
-                                                        Click map to place{' '}
-                                                        {
-                                                            EQUIPMENT_TYPES[selectedEquipmentType]
-                                                                .name
-                                                        }
-                                                    </span>
-                                                </div>
-                                            </div>
                                         )}
 
-                                        {/* Map Controls - Bottom Left */}
-                                        <div className="absolute bottom-3 left-20 z-10 flex space-x-2">
-                                            <Tooltip content="Center map view">
-                                                <button
-                                                    onClick={() => {
-                                                        setMapCenter([14.5995, 120.9842]);
-                                                        setMapZoom(13);
-                                                    }}
-                                                    className="rounded bg-white px-3 py-2 text-sm text-gray-700 shadow-md transition-colors hover:bg-gray-50"
-                                                >
-                                                    📍
-                                                </button>
-                                            </Tooltip>
-                                            <Tooltip content="Get your current location">
-                                                <button
-                                                    onClick={getCurrentLocation}
-                                                    className="rounded bg-white px-3 py-2 text-sm text-gray-700 shadow-md transition-colors hover:bg-gray-50"
-                                                >
-                                                    🎯
-                                                </button>
-                                            </Tooltip>
-
-                                            {/* Equipment Placement Buttons - Only show in Step 3 */}
-                                            {currentStep === 3 && (
-                                                <>
-                                                    <Tooltip content="Place Water Pump">
-                                                        <button
-                                                            onClick={() =>
-                                                                startPlacingEquipment('pump')
-                                                            }
-                                                            className={`rounded bg-white px-3 py-2 text-sm text-gray-700 shadow-md transition-colors hover:bg-gray-50 ${
-                                                                isPlacingEquipment &&
-                                                                selectedEquipmentType === 'pump'
-                                                                    ? 'ring-2 ring-blue-500'
-                                                                    : ''
-                                                            }`}
-                                                        >
-                                                            <img
-                                                                src="./generateTree/wtpump.png"
-                                                                alt="Pump"
-                                                                className="h-6 w-6 object-contain"
-                                                            />
-                                                        </button>
-                                                    </Tooltip>
-                                                    <Tooltip content="Place Solenoid Valve">
-                                                        <button
-                                                            onClick={() =>
-                                                                startPlacingEquipment('solenoid')
-                                                            }
-                                                            className={`rounded bg-white px-3 py-2 text-sm text-gray-700 shadow-md transition-colors hover:bg-gray-50 ${
-                                                                isPlacingEquipment &&
-                                                                selectedEquipmentType === 'solenoid'
-                                                                    ? 'ring-2 ring-blue-500'
-                                                                    : ''
-                                                            }`}
-                                                        >
-                                                            <img
-                                                                src="./generateTree/solv.png"
-                                                                alt="Solenoid Valve"
-                                                                className="h-6 w-6 object-contain"
-                                                            />
-                                                        </button>
-                                                    </Tooltip>
-                                                    <Tooltip content="Place Ball Valve">
-                                                        <button
-                                                            onClick={() =>
-                                                                startPlacingEquipment('ballvalve')
-                                                            }
-                                                            className={`rounded bg-white px-3 py-2 text-sm text-gray-700 shadow-md transition-colors hover:bg-gray-50 ${
-                                                                isPlacingEquipment &&
-                                                                selectedEquipmentType ===
-                                                                    'ballvalve'
-                                                                    ? 'ring-2 ring-blue-500'
-                                                                    : ''
-                                                            }`}
-                                                        >
-                                                            <img
-                                                                src="./generateTree/ballv.png"
-                                                                alt="Ball Valve"
-                                                                className="h-6 w-6 object-contain"
-                                                            />
-                                                        </button>
-                                                    </Tooltip>
-
-                                                    {/* Cancel Equipment Placement Button */}
-                                                    {isPlacingEquipment && (
-                                                        <Tooltip content="Cancel Equipment Placement">
-                                                            <button
-                                                                onClick={cancelPlacingEquipment}
-                                                                className="rounded bg-red-500 px-3 py-2 text-sm text-white shadow-md transition-colors hover:bg-red-600"
-                                                            >
-                                                                ❌
-                                                            </button>
-                                                        </Tooltip>
-                                                    )}
-                                                </>
+                                        {/* No Results Message */}
+                                        {showDropdown &&
+                                            searchResults.length === 0 &&
+                                            !isSearching &&
+                                            searchQuery.trim() && (
+                                                <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-md border border-gray-200 bg-white p-3 text-center text-xs text-gray-500 shadow-lg">
+                                                    No places found for "{searchQuery}"
+                                                </div>
                                             )}
+                                    </div>
+                                </div>
+
+                                {/* Equipment Placement Overlay */}
+                                {isPlacingEquipment && selectedEquipmentType && (
+                                    <div className="pointer-events-none absolute left-1/2 top-4 z-[1000] -translate-x-1/2 transform rounded-lg border border-white px-4 py-2 text-sm text-white" style={{backgroundColor: '#000005'}}>
+                                        <div className="flex items-center space-x-2">
+                                            <span className="text-lg">
+                                                {
+                                                    EQUIPMENT_TYPES[selectedEquipmentType]
+                                                        .icon
+                                                }
+                                            </span>
+                                            <span>
+                                                Click map to place{' '}
+                                                {
+                                                    EQUIPMENT_TYPES[selectedEquipmentType]
+                                                        .name
+                                                }
+                                            </span>
                                         </div>
                                     </div>
+                                )}
+
+                                {/* Map Controls - Bottom Center-Left */}
+                                <div className="absolute bottom-3 left-20 z-10 flex space-x-2">
+                                    <Tooltip content="Center map view">
+                                        <button
+                                            onClick={() => {
+                                                setMapCenter([14.5995, 120.9842]);
+                                                setMapZoom(13);
+                                            }}
+                                            className="flex h-12 w-12 items-center justify-center rounded border border-white text-gray-700 shadow-md transition-colors hover:bg-gray-50"
+                                            style={{backgroundColor: '#ffffff'}}
+                                        >
+                                            📍
+                                        </button>
+                                    </Tooltip>
+                                    <Tooltip content="Get your current location">
+                                        <button
+                                            onClick={getCurrentLocation}
+                                            className="flex h-12 w-12 items-center justify-center rounded border border-white text-gray-700 shadow-md transition-colors hover:bg-gray-50"
+                                            style={{backgroundColor: '#ffffff'}}
+                                        >
+                                            🎯
+                                        </button>
+                                    </Tooltip>
+
+                                    {/* Equipment Placement Buttons - Only show in Step 3 */}
+                                    {currentStep === 3 && (
+                                        <>
+                                            <Tooltip content="Place Water Pump">
+                                                <button
+                                                    onClick={() =>
+                                                        startPlacingEquipment('pump')
+                                                    }
+                                                    className={`flex h-12 w-12 items-center justify-center rounded border border-white text-gray-700 shadow-md transition-colors hover:bg-gray-50 ${
+                                                        isPlacingEquipment &&
+                                                        selectedEquipmentType === 'pump'
+                                                            ? 'ring-2 ring-blue-500'
+                                                            : ''
+                                                    }`}
+                                                    style={{backgroundColor: '#ffffff'}}
+                                                >
+                                                    <img
+                                                        src="./generateTree/wtpump.png"
+                                                        alt="Pump"
+                                                        className="h-8 w-8 object-contain"
+                                                    />
+                                                </button>
+                                            </Tooltip>
+                                            <Tooltip content="Place Solenoid Valve">
+                                                <button
+                                                    onClick={() =>
+                                                        startPlacingEquipment('solenoid')
+                                                    }
+                                                    className={`flex h-12 w-12 items-center justify-center rounded border border-white text-gray-700 shadow-md transition-colors hover:bg-gray-50 ${
+                                                        isPlacingEquipment &&
+                                                        selectedEquipmentType === 'solenoid'
+                                                            ? 'ring-2 ring-blue-500'
+                                                            : ''
+                                                    }`}
+                                                    style={{backgroundColor: '#ffffff'}}
+                                                >
+                                                    <img
+                                                        src="./generateTree/solv.png"
+                                                        alt="Solenoid Valve"
+                                                        className="h-8 w-8 object-contain"
+                                                    />
+                                                </button>
+                                            </Tooltip>
+                                            <Tooltip content="Place Ball Valve">
+                                                <button
+                                                    onClick={() =>
+                                                        startPlacingEquipment('ballvalve')
+                                                    }
+                                                    className={`flex h-12 w-12 items-center justify-center rounded border border-white text-gray-700 shadow-md transition-colors hover:bg-gray-50 ${
+                                                        isPlacingEquipment &&
+                                                        selectedEquipmentType ===
+                                                            'ballvalve'
+                                                            ? 'ring-2 ring-blue-500'
+                                                            : ''
+                                                    }`}
+                                                    style={{backgroundColor: '#ffffff'}}
+                                                >
+                                                    <img
+                                                        src="./generateTree/ballv.png"
+                                                        alt="Ball Valve"
+                                                        className="h-8 w-8 object-contain"
+                                                    />
+                                                </button>
+                                            </Tooltip>
+
+                                            {/* Cancel Equipment Placement Button */}
+                                            {isPlacingEquipment && (
+                                                <Tooltip content="Cancel Equipment Placement">
+                                                    <button
+                                                        onClick={cancelPlacingEquipment}
+                                                        className="flex h-12 w-12 items-center justify-center rounded border border-white bg-red-500 text-white shadow-md transition-colors hover:bg-red-600"
+                                                    >
+                                                        ❌
+                                                    </button>
+                                                </Tooltip>
+                                            )}
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -3590,7 +3579,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 {/* Plant Selection Modal */}
                 {showPlantSelector && selectedZone && (
                     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50">
-                        <div className="mx-4 max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-gray-800 p-6">
+                        <div className="mx-4 max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-white p-6" style={{backgroundColor: '#000005'}}>
                             <div className="mb-4 flex items-center justify-between">
                                 <h3 className="text-xl font-semibold text-white">
                                     🌱 Assign Plant to {typeof selectedZone === 'object' && selectedZone.name}
@@ -3643,11 +3632,12 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                                         crop.value
                                                     )
                                                 }
-                                                className={`rounded-lg border-2 p-4 text-left transition-all ${
+                                                className={`rounded-lg border-2 border-white p-4 text-left transition-all ${
                                                     zoneAssignments[(selectedZone as Zone).id] === crop.value
                                                         ? 'border-blue-500 bg-blue-500/20 text-blue-300'
-                                                        : 'border-gray-600 bg-gray-700 text-white hover:border-blue-400 hover:bg-blue-500/10'
+                                                        : 'text-white hover:border-blue-400 hover:bg-blue-500/10'
                                                 }`}
+                                                style={{backgroundColor: zoneAssignments[(selectedZone as Zone).id] === crop.value ? undefined : '#000005'}}
                                             >
                                                 <div className="flex items-center">
                                                     <span className="mr-3 text-3xl">
@@ -3684,7 +3674,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                             setShowPlantSelector(false);
                                             setSelectedZone(null);
                                         }}
-                                        className="rounded-lg bg-red-600 px-4 py-2 text-white transition-colors hover:bg-red-700"
+                                        className="rounded-lg border border-white bg-red-600 px-4 py-2 text-white transition-colors hover:bg-red-700"
                                     >
                                         Remove Plant
                                     </button>
@@ -3694,7 +3684,8 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                         setShowPlantSelector(false);
                                         setSelectedZone(null);
                                     }}
-                                    className="rounded-lg bg-gray-600 px-4 py-2 text-white transition-colors hover:bg-gray-700"
+                                    className="rounded-lg border border-white px-4 py-2 text-white transition-colors hover:bg-gray-700"
+                                    style={{backgroundColor: '#000005'}}
                                 >
                                     Cancel
                                 </button>

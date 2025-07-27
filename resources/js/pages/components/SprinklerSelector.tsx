@@ -10,7 +10,7 @@ interface SprinklerSelectorProps {
     results: CalculationResults;
     activeZone?: Zone;
     allZoneSprinklers: { [zoneId: string]: any };
-    projectMode?: 'horticulture' | 'garden';
+    projectMode?: 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
 }
 
 const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
