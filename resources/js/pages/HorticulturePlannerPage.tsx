@@ -1,18 +1,11 @@
 // resources/js/pages/HorticulturePlannerPage.tsx
 import React, { useState, useEffect, useRef, useMemo, useCallback, useReducer } from 'react';
-import axios from 'axios';
-import L from 'leaflet';
-import { useMap } from 'react-leaflet';
-import { MapContainer, TileLayer, Polygon, Popup, Marker, Polyline, LayersControl, FeatureGroup } from 'react-leaflet';
-import { EditControl } from 'react-leaflet-draw';
 
 import HorticultureMapComponent from '../components/horticulture/HorticultureMapComponent';
 import HorticultureDrawingManager from '../components/horticulture/HorticultureDrawingManager';
 import EnhancedHorticultureSearchControl from '../components/horticulture/HorticultureSearchControl';
 import { router } from '@inertiajs/react';
 import { useLanguage } from '../contexts/LanguageContext';
-import LanguageSwitcher from '../components/LanguageSwitcher';
-import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
 
 import {
@@ -1297,7 +1290,7 @@ const SimpleMousePlantEditModal = ({
     return (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black bg-opacity-50">
             <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-gray-900 p-6 shadow-2xl">
-                <h3 className="mb-4 text-xl font-semibold text-white">� {t('แก้ไขต้นไม้')}</h3>
+                <h3 className="mb-4 text-xl font-semibold text-white">🌱 {t('แก้ไขต้นไม้')}</h3>
 
                 <div className="mb-4 rounded-lg border border-blue-200 bg-gray-900 p-3 text-sm text-white">
                     💡 <strong>{t('การปรับตำแหน่ง')}:</strong> {t('ลากต้นไม้บนแผนที่ได้โดยตรง')}
@@ -3206,27 +3199,25 @@ export default function EnhancedHorticulturePlannerPage() {
             const isPlantMode = editMode === 'plant';
 
             if (isPlantMode) {
-                let canPlacePlant = true;
+                if (history.present.mainArea.length === 0 && history.present.zones.length === 0) {
+                    alert('❌ ' + t('กรุณากำหนดพื้นที่หลักหรือโซนก่อนวางต้นไม้'));
+                    return;
+                }
+                
+                let canPlacePlant = false;
                 let targetZoneId = 'main-area';
-
+                
                 if (history.present.useZones && history.present.zones.length > 0) {
-                    const containingZone = findZoneContainingPoint(
-                        clickPoint,
-                        history.present.zones
-                    );
+                    const containingZone = findZoneContainingPoint(clickPoint, history.present.zones);
                     if (containingZone) {
                         targetZoneId = containingZone.id;
+                        canPlacePlant = true;
                     } else if (history.present.mainArea.length > 0) {
-                        const isInMainArea = isPointInPolygon(clickPoint, history.present.mainArea);
-                        if (!isInMainArea) {
-                            canPlacePlant = false;
-                        }
+                        canPlacePlant = isPointInPolygon(clickPoint, history.present.mainArea);
                     }
-                } else if (history.present.mainArea.length > 0) {
-                    const isInMainArea = isPointInPolygon(clickPoint, history.present.mainArea);
-                    if (!isInMainArea) {
-                        canPlacePlant = false;
-                    }
+                } 
+                else if (history.present.mainArea.length > 0) {
+                    canPlacePlant = isPointInPolygon(clickPoint, history.present.mainArea);
                 }
 
                 if (!canPlacePlant) {
@@ -3261,6 +3252,7 @@ export default function EnhancedHorticulturePlannerPage() {
             history.present.useZones,
             history.present.zones,
             pushToHistory,
+            t,
         ]
     );
 
@@ -4609,6 +4601,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                     <span
                                                         className={`font-medium ${history.present.pump ? 'text-green-600' : 'text-red-600'}`}
                                                     >
+                                                      
                                                         {history.present.pump
                                                             ? t('พร้อมใช้งาน')
                                                             : t('ยังไม่ได้วาง')}

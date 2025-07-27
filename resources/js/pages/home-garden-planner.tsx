@@ -1667,7 +1667,9 @@ export default function HomeGardenPlanner() {
                                                                     {zone.sprinklerConfig && (
                                                                         <div>
                                                                             <label className="mb-2 block text-xs font-medium text-gray-300">
-                                                                                {t('รัศมีการฉีดน้ำ (เมตร):')}
+                                                                                {t(
+                                                                                    'รัศมีการฉีดน้ำ (เมตร):'
+                                                                                )}
                                                                             </label>
                                                                             <div className="flex items-center space-x-3">
                                                                                 <input
@@ -1975,7 +1977,9 @@ export default function HomeGardenPlanner() {
                                                 </span>
                                             </div>
                                             <p className="text-sm">
-                                                {t('กรุณาไปแท็บ "วางหัวฉีด" และกดปุ่ม "วางแหล่งน้ำ" ก่อนสร้างระบบท่อ')}
+                                                {t(
+                                                    'กรุณาไปแท็บ "วางหัวฉีด" และกดปุ่ม "วางแหล่งน้ำ" ก่อนสร้างระบบท่อ'
+                                                )}
                                             </p>
                                         </div>
                                     ) : sprinklers.length === 0 ? (
@@ -2179,7 +2183,6 @@ export default function HomeGardenPlanner() {
                                             )}
                                         </div>
                                     )}
-
                                 </div>
                             </div>
                         )}

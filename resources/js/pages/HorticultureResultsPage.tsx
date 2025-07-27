@@ -566,7 +566,6 @@ function EnhancedHorticultureResultsPageContent() {
                 setSaveSuccess(true);
 
                 localStorage.removeItem('editingFieldId');
-
             } else {
                 throw new Error(responseData.message || 'Failed to save project');
             }
@@ -967,7 +966,9 @@ function EnhancedHorticultureResultsPageContent() {
                             </div>
 
                             <div className="rounded-lg bg-gray-700 p-4">
-                                <h4 className="mb-3 text-sm font-semibold">🎨 {t('คำอธิบายสัญลักษณ์')}</h4>
+                                <h4 className="mb-3 text-sm font-semibold">
+                                    🎨 {t('คำอธิบายสัญลักษณ์')}
+                                </h4>
                                 <div className="grid grid-cols-2 gap-2 text-xs">
                                     <div className="flex items-center gap-2">
                                         <div
@@ -1031,7 +1032,9 @@ function EnhancedHorticultureResultsPageContent() {
                                 </h3>
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                     <div className="rounded bg-gray-700 p-3">
-                                        <div className="text-gray-400">{t('พื้นที่รวมทั้งหมด')}</div>
+                                        <div className="text-gray-400">
+                                            {t('พื้นที่รวมทั้งหมด')}
+                                        </div>
                                         <div className="text-lg font-bold text-green-400">
                                             {formatAreaInRai(projectSummary.totalAreaInRai)}
                                         </div>
@@ -1043,13 +1046,17 @@ function EnhancedHorticultureResultsPageContent() {
                                         </div>
                                     </div>
                                     <div className="rounded bg-gray-700 p-3">
-                                        <div className="text-gray-400">{t('จำนวนต้นไม้ทั้งหมด')}</div>
+                                        <div className="text-gray-400">
+                                            {t('จำนวนต้นไม้ทั้งหมด')}
+                                        </div>
                                         <div className="text-lg font-bold text-yellow-400">
                                             {projectSummary.totalPlants.toLocaleString()} ต้น
                                         </div>
                                     </div>
                                     <div className="rounded bg-gray-700 p-3">
-                                        <div className="text-gray-400">{t('ปริมาณน้ำต่อครั้ง')}</div>
+                                        <div className="text-gray-400">
+                                            {t('ปริมาณน้ำต่อครั้ง')}
+                                        </div>
                                         <div className="text-lg font-bold text-cyan-400">
                                             {formatWaterVolume(
                                                 projectSummary.totalWaterNeedPerSession
@@ -1065,7 +1072,9 @@ function EnhancedHorticultureResultsPageContent() {
                                 </h3>
 
                                 <div className="mb-4 rounded bg-gray-700 p-4">
-                                    <h4 className="mb-2 font-semibold text-blue-300">🔵 {t('ท่อเมน')}</h4>
+                                    <h4 className="mb-2 font-semibold text-blue-300">
+                                        🔵 {t('ท่อเมน')}
+                                    </h4>
                                     <div className="grid grid-cols-2 gap-4 text-sm">
                                         <div>
                                             <span className="text-gray-400">
@@ -1076,7 +1085,9 @@ function EnhancedHorticultureResultsPageContent() {
                                             </div>
                                         </div>
                                         <div>
-                                            <span className="text-gray-400">{t('ท่อเมนยาวรวม')}:</span>
+                                            <span className="text-gray-400">
+                                                {t('ท่อเมนยาวรวม')}:
+                                            </span>
                                             <div className="font-bold text-blue-400">
                                                 {formatDistance(
                                                     projectSummary.mainPipes.totalLength
@@ -1102,7 +1113,9 @@ function EnhancedHorticultureResultsPageContent() {
                                             </div>
                                         </div>
                                         <div>
-                                            <span className="text-gray-400">{t('ท่อเมนรองยาวรวม')}:</span>
+                                            <span className="text-gray-400">
+                                                {t('ท่อเมนรองยาวรวม')}:
+                                            </span>
                                             <div className="font-bold text-purple-400">
                                                 {formatDistance(
                                                     projectSummary.subMainPipes.totalLength
@@ -1126,7 +1139,9 @@ function EnhancedHorticultureResultsPageContent() {
                                             </div>
                                         </div>
                                         <div>
-                                            <span className="text-gray-400">{t('ท่อย่อยยาวรวม')}:</span>
+                                            <span className="text-gray-400">
+                                                {t('ท่อย่อยยาวรวม')}:
+                                            </span>
                                             <div className="font-bold text-yellow-400">
                                                 {formatDistance(
                                                     projectSummary.branchPipes.totalLength
@@ -1145,7 +1160,8 @@ function EnhancedHorticultureResultsPageContent() {
                                             {formatDistance(projectSummary.longestPipesCombined)}
                                         </div>
                                         <div className="text-xs text-gray-400">
-                                            ({t('ท่อเมน')} + {t('ท่อเมนรอง')} + {t('ท่อย่อยที่ยาวที่สุด')})
+                                            ({t('ท่อเมน')} + {t('ท่อเมนรอง')} +{' '}
+                                            {t('ท่อย่อยที่ยาวที่สุด')})
                                         </div>
                                     </div>
                                 </div>
@@ -1237,8 +1253,9 @@ function EnhancedHorticultureResultsPageContent() {
                                                             {t('ระยะปลูก')}:
                                                         </span>
                                                         <span className="ml-2 text-white">
-                                                            {plantSpacing} × {rowSpacing} {t('เมตร')}
-                                                            ({t('ระหว่างต้น')} × {t('ระหว่างแถว')})
+                                                            {plantSpacing} × {rowSpacing}{' '}
+                                                            {t('เมตร')}({t('ระหว่างต้น')} ×{' '}
+                                                            {t('ระหว่างแถว')})
                                                         </span>
                                                     </div>
 
@@ -1305,8 +1322,9 @@ function EnhancedHorticultureResultsPageContent() {
                                                             {t('สรุปการคำนวณ')}:
                                                         </div>
                                                         <div className="mt-1 text-gray-300">
-                                                            {zone.plantCount.toLocaleString()} {t('ต้น')} ×{' '}
-                                                            {waterPerPlant} {t('ลิตร/ต้น')} ={' '}
+                                                            {zone.plantCount.toLocaleString()}{' '}
+                                                            {t('ต้น')} × {waterPerPlant}{' '}
+                                                            {t('ลิตร/ต้น')} ={' '}
                                                             {formatWaterVolume(
                                                                 zone.waterNeedPerSession
                                                             )}
@@ -1320,7 +1338,6 @@ function EnhancedHorticultureResultsPageContent() {
                             )}
                         </div>
                     </div>
-
                 </div>
             </div>
 
