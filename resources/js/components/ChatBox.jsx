@@ -18,7 +18,7 @@ const ChatBox = () => {
         setIsTyping(true);
 
         try {
-            const response = await axios.post('http://127.0.0.1:8000/api/chat', {
+            const response = await axios.post('/api/chat', {
                 messages: updatedHistory,
             });
             const aiReply = { role: 'assistant', content: response.data.reply };
