@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import Navbar from '../components/Navbar';
 import { cropTypes, getCropByValue, searchCrops, type Crop } from '@/pages/utils/cropData';
 
 interface FieldCropProps {
@@ -54,7 +55,11 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
 
     return (
         <div className="min-h-screen bg-gray-900 text-white">
-            <div className="flex h-screen">
+            {/* Navbar */}
+            <Navbar />
+            
+            {/* Main Content with adjusted height to account for navbar */}
+            <div className="flex" style={{ height: 'calc(100vh - 64px)' }}>
                 {/* Sidebar - Fixed Summary Panel */}
                 <div className="flex w-80 flex-col overflow-hidden border-r border-gray-700 bg-gray-800">
                     {/* Header */}
