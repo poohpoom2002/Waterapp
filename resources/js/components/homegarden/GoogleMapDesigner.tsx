@@ -256,24 +256,24 @@ const MapComponent: React.FC<{
                     restriction: null,
                     zoomControl: true,
                     scrollwheel: true,
-                    gestureHandling: 'greedy'
+                    gestureHandling: 'greedy',
                 });
 
                 let isZooming = false;
                 const customZoomHandler = (e: WheelEvent) => {
                     if (isZooming) return;
                     isZooming = true;
-                    
+
                     e.preventDefault();
                     e.stopPropagation();
-                    
+
                     const currentZoom = newMap.getZoom() || 10;
                     const delta = e.deltaY > 0 ? -0.5 : 0.5;
                     const newZoom = currentZoom + delta;
-                    
+
                     if (newZoom >= 1 && newZoom <= 50) {
                         newMap.setZoom(newZoom);
-                        
+
                         if (newZoom > 25) {
                             const center = newMap.getCenter();
                             if (center) {
@@ -283,16 +283,16 @@ const MapComponent: React.FC<{
                             }
                         }
                     }
-                    
+
                     setTimeout(() => {
                         isZooming = false;
                     }, 50);
                 };
 
                 const mapContainer = ref.current;
-                mapContainer.addEventListener('wheel', customZoomHandler, { 
-                    passive: false, 
-                    capture: true 
+                mapContainer.addEventListener('wheel', customZoomHandler, {
+                    passive: false,
+                    capture: true,
                 });
 
                 newMap.addListener('zoom_changed', () => {
@@ -300,7 +300,7 @@ const MapComponent: React.FC<{
                     if (currentZoom && currentZoom > 25) {
                         newMap.setOptions({
                             minZoom: null,
-                            maxZoom: null
+                            maxZoom: null,
                         });
                     }
                 });
@@ -490,7 +490,7 @@ const ClippedSprinklerCoverage: React.FC<{
                     strokeOpacity: isSelected ? 0.8 : 0.6,
                     strokeWeight: 2,
                     map: map,
-                    clickable: false, 
+                    clickable: false,
                 });
                 overlayRef.current.push(circle);
             } else if (result === 'MASKED_CIRCLE') {
@@ -502,7 +502,8 @@ const ClippedSprinklerCoverage: React.FC<{
                     const lat = center.lat + (radius / 111000) * Math.cos(angle);
                     const lng =
                         center.lng +
-                        (radius / (111000 * Math.cos((center.lat * Math.PI) / 180))) * Math.sin(angle);
+                        (radius / (111000 * Math.cos((center.lat * Math.PI) / 180))) *
+                            Math.sin(angle);
                     const circlePoint = { lat, lng };
 
                     if (isPointInPolygon(circlePoint, zoneCoordinates)) {
@@ -514,7 +515,9 @@ const ClippedSprinklerCoverage: React.FC<{
                     const distance = Math.sqrt(
                         Math.pow((vertex.lat - center.lat) * 111000, 2) +
                             Math.pow(
-                                (vertex.lng - center.lng) * 111000 * Math.cos((center.lat * Math.PI) / 180),
+                                (vertex.lng - center.lng) *
+                                    111000 *
+                                    Math.cos((center.lat * Math.PI) / 180),
                                 2
                             )
                     );
@@ -525,9 +528,11 @@ const ClippedSprinklerCoverage: React.FC<{
 
                 if (intersectionPoints.length >= 3) {
                     const centroidLat =
-                        intersectionPoints.reduce((sum, p) => sum + p.lat, 0) / intersectionPoints.length;
+                        intersectionPoints.reduce((sum, p) => sum + p.lat, 0) /
+                        intersectionPoints.length;
                     const centroidLng =
-                        intersectionPoints.reduce((sum, p) => sum + p.lng, 0) / intersectionPoints.length;
+                        intersectionPoints.reduce((sum, p) => sum + p.lng, 0) /
+                        intersectionPoints.length;
 
                     intersectionPoints.sort((a, b) => {
                         const angleA = Math.atan2(a.lat - centroidLat, a.lng - centroidLng);

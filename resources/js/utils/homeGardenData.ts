@@ -137,7 +137,7 @@ export const SPRINKLER_TYPES: SprinklerType[] = [
         nameTH: 'หัวฉีดด้านเดียวปรับมุม',
         icon: '🟤',
         radius: 4,
-        suitableFor: ['grass', 'flowers'], 
+        suitableFor: ['grass', 'flowers'],
         color: '#33CCFF',
     },
     {
@@ -1153,7 +1153,7 @@ export function createInitialData(): GardenPlannerData {
 export function saveGardenData(data: GardenPlannerData): boolean {
     try {
         if (data.imageData?.scale) {
-            if (!validateScale(data.imageData.scale, 'image')) {    
+            if (!validateScale(data.imageData.scale, 'image')) {
                 data.imageData.scale = 20;
                 data.imageData.isScaleSet = false;
             }
@@ -1170,8 +1170,7 @@ export function saveGardenData(data: GardenPlannerData): boolean {
         if (typeof window !== 'undefined' && window.localStorage) {
             try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-            } catch (e) {
-            }
+            } catch (e) {}
         }
         return true;
     } catch (error) {

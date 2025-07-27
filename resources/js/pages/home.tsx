@@ -7,7 +7,15 @@ import axios from 'axios';
 import { useLanguage } from '../contexts/LanguageContext';
 import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
-import { FaFolder, FaFolderOpen, FaArrowLeft, FaPlus, FaTrash, FaEdit, FaGripVertical } from 'react-icons/fa';
+import {
+    FaFolder,
+    FaFolderOpen,
+    FaArrowLeft,
+    FaPlus,
+    FaTrash,
+    FaEdit,
+    FaGripVertical,
+} from 'react-icons/fa';
 
 // Types
 type Field = {
@@ -221,7 +229,12 @@ const FieldCard = ({
                     <div className="flex justify-between">
                         <span>{t('area')}:</span>
                         <span className="text-white">
-                            {field.totalArea ? (typeof field.totalArea === 'number' ? field.totalArea.toFixed(2) : (parseFloat(field.totalArea) || 0).toFixed(2)) : 'N/A'} ไร่
+                            {field.totalArea
+                                ? typeof field.totalArea === 'number'
+                                    ? field.totalArea.toFixed(2)
+                                    : (parseFloat(field.totalArea) || 0).toFixed(2)
+                                : 'N/A'}{' '}
+                            ไร่
                         </span>
                     </div>
                     <div className="flex justify-between">
@@ -231,7 +244,12 @@ const FieldCard = ({
                     <div className="flex justify-between">
                         <span>{t('water_need')}:</span>
                         <span className="text-white">
-                            {field.total_water_need ? (typeof field.total_water_need === 'number' ? field.total_water_need.toFixed(2) : (parseFloat(field.total_water_need) || 0).toFixed(2)) : 'N/A'} ลิตร/วัน
+                            {field.total_water_need
+                                ? typeof field.total_water_need === 'number'
+                                    ? field.total_water_need.toFixed(2)
+                                    : (parseFloat(field.total_water_need) || 0).toFixed(2)
+                                : 'N/A'}{' '}
+                            ลิตร/วัน
                         </span>
                     </div>
                 </div>
@@ -246,7 +264,12 @@ const FieldCard = ({
                         className="text-red-400 hover:text-red-300"
                         title={t('delete_field')}
                     >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg
+                            className="h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
                             <path
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
@@ -528,17 +551,29 @@ const CreateFolderModal = ({
             <div className="relative z-[10000] mx-4 w-full max-w-md rounded-lg bg-gray-800 p-6">
                 <div className="mb-4 flex items-center justify-between">
                     <h2 className="text-xl font-semibold text-white">
-                        {parentFolder ? `${t('create_folder_in')} ${parentFolder.name}` : t('create_folder')}
+                        {parentFolder
+                            ? `${t('create_folder_in')} ${parentFolder.name}`
+                            : t('create_folder')}
                     </h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-white">
-                        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        <svg
+                            className="h-6 w-6"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                            />
                         </svg>
                     </button>
                 </div>
                 <form onSubmit={handleSubmit}>
                     <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="mb-2 block text-sm font-medium text-gray-300">
                             {t('folder_name')}
                         </label>
                         <input
@@ -551,7 +586,7 @@ const CreateFolderModal = ({
                         />
                     </div>
                     <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="mb-2 block text-sm font-medium text-gray-300">
                             {t('folder_icon')}
                         </label>
                         <div className="grid grid-cols-5 gap-2">
@@ -561,7 +596,9 @@ const CreateFolderModal = ({
                                     type="button"
                                     onClick={() => setFolderIcon(icon)}
                                     className={`rounded p-2 text-xl ${
-                                        folderIcon === icon ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'
+                                        folderIcon === icon
+                                            ? 'bg-blue-600'
+                                            : 'bg-gray-700 hover:bg-gray-600'
                                     }`}
                                 >
                                     {icon}
@@ -570,7 +607,7 @@ const CreateFolderModal = ({
                         </div>
                     </div>
                     <div className="mb-6">
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="mb-2 block text-sm font-medium text-gray-300">
                             {t('folder_color')}
                         </label>
                         <div className="grid grid-cols-6 gap-2">
@@ -580,7 +617,9 @@ const CreateFolderModal = ({
                                     type="button"
                                     onClick={() => setFolderColor(color.value)}
                                     className={`h-8 w-8 rounded-full border-2 ${
-                                        folderColor === color.value ? 'border-white' : 'border-gray-600'
+                                        folderColor === color.value
+                                            ? 'border-white'
+                                            : 'border-gray-600'
                                     }`}
                                     style={{ backgroundColor: color.value }}
                                     title={color.name}
@@ -668,14 +707,24 @@ const EditFolderModal = ({
                 <div className="mb-4 flex items-center justify-between">
                     <h2 className="text-xl font-semibold text-white">{t('edit_folder')}</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-white">
-                        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        <svg
+                            className="h-6 w-6"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                            />
                         </svg>
                     </button>
                 </div>
                 <form onSubmit={handleSubmit}>
                     <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="mb-2 block text-sm font-medium text-gray-300">
                             {t('folder_name')}
                         </label>
                         <input
@@ -687,7 +736,7 @@ const EditFolderModal = ({
                         />
                     </div>
                     <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="mb-2 block text-sm font-medium text-gray-300">
                             {t('folder_icon')}
                         </label>
                         <div className="grid grid-cols-5 gap-2">
@@ -697,7 +746,9 @@ const EditFolderModal = ({
                                     type="button"
                                     onClick={() => setFolderIcon(icon)}
                                     className={`rounded p-2 text-xl ${
-                                        folderIcon === icon ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'
+                                        folderIcon === icon
+                                            ? 'bg-blue-600'
+                                            : 'bg-gray-700 hover:bg-gray-600'
                                     }`}
                                 >
                                     {icon}
@@ -706,7 +757,7 @@ const EditFolderModal = ({
                         </div>
                     </div>
                     <div className="mb-6">
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="mb-2 block text-sm font-medium text-gray-300">
                             {t('folder_color')}
                         </label>
                         <div className="grid grid-cols-6 gap-2">
@@ -716,7 +767,9 @@ const EditFolderModal = ({
                                     type="button"
                                     onClick={() => setFolderColor(color.value)}
                                     className={`h-8 w-8 rounded-full border-2 ${
-                                        folderColor === color.value ? 'border-white' : 'border-gray-600'
+                                        folderColor === color.value
+                                            ? 'border-white'
+                                            : 'border-gray-600'
                                     }`}
                                     style={{ backgroundColor: color.value }}
                                     title={color.name}
@@ -776,7 +829,7 @@ export default function Home() {
 
     // Group fields by folder
     const getFieldsByFolder = (folderId: string) => {
-        return fields.filter(field => field.folderId === folderId);
+        return fields.filter((field) => field.folderId === folderId);
     };
 
     // Get all folders including system folders
@@ -788,15 +841,15 @@ export default function Home() {
     // Get fields for current view
     const getCurrentFields = () => {
         if (!selectedFolder) return fields;
-        
+
         // Check by folder name since system folders are created in the backend
         if (selectedFolder.name === t('finished') || selectedFolder.name === 'Finished') {
-            return fields.filter(field => field.status === 'finished' || field.isCompleted);
+            return fields.filter((field) => field.status === 'finished' || field.isCompleted);
         }
         if (selectedFolder.name === t('unfinished') || selectedFolder.name === 'Unfinished') {
-            return fields.filter(field => field.status !== 'finished' && !field.isCompleted);
+            return fields.filter((field) => field.status !== 'finished' && !field.isCompleted);
         }
-        
+
         return getFieldsByFolder(selectedFolder.id);
     };
 
@@ -804,12 +857,14 @@ export default function Home() {
     const getFieldCountForFolder = (folder: Folder) => {
         // Check by folder name since system folders are created in the backend
         if (folder.name === t('finished') || folder.name === 'Finished') {
-            return fields.filter(field => field.status === 'finished' || field.isCompleted).length;
+            return fields.filter((field) => field.status === 'finished' || field.isCompleted)
+                .length;
         }
         if (folder.name === t('unfinished') || folder.name === 'Unfinished') {
-            return fields.filter(field => field.status !== 'finished' && !field.isCompleted).length;
+            return fields.filter((field) => field.status !== 'finished' && !field.isCompleted)
+                .length;
         }
-        
+
         return getFieldsByFolder(folder.id).length;
     };
 
@@ -819,13 +874,13 @@ export default function Home() {
             try {
                 const [fieldsResponse, foldersResponse] = await Promise.all([
                     axios.get('/api/fields'),
-                    axios.get('/api/folders')
+                    axios.get('/api/folders'),
                 ]);
-                
+
                 if (fieldsResponse.data.fields) {
                     setFields(fieldsResponse.data.fields);
                 }
-                
+
                 if (foldersResponse.data.folders) {
                     setFolders(foldersResponse.data.folders);
                 }
@@ -889,19 +944,21 @@ export default function Home() {
         }
     };
 
-    const handleFieldStatusChange = async (fieldId: string, status: string, isCompleted: boolean) => {
+    const handleFieldStatusChange = async (
+        fieldId: string,
+        status: string,
+        isCompleted: boolean
+    ) => {
         try {
             const response = await axios.put(`/api/fields/${fieldId}/status`, {
                 status,
                 is_completed: isCompleted,
             });
-            
+
             if (response.data.success) {
-                setFields(prev => prev.map(f => 
-                    f.id === fieldId 
-                        ? { ...f, status, isCompleted }
-                        : f
-                ));
+                setFields((prev) =>
+                    prev.map((f) => (f.id === fieldId ? { ...f, status, isCompleted } : f))
+                );
             }
         } catch (error) {
             console.error('Error updating field status:', error);
@@ -937,12 +994,14 @@ export default function Home() {
     };
 
     // Folder management functions
-    const handleCreateFolder = async (folderData: Omit<Folder, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const handleCreateFolder = async (
+        folderData: Omit<Folder, 'id' | 'createdAt' | 'updatedAt'>
+    ) => {
         try {
             const response = await axios.post('/api/folders', folderData);
             if (response.data.success) {
                 // Use the folder returned from the API with the real database ID
-                setFolders(prev => [...prev, response.data.folder]);
+                setFolders((prev) => [...prev, response.data.folder]);
             }
         } catch (error) {
             console.error('Error creating folder:', error);
@@ -959,7 +1018,9 @@ export default function Home() {
         try {
             const response = await axios.put(`/api/folders/${folderId}`, updates);
             if (response.data.success) {
-                setFolders(prev => prev.map(f => f.id === folderId ? { ...f, ...updates } : f));
+                setFolders((prev) =>
+                    prev.map((f) => (f.id === folderId ? { ...f, ...updates } : f))
+                );
                 setShowEditFolderModal(false);
                 setFolderToEdit(null);
             }
@@ -981,20 +1042,20 @@ export default function Home() {
             console.log('Attempting to delete folder:', folderToDelete);
             const response = await axios.delete(`/api/folders/${folderToDelete.id}`);
             console.log('Delete folder response:', response.data);
-            
+
             if (response.data.success) {
                 // Move fields to uncategorized folder
-                setFields(prev => prev.map(f => 
-                    f.folderId === folderToDelete.id 
-                        ? { ...f, folderId: 'uncategorized' }
-                        : f
-                ));
-                
+                setFields((prev) =>
+                    prev.map((f) =>
+                        f.folderId === folderToDelete.id ? { ...f, folderId: 'uncategorized' } : f
+                    )
+                );
+
                 // Remove folder
-                setFolders(prev => prev.filter(f => f.id !== folderToDelete.id));
+                setFolders((prev) => prev.filter((f) => f.id !== folderToDelete.id));
                 setShowFolderDeleteConfirm(false);
                 setFolderToDelete(null);
-                
+
                 // If we were viewing the deleted folder, go back to all
                 if (selectedFolder?.id === folderToDelete.id) {
                     setSelectedFolder(null);
@@ -1023,11 +1084,9 @@ export default function Home() {
 
     const handleFolderDrop = (targetFolderId: string) => {
         if (draggedField && draggedField.folderId !== targetFolderId) {
-            setFields(prev => prev.map(f => 
-                f.id === draggedField.id 
-                    ? { ...f, folderId: targetFolderId }
-                    : f
-            ));
+            setFields((prev) =>
+                prev.map((f) => (f.id === draggedField.id ? { ...f, folderId: targetFolderId } : f))
+            );
         }
     };
 
@@ -1040,7 +1099,7 @@ export default function Home() {
     }
 
     return (
-        <div className="min-h-screen flex flex-col bg-gray-900">
+        <div className="flex min-h-screen flex-col bg-gray-900">
             <Navbar />
             <div className="flex-1">
                 <div className="p-6">
@@ -1104,7 +1163,9 @@ export default function Home() {
                             // Show all folders
                             <div>
                                 <div className="mb-6 flex items-center justify-between">
-                                    <h2 className="text-xl font-semibold text-white">{t('folders')}</h2>
+                                    <h2 className="text-xl font-semibold text-white">
+                                        {t('folders')}
+                                    </h2>
                                     <div className="text-sm text-gray-400">
                                         {t('click_folder_view')}
                                     </div>
@@ -1153,7 +1214,7 @@ export default function Home() {
                 </div>
             </div>
             <Footer />
-            
+
             {/* Modals */}
             <CategorySelectionModal
                 isOpen={showCategoryModal}
@@ -1162,14 +1223,14 @@ export default function Home() {
                 plantCategories={plantCategories}
                 t={t}
             />
-            
+
             <CreateFolderModal
                 isOpen={showCreateFolderModal}
                 onClose={() => setShowCreateFolderModal(false)}
                 onCreate={handleCreateFolder}
                 t={t}
             />
-            
+
             <EditFolderModal
                 isOpen={showEditFolderModal}
                 onClose={() => {
@@ -1180,7 +1241,7 @@ export default function Home() {
                 folder={folderToEdit}
                 t={t}
             />
-            
+
             {/* Delete Field Confirmation Dialog */}
             {showDeleteConfirm && fieldToDelete && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50">
@@ -1262,7 +1323,7 @@ export default function Home() {
                     </div>
                 </div>
             )}
-            
+
             {/* Delete Folder Confirmation Dialog */}
             {showFolderDeleteConfirm && folderToDelete && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50">

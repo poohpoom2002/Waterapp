@@ -79,9 +79,13 @@ class SummaryErrorBoundary extends React.Component<
                 <div className="flex h-full w-full items-center justify-center bg-gray-900">
                     <div className="text-center text-white">
                         <div className="mb-4 text-4xl">⚠️</div>
-                        <h3 className="mb-4 text-lg font-bold">{t('ไม่สามารถแสดงแผนที่สรุปผลได้')}</h3>
+                        <h3 className="mb-4 text-lg font-bold">
+                            {t('ไม่สามารถแสดงแผนที่สรุปผลได้')}
+                        </h3>
                         <p className="mb-4 text-sm text-gray-400">
-                            {t('ไม่พบ Google Maps API Key กรุณาตั้งค่า VITE_GOOGLE_MAPS_API_KEY ในไฟล์ .env')}
+                            {t(
+                                'ไม่พบ Google Maps API Key กรุณาตั้งค่า VITE_GOOGLE_MAPS_API_KEY ในไฟล์ .env'
+                            )}
                         </p>
                         <button
                             onClick={() => window.location.reload()}
@@ -172,7 +176,6 @@ const SummaryMapComponent: React.FC<{
                 setMap(newMap);
                 onLoad?.(newMap);
                 setError(null);
-
             } catch (error) {
                 console.error('Error creating summary map:', error);
                 setError(error instanceof Error ? error.message : 'Unknown error');

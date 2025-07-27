@@ -438,7 +438,8 @@ export const calculatePaybackPeriod = (totalCost: number, annualProfit: number):
 export const convertLegacyData = (legacyData: unknown): GreenhousePlanningData => {
     const now = new Date().toISOString();
     const data = legacyData as Record<string, unknown>;
-    const safePlanningMethod = (val: any): 'draw' | 'import' => (val === 'draw' || val === 'import') ? val : 'draw';
+    const safePlanningMethod = (val: any): 'draw' | 'import' =>
+        val === 'draw' || val === 'import' ? val : 'draw';
     const safeIrrigationMethod = (val: any): 'mini-sprinkler' | 'drip' | 'mixed' =>
         val === 'mini-sprinkler' || val === 'drip' || val === 'mixed' ? val : 'mini-sprinkler';
 
@@ -453,7 +454,7 @@ export const convertLegacyData = (legacyData: unknown): GreenhousePlanningData =
         crops: {
             selectedCrops: (data.selectedCrops as string[]) || [],
             assignments: (data.assignments as CropAssignment[]) || [],
-            totalCropTypes: ((data.selectedCrops as string[])?.length) || 0,
+            totalCropTypes: (data.selectedCrops as string[])?.length || 0,
         },
         structures: {
             shapes: (data.shapes as Shape[]) || [],
@@ -465,7 +466,7 @@ export const convertLegacyData = (legacyData: unknown): GreenhousePlanningData =
                 waterSourceArea: (data.waterSourceArea as number) || 0,
                 utilizationRate: (data.utilizationRate as number) || 0,
             },
-            totalStructures: ((data.shapes as Shape[])?.length) || 0,
+            totalStructures: (data.shapes as Shape[])?.length || 0,
         },
         irrigation: {
             systemInfo: {

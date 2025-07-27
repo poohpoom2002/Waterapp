@@ -109,24 +109,24 @@ const MapComponent: React.FC<{
                     restriction: null,
                     zoomControl: true,
                     scrollwheel: true,
-                    gestureHandling: 'greedy'
+                    gestureHandling: 'greedy',
                 });
 
                 let isZooming = false;
                 const customZoomHandler = (e: WheelEvent) => {
                     if (isZooming) return;
                     isZooming = true;
-                    
+
                     e.preventDefault();
                     e.stopPropagation();
-                    
+
                     const currentZoom = newMap.getZoom() || 10;
                     const delta = e.deltaY > 0 ? -0.5 : 0.5;
                     const newZoom = currentZoom + delta;
-                    
+
                     if (newZoom >= 1 && newZoom <= 50) {
                         newMap.setZoom(newZoom);
-                        
+
                         if (newZoom > 25) {
                             const center = newMap.getCenter();
                             if (center) {
@@ -136,16 +136,16 @@ const MapComponent: React.FC<{
                             }
                         }
                     }
-                    
+
                     setTimeout(() => {
                         isZooming = false;
                     }, 50);
                 };
 
                 const mapContainer = ref.current;
-                mapContainer.addEventListener('wheel', customZoomHandler, { 
-                    passive: false, 
-                    capture: true 
+                mapContainer.addEventListener('wheel', customZoomHandler, {
+                    passive: false,
+                    capture: true,
                 });
 
                 newMap.addListener('zoom_changed', () => {
@@ -153,7 +153,7 @@ const MapComponent: React.FC<{
                     if (currentZoom && currentZoom > 25) {
                         newMap.setOptions({
                             minZoom: null,
-                            maxZoom: null
+                            maxZoom: null,
                         });
                     }
                 });

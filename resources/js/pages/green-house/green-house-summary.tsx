@@ -161,17 +161,23 @@ export default function GreenhouseSummary() {
                 const parsedData = JSON.parse(savedData);
                 console.log('Summary: Loaded data from localStorage:', parsedData);
                 console.log('Summary: Irrigation elements:', parsedData.irrigationElements);
-                console.log('Summary: Irrigation elements length:', parsedData.irrigationElements?.length || 'undefined');
+                console.log(
+                    'Summary: Irrigation elements length:',
+                    parsedData.irrigationElements?.length || 'undefined'
+                );
                 console.log('Summary: Keys in parsedData:', Object.keys(parsedData));
-                
+
                 // Check if irrigationElements exists and is an array
                 if (parsedData.irrigationElements) {
-                    console.log('irrigationElements is array:', Array.isArray(parsedData.irrigationElements));
+                    console.log(
+                        'irrigationElements is array:',
+                        Array.isArray(parsedData.irrigationElements)
+                    );
                     console.log('irrigationElements type:', typeof parsedData.irrigationElements);
                 } else {
                     console.log('irrigationElements is missing or falsy');
                 }
-                
+
                 setSummaryData(parsedData);
             } catch (error) {
                 console.error('Error parsing saved data:', error);
@@ -213,23 +219,25 @@ export default function GreenhouseSummary() {
     // Helper function to check if a point is inside a polygon (Ray casting algorithm)
     const isPointInPolygon = (point: Point, polygon: Point[]): boolean => {
         if (polygon.length < 3) return false;
-        
+
         let isInside = false;
         let j = polygon.length - 1;
-        
+
         for (let i = 0; i < polygon.length; i++) {
             const xi = polygon[i].x;
             const yi = polygon[i].y;
             const xj = polygon[j].x;
             const yj = polygon[j].y;
-            
-            if (((yi > point.y) !== (yj > point.y)) && 
-                (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi)) {
+
+            if (
+                yi > point.y !== yj > point.y &&
+                point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi
+            ) {
                 isInside = !isInside;
             }
             j = i;
         }
-        
+
         return isInside;
     };
 
@@ -239,7 +247,11 @@ export default function GreenhouseSummary() {
     };
 
     // Helper function to find closest point on line segment
-    const closestPointOnLineSegment = (point: Point, lineStart: Point, lineEnd: Point): { point: Point; distance: number; t: number } => {
+    const closestPointOnLineSegment = (
+        point: Point,
+        lineStart: Point,
+        lineEnd: Point
+    ): { point: Point; distance: number; t: number } => {
         const A = point.x - lineStart.x;
         const B = point.y - lineStart.y;
         const C = lineEnd.x - lineStart.x;
@@ -247,7 +259,7 @@ export default function GreenhouseSummary() {
 
         const dot = A * C + B * D;
         const lenSq = C * C + D * D;
-        
+
         let t = 0;
         if (lenSq !== 0) {
             t = Math.max(0, Math.min(1, dot / lenSq));
@@ -255,11 +267,11 @@ export default function GreenhouseSummary() {
 
         const closestPoint = {
             x: lineStart.x + t * C,
-            y: lineStart.y + t * D
+            y: lineStart.y + t * D,
         };
 
         const distance = distanceBetweenPoints(point, closestPoint);
-        
+
         return { point: closestPoint, distance, t };
     };
 
@@ -272,25 +284,26 @@ export default function GreenhouseSummary() {
 
         // ค้นหาจาก value ก่อน
         let crop = getCropByValue(cropType);
-        
+
         // หากไม่พบ ให้ค้นหาจากชื่อไทย
         if (!crop) {
-            crop = greenhouseCrops.find(c => c.name === cropType);
+            crop = greenhouseCrops.find((c) => c.name === cropType);
         }
-        
+
         // หากยังไม่พบ ให้ค้นหาจากชื่ออังกฤษ
         if (!crop) {
-            crop = greenhouseCrops.find(c => c.nameEn.toLowerCase() === cropType.toLowerCase());
+            crop = greenhouseCrops.find((c) => c.nameEn.toLowerCase() === cropType.toLowerCase());
         }
-        
+
         // หากยังไม่พบ ให้ค้นหาแบบ partial match
         if (!crop) {
             const lowerCropType = cropType.toLowerCase();
-            crop = greenhouseCrops.find(c => 
-                c.name.toLowerCase().includes(lowerCropType) || 
-                c.nameEn.toLowerCase().includes(lowerCropType) ||
-                lowerCropType.includes(c.name.toLowerCase()) ||
-                lowerCropType.includes(c.nameEn.toLowerCase())
+            crop = greenhouseCrops.find(
+                (c) =>
+                    c.name.toLowerCase().includes(lowerCropType) ||
+                    c.nameEn.toLowerCase().includes(lowerCropType) ||
+                    lowerCropType.includes(c.name.toLowerCase()) ||
+                    lowerCropType.includes(c.nameEn.toLowerCase())
             );
         }
 
@@ -304,7 +317,7 @@ export default function GreenhouseSummary() {
         console.log('summaryData:', summaryData);
         console.log('summaryData?.irrigationElements:', summaryData?.irrigationElements);
         console.log('irrigationElements length:', summaryData?.irrigationElements?.length);
-        
+
         if (!summaryData?.shapes || !summaryData?.irrigationElements) {
             console.log('Missing data - shapes or irrigationElements');
             return [];
@@ -314,26 +327,30 @@ export default function GreenhouseSummary() {
         const elements = summaryData.irrigationElements;
 
         // Sort plots by position (top to bottom, then left to right)
-        const sortedPlots = plots.map((plot, originalIndex) => ({
-            ...plot,
-            originalIndex,
-            // Calculate plot center for sorting
-            centerY: plot.points.reduce((sum, p) => sum + p.y, 0) / plot.points.length,
-            centerX: plot.points.reduce((sum, p) => sum + p.x, 0) / plot.points.length,
-        })).sort((a, b) => {
-            // Sort by Y first (top to bottom), then by X (left to right)
-            const yDiff = a.centerY - b.centerY;
-            if (Math.abs(yDiff) > 50) { // If Y difference is significant
-                return yDiff;
-            }
-            return a.centerX - b.centerX; // Otherwise sort by X
-        });
+        const sortedPlots = plots
+            .map((plot, originalIndex) => ({
+                ...plot,
+                originalIndex,
+                // Calculate plot center for sorting
+                centerY: plot.points.reduce((sum, p) => sum + p.y, 0) / plot.points.length,
+                centerX: plot.points.reduce((sum, p) => sum + p.x, 0) / plot.points.length,
+            }))
+            .sort((a, b) => {
+                // Sort by Y first (top to bottom), then by X (left to right)
+                const yDiff = a.centerY - b.centerY;
+                if (Math.abs(yDiff) > 50) {
+                    // If Y difference is significant
+                    return yDiff;
+                }
+                return a.centerX - b.centerX; // Otherwise sort by X
+            });
 
         return sortedPlots.map((plot, sortedIndex) => {
             const plotPipeData = {
                 plotName: plot.name || `แปลงปลูกที่ ${sortedIndex + 1}`,
-                cropType: plot.cropType || 
-                    (summaryData.selectedCrops && summaryData.selectedCrops[plot.originalIndex]) || 
+                cropType:
+                    plot.cropType ||
+                    (summaryData.selectedCrops && summaryData.selectedCrops[plot.originalIndex]) ||
                     'ยังไม่ได้เลือกพืช',
                 maxMainPipeLength: 0,
                 maxSubPipeLength: 0,
@@ -341,44 +358,47 @@ export default function GreenhouseSummary() {
                 totalMainPipeLength: 0,
                 totalSubPipeLength: 0,
                 totalPipeLength: 0,
-                hasPipes: false
+                hasPipes: false,
             };
 
             // Find main pipes and sub pipes
-            const mainPipes = elements.filter(e => e.type === 'main-pipe');
-            const subPipes = elements.filter(e => e.type === 'sub-pipe');
+            const mainPipes = elements.filter((e) => e.type === 'main-pipe');
+            const subPipes = elements.filter((e) => e.type === 'sub-pipe');
 
             if (mainPipes.length === 0) return plotPipeData;
 
             let maxMainDistanceForThisPlot = 0;
 
             // For each main pipe, find sub pipes that connect to it and serve this plot
-            mainPipes.forEach(mainPipe => {
+            mainPipes.forEach((mainPipe) => {
                 if (mainPipe.points.length < 2) return;
 
                 // Create cumulative distance array for this main pipe
                 const cumulativeDistances = [0];
                 let totalDistance = 0;
-                
+
                 for (let i = 1; i < mainPipe.points.length; i++) {
-                    const segmentLength = distanceBetweenPoints(mainPipe.points[i-1], mainPipe.points[i]);
+                    const segmentLength = distanceBetweenPoints(
+                        mainPipe.points[i - 1],
+                        mainPipe.points[i]
+                    );
                     totalDistance += segmentLength;
                     cumulativeDistances.push(totalDistance);
                 }
 
                 // Find sub pipes that connect to this main pipe and serve this plot
-                subPipes.forEach(subPipe => {
+                subPipes.forEach((subPipe) => {
                     if (subPipe.points.length < 1) return;
 
                     // Check if this sub pipe serves this plot (any point in plot)
-                    const servesThisPlot = subPipe.points.some(point => 
+                    const servesThisPlot = subPipe.points.some((point) =>
                         isPointInPolygon(point, plot.points)
                     );
 
                     if (!servesThisPlot) return;
 
                     const subPipeStart = subPipe.points[0];
-                    
+
                     // Find the closest connection point on the main pipe
                     let closestDistance = Infinity;
                     let connectionCumulativeDistance = 0;
@@ -386,25 +406,34 @@ export default function GreenhouseSummary() {
 
                     for (let i = 0; i < mainPipe.points.length - 1; i++) {
                         const result = closestPointOnLineSegment(
-                            subPipeStart, 
-                            mainPipe.points[i], 
+                            subPipeStart,
+                            mainPipe.points[i],
                             mainPipe.points[i + 1]
                         );
 
                         if (result.distance < closestDistance) {
                             closestDistance = result.distance;
                             // Calculate cumulative distance to this connection point
-                            connectionCumulativeDistance = cumulativeDistances[i] + 
-                                result.t * distanceBetweenPoints(mainPipe.points[i], mainPipe.points[i + 1]);
+                            connectionCumulativeDistance =
+                                cumulativeDistances[i] +
+                                result.t *
+                                    distanceBetweenPoints(
+                                        mainPipe.points[i],
+                                        mainPipe.points[i + 1]
+                                    );
                             connectionFound = true;
                         }
                     }
 
                     // If connection is found within reasonable tolerance
-                    if (connectionFound && closestDistance < 50) { // 50 pixels tolerance
+                    if (connectionFound && closestDistance < 50) {
+                        // 50 pixels tolerance
                         // Convert to meters and update distance for this plot
                         const connectionDistanceInMeters = connectionCumulativeDistance / 25;
-                        maxMainDistanceForThisPlot = Math.max(maxMainDistanceForThisPlot, connectionDistanceInMeters);
+                        maxMainDistanceForThisPlot = Math.max(
+                            maxMainDistanceForThisPlot,
+                            connectionDistanceInMeters
+                        );
                         plotPipeData.hasPipes = true;
                     }
                 });
@@ -418,24 +447,25 @@ export default function GreenhouseSummary() {
             let maxSubPipeLength = 0;
             let totalSubLengthInPlot = 0;
 
-            subPipes.forEach(subPipe => {
+            subPipes.forEach((subPipe) => {
                 let subPipeLengthInPlot = 0;
                 let hasSegmentInPlot = false;
-                
+
                 for (let i = 0; i < subPipe.points.length - 1; i++) {
                     const p1 = subPipe.points[i];
                     const p2 = subPipe.points[i + 1];
-                    
+
                     // Check if this segment is in the plot
                     const midPoint = {
                         x: (p1.x + p2.x) / 2,
-                        y: (p1.y + p2.y) / 2
+                        y: (p1.y + p2.y) / 2,
                     };
-                    
-                    if (isPointInPolygon(p1, plot.points) || 
-                        isPointInPolygon(p2, plot.points) || 
-                        isPointInPolygon(midPoint, plot.points)) {
-                        
+
+                    if (
+                        isPointInPolygon(p1, plot.points) ||
+                        isPointInPolygon(p2, plot.points) ||
+                        isPointInPolygon(midPoint, plot.points)
+                    ) {
                         const segmentLength = distanceBetweenPoints(p1, p2) / 25; // Convert to meters
                         subPipeLengthInPlot += segmentLength;
                         hasSegmentInPlot = true;
@@ -451,11 +481,14 @@ export default function GreenhouseSummary() {
 
             // Set final values
             plotPipeData.maxSubPipeLength = Math.round(maxSubPipeLength * 100) / 100;
-            plotPipeData.maxTotalPipeLength = Math.round((plotPipeData.maxMainPipeLength + maxSubPipeLength) * 100) / 100;
+            plotPipeData.maxTotalPipeLength =
+                Math.round((plotPipeData.maxMainPipeLength + maxSubPipeLength) * 100) / 100;
             plotPipeData.totalSubPipeLength = Math.round(totalSubLengthInPlot * 100) / 100;
-            plotPipeData.totalPipeLength = Math.round((plotPipeData.totalMainPipeLength + totalSubLengthInPlot) * 100) / 100;
+            plotPipeData.totalPipeLength =
+                Math.round((plotPipeData.totalMainPipeLength + totalSubLengthInPlot) * 100) / 100;
             plotPipeData.maxMainPipeLength = Math.round(plotPipeData.maxMainPipeLength * 100) / 100;
-            plotPipeData.totalMainPipeLength = Math.round(plotPipeData.totalMainPipeLength * 100) / 100;
+            plotPipeData.totalMainPipeLength =
+                Math.round(plotPipeData.totalMainPipeLength * 100) / 100;
 
             // Debug logging
             console.log(`=== ${plotPipeData.plotName} ===`);
@@ -532,15 +565,18 @@ export default function GreenhouseSummary() {
 
     const metrics = calculateMetrics();
 
-    // Enhanced Calculate irrigation equipment from irrigationElements 
+    // Enhanced Calculate irrigation equipment from irrigationElements
     const calculateIrrigationMetrics = () => {
         console.log('=== calculateIrrigationMetrics START ===');
         console.log('summaryData in calculateIrrigationMetrics:', summaryData);
-        console.log('summaryData?.irrigationElements in calculateIrrigationMetrics:', summaryData?.irrigationElements);
+        console.log(
+            'summaryData?.irrigationElements in calculateIrrigationMetrics:',
+            summaryData?.irrigationElements
+        );
         console.log('irrigationElements exists?', !!summaryData?.irrigationElements);
         console.log('irrigationElements is array?', Array.isArray(summaryData?.irrigationElements));
         console.log('irrigationElements length:', summaryData?.irrigationElements?.length);
-        
+
         if (!summaryData?.irrigationElements || summaryData.irrigationElements.length === 0) {
             console.log('Summary: No irrigation elements found or empty array');
             console.log('Reason: irrigationElements =', summaryData?.irrigationElements);
@@ -1336,7 +1372,7 @@ export default function GreenhouseSummary() {
                                         🔵 ระบบท่อ
                                     </h3>
                                     {/* First row: Max pipe lengths */}
-                                    <div className="grid grid-cols-3 gap-1 mb-2 print:gap-2">
+                                    <div className="mb-2 grid grid-cols-3 gap-1 print:gap-2">
                                         <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                             <div className="text-sm font-bold text-blue-400 print:text-sm print:text-black">
                                                 {irrigationMetrics.maxMainPipeLength.toFixed(1)} ม.
@@ -1366,7 +1402,8 @@ export default function GreenhouseSummary() {
                                     <div className="grid grid-cols-3 gap-1 print:gap-2">
                                         <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                             <div className="text-sm font-bold text-cyan-400 print:text-sm print:text-black">
-                                                {irrigationMetrics.totalMainPipeLength.toFixed(1)} ม.
+                                                {irrigationMetrics.totalMainPipeLength.toFixed(1)}{' '}
+                                                ม.
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
                                                 ท่อเมนทั้งหมด
@@ -1530,7 +1567,10 @@ export default function GreenhouseSummary() {
                                             วาล์ว สปริงเกลอร์
                                         </p>
                                         <p>• ขนาดและตำแหน่งอาจต้องปรับตามสภาพพื้นที่จริง</p>
-                                        <p>• ความยาวท่อทั้งหมด: {irrigationMetrics.totalPipeLength.toFixed(1)} เมตร</p>
+                                        <p>
+                                            • ความยาวท่อทั้งหมด:{' '}
+                                            {irrigationMetrics.totalPipeLength.toFixed(1)} เมตร
+                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -1544,25 +1584,32 @@ export default function GreenhouseSummary() {
                                     <div className="space-y-3">
                                         {plotPipeData.length > 0 ? (
                                             plotPipeData.map((plot, index) => (
-                                                <div key={index} className="border-b border-gray-200 pb-3">
-                                                    <div className="flex items-center justify-between mb-2">
+                                                <div
+                                                    key={index}
+                                                    className="border-b border-gray-200 pb-3"
+                                                >
+                                                    <div className="mb-2 flex items-center justify-between">
                                                         <span className="text-sm font-semibold text-gray-700">
-                                                            {getCropIcon(plot.cropType)} {plot.plotName}
+                                                            {getCropIcon(plot.cropType)}{' '}
+                                                            {plot.plotName}
                                                         </span>
                                                         <span className="text-xs text-gray-500">
                                                             สภาพแวดล้อมควบคุม
                                                         </span>
                                                     </div>
-                                                    <p className="text-xs text-gray-600 mb-2">
+                                                    <p className="mb-2 text-xs text-gray-600">
                                                         พืชที่ปลูก: {plot.cropType}
                                                     </p>
-                                                    
+
                                                     {plot.hasPipes ? (
                                                         <div className="space-y-2">
                                                             <div className="grid grid-cols-3 gap-2">
                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
                                                                     <div className="text-xs font-bold text-black">
-                                                                        {plot.maxMainPipeLength.toFixed(1)} ม.
+                                                                        {plot.maxMainPipeLength.toFixed(
+                                                                            1
+                                                                        )}{' '}
+                                                                        ม.
                                                                     </div>
                                                                     <div className="text-xs text-gray-600">
                                                                         ท่อเมนสูงสุด
@@ -1570,7 +1617,10 @@ export default function GreenhouseSummary() {
                                                                 </div>
                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
                                                                     <div className="text-xs font-bold text-black">
-                                                                        {plot.maxSubPipeLength.toFixed(1)} ม.
+                                                                        {plot.maxSubPipeLength.toFixed(
+                                                                            1
+                                                                        )}{' '}
+                                                                        ม.
                                                                     </div>
                                                                     <div className="text-xs text-gray-600">
                                                                         ท่อย่อยสูงสุด
@@ -1578,7 +1628,10 @@ export default function GreenhouseSummary() {
                                                                 </div>
                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
                                                                     <div className="text-xs font-bold text-black">
-                                                                        {plot.maxTotalPipeLength.toFixed(1)} ม.
+                                                                        {plot.maxTotalPipeLength.toFixed(
+                                                                            1
+                                                                        )}{' '}
+                                                                        ม.
                                                                     </div>
                                                                     <div className="text-xs text-gray-600">
                                                                         รวมสูงสุด
@@ -1588,7 +1641,10 @@ export default function GreenhouseSummary() {
                                                             <div className="grid grid-cols-3 gap-2">
                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
                                                                     <div className="text-xs font-bold text-black">
-                                                                        {plot.totalMainPipeLength.toFixed(1)} ม.
+                                                                        {plot.totalMainPipeLength.toFixed(
+                                                                            1
+                                                                        )}{' '}
+                                                                        ม.
                                                                     </div>
                                                                     <div className="text-xs text-gray-600">
                                                                         ท่อเมนทั้งหมด
@@ -1596,7 +1652,10 @@ export default function GreenhouseSummary() {
                                                                 </div>
                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
                                                                     <div className="text-xs font-bold text-black">
-                                                                        {plot.totalSubPipeLength.toFixed(1)} ม.
+                                                                        {plot.totalSubPipeLength.toFixed(
+                                                                            1
+                                                                        )}{' '}
+                                                                        ม.
                                                                     </div>
                                                                     <div className="text-xs text-gray-600">
                                                                         ท่อย่อยทั้งหมด
@@ -1604,7 +1663,10 @@ export default function GreenhouseSummary() {
                                                                 </div>
                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
                                                                     <div className="text-xs font-bold text-black">
-                                                                        {plot.totalPipeLength.toFixed(1)} ม.
+                                                                        {plot.totalPipeLength.toFixed(
+                                                                            1
+                                                                        )}{' '}
+                                                                        ม.
                                                                     </div>
                                                                     <div className="text-xs text-gray-600">
                                                                         รวมทั้งหมด
@@ -1613,7 +1675,7 @@ export default function GreenhouseSummary() {
                                                             </div>
                                                         </div>
                                                     ) : (
-                                                        <div className="text-center p-2 bg-gray-50 border border-gray-200">
+                                                        <div className="border border-gray-200 bg-gray-50 p-2 text-center">
                                                             <span className="text-xs text-gray-600">
                                                                 ไม่มีระบบท่อในแปลงนี้
                                                             </span>
@@ -1655,9 +1717,11 @@ export default function GreenhouseSummary() {
                                     {plotPipeData.length > 0 ? (
                                         plotPipeData.map((plot, index) => (
                                             <div key={index} className="rounded-lg bg-gray-700 p-3">
-                                                <div className="flex items-center justify-between mb-2">
+                                                <div className="mb-2 flex items-center justify-between">
                                                     <div className="flex items-center space-x-2">
-                                                        <span className="text-lg">{getCropIcon(plot.cropType)}</span>
+                                                        <span className="text-lg">
+                                                            {getCropIcon(plot.cropType)}
+                                                        </span>
                                                         <div>
                                                             <h3 className="text-sm font-semibold text-white">
                                                                 {plot.plotName}
@@ -1673,13 +1737,16 @@ export default function GreenhouseSummary() {
                                                         </div>
                                                     </div>
                                                 </div>
-                                                
+
                                                 {plot.hasPipes ? (
                                                     <div className="mt-2 space-y-2">
                                                         <div className="grid grid-cols-3 gap-2">
                                                             <div className="rounded bg-gray-600 p-2 text-center">
                                                                 <div className="text-xs font-bold text-blue-400">
-                                                                    {plot.maxMainPipeLength.toFixed(1)} ม.
+                                                                    {plot.maxMainPipeLength.toFixed(
+                                                                        1
+                                                                    )}{' '}
+                                                                    ม.
                                                                 </div>
                                                                 <div className="text-xs text-gray-400">
                                                                     ท่อเมนสูงสุด
@@ -1687,7 +1754,10 @@ export default function GreenhouseSummary() {
                                                             </div>
                                                             <div className="rounded bg-gray-600 p-2 text-center">
                                                                 <div className="text-xs font-bold text-green-400">
-                                                                    {plot.maxSubPipeLength.toFixed(1)} ม.
+                                                                    {plot.maxSubPipeLength.toFixed(
+                                                                        1
+                                                                    )}{' '}
+                                                                    ม.
                                                                 </div>
                                                                 <div className="text-xs text-gray-400">
                                                                     ท่อย่อยสูงสุด
@@ -1695,7 +1765,10 @@ export default function GreenhouseSummary() {
                                                             </div>
                                                             <div className="rounded bg-gray-600 p-2 text-center">
                                                                 <div className="text-xs font-bold text-purple-400">
-                                                                    {plot.maxTotalPipeLength.toFixed(1)} ม.
+                                                                    {plot.maxTotalPipeLength.toFixed(
+                                                                        1
+                                                                    )}{' '}
+                                                                    ม.
                                                                 </div>
                                                                 <div className="text-xs text-gray-400">
                                                                     รวมสูงสุด
@@ -1705,7 +1778,10 @@ export default function GreenhouseSummary() {
                                                         <div className="grid grid-cols-3 gap-2">
                                                             <div className="rounded bg-gray-600 p-2 text-center">
                                                                 <div className="text-xs font-bold text-cyan-400">
-                                                                    {plot.totalMainPipeLength.toFixed(1)} ม.
+                                                                    {plot.totalMainPipeLength.toFixed(
+                                                                        1
+                                                                    )}{' '}
+                                                                    ม.
                                                                 </div>
                                                                 <div className="text-xs text-gray-400">
                                                                     ท่อเมนทั้งหมด
@@ -1713,7 +1789,10 @@ export default function GreenhouseSummary() {
                                                             </div>
                                                             <div className="rounded bg-gray-600 p-2 text-center">
                                                                 <div className="text-xs font-bold text-yellow-400">
-                                                                    {plot.totalSubPipeLength.toFixed(1)} ม.
+                                                                    {plot.totalSubPipeLength.toFixed(
+                                                                        1
+                                                                    )}{' '}
+                                                                    ม.
                                                                 </div>
                                                                 <div className="text-xs text-gray-400">
                                                                     ท่อย่อยทั้งหมด
@@ -1721,7 +1800,10 @@ export default function GreenhouseSummary() {
                                                             </div>
                                                             <div className="rounded bg-gray-600 p-2 text-center">
                                                                 <div className="text-xs font-bold text-pink-400">
-                                                                    {plot.totalPipeLength.toFixed(1)} ม.
+                                                                    {plot.totalPipeLength.toFixed(
+                                                                        1
+                                                                    )}{' '}
+                                                                    ม.
                                                                 </div>
                                                                 <div className="text-xs text-gray-400">
                                                                     รวมทั้งหมด
@@ -1730,7 +1812,7 @@ export default function GreenhouseSummary() {
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <div className="mt-2 text-center p-2 bg-gray-600 rounded">
+                                                    <div className="mt-2 rounded bg-gray-600 p-2 text-center">
                                                         <span className="text-xs text-gray-400">
                                                             ไม่มีระบบท่อในแปลงนี้
                                                         </span>
@@ -1741,10 +1823,15 @@ export default function GreenhouseSummary() {
                                     ) : (
                                         <>
                                             {summaryData?.selectedCrops?.map((crop, index) => (
-                                                <div key={index} className="rounded-lg bg-gray-700 p-2">
+                                                <div
+                                                    key={index}
+                                                    className="rounded-lg bg-gray-700 p-2"
+                                                >
                                                     <div className="flex items-center justify-between">
                                                         <div className="flex items-center space-x-2">
-                                                            <span className="text-lg">{getCropIcon(crop)}</span>
+                                                            <span className="text-lg">
+                                                                {getCropIcon(crop)}
+                                                            </span>
                                                             <div>
                                                                 <h3 className="text-sm font-semibold text-white">
                                                                     {crop}

@@ -164,7 +164,9 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
 
     const [isPanning, setIsPanning] = useState(false);
     const [panStart, setPanStart] = useState<{ x: number; y: number } | null>(null);
-    const [lastPanPosition, setLastPanPosition] = useState<{ panX: number; panY: number } | null>(null);
+    const [lastPanPosition, setLastPanPosition] = useState<{ panX: number; panY: number } | null>(
+        null
+    );
 
     const zoneDrawingTools: ZoneDrawingTool[] = [
         {
@@ -1316,8 +1318,8 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             if (isPanning && panStart && lastPanPosition) {
                 const deltaX = x - panStart.x;
                 const deltaY = y - panStart.y;
-                
-                setViewport(prev => ({
+
+                setViewport((prev) => ({
                     ...prev,
                     panX: lastPanPosition.panX + deltaX / prev.zoom,
                     panY: lastPanPosition.panY + deltaY / prev.zoom,
@@ -1429,12 +1431,17 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             let x = e.clientX - rect.left;
             let y = e.clientY - rect.top;
 
-            const isMainClick = editMode === 'view' || 
-                              (!dimensionMode && !isSettingScale && 
-                               editMode !== 'draw' && editMode !== 'place' && 
-                               editMode !== 'edit' && editMode !== 'main-pipe' && 
-                               editMode !== 'drag-sprinkler' && 
-                               editMode !== 'connect-sprinklers' && !pipeEditMode);
+            const isMainClick =
+                editMode === 'view' ||
+                (!dimensionMode &&
+                    !isSettingScale &&
+                    editMode !== 'draw' &&
+                    editMode !== 'place' &&
+                    editMode !== 'edit' &&
+                    editMode !== 'main-pipe' &&
+                    editMode !== 'drag-sprinkler' &&
+                    editMode !== 'connect-sprinklers' &&
+                    !pipeEditMode);
 
             if (isMainClick && e.button === 0) {
                 setIsPanning(true);
@@ -2028,7 +2035,14 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 width={canvasSize.width}
                 height={canvasSize.height}
                 className="h-full w-full bg-gray-900"
-                style={{ cursor: isSettingScale || dimensionMode ? 'crosshair' : isPanning ? 'grabbing' : 'default' }}
+                style={{
+                    cursor:
+                        isSettingScale || dimensionMode
+                            ? 'crosshair'
+                            : isPanning
+                              ? 'grabbing'
+                              : 'default',
+                }}
                 onMouseMove={handleMouseMove}
                 onMouseDown={handleMouseDown}
                 onMouseUp={handleMouseUp}
@@ -2123,7 +2137,9 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                     </div>
 
                     <div className="border-t border-gray-600 pt-3">
-                        <div className="mb-2 text-xs font-medium text-gray-300">👁️ {t('การแสดงผล:')}</div>
+                        <div className="mb-2 text-xs font-medium text-gray-300">
+                            👁️ {t('การแสดงผล:')}
+                        </div>
                         <div className="grid grid-cols-2 gap-2">
                             {[
                                 {
@@ -2165,7 +2181,9 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                     </div>
 
                     <div className="border-t border-gray-600 pt-3">
-                        <div className="mb-2 text-xs font-medium text-gray-300">🔍 {t('การซูม:')}</div>
+                        <div className="mb-2 text-xs font-medium text-gray-300">
+                            🔍 {t('การซูม:')}
+                        </div>
                         <div className="flex gap-1">
                             <button
                                 onClick={() =>
@@ -2236,7 +2254,9 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                     </label>
 
                     <div className="border-t border-gray-600 pt-3">
-                        <div className="mb-2 text-xs font-medium text-gray-300">🔍 {t('การซูม:')}</div>
+                        <div className="mb-2 text-xs font-medium text-gray-300">
+                            🔍 {t('การซูม:')}
+                        </div>
                         <div className="flex gap-1">
                             <button
                                 onClick={() =>
@@ -2397,23 +2417,27 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                     </div>
                     {dimensionMode ? (
                         <div>
-                            <div className="mb-1 font-semibold text-yellow-400">📐 {t('โหมดวัดระยะ')}</div>
+                            <div className="mb-1 font-semibold text-yellow-400">
+                                📐 {t('โหมดวัดระยะ')}
+                            </div>
                             <div>
-                                {t('คลิกจุดที่ 1 และจุดที่ 2 เพื่อสร้างเส้นวัด')}{' '}
-                                ({tempDimensionPoints.length}/2)
+                                {t('คลิกจุดที่ 1 และจุดที่ 2 เพื่อสร้างเส้นวัด')} (
+                                {tempDimensionPoints.length}/2)
                             </div>
                         </div>
                     ) : isSettingScale ? (
                         <div>
                             <div className="mb-1 font-semibold text-yellow-400">
-                                    📐 {t('ตั้งค่ามาตราส่วน')}
+                                📐 {t('ตั้งค่ามาตราส่วน')}
                             </div>
-                            <div>{t('คลิก 2 จุดเพื่อวัดระยะ')}{' '}({scalePoints.length}/2)</div>
+                            <div>
+                                {t('คลิก 2 จุดเพื่อวัดระยะ')} ({scalePoints.length}/2)
+                            </div>
                         </div>
                     ) : editMode === 'draw' ? (
                         <div>
                             <div className="mb-1 font-semibold text-blue-400">
-                                ✏️ {t('กำลังวาดโซน')} - {' '}
+                                ✏️ {t('กำลังวาดโซน')} -{' '}
                                 {zoneDrawingTools.find((t) => t.id === currentZoneTool)?.name}
                             </div>
                             {currentZoneTool === 'freehand' ? (
@@ -2462,8 +2486,13 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                         </div>
                     ) : (
                         <div>
-                            <div className="mb-1 font-semibold text-gray-400">{t('เลือกเครื่องมือ')}</div>
-                            <div>{t('เลือกเครื่องมือวาดโซนจากแผงด้านบน')} • {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนตาราง')}</div>
+                            <div className="mb-1 font-semibold text-gray-400">
+                                {t('เลือกเครื่องมือ')}
+                            </div>
+                            <div>
+                                {t('เลือกเครื่องมือวาดโซนจากแผงด้านบน')} •{' '}
+                                {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนตาราง')}
+                            </div>
                         </div>
                     )}
                 </div>
@@ -2477,17 +2506,24 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                             </div>
                             {isDrawing ? (
                                 <div className="space-y-1">
-                                    <div>📍 {t('คลิกเพื่อเพิ่มจุด')} ({currentPolygon.length} {t('จุด')})</div>
+                                    <div>
+                                        📍 {t('คลิกเพื่อเพิ่มจุด')} ({currentPolygon.length}{' '}
+                                        {t('จุด')})
+                                    </div>
                                     <div>🖱️ {t('คลิกขวาเพื่อจบการวาด')}</div>
-                                    <div>🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนตาราง')}</div>
+                                    <div>
+                                        🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนตาราง')}
+                                    </div>
                                 </div>
                             ) : (
                                 <div>
                                     <div>
-                                        🎯 {t('คลิกเพื่อเริ่มวาดโซน')} {' '}
+                                        🎯 {t('คลิกเพื่อเริ่มวาดโซน')}{' '}
                                         {ZONE_TYPES.find((z) => z.id === selectedZoneType)?.name}
                                     </div>
-                                    <div>🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนตาราง')}</div>
+                                    <div>
+                                        🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนตาราง')}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -2501,7 +2537,9 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                             </div>
                             <div>🎯 {t('คลิกเพื่อวางหัวฉีด')}</div>
                             <div className="mt-1 text-xs text-gray-300">
-                                {t('รัศมี:')}{' '}{manualSprinklerRadius}{t('ม.')}{' '}• 🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนตาราง')}
+                                {t('รัศมี:')} {manualSprinklerRadius}
+                                {t('ม.')} • 🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} •{' '}
+                                {t('ลากเพื่อเลื่อนตาราง')}
                             </div>
                         </div>
                     )}
@@ -2514,7 +2552,9 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                             </div>
                             <div>🎯 {t('คลิกเพื่อวางแหล่งน้ำ')}</div>
                             <div>🖱️ {t('คลิกขวาบนแหล่งน้ำเพื่อลบ')}</div>
-                            <div className="text-xs text-gray-300">🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนตาราง')}</div>
+                            <div className="text-xs text-gray-300">
+                                🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนตาราง')}
+                            </div>
                         </div>
                     )}
 
@@ -2526,7 +2566,9 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                             </div>
                             <div>🖱️ {t('ลากหัวฉีดเพื่อย้ายตำแหน่ง')}</div>
                             <div>🖱️ {t('คลิกขวาเพื่อลบหัวฉีด')}</div>
-                            <div className="text-xs text-gray-300">🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนตาราง')}</div>
+                            <div className="text-xs text-gray-300">
+                                🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนตาราง')}
+                            </div>
                         </div>
                     )}
 
@@ -2549,7 +2591,9 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                       ? `🎯 ${t('เลือกหัวฉีด 2 ตัวเพื่อลบท่อ')} (${selectedSprinklersForPipe.length}/2)`
                                       : `🎯 ${t('คลิกหัวฉีดเพื่อเลือก หรือ คลิกท่อเพื่อลบ')}`}
                             </div>
-                            <div className="text-xs text-gray-300">🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนตาราง')}</div>
+                            <div className="text-xs text-gray-300">
+                                🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนตาราง')}
+                            </div>
                         </div>
                     )}
 

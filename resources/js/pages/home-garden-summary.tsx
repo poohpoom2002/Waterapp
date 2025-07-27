@@ -65,7 +65,9 @@ class SummaryErrorBoundary extends React.Component<
                 <div className="flex min-h-screen items-center justify-center bg-gray-900 p-6">
                     <Navbar />
                     <div className="rounded-lg bg-red-900 p-6 text-center text-white">
-                        <h2 className="mb-4 text-xl font-bold">{t('เกิดข้อผิดพลาดในการแสดงสรุปผล')}</h2>
+                        <h2 className="mb-4 text-xl font-bold">
+                            {t('เกิดข้อผิดพลาดในการแสดงสรุปผล')}
+                        </h2>
                         <p className="mb-4">{t('ไม่สามารถโหลดข้อมูลการออกแบบได้')}</p>
                         <button
                             onClick={() => router.visit('/home-garden-planner')}
@@ -122,7 +124,16 @@ const CanvasRenderer: React.FC<{
         });
 
         if (zonePoints.length === 0) {
-            return { minX: 0, maxX: 0, minY: 0, maxY: 0, width: 0, height: 0, centerX: 0, centerY: 0 };
+            return {
+                minX: 0,
+                maxX: 0,
+                minY: 0,
+                maxY: 0,
+                width: 0,
+                height: 0,
+                centerX: 0,
+                centerY: 0,
+            };
         }
 
         const minX = Math.min(...zonePoints.map((p) => p.x));
@@ -178,11 +189,19 @@ const CanvasRenderer: React.FC<{
                 const zoomFactor = delta > 0 ? 1.1 : 0.9;
                 const newZoom = Math.max(0.1, Math.min(5, prev.zoom * zoomFactor));
 
-                const worldX = (centerX - prev.panX - baseTransform.offsetX * prev.zoom) / (baseTransform.scale * prev.zoom);
-                const worldY = (centerY - prev.panY - baseTransform.offsetY * prev.zoom) / (baseTransform.scale * prev.zoom);
+                const worldX =
+                    (centerX - prev.panX - baseTransform.offsetX * prev.zoom) /
+                    (baseTransform.scale * prev.zoom);
+                const worldY =
+                    (centerY - prev.panY - baseTransform.offsetY * prev.zoom) /
+                    (baseTransform.scale * prev.zoom);
 
-                const newPanX = centerX - (worldX * baseTransform.scale * newZoom + baseTransform.offsetX * newZoom);
-                const newPanY = centerY - (worldY * baseTransform.scale * newZoom + baseTransform.offsetY * newZoom);
+                const newPanX =
+                    centerX -
+                    (worldX * baseTransform.scale * newZoom + baseTransform.offsetX * newZoom);
+                const newPanY =
+                    centerY -
+                    (worldY * baseTransform.scale * newZoom + baseTransform.offsetY * newZoom);
 
                 return {
                     zoom: newZoom,
@@ -258,7 +277,7 @@ const CanvasRenderer: React.FC<{
 
                 const unitX = dx / length;
                 const unitY = dy / length;
-                const offsetDistance = 30 * transform.scale / baseTransform.scale;
+                const offsetDistance = (30 * transform.scale) / baseTransform.scale;
 
                 let offsetX = 0;
                 let offsetY = 0;
@@ -298,7 +317,10 @@ const CanvasRenderer: React.FC<{
 
                 ctx.strokeStyle = '#FFD700';
                 ctx.lineWidth = 1 * Math.max(0.5, transform.scale / baseTransform.scale);
-                ctx.setLineDash([3 * Math.max(0.5, transform.scale / baseTransform.scale), 3 * Math.max(0.5, transform.scale / baseTransform.scale)]);
+                ctx.setLineDash([
+                    3 * Math.max(0.5, transform.scale / baseTransform.scale),
+                    3 * Math.max(0.5, transform.scale / baseTransform.scale),
+                ]);
 
                 ctx.beginPath();
                 ctx.moveTo(startScreen.x, startScreen.y);
@@ -397,10 +419,10 @@ const CanvasRenderer: React.FC<{
                     try {
                         const imgWidth = gardenData.imageData?.width || img.width;
                         const imgHeight = gardenData.imageData?.height || img.height;
-                        
+
                         const imgStart = transformPoint({ x: 0, y: 0 });
                         const imgEnd = transformPoint({ x: imgWidth, y: imgHeight });
-                        
+
                         ctx.drawImage(
                             img,
                             imgStart.x,
@@ -408,7 +430,7 @@ const CanvasRenderer: React.FC<{
                             imgEnd.x - imgStart.x,
                             imgEnd.y - imgStart.y
                         );
-                        
+
                         drawElements(ctx, scale);
                     } catch (error) {
                         console.error('Error drawing image:', error);
@@ -432,10 +454,15 @@ const CanvasRenderer: React.FC<{
                         const zoneType = ZONE_TYPES.find((z) => z.id === zone.type);
                         ctx.fillStyle = zoneType?.color + '33' || '#66666633';
                         ctx.strokeStyle = zoneType?.color || '#666666';
-                        ctx.lineWidth = (zone.parentZoneId ? 3 : 2) * Math.max(0.5, transform.scale / baseTransform.scale);
+                        ctx.lineWidth =
+                            (zone.parentZoneId ? 3 : 2) *
+                            Math.max(0.5, transform.scale / baseTransform.scale);
 
                         if (zone.type === 'forbidden' || zone.parentZoneId) {
-                            ctx.setLineDash([5 * Math.max(0.5, transform.scale / baseTransform.scale), 5 * Math.max(0.5, transform.scale / baseTransform.scale)]);
+                            ctx.setLineDash([
+                                5 * Math.max(0.5, transform.scale / baseTransform.scale),
+                                5 * Math.max(0.5, transform.scale / baseTransform.scale),
+                            ]);
                         }
 
                         ctx.beginPath();
@@ -484,7 +511,8 @@ const CanvasRenderer: React.FC<{
                             ctx.fillText(
                                 formatArea(Math.abs(area)),
                                 centerPoint.x,
-                                centerPoint.y + 15 * Math.max(0.8, transform.scale / baseTransform.scale)
+                                centerPoint.y +
+                                    15 * Math.max(0.8, transform.scale / baseTransform.scale)
                             );
                         } catch (error) {
                             console.error('Error drawing zone area:', error);
@@ -512,7 +540,7 @@ const CanvasRenderer: React.FC<{
                         if (!sprinkler.canvasPosition) return;
                         const zone = gardenData.gardenZones?.find((z) => z.id === sprinkler.zoneId);
                         const sprinklerPoint = transformPoint(sprinkler.canvasPosition);
-                        
+
                         if (zone && zone.canvasCoordinates && zone.canvasCoordinates.length >= 3) {
                             if (zone.type === 'forbidden') {
                                 return;
@@ -526,12 +554,15 @@ const CanvasRenderer: React.FC<{
                                     scale
                                 );
 
-                                const radiusPixels = sprinkler.type.radius * scale * transform.scale / baseTransform.scale;
+                                const radiusPixels =
+                                    (sprinkler.type.radius * scale * transform.scale) /
+                                    baseTransform.scale;
 
                                 if (clipResult === 'FULL_CIRCLE') {
                                     ctx.fillStyle = sprinkler.type.color + '33';
                                     ctx.strokeStyle = sprinkler.type.color + '99';
-                                    ctx.lineWidth = 2 * Math.max(0.5, transform.scale / baseTransform.scale);
+                                    ctx.lineWidth =
+                                        2 * Math.max(0.5, transform.scale / baseTransform.scale);
                                     ctx.beginPath();
                                     ctx.arc(
                                         sprinklerPoint.x,
@@ -545,7 +576,9 @@ const CanvasRenderer: React.FC<{
                                 } else if (clipResult === 'MASKED_CIRCLE') {
                                     ctx.save();
                                     ctx.beginPath();
-                                    const firstZonePoint = transformPoint(zone.canvasCoordinates[0]);
+                                    const firstZonePoint = transformPoint(
+                                        zone.canvasCoordinates[0]
+                                    );
                                     ctx.moveTo(firstZonePoint.x, firstZonePoint.y);
                                     for (let i = 1; i < zone.canvasCoordinates.length; i++) {
                                         const zonePoint = transformPoint(zone.canvasCoordinates[i]);
@@ -567,8 +600,12 @@ const CanvasRenderer: React.FC<{
                                     ctx.restore();
 
                                     ctx.strokeStyle = sprinkler.type.color + '66';
-                                    ctx.lineWidth = 1 * Math.max(0.5, transform.scale / baseTransform.scale);
-                                    ctx.setLineDash([3 * Math.max(0.5, transform.scale / baseTransform.scale), 3 * Math.max(0.5, transform.scale / baseTransform.scale)]);
+                                    ctx.lineWidth =
+                                        1 * Math.max(0.5, transform.scale / baseTransform.scale);
+                                    ctx.setLineDash([
+                                        3 * Math.max(0.5, transform.scale / baseTransform.scale),
+                                        3 * Math.max(0.5, transform.scale / baseTransform.scale),
+                                    ]);
                                     ctx.beginPath();
                                     ctx.arc(
                                         sprinklerPoint.x,
@@ -583,7 +620,8 @@ const CanvasRenderer: React.FC<{
                                     const canvasResult = clipResult as CanvasCoordinate[];
                                     ctx.fillStyle = sprinkler.type.color + '33';
                                     ctx.strokeStyle = sprinkler.type.color + '99';
-                                    ctx.lineWidth = 2 * Math.max(0.5, transform.scale / baseTransform.scale);
+                                    ctx.lineWidth =
+                                        2 * Math.max(0.5, transform.scale / baseTransform.scale);
                                     ctx.beginPath();
                                     const firstClipPoint = transformPoint(canvasResult[0]);
                                     ctx.moveTo(firstClipPoint.x, firstClipPoint.y);
@@ -598,10 +636,13 @@ const CanvasRenderer: React.FC<{
                             } catch (error) {
                                 console.error('Error drawing sprinkler radius:', error);
 
-                                const radiusPixels = sprinkler.type.radius * scale * transform.scale / baseTransform.scale;
+                                const radiusPixels =
+                                    (sprinkler.type.radius * scale * transform.scale) /
+                                    baseTransform.scale;
                                 ctx.fillStyle = sprinkler.type.color + '26';
                                 ctx.strokeStyle = sprinkler.type.color + '80';
-                                ctx.lineWidth = 1 * Math.max(0.5, transform.scale / baseTransform.scale);
+                                ctx.lineWidth =
+                                    1 * Math.max(0.5, transform.scale / baseTransform.scale);
                                 ctx.beginPath();
                                 ctx.arc(
                                     sprinklerPoint.x,
@@ -614,12 +655,18 @@ const CanvasRenderer: React.FC<{
                                 ctx.stroke();
                             }
                         } else if (sprinkler.zoneId === 'virtual_zone') {
-                            const radiusPixels = sprinkler.type.radius * scale * transform.scale / baseTransform.scale;
+                            const radiusPixels =
+                                (sprinkler.type.radius * scale * transform.scale) /
+                                baseTransform.scale;
 
                             ctx.fillStyle = sprinkler.type.color + '26';
                             ctx.strokeStyle = sprinkler.type.color + '80';
-                            ctx.lineWidth = 1 * Math.max(0.5, transform.scale / baseTransform.scale);
-                            ctx.setLineDash([8 * Math.max(0.5, transform.scale / baseTransform.scale), 4 * Math.max(0.5, transform.scale / baseTransform.scale)]);
+                            ctx.lineWidth =
+                                1 * Math.max(0.5, transform.scale / baseTransform.scale);
+                            ctx.setLineDash([
+                                8 * Math.max(0.5, transform.scale / baseTransform.scale),
+                                4 * Math.max(0.5, transform.scale / baseTransform.scale),
+                            ]);
                             ctx.beginPath();
                             ctx.arc(
                                 sprinklerPoint.x,
@@ -643,8 +690,10 @@ const CanvasRenderer: React.FC<{
 
                         ctx.shadowColor = 'rgba(0,0,0,0.8)';
                         ctx.shadowBlur = 3 * Math.max(0.5, transform.scale / baseTransform.scale);
-                        ctx.shadowOffsetX = 1 * Math.max(0.5, transform.scale / baseTransform.scale);
-                        ctx.shadowOffsetY = 1 * Math.max(0.5, transform.scale / baseTransform.scale);
+                        ctx.shadowOffsetX =
+                            1 * Math.max(0.5, transform.scale / baseTransform.scale);
+                        ctx.shadowOffsetY =
+                            1 * Math.max(0.5, transform.scale / baseTransform.scale);
 
                         ctx.fillStyle = sprinkler.type.color;
                         ctx.font = `bold ${8 * Math.max(0.8, transform.scale / baseTransform.scale)}px Arial`;
@@ -663,19 +712,29 @@ const CanvasRenderer: React.FC<{
                     });
 
                     if (gardenData.waterSource?.canvasPosition) {
-                        const waterSourcePoint = transformPoint(gardenData.waterSource.canvasPosition);
+                        const waterSourcePoint = transformPoint(
+                            gardenData.waterSource.canvasPosition
+                        );
 
                         ctx.save();
 
                         ctx.shadowColor = 'rgba(0,0,0,0.6)';
                         ctx.shadowBlur = 8 * Math.max(0.5, transform.scale / baseTransform.scale);
-                        ctx.shadowOffsetX = 2 * Math.max(0.5, transform.scale / baseTransform.scale);
-                        ctx.shadowOffsetY = 2 * Math.max(0.5, transform.scale / baseTransform.scale);
+                        ctx.shadowOffsetX =
+                            2 * Math.max(0.5, transform.scale / baseTransform.scale);
+                        ctx.shadowOffsetY =
+                            2 * Math.max(0.5, transform.scale / baseTransform.scale);
 
                         ctx.fillStyle =
                             gardenData.waterSource.type === 'pump' ? '#EF4444' : '#3B82F6';
                         ctx.beginPath();
-                        ctx.arc(waterSourcePoint.x, waterSourcePoint.y, 8 * Math.max(0.5, transform.scale / baseTransform.scale), 0, Math.PI * 2);
+                        ctx.arc(
+                            waterSourcePoint.x,
+                            waterSourcePoint.y,
+                            8 * Math.max(0.5, transform.scale / baseTransform.scale),
+                            0,
+                            Math.PI * 2
+                        );
                         ctx.fill();
 
                         ctx.shadowColor = 'transparent';
@@ -758,7 +817,10 @@ const CanvasRenderer: React.FC<{
     }, [isDragging, lastMousePos]);
 
     return (
-        <div ref={containerRef} className="relative flex h-full w-full items-center justify-center bg-gray-900 p-4">
+        <div
+            ref={containerRef}
+            className="relative flex h-full w-full items-center justify-center bg-gray-900 p-4"
+        >
             <div className="absolute left-4 top-4 z-10 flex gap-2">
                 <button
                     onClick={resetView}
@@ -1138,7 +1200,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                 document.body.removeChild(loadingDiv);
 
                 window.location.href = '/product?mode=garden';
-            } else {    
+            } else {
                 document.body.removeChild(loadingDiv);
                 router.visit('/product?mode=garden');
             }
@@ -1224,10 +1286,9 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                 )
                             </span>
                         </h1>
-                        
                     </div>
                     <div className="text-right text-sm text-gray-400">
-                    <div className="flex gap-2">
+                        <div className="flex gap-2">
                             <button
                                 onClick={() => router.visit('/home-garden-planner')}
                                 className="rounded-lg bg-gray-700 px-4 py-2 text-gray-300 transition-colors hover:bg-gray-600"
@@ -1309,7 +1370,9 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                             </h3>
                             <div className="space-y-3 text-sm">
                                 <div className="rounded-lg bg-gray-700 p-3">
-                                    <div className="mb-1 text-gray-400">{t('พื้นที่รวมทั้งหมด')}</div>
+                                    <div className="mb-1 text-gray-400">
+                                        {t('พื้นที่รวมทั้งหมด')}
+                                    </div>
                                     <div className="text-xl font-bold text-white">
                                         {formatArea(statistics.totalArea)}
                                     </div>
@@ -1325,7 +1388,9 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                 </div>
 
                                 <div className="rounded-lg bg-gray-700 p-3">
-                                    <div className="mb-1 text-gray-400">{t('จำนวนหัวฉีดทั้งหมด')}</div>
+                                    <div className="mb-1 text-gray-400">
+                                        {t('จำนวนหัวฉีดทั้งหมด')}
+                                    </div>
                                     <div className="text-xl font-bold text-blue-400">
                                         {statistics.totalSprinklers} {t('ตัว')}
                                     </div>
@@ -1343,7 +1408,9 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                             </div>
                                         </div>
                                         <div>
-                                            <div className="text-xs text-gray-500">{t('ความยาวรวม')}</div>
+                                            <div className="text-xs text-gray-500">
+                                                {t('ความยาวรวม')}
+                                            </div>
                                             <div className="font-bold text-yellow-400">
                                                 {formatDistance(statistics.totalPipeLength)}
                                             </div>
@@ -1391,7 +1458,9 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                         </div>
 
                                         <div className="flex justify-between">
-                                            <span className="text-gray-400">{t('จำนวนหัวฉีด:')}</span>
+                                            <span className="text-gray-400">
+                                                {t('จำนวนหัวฉีด:')}
+                                            </span>
                                             <span className="font-medium text-blue-400">
                                                 {zone.sprinklerCount} {t('ตัว')}
                                             </span>
@@ -1425,7 +1494,9 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                                 </div>
 
                                                 <div className="flex justify-between">
-                                                    <span className="text-gray-400">{t('รัศมี:')}</span>
+                                                    <span className="text-gray-400">
+                                                        {t('รัศมี:')}
+                                                    </span>
                                                     <span className="font-medium text-cyan-400">
                                                         {zone.sprinklerRadius > 0
                                                             ? `${zone.sprinklerRadius.toFixed(1)} ${t('ม.')}`
@@ -1437,7 +1508,9 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
 
                                         {zone.pipeLength > 0 && (
                                             <div className="border-t border-gray-600 pt-2">
-                                                <div className="mb-1 text-gray-400">{t('ระบบท่อ:')}</div>
+                                                <div className="mb-1 text-gray-400">
+                                                    {t('ระบบท่อ:')}
+                                                </div>
                                                 <div className="grid grid-cols-2 gap-2 text-xs">
                                                     <div>
                                                         <span className="text-gray-500">
@@ -1448,7 +1521,9 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                                         </span>
                                                     </div>
                                                     <div>
-                                                        <span className="text-gray-500">{t('รวม:')}{' '}</span>
+                                                        <span className="text-gray-500">
+                                                            {t('รวม:')}{' '}
+                                                        </span>
                                                         <span className="text-yellow-400">
                                                             {formatDistance(zone.pipeLength)}
                                                         </span>
@@ -1462,7 +1537,6 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                         </div>
                     </div>
                 )}
-
             </div>
         </SummaryErrorBoundary>
     );

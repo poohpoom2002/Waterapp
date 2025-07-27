@@ -212,8 +212,7 @@ export const horticultureTranslations = {
         '0-180°': '0-180°',
         'กำลังบันทึก...': 'Saving...',
         'หมุนแผนที่ได้ 360 องศา ด้วยแถบลื่น': 'Rotate map 360 degrees with the slider',
-        'ล็อกการซูมและลาก เพื่อป้องกันการเปลี่ยนแปลง':
-            'Lock zoom and drag to prevent changes',
+        'ล็อกการซูมและลาก เพื่อป้องกันการเปลี่ยนแปลง': 'Lock zoom and drag to prevent changes',
         ปรับขนาดท่อและไอคอนเพื่อมองเห็นชัดขึ้น: 'Adjust pipe and icon sizes for better visibility',
         รีเซ็ตการหมุนและขนาดได้ตลอดเวลา: 'Reset rotation and size at any time',
         การหมุนจะถูกรีเซ็ตอัตโนมัติเมื่อสร้างภาพ:
@@ -378,7 +377,7 @@ export const horticultureTranslations = {
         กำลังส่งออก: 'Exporting...',
         กำลังกลับไปหน้าหลัก: 'Going back to main page...',
         'ลิตร/ต้น': 'Liter/Plant',
-        
+
         // Common translations that might be used in horticulture
         cancel: 'Cancel',
         save: 'Save',
@@ -669,4 +668,4 @@ export const horticultureTranslations = {
         info: 'ข้อมูล',
         loading: 'กำลังโหลด...',
     },
-}
+};
