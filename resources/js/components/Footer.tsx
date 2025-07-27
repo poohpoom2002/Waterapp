@@ -22,7 +22,7 @@ const Footer: React.FC = () => {
                             >
                                 {/* Line Logo - Replace with your actual Line logo image */}
                                 <img
-                                    src="/images/line-logo.png"
+                                    src="/images/line-logo.svg"
                                     alt="Line"
                                     className="h-4 w-4"
                                     onError={(e) => {
@@ -49,7 +49,7 @@ const Footer: React.FC = () => {
                             >
                                 {/* Facebook Logo - Replace with your actual Facebook logo image */}
                                 <img
-                                    src="/images/facebook-logo.png"
+                                    src="/images/facebook-logo.svg"
                                     alt="Facebook"
                                     className="h-4 w-4"
                                     onError={(e) => {

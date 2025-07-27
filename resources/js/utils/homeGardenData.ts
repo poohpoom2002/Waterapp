@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // resources/js/utils/homeGardenData.ts
 
 export interface Coordinate {
@@ -382,8 +383,7 @@ export function canvasToGPS(
     const centerY = canvasDataTyped.height / 2;
 
     const scale = canvasDataTyped.scale || CANVAS_DEFAULT_SCALE;
-    if (!validateScale(scale, 'canvas')) {
-    }
+    if (!validateScale(scale, 'canvas')) return defaultCenter;
 
     const offsetX = (canvasPoint.x - centerX) / scale;
     const offsetY = -(canvasPoint.y - centerY) / scale;
@@ -1170,7 +1170,9 @@ export function saveGardenData(data: GardenPlannerData): boolean {
         if (typeof window !== 'undefined' && window.localStorage) {
             try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-            } catch (e) {}
+            } catch (e) {
+                // Ignore errors when saving to localStorage
+            }
         }
         return true;
     } catch (error) {

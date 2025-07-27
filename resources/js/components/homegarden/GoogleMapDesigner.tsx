@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // components/homegarden/GoogleMapDesigner.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Wrapper, Status } from '@googlemaps/react-wrapper';
@@ -167,6 +169,15 @@ const MapErrorComponent: React.FC<{
         if (error?.includes('ApiProjectMapError')) {
             return 'API Key ไม่ถูกต้องหรือไม่ได้เปิดใช้งาน Google Maps JavaScript API และ Places API';
         }
+        if (error?.includes('OVER_QUERY_LIMIT')) {
+            return 'เกินขีดจำกัดการใช้งาน Google Maps API กรุณารอสักครู่แล้วลองใหม่';
+        }
+        if (error?.includes('REQUEST_DENIED')) {
+            return 'API Key ถูกปฏิเสธ กรุณาตรวจสอบการตั้งค่าใน Google Cloud Console';
+        }
+        if (error?.includes('INVALID_REQUEST')) {
+            return 'คำขอไม่ถูกต้อง กรุณาตรวจสอบ API Key และการตั้งค่า';
+        }
         return 'ไม่สามารถโหลด Google Maps ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต';
     };
 
@@ -177,16 +188,24 @@ const MapErrorComponent: React.FC<{
                 <h3 className="mb-2 text-lg font-bold">ไม่สามารถโหลด Google Maps ได้</h3>
                 <p className="mb-4 text-sm text-gray-300">{getErrorMessage()}</p>
                 {!config.apiKey && (
-                    <div className="mb-4 rounded bg-yellow-900 p-3 text-left text-xs">
-                        <p className="font-bold">วิธีแก้ไข:</p>
-                        <ol className="mt-2 list-inside list-decimal space-y-1">
-                            <li>หยุด dev server (Ctrl+C)</li>
-                            <li>ตรวจสอบไฟล์ .env</li>
-                            <li>เพิ่ม VITE_GOOGLE_MAPS_API_KEY</li>
-                            <li>เปิดใช้งาน Places API ใน Google Cloud Console</li>
-                            <li>รัน npm run dev ใหม่</li>
-                        </ol>
-                    </div>
+                                    <div className="mb-4 rounded bg-yellow-900 p-3 text-left text-xs">
+                    <p className="font-bold">วิธีแก้ไข:</p>
+                    <ol className="mt-2 list-inside list-decimal space-y-1">
+                        <li>หยุด dev server (Ctrl+C)</li>
+                        <li>ตรวจสอบไฟล์ .env</li>
+                        <li>เพิ่ม VITE_GOOGLE_MAPS_API_KEY</li>
+                        <li>เปิดใช้งาน Places API ใน Google Cloud Console</li>
+                        <li>รัน npm run dev ใหม่</li>
+                    </ol>
+                    {import.meta.env.DEV && (
+                        <div className="mt-3 rounded bg-gray-800 p-2">
+                            <p className="font-bold text-yellow-300">Debug Info:</p>
+                            <p className="text-xs">API Key Length: {config.apiKey.length}</p>
+                            <p className="text-xs">Environment: {import.meta.env.MODE}</p>
+                            <p className="text-xs">Error: {error}</p>
+                        </div>
+                    )}
+                </div>
                 )}
                 <div className="space-y-2">
                     {onRetry && (
@@ -919,8 +938,8 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                                 });
 
                                 marker.addListener('drag', (e: google.maps.MapMouseEvent) => {
-                                    if (e.latLng) {
-                                    }
+                                    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+                                    e.latLng;
                                 });
 
                                 marker.addListener('dragend', (e: google.maps.MapMouseEvent) => {

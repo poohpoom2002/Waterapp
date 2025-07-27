@@ -15,7 +15,7 @@ interface InputFormProps {
     onInputChange: (input: IrrigationInput) => void;
     selectedSprinkler?: any;
     activeZone?: Zone;
-    projectMode?: 'horticulture' | 'garden';
+    projectMode?: 'horticulture' | 'garden' | 'field-crop';
     maxZones?: number;
 }
 
