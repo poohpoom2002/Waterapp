@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Navbar from '../components/Navbar';
 import { cropTypes, getCropByValue, searchCrops, type Crop } from '@/pages/utils/cropData';
 

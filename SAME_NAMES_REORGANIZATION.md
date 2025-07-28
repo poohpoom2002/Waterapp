@@ -17,13 +17,25 @@ app/Http/Controllers/
 ├── HomeGardenController.php
 ├── ProfileController.php
 ├── ProfilePhotoController.php
+├── SuperUserController.php
 ├── Api/
 │   ├── EquipmentCategoryController.php
 │   ├── EquipmentController.php
 │   ├── ImageUploadController.php
 │   ├── PumpAccessoryController.php
 │   └── SprinklerController.php
-└── Auth/ (existing auth controllers)
+├── Auth/
+│   ├── AuthenticatedSessionController.php
+│   ├── ConfirmablePasswordController.php
+│   ├── EmailVerificationNotificationController.php
+│   ├── EmailVerificationPromptController.php
+│   ├── NewPasswordController.php
+│   ├── PasswordResetLinkController.php
+│   ├── RegisteredUserController.php
+│   └── VerifyEmailController.php
+└── Settings/
+    ├── PasswordController.php
+    └── ProfileController.php
 ```
 
 **NEW:**
@@ -34,7 +46,8 @@ app/Http/Controllers/
 │   ├── AiChatController.php
 │   ├── ChatController.php
 │   ├── ProfileController.php
-│   └── ProfilePhotoController.php
+│   ├── ProfilePhotoController.php
+│   └── SuperUserController.php
 ├── Features/                                   # Feature-specific controllers
 │   ├── FieldCrop/
 │   │   └── FarmController.php                  # Move here (handles field crop logic)
@@ -47,7 +60,18 @@ app/Http/Controllers/
 │   │   ├── ImageUploadController.php
 │   │   ├── PumpAccessoryController.php
 │   │   └── SprinklerController.php
-└── Auth/                                       # Keep existing auth
+├── Auth/                                       # Keep existing auth
+│   ├── AuthenticatedSessionController.php
+│   ├── ConfirmablePasswordController.php
+│   ├── EmailVerificationNotificationController.php
+│   ├── EmailVerificationPromptController.php
+│   ├── NewPasswordController.php
+│   ├── PasswordResetLinkController.php
+│   ├── RegisteredUserController.php
+│   └── VerifyEmailController.php
+└── Settings/                                   # Keep settings structure
+    ├── PasswordController.php
+    └── ProfileController.php
 ```
 
 ### Models
@@ -63,6 +87,7 @@ app/Models/
 ├── Field.php
 ├── FieldLayer.php
 ├── FieldZone.php
+├── Folder.php
 ├── Pipe.php
 ├── PlantType.php
 ├── PlantingPoint.php
@@ -76,6 +101,7 @@ app/Models/
 ```
 app/Models/
 ├── User.php                                    # Keep at root
+├── Folder.php                                  # Keep at root (system-wide)
 ├── Core/                                       # Core/shared models
 │   ├── Equipment.php
 │   ├── EquipmentAttribute.php
@@ -183,6 +209,7 @@ resources/js/pages/
 **CURRENT:**
 ```
 resources/js/components/
+├── ChatBox.jsx
 ├── ChatBox.tsx
 ├── FloatingAiChat.jsx
 ├── Footer.tsx
@@ -199,18 +226,82 @@ resources/js/components/
 ├── app-shell.tsx
 ├── app-sidebar-header.tsx
 ├── app-sidebar.tsx
-├── (many other components...)
+├── appearance-dropdown.tsx
+├── appearance-tabs.tsx
+├── breadcrumbs.tsx
+├── delete-user.tsx
+├── heading-small.tsx
+├── heading.tsx
+├── icon.tsx
+├── input-error.tsx
+├── nav-footer.tsx
+├── nav-main.tsx
+├── nav-user.tsx
+├── text-link.tsx
+├── user-info.tsx
+├── user-menu-content.tsx
 ├── homegarden/
 │   ├── CanvasDesigner.tsx
 │   ├── EnhancedSearchBox.tsx
 │   ├── GoogleMapDesigner.tsx
 │   ├── GoogleMapSummary.tsx
-│   ├── ImageDesigner.tsx
-│   └── MapDesigner.tsx
-└── horticulture/
-    ├── HorticultureDrawingManager.tsx
-    ├── HorticultureMapComponent.tsx
-    └── HorticultureSearchControl.tsx
+│   └── ImageDesigner.tsx
+├── horticulture/
+│   ├── HorticultureDrawingManager.tsx
+│   ├── HorticultureMapComponent.tsx
+│   └── HorticultureSearchControl.tsx
+└── ui/
+    ├── alert.tsx
+    ├── avatar.tsx
+    ├── badge.tsx
+    ├── breadcrumb.tsx
+    ├── button.tsx
+    ├── card.tsx
+    ├── checkbox.tsx
+    ├── collapsible.tsx
+    ├── dialog.tsx
+    ├── dropdown-menu.tsx
+    ├── icon.tsx
+    ├── input.tsx
+    ├── label.tsx
+    ├── navigation-menu.tsx
+    ├── placeholder-pattern.tsx
+    ├── select.tsx
+    ├── separator.tsx
+    ├── sheet.tsx
+    ├── sidebar.tsx
+    ├── skeleton.tsx
+    ├── toggle-group.tsx
+    ├── toggle.tsx
+    └── tooltip.tsx
+
+resources/js/pages/components/
+├── CalculationSummary.tsx
+├── CostSummary.tsx
+├── ErrorBoundary.tsx
+├── ErrorMessage.tsx
+├── InputForm.tsx
+├── LoadingSpinner.tsx
+├── PipeSelector.tsx
+├── PumpSelector.tsx
+├── QuotationDocument.tsx
+├── QuotationModal.tsx
+├── SprinklerSelector.tsx
+├── index.ts
+├── Fieldcrop/
+│   ├── FieldMapCropSpacing.tsx
+│   ├── FieldMapFieldInfo.tsx
+│   ├── FieldMapSmartControls.tsx
+│   ├── FieldMapToolsPanel.tsx
+│   ├── FieldMapTypeSelector.tsx
+│   ├── LocationSearchOverlay.tsx
+│   ├── MapClickHandler.tsx
+│   ├── MapControls.tsx
+│   └── Tooltip.tsx
+├── Greenhouse/
+│   └── CropData.tsx
+└── Styles/
+    └── print.css
 ```
 
 **NEW:**
@@ -224,30 +315,85 @@ resources/js/components/
 │   ├── app-shell.tsx
 │   ├── app-sidebar-header.tsx
 │   ├── app-sidebar.tsx
+│   ├── breadcrumbs.tsx
 │   ├── Footer.tsx
 │   ├── Navbar.tsx
-│   └── Navigation.tsx
+│   ├── Navigation.tsx
+│   ├── nav-footer.tsx
+│   ├── nav-main.tsx
+│   └── nav-user.tsx
 ├── common/                                     # Common/shared components
+│   ├── ChatBox.jsx
 │   ├── ChatBox.tsx
 │   ├── FloatingAiChat.jsx
 │   ├── LanguageSwitcher.tsx
 │   ├── ProfilePhotoModal.tsx
 │   ├── Quotation.tsx
-│   └── UserAvatar.tsx
+│   ├── UserAvatar.tsx
+│   ├── user-info.tsx
+│   ├── user-menu-content.tsx
+│   ├── appearance-dropdown.tsx
+│   ├── appearance-tabs.tsx
+│   ├── delete-user.tsx
+│   ├── heading-small.tsx
+│   ├── heading.tsx
+│   ├── icon.tsx
+│   ├── input-error.tsx
+│   ├── text-link.tsx
+│   ├── CalculationSummary.tsx             # Move from pages/components
+│   ├── CostSummary.tsx                    # Move from pages/components
+│   ├── ErrorBoundary.tsx                  # Move from pages/components
+│   ├── ErrorMessage.tsx                   # Move from pages/components
+│   ├── InputForm.tsx                      # Move from pages/components
+│   ├── LoadingSpinner.tsx                 # Move from pages/components
+│   ├── PipeSelector.tsx                   # Move from pages/components
+│   ├── PumpSelector.tsx                   # Move from pages/components
+│   ├── QuotationDocument.tsx              # Move from pages/components
+│   ├── QuotationModal.tsx                 # Move from pages/components
+│   └── SprinklerSelector.tsx              # Move from pages/components
 ├── ui/                                         # Keep existing UI components
-│   └── (all existing ui components)
+│   ├── alert.tsx
+│   ├── avatar.tsx
+│   ├── badge.tsx
+│   ├── breadcrumb.tsx
+│   ├── button.tsx
+│   ├── card.tsx
+│   ├── checkbox.tsx
+│   ├── collapsible.tsx
+│   ├── dialog.tsx
+│   ├── dropdown-menu.tsx
+│   ├── icon.tsx
+│   ├── input.tsx
+│   ├── label.tsx
+│   ├── navigation-menu.tsx
+│   ├── placeholder-pattern.tsx
+│   ├── select.tsx
+│   ├── separator.tsx
+│   ├── sheet.tsx
+│   ├── sidebar.tsx
+│   ├── skeleton.tsx
+│   ├── toggle-group.tsx
+│   ├── toggle.tsx
+│   └── tooltip.tsx
 └── features/                                   # Feature-specific components
     ├── fieldCrop/
-    │   └── (move relevant components here)
+    │   ├── FieldMapCropSpacing.tsx        # Move from pages/components/Fieldcrop
+    │   ├── FieldMapFieldInfo.tsx          # Move from pages/components/Fieldcrop
+    │   ├── FieldMapSmartControls.tsx      # Move from pages/components/Fieldcrop
+    │   ├── FieldMapToolsPanel.tsx         # Move from pages/components/Fieldcrop
+    │   ├── FieldMapTypeSelector.tsx       # Move from pages/components/Fieldcrop
+    │   ├── LocationSearchOverlay.tsx      # Move from pages/components/Fieldcrop
+    │   ├── MapClickHandler.tsx            # Move from pages/components/Fieldcrop
+    │   ├── MapControls.tsx                # Move from pages/components/Fieldcrop
+    │   └── Tooltip.tsx                    # Move from pages/components/Fieldcrop
     ├── homeGarden/
     │   ├── CanvasDesigner.tsx
     │   ├── EnhancedSearchBox.tsx
     │   ├── GoogleMapDesigner.tsx
     │   ├── GoogleMapSummary.tsx
-    │   ├── ImageDesigner.tsx
-    │   └── MapDesigner.tsx
+    │   └── ImageDesigner.tsx
     ├── greenhouse/
-    │   └── (move greenhouse components here)
+    │   └── CropData.tsx                   # Move from pages/components/Greenhouse
     └── horticulture/
         ├── HorticultureDrawingManager.tsx
         ├── HorticultureMapComponent.tsx
@@ -326,21 +472,122 @@ routes/
 
 ## 📋 MIGRATION STEPS (keeping same file names)
 
-1. **Create new folder structure** (empty folders)
-2. **Move files** (same names, new locations):
+1. **Backup current state**
    ```bash
-   # Example moves
-   mv app/Models/Farm.php app/Models/Features/FieldCrop/Farm.php
-   mv resources/js/pages/field-crop.tsx resources/js/pages/features/fieldCrop/field-crop.tsx
-   mv resources/js/components/homegarden/ resources/js/components/features/homeGarden/
+   git add -A
+   git commit -m "Backup before SAME_NAMES reorganization"
    ```
-3. **Update imports** in moved files:
+
+2. **Create new folder structure** (empty folders)
+   ```bash
+   # Backend folders
+   mkdir -p app/Http/Controllers/Core
+   mkdir -p app/Http/Controllers/Features/FieldCrop
+   mkdir -p app/Http/Controllers/Features/HomeGarden
+   mkdir -p app/Http/Controllers/Api/V1
+   mkdir -p app/Models/Core
+   mkdir -p app/Models/Features/FieldCrop
+   mkdir -p app/Models/Features/HomeGarden
+
+   # Frontend folders
+   mkdir -p resources/js/pages/features/fieldCrop
+   mkdir -p resources/js/pages/features/homeGarden
+   mkdir -p resources/js/pages/features/greenhouse
+   mkdir -p resources/js/pages/features/horticulture
+   mkdir -p resources/js/components/layout
+   mkdir -p resources/js/components/common
+   mkdir -p resources/js/components/features/fieldCrop
+   mkdir -p resources/js/components/features/homeGarden
+   mkdir -p resources/js/components/features/greenhouse
+   mkdir -p resources/js/components/features/horticulture
+   mkdir -p resources/js/utils/common
+   mkdir -p resources/js/utils/features/fieldCrop
+   mkdir -p resources/js/utils/features/homeGarden
+   mkdir -p resources/js/utils/features/greenhouse
+   mkdir -p resources/js/utils/features/horticulture
+   ```
+
+3. **Move files** (same names, new locations):
+   ```bash
+   # Backend Controllers
+   mv app/Http/Controllers/AiChatController.php app/Http/Controllers/Core/
+   mv app/Http/Controllers/ChatController.php app/Http/Controllers/Core/
+   mv app/Http/Controllers/ProfileController.php app/Http/Controllers/Core/
+   mv app/Http/Controllers/ProfilePhotoController.php app/Http/Controllers/Core/
+   mv app/Http/Controllers/SuperUserController.php app/Http/Controllers/Core/
+   mv app/Http/Controllers/FarmController.php app/Http/Controllers/Features/FieldCrop/
+   mv app/Http/Controllers/HomeGardenController.php app/Http/Controllers/Features/HomeGarden/
+   mv app/Http/Controllers/Api/*.php app/Http/Controllers/Api/V1/
+
+   # Backend Models
+   mv app/Models/Equipment*.php app/Models/Core/
+   mv app/Models/PlantType.php app/Models/Core/
+   mv app/Models/PumpAccessory.php app/Models/Core/
+   mv app/Models/Sprinkler*.php app/Models/Core/
+   mv app/Models/Farm.php app/Models/Features/FieldCrop/
+   mv app/Models/Field*.php app/Models/Features/FieldCrop/
+   mv app/Models/Pipe.php app/Models/Features/FieldCrop/
+   mv app/Models/PlantingPoint.php app/Models/Features/FieldCrop/
+
+   # Frontend Pages
+   mv resources/js/pages/field-*.tsx resources/js/pages/features/fieldCrop/
+   mv resources/js/pages/home-garden-*.tsx resources/js/pages/features/homeGarden/
+   mv resources/js/pages/map-planner.tsx resources/js/pages/features/homeGarden/
+   mv resources/js/pages/green-house/* resources/js/pages/features/greenhouse/
+   mv resources/js/pages/Horticulture*.tsx resources/js/pages/features/horticulture/
+
+   # Frontend Components
+   mv resources/js/components/app-*.tsx resources/js/components/layout/
+   mv resources/js/components/breadcrumbs.tsx resources/js/components/layout/
+   mv resources/js/components/Footer.tsx resources/js/components/layout/
+   mv resources/js/components/Nav*.tsx resources/js/components/layout/
+   mv resources/js/components/nav-*.tsx resources/js/components/layout/
+   mv resources/js/pages/components/*.tsx resources/js/components/common/
+   mv resources/js/pages/components/Fieldcrop/* resources/js/components/features/fieldCrop/
+   mv resources/js/pages/components/Greenhouse/* resources/js/components/features/greenhouse/
+   mv resources/js/components/homegarden/* resources/js/components/features/homeGarden/
+   mv resources/js/components/horticulture/* resources/js/components/features/horticulture/
+
+   # Frontend Utils
+   mv resources/js/utils/debugHelper.ts resources/js/utils/common/
+   mv resources/js/utils/googleMaps*.ts resources/js/utils/common/
+   mv resources/js/utils/placesApiUtils.ts resources/js/utils/common/
+   mv resources/js/utils/cropData.ts resources/js/utils/features/fieldCrop/
+   mv resources/js/utils/farmData.ts resources/js/utils/features/fieldCrop/
+   mv resources/js/utils/fieldCropData.ts resources/js/utils/features/fieldCrop/
+   mv resources/js/utils/pipeData.ts resources/js/utils/features/fieldCrop/
+   mv resources/js/utils/gardenStatistics.ts resources/js/utils/features/homeGarden/
+   mv resources/js/utils/homeGardenData.ts resources/js/utils/features/homeGarden/
+   mv resources/js/utils/sprinklerLayoutData.ts resources/js/utils/features/homeGarden/
+   mv resources/js/utils/greenHouseData.ts resources/js/utils/features/greenhouse/
+   mv resources/js/utils/horticulture*.ts resources/js/utils/features/horticulture/
+   ```
+
+4. **Update imports** in moved files:
    ```typescript
+   // Examples:
    // OLD: import { something } from '../utils/cropData'
    // NEW: import { something } from '../../utils/features/fieldCrop/cropData'
+   
+   // OLD: import { Button } from '../components/ui/button'
+   // NEW: import { Button } from '../../components/ui/button'
    ```
-4. **Update route paths** (if needed)
-5. **Test each feature** after moving
+
+5. **Update namespaces** in PHP files:
+   ```php
+   // Controllers
+   // OLD: namespace App\Http\Controllers;
+   // NEW: namespace App\Http\Controllers\Core;
+   // NEW: namespace App\Http\Controllers\Features\FieldCrop;
+
+   // Models
+   // OLD: namespace App\Models;
+   // NEW: namespace App\Models\Core;
+   // NEW: namespace App\Models\Features\FieldCrop;
+   ```
+
+6. **Update route definitions** to use new controller paths
+7. **Test each feature** after moving
 
 ## ✅ BENEFITS
 - **Same file names** = easier to find existing code
