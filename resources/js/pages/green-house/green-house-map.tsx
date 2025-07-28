@@ -1308,18 +1308,18 @@ export default function GreenhouseMap() {
         if (selectedElement) {
             // Find the element to delete
             const elementToDelete = irrigationElements.find((el) => el.id === selectedElement);
-            
-            // If it's a sub-pipe, find and delete related sprinklers as well
+
+            // หากเป็นท่อย่อย ให้หาและลบสปริงเกลอร์ที่เกี่ยวข้องด้วย
             if (elementToDelete && elementToDelete.type === 'sub-pipe') {
                 const relatedSprinklers: string[] = [];
-                
-                // Find sprinklers that are close to this sub-pipe
+
+                // หาสปริงเกลอร์ที่อยู่ใกล้กับท่อย่อยนี้
                 irrigationElements
                     .filter((el) => el.type === 'sprinkler')
                     .forEach((sprinkler) => {
                         const sprinklerPoint = sprinkler.points[0];
-                        
-                        // Check if the sprinkler is close to the sub-pipe
+
+                        // ตรวจสอบว่าสปริงเกลอร์อยู่ใกล้กับท่อย่อยหรือไม่
                         for (let i = 0; i < elementToDelete.points.length - 1; i++) {
                             const p1 = elementToDelete.points[i];
                             const p2 = elementToDelete.points[i + 1];
@@ -1348,7 +1348,8 @@ export default function GreenhouseMap() {
                             }
 
                             const distanceToLine = Math.sqrt(
-                                Math.pow(sprinklerPoint.x - xx, 2) + Math.pow(sprinklerPoint.y - yy, 2)
+                                Math.pow(sprinklerPoint.x - xx, 2) +
+                                    Math.pow(sprinklerPoint.y - yy, 2)
                             );
 
                             // If distance is less than 30 pixels, consider them related
@@ -1359,17 +1360,18 @@ export default function GreenhouseMap() {
                         }
                     });
 
-                // Delete sub-pipe and related sprinklers
-                setIrrigationElements((prev) => 
-                    prev.filter((el) => 
-                        el.id !== selectedElement && 
-                        !relatedSprinklers.includes(el.id)
+                // ลบท่อย่อยและสปริงเกลอร์ที่เกี่ยวข้อง
+                setIrrigationElements((prev) =>
+                    prev.filter(
+                        (el) => el.id !== selectedElement && !relatedSprinklers.includes(el.id)
                     )
                 );
-                
-                // Show notification
+
+                // แสดงข้อความแจ้งเตือน
                 if (relatedSprinklers.length > 0) {
-                    alert(`Deleted sub-pipe and ${relatedSprinklers.length} related sprinklers successfully`);
+                    alert(
+                        `ลบท่อย่อยและสปริงเกลอร์ ${relatedSprinklers.length} ตัวที่เกี่ยวข้องเรียบร้อยแล้ว`
+                    );
                 }
             } else if (elementToDelete && elementToDelete.type === 'drip-line') {
                 // If it's a drip line, delete only the drip line
@@ -1379,7 +1381,7 @@ export default function GreenhouseMap() {
                 setShapes((prev) => prev.filter((s) => s.id !== selectedElement));
                 setIrrigationElements((prev) => prev.filter((el) => el.id !== selectedElement));
             }
-            
+
             setSelectedElement(null);
         }
     }, [selectedElement, irrigationElements]);
@@ -1831,11 +1833,15 @@ export default function GreenhouseMap() {
                                                 : 'text-yellow-400'
                                         }`}
                                     >
+                                        <span>{plotsWithoutCrops.length === 0 ? '✓' : '⚠️'}</span>
                                         <span>
-                                            {plotsWithoutCrops.length === 0 ? '✓' : '⚠️'}
-                                        </span>
-                                        <span>
-                                            All plots assigned crops ({shapes.filter((s) => s.type === 'plot' && s.cropType).length}/{shapes.filter((s) => s.type === 'plot').length})
+                                            เลือกพืชครบทุกแปลง (
+                                            {
+                                                shapes.filter(
+                                                    (s) => s.type === 'plot' && s.cropType
+                                                ).length
+                                            }
+                                            /{shapes.filter((s) => s.type === 'plot').length})
                                         </span>
                                     </div>
                                     <div
@@ -1849,7 +1855,8 @@ export default function GreenhouseMap() {
                                 </div>
                                 {plotsWithoutCrops.length > 0 && (
                                     <div className="mt-2 text-xs text-yellow-400">
-                                        Plots without crops: {plotsWithoutCrops.map(plot => plot.name).join(', ')}
+                                        แปลงที่ยังไม่เลือก:{' '}
+                                        {plotsWithoutCrops.map((plot) => plot.name).join(', ')}
                                     </div>
                                 )}
                             </div>
@@ -2276,15 +2283,15 @@ export default function GreenhouseMap() {
                                                                 selectedCrops.length === 0
                                                                     ? 'cursor-not-allowed bg-gray-700 text-gray-500'
                                                                     : plot.cropType
-                                                                    ? 'bg-green-700 text-gray-300 hover:bg-green-600'
-                                                                    : 'bg-yellow-700 text-gray-300 hover:bg-yellow-600'
+                                                                      ? 'bg-green-700 text-gray-300 hover:bg-green-600'
+                                                                      : 'bg-yellow-700 text-gray-300 hover:bg-yellow-600'
                                                             }`}
                                                             title={
                                                                 selectedCrops.length === 0
                                                                     ? 'Please select crops first'
                                                                     : plot.cropType
-                                                                    ? 'Click to change crop'
-                                                                    : 'Click to select crop (required)'
+                                                                      ? 'คลิกเพื่อเปลี่ยนพืช'
+                                                                      : 'คลิกเพื่อเลือกพืช (จำเป็น)'
                                                             }
                                                         >
                                                             <div className="flex items-center justify-between">
@@ -2482,7 +2489,8 @@ export default function GreenhouseMap() {
                             ⚠️ Please select crops for all plots before viewing summary
                         </div>
                         <div className="mt-1 text-xs text-yellow-400">
-                            Plots without crops: {plotsWithoutCrops.map(plot => plot.name).join(', ')}
+                            แปลงที่ยังไม่เลือกพืช:{' '}
+                            {plotsWithoutCrops.map((plot) => plot.name).join(', ')}
                         </div>
                     </div>
                 )}

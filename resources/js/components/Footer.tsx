@@ -5,7 +5,7 @@ const Footer: React.FC = () => {
     useLanguage();
 
     return (
-        <footer className="border-t border-gray-700 bg-gray-800 mt-auto">
+        <footer className="mt-auto border-t border-gray-700 bg-gray-800">
             <div className="mx-auto max-w-7xl px-6 py-2">
                 <div className="text-center">
                     <div className="rounded-xl bg-gray-900 p-3">

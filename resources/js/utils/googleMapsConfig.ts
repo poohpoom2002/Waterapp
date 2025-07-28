@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // utils/googleMapsConfig.ts - แก้ไขการซูมและตำแหน่งปุ่มสลับแผนที่ + แก้ไข ReferenceError
 export const GOOGLE_MAPS_CONFIG = {
     get apiKey() {

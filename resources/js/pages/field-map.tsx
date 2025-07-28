@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Navbar from '../components/Navbar';
 import { Head, Link, router } from '@inertiajs/react';
@@ -577,7 +578,6 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
     const urlParams = new URLSearchParams(window.location.search);
     const isEditMode = urlParams.get('edit') === 'true';
     const targetStep = parseInt(urlParams.get('step') || '1');
-    const isPrintMode = urlParams.get('print') === 'true';
 
     const mapState = useMapState();
     const stepWizard = useStepWizard();
@@ -733,7 +733,9 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
     }, []);
 
     const [error, setError] = useState<string | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading] = useState(false);
+
+    // Map instance
     const [map, setMap] = useState<google.maps.Map | null>(null);
     const [isRestoring, setIsRestoring] = useState(false);
     const [hasRestoredOnce, setHasRestoredOnce] = useState(false);

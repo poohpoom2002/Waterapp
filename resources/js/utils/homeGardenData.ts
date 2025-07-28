@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // resources/js/utils/homeGardenData.ts
 
 export interface Coordinate {
@@ -137,7 +138,7 @@ export const SPRINKLER_TYPES: SprinklerType[] = [
         nameTH: 'หัวฉีดด้านเดียวปรับมุม',
         icon: '🟤',
         radius: 4,
-        suitableFor: ['grass', 'flowers'], 
+        suitableFor: ['grass', 'flowers'],
         color: '#33CCFF',
     },
     {
@@ -382,8 +383,7 @@ export function canvasToGPS(
     const centerY = canvasDataTyped.height / 2;
 
     const scale = canvasDataTyped.scale || CANVAS_DEFAULT_SCALE;
-    if (!validateScale(scale, 'canvas')) {
-    }
+    if (!validateScale(scale, 'canvas')) return defaultCenter;
 
     const offsetX = (canvasPoint.x - centerX) / scale;
     const offsetY = -(canvasPoint.y - centerY) / scale;
@@ -1153,7 +1153,7 @@ export function createInitialData(): GardenPlannerData {
 export function saveGardenData(data: GardenPlannerData): boolean {
     try {
         if (data.imageData?.scale) {
-            if (!validateScale(data.imageData.scale, 'image')) {    
+            if (!validateScale(data.imageData.scale, 'image')) {
                 data.imageData.scale = 20;
                 data.imageData.isScaleSet = false;
             }
@@ -1171,6 +1171,7 @@ export function saveGardenData(data: GardenPlannerData): boolean {
             try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
             } catch (e) {
+                // Ignore errors when saving to localStorage
             }
         }
         return true;
