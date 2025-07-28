@@ -25,14 +25,14 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
             // Navigate to greenhouse planner with draw mode
             window.location.href = `/greenhouse-planner?crops=${selectedCrops.join(',')}&method=draw`;
         } else if (selectedMethod === 'import') {
-            // Navigate to file import page (ยังไม่ได้สร้าง)
-            alert('ฟีเจอร์นำเข้าไฟล์กำลังพัฒนา กรุณาเลือก "วาดพื้นที่เอง" ก่อน');
+            // Navigate to file import page (not yet created)
+            alert('File import feature is under development. Please select "Draw Area Yourself" first.');
             // window.location.href = `/greenhouse-import?crops=${selectedCrops.join(',')}&method=import`;
         }
     };
 
     const handleBack = () => {
-        // บันทึกข้อมูลปัจจุบัน
+        // Save current data
         const currentData = {
             crops: selectedCrops.join(','),
             selectedMethod: selectedMethod,
@@ -40,7 +40,7 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
         };
         localStorage.setItem('areaInputData', JSON.stringify(currentData));
 
-        // กลับไปหน้าเลือกพืช พร้อมข้อมูลพืชที่เลือกไว้
+        // Go back to crop selection page with selected crop data
         const queryParams = new URLSearchParams();
         if (selectedCrops.length > 0) {
             queryParams.set('crops', selectedCrops.join(','));
@@ -72,24 +72,24 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                     d="M10 19l-7-7m0 0l7-7m-7 7h18"
                                 />
                             </svg>
-                            กลับ
+                            Back
                         </button>
 
                         {/* Progress Indicator */}
                         <div className="flex items-center space-x-2 text-sm text-gray-400">
-                            <span className="text-green-400">เลือกพืช</span>
+                            <span className="text-green-400">Select Crops</span>
                             <span>→</span>
-                            <span className="font-medium text-blue-400">วิธีการวางแผน</span>
+                            <span className="font-medium text-blue-400">Planning Method</span>
                             <span>→</span>
-                            <span>ออกแบบพื้นที่</span>
+                            <span>Design Area</span>
                             <span>→</span>
-                            <span>ระบบน้ำ</span>
+                            <span>Water System</span>
                         </div>
                     </div>
 
-                    <h1 className="mb-2 text-3xl font-bold">📐 เลือกวิธีการวางแผนพื้นที่</h1>
+                    <h1 className="mb-2 text-3xl font-bold">📐 Choose Area Planning Method</h1>
                     <p className="text-gray-400">
-                        เลือกวิธีการที่คุณต้องการใช้ในการกำหนดพื้นที่โรงเรือน
+                        Select the method you want to use to define your greenhouse area
                     </p>
                 </div>
 
@@ -97,7 +97,7 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                 {selectedCrops.length > 0 && (
                     <div className="mb-8 rounded-lg bg-gray-800 p-4">
                         <h3 className="mb-2 text-sm font-medium text-gray-300">
-                            พืชที่เลือก ({selectedCrops.length} ชนิด)
+                            Selected Crops ({selectedCrops.length} types)
                         </h3>
                         <div className="flex flex-wrap gap-2">
                             {selectedCrops.map((crop, index) => (
@@ -125,9 +125,9 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                     >
                         <div className="text-center">
                             <div className="mb-4 text-6xl">✏️</div>
-                            <h3 className="mb-3 text-xl font-bold text-white">วาดพื้นที่เอง</h3>
+                            <h3 className="mb-3 text-xl font-bold text-white">Draw Area Yourself</h3>
                             <p className="mb-4 text-gray-400">
-                                ใช้เครื่องมือวาดในระบบเพื่อกำหนดรูปร่างและขนาดโรงเรือน
+                                Use the drawing tools in the system to define the shape and size of your greenhouse
                             </p>
 
                             <div className="space-y-2 text-left">
@@ -143,7 +143,7 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                             clipRule="evenodd"
                                         />
                                     </svg>
-                                    ง่ายและรวดเร็ว
+                                    Simple and fast
                                 </div>
                                 <div className="flex items-center text-sm text-gray-300">
                                     <svg
@@ -157,7 +157,7 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                             clipRule="evenodd"
                                         />
                                     </svg>
-                                    เหมาะสำหรับผู้เริ่มต้น
+                                    Perfect for beginners
                                 </div>
                                 <div className="flex items-center text-sm text-gray-300">
                                     <svg
@@ -171,7 +171,7 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                             clipRule="evenodd"
                                         />
                                     </svg>
-                                    ไม่ต้องเตรียมไฟล์
+                                    No file preparation needed
                                 </div>
                                 <div className="flex items-center text-sm text-gray-300">
                                     <svg
@@ -185,14 +185,14 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                             clipRule="evenodd"
                                         />
                                     </svg>
-                                    มีเทมเพลตให้เลือก
+                                    Templates available
                                 </div>
                             </div>
 
                             {selectedMethod === 'draw' && (
                                 <div className="mt-4">
                                     <span className="inline-flex items-center rounded-full bg-blue-500 px-3 py-1 text-sm font-medium text-white">
-                                        ✓ เลือกแล้ว
+                                        ✓ Selected
                                     </span>
                                 </div>
                             )}
@@ -210,9 +210,9 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                     >
                         <div className="text-center">
                             <div className="mb-4 text-6xl">📁</div>
-                            <h3 className="mb-3 text-xl font-bold text-white">นำเข้าไฟล์แบบแปลน</h3>
+                            <h3 className="mb-3 text-xl font-bold text-white">Import Blueprint File</h3>
                             <p className="mb-4 text-gray-400">
-                                อัปโหลดไฟล์แบบแปลนที่มีอยู่แล้วเพื่อวาดทับและปรับแต่ง
+                                Upload an existing blueprint file to trace and customize
                             </p>
 
                             <div className="space-y-2 text-left">
@@ -228,7 +228,7 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                             clipRule="evenodd"
                                         />
                                     </svg>
-                                    รองรับไฟล์ AutoCAD (DWG, DXF)
+                                    Supports AutoCAD files (DWG, DXF)
                                 </div>
                                 <div className="flex items-center text-sm text-gray-300">
                                     <svg
@@ -242,7 +242,7 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                             clipRule="evenodd"
                                         />
                                     </svg>
-                                    รองรับไฟล์รูปภาพ (PNG, JPG)
+                                    Supports image files (PNG, JPG)
                                 </div>
                                 <div className="flex items-center text-sm text-gray-300">
                                     <svg
@@ -256,7 +256,7 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                             clipRule="evenodd"
                                         />
                                     </svg>
-                                    รองรับไฟล์ PDF
+                                    Supports PDF files
                                 </div>
                                 <div className="flex items-center text-sm text-gray-300">
                                     <svg
@@ -270,14 +270,14 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                             clipRule="evenodd"
                                         />
                                     </svg>
-                                    ต้องมีความรู้ด้านแบบแปลน
+                                    Requires blueprint knowledge
                                 </div>
                             </div>
 
                             {selectedMethod === 'import' && (
                                 <div className="mt-4">
                                     <span className="inline-flex items-center rounded-full bg-orange-500 px-3 py-1 text-sm font-medium text-white">
-                                        ✓ เลือกแล้ว
+                                        ✓ Selected
                                     </span>
                                 </div>
                             )}
@@ -291,12 +291,12 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                         <div className="text-2xl">💡</div>
                         <div>
                             <h4 className="mb-2 font-semibold text-blue-300">
-                                คำแนะนำสำหรับผู้เริ่มต้น
+                                Recommendation for Beginners
                             </h4>
                             <p className="text-blue-100">
-                                หากคุณเป็นผู้เริ่มต้นหรือไม่มีไฟล์แบบแปลน แนะนำให้เลือก{' '}
-                                <strong>"วาดพื้นที่เอง"</strong>
-                                เพราะจะง่ายกว่าและมีเทมเพลตโรงเรือนมาตรฐานให้เลือกใช้
+                                If you're a beginner or don't have blueprint files, we recommend choosing{' '}
+                                <strong>"Draw Area Yourself"</strong>
+                                {' '}as it's easier and includes standard greenhouse templates
                             </p>
                         </div>
                     </div>
@@ -308,7 +308,7 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                         onClick={handleBack}
                         className="rounded-lg bg-gray-600 px-6 py-3 font-medium text-white transition-colors hover:bg-gray-700"
                     >
-                        ← กลับไปเลือกพืช
+                        ← Back to Crop Selection
                     </button>
 
                     <button
@@ -316,9 +316,9 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                         disabled={!selectedMethod}
                         className="rounded-lg bg-blue-600 px-6 py-3 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:opacity-50"
                     >
-                        {selectedMethod === 'draw' && 'เริ่มวาดพื้นที่ →'}
-                        {selectedMethod === 'import' && 'นำเข้าไฟล์ →'}
-                        {!selectedMethod && 'เลือกวิธีการ →'}
+                        {selectedMethod === 'draw' && 'Start Drawing Area →'}
+                        {selectedMethod === 'import' && 'Import File →'}
+                        {!selectedMethod && 'Select Method →'}
                     </button>
                 </div>
 
@@ -326,8 +326,8 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                 {selectedMethod && (
                     <div className="mt-8 rounded-lg bg-gray-800 p-6">
                         <h4 className="mb-4 text-lg font-semibold text-white">
-                            {selectedMethod === 'draw' && '🎨 ตัวอย่างการวาดพื้นที่'}
-                            {selectedMethod === 'import' && '📋 ขั้นตอนการนำเข้าไฟล์'}
+                            {selectedMethod === 'draw' && '🎨 Area Drawing Preview'}
+                            {selectedMethod === 'import' && '📋 File Import Steps'}
                         </h4>
 
                         {selectedMethod === 'draw' && (
@@ -336,25 +336,25 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                     <div className="mr-3 flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
                                         1
                                     </div>
-                                    <span>เลือกเทมเพลตโรงเรือนหรือวาดแบบอิสระ</span>
+                                    <span>Choose greenhouse template or draw freely</span>
                                 </div>
                                 <div className="flex items-center">
                                     <div className="mr-3 flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
                                         2
                                     </div>
-                                    <span>กำหนดขนาดและรูปร่างโรงเรือน</span>
+                                    <span>Define greenhouse size and shape</span>
                                 </div>
                                 <div className="flex items-center">
                                     <div className="mr-3 flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
                                         3
                                     </div>
-                                    <span>เพิ่มแปลงปลูกและพื้นที่เดิน</span>
+                                    <span>Add growing beds and walkways</span>
                                 </div>
                                 <div className="flex items-center">
                                     <div className="mr-3 flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
                                         4
                                     </div>
-                                    <span>ยืนยันและไปขั้นตอนถัดไป</span>
+                                    <span>Confirm and proceed to next step</span>
                                 </div>
                             </div>
                         )}
@@ -365,25 +365,25 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                     <div className="mr-3 flex h-6 w-6 items-center justify-center rounded-full bg-orange-600 text-xs font-bold text-white">
                                         1
                                     </div>
-                                    <span>อัปโหลดไฟล์แบบแปลน (DWG, DXF, PDF, หรือรูปภาพ)</span>
+                                    <span>Upload blueprint file (DWG, DXF, PDF, or image)</span>
                                 </div>
                                 <div className="flex items-center">
                                     <div className="mr-3 flex h-6 w-6 items-center justify-center rounded-full bg-orange-600 text-xs font-bold text-white">
                                         2
                                     </div>
-                                    <span>ปรับขนาดและตำแหน่งให้ถูกต้อง</span>
+                                    <span>Adjust size and position correctly</span>
                                 </div>
                                 <div className="flex items-center">
                                     <div className="mr-3 flex h-6 w-6 items-center justify-center rounded-full bg-orange-600 text-xs font-bold text-white">
                                         3
                                     </div>
-                                    <span>วาดทับพื้นที่โรงเรือนและแปลงปลูก</span>
+                                    <span>Trace greenhouse area and growing beds</span>
                                 </div>
                                 <div className="flex items-center">
                                     <div className="mr-3 flex h-6 w-6 items-center justify-center rounded-full bg-orange-600 text-xs font-bold text-white">
                                         4
                                     </div>
-                                    <span>ยืนยันและไปขั้นตอนถัดไป</span>
+                                    <span>Confirm and proceed to next step</span>
                                 </div>
                             </div>
                         )}

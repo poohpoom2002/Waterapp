@@ -1,4 +1,4 @@
-// Field Map Constants และ Configurations
+// Field Map Constants and Configurations
 export const ZONE_COLORS = [
     '#FF6B6B',
     '#4ECDC4',
@@ -12,57 +12,57 @@ export const ZONE_COLORS = [
 
 export const OBSTACLE_TYPES = {
     river: {
-        name: 'แม่น้ำ/ลำธาร (River)',
+        name: 'River/Stream',
         icon: '🌊',
         color: '#3B82F6',
         fillColor: '#3B82F6',
         fillOpacity: 0.3,
-        description: 'แหล่งน้ำธรรมชาติ ท่อไม่สามารถวางผ่านได้',
+        description: 'Natural water source, pipes cannot be placed through',
     },
     building: {
-        name: 'อาคาร/สิ่งปลูกสร้าง (Building)',
+        name: 'Building/Structure',
         icon: '🏠',
         color: '#6B7280',
         fillColor: '#6B7280',
         fillOpacity: 0.5,
-        description: 'อาคารหรือสิ่งปลูกสร้าง ท่อไม่สามารถวางผ่านได้',
+        description: 'Building or structure, pipes cannot be placed through',
     },
     rock: {
-        name: 'หิน/ภูเขา (Rock/Mountain)',
+        name: 'Rock/Mountain',
         icon: '⛰️',
         color: '#8B5CF6',
         fillColor: '#8B5CF6',
         fillOpacity: 0.4,
-        description: 'พื้นที่หินหรือภูเขา ท่อไม่สามารถวางผ่านได้',
+        description: 'Rocky area or mountain, pipes cannot be placed through',
     },
 } as const;
 
 export const PIPE_TYPES = {
     main: {
-        name: 'ท่อเมน',
+        name: 'Main Pipe',
         icon: '🔵',
         color: '#2563eb',
         weight: 8,
         opacity: 0.9,
-        description: 'ท่อหลักขนาดใหญ่ นำน้ำจากแหล่งน้ำสู่พื้นที่',
+        description: 'Large main pipe, carries water from source to area',
         manual: true,
     },
     submain: {
-        name: 'ท่อเมนย่อย',
+        name: 'Submain Pipe',
         icon: '🟢',
         color: '#16a34a',
         weight: 5,
         opacity: 0.8,
-        description: 'ท่อขนาดกลาง แยกจากท่อเมนไปยังแต่ละโซน',
+        description: 'Medium-sized pipe, branches from main pipe to each zone',
         manual: true,
     },
     lateral: {
-        name: 'ท่อย่อย',
+        name: 'Lateral Pipe',
         icon: '🟡',
         color: '#ca8a04',
         weight: 2,
         opacity: 0.7,
-        description: 'ท่อขนาดเล็ก กระจายน้ำภายในโซน (Auto Generate)',
+        description: 'Small pipe, distributes water within zone (Auto Generate)',
         manual: false,
     },
 } as const;
@@ -93,32 +93,32 @@ export const MAP_TILES = {
 
 export const EQUIPMENT_TYPES = {
     pump: {
-        name: 'ปั๊ม (Pump)',
+        name: 'Pump',
         icon: '⚡',
         imageUrl: '/generateTree/wtpump.png',
-        description: 'ปั๊มน้ำสำหรับดูดส่งน้ำ',
+        description: 'Water pump for suction and delivery',
         color: '#DC2626',
     },
     ballvalve: {
-        name: 'บอลวาล์ว (Ball Valve)',
+        name: 'Ball Valve',
         icon: '🔘',
         imageUrl: '/generateTree/ballv.png',
-        description: 'วาล์วควบคุมการไหลของน้ำ',
+        description: 'Valve for controlling water flow',
         color: '#2563EB',
     },
     solenoid: {
-        name: 'โซลินอยด์วาล์ว (Solenoid Valve)',
+        name: 'Solenoid Valve',
         icon: '🔌',
         imageUrl: '/generateTree/solv.png',
-        description: 'วาล์วอัตโนมัติควบคุมด้วยไฟฟ้า',
+        description: 'Automatic valve controlled by electricity',
         color: '#16A34A',
     },
 } as const;
 
 export const DEFAULT_MAP_CENTER: [number, number] = [14.5995, 120.9842];
 export const DEFAULT_MAP_ZOOM = 13;
-export const DEFAULT_SNAP_DISTANCE = 20; // เพิ่มจาก 8 เป็น 20 (2.5 เท่า)
-export const DEFAULT_PIPE_SNAP_DISTANCE = 30; // เพิ่มจาก 15 เป็น 30 (2 เท่า)
+export const DEFAULT_SNAP_DISTANCE = 20; // Increased from 8 to 20 (2.5x)
+export const DEFAULT_PIPE_SNAP_DISTANCE = 30; // Increased from 15 to 30 (2x)
 export const DEFAULT_GRID_SIZE = 10;
 
 // Type definitions
