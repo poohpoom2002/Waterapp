@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // @/pages/utils/greenHouseData.ts
 
 import { getCropByValue } from '@/pages/utils/cropData';
@@ -179,7 +180,7 @@ export const calculateAllGreenhouseStats = (rawData: any): GreenhousePlanningDat
         
         // คำนวณการผลิต
         const crop = getCropByValue(plot.cropType || '');
-        let production: ProductionSummary = { totalPlants: 0, waterRequirementPerIrrigation: 0, estimatedYield: 0, estimatedIncome: 0 };
+        const production: ProductionSummary = { totalPlants: 0, waterRequirementPerIrrigation: 0, estimatedYield: 0, estimatedIncome: 0 };
         if (crop) {
             // คำนวณความหนาแน่นจากระยะห่างระหว่างแถวและต้น
             const density = crop.rowSpacing > 0 && crop.plantSpacing > 0 

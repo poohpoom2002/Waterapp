@@ -79,7 +79,6 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
         if (!isGoogleMapsReady || !inputRef.current) return;
 
         try {
-
             placesServiceRef.current = new PlacesServiceWrapper();
 
             autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
@@ -122,7 +121,6 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
                     setError(t('ไม่สามารถเลือกสถานที่นี้ได้'));
                 }
             });
-
         } catch (error) {
             console.error('❌ Error initializing Google Places:', error);
             setError(t('ไม่สามารถเริ่มต้นระบบค้นหาได้'));
@@ -150,7 +148,6 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
         setError(null);
 
         try {
-
             const searchResult = await placesServiceRef.current.textSearch(query, {
                 maxResults: 6,
             });

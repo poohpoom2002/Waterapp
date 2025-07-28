@@ -1,5 +1,7 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // resources/js/pages/product.tsx - Updated to support greenhouse mode
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useMemo } from 'react';
 import { IrrigationInput, QuotationData, QuotationDataCustomer } from './types/interfaces';
 import { useCalculations, ZoneCalculationData } from './hooks/useCalculations';
@@ -158,8 +160,8 @@ export default function Product() {
         const crop = getCropByValue(plot.cropType || '');
         
         // Calculate planting points for this plot
-        let totalTrees = plot.production.totalPlants || 100;
-        let waterPerTree = (plot.production.waterRequirementPerIrrigation / Math.max(totalTrees, 1)) || 50;
+        const totalTrees = plot.production.totalPlants || 100;
+        const waterPerTree = (plot.production.waterRequirementPerIrrigation / Math.max(totalTrees, 1)) || 50;
         
         // Use pipe stats from the plot
         const longestBranch = plot.pipeStats.sub.longest || 30;
@@ -1838,7 +1840,7 @@ export default function Product() {
                         >
                             ×
                         </button>
-                        <div className="relative h-[90vh] w-[90vw] flex items-center justify-center">
+                        <div className="relative flex h-[90vh] w-[90vw] items-center justify-center">
                             <img
                                 src={projectImage}
                                 alt={`${

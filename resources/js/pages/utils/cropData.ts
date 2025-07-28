@@ -197,14 +197,14 @@ export const cropTypes: Crop[] = [
 
 // Find a crop by its value
 export function getCropByValue(value: string): Crop | undefined {
-    return cropTypes.find(crop => crop.value === value);
+    return cropTypes.find((crop) => crop.value === value);
 }
 
 // Search crops by name or description (case-insensitive)
 export function searchCrops(term: string): Crop[] {
     const lower = term.toLowerCase();
     return cropTypes.filter(
-        crop =>
+        (crop) =>
             crop.name.toLowerCase().includes(lower) ||
             crop.description.toLowerCase().includes(lower)
     );

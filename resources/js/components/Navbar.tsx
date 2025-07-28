@@ -40,7 +40,7 @@ const Navbar: React.FC = () => {
                                 Super Dashboard
                             </Link>
                         )}
-                        
+
                         <LanguageSwitcher />
 
                         {/* User Avatar - Only show if authenticated */}
