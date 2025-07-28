@@ -59,7 +59,7 @@ const FieldMapCropSpacing: React.FC<FieldMapCropSpacingProps> = ({
                                 <div className="mb-2">
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs text-gray-300">
-                                            ระยะห่างระหว่างแถว (เมตร)
+                                            Row Spacing (m)
                                         </span>
                                         {editingRowSpacingForCrop !== crop.value ? (
                                             <div className="flex items-center space-x-2">
@@ -131,7 +131,7 @@ const FieldMapCropSpacing: React.FC<FieldMapCropSpacingProps> = ({
                                 <div>
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs text-gray-300">
-                                            ระยะห่างระหว่างต้น (เมตร)
+                                            Plant Spacing (m)
                                         </span>
                                         {editingPlantSpacingForCrop !== crop.value ? (
                                             <div className="flex items-center space-x-2">
