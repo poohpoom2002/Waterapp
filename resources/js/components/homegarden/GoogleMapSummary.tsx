@@ -1,4 +1,4 @@
-// components/homegarden/GoogleMapSummary.tsx - Updated to show uniform pipes
+// resources/js/components/homegarden/GoogleMapSummary.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Wrapper, Status } from '@googlemaps/react-wrapper';
 import {
@@ -8,15 +8,10 @@ import {
     clipCircleToPolygon,
     isCornerSprinkler,
 } from '../../utils/homeGardenData';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 const getGoogleMapsConfig = () => {
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
-
-    console.log('🗺️ Google Maps Summary Config:', {
-        hasApiKey: !!apiKey,
-        apiKeyLength: apiKey.length,
-    });
-
     return {
         apiKey,
         libraries: ['drawing', 'geometry', 'places'],
@@ -49,7 +44,6 @@ const getGoogleMapsConfig = () => {
             scrollwheel: false,
             disableDoubleClickZoom: true,
             clickableIcons: false,
-            minZoom: 1,
         },
     };
 };
@@ -61,7 +55,7 @@ interface GoogleMapSummaryProps {
 }
 
 class SummaryErrorBoundary extends React.Component<
-    { children: React.ReactNode },
+    { children: React.ReactNode; t: any },
     { hasError: boolean; error?: Error }
 > {
     constructor(props: any) {
@@ -79,20 +73,25 @@ class SummaryErrorBoundary extends React.Component<
     }
 
     render() {
+        const { t } = this.props;
         if (this.state.hasError) {
             return (
                 <div className="flex h-full w-full items-center justify-center bg-gray-900">
                     <div className="text-center text-white">
                         <div className="mb-4 text-4xl">⚠️</div>
-                        <h3 className="mb-4 text-lg font-bold">ไม่สามารถแสดงแผนที่สรุปผลได้</h3>
+                        <h3 className="mb-4 text-lg font-bold">
+                            {t('ไม่สามารถแสดงแผนที่สรุปผลได้')}
+                        </h3>
                         <p className="mb-4 text-sm text-gray-400">
-                            กรุณาตรวจสอบการตั้งค่า Google Maps API
+                            {t(
+                                'ไม่พบ Google Maps API Key กรุณาตั้งค่า VITE_GOOGLE_MAPS_API_KEY ในไฟล์ .env'
+                            )}
                         </p>
                         <button
                             onClick={() => window.location.reload()}
                             className="rounded bg-blue-600 px-4 py-2 transition-colors hover:bg-blue-700"
                         >
-                            โหลดใหม่
+                            {t('ลองใหม่')}
                         </button>
                     </div>
                 </div>
@@ -103,35 +102,34 @@ class SummaryErrorBoundary extends React.Component<
     }
 }
 
-const SummaryLoadingComponent: React.FC = () => (
+const SummaryLoadingComponent: React.FC<{ t: any }> = ({ t }) => (
     <div className="flex h-full w-full items-center justify-center bg-gray-900">
         <div className="text-center">
             <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-b-2 border-white"></div>
-            <p className="text-white">กำลังโหลดสรุปผล...</p>
-            <p className="mt-1 text-xs text-gray-400">กำลังสร้างแผนที่...</p>
+            <p className="text-white">{t('กำลังโหลดสรุปผล...')}</p>
+            <p className="mt-1 text-xs text-gray-400">{t('กำลังสร้างแผนที่...')}</p>
         </div>
     </div>
 );
 
-const SummaryErrorComponent: React.FC<{ onRetry?: () => void }> = ({ onRetry }) => {
+const SummaryErrorComponent: React.FC<{ onRetry?: () => void; t: any }> = ({ onRetry, t }) => {
     const config = getGoogleMapsConfig();
-
     return (
         <div className="flex h-full w-full items-center justify-center bg-gray-900">
             <div className="max-w-md rounded-lg bg-red-900 p-6 text-center text-white">
                 <div className="mb-4 text-4xl">❌</div>
-                <h3 className="mb-2 text-lg font-bold">ไม่สามารถโหลดแผนที่สรุปผลได้</h3>
+                <h3 className="mb-2 text-lg font-bold">{t('ไม่สามารถโหลดแผนที่สรุปผลได้')}</h3>
                 <p className="mb-4 text-sm text-gray-300">
                     {!config.apiKey
-                        ? 'ไม่พบ Google Maps API Key'
-                        : 'เกิดข้อผิดพลาดในการเชื่อมต่อ Google Maps'}
+                        ? t('ไม่พบ Google Maps API Key')
+                        : t('เกิดข้อผิดพลาดในการเชื่อมต่อ Google Maps')}
                 </p>
                 {onRetry && (
                     <button
                         onClick={onRetry}
                         className="w-full rounded bg-red-600 px-4 py-2 transition-colors hover:bg-red-700"
                     >
-                        ลองใหม่
+                        {t('ลองใหม่')}
                     </button>
                 )}
             </div>
@@ -148,7 +146,7 @@ const SummaryMapComponent: React.FC<{
     const ref = useRef<HTMLDivElement>(null);
     const [map, setMap] = useState<google.maps.Map>();
     const [error, setError] = useState<string | null>(null);
-
+    const { t } = useLanguage();
     useEffect(() => {
         if (ref.current && !map && window.google?.maps) {
             try {
@@ -162,7 +160,6 @@ const SummaryMapComponent: React.FC<{
                         style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
                         mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain'],
                     },
-                    minZoom: 1,
                 };
 
                 const newMap = new window.google.maps.Map(ref.current, {
@@ -174,20 +171,11 @@ const SummaryMapComponent: React.FC<{
 
                 const loadingListener = newMap.addListener('tilesloaded', () => {
                     google.maps.event.removeListener(loadingListener);
-                    console.log('✅ Summary map tiles loaded successfully');
                 });
 
                 setMap(newMap);
                 onLoad?.(newMap);
                 setError(null);
-
-                console.log('📊 Summary map initialized with settings:', {
-                    currentZoom: zoom,
-                    minZoom: summaryMapOptions.minZoom,
-                    maxZoom: 120,
-                    mapTypeControl: 'LEFT_BOTTOM',
-                    gestureHandling: summaryMapOptions.gestureHandling,
-                });
             } catch (error) {
                 console.error('Error creating summary map:', error);
                 setError(error instanceof Error ? error.message : 'Unknown error');
@@ -207,7 +195,7 @@ const SummaryMapComponent: React.FC<{
     }, [map, center, zoom]);
 
     if (error) {
-        return <SummaryErrorComponent />;
+        return <SummaryErrorComponent t={t} />;
     }
 
     return (
@@ -490,8 +478,6 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
         clearOverlays();
 
         try {
-            console.log('🎨 Rendering summary overlays...');
-
             gardenData.gardenZones?.forEach((zone) => {
                 if (!zone.coordinates || zone.coordinates.length < 3) return;
 
@@ -515,7 +501,6 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
                 }
             });
 
-            // Render uniform pipes (no branch classification)
             gardenData.pipes
                 ?.filter((p) => p.type === 'pipe')
                 .forEach((pipe) => {
@@ -525,8 +510,8 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
                                 { lat: pipe.start.lat, lng: pipe.start.lng },
                                 { lat: pipe.end.lat, lng: pipe.end.lng },
                             ],
-                            strokeColor: '#FFFF00', // Uniform yellow color for all pipes
-                            strokeWeight: 4, // Uniform size for all pipes
+                            strokeColor: '#FFFF00',
+                            strokeWeight: 4,
                             strokeOpacity: 0.9,
                             map: map,
                         });
@@ -536,14 +521,12 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
                     }
                 });
 
-            // Render sprinklers
             gardenData.sprinklers?.forEach((sprinkler) => {
                 if (!sprinkler.position) return;
 
                 try {
                     const zone = gardenData.gardenZones?.find((z) => z.id === sprinkler.zoneId);
 
-                    // Handle virtual zone sprinklers (no zone coverage)
                     if (!zone || sprinkler.zoneId === 'virtual_zone') {
                         const circle = new google.maps.Circle({
                             center: { lat: sprinkler.position.lat, lng: sprinkler.position.lng },
@@ -558,7 +541,6 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
                         overlaysRef.current.set(`virtual-coverage-${sprinkler.id}`, circle);
                     }
 
-                    // Render sprinkler marker
                     const marker = new google.maps.Marker({
                         position: { lat: sprinkler.position.lat, lng: sprinkler.position.lng },
                         icon: createSprinklerIcon(sprinkler.type, sprinkler.orientation),
@@ -571,7 +553,6 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
                 }
             });
 
-            // Render water source
             if (gardenData.waterSource?.position) {
                 try {
                     const marker = new google.maps.Marker({
@@ -588,8 +569,6 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
                     console.error('Error rendering water source:', error);
                 }
             }
-
-            console.log('✅ Summary overlays rendered successfully');
         } catch (error) {
             console.error('Error rendering summary overlays:', error);
         }
@@ -599,7 +578,6 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
 
     return (
         <>
-            {/* Render clipped sprinkler coverage for zones */}
             {gardenData.sprinklers?.map((sprinkler) => {
                 if (!sprinkler.position) return null;
 
@@ -627,44 +605,37 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
 };
 
 const renderSummaryMap = (status: Status): React.ReactElement => {
+    const { t } = useLanguage();
     switch (status) {
         case Status.LOADING:
-            return <SummaryLoadingComponent />;
+            return <SummaryLoadingComponent t={t} />;
         case Status.FAILURE:
-            return <SummaryErrorComponent onRetry={() => window.location.reload()} />;
+            return <SummaryErrorComponent onRetry={() => window.location.reload()} t={t} />;
         case Status.SUCCESS:
             return <div style={{ width: '100%', height: '100%' }} />;
         default:
-            return <SummaryLoadingComponent />;
+            return <SummaryLoadingComponent t={t} />;
     }
 };
 
 const GoogleMapSummary: React.FC<GoogleMapSummaryProps> = (props) => {
     const { mapCenter, calculateZoomLevel } = props;
     const config = getGoogleMapsConfig();
-
+    const { t } = useLanguage();
     useEffect(() => {
         if (!config.apiKey) {
             console.error('❌ Google Maps API Key is missing for summary');
         } else {
             console.log('✅ Google Maps Summary API Key found');
-            console.log('📊 Summary map settings:', {
-                mapTypeControl: 'LEFT_BOTTOM',
-                minZoom: 1,
-                maxZoom: 'UNLIMITED ♾️',
-                gestureHandling: 'none',
-                note: 'Zoom restrictions removed completely',
-                pipeSystem: 'Uniform yellow pipes (no branch classification)',
-            });
         }
     }, [config.apiKey]);
 
     if (!config.apiKey) {
-        return <SummaryErrorComponent onRetry={() => window.location.reload()} />;
+        return <SummaryErrorComponent onRetry={() => window.location.reload()} t={t} />;
     }
 
     return (
-        <SummaryErrorBoundary>
+        <SummaryErrorBoundary t={t}>
             <Wrapper
                 apiKey={config.apiKey}
                 render={renderSummaryMap}

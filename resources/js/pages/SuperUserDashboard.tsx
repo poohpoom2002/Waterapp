@@ -4,7 +4,16 @@ import axios from 'axios';
 import { useLanguage } from '../contexts/LanguageContext';
 import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
-import { FaUsers, FaFolder, FaMap, FaPlus, FaEdit, FaTrash, FaEye, FaChartBar } from 'react-icons/fa';
+import {
+    FaUsers,
+    FaFolder,
+    FaMap,
+    FaPlus,
+    FaEdit,
+    FaTrash,
+    FaEye,
+    FaChartBar,
+} from 'react-icons/fa';
 
 // Types
 type User = {
@@ -54,7 +63,9 @@ export default function SuperUserDashboard() {
     const [fields, setFields] = useState<Field[]>([]);
     const [folders, setFolders] = useState<Folder[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'fields' | 'folders'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'fields' | 'folders'>(
+        'dashboard'
+    );
     const [showCreateUserModal, setShowCreateUserModal] = useState(false);
     const [showEditUserModal, setShowEditUserModal] = useState(false);
     const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
@@ -66,12 +77,13 @@ export default function SuperUserDashboard() {
 
     const loadDashboardData = async () => {
         try {
-            const [statsResponse, usersResponse, fieldsResponse, foldersResponse] = await Promise.all([
-                axios.get('/super/dashboard'),
-                axios.get('/super/users'),
-                axios.get('/super/fields'),
-                axios.get('/super/folders')
-            ]);
+            const [statsResponse, usersResponse, fieldsResponse, foldersResponse] =
+                await Promise.all([
+                    axios.get('/super/dashboard'),
+                    axios.get('/super/users'),
+                    axios.get('/super/fields'),
+                    axios.get('/super/folders'),
+                ]);
 
             if (statsResponse.data.success) {
                 setStats(statsResponse.data.stats);
@@ -92,11 +104,13 @@ export default function SuperUserDashboard() {
         }
     };
 
-    const handleCreateUser = async (userData: Omit<User, 'id' | 'created_at'> & { password: string }) => {
+    const handleCreateUser = async (
+        userData: Omit<User, 'id' | 'created_at'> & { password: string }
+    ) => {
         try {
             const response = await axios.post('/super/users', userData);
             if (response.data.success) {
-                setUsers(prev => [...prev, response.data.user]);
+                setUsers((prev) => [...prev, response.data.user]);
                 setShowCreateUserModal(false);
             }
         } catch (error) {
@@ -109,7 +123,7 @@ export default function SuperUserDashboard() {
         try {
             const response = await axios.put(`/super/users/${userId}`, userData);
             if (response.data.success) {
-                setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...userData } : u));
+                setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, ...userData } : u)));
                 setShowEditUserModal(false);
                 setSelectedUser(null);
             }
@@ -120,14 +134,18 @@ export default function SuperUserDashboard() {
     };
 
     const handleDeleteUser = async (userId: number) => {
-        if (!confirm('Are you sure you want to delete this user? This will also delete all their fields and folders.')) {
+        if (
+            !confirm(
+                'Are you sure you want to delete this user? This will also delete all their fields and folders.'
+            )
+        ) {
             return;
         }
 
         try {
             const response = await axios.delete(`/super/users/${userId}`);
             if (response.data.success) {
-                setUsers(prev => prev.filter(u => u.id !== userId));
+                setUsers((prev) => prev.filter((u) => u.id !== userId));
             }
         } catch (error) {
             console.error('Error deleting user:', error);
@@ -143,7 +161,7 @@ export default function SuperUserDashboard() {
         try {
             const response = await axios.delete(`/super/fields/${fieldId}`);
             if (response.data.success) {
-                setFields(prev => prev.filter(f => f.id !== fieldId));
+                setFields((prev) => prev.filter((f) => f.id !== fieldId));
             }
         } catch (error) {
             console.error('Error deleting field:', error);
@@ -159,7 +177,7 @@ export default function SuperUserDashboard() {
         try {
             const response = await axios.delete(`/super/folders/${folderId}`);
             if (response.data.success) {
-                setFolders(prev => prev.filter(f => f.id !== folderId));
+                setFolders((prev) => prev.filter((f) => f.id !== folderId));
             }
         } catch (error) {
             console.error('Error deleting folder:', error);
@@ -167,7 +185,9 @@ export default function SuperUserDashboard() {
         }
     };
 
-    const handleCreateFolder = async (folderData: Omit<Folder, 'id' | 'created_at' | 'user'> & { user_id: number }) => {
+    const handleCreateFolder = async (
+        folderData: Omit<Folder, 'id' | 'created_at' | 'user'> & { user_id: number }
+    ) => {
         try {
             const response = await axios.post('/super/folders', folderData);
             if (response.data.success) {
@@ -193,7 +213,7 @@ export default function SuperUserDashboard() {
     }
 
     return (
-        <div className="min-h-screen flex flex-col bg-gray-900">
+        <div className="flex min-h-screen flex-col bg-gray-900">
             <Navbar />
             <div className="flex-1">
                 <div className="p-6">
@@ -203,9 +223,7 @@ export default function SuperUserDashboard() {
                             <h1 className="text-3xl font-bold text-white">
                                 {t('super_user_dashboard')}
                             </h1>
-                            <p className="mt-2 text-gray-400">
-                                {t('manage_all_users_and_data')}
-                            </p>
+                            <p className="mt-2 text-gray-400">{t('manage_all_users_and_data')}</p>
                         </div>
 
                         {/* Navigation Tabs */}
@@ -220,10 +238,10 @@ export default function SuperUserDashboard() {
                                     <button
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id as any)}
-                                        className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                                        className={`flex items-center gap-2 rounded-lg px-3 py-2 transition-colors ${
                                             activeTab === tab.id
                                                 ? 'bg-blue-600 text-white'
-                                                : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                                                : 'text-gray-400 hover:bg-gray-700 hover:text-white'
                                         }`}
                                     >
                                         <tab.icon className="h-4 w-4" />
@@ -242,8 +260,12 @@ export default function SuperUserDashboard() {
                                         <div className="flex items-center">
                                             <FaUsers className="h-8 w-8" />
                                             <div className="ml-4">
-                                                <p className="text-sm opacity-90">{t('total_users')}</p>
-                                                <p className="text-2xl font-bold">{stats.total_users}</p>
+                                                <p className="text-sm opacity-90">
+                                                    {t('total_users')}
+                                                </p>
+                                                <p className="text-2xl font-bold">
+                                                    {stats.total_users}
+                                                </p>
                                             </div>
                                         </div>
                                     </div>
@@ -251,8 +273,12 @@ export default function SuperUserDashboard() {
                                         <div className="flex items-center">
                                             <FaMap className="h-8 w-8" />
                                             <div className="ml-4">
-                                                <p className="text-sm opacity-90">{t('total_fields')}</p>
-                                                <p className="text-2xl font-bold">{stats.total_fields}</p>
+                                                <p className="text-sm opacity-90">
+                                                    {t('total_fields')}
+                                                </p>
+                                                <p className="text-2xl font-bold">
+                                                    {stats.total_fields}
+                                                </p>
                                             </div>
                                         </div>
                                     </div>
@@ -260,8 +286,12 @@ export default function SuperUserDashboard() {
                                         <div className="flex items-center">
                                             <FaFolder className="h-8 w-8" />
                                             <div className="ml-4">
-                                                <p className="text-sm opacity-90">{t('total_folders')}</p>
-                                                <p className="text-2xl font-bold">{stats.total_folders}</p>
+                                                <p className="text-sm opacity-90">
+                                                    {t('total_folders')}
+                                                </p>
+                                                <p className="text-2xl font-bold">
+                                                    {stats.total_folders}
+                                                </p>
                                             </div>
                                         </div>
                                     </div>
@@ -270,13 +300,20 @@ export default function SuperUserDashboard() {
                                 {/* Recent Activity */}
                                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                                     <div className="rounded-lg bg-gray-800 p-6">
-                                        <h3 className="mb-4 text-lg font-semibold text-white">{t('recent_users')}</h3>
+                                        <h3 className="mb-4 text-lg font-semibold text-white">
+                                            {t('recent_users')}
+                                        </h3>
                                         <div className="space-y-3">
                                             {stats.recent_users.map((user) => (
-                                                <div key={user.id} className="flex items-center justify-between">
+                                                <div
+                                                    key={user.id}
+                                                    className="flex items-center justify-between"
+                                                >
                                                     <div>
                                                         <p className="text-white">{user.name}</p>
-                                                        <p className="text-sm text-gray-400">{user.email}</p>
+                                                        <p className="text-sm text-gray-400">
+                                                            {user.email}
+                                                        </p>
                                                     </div>
                                                     {user.is_super_user && (
                                                         <span className="rounded bg-yellow-600 px-2 py-1 text-xs text-white">
@@ -289,13 +326,20 @@ export default function SuperUserDashboard() {
                                     </div>
 
                                     <div className="rounded-lg bg-gray-800 p-6">
-                                        <h3 className="mb-4 text-lg font-semibold text-white">{t('recent_fields')}</h3>
+                                        <h3 className="mb-4 text-lg font-semibold text-white">
+                                            {t('recent_fields')}
+                                        </h3>
                                         <div className="space-y-3">
                                             {stats.recent_fields.map((field) => (
-                                                <div key={field.id} className="flex items-center justify-between">
+                                                <div
+                                                    key={field.id}
+                                                    className="flex items-center justify-between"
+                                                >
                                                     <div>
                                                         <p className="text-white">{field.name}</p>
-                                                        <p className="text-sm text-gray-400">{field.user.name}</p>
+                                                        <p className="text-sm text-gray-400">
+                                                            {field.user.name}
+                                                        </p>
                                                     </div>
                                                     <span className="text-sm text-gray-400">
                                                         {field.totalArea?.toFixed(2)} ไร่
@@ -306,15 +350,24 @@ export default function SuperUserDashboard() {
                                     </div>
 
                                     <div className="rounded-lg bg-gray-800 p-6">
-                                        <h3 className="mb-4 text-lg font-semibold text-white">{t('recent_folders')}</h3>
+                                        <h3 className="mb-4 text-lg font-semibold text-white">
+                                            {t('recent_folders')}
+                                        </h3>
                                         <div className="space-y-3">
                                             {stats.recent_folders.map((folder) => (
-                                                <div key={folder.id} className="flex items-center justify-between">
+                                                <div
+                                                    key={folder.id}
+                                                    className="flex items-center justify-between"
+                                                >
                                                     <div>
                                                         <p className="text-white">{folder.name}</p>
-                                                        <p className="text-sm text-gray-400">{folder.user.name}</p>
+                                                        <p className="text-sm text-gray-400">
+                                                            {folder.user.name}
+                                                        </p>
                                                     </div>
-                                                    <span className="text-sm text-gray-400">{folder.type}</span>
+                                                    <span className="text-sm text-gray-400">
+                                                        {folder.type}
+                                                    </span>
                                                 </div>
                                             ))}
                                         </div>
@@ -326,7 +379,9 @@ export default function SuperUserDashboard() {
                         {activeTab === 'users' && (
                             <div>
                                 <div className="mb-6 flex items-center justify-between">
-                                    <h2 className="text-xl font-semibold text-white">{t('user_management')}</h2>
+                                    <h2 className="text-xl font-semibold text-white">
+                                        {t('user_management')}
+                                    </h2>
                                     <button
                                         onClick={() => setShowCreateUserModal(true)}
                                         className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
@@ -337,11 +392,18 @@ export default function SuperUserDashboard() {
                                 </div>
                                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                                     {users.map((user) => (
-                                        <div key={user.id} className="rounded-lg border border-gray-700 bg-gray-800 p-6">
+                                        <div
+                                            key={user.id}
+                                            className="rounded-lg border border-gray-700 bg-gray-800 p-6"
+                                        >
                                             <div className="mb-4 flex items-center justify-between">
                                                 <div>
-                                                    <h3 className="font-semibold text-white">{user.name}</h3>
-                                                    <p className="text-sm text-gray-400">{user.email}</p>
+                                                    <h3 className="font-semibold text-white">
+                                                        {user.name}
+                                                    </h3>
+                                                    <p className="text-sm text-gray-400">
+                                                        {user.email}
+                                                    </p>
                                                 </div>
                                                 {user.is_super_user && (
                                                     <span className="rounded bg-yellow-600 px-2 py-1 text-xs text-white">
@@ -377,84 +439,134 @@ export default function SuperUserDashboard() {
                         {activeTab === 'fields' && (
                             <div>
                                 <div className="mb-6">
-                                    <h2 className="text-xl font-semibold text-white">{t('field_management')}</h2>
+                                    <h2 className="text-xl font-semibold text-white">
+                                        {t('field_management')}
+                                    </h2>
                                 </div>
-                                
+
                                 {/* Group fields by user */}
                                 {(() => {
-                                    const fieldsByUser = fields.reduce((acc, field) => {
-                                        const userId = field.user.id;
-                                        if (!acc[userId]) {
-                                            acc[userId] = {
-                                                user: field.user,
-                                                fields: []
-                                            };
-                                        }
-                                        acc[userId].fields.push(field);
-                                        return acc;
-                                    }, {} as Record<number, { user: User; fields: Field[] }>);
+                                    const fieldsByUser = fields.reduce(
+                                        (acc, field) => {
+                                            const userId = field.user.id;
+                                            if (!acc[userId]) {
+                                                acc[userId] = {
+                                                    user: field.user,
+                                                    fields: [],
+                                                };
+                                            }
+                                            acc[userId].fields.push(field);
+                                            return acc;
+                                        },
+                                        {} as Record<number, { user: User; fields: Field[] }>
+                                    );
 
                                     return (
                                         <div className="space-y-8">
-                                            {Object.values(fieldsByUser).map(({ user, fields: userFields }) => (
-                                                <div key={user.id} className="rounded-lg border border-gray-700 bg-gray-800 p-6">
-                                                    <div className="mb-4 flex items-center justify-between">
-                                                        <div>
-                                                            <h3 className="text-lg font-semibold text-white">{user.name}</h3>
-                                                            <p className="text-sm text-gray-400">{user.email}</p>
-                                                            {user.is_super_user && (
-                                                                <span className="mt-1 inline-block rounded bg-yellow-600 px-2 py-1 text-xs text-white">
-                                                                    {t('super_user')}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <span className="text-sm text-gray-400">
-                                                            {userFields.length} {t('fields')}
-                                                        </span>
-                                                    </div>
-                                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                                        {userFields.map((field) => (
-                                                            <div key={field.id} className="rounded-lg border border-gray-600 bg-gray-700 p-4">
-                                                                <div className="mb-3">
-                                                                    <h4 className="font-semibold text-white">{field.name}</h4>
-                                                                    <p className="text-xs text-gray-400">{field.status}</p>
-                                                                </div>
-                                                                <div className="mb-3 space-y-1 text-xs text-gray-300">
-                                                                    <div className="flex justify-between">
-                                                                        <span>{t('area')}:</span>
-                                                                        <span className="text-white">{field.totalArea?.toFixed(2)} ไร่</span>
-                                                                    </div>
-                                                                    <div className="flex justify-between">
-                                                                        <span>{t('plants')}:</span>
-                                                                        <span className="text-white">{field.totalPlants}</span>
-                                                                    </div>
-                                                                    <div className="flex justify-between">
-                                                                        <span>{t('status')}:</span>
-                                                                        <span className={`${
-                                                                            field.isCompleted ? 'text-green-400' : 'text-yellow-400'
-                                                                        }`}>
-                                                                            {field.isCompleted ? t('completed') : t('in_progress')}
-                                                                        </span>
-                                                                    </div>
-                                                                    <div className="flex justify-between">
-                                                                        <span>{t('created')}:</span>
-                                                                        <span className="text-white">
-                                                                            {new Date(field.created_at).toLocaleDateString()}
-                                                                        </span>
-                                                                    </div>
-                                                                </div>
-                                                                <button
-                                                                    onClick={() => handleDeleteField(field.id)}
-                                                                    className="w-full rounded bg-red-600 px-3 py-2 text-xs text-white transition-colors hover:bg-red-700"
-                                                                >
-                                                                    <FaTrash className="mr-1 h-3 w-3" />
-                                                                    {t('delete')}
-                                                                </button>
+                                            {Object.values(fieldsByUser).map(
+                                                ({ user, fields: userFields }) => (
+                                                    <div
+                                                        key={user.id}
+                                                        className="rounded-lg border border-gray-700 bg-gray-800 p-6"
+                                                    >
+                                                        <div className="mb-4 flex items-center justify-between">
+                                                            <div>
+                                                                <h3 className="text-lg font-semibold text-white">
+                                                                    {user.name}
+                                                                </h3>
+                                                                <p className="text-sm text-gray-400">
+                                                                    {user.email}
+                                                                </p>
+                                                                {user.is_super_user && (
+                                                                    <span className="mt-1 inline-block rounded bg-yellow-600 px-2 py-1 text-xs text-white">
+                                                                        {t('super_user')}
+                                                                    </span>
+                                                                )}
                                                             </div>
-                                                        ))}
+                                                            <span className="text-sm text-gray-400">
+                                                                {userFields.length} {t('fields')}
+                                                            </span>
+                                                        </div>
+                                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                                            {userFields.map((field) => (
+                                                                <div
+                                                                    key={field.id}
+                                                                    className="rounded-lg border border-gray-600 bg-gray-700 p-4"
+                                                                >
+                                                                    <div className="mb-3">
+                                                                        <h4 className="font-semibold text-white">
+                                                                            {field.name}
+                                                                        </h4>
+                                                                        <p className="text-xs text-gray-400">
+                                                                            {field.status}
+                                                                        </p>
+                                                                    </div>
+                                                                    <div className="mb-3 space-y-1 text-xs text-gray-300">
+                                                                        <div className="flex justify-between">
+                                                                            <span>
+                                                                                {t('area')}:
+                                                                            </span>
+                                                                            <span className="text-white">
+                                                                                {field.totalArea?.toFixed(
+                                                                                    2
+                                                                                )}{' '}
+                                                                                ไร่
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="flex justify-between">
+                                                                            <span>
+                                                                                {t('plants')}:
+                                                                            </span>
+                                                                            <span className="text-white">
+                                                                                {field.totalPlants}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="flex justify-between">
+                                                                            <span>
+                                                                                {t('status')}:
+                                                                            </span>
+                                                                            <span
+                                                                                className={`${
+                                                                                    field.isCompleted
+                                                                                        ? 'text-green-400'
+                                                                                        : 'text-yellow-400'
+                                                                                }`}
+                                                                            >
+                                                                                {field.isCompleted
+                                                                                    ? t('completed')
+                                                                                    : t(
+                                                                                          'in_progress'
+                                                                                      )}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="flex justify-between">
+                                                                            <span>
+                                                                                {t('created')}:
+                                                                            </span>
+                                                                            <span className="text-white">
+                                                                                {new Date(
+                                                                                    field.created_at
+                                                                                ).toLocaleDateString()}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={() =>
+                                                                            handleDeleteField(
+                                                                                field.id
+                                                                            )
+                                                                        }
+                                                                        className="w-full rounded bg-red-600 px-3 py-2 text-xs text-white transition-colors hover:bg-red-700"
+                                                                    >
+                                                                        <FaTrash className="mr-1 h-3 w-3" />
+                                                                        {t('delete')}
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))}
+                                                )
+                                            )}
                                         </div>
                                     );
                                 })()}
@@ -464,7 +576,9 @@ export default function SuperUserDashboard() {
                         {activeTab === 'folders' && (
                             <div>
                                 <div className="mb-6 flex items-center justify-between">
-                                    <h2 className="text-xl font-semibold text-white">{t('folder_management')}</h2>
+                                    <h2 className="text-xl font-semibold text-white">
+                                        {t('folder_management')}
+                                    </h2>
                                     <button
                                         onClick={() => setShowCreateFolderModal(true)}
                                         className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700"
@@ -473,75 +587,107 @@ export default function SuperUserDashboard() {
                                         {t('create_folder')}
                                     </button>
                                 </div>
-                                
+
                                 {/* Group folders by user */}
                                 {(() => {
-                                    const foldersByUser = folders.reduce((acc, folder) => {
-                                        const userId = folder.user.id;
-                                        if (!acc[userId]) {
-                                            acc[userId] = {
-                                                user: folder.user,
-                                                folders: []
-                                            };
-                                        }
-                                        acc[userId].folders.push(folder);
-                                        return acc;
-                                    }, {} as Record<number, { user: User; folders: Folder[] }>);
+                                    const foldersByUser = folders.reduce(
+                                        (acc, folder) => {
+                                            const userId = folder.user.id;
+                                            if (!acc[userId]) {
+                                                acc[userId] = {
+                                                    user: folder.user,
+                                                    folders: [],
+                                                };
+                                            }
+                                            acc[userId].folders.push(folder);
+                                            return acc;
+                                        },
+                                        {} as Record<number, { user: User; folders: Folder[] }>
+                                    );
 
                                     return (
                                         <div className="space-y-8">
-                                            {Object.values(foldersByUser).map(({ user, folders: userFolders }) => (
-                                                <div key={user.id} className="rounded-lg border border-gray-700 bg-gray-800 p-6">
-                                                    <div className="mb-4 flex items-center justify-between">
-                                                        <div>
-                                                            <h3 className="text-lg font-semibold text-white">{user.name}</h3>
-                                                            <p className="text-sm text-gray-400">{user.email}</p>
-                                                            {user.is_super_user && (
-                                                                <span className="mt-1 inline-block rounded bg-yellow-600 px-2 py-1 text-xs text-white">
-                                                                    {t('super_user')}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <span className="text-sm text-gray-400">
-                                                            {userFolders.length} {t('folders')}
-                                                        </span>
-                                                    </div>
-                                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                                        {userFolders.map((folder) => (
-                                                            <div key={folder.id} className="rounded-lg border border-gray-600 bg-gray-700 p-4">
-                                                                <div className="mb-3">
-                                                                    <h4 className="font-semibold text-white">{folder.name}</h4>
-                                                                    <p className="text-xs text-gray-400">{folder.type}</p>
-                                                                </div>
-                                                                <div className="mb-3 space-y-1 text-xs text-gray-300">
-                                                                    <div className="flex justify-between">
-                                                                        <span>{t('created')}:</span>
-                                                                        <span className="text-white">
-                                                                            {new Date(folder.created_at).toLocaleDateString()}
-                                                                        </span>
-                                                                    </div>
-                                                                    {folder.color && (
-                                                                        <div className="flex items-center justify-between">
-                                                                            <span>{t('color')}:</span>
-                                                                            <div 
-                                                                                className="h-4 w-4 rounded-full border border-gray-500"
-                                                                                style={{ backgroundColor: folder.color }}
-                                                                            />
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                <button
-                                                                    onClick={() => handleDeleteFolder(folder.id)}
-                                                                    className="w-full rounded bg-red-600 px-3 py-2 text-xs text-white transition-colors hover:bg-red-700"
-                                                                >
-                                                                    <FaTrash className="mr-1 h-3 w-3" />
-                                                                    {t('delete')}
-                                                                </button>
+                                            {Object.values(foldersByUser).map(
+                                                ({ user, folders: userFolders }) => (
+                                                    <div
+                                                        key={user.id}
+                                                        className="rounded-lg border border-gray-700 bg-gray-800 p-6"
+                                                    >
+                                                        <div className="mb-4 flex items-center justify-between">
+                                                            <div>
+                                                                <h3 className="text-lg font-semibold text-white">
+                                                                    {user.name}
+                                                                </h3>
+                                                                <p className="text-sm text-gray-400">
+                                                                    {user.email}
+                                                                </p>
+                                                                {user.is_super_user && (
+                                                                    <span className="mt-1 inline-block rounded bg-yellow-600 px-2 py-1 text-xs text-white">
+                                                                        {t('super_user')}
+                                                                    </span>
+                                                                )}
                                                             </div>
-                                                        ))}
+                                                            <span className="text-sm text-gray-400">
+                                                                {userFolders.length} {t('folders')}
+                                                            </span>
+                                                        </div>
+                                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                                            {userFolders.map((folder) => (
+                                                                <div
+                                                                    key={folder.id}
+                                                                    className="rounded-lg border border-gray-600 bg-gray-700 p-4"
+                                                                >
+                                                                    <div className="mb-3">
+                                                                        <h4 className="font-semibold text-white">
+                                                                            {folder.name}
+                                                                        </h4>
+                                                                        <p className="text-xs text-gray-400">
+                                                                            {folder.type}
+                                                                        </p>
+                                                                    </div>
+                                                                    <div className="mb-3 space-y-1 text-xs text-gray-300">
+                                                                        <div className="flex justify-between">
+                                                                            <span>
+                                                                                {t('created')}:
+                                                                            </span>
+                                                                            <span className="text-white">
+                                                                                {new Date(
+                                                                                    folder.created_at
+                                                                                ).toLocaleDateString()}
+                                                                            </span>
+                                                                        </div>
+                                                                        {folder.color && (
+                                                                            <div className="flex items-center justify-between">
+                                                                                <span>
+                                                                                    {t('color')}:
+                                                                                </span>
+                                                                                <div
+                                                                                    className="h-4 w-4 rounded-full border border-gray-500"
+                                                                                    style={{
+                                                                                        backgroundColor:
+                                                                                            folder.color,
+                                                                                    }}
+                                                                                />
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={() =>
+                                                                            handleDeleteFolder(
+                                                                                folder.id
+                                                                            )
+                                                                        }
+                                                                        className="w-full rounded bg-red-600 px-3 py-2 text-xs text-white transition-colors hover:bg-red-700"
+                                                                    >
+                                                                        <FaTrash className="mr-1 h-3 w-3" />
+                                                                        {t('delete')}
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))}
+                                                )
+                                            )}
                                         </div>
                                     );
                                 })()}
@@ -551,7 +697,7 @@ export default function SuperUserDashboard() {
                 </div>
             </div>
             <Footer />
-            
+
             {/* Create Folder Modal */}
             {showCreateFolderModal && (
                 <CreateFolderModal
@@ -634,19 +780,31 @@ const CreateFolderModal = ({
                 <div className="mb-4 flex items-center justify-between">
                     <h2 className="text-xl font-semibold text-white">{t('create_folder')}</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-white">
-                        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        <svg
+                            className="h-6 w-6"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                            />
                         </svg>
                     </button>
                 </div>
                 <form onSubmit={handleSubmit}>
                     <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="mb-2 block text-sm font-medium text-gray-300">
                             {t('select_user')}
                         </label>
                         <select
                             value={selectedUserId}
-                            onChange={(e) => setSelectedUserId(e.target.value ? Number(e.target.value) : '')}
+                            onChange={(e) =>
+                                setSelectedUserId(e.target.value ? Number(e.target.value) : '')
+                            }
                             className="w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
                             required
                         >
@@ -659,7 +817,7 @@ const CreateFolderModal = ({
                         </select>
                     </div>
                     <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="mb-2 block text-sm font-medium text-gray-300">
                             {t('folder_name')}
                         </label>
                         <input
@@ -673,7 +831,7 @@ const CreateFolderModal = ({
                         />
                     </div>
                     <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="mb-2 block text-sm font-medium text-gray-300">
                             {t('folder_icon')}
                         </label>
                         <div className="grid grid-cols-5 gap-2">
@@ -683,7 +841,9 @@ const CreateFolderModal = ({
                                     type="button"
                                     onClick={() => setFolderIcon(icon)}
                                     className={`rounded p-2 text-xl ${
-                                        folderIcon === icon ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'
+                                        folderIcon === icon
+                                            ? 'bg-blue-600'
+                                            : 'bg-gray-700 hover:bg-gray-600'
                                     }`}
                                 >
                                     {icon}
@@ -692,7 +852,7 @@ const CreateFolderModal = ({
                         </div>
                     </div>
                     <div className="mb-6">
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="mb-2 block text-sm font-medium text-gray-300">
                             {t('folder_color')}
                         </label>
                         <div className="grid grid-cols-6 gap-2">
@@ -702,7 +862,9 @@ const CreateFolderModal = ({
                                     type="button"
                                     onClick={() => setFolderColor(color.value)}
                                     className={`h-8 w-8 rounded-full border-2 ${
-                                        folderColor === color.value ? 'border-white' : 'border-gray-600'
+                                        folderColor === color.value
+                                            ? 'border-white'
+                                            : 'border-gray-600'
                                     }`}
                                     style={{ backgroundColor: color.value }}
                                     title={color.name}
@@ -730,7 +892,7 @@ const CreateFolderModal = ({
             </div>
         </div>
     );
-}; 
+};
 
 // Create User Modal Component
 const CreateUserModal = ({
@@ -775,14 +937,24 @@ const CreateUserModal = ({
                 <div className="mb-4 flex items-center justify-between">
                     <h2 className="text-xl font-semibold text-white">{t('create_user')}</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-white">
-                        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        <svg
+                            className="h-6 w-6"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                            />
                         </svg>
                     </button>
                 </div>
                 <form onSubmit={handleSubmit}>
                     <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="mb-2 block text-sm font-medium text-gray-300">
                             {t('name')}
                         </label>
                         <input
@@ -796,7 +968,7 @@ const CreateUserModal = ({
                         />
                     </div>
                     <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="mb-2 block text-sm font-medium text-gray-300">
                             {t('email')}
                         </label>
                         <input
@@ -809,7 +981,7 @@ const CreateUserModal = ({
                         />
                     </div>
                     <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="mb-2 block text-sm font-medium text-gray-300">
                             {t('password')}
                         </label>
                         <input
@@ -853,4 +1025,4 @@ const CreateUserModal = ({
             </div>
         </div>
     );
-}; 
+};

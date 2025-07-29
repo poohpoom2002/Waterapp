@@ -7,79 +7,79 @@ export interface Crop {
     description: string;
     category: 'cereal' | 'root' | 'legume' | 'industrial' | 'oilseed';
     irrigationNeeds: 'low' | 'medium' | 'high';
-    growthPeriod: number; // ระยะเวลาที่ใช้ในการเติบโตตั้งแต่เริ่มปลูกจนโตเต็มที่ (วัน)
-    waterRequirement: number; // ปริมาณน้ำที่ต้องการ (ลิตร/ต้น/วัน) - เป็นค่าประมาณการ
-    rowSpacing: number; // ระยะห่างระหว่างแถวปลูก (ซม.)
-    plantSpacing: number; // ระยะห่างระหว่างต้นในแถวเดียวกัน (ซม.)
-    yield: number; // ผลผลิตที่คาดว่าจะได้ (กก./ไร่)
-    price: number; // ราคา (บาท/กก.)
+    growthPeriod: number; // Growth period from planting to full maturity (days)
+    waterRequirement: number; // Estimated water requirement (liters/plant/day)
+    rowSpacing: number; // Spacing between rows (cm)
+    plantSpacing: number; // Spacing between plants in the same row (cm)
+    yield: number; // Expected yield (kg/rai)
+    price: number; // Price (THB/kg)
 }
 
 export const cropTypes: Crop[] = [
-    // Cereals (ธัญพืช)
+    // Cereals
     {
         value: 'rice',
-        name: 'ข้าว (Rice)',
+        name: 'Rice',
         icon: '🌾',
-        description: 'พืชหลักของไทย ปลูกในนาข้าว ต้องการน้ำมาก โดยเฉพาะช่วงแตกกอและตั้งท้อง',
+        description: "Thailand's main crop, grown in paddy fields. Requires a lot of water, especially during tillering and booting stages.",
         category: 'cereal',
         irrigationNeeds: 'high',
-        growthPeriod: 120, // พันธุ์ส่วนใหญ่มีอายุเก็บเกี่ยวประมาณ 120 วัน
-        waterRequirement: 4.2, // ประมาณการจาก 1,600 ลบ.ม./ไร่ และความหนาแน่น 16 ต้น/ตร.ม.
+        growthPeriod: 120, // Most varieties have a harvest period of about 120 days
+        waterRequirement: 4.2, // Estimated from 1,600 m³/rai and a density of 16 plants/m²
         rowSpacing: 25,
         plantSpacing: 25,
-        yield: 650, // ผลผลิตเฉลี่ยข้าวนาปรัง
-        price: 12, // ราคาข้าวเปลือกเจ้าความชื้น 15% (อาจผันผวน)
+        yield: 650, // Average yield for off-season rice
+        price: 12, // Price for paddy rice with 15% moisture (subject to fluctuation)
     },
     {
         value: 'corn',
-        name: 'ข้าวโพดเลี้ยงสัตว์ (Field Corn)',
+        name: 'Field Corn',
         icon: '🌽',
-        description: 'พืชไร่เศรษฐกิจสำคัญ ใช้ในอุตสาหกรรมอาหารสัตว์',
+        description: 'An important economic field crop used in the animal feed industry.',
         category: 'cereal',
         irrigationNeeds: 'medium',
-        growthPeriod: 115, // ตั้งแต่ปลูกจนถึงเก็บเกี่ยวฝักแก่
-        waterRequirement: 2.5, // ประมาณการจาก 800-1,200 ลบ.ม./ไร่ และความหนาแน่น 8,500 ต้น/ไร่
+        growthPeriod: 115, // From planting until harvesting mature cobs
+        waterRequirement: 2.5, // Estimated from 800-1,200 m³/rai and a density of 8,500 plants/rai
         rowSpacing: 75,
         plantSpacing: 25,
-        yield: 750, // ผลผลิตเฉลี่ยของประเทศ
-        price: 9.5, // ราคา ณ ไร่นา (อาจผันผวน)
+        yield: 750, // National average yield
+        price: 9.5, // Price at the farm (subject to fluctuation)
     },
     {
         value: 'sorghum',
-        name: 'ข้าวฟ่าง (Sorghum)',
+        name: 'Sorghum',
         icon: '🌾',
-        description: 'พืชธัญพืชทนแล้ง เหมาะกับพื้นที่แห้งแล้ง ใช้เป็นอาหารสัตว์และมนุษย์',
+        description: 'A drought-tolerant cereal crop suitable for arid areas, used for animal and human consumption.',
         category: 'cereal',
         irrigationNeeds: 'low',
         growthPeriod: 110,
-        waterRequirement: 1.8, // ทนแล้งและต้องการน้ำน้อยกว่าข้าวโพด
+        waterRequirement: 1.8, // More drought-tolerant and requires less water than corn
         rowSpacing: 60,
         plantSpacing: 10,
         yield: 450,
         price: 8,
     },
 
-    // Root crops (พืชหัว)
+    // Root crops
     {
         value: 'cassava',
-        name: 'มันสำปะหลัง (Cassava)',
+        name: 'Cassava',
         icon: '🍠',
-        description: 'พืชหัวเศรษฐกิจหลัก ทนแล้งได้ดีมาก ใช้ในอุตสาหกรรมแป้งและพลังงาน',
+        description: 'A major economic root crop, very drought-tolerant, used in starch and energy industries.',
         category: 'root',
         irrigationNeeds: 'low',
-        growthPeriod: 300, // อายุเก็บเกี่ยว 8-12 เดือน
-        waterRequirement: 1.5, // เป็นพืชที่ทนแล้งสูงมาก
+        growthPeriod: 300, // Harvest time is 8-12 months
+        waterRequirement: 1.5, // A very drought-tolerant plant
         rowSpacing: 100,
         plantSpacing: 80,
-        yield: 3500, // ผลผลิตเฉลี่ยหัวสด
-        price: 3.0, // ราคาเชื้อแป้ง 25% (อาจผันผวน)
+        yield: 3500, // Average fresh root yield
+        price: 3.0, // Price for 25% starch content (subject to fluctuation)
     },
     {
         value: 'sweet_potato',
-        name: 'มันเทศ (Sweet Potato)',
+        name: 'Sweet Potato',
         icon: '🍠',
-        description: 'พืชหัวมีคุณค่าทางโภชนาการสูง ตลาดต้องการทั้งในและต่างประเทศ',
+        description: 'A highly nutritious root crop with both domestic and international market demand.',
         category: 'root',
         irrigationNeeds: 'medium',
         growthPeriod: 110,
@@ -90,12 +90,12 @@ export const cropTypes: Crop[] = [
         price: 15,
     },
 
-    // Legumes (พืชตระกูลถั่ว)
+    // Legumes
     {
         value: 'soybean',
-        name: 'ถั่วเหลือง (Soybean)',
+        name: 'Soybean',
         icon: '🫘',
-        description: 'พืชโปรตีนสูง ปรับปรุงดิน ต้องการการดูแลช่วงออกดอกและติดฝัก',
+        description: 'A high-protein, soil-improving crop that requires care during flowering and podding.',
         category: 'legume',
         irrigationNeeds: 'medium',
         growthPeriod: 95,
@@ -107,9 +107,9 @@ export const cropTypes: Crop[] = [
     },
     {
         value: 'mung_bean',
-        name: 'ถั่วเขียว (Mung Bean)',
+        name: 'Mung Bean',
         icon: '🫘',
-        description: 'พืชอายุสั้น ใช้น้ำน้อย นิยมปลูกหลังทำนา',
+        description: 'A short-lived crop that uses little water, popular for planting after rice.',
         category: 'legume',
         irrigationNeeds: 'low',
         growthPeriod: 70,
@@ -121,9 +121,9 @@ export const cropTypes: Crop[] = [
     },
     {
         value: 'peanut',
-        name: 'ถั่วลิสง (Peanut)',
+        name: 'Peanut',
         icon: '🥜',
-        description: 'พืชน้ำมันและโปรตีน ปลูกในดินร่วนซุย ต้องการน้ำสม่ำเสมอช่วงสร้างฝัก',
+        description: 'An oil and protein crop grown in loamy soil, requiring consistent water during pod formation.',
         category: 'legume',
         irrigationNeeds: 'medium',
         growthPeriod: 100,
@@ -134,56 +134,56 @@ export const cropTypes: Crop[] = [
         price: 22,
     },
 
-    // Industrial crops (พืชอุตสาหกรรม)
+    // Industrial crops
     {
         value: 'sugarcane',
-        name: 'อ้อย (Sugarcane)',
+        name: 'Sugarcane',
         icon: '🎋',
-        description: 'พืชหลักสำหรับอุตสาหกรรมน้ำตาลและเอทานอล',
+        description: 'The main crop for the sugar and ethanol industries.',
         category: 'industrial',
         irrigationNeeds: 'high',
-        growthPeriod: 365, // อายุเก็บเกี่ยว 10-14 เดือน
-        waterRequirement: 3.5, // ต้องการน้ำมาก โดยเฉพาะช่วงย่างปล้อง
+        growthPeriod: 365, // Harvest time is 10-14 months
+        waterRequirement: 3.5, // Requires a lot of water, especially during the internode elongation stage
         rowSpacing: 150,
-        plantSpacing: 50, // ปลูกเป็นท่อน
-        yield: 12000, // ผลผลิตเฉลี่ยอ้อยสด
-        price: 1.2, // ราคา ณ หน้าโรงงาน (บาท/กก. หรือ 1,200 บาท/ตัน)
+        plantSpacing: 50, // Planted as cuttings
+        yield: 12000, // Average fresh cane yield
+        price: 1.2, // Price at the factory (THB/kg or 1,200 THB/ton)
     },
     {
         value: 'rubber',
-        name: 'ยางพารา (Rubber)',
+        name: 'Rubber',
         icon: '🌳',
-        description: 'พืชเศรษฐกิจระยะยาว กรีดยางได้หลังปลูกประมาณ 7 ปี',
+        description: 'A long-term economic crop. Tapping can begin about 7 years after planting.',
         category: 'industrial',
         irrigationNeeds: 'medium',
-        growthPeriod: 2555, // 7 ปีก่อนเริ่มกรีด
-        waterRequirement: 10.0, // ต้องการความชื้นสูงและสม่ำเสมอ
+        growthPeriod: 2555, // 7 years before tapping begins
+        waterRequirement: 10.0, // Requires high and consistent moisture
         rowSpacing: 700,
         plantSpacing: 300,
-        yield: 280, // ผลผลิตน้ำยางแห้งเฉลี่ยต่อปี
-        price: 25, // ราคาน้ำยางสด (อาจผันผวน)
+        yield: 280, // Average annual dry rubber yield
+        price: 25, // Price for fresh latex (subject to fluctuation)
     },
 
-    // Oilseed crops (พืชน้ำมัน)
+    // Oilseed crops
     {
         value: 'oil_palm',
-        name: 'ปาล์มน้ำมัน (Oil Palm)',
+        name: 'Oil Palm',
         icon: '🌴',
-        description: 'พืชน้ำมันที่ให้ผลผลิตต่อไร่สูงที่สุด เริ่มให้ผลหลังปลูก 3 ปี',
+        description: 'The oilseed crop with the highest yield per rai. Begins to bear fruit 3 years after planting.',
         category: 'oilseed',
         irrigationNeeds: 'high',
-        growthPeriod: 1095, // ~3 ปีก่อนเริ่มเก็บเกี่ยว
-        waterRequirement: 15.0, // ต้องการน้ำมากและสม่ำเสมอตลอดปี
+        growthPeriod: 1095, // ~3 years before first harvest
+        waterRequirement: 15.0, // Requires a lot of consistent water throughout the year
         rowSpacing: 900,
-        plantSpacing: 900, // ปลูกแบบสามเหลี่ยมด้านเท่า
-        yield: 3000, // ผลผลิตทะลายปาล์มสด
-        price: 5.5, // ราคาผลปาล์มดิบ (อาจผันผวน)
+        plantSpacing: 900, // Planted in an equilateral triangle pattern
+        yield: 3000, // Fresh fruit bunch yield
+        price: 5.5, // Price for raw palm fruit (subject to fluctuation)
     },
     {
         value: 'sunflower',
-        name: 'ทานตะวัน (Sunflower)',
+        name: 'Sunflower',
         icon: '🌻',
-        description: 'พืชน้ำมันอายุสั้น ทนแล้ง ปลูกเสริมรายได้และส่งเสริมการท่องเที่ยว',
+        description: 'A short-lived, drought-tolerant oilseed crop grown for supplemental income and tourism.',
         category: 'oilseed',
         irrigationNeeds: 'low',
         growthPeriod: 90,
@@ -197,14 +197,14 @@ export const cropTypes: Crop[] = [
 
 // Find a crop by its value
 export function getCropByValue(value: string): Crop | undefined {
-    return cropTypes.find(crop => crop.value === value);
+    return cropTypes.find((crop) => crop.value === value);
 }
 
 // Search crops by name or description (case-insensitive)
 export function searchCrops(term: string): Crop[] {
     const lower = term.toLowerCase();
     return cropTypes.filter(
-        crop =>
+        (crop) =>
             crop.name.toLowerCase().includes(lower) ||
             crop.description.toLowerCase().includes(lower)
     );

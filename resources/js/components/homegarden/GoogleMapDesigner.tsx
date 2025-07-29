@@ -1,4 +1,6 @@
-// components/homegarden/GoogleMapDesigner.tsx - Fixed sprinkler dragging and flickering issues
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// components/homegarden/GoogleMapDesigner.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Wrapper, Status } from '@googlemaps/react-wrapper';
 import EnhancedSearchBox from './EnhancedSearchBox';
@@ -31,7 +33,6 @@ const getGoogleMapsConfig = () => {
                 style: 'HORIZONTAL_BAR' as any,
                 mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain'],
             },
-            minZoom: 1,
             restriction: {
                 strictBounds: false,
             },
@@ -168,6 +169,15 @@ const MapErrorComponent: React.FC<{
         if (error?.includes('ApiProjectMapError')) {
             return 'API Key ไม่ถูกต้องหรือไม่ได้เปิดใช้งาน Google Maps JavaScript API และ Places API';
         }
+        if (error?.includes('OVER_QUERY_LIMIT')) {
+            return 'เกินขีดจำกัดการใช้งาน Google Maps API กรุณารอสักครู่แล้วลองใหม่';
+        }
+        if (error?.includes('REQUEST_DENIED')) {
+            return 'API Key ถูกปฏิเสธ กรุณาตรวจสอบการตั้งค่าใน Google Cloud Console';
+        }
+        if (error?.includes('INVALID_REQUEST')) {
+            return 'คำขอไม่ถูกต้อง กรุณาตรวจสอบ API Key และการตั้งค่า';
+        }
         return 'ไม่สามารถโหลด Google Maps ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต';
     };
 
@@ -178,16 +188,24 @@ const MapErrorComponent: React.FC<{
                 <h3 className="mb-2 text-lg font-bold">ไม่สามารถโหลด Google Maps ได้</h3>
                 <p className="mb-4 text-sm text-gray-300">{getErrorMessage()}</p>
                 {!config.apiKey && (
-                    <div className="mb-4 rounded bg-yellow-900 p-3 text-left text-xs">
-                        <p className="font-bold">วิธีแก้ไข:</p>
-                        <ol className="mt-2 list-inside list-decimal space-y-1">
-                            <li>หยุด dev server (Ctrl+C)</li>
-                            <li>ตรวจสอบไฟล์ .env</li>
-                            <li>เพิ่ม VITE_GOOGLE_MAPS_API_KEY</li>
-                            <li>เปิดใช้งาน Places API ใน Google Cloud Console</li>
-                            <li>รัน npm run dev ใหม่</li>
-                        </ol>
-                    </div>
+                                    <div className="mb-4 rounded bg-yellow-900 p-3 text-left text-xs">
+                    <p className="font-bold">วิธีแก้ไข:</p>
+                    <ol className="mt-2 list-inside list-decimal space-y-1">
+                        <li>หยุด dev server (Ctrl+C)</li>
+                        <li>ตรวจสอบไฟล์ .env</li>
+                        <li>เพิ่ม VITE_GOOGLE_MAPS_API_KEY</li>
+                        <li>เปิดใช้งาน Places API ใน Google Cloud Console</li>
+                        <li>รัน npm run dev ใหม่</li>
+                    </ol>
+                    {import.meta.env.DEV && (
+                        <div className="mt-3 rounded bg-gray-800 p-2">
+                            <p className="font-bold text-yellow-300">Debug Info:</p>
+                            <p className="text-xs">API Key Length: {config.apiKey.length}</p>
+                            <p className="text-xs">Environment: {import.meta.env.MODE}</p>
+                            <p className="text-xs">Error: {error}</p>
+                        </div>
+                    )}
+                </div>
                 )}
                 <div className="space-y-2">
                     {onRetry && (
@@ -234,7 +252,6 @@ const MapComponent: React.FC<{
                         style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
                         mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain'],
                     },
-                    minZoom: 1,
                     restriction: {
                         strictBounds: false,
                     },
@@ -251,6 +268,62 @@ const MapComponent: React.FC<{
                     zoom,
                     ...mapOptions,
                 });
+
+                newMap.setOptions({
+                    minZoom: null,
+                    maxZoom: null,
+                    restriction: null,
+                    zoomControl: true,
+                    scrollwheel: true,
+                    gestureHandling: 'greedy',
+                });
+
+                let isZooming = false;
+                const customZoomHandler = (e: WheelEvent) => {
+                    if (isZooming) return;
+                    isZooming = true;
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    const currentZoom = newMap.getZoom() || 10;
+                    const delta = e.deltaY > 0 ? -0.5 : 0.5;
+                    const newZoom = currentZoom + delta;
+
+                    if (newZoom >= 1 && newZoom <= 50) {
+                        newMap.setZoom(newZoom);
+
+                        if (newZoom > 25) {
+                            const center = newMap.getCenter();
+                            if (center) {
+                                setTimeout(() => {
+                                    newMap.panTo(center);
+                                }, 10);
+                            }
+                        }
+                    }
+
+                    setTimeout(() => {
+                        isZooming = false;
+                    }, 50);
+                };
+
+                const mapContainer = ref.current;
+                mapContainer.addEventListener('wheel', customZoomHandler, {
+                    passive: false,
+                    capture: true,
+                });
+
+                newMap.addListener('zoom_changed', () => {
+                    const currentZoom = newMap.getZoom();
+                    if (currentZoom && currentZoom > 25) {
+                        newMap.setOptions({
+                            minZoom: null,
+                            maxZoom: null,
+                        });
+                    }
+                });
+
                 setMap(newMap);
                 onLoad?.(newMap);
                 setError(null);
@@ -363,61 +436,6 @@ const DrawingManager: React.FC<{
     return null;
 };
 
-// Enhanced Circle Masking System - สร้าง polygon จาก intersection ของ circle และ zone
-const createCircleZoneIntersection = (
-    center: Coordinate,
-    radius: number,
-    zoneCoordinates: Coordinate[]
-): Coordinate[] => {
-    const intersectionPoints: Coordinate[] = [];
-    const numCirclePoints = 64; // เพิ่มจำนวนจุดเพื่อความละเอียด
-
-    // สร้างจุดรอบ ๆ วงกลม และเช็คว่าอยู่ใน zone หรือไม่
-    for (let i = 0; i < numCirclePoints; i++) {
-        const angle = (i * 2 * Math.PI) / numCirclePoints;
-        const lat = center.lat + (radius / 111000) * Math.cos(angle);
-        const lng =
-            center.lng +
-            (radius / (111000 * Math.cos((center.lat * Math.PI) / 180))) * Math.sin(angle);
-        const circlePoint = { lat, lng };
-
-        if (isPointInPolygon(circlePoint, zoneCoordinates)) {
-            intersectionPoints.push(circlePoint);
-        }
-    }
-
-    // เพิ่ม vertices ของ zone ที่อยู่ในวงกลม
-    zoneCoordinates.forEach((vertex) => {
-        const distance = Math.sqrt(
-            Math.pow((vertex.lat - center.lat) * 111000, 2) +
-                Math.pow(
-                    (vertex.lng - center.lng) * 111000 * Math.cos((center.lat * Math.PI) / 180),
-                    2
-                )
-        );
-        if (distance <= radius) {
-            intersectionPoints.push(vertex);
-        }
-    });
-
-    // เรียงลำดับจุดตาม clockwise
-    if (intersectionPoints.length >= 3) {
-        const centroidLat =
-            intersectionPoints.reduce((sum, p) => sum + p.lat, 0) / intersectionPoints.length;
-        const centroidLng =
-            intersectionPoints.reduce((sum, p) => sum + p.lng, 0) / intersectionPoints.length;
-
-        intersectionPoints.sort((a, b) => {
-            const angleA = Math.atan2(a.lat - centroidLat, a.lng - centroidLng);
-            const angleB = Math.atan2(b.lat - centroidLat, b.lng - centroidLng);
-            return angleA - angleB;
-        });
-    }
-
-    return intersectionPoints;
-};
-
-// Helper function สำหรับเช็ค point in polygon
 const isPointInPolygon = (point: Coordinate, polygon: Coordinate[]): boolean => {
     let inside = false;
     const x = point.lng;
@@ -436,7 +454,6 @@ const isPointInPolygon = (point: Coordinate, polygon: Coordinate[]): boolean => 
     return inside;
 };
 
-// Fixed ClippedSprinklerCoverage component with better performance
 const ClippedSprinklerCoverage: React.FC<{
     map?: google.maps.Map;
     center: Coordinate;
@@ -453,7 +470,6 @@ const ClippedSprinklerCoverage: React.FC<{
     useEffect(() => {
         if (!map || !window.google?.maps) return;
 
-        // Add delay to prevent flickering
         const timer = setTimeout(() => {
             setIsStable(true);
         }, 100);
@@ -464,7 +480,6 @@ const ClippedSprinklerCoverage: React.FC<{
     useEffect(() => {
         if (!map || !window.google?.maps || !isStable) return;
 
-        // Clear existing overlays
         overlayRef.current.forEach((overlay) => {
             try {
                 if ('setMap' in overlay) {
@@ -476,7 +491,6 @@ const ClippedSprinklerCoverage: React.FC<{
         });
         overlayRef.current = [];
 
-        // Don't show radius for forbidden zones
         if (zoneType === 'forbidden') {
             return;
         }
@@ -495,20 +509,58 @@ const ClippedSprinklerCoverage: React.FC<{
                     strokeOpacity: isSelected ? 0.8 : 0.6,
                     strokeWeight: 2,
                     map: map,
-                    clickable: false, // Prevent interference with other clicks
+                    clickable: false,
                 });
                 overlayRef.current.push(circle);
             } else if (result === 'MASKED_CIRCLE') {
-                // Create intersection polygon instead of showing full circle
-                const intersectionPolygon = createCircleZoneIntersection(
-                    center,
-                    radius,
-                    zoneCoordinates
-                );
+                const intersectionPoints: Coordinate[] = [];
+                const numCirclePoints = 64;
 
-                if (intersectionPolygon.length >= 3) {
+                for (let i = 0; i < numCirclePoints; i++) {
+                    const angle = (i * 2 * Math.PI) / numCirclePoints;
+                    const lat = center.lat + (radius / 111000) * Math.cos(angle);
+                    const lng =
+                        center.lng +
+                        (radius / (111000 * Math.cos((center.lat * Math.PI) / 180))) *
+                            Math.sin(angle);
+                    const circlePoint = { lat, lng };
+
+                    if (isPointInPolygon(circlePoint, zoneCoordinates)) {
+                        intersectionPoints.push(circlePoint);
+                    }
+                }
+
+                zoneCoordinates.forEach((vertex) => {
+                    const distance = Math.sqrt(
+                        Math.pow((vertex.lat - center.lat) * 111000, 2) +
+                            Math.pow(
+                                (vertex.lng - center.lng) *
+                                    111000 *
+                                    Math.cos((center.lat * Math.PI) / 180),
+                                2
+                            )
+                    );
+                    if (distance <= radius) {
+                        intersectionPoints.push(vertex);
+                    }
+                });
+
+                if (intersectionPoints.length >= 3) {
+                    const centroidLat =
+                        intersectionPoints.reduce((sum, p) => sum + p.lat, 0) /
+                        intersectionPoints.length;
+                    const centroidLng =
+                        intersectionPoints.reduce((sum, p) => sum + p.lng, 0) /
+                        intersectionPoints.length;
+
+                    intersectionPoints.sort((a, b) => {
+                        const angleA = Math.atan2(a.lat - centroidLat, a.lng - centroidLng);
+                        const angleB = Math.atan2(b.lat - centroidLat, b.lng - centroidLng);
+                        return angleA - angleB;
+                    });
+
                     const polygon = new google.maps.Polygon({
-                        paths: intersectionPolygon.map((p) => ({ lat: p.lat, lng: p.lng })),
+                        paths: intersectionPoints.map((p) => ({ lat: p.lat, lng: p.lng })),
                         fillColor: selectedColor,
                         fillOpacity: isSelected ? 0.3 : 0.2,
                         strokeColor: selectedColor,
@@ -518,20 +570,7 @@ const ClippedSprinklerCoverage: React.FC<{
                         clickable: false,
                     });
                     overlayRef.current.push(polygon);
-
-                    // Show zone boundary as dashed line
-                    const zoneBoundary = new google.maps.Polygon({
-                        paths: zoneCoordinates.map((p) => ({ lat: p.lat, lng: p.lng })),
-                        fillOpacity: 0,
-                        strokeColor: selectedColor,
-                        strokeOpacity: 0.4,
-                        strokeWeight: 1,
-                        map: map,
-                        clickable: false,
-                    });
-                    overlayRef.current.push(zoneBoundary);
                 } else {
-                    // Fallback to full circle if intersection calculation fails
                     const circle = new google.maps.Circle({
                         center: { lat: center.lat, lng: center.lng },
                         radius: radius,
@@ -546,9 +585,6 @@ const ClippedSprinklerCoverage: React.FC<{
                     overlayRef.current.push(circle);
                 }
             } else if (Array.isArray(result) && result.length >= 3) {
-                console.log(
-                    `🎨 ${sprinklerId}: Created clipped polygon with ${result.length} points`
-                );
                 const coordinates = result as Coordinate[];
                 const polygon = new google.maps.Polygon({
                     paths: coordinates.map((p) => ({ lat: p.lat, lng: p.lng })),
@@ -562,8 +598,6 @@ const ClippedSprinklerCoverage: React.FC<{
                 });
                 overlayRef.current.push(polygon);
             } else {
-                console.log(`❌ ${sprinklerId}: No coverage or minimal intersection`);
-                // Show dashed circle for no coverage
                 const circle = new google.maps.Circle({
                     center: { lat: center.lat, lng: center.lng },
                     radius: radius,
@@ -580,7 +614,6 @@ const ClippedSprinklerCoverage: React.FC<{
         } catch (error) {
             console.error(`Error creating clipped sprinkler coverage for ${sprinklerId}:`, error);
 
-            // Fallback - simple circle
             try {
                 const circle = new google.maps.Circle({
                     center: { lat: center.lat, lng: center.lng },
@@ -756,7 +789,6 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
         };
     }, []);
 
-    // Add map stability check
     useEffect(() => {
         if (props.map) {
             const timer = setTimeout(() => {
@@ -769,15 +801,11 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
     useEffect(() => {
         if (!props.map || !window.google?.maps || !isMapStable) return;
 
-        // Throttle the rendering to prevent flickering
         const timer = setTimeout(
             () => {
                 clearOverlays();
 
                 try {
-                    console.log('🎨 Rendering map overlays...');
-
-                    // Render zones
                     props.gardenZones?.forEach((zone) => {
                         if (!zone.coordinates || zone.coordinates.length < 3) return;
 
@@ -803,7 +831,6 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                         }
                     });
 
-                    // Render main pipe drawing
                     if (props.mainPipeDrawing.length > 0) {
                         try {
                             const polyline = new google.maps.Polyline({
@@ -823,7 +850,6 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                         }
                     }
 
-                    // Render main pipe
                     if (props.mainPipeDrawing.length >= 2) {
                         try {
                             const polyline = new google.maps.Polyline({
@@ -843,7 +869,6 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                         }
                     }
 
-                    // Render pipes
                     props.pipes
                         ?.filter((p) => p.type === 'pipe')
                         .forEach((pipe) => {
@@ -870,7 +895,6 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                             }
                         });
 
-                    // Render sprinklers with improved dragging
                     props.sprinklers?.forEach((sprinkler) => {
                         if (!sprinkler.position) return;
                         try {
@@ -893,7 +917,6 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                                 map: props.map,
                             });
 
-                            // Enhanced click handling
                             marker.addListener('click', () => {
                                 if (
                                     props.pipeEditMode === 'add' ||
@@ -905,22 +928,18 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                                 }
                             });
 
-                            // Enhanced right-click handling
                             marker.addListener('rightclick', () => {
                                 props.onSprinklerDelete(sprinkler.id);
                             });
 
-                            // Enhanced drag handling
                             if (props.editMode === 'drag-sprinkler') {
                                 marker.addListener('dragstart', () => {
                                     setIsDragging(true);
                                 });
 
                                 marker.addListener('drag', (e: google.maps.MapMouseEvent) => {
-                                    if (e.latLng) {
-                                        // Optional: Real-time position update during drag
-                                        // Can be removed if causing performance issues
-                                    }
+                                    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+                                    e.latLng;
                                 });
 
                                 marker.addListener('dragend', (e: google.maps.MapMouseEvent) => {
@@ -941,7 +960,6 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                         }
                     });
 
-                    // Render water source
                     if (props.waterSource?.position) {
                         try {
                             const marker = new google.maps.Marker({
@@ -976,14 +994,12 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                             console.error('Error rendering water source:', error);
                         }
                     }
-
-                    console.log('✅ Map overlays rendered successfully');
                 } catch (error) {
                     console.error('Error rendering map overlays:', error);
                 }
             },
             isDragging ? 100 : 50
-        ); // Longer delay when dragging
+        );
 
         return () => {
             clearTimeout(timer);
@@ -1037,7 +1053,6 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                 onMapClick={props.onMapClick}
             />
 
-            {/* Render sprinkler radius coverage with stability check */}
             {isMapStable &&
                 !isDragging &&
                 props.sprinklers?.map((sprinkler) => {
@@ -1100,12 +1115,6 @@ const GoogleMapDesigner: React.FC<GoogleMapDesignerProps> = (props) => {
             );
         } else {
             console.log('✅ Google Maps API Key found');
-            console.log('🔍 Zoom settings:', {
-                minZoom: 1,
-                maxZoom: 'UNLIMITED ♾️',
-                mapTypeControlPosition: 'LEFT_BOTTOM',
-                note: '💡 ปลดล็อคแล้ว: ซูมได้ไม่จำกัด!',
-            });
         }
     }, [config.apiKey]);
 

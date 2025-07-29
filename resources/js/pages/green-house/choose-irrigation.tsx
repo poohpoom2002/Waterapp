@@ -3,7 +3,7 @@ import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
 import { useLanguage } from '../../contexts/LanguageContext';
 
-// --- คำจำกัดความของตัวเลือกระบบน้ำ ---
+// --- Definition of irrigation system options ---
 interface IrrigationOption {
     id: string;
     name: string;
@@ -16,27 +16,27 @@ interface IrrigationOption {
 const irrigationOptions: IrrigationOption[] = [
     {
         id: 'mini-sprinkler',
-        name: 'มินิสปริงเกลอร์',
+        name: 'Mini Sprinkler',
         icon: '💧',
-        description: 'ให้น้ำเป็นวงแคบลงมา เหมาะสำหรับแปลงผักหรือไม้พุ่ม',
+        description: 'Provides water in narrow circles, suitable for vegetable plots or shrubs',
     },
     {
         id: 'drip',
-        name: 'น้ำหยด',
+        name: 'Drip Irrigation',
         icon: '💧🌱',
-        description: 'ประหยดน้ำสูงสุด โดยให้น้ำโดยตรงที่โคนต้นพืช',
+        description: 'Maximum water savings by delivering water directly to plant roots',
     },
     {
         id: 'mixed',
-        name: 'แบบผสม',
+        name: 'Mixed System',
         icon: '🔄',
-        description: 'ผสมผสานระบบต่างๆ เพื่อให้เหมาะกับพืชหลากหลายชนิด',
+        description: 'Combines different systems to suit various types of plants',
         disabled: true,
-        developmentMessage: 'กำลังพัฒนา',
+        developmentMessage: 'Under Development',
     },
 ];
 
-// --- คอมโพเนนต์ React ---
+// --- React Component ---
 export default function ChooseIrrigationMethod() {
     const { t } = useLanguage();
     const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
@@ -54,8 +54,8 @@ export default function ChooseIrrigationMethod() {
         console.log('Choose-irrigation received:', {
             crops: cropsParam,
             shapes: shapesParam
-                ? `มีข้อมูล shapes (${shapesParam.length} characters)`
-                : 'ไม่มีข้อมูล shapes',
+                ? `Has shapes data (${shapesParam.length} characters)`
+                : 'No shapes data',
             method: methodParam,
         });
 
@@ -64,9 +64,9 @@ export default function ChooseIrrigationMethod() {
         if (methodParam) setMethod(methodParam);
     }, []);
 
-    // ฟังก์ชันสำหรับย้อนกลับไปหน้า planner
+    // Function to go back to planner page
     const handleBack = () => {
-        // บันทึกข้อมูลปัจจุบัน
+        // Save current data
         const currentData = {
             crops: crops,
             shapes: shapes,
@@ -76,23 +76,23 @@ export default function ChooseIrrigationMethod() {
         };
         localStorage.setItem('choosingIrrigationData', JSON.stringify(currentData));
 
-        // กลับไปหน้า planner พร้อมข้อมูล
+        // Go back to planner page with data
         const queryParams = new URLSearchParams();
         if (crops) queryParams.set('crops', crops);
-        if (shapes) queryParams.set('shapes', shapes); // เพิ่มบรรทัดนี้
+        if (shapes) queryParams.set('shapes', shapes); // Add this line
         if (method) queryParams.set('method', method);
 
         window.location.href = `/greenhouse-planner?${queryParams.toString()}`;
     };
 
-    // ฟังก์ชันสำหรับไปขั้นตอนถัดไป
+    // Function to proceed to next step
     const handleProceed = () => {
         if (!selectedMethod) {
-            alert('กรุณาเลือกระบบน้ำที่ต้องการ');
+            alert('Please select the desired irrigation system');
             return;
         }
 
-        // บันทึกข้อมูลทั้งหมดใน localStorage
+        // Save all data in localStorage
         const completeData = {
             crops: crops,
             shapes: shapes,
@@ -103,7 +103,7 @@ export default function ChooseIrrigationMethod() {
         };
         localStorage.setItem('irrigationSelectionData', JSON.stringify(completeData));
 
-        // สร้าง URL parameters สำหรับหน้า green-house-map
+        // Create URL parameters for greenhouse-map page
         const queryParams = new URLSearchParams();
 
         if (crops) queryParams.set('crops', crops);
@@ -111,7 +111,7 @@ export default function ChooseIrrigationMethod() {
         if (method) queryParams.set('method', method);
         queryParams.set('irrigation', selectedMethod);
 
-        // นำทางไปยังหน้า green-house-map
+        // Navigate to greenhouse-map page
         window.location.href = `/greenhouse-map?${queryParams.toString()}`;
     };
 
@@ -122,22 +122,22 @@ export default function ChooseIrrigationMethod() {
                 <div className="w-full max-w-4xl">
                 {/* Header */}
                 <div className="mb-10 text-center">
-                    <h1 className="text-3xl font-bold text-white">{t('greenhouse_irrigation_selection')}</h1>
+                    <h1 className="text-3xl font-bold text-white">Choose Irrigation System</h1>
                     <p className="text-md mt-2 text-gray-400">
-                        {t('greenhouse_irrigation_description')}
+                        Please select the irrigation method that suits your needs
                     </p>
 
                     {/* Progress indicator */}
                     <div className="mt-4 flex items-center justify-center space-x-2 text-sm text-gray-400">
-                        <span className="text-green-400">✓ เลือกพืช</span>
+                        <span className="text-green-400">✓ Select Crops</span>
                         <span>→</span>
-                        <span className="text-green-400">✓ วิธีการวางแผน</span>
+                        <span className="text-green-400">✓ Planning Method</span>
                         <span>→</span>
-                        <span className="text-green-400">✓ ออกแบบพื้นที่</span>
+                        <span className="text-green-400">✓ Design Area</span>
                         <span>→</span>
-                        <span className="font-medium text-blue-400">เลือกระบบน้ำ</span>
+                        <span className="font-medium text-blue-400">Select Water System</span>
                         <span>→</span>
-                        <span>ออกแบบระบบน้ำ</span>
+                        <span>Design Water System</span>
                     </div>
                 </div>
 
@@ -145,11 +145,11 @@ export default function ChooseIrrigationMethod() {
                 {(crops || shapes) && (
                     <div className="mb-8 rounded-lg border border-gray-700 bg-gray-800 p-4">
                         <h3 className="mb-2 text-lg font-medium text-green-400">
-                            {t('greenhouse_selected_data')}
+                            Selected Data
                         </h3>
                         {crops && (
                             <div className="mb-2">
-                                <span className="text-sm text-gray-400">{t('greenhouse_selected_crops')}: </span>
+                                <span className="text-sm text-gray-400">Selected Crops: </span>
                                 <div className="mt-1 flex flex-wrap gap-1">
                                     {crops.split(',').map((crop, index) => (
                                         <span
@@ -164,19 +164,19 @@ export default function ChooseIrrigationMethod() {
                         )}
                         {shapes && (
                             <div className="text-sm text-gray-400">
-                                ✓ {t('greenhouse_greenhouse_plans')} (
+                                ✓ Has greenhouse design drawn (
                                 {(() => {
                                     try {
                                         return JSON.parse(decodeURIComponent(shapes)).length;
                                     } catch {
-                                        return 'ข้อมูลผิดพลาด';
+                                        return 'Data Error';
                                     }
                                 })()}{' '}
-                                องค์ประกอบ)
+                                elements)
                             </div>
                         )}
                         {method && (
-                            <div className="text-sm text-gray-400">{t('greenhouse_planning_method')}: {method}</div>
+                            <div className="text-sm text-gray-400">Planning Method: {method}</div>
                         )}
                     </div>
                 )}
@@ -231,7 +231,7 @@ export default function ChooseIrrigationMethod() {
                             </span>
                             <div>
                                 <h4 className="font-medium text-blue-300">
-                                    เลือก:{' '}
+                                    Selected:{' '}
                                     {
                                         irrigationOptions.find((opt) => opt.id === selectedMethod)
                                             ?.name
@@ -267,7 +267,7 @@ export default function ChooseIrrigationMethod() {
                                 d="M10 19l-7-7m0 0l7-7m-7 7h18"
                             />
                         </svg>
-                        {t('greenhouse_back_to_planning')}
+                        Back to Area Design
                     </button>
 
                     <button
@@ -279,7 +279,7 @@ export default function ChooseIrrigationMethod() {
                                 : 'bg-green-600 hover:bg-green-700'
                         }`}
                     >
-                        {t('greenhouse_proceed_to_irrigation')}
+                        Go to Water System Design
                         <svg
                             className="ml-2 h-5 w-5"
                             fill="none"

@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import {
     ZONE_COLORS,
@@ -202,7 +204,6 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
     dripSpacing,
     setDripSpacing,
 }) => {
-
     // Fanggy005 EDIT: Configuration for radius-based irrigation systems
     const irrigationRadiusConfig = {
         sprinkler: { min: 3, max: 15, step: 0.5, defaultValue: 8 },
@@ -212,13 +213,10 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
 
     return (
         <>
-            {/* Current Active Step - Display Only Current Step */}
-
             {/* Step 1: Field Drawing */}
             {currentStep === 1 && (
                 <div className="space-y-3">
-                    {/* Step Header */}
-                    <div className="rounded-lg border border-orange-500/20 bg-orange-500/10 p-3">
+                    <div className="rounded-lg border border-white p-3 bg-orange-500/10">
                         <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-orange-300">
                                 🏗️ Step 1: Field Drawing
@@ -230,30 +228,30 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                         </div>
                     </div>
 
-                    {/* Crop Spacing Settings */}
                     {selectedCropObjects.length > 0 && (
-                        <FieldMapCropSpacing
-                            selectedCropObjects={selectedCropObjects}
-                            rowSpacing={rowSpacing}
-                            tempRowSpacing={tempRowSpacing}
-                            setTempRowSpacing={setTempRowSpacing}
-                            editingRowSpacingForCrop={editingRowSpacingForCrop}
-                            setEditingRowSpacingForCrop={setEditingRowSpacingForCrop}
-                            handleRowSpacingConfirm={handleRowSpacingConfirm}
-                            handleRowSpacingCancel={handleRowSpacingCancel}
-                            plantSpacing={plantSpacing}
-                            tempPlantSpacing={tempPlantSpacing}
-                            setTempPlantSpacing={setTempPlantSpacing}
-                            editingPlantSpacingForCrop={editingPlantSpacingForCrop}
-                            setEditingPlantSpacingForCrop={setEditingPlantSpacingForCrop}
-                            handlePlantSpacingConfirm={handlePlantSpacingConfirm}
-                            handlePlantSpacingCancel={handlePlantSpacingCancel}
-                        />
+                        <div className="rounded border border-white p-2" style={{backgroundColor: '#000005'}}>
+                            <FieldMapCropSpacing
+                                selectedCropObjects={selectedCropObjects}
+                                rowSpacing={rowSpacing}
+                                tempRowSpacing={tempRowSpacing}
+                                setTempRowSpacing={setTempRowSpacing}
+                                editingRowSpacingForCrop={editingRowSpacingForCrop}
+                                setEditingRowSpacingForCrop={setEditingRowSpacingForCrop}
+                                handleRowSpacingConfirm={handleRowSpacingConfirm}
+                                handleRowSpacingCancel={handleRowSpacingCancel}
+                                plantSpacing={plantSpacing}
+                                tempPlantSpacing={tempPlantSpacing}
+                                setTempPlantSpacing={setTempPlantSpacing}
+                                editingPlantSpacingForCrop={editingPlantSpacingForCrop}
+                                setEditingPlantSpacingForCrop={setEditingPlantSpacingForCrop}
+                                handlePlantSpacingConfirm={handlePlantSpacingConfirm}
+                                handlePlantSpacingCancel={handlePlantSpacingCancel}
+                            />
+                        </div>
                     )}
 
-                    {/* Field Area Info */}
                     {mainField && (
-                        <div className="rounded-lg bg-gray-700 p-3">
+                        <div className="rounded-lg border border-white p-3" style={{backgroundColor: '#000005'}}>
                             <div className="mb-2 text-sm text-gray-300">📐 Field Info</div>
                             <div className="space-y-1">
                                 <div className="flex justify-between text-xs">
@@ -261,7 +259,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                     <span className="text-white">
                                         {fieldAreaSize > 0
                                             ? fieldAreaSize >= 1600
-                                                ? `${(fieldAreaSize / 1600).toFixed(2)} ไร่`
+                                                ? `${(fieldAreaSize / 1600).toFixed(2)} Rai`
                                                 : `${fieldAreaSize.toFixed(0)} m²`
                                             : 'Calculating...'}
                                     </span>
@@ -274,23 +272,23 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                         </div>
                     )}
 
-                    {/* Step Navigation */}
-                    <div className="rounded-lg bg-gray-700 p-3">
+                    <div className="rounded-lg border border-white p-3" style={{backgroundColor: '#000005'}}>
                         <div className="flex items-center justify-between">
                             <button
                                 onClick={resetAll}
-                                className="rounded bg-red-600 px-3 py-1 text-sm text-white transition-colors hover:bg-red-700"
+                                className="rounded border border-white bg-red-600 px-3 py-1 text-sm text-white transition-colors hover:bg-red-700"
                             >
                                 🗑️ Reset All
                             </button>
                             <button
                                 onClick={nextStep}
                                 disabled={!validateStep(1)}
-                                className={`rounded px-4 py-1 text-sm transition-colors ${
+                                className={`rounded border border-white px-4 py-1 text-sm transition-colors ${
                                     validateStep(1)
                                         ? 'bg-orange-600 text-white hover:bg-orange-700'
-                                        : 'cursor-not-allowed bg-gray-600 text-gray-400'
+                                        : 'cursor-not-allowed text-gray-400'
                                 }`}
+                                style={{backgroundColor: validateStep(1) ? undefined : '#000005'}}
                             >
                                 Next Step ➡️
                             </button>
@@ -302,8 +300,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
             {/* Step 2: Zones & Obstacles */}
             {currentStep === 2 && (
                 <div className="space-y-3">
-                    {/* Step Header */}
-                    <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-3">
+                    <div className="rounded-lg border border-white p-3 bg-blue-500/10">
                         <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-blue-300">
                                 🎯 Step 2: Zones & Obstacles
@@ -315,38 +312,38 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                         </div>
                     </div>
 
-                    {/* Drawing Mode */}
-                    <div className="rounded-lg bg-gray-700 p-3">
+                    <div className="rounded-lg border border-white p-3" style={{backgroundColor: '#000005'}}>
                         <div className="mb-2 flex items-center justify-between">
                             <span className="text-sm font-medium text-gray-300">Drawing Mode</span>
                         </div>
                         <div className="grid grid-cols-2 gap-1">
                             <button
                                 onClick={() => setDrawingMode('zone')}
-                                className={`rounded p-2 text-xs transition-colors ${
+                                className={`rounded border border-white p-2 text-xs transition-colors ${
                                     drawingMode === 'zone'
                                         ? 'bg-blue-600 text-white'
-                                        : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                                        : 'text-gray-300 hover:bg-gray-500'
                                 }`}
+                                style={{backgroundColor: drawingMode === 'zone' ? undefined : '#000005'}}
                             >
                                 🎯 Zones
                             </button>
                             <button
                                 onClick={() => setDrawingMode('obstacle')}
-                                className={`rounded p-2 text-xs transition-colors ${
+                                className={`rounded border border-white p-2 text-xs transition-colors ${
                                     drawingMode === 'obstacle'
                                         ? 'bg-orange-600 text-white'
-                                        : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                                        : 'text-gray-300 hover:bg-gray-500'
                                 }`}
+                                style={{backgroundColor: drawingMode === 'obstacle' ? undefined : '#000005'}}
                             >
                                 ⛔ Obstacles
                             </button>
                         </div>
                     </div>
 
-                    {/* Obstacle Type Selector */}
                     {drawingMode === 'obstacle' && (
-                        <div className="rounded-lg border border-orange-500/20 bg-orange-500/10 p-3">
+                        <div className="rounded-lg border border-white p-3 bg-orange-500/10">
                             <div className="mb-2 flex items-center justify-between">
                                 <span className="text-sm font-medium text-orange-300">
                                     Obstacle Type
@@ -360,7 +357,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                     <button
                                         key={key}
                                         onClick={() => setCurrentObstacleType(key as ObstacleType)}
-                                        className={`rounded-md px-3 py-2 text-left transition-colors ${
+                                        className={`rounded-md border border-white px-3 py-2 text-left transition-colors ${
                                             currentObstacleType === key
                                                 ? 'bg-blue-500 text-white'
                                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -376,15 +373,14 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                         </div>
                     )}
 
-                    {/* Zone Assignment */}
                     {zones.length > 0 && selectedCrops.length > 0 && (
-                        <div className="rounded-lg border border-purple-500/20 bg-purple-500/10 p-4">
+                        <div className="rounded-lg border border-white p-4 bg-purple-500/10">
                             <div className="mb-3 flex items-center justify-between">
                                 <div className="flex items-center space-x-2">
                                     <span className="font-medium text-purple-300">
                                         🌱 Assign Crops
                                     </span>
-                                    <span className="rounded-full bg-purple-500/20 px-2 py-0.5 text-xs text-purple-300">
+                                    <span className="rounded-full border border-white bg-purple-500/20 px-2 py-0.5 text-xs text-purple-300">
                                         {zones.length} zones
                                     </span>
                                 </div>
@@ -400,7 +396,8 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                     return (
                                         <div
                                             key={zone.id}
-                                            className="relative rounded-lg border border-gray-600 bg-gray-700/50 p-3 transition-all hover:bg-gray-700/70"
+                                            className="relative rounded-lg border border-white p-3 transition-all hover:bg-gray-700/70"
+                                            style={{backgroundColor: '#000005'}}
                                         >
                                             <button
                                                 onClick={() => deleteZone(zone.id.toString())}
@@ -420,7 +417,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                         Zone {index + 1}
                                                     </span>
                                                     {assignedCrop && (
-                                                        <span className="rounded-full bg-green-500/20 px-2 py-0.5 text-xs text-green-300">
+                                                        <span className="rounded-full border border-white bg-green-500/20 px-2 py-0.5 text-xs text-green-300">
                                                             ✓ Assigned
                                                         </span>
                                                     )}
@@ -439,7 +436,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                         removePlantFromZone(zone.id.toString());
                                                     }
                                                 }}
-                                                className="w-full rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white transition-colors focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                                                className="w-full rounded-lg border border-white bg-gray-800 px-3 py-2 text-sm text-white transition-colors focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
                                             >
                                                 <option value="">
                                                     Select a crop for this zone...
@@ -461,9 +458,8 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                         </div>
                     )}
 
-                    {/* Zone Statistics */}
                     {zones.length > 0 && (
-                        <div className="rounded-lg bg-gray-700 p-3">
+                        <div className="rounded-lg border border-white p-3" style={{backgroundColor: '#000005'}}>
                             <div className="mb-2 text-sm text-gray-300">📊 Zone Summary</div>
                             <div className="grid grid-cols-3 gap-2 text-xs">
                                 <div>
@@ -484,23 +480,24 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                         </div>
                     )}
 
-                    {/* Step Navigation */}
-                    <div className="rounded-lg bg-gray-700 p-3">
+                    <div className="rounded-lg border border-white p-3" style={{backgroundColor: '#000005'}}>
                         <div className="flex items-center justify-between">
                             <button
                                 onClick={previousStep}
-                                className="rounded bg-gray-600 px-3 py-1 text-sm text-white transition-colors hover:bg-gray-500"
+                                className="rounded border border-white px-3 py-1 text-sm text-white transition-colors hover:bg-gray-500"
+                                style={{backgroundColor: '#000005'}}
                             >
                                 ⬅️ Previous
                             </button>
                             <button
                                 onClick={nextStep}
                                 disabled={!validateStep(2)}
-                                className={`rounded px-4 py-1 text-sm transition-colors ${
+                                className={`rounded border border-white px-4 py-1 text-sm transition-colors ${
                                     validateStep(2)
                                         ? 'bg-green-600 text-white hover:bg-green-700'
-                                        : 'cursor-not-allowed bg-gray-600 text-gray-400'
+                                        : 'cursor-not-allowed text-gray-400'
                                 }`}
+                                style={{backgroundColor: validateStep(2) ? undefined : '#000005'}}
                             >
                                 Next Step ➡️
                             </button>
@@ -512,8 +509,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
             {/* Step 3: Pipe System */}
             {currentStep === 3 && (
                 <div className="space-y-3">
-                    {/* Step Header */}
-                    <div className="rounded-lg border border-purple-500/20 bg-purple-500/10 p-3">
+                    <div className="rounded-lg border border-white p-3 bg-purple-500/10">
                         <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-purple-300">
                                 🚰 Step 3: Pipe System
@@ -525,8 +521,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                         </div>
                     </div>
 
-                    {/* Manual Pipe Drawing */}
-                    <div className="rounded-lg bg-gray-700 p-3">
+                    <div className="rounded-lg border border-white p-3" style={{backgroundColor: '#000005'}}>
                         <div className="mb-2 flex items-center justify-between">
                             <span className="text-sm font-medium text-gray-300">
                                 Manual Drawing
@@ -543,11 +538,12 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                     <button
                                         key={key}
                                         onClick={() => setCurrentPipeType(key as any)}
-                                        className={`w-full rounded p-2 text-left text-xs transition-colors ${
+                                        className={`w-full rounded border border-white p-2 text-left text-xs transition-colors ${
                                             currentPipeType === key
                                                 ? 'bg-purple-600 text-white'
-                                                : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                                                : 'text-gray-300 hover:bg-gray-500'
                                         }`}
+                                        style={{backgroundColor: currentPipeType === key ? undefined : '#000005'}}
                                     >
                                         <div className="flex items-center space-x-2">
                                             <span>{config.icon}</span>
@@ -562,8 +558,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                         </div>
                     </div>
 
-                    {/* Auto Generate Laterals */}
-                    <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-3">
+                    <div className="rounded-lg border border-white p-3 bg-yellow-500/10">
                         <div className="mb-2 flex items-center justify-between">
                             <span className="text-sm font-medium text-yellow-300">
                                 ⚡ Auto Generate
@@ -580,13 +575,14 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                     isGeneratingPipes ||
                                     pipes.filter((p) => p.type === 'submain').length === 0
                                 }
-                                className={`w-full rounded px-3 py-2 text-sm transition-colors ${
+                                className={`w-full rounded border border-white px-3 py-2 text-sm transition-colors ${
                                     pipes.filter((p) => p.type === 'submain').length === 0
-                                        ? 'cursor-not-allowed bg-gray-600 text-gray-400'
+                                        ? 'cursor-not-allowed text-gray-400'
                                         : isGeneratingPipes
                                           ? 'cursor-not-allowed bg-yellow-500/50 text-gray-300'
                                           : 'bg-yellow-600 text-white hover:bg-yellow-700'
                                 }`}
+                                style={{backgroundColor: (pipes.filter((p) => p.type === 'submain').length === 0 || isGeneratingPipes) ? '#000005' : undefined}}
                             >
                                 {isGeneratingPipes ? '⏳ Generating...' : '⚡ Generate Laterals'}
                             </button>
@@ -594,7 +590,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                             {pipes.filter((p) => p.type === 'lateral').length > 0 && (
                                 <button
                                     onClick={clearLateralPipes}
-                                    className="w-full rounded bg-red-600 px-3 py-2 text-sm text-white transition-colors hover:bg-red-700"
+                                    className="w-full rounded border border-white bg-red-600 px-3 py-2 text-sm text-white transition-colors hover:bg-red-700"
                                 >
                                     🗑️ Clear Laterals
                                 </button>
@@ -608,9 +604,8 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                         )}
                     </div>
 
-                    {/* Pipe Statistics */}
                     {pipes.length > 0 && (
-                        <div className="rounded-lg bg-gray-700 p-3">
+                        <div className="rounded-lg border border-white p-3" style={{backgroundColor: '#000005'}}>
                             <div className="mb-2 text-sm text-gray-300">📊 Pipe Summary</div>
                             <div className="grid grid-cols-2 gap-2 text-xs">
                                 <div>
@@ -639,23 +634,24 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                         </div>
                     )}
 
-                    {/* Step Navigation */}
-                    <div className="rounded-lg bg-gray-700 p-3">
+                    <div className="rounded-lg border border-white p-3" style={{backgroundColor: '#000005'}}>
                         <div className="flex items-center justify-between">
                             <button
                                 onClick={previousStep}
-                                className="rounded bg-gray-600 px-3 py-1 text-sm text-white transition-colors hover:bg-gray-500"
+                                className="rounded border border-white px-3 py-1 text-sm text-white transition-colors hover:bg-gray-500"
+                                style={{backgroundColor: '#000005'}}
                             >
                                 ⬅️ Previous
                             </button>
                             <button
                                 onClick={nextStep}
                                 disabled={!validateStep(3)}
-                                className={`rounded px-4 py-1 text-sm transition-colors ${
+                                className={`rounded border border-white px-4 py-1 text-sm transition-colors ${
                                     validateStep(3)
                                         ? 'bg-cyan-600 text-white hover:bg-cyan-700'
-                                        : 'cursor-not-allowed bg-gray-600 text-gray-400'
+                                        : 'cursor-not-allowed text-gray-400'
                                 }`}
+                                style={{backgroundColor: validateStep(3) ? undefined : '#000005'}}
                             >
                                 Next Step ➡️
                             </button>
@@ -667,8 +663,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
             {/* Step 4: Irrigation System */}
             {currentStep === 4 && (
                 <div className="space-y-3">
-                    {/* Step Header */}
-                    <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/10 p-3">
+                    <div className="rounded-lg border border-white p-3 bg-cyan-500/10">
                         <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-cyan-300">
                                 🚿 Step 4: Irrigation System
@@ -682,15 +677,14 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                         </div>
                     </div>
 
-                    {/* Zone Irrigation Assignment */}
                     {zones.length > 0 && (
-                        <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/10 p-4">
+                        <div className="rounded-lg border border-white p-4 bg-cyan-500/10">
                             <div className="mb-3 flex items-center justify-between">
                                 <div className="flex items-center space-x-2">
                                     <span className="font-medium text-cyan-300">
                                         🚿 Irrigation Systems
                                     </span>
-                                    <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-xs text-cyan-300">
+                                    <span className="rounded-full border border-white bg-cyan-500/20 px-2 py-0.5 text-xs text-cyan-300">
                                         {zones.length} zones
                                     </span>
                                 </div>
@@ -703,13 +697,18 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                             <div className="grid gap-3">
                                 {zones.map((zone: any, index: number) => {
                                     const irrigationType = irrigationAssignments[zone.id];
-                                    const dripPointCount = zoneSummaries[zone.id]?.dripPointCount || 0;
-                                    const currentRadiusConfig = irrigationRadiusConfig[irrigationType as keyof typeof irrigationRadiusConfig];
+                                    const dripPointCount =
+                                        zoneSummaries[zone.id]?.dripPointCount || 0;
+                                    const currentRadiusConfig =
+                                        irrigationRadiusConfig[
+                                            irrigationType as keyof typeof irrigationRadiusConfig
+                                        ];
 
                                     return (
                                         <div
                                             key={zone.id}
-                                            className="relative rounded-lg border border-gray-600 bg-gray-700/50 p-3 transition-all hover:bg-gray-700/70"
+                                            className="relative rounded-lg border border-white p-3 transition-all hover:bg-gray-700/70"
+                                            style={{backgroundColor: '#000005'}}
                                         >
                                             <div className="mb-3 flex items-center justify-between">
                                                 <div className="flex items-center space-x-3">
@@ -721,7 +720,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                         Zone {index + 1}
                                                     </span>
                                                     {irrigationType && (
-                                                        <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-xs text-cyan-300">
+                                                        <span className="rounded-full border border-white bg-cyan-500/20 px-2 py-0.5 text-xs text-cyan-300">
                                                             ✓ Assigned
                                                         </span>
                                                     )}
@@ -740,29 +739,34 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                         clearIrrigationForZone(zone.id);
                                                     }
                                                 }}
-                                                className="w-full rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white transition-colors focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                                                className="w-full rounded-lg border border-white bg-gray-800 px-3 py-2 text-sm text-white transition-colors focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
                                             >
                                                 <option value="">
                                                     Select irrigation system...
                                                 </option>
                                                 <option value="sprinkler">🌿 Sprinkler</option>
-                                                <option value="mini_sprinkler">🌱 Mini Sprinkler</option>
-                                                <option value="micro_spray">💦 Micro Spray & Jet</option>
+                                                <option value="mini_sprinkler">
+                                                    🌱 Mini Sprinkler
+                                                </option>
+                                                <option value="micro_spray">
+                                                    💦 Micro Spray & Jet
+                                                </option>
                                                 <option value="drip-tape">💧 Drip Tape</option>
                                             </select>
 
-                                            {/* Irrigation Settings */}
                                             {irrigationType && (
-                                                <div className="mt-3 rounded-lg border border-gray-600 bg-gray-800 p-3">
+                                                <div className="mt-3 rounded-lg border border-white bg-gray-800 p-3">
                                                     <div className="mb-2 text-xs text-gray-300">
                                                         Settings:
                                                     </div>
 
-                                                    {/* Fanggy005 EDIT: Conditional rendering for settings */}
                                                     {irrigationType === 'drip-tape' ? (
                                                         <div className="space-y-2">
                                                             <div>
-                                                                <label htmlFor={`drip-spacing-${zone.id}`} className="block text-xs font-medium text-gray-400">
+                                                                <label
+                                                                    htmlFor={`drip-spacing-${zone.id}`}
+                                                                    className="block text-xs font-medium text-gray-400"
+                                                                >
                                                                     ระยะห่างจุดน้ำหยด (m):
                                                                 </label>
                                                                 <div className="flex items-center space-x-2">
@@ -772,59 +776,119 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                                         min={0.2}
                                                                         max={0.5}
                                                                         step={0.05}
-                                                                        value={dripSpacing[zone.id] || 0.3}
-                                                                        onChange={(e) => setDripSpacing({ ...dripSpacing, [zone.id]: parseFloat(e.target.value) })}
+                                                                        value={
+                                                                            dripSpacing[zone.id] ||
+                                                                            0.3
+                                                                        }
+                                                                        onChange={(e) =>
+                                                                            setDripSpacing({
+                                                                                ...dripSpacing,
+                                                                                [zone.id]:
+                                                                                    parseFloat(
+                                                                                        e.target
+                                                                                            .value
+                                                                                    ),
+                                                                            })
+                                                                        }
                                                                         className="w-full"
                                                                     />
                                                                     <span className="text-sm font-semibold text-white">
-                                                                        {(dripSpacing[zone.id] || 0.3).toFixed(2)}m
+                                                                        {(
+                                                                            dripSpacing[zone.id] ||
+                                                                            0.3
+                                                                        ).toFixed(2)}
+                                                                        m
                                                                     </span>
                                                                 </div>
                                                                 <div className="text-xs text-gray-500">
-                                                                    ระยะห่างระหว่างจุดหยดน้ำบนเทป
+                                                                    Spacing between emitters on the tape
                                                                 </div>
                                                             </div>
                                                             {dripPointCount > 0 && (
                                                                 <div className="text-xs text-cyan-300">
-                                                                    คำนวณได้ประมาณ {dripPointCount.toLocaleString()} จุด
+                                                                    คำนวณได้ประมาณ{' '}
+                                                                    {dripPointCount.toLocaleString()}{' '}
+                                                                    จุด
                                                                 </div>
                                                             )}
                                                         </div>
                                                     ) : irrigationType && currentRadiusConfig ? (
                                                         <div className="space-y-2">
                                                             <div>
-                                                                <label htmlFor={`radius-${zone.id}`} className="block text-xs font-medium text-gray-400">
+                                                                <label
+                                                                    htmlFor={`radius-${zone.id}`}
+                                                                    className="block text-xs font-medium text-gray-400"
+                                                                >
                                                                     รัศมีการฉีด (m):
                                                                 </label>
                                                                 <div className="flex items-center space-x-2">
                                                                     <input
                                                                         id={`radius-${zone.id}`}
                                                                         type="range"
-                                                                        min={currentRadiusConfig.min}
-                                                                        max={currentRadiusConfig.max}
-                                                                        step={currentRadiusConfig.step}
-                                                                        value={irrigationRadius[zone.id] || currentRadiusConfig.defaultValue}
-                                                                        onChange={(e) => setIrrigationRadius({ ...irrigationRadius, [zone.id]: parseFloat(e.target.value) })}
+                                                                        min={
+                                                                            currentRadiusConfig.min
+                                                                        }
+                                                                        max={
+                                                                            currentRadiusConfig.max
+                                                                        }
+                                                                        step={
+                                                                            currentRadiusConfig.step
+                                                                        }
+                                                                        value={
+                                                                            irrigationRadius[
+                                                                                zone.id
+                                                                            ] ||
+                                                                            currentRadiusConfig.defaultValue
+                                                                        }
+                                                                        onChange={(e) =>
+                                                                            setIrrigationRadius({
+                                                                                ...irrigationRadius,
+                                                                                [zone.id]:
+                                                                                    parseFloat(
+                                                                                        e.target
+                                                                                            .value
+                                                                                    ),
+                                                                            })
+                                                                        }
                                                                         className="w-full"
                                                                     />
                                                                     <span className="text-sm font-semibold text-white">
-                                                                        {(irrigationRadius[zone.id] || currentRadiusConfig.defaultValue).toFixed(2)}m
+                                                                        {(
+                                                                            irrigationRadius[
+                                                                                zone.id
+                                                                            ] ||
+                                                                            currentRadiusConfig.defaultValue
+                                                                        ).toFixed(2)}
+                                                                        m
                                                                     </span>
                                                                 </div>
                                                             </div>
                                                             <div className="flex items-center justify-between">
                                                                 <span className="text-xs text-gray-400">
-                                                                    รูปแบบทับซ้อน:
+                                                                    Overlap Pattern:
                                                                 </span>
                                                                 <label className="flex items-center space-x-2">
                                                                     <input
                                                                         type="checkbox"
-                                                                        checked={sprinklerOverlap[zone.id] || false}
-                                                                        onChange={(e) => setSprinklerOverlap({ ...sprinklerOverlap, [zone.id]: e.target.checked })}
+                                                                        checked={
+                                                                            sprinklerOverlap[
+                                                                                zone.id
+                                                                            ] || false
+                                                                        }
+                                                                        onChange={(e) =>
+                                                                            setSprinklerOverlap({
+                                                                                ...sprinklerOverlap,
+                                                                                [zone.id]:
+                                                                                    e.target
+                                                                                        .checked,
+                                                                            })
+                                                                        }
                                                                         className="h-3 w-3 rounded border-gray-600 bg-gray-700 text-cyan-600 focus:ring-cyan-500"
                                                                     />
                                                                     <span className="text-xs text-white">
-                                                                        {sprinklerOverlap[zone.id] ? 'เปิด' : 'ปิด'}
+                                                                        {sprinklerOverlap[zone.id]
+                                                                            ? 'เปิด'
+                                                                            : 'ปิด'}
                                                                     </span>
                                                                 </label>
                                                             </div>
@@ -834,15 +898,15 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                     <div className="mt-3 flex space-x-2">
                                                         <button
                                                             onClick={() => generateIrrigationForZone(zone, irrigationType)}
-                                                            className="flex-1 rounded bg-cyan-600 px-3 py-1 text-xs text-white transition-colors hover:bg-cyan-700"
+                                                            className="flex-1 rounded border border-white bg-cyan-600 px-3 py-1 text-xs text-white transition-colors hover:bg-cyan-700"
                                                         >
-                                                            🚿 สร้าง/อัปเดตระบบน้ำ
+                                                            🚿 Generate/Update System
                                                         </button>
                                                         <button
                                                             onClick={() => clearIrrigationForZone(zone.id.toString())}
-                                                            className="rounded bg-red-600 px-3 py-1 text-xs text-white transition-colors hover:bg-red-700"
+                                                            className="rounded border border-white bg-red-600 px-3 py-1 text-xs text-white transition-colors hover:bg-red-700"
                                                         >
-                                                            🗑️ ลบ
+                                                            🗑️ Delete
                                                         </button>
                                                     </div>
                                                 </div>
@@ -854,12 +918,12 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                         </div>
                     )}
 
-                    {/* Step Navigation */}
-                    <div className="rounded-lg bg-gray-700 p-3">
+                    <div className="rounded-lg border border-white p-3" style={{backgroundColor: '#000005'}}>
                         <div className="flex items-center justify-between">
                             <button
                                 onClick={previousStep}
-                                className="rounded bg-gray-600 px-3 py-1 text-sm text-white transition-colors hover:bg-gray-500"
+                                className="rounded border border-white px-3 py-1 text-sm text-white transition-colors hover:bg-gray-500"
+                                style={{backgroundColor: '#000005'}}
                             >
                                 ⬅️ Previous
                             </button>
@@ -870,9 +934,8 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                         </div>
                     </div>
 
-                    {/* View Summary Button - Only show when step is completed */}
                     {validateStep(4) && handleCaptureMapAndSummary && (
-                        <div className="rounded-lg border border-green-500/20 bg-green-500/10 p-3">
+                        <div className="rounded-lg border border-white p-3 bg-green-500/10">
                             <div className="text-center">
                                 <div className="mb-2 text-sm font-medium text-green-300">
                                     🎉 Project Complete!
@@ -883,9 +946,9 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                 </div>
                                 <button
                                     onClick={handleCaptureMapAndSummary}
-                                    className="w-full rounded-lg bg-green-600 px-4 py-2 font-medium text-white transition-colors hover:bg-green-700"
+                                    className="w-full rounded-lg border border-white bg-green-600 px-4 py-2 font-medium text-white transition-colors hover:bg-green-700"
                                 >
-                                    📸 บันทึกภาพแผนที่และดูสรุป
+                                    📸 Capture Map & View Summary
                                 </button>
                             </div>
                         </div>

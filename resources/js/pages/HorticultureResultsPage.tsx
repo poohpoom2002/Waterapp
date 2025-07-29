@@ -17,8 +17,6 @@ import {
     isPointInPolygon,
 } from '../utils/horticultureUtils';
 
-import { createAndDownloadMapImage, createPDFReport } from '../utils/horticultureProjectStats';
-
 interface Coordinate {
     lat: number;
     lng: number;
@@ -363,116 +361,6 @@ function EnhancedHorticultureResultsPageContent() {
         setIconSize(1);
     };
 
-    const handleCreateMapImage = async () => {
-        if (!mapContainerRef.current) {
-            alert(t('ไม่พบแผนที่'));
-            return;
-        }
-
-        setIsCreatingImage(true);
-        try {
-            const currentRotation = mapRotation;
-            if (currentRotation !== 0) {
-                setMapRotation(0);
-                await new Promise((resolve) => setTimeout(resolve, 500));
-            }
-
-            const loadingDiv = document.createElement('div');
-            loadingDiv.id = 'image-loading';
-            loadingDiv.style.cssText = `
-                position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                background: rgba(0,0,0,0.8);
-                color: white;
-                padding: 20px;
-                border-radius: 10px;
-                z-index: 10000;
-                text-align: center;
-            `;
-            loadingDiv.innerHTML = `
-                <div>🖼️ ${t('กำลังสร้างภาพแผนที่')}...</div>
-                <div style="margin-top: 10px; font-size: 12px;">กรุณารอสักครู่</div>
-            `;
-            document.body.appendChild(loadingDiv);
-
-            const success = await createAndDownloadMapImage(mapContainerRef.current, {
-                quality: 0.9,
-                scale: 2,
-                filename: `${projectData?.projectName || 'horticulture-layout'}.jpg`,
-            });
-
-            document.body.removeChild(loadingDiv);
-
-            if (currentRotation !== 0) {
-                setMapRotation(currentRotation);
-            }
-        } catch (error) {
-            console.error('❌ Error creating map image:', error);
-            alert(
-                '❌ ' +
-                    t('เกิดข้อผิดพลาดในการสร้างภาพ') +
-                    '\n\nกรุณาใช้วิธี Screenshot แทน:\n• กด Print Screen\n• หรือใช้ Extension เช่น "Full Page Screen Capture"'
-            );
-        } finally {
-            setIsCreatingImage(false);
-        }
-    };
-
-    const handleCreatePDFReport = async () => {
-        if (!mapContainerRef.current) {
-            alert(t('ไม่พบแผนที่'));
-            return;
-        }
-
-        setIsCreatingPDF(true);
-        try {
-            const currentRotation = mapRotation;
-            if (currentRotation !== 0) {
-                setMapRotation(0);
-                await new Promise((resolve) => setTimeout(resolve, 500));
-            }
-
-            const loadingDiv = document.createElement('div');
-            loadingDiv.id = 'pdf-loading';
-            loadingDiv.style.cssText = `
-                position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                background: rgba(0,0,0,0.8);
-                color: white;
-                padding: 20px;
-                border-radius: 10px;
-                z-index: 10000;
-                text-align: center;
-            `;
-            loadingDiv.innerHTML = `
-                <div>📄 กำลังสร้างรายงาน PDF...</div>
-                <div style="margin-top: 10px; font-size: 12px;">กรุณารอสักครู่</div>
-            `;
-            document.body.appendChild(loadingDiv);
-
-            const success = await createPDFReport(true, mapContainerRef.current);
-
-            document.body.removeChild(loadingDiv);
-
-            if (currentRotation !== 0) {
-                setMapRotation(currentRotation);
-            }
-        } catch (error) {
-            console.error('❌ Error creating PDF:', error);
-            alert(
-                '❌ ' +
-                    t('เกิดข้อผิดพลาดในการสร้าง PDF') +
-                    '\n\nกรุณาลองใช้:\n• ดาวน์โหลด JSON/CSV\n• Screenshot หน้าจอ\n• คัดลอกข้อมูลด้วยตนเอง'
-            );
-        } finally {
-            setIsCreatingPDF(false);
-        }
-    };
-
     const handleNewProject = () => {
         localStorage.removeItem('horticultureIrrigationData');
         localStorage.removeItem('editingFieldId');
@@ -678,8 +566,6 @@ function EnhancedHorticultureResultsPageContent() {
                 setSaveSuccess(true);
 
                 localStorage.removeItem('editingFieldId');
-
-                router.visit('/');
             } else {
                 throw new Error(responseData.message || 'Failed to save project');
             }
@@ -815,7 +701,7 @@ function EnhancedHorticultureResultsPageContent() {
             <div className="flex min-h-screen items-center justify-center bg-gray-900 text-white">
                 <div className="text-center">
                     <div className="mx-auto mb-4 h-32 w-32 animate-spin rounded-full border-b-2 border-white"></div>
-                    <p className="text-xl">กำลังโหลดข้อมูลโครงการ...</p>
+                    <p className="text-xl">{t('กำลังโหลดข้อมูลโครงการ...')}</p>
                 </div>
             </div>
         );
@@ -825,7 +711,7 @@ function EnhancedHorticultureResultsPageContent() {
         return (
             <div className="flex min-h-screen items-center justify-center bg-gray-900 text-white">
                 <div className="text-center">
-                    <h1 className="mb-4 text-2xl font-bold">ไม่พบข้อมูลโครงการ</h1>
+                    <h1 className="mb-4 text-2xl font-bold">{t('ไม่พบข้อมูลโครงการ')}</h1>
                     <button
                         onClick={handleNewProject}
                         className="rounded-lg bg-blue-600 px-6 py-3 transition-colors hover:bg-blue-700"
@@ -878,17 +764,17 @@ function EnhancedHorticultureResultsPageContent() {
                                                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                                             ></path>
                                         </svg>
-                                        กำลังบันทึก...
+                                        {t('กำลังบันทึก...')}
                                     </>
                                 ) : (
-                                    '💾 บันทึกโครงการ'
+                                    '💾 ' + t('บันทึกโครงการ')
                                 )}
                             </button>
                             <button
                                 onClick={handleNewProject}
                                 className="rounded-lg bg-green-600 px-6 py-3 font-semibold transition-colors hover:bg-green-700"
                             >
-                                ➕ โครงการใหม่
+                                ➕ {t('โครงการใหม่')}
                             </button>
                             <button
                                 onClick={handleExportMapToProduct}
@@ -916,10 +802,10 @@ function EnhancedHorticultureResultsPageContent() {
                                                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                                             ></path>
                                         </svg>
-                                        กำลังส่งออก...
+                                        {t('กำลังส่งออก...')}
                                     </>
                                 ) : (
-                                    'คำนวณระบบน้ำ'
+                                    t('คำนวณระบบน้ำ')
                                 )}
                             </button>
                         </div>
@@ -928,18 +814,18 @@ function EnhancedHorticultureResultsPageContent() {
                     <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
                         <div className="rounded-lg bg-gray-800 p-6">
                             <div className="mb-4 flex items-center justify-between">
-                                <h3 className="text-xl font-semibold">🗺️ แผนผังโครงการ</h3>
+                                <h3 className="text-xl font-semibold">🗺️ {t('แผนผังโครงการ')}</h3>
                             </div>
 
                             <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
                                 <div className="rounded-lg bg-gray-700 p-4">
                                     <h4 className="mb-3 text-sm font-semibold text-blue-300">
-                                        🔄 การหมุนแผนที่
+                                        🔄 {t('การหมุนแผนที่')}
                                     </h4>
                                     <div className="space-y-3">
                                         <div className="flex items-center gap-2">
                                             <label className="w-16 text-xs text-gray-300">
-                                                หมุน:
+                                                {t('หมุน')}:
                                             </label>
                                             <input
                                                 type="range"
@@ -969,7 +855,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                 onClick={resetMapRotation}
                                                 className="flex-1 rounded bg-gray-600 px-2 py-1 text-xs hover:bg-gray-700"
                                             >
-                                                🔄 รีเซ็ต
+                                                🔄 {t('รีเซ็ต')}
                                             </button>
                                             <button
                                                 onClick={() =>
@@ -988,7 +874,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                 className="accent-purple-600"
                                             />
                                             <label className="text-xs text-gray-300">
-                                                🔒 ล็อกการซูมและลาก
+                                                🔒 {t('ล็อกการซูมและลาก')}
                                             </label>
                                         </div>
                                     </div>
@@ -996,12 +882,12 @@ function EnhancedHorticultureResultsPageContent() {
 
                                 <div className="rounded-lg bg-gray-700 p-4">
                                     <h4 className="mb-3 text-sm font-semibold text-green-300">
-                                        📏 ขนาดไอคอน
+                                        📏 {t('ขนาดไอคอน')}
                                     </h4>
                                     <div className="space-y-3">
                                         <div className="flex items-center gap-2">
                                             <label className="w-16 text-xs text-gray-300">
-                                                ท่อ:
+                                                {t('ท่อ')}:
                                             </label>
                                             <input
                                                 type="range"
@@ -1020,7 +906,7 @@ function EnhancedHorticultureResultsPageContent() {
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <label className="w-16 text-xs text-gray-300">
-                                                ไอคอน:
+                                                {t('ไอคอน')}:
                                             </label>
                                             <input
                                                 type="range"
@@ -1041,7 +927,7 @@ function EnhancedHorticultureResultsPageContent() {
                                             onClick={resetSizes}
                                             className="w-full rounded bg-gray-600 px-3 py-1 text-xs hover:bg-gray-700"
                                         >
-                                            🔄 รีเซ็ตขนาด
+                                            🔄 {t('รีเซ็ตขนาด')}
                                         </button>
                                     </div>
                                 </div>
@@ -1080,32 +966,34 @@ function EnhancedHorticultureResultsPageContent() {
                             </div>
 
                             <div className="rounded-lg bg-gray-700 p-4">
-                                <h4 className="mb-3 text-sm font-semibold">🎨 คำอธิบายสัญลักษณ์</h4>
+                                <h4 className="mb-3 text-sm font-semibold">
+                                    🎨 {t('คำอธิบายสัญลักษณ์')}
+                                </h4>
                                 <div className="grid grid-cols-2 gap-2 text-xs">
                                     <div className="flex items-center gap-2">
                                         <div
                                             className="h-1 w-4 bg-blue-500"
                                             style={{ height: `${2 * pipeSize}px` }}
                                         ></div>
-                                        <span>ท่อเมน (จากปั๊ม)</span>
+                                        <span>{t('ท่อเมนหลัก')}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <div
                                             className="h-1 w-4 bg-purple-500"
                                             style={{ height: `${1.5 * pipeSize}px` }}
                                         ></div>
-                                        <span>ท่อเมนรอง</span>
+                                        <span>{t('ท่อเมนรอง')}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <div
                                             className="h-1 w-4 bg-yellow-300"
                                             style={{ height: `${1 * pipeSize}px` }}
                                         ></div>
-                                        <span>ท่อย่อย</span>
+                                        <span>{t('ท่อย่อย')}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <div className="h-4 w-4 bg-red-500 opacity-50"></div>
-                                        <span>พื้นที่ต้องหลีกเลี่ยง</span>
+                                        <span>{t('พื้นที่ต้องหลีกเลี่ยง')}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <div
@@ -1118,7 +1006,7 @@ function EnhancedHorticultureResultsPageContent() {
                                         >
                                             P
                                         </div>
-                                        <span>ปั๊มน้ำ</span>
+                                        <span>{t('ปั๊มน้ำ')}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <div
@@ -1131,7 +1019,7 @@ function EnhancedHorticultureResultsPageContent() {
                                         >
                                             🌱
                                         </div>
-                                        <span>ต้นไม้</span>
+                                        <span>{t('ต้นไม้')}</span>
                                     </div>
                                 </div>
                             </div>
@@ -1140,29 +1028,35 @@ function EnhancedHorticultureResultsPageContent() {
                         <div className="space-y-6">
                             <div className="rounded-lg bg-gray-800 p-6">
                                 <h3 className="mb-4 text-xl font-semibold text-green-400">
-                                    📊 ข้อมูลโดยรวม
+                                    📊 {t('ข้อมูลโดยรวม')}
                                 </h3>
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                     <div className="rounded bg-gray-700 p-3">
-                                        <div className="text-gray-400">พื้นที่รวมทั้งหมด</div>
+                                        <div className="text-gray-400">
+                                            {t('พื้นที่รวมทั้งหมด')}
+                                        </div>
                                         <div className="text-lg font-bold text-green-400">
                                             {formatAreaInRai(projectSummary.totalAreaInRai)}
                                         </div>
                                     </div>
                                     <div className="rounded bg-gray-700 p-3">
-                                        <div className="text-gray-400">จำนวนโซน</div>
+                                        <div className="text-gray-400">{t('จำนวนโซน')}</div>
                                         <div className="text-lg font-bold text-blue-400">
                                             {projectSummary.totalZones} โซน
                                         </div>
                                     </div>
                                     <div className="rounded bg-gray-700 p-3">
-                                        <div className="text-gray-400">จำนวนต้นไม้ทั้งหมด</div>
+                                        <div className="text-gray-400">
+                                            {t('จำนวนต้นไม้ทั้งหมด')}
+                                        </div>
                                         <div className="text-lg font-bold text-yellow-400">
                                             {projectSummary.totalPlants.toLocaleString()} ต้น
                                         </div>
                                     </div>
                                     <div className="rounded bg-gray-700 p-3">
-                                        <div className="text-gray-400">ปริมาณน้ำต่อครั้ง</div>
+                                        <div className="text-gray-400">
+                                            {t('ปริมาณน้ำต่อครั้ง')}
+                                        </div>
                                         <div className="text-lg font-bold text-cyan-400">
                                             {formatWaterVolume(
                                                 projectSummary.totalWaterNeedPerSession
@@ -1174,22 +1068,26 @@ function EnhancedHorticultureResultsPageContent() {
 
                             <div className="rounded-lg bg-gray-800 p-6">
                                 <h3 className="mb-4 text-xl font-semibold text-blue-400">
-                                    🔧 ระบบท่อ
+                                    🔧 {t('ระบบท่อ')}
                                 </h3>
 
                                 <div className="mb-4 rounded bg-gray-700 p-4">
-                                    <h4 className="mb-2 font-semibold text-blue-300">🔵 ท่อเมน</h4>
+                                    <h4 className="mb-2 font-semibold text-blue-300">
+                                        🔵 {t('ท่อเมน')}
+                                    </h4>
                                     <div className="grid grid-cols-2 gap-4 text-sm">
                                         <div>
                                             <span className="text-gray-400">
-                                                ท่อเมนที่ยาวที่สุด:
+                                                {t('ท่อเมนที่ยาวที่สุด')}:
                                             </span>
                                             <div className="font-bold text-blue-400">
                                                 {formatDistance(projectSummary.mainPipes.longest)}
                                             </div>
                                         </div>
                                         <div>
-                                            <span className="text-gray-400">ท่อเมนยาวรวม:</span>
+                                            <span className="text-gray-400">
+                                                {t('ท่อเมนยาวรวม')}:
+                                            </span>
                                             <div className="font-bold text-blue-400">
                                                 {formatDistance(
                                                     projectSummary.mainPipes.totalLength
@@ -1201,12 +1099,12 @@ function EnhancedHorticultureResultsPageContent() {
 
                                 <div className="mb-4 rounded bg-gray-700 p-4">
                                     <h4 className="mb-2 font-semibold text-purple-300">
-                                        🟣 ท่อเมนรอง
+                                        🟣 {t('ท่อเมนรอง')}
                                     </h4>
                                     <div className="grid grid-cols-2 gap-4 text-sm">
                                         <div>
                                             <span className="text-gray-400">
-                                                ท่อเมนรองที่ยาวที่สุด:
+                                                {t('ท่อเมนรองที่ยาวที่สุด')}:
                                             </span>
                                             <div className="font-bold text-purple-400">
                                                 {formatDistance(
@@ -1215,7 +1113,9 @@ function EnhancedHorticultureResultsPageContent() {
                                             </div>
                                         </div>
                                         <div>
-                                            <span className="text-gray-400">ท่อเมนรองยาวรวม:</span>
+                                            <span className="text-gray-400">
+                                                {t('ท่อเมนรองยาวรวม')}:
+                                            </span>
                                             <div className="font-bold text-purple-400">
                                                 {formatDistance(
                                                     projectSummary.subMainPipes.totalLength
@@ -1227,19 +1127,21 @@ function EnhancedHorticultureResultsPageContent() {
 
                                 <div className="mb-4 rounded bg-gray-700 p-4">
                                     <h4 className="mb-2 font-semibold text-yellow-300">
-                                        🟡 ท่อย่อย
+                                        🟡 {t('ท่อย่อย')}
                                     </h4>
                                     <div className="grid grid-cols-2 gap-4 text-sm">
                                         <div>
                                             <span className="text-gray-400">
-                                                ท่อย่อยที่ยาวที่สุด:
+                                                {t('ท่อย่อยที่ยาวที่สุด')}:
                                             </span>
                                             <div className="font-bold text-yellow-400">
                                                 {formatDistance(projectSummary.branchPipes.longest)}
                                             </div>
                                         </div>
                                         <div>
-                                            <span className="text-gray-400">ท่อย่อยยาวรวม:</span>
+                                            <span className="text-gray-400">
+                                                {t('ท่อย่อยยาวรวม')}:
+                                            </span>
                                             <div className="font-bold text-yellow-400">
                                                 {formatDistance(
                                                     projectSummary.branchPipes.totalLength
@@ -1251,14 +1153,15 @@ function EnhancedHorticultureResultsPageContent() {
 
                                 <div className="rounded bg-yellow-900/30 p-4">
                                     <h4 className="mb-2 font-semibold text-yellow-300">
-                                        📏 ท่อที่ยาวที่สุดรวมกัน
+                                        📏 {t('ท่อที่ยาวที่สุดรวมกัน')}
                                     </h4>
                                     <div className="text-center">
                                         <div className="text-2xl font-bold text-yellow-400">
                                             {formatDistance(projectSummary.longestPipesCombined)}
                                         </div>
                                         <div className="text-xs text-gray-400">
-                                            (ท่อเมน + ท่อเมนรอง + ท่อย่อยที่ยาวที่สุด)
+                                            ({t('ท่อเมน')} + {t('ท่อเมนรอง')} +{' '}
+                                            {t('ท่อย่อยที่ยาวที่สุด')})
                                         </div>
                                     </div>
                                 </div>
@@ -1267,7 +1170,7 @@ function EnhancedHorticultureResultsPageContent() {
                             {projectSummary.zoneDetails.length > 0 && (
                                 <div className="rounded-lg bg-gray-800 p-6">
                                     <h3 className="mb-4 text-xl font-semibold text-green-400">
-                                        🏞️ รายละเอียดแต่ละโซน
+                                        🏞️ {t('รายละเอียดแต่ละโซน')}
                                     </h3>
                                     <div className="space-y-4">
                                         {projectSummary.zoneDetails.map((zone, index) => {
@@ -1310,7 +1213,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                     <div className="mb-3 grid grid-cols-2 gap-4 text-sm">
                                                         <div>
                                                             <span className="text-gray-400">
-                                                                พื้นที่โซน:
+                                                                {t('พื้นที่โซน')}:
                                                             </span>
                                                             <div className="font-bold text-green-400">
                                                                 {formatAreaInRai(zone.areaInRai)}
@@ -1318,24 +1221,24 @@ function EnhancedHorticultureResultsPageContent() {
                                                         </div>
                                                         <div>
                                                             <span className="text-gray-400">
-                                                                จำนวนต้นไม้:
+                                                                {t('จำนวนต้นไม้')}:
                                                             </span>
                                                             <div className="font-bold text-yellow-400">
                                                                 {zone.plantCount.toLocaleString()}{' '}
-                                                                ต้น
+                                                                {t('ต้น')}
                                                             </div>
                                                         </div>
                                                         <div>
                                                             <span className="text-gray-400">
-                                                                น้ำต่อต้นต่อครั้ง:
+                                                                {t('น้ำต่อต้นต่อครั้ง')}:
                                                             </span>
                                                             <div className="font-bold text-blue-400">
-                                                                {waterPerPlant} ลิตร/ต้น
+                                                                {waterPerPlant} {t('ลิตร/ต้น')}
                                                             </div>
                                                         </div>
                                                         <div>
                                                             <span className="text-gray-400">
-                                                                ปริมาณน้ำรวมต่อครั้ง:
+                                                                {t('ปริมาณน้ำรวมต่อครั้ง')}:
                                                             </span>
                                                             <div className="font-bold text-cyan-400">
                                                                 {formatWaterVolume(
@@ -1347,11 +1250,12 @@ function EnhancedHorticultureResultsPageContent() {
 
                                                     <div className="mb-3 rounded bg-gray-600/50 p-2 text-xs">
                                                         <span className="text-gray-400">
-                                                            ระยะปลูก:
+                                                            {t('ระยะปลูก')}:
                                                         </span>
                                                         <span className="ml-2 text-white">
-                                                            {plantSpacing} × {rowSpacing} เมตร
-                                                            (ระหว่างต้น × ระหว่างแถว)
+                                                            {plantSpacing} × {rowSpacing}{' '}
+                                                            {t('เมตร')}({t('ระหว่างต้น')} ×{' '}
+                                                            {t('ระหว่างแถว')})
                                                         </span>
                                                     </div>
 
@@ -1359,16 +1263,16 @@ function EnhancedHorticultureResultsPageContent() {
                                                         <div className="grid grid-cols-2 gap-2">
                                                             <div className="rounded bg-blue-900/30 p-2">
                                                                 <div className="text-blue-300">
-                                                                    ท่อเมนในโซน
+                                                                    {t('ท่อเมนในโซน')}
                                                                 </div>
                                                                 <div>
-                                                                    ยาวที่สุด:{' '}
+                                                                    {t('ยาวที่สุด')}:{' '}
                                                                     {formatDistance(
                                                                         zone.mainPipesInZone.longest
                                                                     )}
                                                                 </div>
                                                                 <div>
-                                                                    รวม:{' '}
+                                                                    {t('รวม')}:{' '}
                                                                     {formatDistance(
                                                                         zone.mainPipesInZone
                                                                             .totalLength
@@ -1377,17 +1281,17 @@ function EnhancedHorticultureResultsPageContent() {
                                                             </div>
                                                             <div className="rounded bg-purple-900/30 p-2">
                                                                 <div className="text-purple-300">
-                                                                    ท่อเมนรองในโซน
+                                                                    {t('ท่อเมนรองในโซน')}
                                                                 </div>
                                                                 <div>
-                                                                    ยาวที่สุด:{' '}
+                                                                    {t('ยาวที่สุด')}:{' '}
                                                                     {formatDistance(
                                                                         zone.subMainPipesInZone
                                                                             .longest
                                                                     )}
                                                                 </div>
                                                                 <div>
-                                                                    รวม:{' '}
+                                                                    {t('รวม')}:{' '}
                                                                     {formatDistance(
                                                                         zone.subMainPipesInZone
                                                                             .totalLength
@@ -1397,14 +1301,14 @@ function EnhancedHorticultureResultsPageContent() {
                                                         </div>
                                                         <div className="rounded bg-green-900/30 p-2">
                                                             <div className="text-green-300">
-                                                                ท่อย่อยในโซน
+                                                                {t('ท่อย่อยในโซน')}
                                                             </div>
                                                             <div>
-                                                                ยาวที่สุด:{' '}
+                                                                {t('ยาวที่สุด')}:{' '}
                                                                 {formatDistance(
                                                                     zone.branchPipesInZone.longest
                                                                 )}{' '}
-                                                                | รวม:{' '}
+                                                                | {t('รวม')}:{' '}
                                                                 {formatDistance(
                                                                     zone.branchPipesInZone
                                                                         .totalLength
@@ -1415,11 +1319,12 @@ function EnhancedHorticultureResultsPageContent() {
 
                                                     <div className="mt-3 rounded bg-blue-900/20 p-2 text-xs">
                                                         <div className="text-blue-300">
-                                                            สรุปการคำนวณ:
+                                                            {t('สรุปการคำนวณ')}:
                                                         </div>
                                                         <div className="mt-1 text-gray-300">
-                                                            {zone.plantCount.toLocaleString()} ต้น ×{' '}
-                                                            {waterPerPlant} ลิตร/ต้น ={' '}
+                                                            {zone.plantCount.toLocaleString()}{' '}
+                                                            {t('ต้น')} × {waterPerPlant}{' '}
+                                                            {t('ลิตร/ต้น')} ={' '}
                                                             {formatWaterVolume(
                                                                 zone.waterNeedPerSession
                                                             )}
@@ -1433,20 +1338,6 @@ function EnhancedHorticultureResultsPageContent() {
                             )}
                         </div>
                     </div>
-
-                    {saveSuccess && (
-                        <div className="mt-6 flex items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/10 p-4 text-green-400">
-                            <span className="text-lg">✅</span>
-                            <span>โครงการบันทึกสำเร็จ! กำลังกลับไปหน้าหลัก</span>
-                        </div>
-                    )}
-
-                    {saveError && (
-                        <div className="mt-6 flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-red-400">
-                            <span className="text-lg">❌</span>
-                            <span>เกิดข้อผิดพลาด: {saveError}</span>
-                        </div>
-                    )}
                 </div>
             </div>
 

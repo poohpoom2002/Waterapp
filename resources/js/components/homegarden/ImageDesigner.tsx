@@ -15,6 +15,7 @@ import {
     clipCircleToPolygon,
     canvasToGPS,
 } from '../../utils/homeGardenData';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface ZoneDrawingTool {
     id: string;
@@ -90,7 +91,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-
+    const { t } = useLanguage();
     const [currentZoneTool, setCurrentZoneTool] = useState<string>('freehand');
     const [enhancedDrawing, setEnhancedDrawing] = useState({
         isDrawing: false,
@@ -159,23 +160,23 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
     const zoneDrawingTools: ZoneDrawingTool[] = [
         {
             id: 'freehand',
-            name: 'วาดอิสระ',
+            name: t('วาดอิสระ'),
             icon: '✏️',
-            description: 'วาดโซนด้วยการคลิกทีละจุด (เหมือนเดิม)',
+            description: t('วาดโซนด้วยการคลิกทีละจุด (เหมือนเดิม)'),
             type: 'freehand',
         },
         {
             id: 'rectangle',
-            name: 'สี่เหลี่ยม',
+            name: t('สี่เหลี่ยม'),
             icon: '⬜',
-            description: 'วาดโซนสี่เหลี่ยมผืนผ้า (บ้าน, แปลงปลูก)',
+            description: t('วาดโซนสี่เหลี่ยมผืนผ้า (บ้าน, แปลงปลูก)'),
             type: 'rectangle',
         },
         {
             id: 'circle',
-            name: 'วงกลม',
+            name: t('วงกลม'),
             icon: '⭕',
-            description: 'วาดโซนทรงกลม (สนาม, บ่อน้ำ)',
+            description: t('วาดโซนทรงกลม (สนาม, บ่อน้ำ)'),
             type: 'circle',
         },
     ];
@@ -184,9 +185,9 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
         (pixels: number) => {
             const meters = pixels / currentScale;
             if (meters >= 1) {
-                return `${meters.toFixed(2)} ม.`;
+                return `${meters.toFixed(2)} ${t('ม.')}`;
             } else {
-                return `${(meters * 100).toFixed(1)} ซม.`;
+                return `${(meters * 100).toFixed(1)} ${t('ซม.')}`;
             }
         },
         [currentScale]
@@ -196,9 +197,9 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
         (pixels: number) => {
             const sqMeters = pixels / (currentScale * currentScale);
             if (sqMeters >= 1) {
-                return `${sqMeters.toFixed(2)} ตร.ม.`;
+                return `${sqMeters.toFixed(2)} ${t('ตร.ม.')}`;
             } else {
-                return `${(sqMeters * 10000).toFixed(0)} ตร.ซม.`;
+                return `${(sqMeters * 10000).toFixed(0)} ${t('ตร.ซม.')}`;
             }
         },
         [currentScale]
@@ -444,13 +445,14 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
 
             if (area > 300) {
                 alert(
-                    `❌ ขนาดพื้นที่เกินกำหนด!\n\nขนาดที่วาด: ${formatArea(area)}\nขนาดสูงสุดที่อนุญาต: 300 ตร.ม.\n\nกรุณาวาดพื้นที่ให้มีขนาดเล็กลง`
+                    `❌ ${t('ขนาดพื้นที่เกินกำหนด!')}\n\n${t('ขนาดที่วาด:')} ${formatArea(area)}\n${t('ขนาดสูงสุดที่อนุญาต:')} 300 ${t('ตร.ม.')}\n\n${t('กรุณาวาดพื้นที่ให้มีขนาดเล็กลง')}`
                 );
                 return;
             }
 
             onZoneCreated(coordinates);
 
+            // Reset ทุก state ที่เกี่ยวข้องกับการวาด
             setEnhancedDrawing({
                 isDrawing: false,
                 startPoint: null,
@@ -458,7 +460,12 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                 previewShape: null,
             });
 
+            setIsDrawing(false);
+            setCurrentPolygon([]);
             setDistanceCursor({ show: false, distance: 0 });
+
+            // Reset mouse position เพื่อป้องกัน drift
+            setMousePos({ x: 0, y: 0 });
         },
         [currentScale, onZoneCreated]
     );
@@ -473,6 +480,9 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
         setIsDrawing(false);
         setCurrentPolygon([]);
         setDistanceCursor({ show: false, distance: 0 });
+
+        // Reset mouse position และ cursor state
+        setMousePos({ x: 0, y: 0 });
     }, []);
 
     const handleFileChange = useCallback(
@@ -1181,6 +1191,9 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
             setCurrentPolygon([]);
             setDistanceCursor({ show: false, distance: 0 });
 
+            // Reset mouse position
+            setMousePos({ x: 0, y: 0 });
+
             setDimensionMode(false);
             setTempDimensionPoints([]);
             setShowDimensionDirectionDialog(false);
@@ -1207,9 +1220,11 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                     <div className="mb-4">
                         <div className="mb-3 text-5xl">🖼️</div>
                         <h3 className="mb-2 text-xl font-semibold text-white">
-                            อัปโหลดแบบแปลนบ้าน
+                            {t('อัปโหลดแบบแปลนบ้าน')}
                         </h3>
-                        <p className="text-sm text-gray-400">รองรับไฟล์ JPG, PNG (สูงสุด 15MB)</p>
+                        <p className="text-sm text-gray-400">
+                            {t('รองรับไฟล์ JPG, PNG (สูงสุด 15MB)')}
+                        </p>
                     </div>
                     <input
                         ref={fileInputRef}
@@ -1223,7 +1238,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                         htmlFor="image-upload"
                         className="inline-block cursor-pointer rounded-lg bg-blue-600 px-6 py-3 text-white transition-colors hover:bg-blue-700"
                     >
-                        📁 เลือกไฟล์รูปภาพ
+                        📁 {t('เลือกไฟล์รูปภาพ')}
                     </label>
                 </div>
             ) : (
@@ -1231,28 +1246,33 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                     <div className="w-80 space-y-4 overflow-y-auto rounded-lg bg-gray-800 p-4">
                         <div className="rounded-lg bg-gray-700 p-4">
                             <h4 className="mb-3 text-lg font-semibold text-white">
-                                📏 ตั้งค่าขนาดจริง
+                                📏 {t('ตั้งค่าขนาดจริง')}
                             </h4>
 
                             {isScaleSet ? (
                                 <div className="space-y-3">
                                     <div className="rounded-lg bg-green-900/30 p-3">
                                         <div className="mb-2 text-sm font-medium text-green-400">
-                                            ✅ ตั้งค่าขนาดแล้ว
+                                            ✅ {t('ตั้งค่าขนาดแล้ว')}
                                         </div>
                                         <div className="space-y-1 text-xs text-green-200">
-                                            <div>📐 {currentScale.toFixed(2)} พิกเซล/เมตร</div>
                                             <div>
-                                                📏 {(100 / currentScale).toFixed(2)} ซม./พิกเซล
+                                                📐 {currentScale.toFixed(2)} {t('พิกเซล/เมตร')}
                                             </div>
-                                            <div>🔬 {(1 / currentScale).toFixed(4)} ม./พิกเซล</div>
+                                            <div>
+                                                📏 {(100 / currentScale).toFixed(2)}{' '}
+                                                {t('ซม./พิกเซล')}
+                                            </div>
+                                            <div>
+                                                🔬 {(1 / currentScale).toFixed(4)} {t('ม./พิกเซล')}
+                                            </div>
                                         </div>
                                     </div>
 
                                     {measurementHistory.length > 0 && (
                                         <div className="rounded-lg bg-blue-900/30 p-3">
                                             <div className="mb-1 text-xs text-blue-300">
-                                                ประวัติการวัด:
+                                                {t('ประวัติการวัด:')}
                                             </div>
                                             <div className="text-xs text-blue-200">
                                                 {measurementHistory[
@@ -1274,7 +1294,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                             onClick={resetScale}
                                             className="w-full rounded bg-amber-600 px-3 py-2 text-sm text-white transition-colors hover:bg-amber-700"
                                         >
-                                            📏 วัดใหม่
+                                            📏 {t('วัดใหม่')}
                                         </button>
                                     </div>
                                 </div>
@@ -1282,15 +1302,17 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                 <div className="space-y-3">
                                     <div className="rounded-lg bg-amber-900/30 p-3">
                                         <p className="mb-2 text-sm text-amber-200">
-                                            🎯 <strong>วิธีการตั้งค่า:</strong>
+                                            🎯 <strong>{t('วิธีการตั้งค่า:')}</strong>
                                         </p>
                                         <ol className="list-inside list-decimal space-y-1 text-xs text-amber-100">
                                             <li>
-                                                หาสิ่งที่รู้ขนาดจริง เช่น ประตู (80cm), รถ (4.5m)
+                                                {t(
+                                                    'หาสิ่งที่รู้ขนาดจริง เช่น ประตู (80cm), รถ (4.5m)'
+                                                )}
                                             </li>
-                                            <li>กดปุ่ม "📐 เริ่มวัดระยะ"</li>
-                                            <li>คลิกจุดเริ่มต้นและจุดสิ้นสุด</li>
-                                            <li>กรอกขนาดจริงเป็นเมตร</li>
+                                            <li>{t('กดปุ่ม "📐 เริ่มวัดระยะ"')}</li>
+                                            <li>{t('คลิกจุดเริ่มต้นและจุดสิ้นสุด')}</li>
+                                            <li>{t('กรอกขนาดจริงเป็นเมตร')}</li>
                                         </ol>
                                     </div>
 
@@ -1302,7 +1324,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                             }}
                                             className="w-full rounded-lg bg-amber-600 px-4 py-3 font-medium text-white transition-colors hover:bg-amber-700"
                                         >
-                                            📐 เริ่มวัดระยะ
+                                            📐 {t('เริ่มวัดระยะ')}
                                         </button>
                                     ) : (
                                         <div className="space-y-2">
@@ -1310,9 +1332,9 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                 📐{' '}
                                                 {measurementLine.start
                                                     ? measurementLine.end
-                                                        ? 'วัดเสร็จแล้ว'
-                                                        : 'คลิกจุดที่ 2 (หรือคลิกหัวฉีด)'
-                                                    : 'คลิกจุดที่ 1 (หรือคลิกหัวฉีด)'}
+                                                        ? t('วัดเสร็จแล้ว')
+                                                        : t('คลิกจุดที่ 2 (หรือคลิกหัวฉีด)')
+                                                    : t('คลิกจุดที่ 1 (หรือคลิกหัวฉีด)')}
                                             </div>
                                             <button
                                                 onClick={() => {
@@ -1322,7 +1344,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                 }}
                                                 className="w-full rounded-lg bg-gray-600 px-4 py-2 text-white transition-colors hover:bg-gray-700"
                                             >
-                                                ❌ ยกเลิกการวัด
+                                                ❌ {t('ยกเลิกการวัด')}
                                             </button>
                                         </div>
                                     )}
@@ -1334,7 +1356,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                         {isScaleSet && editMode === 'draw' && (
                             <div className="rounded-lg bg-gray-700 p-4">
                                 <h4 className="mb-3 text-lg font-semibold text-blue-400">
-                                    🏗️ เครื่องมือวาดโซน
+                                    🏗️ {t('เครื่องมือวาดโซน')}
                                 </h4>
 
                                 {/* Zone Drawing Tools */}
@@ -1364,19 +1386,19 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                     {currentZoneTool === 'freehand' ? (
                                         <div>
                                             {enhancedDrawing.isDrawing
-                                                ? `คลิกเพื่อเพิ่มจุด (${enhancedDrawing.currentPoints.length} จุด) • คลิกขวาเพื่อจบ`
-                                                : 'คลิกเพื่อเริ่มวาดโซนอิสระ'}
+                                                ? `${t('คลิกเพื่อเพิ่มจุด')} (${enhancedDrawing.currentPoints.length} {t('จุด')}) • {t('คลิกขวาเพื่อจบ')}`
+                                                : t('คลิกเพื่อเริ่มวาดโซนอิสระ')}
                                         </div>
                                     ) : (
                                         <div>
                                             {enhancedDrawing.isDrawing
-                                                ? 'คลิกจุดที่ 2 เพื่อกำหนดขนาด'
-                                                : `คลิกจุดแรกเพื่อเริ่มวาด${zoneDrawingTools.find((t) => t.id === currentZoneTool)?.name}`}
+                                                ? t('คลิกจุดที่ 2 เพื่อกำหนดขนาด')
+                                                : `${t('คลิกจุดแรกเพื่อเริ่มวาด')}${zoneDrawingTools.find((t) => t.id === currentZoneTool)?.name}`}
                                         </div>
                                     )}
                                     {distanceCursor.show && (
                                         <div className="mt-1 text-green-400">
-                                            ระยะทาง:{' '}
+                                            {t('ระยะทาง:')}{' '}
                                             {formatEnhancedDistance(distanceCursor.distance)}
                                         </div>
                                     )}
@@ -1388,7 +1410,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                         {isScaleSet && (
                             <div className="rounded-lg bg-gray-700 p-4">
                                 <h4 className="mb-3 text-lg font-semibold text-yellow-400">
-                                    📐 เครื่องมือวัด
+                                    📐 {t('เครื่องมือวัด')}
                                 </h4>
 
                                 <div className="space-y-2">
@@ -1403,7 +1425,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                 : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
                                         }`}
                                     >
-                                        📏 {dimensionMode ? 'กำลังวัดระยะ' : 'เพิ่มเส้นวัด'}
+                                        📏 {dimensionMode ? t('กำลังวัดระยะ') : t('เพิ่มเส้นวัด')}
                                     </button>
 
                                     {dimensionLines.length > 0 && (
@@ -1421,17 +1443,17 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                             }}
                                             className="w-full rounded-lg bg-red-600 p-2 text-white transition-colors hover:bg-red-700"
                                         >
-                                            🗑️ ลบเส้นวัดทั้งหมด ({dimensionLines.length})
+                                            🗑️ {t('ลบเส้นวัดทั้งหมด')} ({dimensionLines.length})
                                         </button>
                                     )}
                                 </div>
 
                                 {dimensionMode && (
                                     <div className="mt-3 rounded-lg bg-yellow-900/30 p-3 text-sm text-yellow-200">
-                                        📐 คลิกจุดที่ 1 และจุดที่ 2 เพื่อสร้างเส้นวัด (
-                                        {tempDimensionPoints.length}/2)
+                                        📐 {t('คลิกจุดที่ 1 และจุดที่ 2 เพื่อสร้างเส้นวัด')} (
+                                        {tempDimensionPoints.length}/{t('2')})
                                         <br />
-                                        💡 คลิกที่หัวฉีดเพื่อ snap ที่จุดศูนย์กลาง
+                                        💡 {t('คลิกที่หัวฉีดเพื่อ snap ที่จุดศูนย์กลาง')}
                                     </div>
                                 )}
                             </div>
@@ -1441,17 +1463,21 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                         {isScaleSet && (
                             <div className="rounded-lg bg-gray-700 p-4">
                                 <h4 className="mb-3 text-lg font-semibold text-purple-400">
-                                    🔧 แก้ไขระบบท่อ
+                                    🔧 {t('แก้ไขระบบท่อ')}
                                 </h4>
 
                                 <div className="space-y-3">
                                     {/* Pipe statistics */}
                                     {pipes.length > 0 && (
                                         <div className="rounded-lg bg-purple-900/30 p-3 text-sm text-purple-300">
-                                            <div className="mb-1 font-medium">📊 สถิติระบบท่อ:</div>
-                                            <div>จำนวนท่อ: {pipes.length} เส้น</div>
+                                            <div className="mb-1 font-medium">
+                                                📊 {t('สถิติระบบท่อ:')}
+                                            </div>
                                             <div>
-                                                ความยาวรวม:{' '}
+                                                {t('จำนวนท่อ:')} {pipes.length} {t('เส้น')}
+                                            </div>
+                                            <div>
+                                                {t('ความยาวรวม:')}{' '}
                                                 {formatDistance(
                                                     pipes.reduce((sum, p) => sum + p.length, 0)
                                                 )}
@@ -1464,13 +1490,13 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                         <div className="rounded-lg bg-blue-900/30 p-3 text-sm text-blue-300">
                                             <div className="mb-1 font-medium">
                                                 {pipeEditMode === 'add'
-                                                    ? '➕ เพิ่มท่อ'
-                                                    : '➖ ลบท่อ'}
+                                                    ? '➕' + t('เพิ่มท่อ')
+                                                    : '➖' + t('ลบท่อ')}
                                             </div>
                                             <div className="text-xs">
                                                 {pipeEditMode === 'add'
-                                                    ? `เลือกหัวฉีด 2 ตัวเพื่อเชื่อมต่อ (${selectedSprinklersForPipe.length}/2)`
-                                                    : `เลือกหัวฉีด 2 ตัวเพื่อลบท่อ (${selectedSprinklersForPipe.length}/2)`}
+                                                    ? `${t('เลือกหัวฉีด 2 ตัวเพื่อเชื่อมต่อ')} (${selectedSprinklersForPipe.length}/{t('2')})`
+                                                    : `${t('เลือกหัวฉีด 2 ตัวเพื่อลบท่อ')} (${selectedSprinklersForPipe.length}/{t('2')})`}
                                             </div>
                                         </div>
                                     )}
@@ -1479,21 +1505,21 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                     {selectedPipes.size > 0 && (
                                         <div className="rounded-lg bg-yellow-900/30 p-3 text-sm text-yellow-300">
                                             <div className="mb-1 font-medium">
-                                                📋 เลือกแล้ว: {selectedPipes.size} ท่อ
+                                                📋 {t('เลือกแล้ว:')} {selectedPipes.size} {t('ท่อ')}
                                             </div>
                                             <div className="text-xs">
-                                                คลิกที่ท่อเพื่อเลือก/ยกเลิก
+                                                {t('คลิกที่ท่อเพื่อเลือก/ยกเลิก')}
                                             </div>
                                         </div>
                                     )}
 
                                     {/* Pipe editing instructions */}
                                     <div className="rounded-lg bg-gray-600 p-3 text-xs text-gray-300">
-                                        <div className="mb-2 font-medium">💡 วิธีใช้:</div>
+                                        <div className="mb-2 font-medium">💡 {t('วิธีใช้:')}</div>
                                         <div className="space-y-1">
-                                            <div>• คลิกที่ท่อเพื่อเลือก</div>
-                                            <div>• คลิกหัวฉีด 2 ตัวเพื่อเพิ่ม/ลบท่อ</div>
-                                            <div>• ใช้ปุ่มด้านล่างเพื่อเปลี่ยนโหมด</div>
+                                            <div>• {t('คลิกที่ท่อเพื่อเลือก')}</div>
+                                            <div>• {t('คลิกหัวฉีด 2 ตัวเพื่อเพิ่ม/ลบท่อ')}</div>
+                                            <div>• {t('ใช้ปุ่มด้านล่างเพื่อเปลี่ยนโหมด')}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -1504,7 +1530,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                         {isScaleSet && (
                             <div className="rounded-lg bg-gray-700 p-4">
                                 <h4 className="mb-3 text-lg font-semibold text-purple-400">
-                                    🔲 ตาราง
+                                    🔲 {t('ตาราง')}
                                 </h4>
 
                                 <div className="space-y-3">
@@ -1515,14 +1541,14 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                             onChange={(e) => setShowGrid(e.target.checked)}
                                             className="rounded"
                                         />
-                                        แสดงตาราง
+                                        {t('แสดงตาราง')}
                                     </label>
 
                                     {showGrid && (
                                         <div>
                                             <label className="mb-1 block text-xs text-gray-300">
-                                                ระยะห่างตาราง:{' '}
-                                                {(gridSize / currentScale).toFixed(1)} ม.
+                                                {t('ระยะห่างตาราง:')}{' '}
+                                                {(gridSize / currentScale).toFixed(1)} {t('ม.')}
                                             </label>
                                             <input
                                                 type="range"
@@ -1536,8 +1562,8 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                 className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-600"
                                             />
                                             <div className="mt-1 flex justify-between text-xs text-gray-400">
-                                                <span>ใกล้</span>
-                                                <span>ไกล</span>
+                                                <span>{t('ใกล้')}</span>
+                                                <span>{t('ไกล')}</span>
                                             </div>
                                         </div>
                                     )}
@@ -1547,50 +1573,54 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
 
                         <div className="rounded-lg bg-gray-700 p-4">
                             <h4 className="mb-2 text-sm font-semibold text-gray-300">
-                                📊 ข้อมูลรูปภาพ
+                                📊 {t('ข้อมูลรูปภาพ')}
                             </h4>
                             <div className="space-y-1 text-xs text-gray-400">
                                 <div>
-                                    📐 ขนาด: {imageData.width} × {imageData.height} px
+                                    📐 {t('ขนาด:')} {imageData.width} × {imageData.height} {t('px')}
                                 </div>
                                 <div className="text-yellow-300">
-                                    ⚖️ Scale: {currentScale.toFixed(2)} พิกเซล/เมตร
+                                    ⚖️ {t('Scale:')} {currentScale.toFixed(2)} {t('พิกเซล/เมตร')}
                                 </div>
                                 <div
                                     className={`text-sm font-medium ${isScaleSet ? 'text-green-400' : 'text-red-400'}`}
                                 >
-                                    🔧 สถานะ: {isScaleSet ? '✅ ตั้งค่าแล้ว' : '❌ ยังไม่ตั้งค่า'}
+                                    🔧 {t('สถานะ:')}{' '}
+                                    {isScaleSet
+                                        ? '✅' + t('ตั้งค่าแล้ว')
+                                        : '❌' + t('ยังไม่ตั้งค่า')}
                                 </div>
                                 {gardenZones.length > 0 && isScaleSet && (
                                     <div className="text-blue-300">
-                                        🏡 โซน: {gardenZones.length} โซน
+                                        🏡 {t('โซน')} : {gardenZones.length} {t('โซน')}
                                     </div>
                                 )}
                                 {sprinklers.length > 0 && isScaleSet && (
                                     <div className="text-green-300">
-                                        💧 หัวฉีด: {sprinklers.length} ตัว
+                                        💧 {t('หัวฉีด:')} {sprinklers.length} {t('ตัว')}
                                     </div>
                                 )}
                                 {pipes.length > 0 && isScaleSet && (
                                     <div className="text-purple-300">
-                                        🔧 ท่อ: {pipes.length} เส้น
+                                        🔧 {t('ท่อ:')} {pipes.length} {t('เส้น')}
                                     </div>
                                 )}
                                 {dimensionLines.length > 0 && (
                                     <div className="text-yellow-300">
-                                        📏 เส้นวัด: {dimensionLines.length} เส้น
+                                        📏 {t('เส้นวัด:')} {dimensionLines.length} {t('เส้น')}
                                     </div>
                                 )}
                                 {showGrid && (
                                     <div className="text-purple-300">
-                                        🔲 ตาราง: {(gridSize / currentScale).toFixed(1)} ม.
+                                        🔲 {t('ตาราง:')} {(gridSize / currentScale).toFixed(1)}{' '}
+                                        {t('ม.')}
                                     </div>
                                 )}
                             </div>
 
                             <div className="mt-3 space-y-2 border-t border-gray-600 pt-3">
                                 <h5 className="text-xs font-medium text-gray-300">
-                                    🔍 การซูมและแพน:
+                                    🔍 {t('การซูมและแพน:')}
                                 </h5>
                                 <div className="flex items-center gap-2">
                                     <button
@@ -1633,7 +1663,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                     ))}
                                 </div>
                                 <div className="mt-2 text-xs text-gray-400">
-                                    💡 ล้อเมาส์: ซูม | คลิกลาก: แพน | Grid ช่วยวาดโซน
+                                    💡 {t('ล้อเมาส์: ซูม | คลิกลาก: แพน | Grid ช่วยวาดโซน')}
                                 </div>
                             </div>
                         </div>
@@ -1644,10 +1674,12 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                     <span className="text-2xl">⚠️</span>
                                     <div>
                                         <div className="mb-1 font-medium text-amber-100">
-                                            ต้องตั้งค่าขนาดก่อน!
+                                            {t('ต้องตั้งค่าขนาดก่อน!')}
                                         </div>
                                         <p className="text-sm text-amber-200">
-                                            กรุณาตั้งค่าขนาดจริงเพื่อให้ระบบคำนวณพื้นที่และระยะทางได้ถูกต้อง
+                                            {t(
+                                                'กรุณาตั้งค่าขนาดจริงเพื่อให้ระบบคำนวณพื้นที่และระยะทางได้ถูกต้อง'
+                                            )}
                                         </p>
                                     </div>
                                 </div>
@@ -1667,7 +1699,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                 htmlFor="image-change"
                                 className="block w-full cursor-pointer rounded-lg bg-purple-600 px-4 py-3 text-center font-medium text-white transition-colors hover:bg-purple-700"
                             >
-                                🖼️ เปลี่ยนรูปภาพ
+                                🖼️ {t('เปลี่ยนรูปภาพ')}
                             </label>
                         </div>
                     </div>
@@ -1774,7 +1806,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                     filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))',
                                                 }}
                                             >
-                                                จุดที่ 1
+                                                {t('จุดที่ 1')}
                                             </text>
 
                                             {measurementLine.end && (
@@ -1807,7 +1839,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                             filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))',
                                                         }}
                                                     >
-                                                        จุดที่ 2
+                                                        {t('จุดที่ 2')}
                                                     </text>
                                                     <text
                                                         x={
@@ -1831,7 +1863,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                     >
                                                         📏{' '}
                                                         {measurementLine.pixelDistance?.toFixed(1)}{' '}
-                                                        พิกเซล
+                                                        {t('พิกเซล')}
                                                     </text>
                                                 </>
                                             )}
@@ -2192,7 +2224,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                                     filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))',
                                                                 }}
                                                             >
-                                                                {zone.name}
+                                                                {t(zone.name)}
                                                             </text>
 
                                                             {/* Show area */}
@@ -2420,16 +2452,16 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
                     <div className="mx-4 w-full max-w-md rounded-lg bg-gray-800 p-6">
                         <h3 className="mb-4 text-lg font-semibold text-yellow-400">
-                            📐 เลือกทิศทางเส้นวัด
+                            📐 {t('เลือกทิศทางเส้นวัด')}
                         </h3>
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-3">
                                 {[
-                                    { id: 'auto', label: 'อัตโนมัติ', icon: '🔄' },
-                                    { id: 'top', label: 'บน', icon: '⬆️' },
-                                    { id: 'bottom', label: 'ล่าง', icon: '⬇️' },
-                                    { id: 'left', label: 'ซ้าย', icon: '⬅️' },
-                                    { id: 'right', label: 'ขวา', icon: '➡️' },
+                                    { id: 'auto', label: t('อัตโนมัติ'), icon: '🔄' },
+                                    { id: 'top', label: t('บน'), icon: '⬆️' },
+                                    { id: 'bottom', label: t('ล่าง'), icon: '⬇️' },
+                                    { id: 'left', label: t('ซ้าย'), icon: '⬅️' },
+                                    { id: 'right', label: t('ขวา'), icon: '➡️' },
                                 ].map((dir) => (
                                     <button
                                         key={dir.id}
@@ -2461,7 +2493,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                     }}
                                     className="flex-1 rounded-lg bg-yellow-600 px-4 py-2 font-medium transition-colors hover:bg-yellow-700"
                                 >
-                                    สร้างเส้นวัด
+                                    {t('สร้างเส้นวัด')}
                                 </button>
                                 <button
                                     onClick={() => {
@@ -2471,7 +2503,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                     }}
                                     className="flex-1 rounded-lg bg-gray-600 px-4 py-2 font-medium transition-colors hover:bg-gray-700"
                                 >
-                                    ยกเลิก
+                                    {t('ยกเลิก')}
                                 </button>
                             </div>
                         </div>
@@ -2483,24 +2515,27 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
                     <div className="mx-4 w-full max-w-md rounded-lg bg-gray-800 p-6">
                         <h3 className="mb-4 text-lg font-semibold text-yellow-400">
-                            📐 กรอกระยะทางจริง
+                            📐 {t('กรอกระยะทางจริง')}
                         </h3>
 
                         <div className="mb-4 rounded-lg bg-blue-900/30 p-3">
-                            <div className="mb-2 text-sm text-blue-300">📏 ข้อมูลการวัด:</div>
+                            <div className="mb-2 text-sm text-blue-300">
+                                📏 {t('ข้อมูลการวัด:')}
+                            </div>
                             <div className="space-y-1 text-sm text-blue-200">
                                 <div>
-                                    • ระยะในรูป:{' '}
+                                    • {t('ระยะในรูป:')}{' '}
                                     <span className="font-bold text-yellow-300">
-                                        {measurementLine.pixelDistance?.toFixed(1) || 0} พิกเซล
+                                        {measurementLine.pixelDistance?.toFixed(1) || 0}{' '}
+                                        {t('พิกเซล')}
                                     </span>
                                 </div>
                                 <div>
-                                    • จุดเริ่มต้น: ({measurementLine.start?.x.toFixed(0)},{' '}
+                                    • {t('จุดเริ่มต้น:')} ({measurementLine.start?.x.toFixed(0)},{' '}
                                     {measurementLine.start?.y.toFixed(0)})
                                 </div>
                                 <div>
-                                    • จุดสิ้นสุด: ({measurementLine.end?.x.toFixed(0)},{' '}
+                                    • {t('จุดสิ้นสุด:')} ({measurementLine.end?.x.toFixed(0)},{' '}
                                     {measurementLine.end?.y.toFixed(0)})
                                 </div>
                             </div>
@@ -2508,7 +2543,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
 
                         <div className="mb-4">
                             <label className="mb-2 block text-sm font-medium text-gray-300">
-                                ระยะทางจริง (เมตร):
+                                {t('ระยะทางจริง (เมตร):')}
                             </label>
                             <div className="flex items-center gap-2">
                                 <input
@@ -2517,14 +2552,14 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                     min="0.01"
                                     value={realDistance}
                                     onChange={(e) => setRealDistance(e.target.value)}
-                                    placeholder="เช่น 1.5, 2.4, 80"
+                                    placeholder={t('เช่น 1.5, 2.4, 80')}
                                     className="flex-1 rounded border border-gray-600 bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
                                     autoFocus
                                 />
-                                <span className="font-medium text-gray-300">เมตร</span>
+                                <span className="font-medium text-gray-300">{t('เมตร')}</span>
                             </div>
                             <div className="mt-2 text-xs text-gray-400">
-                                💡 ตัวอย่าง: ประตู = 0.8, รถยนต์ = 4.5, ห้อง = 3.0
+                                💡 {t('ตัวอย่าง: ประตู = 0.8, รถยนต์ = 4.5, ห้อง = 3.0')}
                             </div>
                         </div>
 
@@ -2534,27 +2569,27 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                             measurementLine.pixelDistance && (
                                 <div className="mb-4 rounded-lg bg-green-900/30 p-3">
                                     <div className="mb-1 text-sm text-green-300">
-                                        🧮 ผลการคำนวณ:
+                                        🧮 {t('ผลการคำนวณ:')}
                                     </div>
                                     <div className="space-y-1 text-sm text-green-200">
                                         <div>
-                                            • มาตราส่วน:{' '}
+                                            • {t('มาตราส่วน:')}{' '}
                                             <span className="font-bold">
                                                 {(
                                                     measurementLine.pixelDistance /
                                                     parseFloat(realDistance)
                                                 ).toFixed(2)}{' '}
-                                                พิกเซล/เมตร
+                                                {t('พิกเซล/เมตร')}
                                             </span>
                                         </div>
                                         <div>
-                                            • ความละเอียด:{' '}
+                                            • {t('ความละเอียด:')}{' '}
                                             <span className="font-bold">
                                                 {(
                                                     (parseFloat(realDistance) * 100) /
                                                     measurementLine.pixelDistance
                                                 ).toFixed(2)}{' '}
-                                                ซม./พิกเซล
+                                                {t('ซม./พิกเซล')}
                                             </span>
                                         </div>
                                     </div>
@@ -2571,7 +2606,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                 }
                                 className="flex-1 rounded bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-600"
                             >
-                                ✅ ตั้งค่า
+                                ✅ {t('ตั้งค่า')}
                             </button>
                             <button
                                 onClick={() => {
@@ -2582,7 +2617,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                 }}
                                 className="flex-1 rounded bg-gray-600 px-4 py-2 font-medium text-white transition-colors hover:bg-gray-700"
                             >
-                                ❌ ยกเลิก
+                                ❌ {t('ยกเลิก')}
                             </button>
                         </div>
                     </div>

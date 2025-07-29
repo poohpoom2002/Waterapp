@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // utils/googleMapsConfig.ts - แก้ไขการซูมและตำแหน่งปุ่มสลับแผนที่ + แก้ไข ReferenceError
 export const GOOGLE_MAPS_CONFIG = {
     get apiKey() {
@@ -13,6 +14,11 @@ export const GOOGLE_MAPS_CONFIG = {
             console.error(
                 '❌ Google Maps API Key not found. Please set VITE_GOOGLE_MAPS_API_KEY in .env file'
             );
+            console.error('Available sources:', {
+                'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': import.meta.env.VITE_GOOGLE_MAPS_API_KEY ? 'Found' : 'Missing',
+                'globalThis.GOOGLE_MAPS_API_KEY': (globalThis as unknown as { GOOGLE_MAPS_API_KEY?: string }).GOOGLE_MAPS_API_KEY ? 'Found' : 'Missing',
+                'process.env.REACT_APP_GOOGLE_MAPS_API_KEY': process.env?.REACT_APP_GOOGLE_MAPS_API_KEY ? 'Found' : 'Missing',
+            });
             return '';
         }
 
@@ -37,12 +43,10 @@ export const GOOGLE_MAPS_CONFIG = {
         fullscreenControl: true,
         mapTypeControl: true,
         mapTypeControlOptions: {
-            position: 'LEFT_BOTTOM' as unknown, // ใช้ string แทน google.maps.ControlPosition.LEFT_BOTTOM
-            style: 'HORIZONTAL_BAR' as unknown, // ใช้ string แทน google.maps.MapTypeControlStyle.HORIZONTAL_BAR
+            position: 'TOP_CENTER' as any,
+            style: 'HORIZONTAL_BAR' as any,
             mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain'],
         },
-        minZoom: 1,
-        maxZoom: 25,
         gestureHandling: 'greedy' as const,
         clickableIcons: false,
         scrollwheel: true,
@@ -83,7 +87,7 @@ export const GOOGLE_MAPS_CONFIG = {
         detail: 20,
         extreme: 21,
         house: 22,
-        maximum: 25,
+        maximum: 35,
     },
 };
 
@@ -122,7 +126,7 @@ export const GOOGLE_MAPS_ERRORS = {
         solutions: [
             '1. อัปเดตไปใช้ Advanced Markers',
             '2. ใช้ Places API (New)',
-            '3. อัปเดต @googlemaps/react-wrapper',
+            '3. อัปเดท @googlemaps/react-wrapper',
             '4. ใช้ Google Maps Platform ใหม่',
         ],
     },
@@ -281,7 +285,7 @@ export class PlacesServiceWrapper {
         if (!this.placesService) {
             return {
                 results: [],
-                status: 'UNKNOWN_ERROR' as google.maps.places.PlacesServiceStatus,
+                status: 'UNKNOWN_ERROR' as any,
                 error: 'Places Service not initialized',
             };
         }
@@ -301,7 +305,6 @@ export class PlacesServiceWrapper {
                     resultsCount: results?.length || 0,
                 });
 
-                // ✅ ใช้ string comparison แทน google.maps.places.PlacesServiceStatus.OK
                 if (status === 'OK' && results) {
                     const limitedResults = results.slice(0, options?.maxResults || 8);
                     resolve({ results: limitedResults, status });
@@ -315,7 +318,6 @@ export class PlacesServiceWrapper {
     }
 
     private getStatusErrorMessage(status: google.maps.places.PlacesServiceStatus): string {
-        // ✅ ใช้ string comparison แทน google.maps constants
         const statusString = status.toString();
 
         switch (statusString) {
@@ -371,7 +373,6 @@ export const debugGoogleMapsSetup = async (): Promise<void> => {
     }
 };
 
-// ✅ แก้ไข: ย้าย debug function ไปทำงานหลังจาก Google Maps โหลดเสร็จแล้ว
 if (import.meta.env.DEV) {
     const checkAndDebug = () => {
         if (window.google?.maps) {
@@ -381,7 +382,6 @@ if (import.meta.env.DEV) {
         }
     };
 
-    // ✅ ใช้ window.addEventListener แทน setTimeout ตรงๆ
     if (typeof window !== 'undefined') {
         window.addEventListener('load', () => {
             setTimeout(checkAndDebug, 1000);

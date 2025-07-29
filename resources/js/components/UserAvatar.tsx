@@ -6,6 +6,7 @@ interface UserAvatarProps {
         name: string;
         email: string;
         profile_photo_url?: string;
+        is_super_user?: boolean;
     };
     size?: 'sm' | 'md' | 'lg';
     className?: string;
@@ -65,11 +66,18 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
 
     // Show initials if no profile photo
     const avatarContent = (
-        <div
-            className={`inline-flex items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 font-semibold text-white shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl ${sizeClasses[size]} ${className}`}
-            title={`${user.name} (${user.email})`}
-        >
-            {initials}
+        <div className="relative">
+            <div
+                className={`inline-flex items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 font-semibold text-white shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl ${sizeClasses[size]} ${className}`}
+                title={`${user.name} (${user.email})${user.is_super_user ? ' - Super User' : ''}`}
+            >
+                {initials}
+            </div>
+            {user.is_super_user && (
+                <div className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-yellow-500 text-xs font-bold text-white">
+                    👑
+                </div>
+            )}
         </div>
     );
 

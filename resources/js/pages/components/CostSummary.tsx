@@ -17,7 +17,7 @@ interface CostSummaryProps {
     gardenStats?: GardenStatistics | null;
     zoneInputs: { [zoneId: string]: IrrigationInput };
     onQuotationClick: () => void;
-    projectMode?: 'horticulture' | 'garden';
+    projectMode?: 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
     showPump?: boolean;
 }
 
