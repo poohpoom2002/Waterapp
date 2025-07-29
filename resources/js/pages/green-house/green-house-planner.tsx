@@ -1438,7 +1438,6 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                     Real-time distance measurement display
                                 </span>
                             </p>
->>>>>>> 0295538755fa4f41c4e2f5f543e0e7d77c907e5c
                         </div>
                     </div>
 

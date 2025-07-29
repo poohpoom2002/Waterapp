@@ -1700,14 +1700,12 @@ export default function GreenhouseMap() {
                         <h1 className="text-xl font-bold">💧 Greenhouse Irrigation System Design (Large)</h1>
                         <p className="text-sm text-gray-400">
                             Irrigation system design:{' '}
->>>>>>> 0295538755fa4f41c4e2f5f543e0e7d77c907e5c
                             {
                                 irrigationMethods[
                                     selectedIrrigationMethod as keyof typeof irrigationMethods
                                 ]?.name
                             }{' '}
                             - Area 2400x1600 pixels
->>>>>>> 0295538755fa4f41c4e2f5f543e0e7d77c907e5c
                         </p>
                     </div>
                     <div className="flex items-center space-x-2 text-sm text-gray-400">
@@ -1751,7 +1749,6 @@ export default function GreenhouseMap() {
                         <div className="mb-4">
                             <h3 className="mb-2 text-sm font-medium text-gray-300">
                                 Selected Irrigation Method
->>>>>>> 0295538755fa4f41c4e2f5f543e0e7d77c907e5c
                             </h3>
                             <div className="rounded border border-blue-500 bg-blue-600 px-3 py-2 text-sm text-white">
                                 {
