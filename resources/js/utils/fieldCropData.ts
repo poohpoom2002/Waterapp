@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // @/pages/utils/fieldCropData.ts
 
 import * as turf from '@turf/turf';

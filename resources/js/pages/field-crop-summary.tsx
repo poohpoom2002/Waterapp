@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Head, Link, router } from '@inertiajs/react'; // Fanggy005 EDIT: Import router
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
 import { useState, useEffect, useRef } from 'react';
@@ -644,7 +646,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
             setCalculatedZoneSummaries(newZoneSummaries);
             console.log('✅ Zone calculations completed with cropData (per irrigation):', newZoneSummaries);
         }
-    }, [summaryData, zones, zoneAssignments, rowSpacing, plantSpacing, irrigationAssignments]);
+    }, [summaryData, zones, zoneAssignments, rowSpacing, plantSpacing, irrigationAssignments, pipes]);
     
     // Fanggy005 EDIT: Add handler for the calculation button
     const handleCalculateEquipment = () => {
