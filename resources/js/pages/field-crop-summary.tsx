@@ -1828,7 +1828,6 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                     </div>
                 </div>
             </div>
-            <Footer />
         </div>
     );
 }
