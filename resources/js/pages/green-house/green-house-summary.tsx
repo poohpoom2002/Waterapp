@@ -111,8 +111,29 @@ export default function GreenhouseSummary() {
     }, []);
 
     // NEW: Handle navigation to equipment calculator
-    const handleCalculateEquipment = () => {
+    const handleCalculateEquipment = async () => { // ทำให้ฟังก์ชันเป็น async
         if (summaryData) {
+            // --- เพิ่มส่วนการจับภาพ canvas และบันทึกลง localStorage ---
+            if (canvasRef.current) {
+                try {
+                    console.log('Capturing canvas image...');
+                    const canvas = await html2canvas(canvasRef.current, {
+                        backgroundColor: '#000000', // กำหนดพื้นหลังให้เป็นสีเดียวกับ Canvas
+                        useCORS: true,
+                    });
+                    const image = canvas.toDataURL('image/png');
+                    
+                    // บันทึกภาพลงใน localStorage ด้วย key ที่หน้า product.tsx รอรับอยู่
+                    localStorage.setItem('projectMapImage', image); 
+                    
+                    console.log('✅ Image saved to localStorage successfully.');
+                } catch (error) {
+                    console.error('Error capturing canvas image:', error);
+                    alert('เกิดข้อผิดพลาดในการสร้างภาพแผนผัง');
+                }
+            }
+            // --- จบส่วนที่เพิ่มเข้ามา ---
+
             // Convert summary data to GreenhousePlanningData format
             const greenhouseData: GreenhousePlanningData = calculateAllGreenhouseStats({
                 shapes: summaryData.shapes || [],
@@ -1052,8 +1073,13 @@ export default function GreenhouseSummary() {
             <div className="min-h-screen bg-gray-900 text-white">
                 <Head title="Greenhouse Summary - Growing System Planning" />
                 
-                {/* Add Navbar at the top */}
-                <Navbar />
+                {/* Add Navbar at the top - fixed position */}
+                <div className="fixed top-0 left-0 right-0 z-50">
+                    <Navbar />
+                </div>
+                
+                {/* Add padding top to account for fixed navbar */}
+                <div className="pt-16"></div>
 
                 <div className="border-b border-gray-700 bg-gray-800">
                     <div className="container mx-auto px-4 py-6">

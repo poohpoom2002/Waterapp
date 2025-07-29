@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // components/homegarden/EnhancedSearchBox.tsx
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
@@ -73,7 +74,7 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
 
             return () => clearInterval(pollInterval);
         }
-    }, [isGoogleMapsReady]);
+    }, [isGoogleMapsReady, t]);
 
     useEffect(() => {
         if (!isGoogleMapsReady || !inputRef.current) return;
@@ -135,7 +136,7 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
                 console.warn('Error cleaning up autocomplete:', error);
             }
         };
-    }, [isGoogleMapsReady, onPlaceSelect]);
+    }, [isGoogleMapsReady, onPlaceSelect, t]);
 
     const searchWithPlacesAPI = useCallback(async (query: string) => {
         if (!placesServiceRef.current || !query.trim() || query.length < 1) {
@@ -184,7 +185,7 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [t]);
 
     const handleInputChange = useCallback(
         (e: React.ChangeEvent<HTMLInputElement>) => {

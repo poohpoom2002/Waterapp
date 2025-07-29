@@ -1963,6 +1963,12 @@ class FarmController extends Controller
                     ->update(['folder_id' => $unfinishedFolder->id]);
             }
 
+            // Delete all sub-folders first
+            Folder::where('user_id', $user->id)
+                ->where('parent_id', $folder->id)
+                ->delete();
+
+            // Delete the main folder
             $folder->delete();
 
             return response()->json([
@@ -2001,6 +2007,53 @@ class FarmController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error updating field status'
+            ], 500);
+        }
+    }
+
+    public function updateFieldFolder(Request $request, $fieldId): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+            
+            // Check if this is a mock field (starts with 'mock-')
+            if (str_starts_with($fieldId, 'mock-')) {
+                \Log::info('Mock field folder update - skipping database update', [
+                    'field_id' => $fieldId,
+                    'folder_id' => $request->input('folder_id'),
+                    'user_id' => $user->id
+                ]);
+                
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Mock field updated successfully'
+                ]);
+            }
+            
+            $field = Field::where('user_id', $user->id)
+                ->findOrFail($fieldId);
+
+            \Log::info('Updating field folder', [
+                'field_id' => $fieldId,
+                'folder_id' => $request->input('folder_id'),
+                'user_id' => $user->id
+            ]);
+
+            $validated = $request->validate([
+                'folder_id' => 'required|integer',
+            ]);
+
+            $field->update($validated);
+
+            return response()->json([
+                'success' => true,
+                'field' => $field
+            ]);
+        } catch (Exception $e) {
+            \Log::error('Error updating field folder: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error updating field folder'
             ], 500);
         }
     }
