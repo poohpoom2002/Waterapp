@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import Navbar from '../../components/Navbar';
-import { useLanguage } from '../../contexts/LanguageContext';
 import {
     greenhouseCrops,
     getCropByValue,
@@ -28,7 +27,7 @@ export default function GreenhouseCrop({ cropType, crops }) {
             const cropArray = crops.split(',').filter(Boolean);
             setSelectedCrops(cropArray);
         }
-    }, [cropType, crops]);
+    }, [cropType, crops, selectedCrops]);
 
     // Update filtered crops when search or category changes
     useEffect(() => {
@@ -73,7 +72,7 @@ export default function GreenhouseCrop({ cropType, crops }) {
         <div className="min-h-screen bg-gray-900 text-white">
             {/* Navbar */}
             <Navbar />
-            
+
             {/* Main Content with adjusted height to account for navbar */}
             <div className="flex" style={{ height: 'calc(100vh - 64px)' }}>
                 {/* Sidebar - Fixed Summary Panel */}

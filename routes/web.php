@@ -2,11 +2,8 @@
 // routes\web.php
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use App\Http\Controllers\FarmController;
-use App\Http\Controllers\HomeGardenController;
-use App\Http\Controllers\ProfilePhotoController;
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\SuperUserController;
+use App\Http\Controllers\ProfileController; // เก็บไว้ถ้าใช้
+use App\Http\Controllers\SuperUserController; // เก็บไว้ถ้าใช้
 
 /*
 |--------------------------------------------------------------------------
@@ -32,24 +29,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Horticulture Irrigation System Routes (ระบบชลประทานสวนผลไม้)
     Route::prefix('horticulture')->name('horticulture.')->group(function () {
-        // หน้าวางแผนระบบน้ำสวนผลไม้
         Route::get('planner', function () {
             return Inertia::render('HorticulturePlannerPage');
         })->name('planner');
         
-        // หน้าแสดงผลลัพธ์ระบบน้ำสวนผลไม้
         Route::get('results', function () {
             return Inertia::render('HorticultureResultsPage');
         })->name('results');
     });
+
     // Home Garden Irrigation System Routes (ระบบชลประทานบ้านสวน)
     Route::prefix('home-garden')->name('home-garden.')->group(function () {
-        // หน้าวางแผนระบบน้ำบ้านสวน
         Route::get('planner', function () {
             return Inertia::render('home-garden-planner');
         })->name('planner');
         
-        // หน้าแสดงผลลัพธ์ระบบน้ำบ้านสวน
         Route::get('summary', function () {
             return Inertia::render('home-garden-summary');
         })->name('summary');
@@ -62,7 +56,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('horticulture-results', function () {
         return redirect()->route('horticulture.results');
     });
-    // Legacy routes for backward compatibility
     Route::get('home-garden-planner', function () {
         return redirect()->route('home-garden.planner');
     });
@@ -250,11 +243,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     
     // Field Status Management
     Route::put('/api/fields/{fieldId}/status', [FarmController::class, 'updateFieldStatus'])->name('update-field-status');
+    Route::put('/api/fields/{fieldId}/folder', [FarmController::class, 'updateFieldFolder'])->name('update-field-folder');
     
     // Profile Photo Routes
     Route::post('/api/profile-photo/upload', [ProfilePhotoController::class, 'upload'])->name('profile-photo.upload');
     Route::delete('/api/profile-photo/delete', [ProfilePhotoController::class, 'delete'])->name('profile-photo.delete');
-
+  
     // Super User Routes
     Route::prefix('super')->name('super.')->group(function () {
         Route::get('/dashboard', function () {

@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // resources\js\pages\components\CostSummary.tsx
 import React from 'react';
 import { AnalyzedPipe, CalculationResults, IrrigationInput } from '../types/interfaces';
@@ -5,6 +7,7 @@ import { HorticultureProjectData } from '../../utils/horticultureUtils';
 import { GardenPlannerData } from '../../utils/homeGardenData';
 import { GardenStatistics } from '../../utils/gardenStatistics';
 import { calculatePipeRolls } from '../utils/calculations';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface CostSummaryProps {
     results: CalculationResults;
@@ -76,6 +79,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
     projectMode = 'horticulture',
     showPump = true,
 }) => {
+    const { t } = useLanguage();
     const calculateTotalCosts = () => {
         let totalSprinklerCost = 0;
         let totalBranchPipeCost = 0;
@@ -347,7 +351,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 sprinklerSummary[`${currentSprinkler.id}`] = {
                     sprinkler: currentSprinkler,
                     quantity: sprinklerQuantity,
-                    zones: ['พื้นที่หลัก'],
+                    zones: [t('พื้นที่หลัก')],
                     totalCost: totalSprinklerCost,
                 };
             }
@@ -365,7 +369,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         pipe: branchPipe,
                         totalLength: totalLength,
                         quantity: quantity,
-                        zones: ['พื้นที่หลัก'],
+                        zones: [t('พื้นที่หลัก')],
                         totalCost: cost,
                     };
                 }
@@ -382,7 +386,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         pipe: secondaryPipe,
                         totalLength: currentInput.totalSecondaryPipeM,
                         quantity: quantity,
-                        zones: ['พื้นที่หลัก'],
+                        zones: [t('พื้นที่หลัก')],
                         totalCost: cost,
                     };
                 }
@@ -399,7 +403,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         pipe: mainPipe,
                         totalLength: currentInput.totalMainPipeM,
                         quantity: quantity,
-                        zones: ['พื้นที่หลัก'],
+                        zones: [t('พื้นที่หลัก')],
                         totalCost: cost,
                     };
                 }
@@ -490,15 +494,15 @@ const CostSummary: React.FC<CostSummaryProps> = ({
     const effectivePump = selectedPump || results.autoSelectedPump;
 
     const getSelectionStatus = (equipment: any, type: string, isAuto: boolean) => {
-        if (!equipment) return `❌ ไม่มี${type}`;
+        if (!equipment) return `❌ ${t('ไม่มี')}${type}`;
 
         if (isAuto) {
-            if (equipment.isRecommended) return `🤖⭐ ${type}ที่แนะนำ (อัตโนมัติ)`;
-            if (equipment.isGoodChoice) return `🤖✅ ${type}ตัวเลือกดี (อัตโนมัติ)`;
-            if (equipment.isUsable) return `🤖⚡ ${type}ใช้ได้ (อัตโนมัติ)`;
-            return `🤖⚠️ ${type}ที่ดีที่สุดที่มี (อัตโนมัติ)`;
+            if (equipment.isRecommended) return `🤖⭐ ${type} ${t('ที่แนะนำ')} (อัตโนมัติ)`;
+            if (equipment.isGoodChoice) return `🤖✅ ${type} ${t('ตัวเลือกดี')} (อัตโนมัติ)`;
+            if (equipment.isUsable) return `🤖⚡ ${type} ${t('ใช้ได้')} (อัตโนมัติ)`;
+            return `🤖⚠️ ${type} ${t('ที่ดีที่สุดที่มี')} (อัตโนมัติ)`;
         } else {
-            return `👤 ${type}ที่เลือกเอง`;
+            return `👤 ${type} ${t('ที่เลือกเอง')}`;
         }
     };
 
@@ -521,8 +525,8 @@ const CostSummary: React.FC<CostSummaryProps> = ({
     const systemMode =
         (projectMode === 'horticulture' && projectData?.useZones && projectData.zones.length > 1) ||
         (projectMode === 'garden' && gardenStats && gardenStats.zones.length > 1)
-            ? 'หลายโซน'
-            : 'โซนเดียว';
+            ? t('หลายโซน')
+            : t('โซนเดียว');
 
     const getTotalArea = () => {
         if (projectMode === 'garden' && gardenStats) {
@@ -535,54 +539,12 @@ const CostSummary: React.FC<CostSummaryProps> = ({
 
     return (
         <div className="rounded-lg bg-gray-700 p-6">
-            <h2 className="mb-4 text-xl font-semibold text-yellow-400">💰 สรุปราคารวม</h2>
-
-            <div className="mb-4 rounded bg-blue-900 p-3">
-                <h3 className="mb-2 text-sm font-semibold text-blue-300">
-                    {projectMode === 'garden' ? '🏡' : '🏗️'} ภาพรวมระบบ ({systemMode}):
-                </h3>
-                <div className="grid grid-cols-2 gap-4 text-xs md:grid-cols-5">
-                    <div>
-                        <p className="text-blue-200">
-                            💧 {projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}:{' '}
-                            {uniqueSprinklers} ชนิด ({totalSprinklerHeads} หัว)
-                        </p>
-                    </div>
-                    <div>
-                        <p className="text-blue-200">🔧 ท่อย่อย: {uniqueBranchPipes} ชนิด</p>
-                    </div>
-                    {uniqueSecondaryPipes > 0 && (
-                        <div>
-                            <p className="text-blue-200">🔧 ท่อรอง: {uniqueSecondaryPipes} ชนิด</p>
-                        </div>
-                    )}
-                    {uniqueMainPipes > 0 && (
-                        <div>
-                            <p className="text-blue-200">🔧 ท่อหลัก: {uniqueMainPipes} ชนิด</p>
-                        </div>
-                    )}
-                    {showPump && (
-                        <div>
-                            <p className="text-blue-200">⚡ ปั๊ม: 1 ตัว</p>
-                        </div>
-                    )}
-                </div>
-                <div className="mt-2 text-xs text-blue-200">
-                    <p>
-                        📊 รวมท่อทั้งหมด: {totalPipeRolls} ม้วน
-                        {(costs as any).extraPipeSummary && ' (รวมท่อเสริม)'}| ราคาเฉลี่ย:{' '}
-                        {totalSprinklerHeads > 0
-                            ? (costs.totalCost / totalSprinklerHeads).toLocaleString()
-                            : 0}{' '}
-                        บาท/หัว
-                    </p>
-                </div>
-            </div>
+            <h2 className="mb-4 text-2xl font-bold text-yellow-400">💰 {t('สรุปอุปกรณ์ทั้งหมด')}</h2>
 
             {uniqueSprinklers > 0 && (
                 <div className="mb-4 rounded bg-green-900 p-3">
                     <h3 className="mb-2 text-sm font-semibold text-green-300">
-                        💧 รายละเอียด{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}:
+                        💧 {t('รายละเอียด')}{projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}:
                     </h3>
                     <div className="space-y-2">
                         {Object.values(costs.sprinklerSummary).map((item, index) => (
@@ -591,31 +553,32 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                 className="flex items-center justify-between rounded bg-green-800 p-2"
                             >
                                 <div className="flex items-center space-x-3">
-                                    <div className="flex h-8 w-8 items-center justify-center rounded bg-green-600 text-xs">
-                                        💧
-                                    </div>
+                                    <img src={item.sprinkler.image} alt="" className="w-10 h-10" />
                                     <div className="text-sm">
                                         <p className="font-medium text-white">
                                             {item.sprinkler.name}
                                         </p>
                                         <p className="text-green-200">
                                             {item.sprinkler.productCode} |{' '}
-                                            {item.sprinkler.price?.toLocaleString()} บาท/หัว
+                                            {item.sprinkler.price?.toLocaleString()} {t('บาท/หัว')}
                                         </p>
                                         <p className="text-xs text-green-300">
-                                            ใช้ในโซน: {item.zones.join(', ')}
+                                            {t('ใช้ในโซน:')} {item.zones.join(', ')}
                                         </p>
                                     </div>
                                 </div>
                                 <div className="text-right text-sm">
                                     <p className="text-green-200">
-                                        {item.quantity?.toLocaleString()} หัว
+                                        {item.quantity?.toLocaleString()} {t('หัว')}
                                     </p>
                                     <p className="font-bold text-white">
-                                        {item.totalCost?.toLocaleString()} บาท
+                                        {item.totalCost?.toLocaleString()} {t('บาท')}
                                     </p>
                                     <p className="text-xs text-green-300">
-                                        ({(item.totalCost / item.quantity).toFixed(0)} บาท/หัว)
+                                        {(Number(item.totalCost) / Number(item.quantity)).toFixed(
+                                            0
+                                        )}{' '}
+                                        {t('บาท/หัว')}
                                     </p>
                                 </div>
                             </div>
@@ -627,13 +590,13 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             {(uniqueBranchPipes > 0 || uniqueSecondaryPipes > 0 || uniqueMainPipes > 0) && (
                 <div className="mb-4 rounded bg-purple-900 p-3">
                     <h3 className="mb-2 text-sm font-semibold text-purple-300">
-                        🔧 รายละเอียดท่อ:
+                        🔧 {t('รายละเอียดท่อ:')}
                     </h3>
                     <div className="space-y-3">
                         {uniqueBranchPipes > 0 && (
                             <div>
                                 <h4 className="mb-1 text-xs font-medium text-purple-200">
-                                    ท่อย่อย ({uniqueBranchPipes} ชนิด):
+                                    {t('ท่อย่อย')} ({uniqueBranchPipes} {t('ชนิด')}):
                                 </h4>
                                 <div className="space-y-1">
                                     {Object.values(costs.pipeSummary.branch).map((item, index) => (
@@ -652,29 +615,31 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                     )}
                                                     {item.includesExtra && (
                                                         <span className="ml-1 text-yellow-400">
-                                                            +Riser
+                                                            +{t('Riser')}
                                                         </span>
                                                     )}
                                                 </p>
                                                 <p className="text-xs text-purple-200">
                                                     {item.zones.join(', ')} |{' '}
-                                                    {item.pipe.price?.toLocaleString()} บาท/ม้วน (
-                                                    {item.pipe.lengthM}ม./ม้วน) | คะแนน:{' '}
+                                                    {(
+                                                        Number(item.pipe.price) || 0
+                                                    )?.toLocaleString()}{' '}
+                                                    {t('บาท/ม้วน')} ({item.pipe.lengthM} {t('ม./ม้วน')}) | {t('คะแนน:')} {' '}
                                                     {item.pipe.score || 'N/A'}
                                                 </p>
                                                 <p className="text-xs text-purple-300">
-                                                    รวมความยาว: {item.totalLength?.toLocaleString()}{' '}
-                                                    ม.
+                                                    {t('รวมความยาว:')} {item.totalLength?.toLocaleString()}{' '}
+                                                    {t('ม.')}
                                                     {item.extraLength && item.extraLength > 0 && (
                                                         <span className="text-yellow-300">
                                                             {' '}
-                                                            (+ Riser {item.extraLength.toFixed(
+                                                            (+ {t('Riser')} {item.extraLength.toFixed(
                                                                 1
                                                             )}{' '}
                                                             ม.)
                                                         </span>
                                                     )}{' '}
-                                                    | ประสิทธิภาพ:{' '}
+                                                    | {t('ประสิทธิภาพ:')} {' '}
                                                     {(
                                                         ((item.totalLength +
                                                             (item.extraLength || 0)) /
@@ -686,10 +651,10 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                             </div>
                                             <div className="text-right text-sm">
                                                 <p className="text-purple-200">
-                                                    {item.quantity} ม้วน
+                                                    {item.quantity} {t('ม้วน')}
                                                 </p>
                                                 <p className="font-bold text-white">
-                                                    {item.totalCost?.toLocaleString()} บาท
+                                                    {item.totalCost?.toLocaleString()} {t('บาท')}
                                                 </p>
                                                 <p className="text-xs text-purple-300">
                                                     (
@@ -699,7 +664,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                                 (item.extraLength || 0))) *
                                                         100
                                                     ).toFixed(1)}{' '}
-                                                    บาท/100ม.)
+                                                    {t('บาท/100ม.')}
                                                 </p>
                                             </div>
                                         </div>
@@ -711,7 +676,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         {uniqueSecondaryPipes > 0 && (
                             <div>
                                 <h4 className="mb-1 text-xs font-medium text-purple-200">
-                                    ท่อเมนรอง ({uniqueSecondaryPipes} ชนิด):
+                                    {t('ท่อเมนรอง')} ({uniqueSecondaryPipes} {t('ชนิด')}):
                                 </h4>
                                 <div className="space-y-1">
                                     {Object.values(costs.pipeSummary.secondary).map(
@@ -732,29 +697,28 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                     </p>
                                                     <p className="text-xs text-purple-200">
                                                         {item.zones.join(', ')} |{' '}
-                                                        {item.pipe.price?.toLocaleString()} บาท/ม้วน
-                                                        ({item.pipe.lengthM}ม./ม้วน) | คะแนน:{' '}
+                                                        {item.pipe.price?.toLocaleString()} {t('บาท/ม้วน')}
+                                                        ({item.pipe.lengthM} {t('ม./ม้วน')}) | {t('คะแนน:')} {' '}
                                                         {item.pipe.score || 'N/A'}
                                                     </p>
                                                     <p className="text-xs text-purple-300">
-                                                        รวมความยาว:{' '}
-                                                        {item.totalLength?.toLocaleString()} ม.
+                                                        {t('รวมความยาว:')} {' '}
+                                                        {item.totalLength?.toLocaleString()} {t('ม.')}
                                                     </p>
                                                 </div>
                                                 <div className="text-right text-sm">
                                                     <p className="text-purple-200">
-                                                        {item.quantity} ม้วน
+                                                        {item.quantity} {t('ม้วน')}
                                                     </p>
                                                     <p className="font-bold text-white">
-                                                        {item.totalCost?.toLocaleString()} บาท
+                                                        {item.totalCost?.toLocaleString()} {t('บาท')}
                                                     </p>
                                                     <p className="text-xs text-purple-300">
-                                                        (
                                                         {(
                                                             (item.totalCost / item.totalLength) *
                                                             100
                                                         ).toFixed(1)}{' '}
-                                                        บาท/100ม.)
+                                                        {t('บาท/100ม.')}
                                                     </p>
                                                 </div>
                                             </div>
@@ -767,7 +731,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         {uniqueMainPipes > 0 && (
                             <div>
                                 <h4 className="mb-1 text-xs font-medium text-purple-200">
-                                    ท่อเมนหลัก ({uniqueMainPipes} ชนิด):
+                                    {t('ท่อเมนหลัก')} ({uniqueMainPipes} {t('ชนิด')}):
                                 </h4>
                                 <div className="space-y-1">
                                     {Object.values(costs.pipeSummary.main).map((item, index) => (
@@ -787,29 +751,28 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                 </p>
                                                 <p className="text-xs text-purple-200">
                                                     {item.zones.join(', ')} |{' '}
-                                                    {item.pipe.price?.toLocaleString()} บาท/ม้วน (
-                                                    {item.pipe.lengthM}ม./ม้วน) | คะแนน:{' '}
+                                                    {item.pipe.price?.toLocaleString()} {t('บาท/ม้วน')} (
+                                                    {item.pipe.lengthM} {t('ม./ม้วน')}) | {t('คะแนน:')} {' '}
                                                     {item.pipe.score || 'N/A'}
                                                 </p>
                                                 <p className="text-xs text-purple-300">
-                                                    รวมความยาว: {item.totalLength?.toLocaleString()}{' '}
-                                                    ม.
+                                                    {t('รวมความยาว:')} {item.totalLength?.toLocaleString()}{' '}
+                                                    {t('ม.')}
                                                 </p>
                                             </div>
                                             <div className="text-right text-sm">
                                                 <p className="text-purple-200">
-                                                    {item.quantity} ม้วน
+                                                    {item.quantity} {t('ม้วน')}
                                                 </p>
                                                 <p className="font-bold text-white">
-                                                    {item.totalCost?.toLocaleString()} บาท
+                                                    {item.totalCost?.toLocaleString()} {t('บาท')}
                                                 </p>
                                                 <p className="text-xs text-purple-300">
-                                                    (
                                                     {(
                                                         (item.totalCost / item.totalLength) *
                                                         100
                                                     ).toFixed(1)}{' '}
-                                                    บาท/100ม.)
+                                                    {t('บาท/100ม.')}
                                                 </p>
                                             </div>
                                         </div>
@@ -821,7 +784,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         {(costs as any).extraPipeSummary && (
                             <div className="mt-2 rounded bg-blue-900 p-2">
                                 <h4 className="mb-1 text-xs font-medium text-blue-200">
-                                    ท่อเสริม (Riser/แขนง) - แยกแสดง:
+                                    {t('ท่อเสริม')} ({t('Riser/แขนง')}) - {t('แยกแสดง:')}
                                 </h4>
                                 <div className="flex items-center justify-between text-sm">
                                     <div>
@@ -832,23 +795,23 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                             - {(costs as any).extraPipeSummary.pipe.sizeMM}mm
                                         </p>
                                         <p className="text-xs text-blue-200">
-                                            รวมความยาว:{' '}
+                                            {t('รวมความยาว:')} {' '}
                                             {(
                                                 costs as any
                                             ).extraPipeSummary.totalLength.toLocaleString()}{' '}
-                                            ม. | ใช้ในโซน:{' '}
+                                            {t('ม.')} | {t('ใช้ในโซน:')} {' '}
                                             {(costs as any).extraPipeSummary.zones.join(', ')}
                                         </p>
                                     </div>
                                     <div className="text-right">
                                         <p className="text-blue-200">
-                                            {(costs as any).extraPipeSummary.quantity} ม้วน
+                                            {(costs as any).extraPipeSummary.quantity} {t('ม้วน')}
                                         </p>
                                         <p className="font-bold text-white">
                                             {(
                                                 costs as any
                                             ).extraPipeSummary.totalCost.toLocaleString()}{' '}
-                                            บาท
+                                            {t('บาท')}
                                         </p>
                                     </div>
                                 </div>
@@ -861,10 +824,10 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <div className="rounded bg-gray-600 p-4">
                     <h4 className="font-medium text-green-300">
-                        💧 {projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}ทั้งหมด
+                        💧 {projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')} {t('ทั้งหมด')}
                     </h4>
                     <p className="text-sm">
-                        {uniqueSprinklers} ชนิด | รวม {totalSprinklerHeads?.toLocaleString()} หัว
+                        {uniqueSprinklers} {t('ชนิด')} | {t('รวม')} {totalSprinklerHeads?.toLocaleString()} {t('หัว')}
                     </p>
                     {systemMode === 'หลายโซน' && (
                         <p className="text-xs text-gray-300">
@@ -872,38 +835,40 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             {projectMode === 'garden' && gardenStats
                                 ? gardenStats.zones.length
                                 : projectData?.zones.length || 0}{' '}
-                            โซน)
+                            {t('โซน')}
+                            )
                         </p>
                     )}
                     <p className="text-xl font-bold">
-                        {costs.totalSprinklerCost?.toLocaleString()} บาท
+                        {costs.totalSprinklerCost?.toLocaleString()} {t('บาท')}
                     </p>
                     <p className="text-xs text-green-300">
                         (
                         {totalSprinklerHeads > 0
                             ? (costs.totalSprinklerCost / totalSprinklerHeads).toFixed(0)
                             : 0}{' '}
-                        บาท/หัว)
+                        {t('บาท/หัว')}
+                        )
                     </p>
                 </div>
 
                 {showPump && (
                     <div className="rounded bg-gray-600 p-4">
-                        <h4 className="font-medium text-red-300">⚡ ปั๊มน้ำ</h4>
+                        <h4 className="font-medium text-red-300">⚡ {t('ปั๊มน้ำ')}</h4>
                         <p className="text-sm">
                             {effectivePump
                                 ? effectivePump.name || effectivePump.productCode
-                                : 'ไม่มีข้อมูล'}
+                                    : t('ไม่มีข้อมูล')}
                         </p>
                         <p className="text-sm">
-                            จำนวน: 1 ตัว ({effectivePump?.powerHP || 'N/A'} HP)
+                            {t('จำนวน:')} 1 {t('ตัว')} ({effectivePump?.powerHP || 'N/A'} {t('HP')})
                         </p>
-                        <p className="text-xl font-bold">{costs.pumpCost?.toLocaleString()} บาท</p>
+                        <p className="text-xl font-bold">{costs.pumpCost?.toLocaleString()} {t('บาท')}</p>
                         {effectivePump && (
                             <p className="mt-1 text-xs text-green-300">
                                 {getSelectionStatus(
                                     effectivePump,
-                                    'ปั๊ม',
+                                    t('ปั๊ม'),
                                     effectivePump.id === results.autoSelectedPump?.id
                                 )}
                             </p>
@@ -912,10 +877,10 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 )}
 
                 <div className="rounded bg-gray-600 p-4">
-                    <h4 className="font-medium text-purple-300">🔧 ท่อทั้งหมด</h4>
+                    <h4 className="font-medium text-purple-300">🔧 {t('ท่อทั้งหมด')}</h4>
                     <div className="space-y-1 text-sm">
                         <p>
-                            ท่อย่อย: {costs.totalBranchPipeCost?.toLocaleString()} บาท
+                            {t('ท่อย่อย:')} {costs.totalBranchPipeCost?.toLocaleString()} {t('บาท')}
                             <span className="text-xs text-gray-400">
                                 {' '}
                                 (
@@ -923,12 +888,13 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                     (sum, item) => sum + item.quantity,
                                     0
                                 )}{' '}
-                                ม้วน)
+                                {t('ม้วน')}
+                                )
                             </span>
                         </p>
                         {costs.totalSecondaryPipeCost > 0 && (
                             <p>
-                                ท่อรอง: {costs.totalSecondaryPipeCost?.toLocaleString()} บาท
+                                {t('ท่อรอง:')} {costs.totalSecondaryPipeCost?.toLocaleString()} {t('บาท')}
                                 <span className="text-xs text-gray-400">
                                     {' '}
                                     (
@@ -936,13 +902,14 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                         (sum, item) => sum + item.quantity,
                                         0
                                     )}{' '}
-                                    ม้วน)
+                                    {t('ม้วน')}
+                                    )
                                 </span>
                             </p>
                         )}
                         {costs.totalMainPipeCost > 0 && (
                             <p>
-                                ท่อหลัก: {costs.totalMainPipeCost?.toLocaleString()} บาท
+                                {t('ท่อหลัก:')} {costs.totalMainPipeCost?.toLocaleString()} {t('บาท')}
                                 <span className="text-xs text-gray-400">
                                     {' '}
                                     (
@@ -950,13 +917,14 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                         (sum, item) => sum + item.quantity,
                                         0
                                     )}{' '}
-                                    ม้วน)
+                                    {t('ม้วน')}
+                                    )
                                 </span>
                             </p>
                         )}
                         {(costs as any).extraPipeCost > 0 && (
                             <p>
-                                ท่อเสริม: {(costs as any).extraPipeCost?.toLocaleString()} บาท
+                                {t('ท่อเสริม:')} {(costs as any).extraPipeCost?.toLocaleString()} {t('บาท')}
                                 <span className="text-xs text-gray-400">
                                     {' '}
                                     ({(costs as any).extraPipeSummary?.quantity} ม้วน)
@@ -971,30 +939,30 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             costs.totalMainPipeCost +
                             ((costs as any).extraPipeCost || 0)
                         )?.toLocaleString()}{' '}
-                        บาท
+                        {t('บาท')}
                     </p>
-                    <p className="text-xs text-purple-300">({totalPipeRolls} ม้วนรวม)</p>
+                    <p className="text-xs text-purple-300">({totalPipeRolls} {t('ม้วนรวม')})</p>
                 </div>
 
                 <div className="rounded bg-gradient-to-r from-green-600 to-blue-600 p-4 md:col-span-2 lg:col-span-3">
-                    <h4 className="font-medium text-white">💎 รวมทั้งหมด</h4>
-                    <p className="text-sm text-green-100">ราคาสุทธิ (ไม่รวม VAT)</p>
+                        <h4 className="font-medium text-white">💎 {t('รวมทั้งหมด')}</h4>
+                    <p className="text-sm text-green-100">{t('ราคาสุทธิ')} ({t('ไม่รวม VAT')})</p>
                     <div className="mt-2 grid grid-cols-2 gap-4">
                         <div>
                             <p className="text-2xl font-bold text-white">
-                                {costs.totalCost?.toLocaleString()} บาท
+                                {(Number(costs.totalCost) || 0)?.toLocaleString()} {t('บาท')}
                             </p>
                             <p className="mt-1 text-xs text-green-200">
-                                * รวมอุปกรณ์ที่เลือกอัตโนมัติและปรับแต่ง
+                                * {t('รวมอุปกรณ์ที่เลือกอัตโนมัติและปรับแต่ง')}
                             </p>
                             {!showPump && projectMode === 'garden' && (
                                 <p className="mt-1 text-xs text-yellow-200">
-                                    * ไม่รวมปั๊มน้ำ (ใช้แรงดันประปา)
+                                    * {t('ไม่รวมปั๊มน้ำ')} ({t('ใช้แรงดันประปา')})
                                 </p>
                             )}
                             {(costs as any).extraPipeCost > 0 && (
                                 <p className="mt-1 text-xs text-blue-200">
-                                    * รวมท่อเสริม (Riser/แขนง)
+                                    * {t('รวมท่อเสริม')} ({t('Riser/แขนง')})
                                 </p>
                             )}
                         </div>
@@ -1002,52 +970,52 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             {systemMode === 'หลายโซน' ? (
                                 <div className="text-sm text-green-100">
                                     <p>
-                                        ราคาต่อโซน:{' '}
+                                        {t('ราคาต่อโซน:')} {' '}
                                         {(
                                             costs.totalCost /
                                             (projectMode === 'garden' && gardenStats
                                                 ? gardenStats.zones.length
                                                 : projectData?.zones.length || 1)
                                         )?.toLocaleString()}{' '}
-                                        บาท
+                                        {t('บาท')}
                                     </p>
                                     <p>
-                                        ราคาต่อไร่:{' '}
+                                        {t('ราคาต่อไร่:')} {' '}
                                         {totalArea > 0
                                             ? (costs.totalCost / totalArea)?.toLocaleString()
                                             : 0}{' '}
-                                        บาท
+                                        {t('บาท')}
                                     </p>
                                     <p>
-                                        ราคาต่อ{projectMode === 'garden' ? 'หัวฉีด' : 'ต้น'}:{' '}
+                                        {t('ราคาต่อ')}{projectMode === 'garden' ? t('หัวฉีด') : t('ต้น')}:{' '}
                                         {totalSprinklerHeads > 0
                                             ? (costs.totalCost / totalSprinklerHeads).toFixed(0)
                                             : 0}{' '}
-                                        บาท
+                                        {t('บาท')}
                                     </p>
                                 </div>
                             ) : (
                                 <div className="text-sm text-green-100">
                                     <p>
-                                        ราคาต่อไร่:{' '}
+                                        {t('ราคาต่อไร่:')} {' '}
                                         {totalArea > 0
                                             ? (costs.totalCost / totalArea)?.toLocaleString()
                                             : 0}{' '}
-                                        บาท
+                                        {t('บาท')}
                                     </p>
                                     <p>
-                                        ราคาต่อ{projectMode === 'garden' ? 'หัวฉีด' : 'ต้น'}:{' '}
+                                        {t('ราคาต่อ')}{projectMode === 'garden' ? t('หัวฉีด') : t('ต้น')}:{' '}
                                         {totalSprinklerHeads > 0
                                             ? (costs.totalCost / totalSprinklerHeads).toFixed(0)
                                             : 0}{' '}
-                                        บาท
+                                        {t('บาท')}
                                     </p>
                                     <p>
-                                        ราคาต่อม้วน:{' '}
+                                        {t('ราคาต่อม้วน:')} {' '}
                                         {totalPipeRolls > 0
                                             ? (costs.totalCost / totalPipeRolls).toLocaleString()
                                             : 0}{' '}
-                                        บาท
+                                        {t('บาท')}
                                     </p>
                                 </div>
                             )}
@@ -1062,12 +1030,12 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                     className="rounded bg-gradient-to-r from-blue-500 to-purple-600 px-8 py-3 text-lg font-bold text-white hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     disabled={costs.totalCost === 0}
                 >
-                    📋 ออกใบเสนอราคา
+                    📋 {t('ออกใบเสนอราคา')}
                 </button>
                 {costs.totalCost === 0 && (
                     <p className="mt-2 text-sm text-red-400">
-                        กรุณาเลือก{projectMode === 'garden' ? 'หัวฉีด' : 'สปริงเกอร์'}
-                        เพื่อให้ระบบคำนวณราคา
+                        {t('กรุณาเลือก')}{projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}
+                        {t('เพื่อให้ระบบคำนวณราคา')}
                     </p>
                 )}
             </div>

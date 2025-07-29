@@ -1,6 +1,7 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// green-house-summary.tsx - Updated to integrate with product page
+// green-house-summary.tsx - Updated to integrate with product page and include Navbar
 
 import { Head } from '@inertiajs/react';
 import { useState, useEffect, useRef } from 'react';
@@ -8,6 +9,7 @@ import html2canvas from 'html2canvas';
 import { router } from '@inertiajs/react';
 import { greenhouseCrops, getCropByValue } from '../components/Greenhouse/CropData';
 import { saveGreenhouseData, GreenhousePlanningData, calculateAllGreenhouseStats } from '@/utils/greenHouseData';
+import Navbar from '../../components/Navbar';
 
 interface Point {
     x: number;
@@ -110,8 +112,29 @@ export default function GreenhouseSummary() {
     }, []);
 
     // NEW: Handle navigation to equipment calculator
-    const handleCalculateEquipment = () => {
+    const handleCalculateEquipment = async () => { // ทำให้ฟังก์ชันเป็น async
         if (summaryData) {
+            // --- เพิ่มส่วนการจับภาพ canvas และบันทึกลง localStorage ---
+            if (canvasRef.current) {
+                try {
+                    console.log('Capturing canvas image...');
+                    const canvas = await html2canvas(canvasRef.current, {
+                        backgroundColor: '#000000', // กำหนดพื้นหลังให้เป็นสีเดียวกับ Canvas
+                        useCORS: true,
+                    });
+                    const image = canvas.toDataURL('image/png');
+                    
+                    // บันทึกภาพลงใน localStorage ด้วย key ที่หน้า product.tsx รอรับอยู่
+                    localStorage.setItem('projectMapImage', image); 
+                    
+                    console.log('✅ Image saved to localStorage successfully.');
+                } catch (error) {
+                    console.error('Error capturing canvas image:', error);
+                    alert('เกิดข้อผิดพลาดในการสร้างภาพแผนผัง');
+                }
+            }
+            // --- จบส่วนที่เพิ่มเข้ามา ---
+
             // Convert summary data to GreenhousePlanningData format
             const greenhouseData: GreenhousePlanningData = calculateAllGreenhouseStats({
                 shapes: summaryData.shapes || [],
@@ -132,20 +155,20 @@ export default function GreenhouseSummary() {
             // Navigate to product page with greenhouse mode
             router.visit('/product?mode=greenhouse');
         } else {
-            alert('ไม่พบข้อมูลโรงเรือน กรุณาทำการออกแบบโรงเรือนใหม่');
+            alert('Greenhouse data not found. Please create a new greenhouse design.');
         }
     };
 
     const handleEditProject = () => {
         if (summaryData) {
-            // บันทึกข้อมูลใน localStorage ก่อนย้อนกลับ รวมทั้ง irrigationElements
+            // Save data to localStorage before navigating back, including irrigationElements
             const dataToSave = {
                 ...summaryData,
                 updatedAt: new Date().toISOString(),
             };
             localStorage.setItem('greenhousePlanningData', JSON.stringify(dataToSave));
 
-            // สร้าง URL parameters สำหรับ green-house-map
+            // Create URL parameters for green-house-map
             const queryParams = new URLSearchParams();
             if (summaryData.selectedCrops && summaryData.selectedCrops.length > 0) {
                 queryParams.set('crops', summaryData.selectedCrops.join(','));
@@ -159,23 +182,22 @@ export default function GreenhouseSummary() {
             if (summaryData.irrigationMethod) {
                 queryParams.set('irrigation', summaryData.irrigationMethod);
             }
-            // เพิ่ม flag เพื่อบอกว่าต้องโหลด irrigation elements
+            // Add a flag to indicate that irrigation elements should be loaded
             queryParams.set('loadIrrigation', 'true');
 
-            // นำทางไปยัง green-house-map พร้อมข้อมูล
+            // Navigate to green-house-map with the data
             window.location.href = `/greenhouse-map?${queryParams.toString()}`;
         } else {
-            // หากไม่มีข้อมูล ให้ไปหน้าเลือกพืชใหม่
+            // If no data, navigate to the new crop selection page
             window.location.href = '/greenhouse-crop';
         }
     };
 
     const handleBackNavigation = () => {
-        handleEditProject(); // ใช้ฟังก์ชันเดียวกัน
+        handleEditProject(); // Use the same function
     };
 
     useEffect(() => {
-        console.log('=== useEffect START ===');
         // Get data from URL parameters
         const urlParams = new URLSearchParams(window.location.search);
         const crops = urlParams.get('crops');
@@ -183,11 +205,8 @@ export default function GreenhouseSummary() {
         const shapesParam = urlParams.get('shapes');
         const irrigationParam = urlParams.get('irrigation');
 
-        console.log('URL Parameters:', { crops, method, shapesParam, irrigationParam });
-
         // Try to get complete data from localStorage
         const savedData = localStorage.getItem('greenhousePlanningData');
-        console.log('Raw localStorage data:', savedData);
 
         if (savedData) {
             try {
@@ -217,7 +236,6 @@ export default function GreenhouseSummary() {
 
                 // Fallback to URL parameters
                 if (crops || shapesParam) {
-                    console.log('Falling back to URL parameters');
                     const newData: GreenhouseSummaryData = {
                         selectedCrops: crops ? crops.split(',') : [],
                         planningMethod: (method as 'draw' | 'import') || 'draw',
@@ -226,12 +244,10 @@ export default function GreenhouseSummary() {
                         irrigationElements: [], // Initialize empty array for irrigation elements
                         createdAt: new Date().toISOString(),
                     };
-                    console.log('Created fallback data:', newData);
                     setSummaryData(newData);
                 }
             }
         } else if (crops || shapesParam) {
-            console.log('No localStorage data, creating from URL parameters');
             // Create new data from URL parameters
             const newData: GreenhouseSummaryData = {
                 selectedCrops: crops ? crops.split(',') : [],
@@ -241,12 +257,8 @@ export default function GreenhouseSummary() {
                 irrigationElements: [], // Initialize empty array for irrigation elements
                 createdAt: new Date().toISOString(),
             };
-            console.log('Created new data from URL:', newData);
             setSummaryData(newData);
-        } else {
-            console.log('No data source available');
         }
-        console.log('=== useEffect END ===');
     }, []);
 
     // Helper function to check if a point is inside a polygon (Ray casting algorithm)
@@ -257,11 +269,15 @@ export default function GreenhouseSummary() {
         let j = polygon.length - 1;
 
         for (let i = 0; i < polygon.length; i++) {
-            const xi = polygon[i].x, yi = polygon[i].y;
-            const xj = polygon[j].x, yj = polygon[j].y;
-            
-            if (((yi > point.y) !== (yj > point.y)) && 
-                (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi)) {
+            const xi = polygon[i].x,
+                yi = polygon[i].y;
+            const xj = polygon[j].x,
+                yj = polygon[j].y;
+
+            if (
+                yi > point.y !== yj > point.y &&
+                point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi
+            ) {
                 isInside = !isInside;
             }
             j = i;
@@ -306,12 +322,10 @@ export default function GreenhouseSummary() {
 
     // Helper function to get crop icon based on crop name using CropData
     const getCropIcon = (cropType: string): string => {
-        // หากเป็น "ยังไม่ได้เลือกพืช" ให้ใช้ไอคอนเริ่มต้น
-        if (cropType === 'ยังไม่ได้เลือกพืช') {
+        if (cropType === 'No crop selected') {
             return '🌱';
         }
 
-        // ค้นหาจาก value ก่อน
         let crop = getCropByValue(cropType);
 
         // หากไม่พบ ให้ค้นหาจากชื่อไทย
@@ -336,8 +350,7 @@ export default function GreenhouseSummary() {
             );
         }
 
-        // คืนไอคอนหากพบ หรือไอคอนเริ่มต้นหากไม่พบ
-        return crop ? crop.icon : '🌿';
+        return crop ? crop.icon : '🌱';
     };
 
     // Calculate cumulative pipe lengths for each plot (Enhanced version)
@@ -348,7 +361,6 @@ export default function GreenhouseSummary() {
         console.log('irrigationElements length:', summaryData?.irrigationElements?.length);
 
         if (!summaryData?.shapes || !summaryData?.irrigationElements) {
-            console.log('Missing data - shapes or irrigationElements');
             return [];
         }
 
@@ -402,7 +414,6 @@ export default function GreenhouseSummary() {
             mainPipes.forEach((mainPipe) => {
                 if (mainPipe.points.length < 2) return;
 
-                // Create cumulative distance array for this main pipe
                 const cumulativeDistances = [0];
                 let totalDistance = 0;
 
@@ -468,11 +479,9 @@ export default function GreenhouseSummary() {
                 });
             });
 
-            // Set the main pipe lengths (both max and total should be the same for cumulative calculation)
             plotPipeData.maxMainPipeLength = maxMainDistanceForThisPlot;
             plotPipeData.totalMainPipeLength = maxMainDistanceForThisPlot;
 
-            // Calculate sub pipe lengths in this plot
             let maxSubPipeLength = 0;
             let totalSubLengthInPlot = 0;
 
@@ -508,7 +517,6 @@ export default function GreenhouseSummary() {
                 }
             });
 
-            // Set final values
             plotPipeData.maxSubPipeLength = Math.round(maxSubPipeLength * 100) / 100;
             plotPipeData.maxTotalPipeLength =
                 Math.round((plotPipeData.maxMainPipeLength + maxSubPipeLength) * 100) / 100;
@@ -519,23 +527,11 @@ export default function GreenhouseSummary() {
             plotPipeData.totalMainPipeLength =
                 Math.round(plotPipeData.totalMainPipeLength * 100) / 100;
 
-            // Debug logging
-            console.log(`=== ${plotPipeData.plotName} ===`);
-            console.log(`ความยาวท่อเมนสูงสุด: ${plotPipeData.maxMainPipeLength} ม.`);
-            console.log(`ความยาวท่อเมนทั้งหมด: ${plotPipeData.totalMainPipeLength} ม.`);
-            console.log(`ความยาวท่อย่อยสูงสุด: ${plotPipeData.maxSubPipeLength} ม.`);
-            console.log(`ความยาวท่อย่อยทั้งหมด: ${plotPipeData.totalSubPipeLength} ม.`);
-            console.log(`มีระบบท่อ: ${plotPipeData.hasPipes}`);
-            console.log(`พืชที่ปลูก: ${plotPipeData.cropType}`);
-            console.log('---');
-
             return plotPipeData;
         });
     };
 
     const plotPipeData = calculatePipeInPlots();
-    console.log('=== plotPipeData RESULT ===');
-    console.log('plotPipeData:', plotPipeData);
 
     // Calculate metrics from shapes data
     const calculateMetrics = () => {
@@ -555,11 +551,9 @@ export default function GreenhouseSummary() {
         const walkways = shapes.filter((s) => s.type === 'walkway');
         const waterSources = shapes.filter((s) => s.type === 'water-source');
 
-        // Get unique shape types
         const shapeTypes = new Set(shapes.map((s) => s.type));
         const shapeTypeCount = shapeTypes.size;
 
-        // Calculate polygon area using Shoelace formula (1 grid = 25 pixels = 1 meter)
         const calculatePolygonArea = (points: { x: number; y: number }[]) => {
             if (points.length < 3) return 0;
             let area = 0;
@@ -568,7 +562,6 @@ export default function GreenhouseSummary() {
                 area += points[i].x * points[j].y;
                 area -= points[j].x * points[i].y;
             }
-            // Convert from pixels to square meters (25 pixels = 1 meter, so 625 pixels² = 1 m²)
             return Math.abs(area / 2) / 625;
         };
 
@@ -607,8 +600,6 @@ export default function GreenhouseSummary() {
         console.log('irrigationElements length:', summaryData?.irrigationElements?.length);
 
         if (!summaryData?.irrigationElements || summaryData.irrigationElements.length === 0) {
-            console.log('Summary: No irrigation elements found or empty array');
-            console.log('Reason: irrigationElements =', summaryData?.irrigationElements);
             return {
                 maxMainPipeLength: 0,
                 maxSubPipeLength: 0,
@@ -625,9 +616,7 @@ export default function GreenhouseSummary() {
         }
 
         const elements = summaryData.irrigationElements;
-        console.log('Summary: Calculating metrics for irrigation elements:', elements);
 
-        // Calculate pipe length
         const calculatePipeLength = (points: Point[]) => {
             if (points.length < 2) return 0;
             let totalLength = 0;
@@ -639,11 +628,9 @@ export default function GreenhouseSummary() {
                 );
                 totalLength += segmentLength;
             }
-            // Convert from pixels to meters (25 pixels = 1 meter)
             return totalLength / 25;
         };
 
-        // Calculate for main pipes
         const mainPipes = elements.filter((e) => e.type === 'main-pipe');
         let maxMainPipeLength = 0;
         let totalMainPipeLength = 0;
@@ -653,7 +640,6 @@ export default function GreenhouseSummary() {
             totalMainPipeLength = mainPipeLengths.reduce((sum, length) => sum + length, 0);
         }
 
-        // Calculate for sub pipes
         const subPipes = elements.filter((e) => e.type === 'sub-pipe');
         let maxSubPipeLength = 0;
         let totalSubPipeLength = 0;
@@ -663,7 +649,6 @@ export default function GreenhouseSummary() {
             totalSubPipeLength = subPipeLengths.reduce((sum, length) => sum + length, 0);
         }
 
-        // Calculate combined metrics
         const maxTotalPipeLength = maxMainPipeLength + maxSubPipeLength;
         const totalPipeLength = totalMainPipeLength + totalSubPipeLength;
 
@@ -692,24 +677,19 @@ export default function GreenhouseSummary() {
         color: string,
         scale: number = 1
     ) => {
-        // Try to use image first
         if (componentImages[type]) {
             const img = componentImages[type];
 
-            // Different sizes for different components
             let imgSize, containerSize;
             if (type === 'pump') {
                 imgSize = 18 * scale;
                 containerSize = 24 * scale;
             } else {
-                // valves
                 imgSize = 12 * scale;
                 containerSize = 18 * scale;
             }
 
             ctx.save();
-
-            // Draw circular container background
             ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
             ctx.strokeStyle = '#666666';
             ctx.lineWidth = 1.5 * scale;
@@ -717,16 +697,12 @@ export default function GreenhouseSummary() {
             ctx.arc(point.x, point.y, containerSize / 2, 0, 2 * Math.PI);
             ctx.fill();
             ctx.stroke();
-
-            // Draw the component image
             ctx.drawImage(img, point.x - imgSize / 2, point.y - imgSize / 2, imgSize, imgSize);
             ctx.restore();
             return;
         }
 
-        // Fallback to original drawing if image not loaded
         const size = 8 * scale;
-
         ctx.fillStyle = color;
         ctx.strokeStyle = color;
         ctx.lineWidth = 2 * scale;
@@ -737,8 +713,6 @@ export default function GreenhouseSummary() {
                 ctx.arc(point.x, point.y, size, 0, 2 * Math.PI);
                 ctx.fill();
                 ctx.stroke();
-
-                // Draw pump blades
                 ctx.strokeStyle = '#FFFFFF';
                 ctx.lineWidth = 1.5 * scale;
                 for (let i = 0; i < 4; i++) {
@@ -747,19 +721,15 @@ export default function GreenhouseSummary() {
                     const startY = point.y + Math.sin(angle) * (size * 0.3);
                     const endX = point.x + Math.cos(angle) * (size * 0.7);
                     const endY = point.y + Math.sin(angle) * (size * 0.7);
-
                     ctx.beginPath();
                     ctx.moveTo(startX, startY);
                     ctx.lineTo(endX, endY);
                     ctx.stroke();
                 }
                 break;
-
             case 'solenoid-valve':
                 ctx.fillRect(point.x - size / 2, point.y - size / 2, size, size);
                 ctx.strokeRect(point.x - size / 2, point.y - size / 2, size, size);
-
-                // Draw solenoid lines
                 ctx.strokeStyle = '#FFFFFF';
                 ctx.lineWidth = 1 * scale;
                 for (let i = 0; i < 3; i++) {
@@ -770,14 +740,11 @@ export default function GreenhouseSummary() {
                     ctx.stroke();
                 }
                 break;
-
             case 'ball-valve':
                 ctx.beginPath();
                 ctx.arc(point.x, point.y, size, 0, 2 * Math.PI);
                 ctx.fill();
                 ctx.stroke();
-
-                // Draw valve line
                 ctx.strokeStyle = '#FFFFFF';
                 ctx.lineWidth = 2 * scale;
                 ctx.beginPath();
@@ -785,22 +752,17 @@ export default function GreenhouseSummary() {
                 ctx.lineTo(point.x + size * 0.7, point.y);
                 ctx.stroke();
                 break;
-
             case 'sprinkler':
-                // Draw sprinkler as a small circle with radiating lines
                 ctx.fillStyle = color;
                 ctx.beginPath();
                 ctx.arc(point.x, point.y, size * 0.5, 0, 2 * Math.PI);
                 ctx.fill();
-
-                // Draw radiating lines to show spray pattern
                 ctx.strokeStyle = color;
                 ctx.lineWidth = 1 * scale;
                 for (let i = 0; i < 8; i++) {
                     const angle = (i * Math.PI) / 4;
                     const endX = point.x + Math.cos(angle) * (size * 1.5);
                     const endY = point.y + Math.sin(angle) * (size * 1.5);
-
                     ctx.beginPath();
                     ctx.moveTo(point.x, point.y);
                     ctx.lineTo(endX, endY);
@@ -878,7 +840,6 @@ export default function GreenhouseSummary() {
                 }
             } else if (element.type === 'drip-line') {
                 if (element.points.length >= 2) {
-                    // Draw dashed line for drip line
                     ctx.setLineDash([5 * scale, 3 * scale]);
                     ctx.beginPath();
                     ctx.moveTo(
@@ -896,7 +857,6 @@ export default function GreenhouseSummary() {
                     ctx.stroke();
                     ctx.setLineDash([]);
 
-                    // Draw drip points
                     const scaledElement = {
                         ...element,
                         points: element.points.map((p) => ({
@@ -913,7 +873,6 @@ export default function GreenhouseSummary() {
                         y: element.points[0].y * scale + offsetY,
                     };
 
-                    // Draw sprinkler coverage area (optional, can be removed for cleaner look)
                     if (element.radius) {
                         ctx.strokeStyle = element.color + '40';
                         ctx.setLineDash([3 * scale, 2 * scale]);
@@ -939,13 +898,14 @@ export default function GreenhouseSummary() {
 
     // Simple print function that shows browser print dialog
     const handlePrint = () => {
-        // Simply trigger the browser's print dialog
         window.print();
     };
 
-    // ปิดการใช้งานปุ่มบันทึกข้อมูลชั่วคราว
+    // Temporarily disable the save data button
     const handleSaveData = () => {
-        alert('ฟีเจอร์การบันทึกข้อมูลยังอยู่ระหว่างการพัฒนา กรุณารอการอัพเดทในเวอร์ชันถัดไป');
+        alert(
+            'The save feature is still under development. Please wait for the next version update.'
+        );
     };
 
     // Update canvas when data changes
@@ -957,17 +917,14 @@ export default function GreenhouseSummary() {
                 canvas.width = 600;
                 canvas.height = 400;
 
-                // Clear canvas with black background
                 ctx.fillStyle = '#000000';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                // Calculate bounds of all elements
                 let minX = Infinity,
                     minY = Infinity,
                     maxX = -Infinity,
                     maxY = -Infinity;
 
-                // Find bounds from shapes
                 if (summaryData.shapes && summaryData.shapes.length > 0) {
                     summaryData.shapes.forEach((shape) => {
                         shape.points.forEach((point) => {
@@ -979,7 +936,6 @@ export default function GreenhouseSummary() {
                     });
                 }
 
-                // Find bounds from irrigation elements
                 if (summaryData.irrigationElements && summaryData.irrigationElements.length > 0) {
                     summaryData.irrigationElements.forEach((element) => {
                         element.points.forEach((point) => {
@@ -991,7 +947,6 @@ export default function GreenhouseSummary() {
                     });
                 }
 
-                // If no elements found, use default values
                 if (minX === Infinity) {
                     minX = 0;
                     minY = 0;
@@ -999,49 +954,39 @@ export default function GreenhouseSummary() {
                     maxY = 800;
                 }
 
-                // Add padding
                 const padding = 50;
                 const contentWidth = maxX - minX;
                 const contentHeight = maxY - minY;
 
-                // Calculate scale to fit content in canvas with padding
                 const scaleX = (canvas.width - 2 * padding) / contentWidth;
                 const scaleY = (canvas.height - 2 * padding) / contentHeight;
-                const scale = Math.min(scaleX, scaleY, 1); // Don't scale up beyond original size
+                const scale = Math.min(scaleX, scaleY, 1);
 
-                // Calculate offset to center the content
                 const scaledWidth = contentWidth * scale;
                 const scaledHeight = contentHeight * scale;
                 const offsetX = (canvas.width - scaledWidth) / 2 - minX * scale;
                 const offsetY = (canvas.height - scaledHeight) / 2 - minY * scale;
 
-                // Draw shapes first
                 if (summaryData.shapes && summaryData.shapes.length > 0) {
                     summaryData.shapes.forEach((shape) => {
                         if (shape.points.length < 2) return;
 
-                        // Handle measurement shapes
                         if (shape.type === 'measurement') {
                             if (shape.points.length >= 2) {
                                 const [start, end] = shape.points;
-
                                 ctx.strokeStyle = shape.color;
                                 ctx.lineWidth = 2;
                                 ctx.setLineDash([8, 4]);
-
                                 ctx.beginPath();
                                 ctx.moveTo(start.x * scale + offsetX, start.y * scale + offsetY);
                                 ctx.lineTo(end.x * scale + offsetX, end.y * scale + offsetY);
                                 ctx.stroke();
                                 ctx.setLineDash([]);
-
                                 if (shape.measurement) {
                                     const midX = ((start.x + end.x) / 2) * scale + offsetX;
                                     const midY = ((start.y + end.y) / 2) * scale + offsetY;
-
                                     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
                                     ctx.fillRect(midX - 15, midY - 10, 30, 15);
-
                                     ctx.fillStyle = '#FFFFFF';
                                     ctx.font = 'bold 8px Arial';
                                     ctx.textAlign = 'center';
@@ -1055,13 +1000,11 @@ export default function GreenhouseSummary() {
                             return;
                         }
 
-                        // Handle water sources
                         if (shape.type === 'water-source') {
                             if (shape.points.length === 1) {
                                 const point = shape.points[0];
                                 const scaledX = point.x * scale + offsetX;
                                 const scaledY = point.y * scale + offsetY;
-
                                 ctx.fillStyle = shape.fillColor;
                                 ctx.strokeStyle = shape.color;
                                 ctx.lineWidth = 2;
@@ -1069,7 +1012,6 @@ export default function GreenhouseSummary() {
                                 ctx.arc(scaledX, scaledY, 8 * scale, 0, 2 * Math.PI);
                                 ctx.fill();
                                 ctx.stroke();
-
                                 ctx.fillStyle = '#FFFFFF';
                                 ctx.font = `${10 * scale}px Arial`;
                                 ctx.textAlign = 'center';
@@ -1078,20 +1020,17 @@ export default function GreenhouseSummary() {
                                 ctx.strokeStyle = shape.color;
                                 ctx.fillStyle = shape.fillColor;
                                 ctx.lineWidth = 2;
-
                                 ctx.beginPath();
                                 ctx.moveTo(
                                     shape.points[0].x * scale + offsetX,
                                     shape.points[0].y * scale + offsetY
                                 );
-
                                 for (let i = 1; i < shape.points.length; i++) {
                                     ctx.lineTo(
                                         shape.points[i].x * scale + offsetX,
                                         shape.points[i].y * scale + offsetY
                                     );
                                 }
-
                                 if (shape.points.length > 2) {
                                     ctx.closePath();
                                     ctx.fill();
@@ -1101,24 +1040,20 @@ export default function GreenhouseSummary() {
                             return;
                         }
 
-                        // Regular shapes
                         ctx.strokeStyle = shape.color;
                         ctx.fillStyle = shape.fillColor;
                         ctx.lineWidth = 2;
-
                         ctx.beginPath();
                         ctx.moveTo(
                             shape.points[0].x * scale + offsetX,
                             shape.points[0].y * scale + offsetY
                         );
-
                         for (let i = 1; i < shape.points.length; i++) {
                             ctx.lineTo(
                                 shape.points[i].x * scale + offsetX,
                                 shape.points[i].y * scale + offsetY
                             );
                         }
-
                         if (shape.points.length > 2) {
                             ctx.closePath();
                             ctx.fill();
@@ -1127,7 +1062,6 @@ export default function GreenhouseSummary() {
                     });
                 }
 
-                // Draw irrigation elements on top
                 if (summaryData.irrigationElements && summaryData.irrigationElements.length > 0) {
                     drawIrrigationElements(
                         ctx,
@@ -1141,19 +1075,23 @@ export default function GreenhouseSummary() {
         }
     }, [summaryData, componentImages]);
 
-    // Show loading or no data message
     if (!summaryData) {
         return (
             <div className="min-h-screen bg-gray-900 text-white">
                 <Head title="Greenhouse Summary - Growing System Planning" />
+                
+                {/* Add Navbar at the top - fixed position */}
+                <div className="fixed top-0 left-0 right-0 z-50">
+                    <Navbar />
+                </div>
+                
+                {/* Add padding top to account for fixed navbar */}
+                <div className="pt-16"></div>
 
-                {/* Header */}
                 <div className="border-b border-gray-700 bg-gray-800">
                     <div className="container mx-auto px-4 py-6">
                         <div className="mx-auto max-w-7xl">
-                            {/* Enhanced Header with Equipment Calculator Button */}
-                            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                                {/* Left side: Back button and title */}
+                            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                 <div className="flex-1">
                                     <button
                                         onClick={handleBackNavigation}
@@ -1174,32 +1112,33 @@ export default function GreenhouseSummary() {
                                         </svg>
                                         Back to Greenhouse Map
                                     </button>
-                                    <h1 className="mb-2 text-4xl font-bold">🏠 Greenhouse Summary</h1>
+                                    <h1 className="mb-2 text-4xl font-bold">
+                                        🏠 Greenhouse Summary
+                                    </h1>
                                     <p className="mb-6 text-gray-400">
                                         Complete overview of your greenhouse system planning project
                                     </p>
                                 </div>
 
-                                {/* Right side: Equipment Calculator Button */}
                                 <div className="flex-shrink-0">
                                     <button
                                         onClick={handleCalculateEquipment}
-                                        className="inline-flex items-center rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 text-white font-semibold transition-all duration-200 hover:from-purple-700 hover:to-blue-700 hover:shadow-lg transform hover:scale-105"
+                                        className="inline-flex transform items-center rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 font-semibold text-white transition-all duration-200 hover:scale-105 hover:from-purple-700 hover:to-blue-700 hover:shadow-lg"
                                     >
-                                        <svg 
-                                            className="mr-2 h-5 w-5" 
-                                            fill="none" 
-                                            stroke="currentColor" 
+                                        <svg
+                                            className="mr-2 h-5 w-5"
+                                            fill="none"
+                                            stroke="currentColor"
                                             viewBox="0 0 24 24"
                                         >
-                                            <path 
-                                                strokeLinecap="round" 
-                                                strokeLinejoin="round" 
-                                                strokeWidth={2} 
-                                                d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" 
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
                                             />
                                         </svg>
-                                        🧮 คำนวณอุปกรณ์
+                                        🧮 Calculate Equipment
                                     </button>
                                 </div>
                             </div>
@@ -1207,7 +1146,6 @@ export default function GreenhouseSummary() {
                     </div>
                 </div>
 
-                {/* No Data Message */}
                 <div className="container mx-auto px-4 py-6">
                     <div className="mx-auto max-w-7xl">
                         <div className="rounded-lg bg-gray-800 p-8 text-center">
@@ -1241,7 +1179,7 @@ export default function GreenhouseSummary() {
                                     onClick={() => (window.location.href = '/greenhouse-crop')}
                                     className="inline-flex items-center rounded-lg bg-blue-600 px-6 py-3 text-white transition-colors hover:bg-blue-700"
                                 >
-                                    🏠 เริ่มต้นใหม่
+                                    🏠 Start New Plan
                                 </button>
                             </div>
                         </div>
@@ -1254,14 +1192,19 @@ export default function GreenhouseSummary() {
     return (
         <div className="min-h-screen bg-gray-900 text-white print:bg-white print:text-black">
             <Head title="Greenhouse Summary - Growing System Planning" />
+            
+            {/* Add Navbar at the top - fixed position, hidden in print */}
+            <div className="fixed top-0 left-0 right-0 z-50 print:hidden">
+                <Navbar />
+            </div>
+            
+            {/* Add padding top to account for fixed navbar */}
+            <div className="pt-16 print:pt-0"></div>
 
-            {/* Header */}
             <div className="border-b border-gray-700 bg-gray-800 print:hidden print:border-gray-300 print:bg-white">
                 <div className="container mx-auto px-4 py-4">
                     <div className="mx-auto max-w-7xl">
-                        {/* Enhanced Header with Equipment Calculator Button */}
-                        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                            {/* Left side: Back button and title */}
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                             <div className="flex-1">
                                 <button
                                     onClick={handleBackNavigation}
@@ -1283,32 +1226,33 @@ export default function GreenhouseSummary() {
                                     Back to Greenhouse Map
                                 </button>
 
-                                <h1 className="mb-1 text-3xl font-bold">🏠 สรุปการวางแผนโรงเรือน</h1>
+                                <h1 className="mb-1 text-3xl font-bold">
+                                    🏠 Greenhouse Planning Summary
+                                </h1>
                                 <p className="mb-4 text-gray-400">
-                                    ภาพรวมการออกแบบโรงเรือนและระบบการให้น้ำ
+                                    Overview of the greenhouse and irrigation system design.
                                 </p>
                             </div>
 
-                            {/* Right side: Equipment Calculator Button */}
                             <div className="flex-shrink-0">
                                 <button
                                     onClick={handleCalculateEquipment}
-                                    className="inline-flex items-center rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 text-white font-semibold transition-all duration-200 hover:from-purple-700 hover:to-blue-700 hover:shadow-lg transform hover:scale-105"
+                                    className="inline-flex transform items-center rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 font-semibold text-white transition-all duration-200 hover:scale-105 hover:from-purple-700 hover:to-blue-700 hover:shadow-lg"
                                 >
-                                    <svg 
-                                        className="mr-2 h-5 w-5" 
-                                        fill="none" 
-                                        stroke="currentColor" 
+                                    <svg
+                                        className="mr-2 h-5 w-5"
+                                        fill="none"
+                                        stroke="currentColor"
                                         viewBox="0 0 24 24"
                                     >
-                                        <path 
-                                            strokeLinecap="round" 
-                                            strokeLinejoin="round" 
-                                            strokeWidth={2} 
-                                            d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" 
-                                            />
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                                        />
                                     </svg>
-                                    🧮 คำนวณอุปกรณ์
+                                    🧮 Calculate Equipment
                                 </button>
                             </div>
                         </div>
@@ -1316,27 +1260,24 @@ export default function GreenhouseSummary() {
                 </div>
             </div>
 
-            {/* Print Header - หน้าที่ 1 */}
             <div className="hidden print:mb-6 print:block">
-                <h1 className="text-2xl font-bold text-black">🏠 สรุปการวางแผนโรงเรือน</h1>
-                <p className="text-gray-600">ภาพรวมการออกแบบโรงเรือนและระบบการให้น้ำ</p>
+                <h1 className="text-2xl font-bold text-black">🏠 Greenhouse Planning Summary</h1>
+                <p className="text-gray-600">
+                    Overview of the greenhouse and irrigation system design.
+                </p>
                 <hr className="my-2 border-gray-300" />
                 <p className="text-sm text-gray-500">
-                    วันที่: {new Date().toLocaleDateString('th-TH')}
+                    Date: {new Date().toLocaleDateString('en-US')}
                 </p>
             </div>
 
-            {/* Main Content */}
             <div className="container mx-auto px-4 py-4 print:px-0 print:py-0">
                 <div className="mx-auto max-w-7xl">
-                    {/* Single Column Layout for Print */}
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 print:grid-cols-1 print:gap-4">
-                        {/* Project Overview & Equipment Info - หน้าที่ 1 สำหรับการพิมพ์ */}
                         <div className="print:page-break-after-avoid space-y-4 print:space-y-4">
-                            {/* Project Overview */}
                             <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-4">
                                 <h2 className="mb-3 text-lg font-bold text-green-400 print:text-lg print:text-black">
-                                    🏠 ภาพรวมโครงการ
+                                    🏠 Project Overview
                                 </h2>
                                 <div className="grid grid-cols-3 gap-2 print:grid-cols-3 print:gap-3">
                                     <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
@@ -1344,7 +1285,7 @@ export default function GreenhouseSummary() {
                                             {metrics.shapeTypeCount}
                                         </div>
                                         <div className="text-xs text-gray-400 print:text-sm print:text-gray-600">
-                                            ชนิดพื้นที่
+                                            Area Types
                                         </div>
                                     </div>
                                     <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
@@ -1352,7 +1293,7 @@ export default function GreenhouseSummary() {
                                             {metrics.greenhouseArea.toFixed(1)}
                                         </div>
                                         <div className="text-xs text-gray-400 print:text-sm print:text-gray-600">
-                                            พื้นที่โรงเรือน (ตร.ม.)
+                                            Greenhouse Area (m²)
                                         </div>
                                     </div>
                                     <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
@@ -1360,19 +1301,18 @@ export default function GreenhouseSummary() {
                                             {metrics.plotArea.toFixed(1)}
                                         </div>
                                         <div className="text-xs text-gray-400 print:text-sm print:text-gray-600">
-                                            พื้นที่แปลงปลูก (ตร.ม.)
+                                            Plot Area (m²)
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Additional metrics row */}
                                 <div className="mt-3 grid grid-cols-3 gap-2 print:mt-4 print:grid-cols-3 print:gap-3">
                                     <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                         <div className="text-lg font-bold text-orange-400 print:text-lg print:text-black">
                                             {metrics.plotCount}
                                         </div>
                                         <div className="text-xs text-gray-400 print:text-sm print:text-gray-600">
-                                            จำนวนแปลงปลูก
+                                            Number of Plots
                                         </div>
                                     </div>
                                     <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
@@ -1380,7 +1320,7 @@ export default function GreenhouseSummary() {
                                             {metrics.waterSourceCount}
                                         </div>
                                         <div className="text-xs text-gray-400 print:text-sm print:text-gray-600">
-                                            จำนวนแหล่งน้ำ
+                                            Water Sources
                                         </div>
                                     </div>
                                     <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
@@ -1388,100 +1328,96 @@ export default function GreenhouseSummary() {
                                             {metrics.walkwayArea.toFixed(1)}
                                         </div>
                                         <div className="text-xs text-gray-400 print:text-sm print:text-gray-600">
-                                            พื้นที่ทางเดิน (ตร.ม.)
+                                            Walkway Area (m²)
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Planning Method & Progress */}
                             <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-4">
                                 <h2 className="mb-3 text-lg font-bold text-blue-400 print:text-lg print:text-black">
-                                    📋 วิธีการวางแผน
+                                    📋 Planning Method
                                 </h2>
                                 <div className="space-y-2 print:space-y-3">
                                     <div className="rounded-lg bg-gray-700 p-2 print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-gray-400 print:text-sm print:text-gray-600">
-                                                วิธีการออกแบบ
+                                                Design Method
                                             </span>
                                             <span className="text-sm font-bold text-orange-400 print:text-sm print:text-black">
                                                 {summaryData?.planningMethod === 'draw'
-                                                    ? '✏️ วาดเอง'
-                                                    : '📁 นำเข้าไฟล์'}
+                                                    ? '✏️ Manual Drawing'
+                                                    : '📁 File Import'}
                                             </span>
                                         </div>
                                     </div>
                                     <div className="rounded-lg bg-gray-700 p-2 print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-gray-400 print:text-sm print:text-gray-600">
-                                                ระบบการให้น้ำ
+                                                Irrigation System
                                             </span>
                                             <span className="text-sm font-bold text-cyan-400 print:text-sm print:text-black">
                                                 {summaryData?.irrigationMethod === 'mini-sprinkler'
-                                                    ? '💧 มินิสปริงเกลอร์'
+                                                    ? '💧 Mini-Sprinkler'
                                                     : summaryData?.irrigationMethod === 'drip'
-                                                      ? '💧🌱 น้ำหยด'
-                                                      : '🔄 แบบผสม'}
+                                                      ? '💧🌱 Drip System'
+                                                      : '🔄 Mixed System'}
                                             </span>
                                         </div>
                                     </div>
                                     <div className="rounded-lg bg-gray-700 p-2 print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-gray-400 print:text-sm print:text-gray-600">
-                                                วันที่สร้าง
+                                                Date Created
                                             </span>
                                             <span className="text-sm font-bold text-purple-400 print:text-sm print:text-black">
                                                 {summaryData?.createdAt
                                                     ? new Date(
                                                           summaryData.createdAt
-                                                      ).toLocaleDateString('th-TH')
-                                                    : 'วันนี้'}
+                                                      ).toLocaleDateString('en-US')
+                                                    : 'Today'}
                                             </span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Enhanced Equipment Summary */}
                             <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-4">
                                 <h2 className="mb-3 text-lg font-bold text-purple-400 print:text-lg print:text-black">
-                                    ⚙️ สรุปอุปกรณ์การให้น้ำ
+                                    ⚙️ Irrigation Equipment Summary
                                 </h2>
 
-                                {/* Pipe System - Enhanced with 6 rows */}
                                 <div className="mb-3">
                                     <h3 className="mb-2 text-sm font-semibold text-orange-400 print:text-sm print:text-black">
-                                        🔵 ระบบท่อ
+                                        🔵 Pipe System
                                     </h3>
                                     {/* First row: Max pipe lengths */}
                                     <div className="mb-2 grid grid-cols-3 gap-1 print:gap-2">
                                         <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                             <div className="text-sm font-bold text-blue-400 print:text-sm print:text-black">
-                                                {irrigationMetrics.maxMainPipeLength.toFixed(1)} ม.
+                                                {irrigationMetrics.maxMainPipeLength.toFixed(1)} m
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                ท่อเมนสูงสุด
+                                                Max Main Pipe
                                             </div>
                                         </div>
                                         <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                             <div className="text-sm font-bold text-green-400 print:text-sm print:text-black">
-                                                {irrigationMetrics.maxSubPipeLength.toFixed(1)} ม.
+                                                {irrigationMetrics.maxSubPipeLength.toFixed(1)} m
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                ท่อย่อยสูงสุด
+                                                Max Sub-Pipe
                                             </div>
                                         </div>
                                         <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                             <div className="text-sm font-bold text-purple-400 print:text-sm print:text-black">
-                                                {irrigationMetrics.maxTotalPipeLength.toFixed(1)} ม.
+                                                {irrigationMetrics.maxTotalPipeLength.toFixed(1)} m
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                ความยาวสูงสุดรวม
+                                                Max Total Length
                                             </div>
                                         </div>
                                     </div>
-                                    {/* Second row: Total pipe lengths */}
                                     <div className="grid grid-cols-3 gap-1 print:gap-2">
                                         <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                             <div className="text-sm font-bold text-cyan-400 print:text-sm print:text-black">
@@ -1489,32 +1425,31 @@ export default function GreenhouseSummary() {
                                                 ม.
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                ท่อเมนทั้งหมด
+                                                Total Main Pipe
                                             </div>
                                         </div>
                                         <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                             <div className="text-sm font-bold text-yellow-400 print:text-sm print:text-black">
-                                                {irrigationMetrics.totalSubPipeLength.toFixed(1)} ม.
+                                                {irrigationMetrics.totalSubPipeLength.toFixed(1)} m
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                ท่อย่อยทั้งหมด
+                                                Total Sub-Pipe
                                             </div>
                                         </div>
                                         <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                             <div className="text-sm font-bold text-pink-400 print:text-sm print:text-black">
-                                                {irrigationMetrics.totalPipeLength.toFixed(1)} ม.
+                                                {irrigationMetrics.totalPipeLength.toFixed(1)} m
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                ความยาวรวมทั้งหมด
+                                                Total Length
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Control Equipment */}
                                 <div className="mb-3">
                                     <h3 className="mb-2 text-sm font-semibold text-red-400 print:text-sm print:text-black">
-                                        🔧 อุปกรณ์ควบคุม
+                                        🔧 Control Equipment
                                     </h3>
                                     <div className="grid grid-cols-3 gap-1 print:gap-2">
                                         <div className="rounded bg-gray-700 p-1 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-2">
@@ -1522,7 +1457,7 @@ export default function GreenhouseSummary() {
                                                 {irrigationMetrics.pumps}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                ปั๊ม
+                                                Pumps
                                             </div>
                                         </div>
                                         <div className="rounded bg-gray-700 p-1 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-2">
@@ -1530,7 +1465,7 @@ export default function GreenhouseSummary() {
                                                 {irrigationMetrics.solenoidValves}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                โซลินอยด์วาล์ว
+                                                Solenoid Valves
                                             </div>
                                         </div>
                                         <div className="rounded bg-gray-700 p-1 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-2">
@@ -1538,16 +1473,15 @@ export default function GreenhouseSummary() {
                                                 {irrigationMetrics.ballValves}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                บอลวาล์ว
+                                                Ball Valves
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Irrigation Equipment */}
                                 <div>
                                     <h3 className="mb-2 text-sm font-semibold text-cyan-400 print:text-sm print:text-black">
-                                        💧 อุปกรณ์การให้น้ำ
+                                        💧 Irrigation Emitters
                                     </h3>
                                     <div className="grid grid-cols-2 gap-1 print:gap-2">
                                         <div className="rounded bg-gray-700 p-1 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-2">
@@ -1555,7 +1489,7 @@ export default function GreenhouseSummary() {
                                                 {irrigationMetrics.sprinklers}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                สปริงเกลอร์
+                                                Sprinklers
                                             </div>
                                         </div>
                                         <div className="rounded bg-gray-700 p-1 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-2">
@@ -1563,58 +1497,54 @@ export default function GreenhouseSummary() {
                                                 {irrigationMetrics.dripLines}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                สายน้ำหยด
+                                                Drip Lines
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Action Buttons */}
                             <div className="rounded-lg bg-gray-800 p-4 print:hidden">
                                 <h2 className="mb-3 text-lg font-bold text-purple-400">
-                                    📋 การจัดการ
+                                    📋 Actions
                                 </h2>
                                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                                     <button
                                         onClick={handleBackNavigation}
                                         className="rounded-lg bg-blue-600 px-4 py-2 text-center font-semibold text-white transition-colors hover:bg-blue-700"
                                     >
-                                        🔄 แก้ไขโครงการ
+                                        🔄 Edit Project
                                     </button>
                                     <button
                                         onClick={handleCalculateEquipment}
                                         className="rounded-lg bg-purple-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-purple-700"
                                     >
-                                        🧮 คำนวณอุปกรณ์
+                                        🧮 Calculate Equipment
                                     </button>
                                     <button
                                         onClick={handlePrint}
                                         className="rounded-lg bg-green-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-green-700"
                                     >
-                                        🖨️ พิมพ์แบบแปลน
+                                        🖨️ Print Plan
                                     </button>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Greenhouse Layout Image - หน้าที่ 2 สำหรับการพิมพ์ */}
                         <div className="print:page-break-before-always space-y-4 print:space-y-0">
-                            {/* Print Header สำหรับหน้าที่ 2 */}
                             <div className="hidden print:mb-6 print:block">
                                 <h1 className="text-xl font-bold text-black">
-                                    📐 แบบแปลนโรงเรือนพร้อมระบบการให้น้ำ
+                                    📐 Greenhouse Plan with Irrigation System
                                 </h1>
                                 <p className="text-gray-600">
-                                    รายละเอียดโครงสร้างโรงเรือนและการติดตั้งอุปกรณ์
+                                    Details of greenhouse structure and equipment installation.
                                 </p>
                                 <hr className="my-2 border-gray-300" />
                             </div>
 
-                            {/* Greenhouse Layout - หลัก */}
                             <div className="rounded-lg bg-gray-800 p-4 print:border-0 print:bg-white print:p-0">
                                 <h2 className="mb-3 text-lg font-bold text-green-400 print:hidden">
-                                    🏠 แบบแปลนโรงเรือน (พร้อมระบบน้ำ)
+                                    🏠 Greenhouse Layout (with Irrigation)
                                 </h2>
                                 <div className="overflow-hidden rounded-lg bg-white print:h-96">
                                     <canvas
@@ -1624,28 +1554,28 @@ export default function GreenhouseSummary() {
                                     />
                                 </div>
                                 <div className="mt-2 text-center text-xs text-gray-400 print:hidden">
-                                    แบบแปลนโรงเรือนพร้อมระบบการให้น้ำและอุปกรณ์ทั้งหมด (อยู่ตรงกลาง)
+                                    Greenhouse layout with all irrigation systems and equipment
+                                    (centered).
                                 </div>
                             </div>
 
-                            {/* Print Notes สำหรับหน้าที่ 2 */}
                             <div className="hidden print:mt-8 print:block">
                                 <div className="border border-gray-300 bg-gray-50 p-4">
                                     <h3 className="mb-3 text-sm font-bold text-black">
-                                        📝 หมายเหตุการใช้งาน
+                                        📝 Usage Notes
                                     </h3>
                                     <div className="space-y-1 text-xs text-gray-700">
                                         <p>
-                                            •
-                                            แบบแปลนนี้แสดงตำแหน่งของโครงสร้างโรงเรือนและระบบการให้น้ำทั้งหมด
+                                            • This plan shows the positions of all greenhouse
+                                            structures and irrigation systems.
                                         </p>
                                         <p>
-                                            • สีน้ำเงิน: ท่อเมนและท่อย่อย | สีเขียว: พื้นที่แปลงปลูก
-                                            | สีน้ำตาล: โครงสร้างโรงเรือน
+                                            • Blue: Main and sub-pipes | Green: Plot areas | Brown:
+                                            Greenhouse structure.
                                         </p>
                                         <p>
-                                            • สัญลักษณ์ต่างๆ แสดงตำแหน่งอุปกรณ์การให้น้ำ เช่น ปั๊ม
-                                            วาล์ว สปริงเกลอร์
+                                            • Symbols indicate the positions of irrigation equipment
+                                            such as pumps, valves, and sprinklers.
                                         </p>
                                         <p>• ขนาดและตำแหน่งอาจต้องปรับตามสภาพพื้นที่จริง</p>
                                         <p>
@@ -1656,11 +1586,10 @@ export default function GreenhouseSummary() {
                                 </div>
                             </div>
 
-                            {/* Growing Information - สำหรับหน้าที่ 2 ในการพิมพ์ */}
                             <div className="hidden print:mt-6 print:block">
                                 <div className="border border-gray-300 bg-white p-4">
                                     <h3 className="mb-3 text-sm font-bold text-black">
-                                        🌱 ข้อมูลการปลูก
+                                        🌱 Crop Information
                                     </h3>
                                     <div className="space-y-3">
                                         {plotPipeData.length > 0 ? (
@@ -1675,7 +1604,7 @@ export default function GreenhouseSummary() {
                                                             {plot.plotName}
                                                         </span>
                                                         <span className="text-xs text-gray-500">
-                                                            สภาพแวดล้อมควบคุม
+                                                            Controlled Environment
                                                         </span>
                                                     </div>
                                                     <p className="mb-2 text-xs text-gray-600">
@@ -1693,7 +1622,7 @@ export default function GreenhouseSummary() {
                                                                         ม.
                                                                     </div>
                                                                     <div className="text-xs text-gray-600">
-                                                                        ท่อเมนสูงสุด
+                                                                        Max Main Pipe
                                                                     </div>
                                                                 </div>
                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
@@ -1704,7 +1633,7 @@ export default function GreenhouseSummary() {
                                                                         ม.
                                                                     </div>
                                                                     <div className="text-xs text-gray-600">
-                                                                        ท่อย่อยสูงสุด
+                                                                        Max Sub-Pipe
                                                                     </div>
                                                                 </div>
                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
@@ -1715,7 +1644,7 @@ export default function GreenhouseSummary() {
                                                                         ม.
                                                                     </div>
                                                                     <div className="text-xs text-gray-600">
-                                                                        รวมสูงสุด
+                                                                        Max Total
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -1728,7 +1657,7 @@ export default function GreenhouseSummary() {
                                                                         ม.
                                                                     </div>
                                                                     <div className="text-xs text-gray-600">
-                                                                        ท่อเมนทั้งหมด
+                                                                        Total Main Pipe
                                                                     </div>
                                                                 </div>
                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
@@ -1739,7 +1668,7 @@ export default function GreenhouseSummary() {
                                                                         ม.
                                                                     </div>
                                                                     <div className="text-xs text-gray-600">
-                                                                        ท่อย่อยทั้งหมด
+                                                                        Total Sub-Pipe
                                                                     </div>
                                                                 </div>
                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
@@ -1750,7 +1679,7 @@ export default function GreenhouseSummary() {
                                                                         ม.
                                                                     </div>
                                                                     <div className="text-xs text-gray-600">
-                                                                        รวมทั้งหมด
+                                                                        Total
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -1758,7 +1687,7 @@ export default function GreenhouseSummary() {
                                                     ) : (
                                                         <div className="border border-gray-200 bg-gray-50 p-2 text-center">
                                                             <span className="text-xs text-gray-600">
-                                                                ไม่มีระบบท่อในแปลงนี้
+                                                                No pipe system in this plot.
                                                             </span>
                                                         </div>
                                                     )}
@@ -1775,12 +1704,12 @@ export default function GreenhouseSummary() {
                                                             {getCropIcon(crop)} {crop}
                                                         </span>
                                                         <span className="text-xs text-gray-500">
-                                                            สภาพแวดล้อมควบคุม
+                                                            Controlled Environment
                                                         </span>
                                                     </div>
                                                 )) || (
                                                     <p className="text-sm text-gray-500">
-                                                        ยังไม่ได้เลือกพืช
+                                                        No crops selected.
                                                     </p>
                                                 )}
                                             </>
@@ -1789,10 +1718,9 @@ export default function GreenhouseSummary() {
                                 </div>
                             </div>
 
-                            {/* Growing Information - แสดงในหน้าจอปกติ */}
                             <div className="rounded-lg bg-gray-800 p-4 print:hidden">
                                 <h2 className="mb-3 text-lg font-bold text-yellow-400">
-                                    🌱 ข้อมูลการปลูก
+                                    🌱 Crop Information
                                 </h2>
                                 <div className="space-y-3">
                                     {plotPipeData.length > 0 ? (
@@ -1808,13 +1736,13 @@ export default function GreenhouseSummary() {
                                                                 {plot.plotName}
                                                             </h3>
                                                             <p className="text-xs text-gray-400">
-                                                                พืชที่ปลูก: {plot.cropType}
+                                                                Crop: {plot.cropType}
                                                             </p>
                                                         </div>
                                                     </div>
                                                     <div className="text-right">
                                                         <div className="text-xs text-gray-400">
-                                                            สภาพแวดล้อมควบคุม
+                                                            Controlled Environment
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1830,7 +1758,7 @@ export default function GreenhouseSummary() {
                                                                     ม.
                                                                 </div>
                                                                 <div className="text-xs text-gray-400">
-                                                                    ท่อเมนสูงสุด
+                                                                    Max Main Pipe
                                                                 </div>
                                                             </div>
                                                             <div className="rounded bg-gray-600 p-2 text-center">
@@ -1841,7 +1769,7 @@ export default function GreenhouseSummary() {
                                                                     ม.
                                                                 </div>
                                                                 <div className="text-xs text-gray-400">
-                                                                    ท่อย่อยสูงสุด
+                                                                    Max Sub-Pipe
                                                                 </div>
                                                             </div>
                                                             <div className="rounded bg-gray-600 p-2 text-center">
@@ -1852,7 +1780,7 @@ export default function GreenhouseSummary() {
                                                                     ม.
                                                                 </div>
                                                                 <div className="text-xs text-gray-400">
-                                                                    รวมสูงสุด
+                                                                    Max Total
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -1865,7 +1793,7 @@ export default function GreenhouseSummary() {
                                                                     ม.
                                                                 </div>
                                                                 <div className="text-xs text-gray-400">
-                                                                    ท่อเมนทั้งหมด
+                                                                    Total Main Pipe
                                                                 </div>
                                                             </div>
                                                             <div className="rounded bg-gray-600 p-2 text-center">
@@ -1876,7 +1804,7 @@ export default function GreenhouseSummary() {
                                                                     ม.
                                                                 </div>
                                                                 <div className="text-xs text-gray-400">
-                                                                    ท่อย่อยทั้งหมด
+                                                                    Total Sub-Pipe
                                                                 </div>
                                                             </div>
                                                             <div className="rounded bg-gray-600 p-2 text-center">
@@ -1887,7 +1815,7 @@ export default function GreenhouseSummary() {
                                                                     ม.
                                                                 </div>
                                                                 <div className="text-xs text-gray-400">
-                                                                    รวมทั้งหมด
+                                                                    Total
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -1895,7 +1823,7 @@ export default function GreenhouseSummary() {
                                                 ) : (
                                                     <div className="mt-2 rounded bg-gray-600 p-2 text-center">
                                                         <span className="text-xs text-gray-400">
-                                                            ไม่มีระบบท่อในแปลงนี้
+                                                            No pipe system in this plot.
                                                         </span>
                                                     </div>
                                                 )}
@@ -1921,7 +1849,7 @@ export default function GreenhouseSummary() {
                                                         </div>
                                                         <div className="text-right">
                                                             <div className="text-xs text-gray-400">
-                                                                สภาพแวดล้อมควบคุม
+                                                                Controlled Environment
                                                             </div>
                                                         </div>
                                                     </div>
@@ -1929,7 +1857,7 @@ export default function GreenhouseSummary() {
                                             )) || (
                                                 <div className="rounded-lg bg-gray-700 p-2 text-center">
                                                     <span className="text-sm text-gray-400">
-                                                        ยังไม่ได้เลือกพืช
+                                                        No crops selected.
                                                     </span>
                                                 </div>
                                             )}
@@ -1938,10 +1866,10 @@ export default function GreenhouseSummary() {
                                 </div>
                             </div>
 
-                            {/* Footer สำหรับหน้าที่ 2 */}
                             <div className="hidden print:mt-8 print:block print:text-center">
                                 <p className="text-xs text-gray-500">
-                                    เอกสารนี้สร้างโดยระบบวางแผนโรงเรือนอัตโนมัติ - หน้า 2/2
+                                    This document was generated by the automated greenhouse planning
+                                    system - Page 2/2
                                 </p>
                             </div>
                         </div>
@@ -1949,10 +1877,10 @@ export default function GreenhouseSummary() {
                 </div>
             </div>
 
-            {/* Footer สำหรับหน้าที่ 1 */}
             <div className="print:page-break-after-avoid hidden print:mt-8 print:block print:text-center">
                 <p className="text-xs text-gray-500">
-                    เอกสารนี้สร้างโดยระบบวางแผนโรงเรือนอัตโนมัติ - หน้า 1/2
+                    This document was generated by the automated greenhouse planning system - Page
+                    1/2
                 </p>
             </div>
         </div>

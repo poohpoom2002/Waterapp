@@ -1,4 +1,8 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import Navbar from '../../components/Navbar';
 
 interface GreenhousePlannerProps {
     crops?: string;
@@ -36,110 +40,110 @@ interface Tool {
 const tools: Tool[] = [
     {
         id: 'select',
-        name: 'เลือก',
+        name: 'Select',
         icon: '↖️',
         cursor: 'default',
-        description: 'เลือกและแก้ไขออบเจ็ค',
+        description: 'Select and edit objects',
         instructions: [
-            'คลิกเพื่อเลือกออบเจ็ค',
-            'ลากเพื่อขยับออบเจ็ค (ห้ามกด Ctrl)',
-            'กด Ctrl+คลิก เพื่อเลื่อนมุมมอง',
-            'คลิกพื้นที่ว่างเพื่อเลื่อนมุมมอง',
-            'กด Delete เพื่อลบออบเจ็คที่เลือก',
-            'กด Escape เพื่อยกเลิกการเลือก',
-            'แสดงข้อมูลการวัดเมื่อเลือกออบเจ็ค',
+            'Click to select objects',
+            'Drag to move objects (without holding Ctrl)',
+            'Press Ctrl+Click to pan view',
+            'Click empty space to pan view',
+            'Press Delete to delete selected object',
+            'Press Escape to cancel selection',
+            'Show measurement data when selecting objects',
         ],
     },
     {
         id: 'greenhouse',
-        name: 'โรงเรือน',
+        name: 'Greenhouse',
         icon: '🏠',
         cursor: 'crosshair',
-        description: 'วาดโครงสร้างโรงเรือน',
+        description: 'Draw greenhouse structure',
         instructions: [
-            'คลิกเพื่อเริ่มวาดโครงสร้างโรงเรือน',
-            'คลิกต่อเนื่องเพื่อสร้างมุมต่างๆ',
-            'คลิกที่จุดแรก (เขียว) เพื่อปิดรูปร่าง',
-            'กด Enter เพื่อจบการวาด',
-            'โรงเรือนจะแสดงเป็นพื้นที่สีเขียว',
-            '🟢 สีเขียว: ระยะต่อเส้น',
-            '🟡 สีเหลือง: ระยะรวม',
+            'Click to start drawing greenhouse structure',
+            'Click continuously to create corners',
+            'Click on the first point (green) to close the shape',
+            'Press Enter to finish drawing',
+            'Greenhouse will appear as green area',
+            '🟢 Green: Edge distance',
+            '🟡 Yellow: Total distance',
         ],
     },
     {
         id: 'plot',
-        name: 'แปลงปลูก',
+        name: 'Growing Plot',
         icon: '🌱',
         cursor: 'crosshair',
-        description: 'วาดแปลงปลูกพืช',
+        description: 'Draw crop growing plots',
         instructions: [
-            'คลิกเพื่อเริ่มวาดแปลงปลูกพืช',
-            'คลิกต่อเนื่องเพื่อกำหนดรูปทรงแปลง',
-            'คลิกที่จุดแรก (เขียว) เพื่อปิดรูปร่าง',
-            'กด Enter เพื่อจบการวาด',
-            'แปลงจะแสดงเป็นพื้นที่สีเหลือง',
-            '🟢 สีเขียว: ระยะต่อเส้น',
-            '🟡 สีเหลือง: ระยะรวม',
+            'Click to start drawing growing plot',
+            'Click continuously to define plot shape',
+            'Click on the first point (green) to close the shape',
+            'Press Enter to finish drawing',
+            'Plot will appear as yellow area',
+            '🟢 Green: Edge distance',
+            '🟡 Yellow: Total distance',
         ],
     },
     {
         id: 'walkway',
-        name: 'ทางเดิน',
+        name: 'Walkway',
         icon: '🚶',
         cursor: 'crosshair',
-        description: 'วาดทางเดินในโรงเรือน',
+        description: 'Draw walkways in greenhouse',
         instructions: [
-            'คลิกเพื่อเริ่มวาดทางเดิน',
-            'คลิกต่อเนื่องเพื่อสร้างเส้นทางเดิน',
-            'คลิกที่จุดแรก (เขียว) เพื่อปิดรูปร่าง',
-            'กด Enter เพื่อจบการวาด',
-            'ทางเดินจะแสดงเป็นพื้นที่สีเทา',
-            '🟢 สีเขียว: ระยะต่อเส้น',
-            '🟡 สีเหลือง: ระยะรวม',
+            'Click to start drawing walkway',
+            'Click continuously to create walkway path',
+            'Click on the first point (green) to close the shape',
+            'Press Enter to finish drawing',
+            'Walkway will appear as gray area',
+            '🟢 Green: Edge distance',
+            '🟡 Yellow: Total distance',
         ],
     },
     {
         id: 'water',
-        name: 'แหล่งน้ำ',
+        name: 'Water Source',
         icon: '💧',
         cursor: 'crosshair',
-        description: 'กำหนดตำแหน่งแหล่งน้ำ',
+        description: 'Define water source location',
         instructions: [
-            'คลิกจุดเดียวสำหรับแหล่งน้ำแบบจุด',
-            'หรือคลิกหลายจุดสำหรับแหล่งน้ำขนาดใหญ่',
-            'คลิกที่จุดแรก (เขียว) เพื่อปิดรูปร่าง',
-            'กด Enter เพื่อจบการวาด',
-            'แหล่งน้ำจะแสดงเป็นสีน้ำเงินพร้อมไอคอน 💧',
-            '🟢 สีเขียว: ระยะต่อเส้น',
-            '🟡 สีเหลือง: ระยะรวม',
+            'Click once for point water source',
+            'Or click multiple points for large water source',
+            'Click on the first point (green) to close the shape',
+            'Press Enter to finish drawing',
+            'Water source will appear in blue with 💧 icon',
+            '🟢 Green: Edge distance',
+            '🟡 Yellow: Total distance',
         ],
     },
     {
         id: 'measure',
-        name: 'วัดระยะ',
+        name: 'Measure',
         icon: '📏',
         cursor: 'crosshair',
-        description: 'วัดระยะทางระหว่างจุด (1 grid = 1 เมตร)',
+        description: 'Measure distance between points (1 grid = 1 meter)',
         instructions: [
-            'คลิกจุดแรกเพื่อเริ่มวัด',
-            'คลิกจุดที่สองเพื่อวัดระยะ',
-            'ระยะทางจะแสดงเป็นเมตรอัตโนมัติ',
-            '1 ช่อง grid = 1 เมตร',
-            'กด Escape เพื่อยกเลิกการวัด',
+            'Click first point to start measuring',
+            'Click second point to measure distance',
+            'Distance will be shown in meters automatically',
+            '1 grid square = 1 meter',
+            'Press Escape to cancel measurement',
         ],
     },
 ];
 
 const generalInstructions = [
-    { icon: '🖱️', text: 'ซูม: ล้อเมาส์ (เมื่อเมาส์อยู่บน Canvas)' },
-    { icon: '✋', text: 'แพน: ลากด้วยเมาส์ในโหมดเลือก หรือ Ctrl+ลาก' },
-    { icon: '🔄', text: 'รีเซ็ตมุมมอง: กด Spacebar' },
-    { icon: '⚡', text: 'จบการวาดทันที: ดับเบิลคลิก' },
-    { icon: '🚫', text: 'ยกเลิก: กด Escape' },
-    { icon: '↶', text: 'ย้อนกลับ: Ctrl+Z' },
-    { icon: '↷', text: 'ทำซ้ำ: Ctrl+Y หรือ Ctrl+Shift+Z' },
-    { icon: '🟢', text: 'สีเขียว: ระยะต่อเส้น (แต่ละด้าน)' },
-    { icon: '🟡', text: 'สีเหลือง: ระยะรวม (ทั้งหมด)' },
+    { icon: '🖱️', text: 'Zoom: Mouse wheel (when mouse is over Canvas)' },
+    { icon: '✋', text: 'Pan: Drag with mouse in select mode or Ctrl+drag' },
+    { icon: '🔄', text: 'Reset view: Press Spacebar' },
+    { icon: '⚡', text: 'Finish drawing immediately: Double-click' },
+    { icon: '🚫', text: 'Cancel: Press Escape' },
+    { icon: '↶', text: 'Undo: Ctrl+Z' },
+    { icon: '↷', text: 'Redo: Ctrl+Y or Ctrl+Shift+Z' },
+    { icon: '🟢', text: 'Green: Edge distance (per side)' },
+    { icon: '🟡', text: 'Yellow: Total distance (overall)' },
 ];
 
 const GRID_SIZE = 25;
@@ -268,7 +272,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 console.error('Error parsing shapes:', error);
             }
         }
-    }, [crops]);
+    }, [addToHistory, crops]);
 
     // Initialize history with empty shapes
     useEffect(() => {
@@ -448,8 +452,8 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 ctx.fillStyle = '#000000';
                 ctx.font = 'bold 11px Inter, sans-serif';
                 ctx.textAlign = 'center';
-                ctx.fillText(`รอบรูป: ${perimeter.toFixed(1)}m`, infoX + 80, infoY + 18);
-                ctx.fillText(`พื้นที่: ${area.toFixed(1)}m²`, infoX + 80, infoY + 35);
+                ctx.fillText(`Perimeter: ${perimeter.toFixed(1)}m`, infoX + 80, infoY + 18);
+                ctx.fillText(`Area: ${area.toFixed(1)}m²`, infoX + 80, infoY + 35);
             }
         },
         [calculateDistance, calculatePerimeter, calculatePolygonArea]
@@ -685,7 +689,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 }
             }
 
-            // Draw measurement for current edge (to mouse) - สีเขียว = ระยะต่อเส้น
+            // Draw measurement for current edge (to mouse) - Green = edge distance
             if (mousePos && currentPath.length > 0) {
                 const lastPoint = currentPath[currentPath.length - 1];
                 const distance = calculateDistance(lastPoint, mousePos);
@@ -700,10 +704,10 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 const textX = midX + textOffsetX;
                 const textY = midY + textOffsetY;
 
-                // Background for text - สีเขียวสำหรับระยะต่อเส้น
-                ctx.fillStyle = 'rgba(16, 185, 129, 0.95)'; // สีเขียวเด่น
+                // Background for text - Green for edge distance
+                ctx.fillStyle = 'rgba(16, 185, 129, 0.95)'; // Bright green
                 const text = `${distance.toFixed(1)}m`;
-                ctx.font = 'bold 14px Inter, sans-serif'; // ตัวอักษรใหญ่ขึ้น
+                ctx.font = 'bold 14px Inter, sans-serif'; // Larger font
                 const textWidth = ctx.measureText(text).width;
                 ctx.fillRect(textX - textWidth / 2 - 6, textY - 16, textWidth + 12, 22);
 
@@ -718,27 +722,27 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 ctx.fillText(text, textX, textY - 2);
             }
 
-            // แสดงระยะทางแบบ live ข้างเมาส์
+            // Show live distance next to mouse
             if (mousePos && currentPath.length > 0 && isDrawing) {
-                // คำนวณระยะรวมทั้งหมด
+                // Calculate total distance
                 let totalDistance = 0;
 
-                // ระยะของเส้นที่วาดแล้ว
+                // Distance of drawn lines
                 for (let i = 0; i < currentPath.length - 1; i++) {
                     totalDistance += calculateDistance(currentPath[i], currentPath[i + 1]);
                 }
 
-                // ระยะจากจุดสุดท้ายถึงเมาส์ปัจจุบัน
+                // Distance from last point to current mouse position
                 const lastPoint = currentPath[currentPath.length - 1];
                 totalDistance += calculateDistance(lastPoint, mousePos);
 
-                // แสดงระยะรวมข้างเมาส์ (สีเหลือง = ระยะรวม)
+                // Show total distance next to mouse (Yellow = total distance)
                 const mouseTextX = mousePos.x + 20;
                 const mouseTextY = mousePos.y - 10;
 
                 // Background
-                ctx.fillStyle = 'rgba(255, 193, 7, 0.95)'; // สีเหลือง
-                const mouseText = `รวม ${totalDistance.toFixed(1)}m`;
+                ctx.fillStyle = 'rgba(255, 193, 7, 0.95)'; // Yellow
+                const mouseText = `Total ${totalDistance.toFixed(1)}m`;
                 ctx.font = 'bold 13px Inter, sans-serif';
                 const mouseTextWidth = ctx.measureText(mouseText).width;
                 ctx.fillRect(mouseTextX - 4, mouseTextY - 15, mouseTextWidth + 8, 20);
@@ -762,7 +766,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 const perimeter = calculatePerimeter(tempPoints);
                 const area = calculatePolygonArea(tempPoints);
 
-                // Draw info box - ทำให้เด่นขึ้น
+                // Draw info box - make it more prominent
                 const infoX = 15;
                 const infoY = 15;
 
@@ -777,8 +781,8 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 ctx.fillStyle = '#FFFFFF';
                 ctx.font = 'bold 13px Inter, sans-serif';
                 ctx.textAlign = 'left';
-                ctx.fillText(`เส้นรอบรูป: ${perimeter.toFixed(1)}m`, infoX + 10, infoY + 25);
-                ctx.fillText(`พื้นที่: ${area.toFixed(1)}m²`, infoX + 10, infoY + 50);
+                ctx.fillText(`Perimeter: ${perimeter.toFixed(1)}m`, infoX + 10, infoY + 25);
+                ctx.fillText(`Area: ${area.toFixed(1)}m²`, infoX + 10, infoY + 50);
             }
         },
         [
@@ -1011,7 +1015,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
     const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
         const point = getMousePos(e);
 
-        // Handle panning with middle mouse or Ctrl+click (ตรวจสอบก่อนทุกอย่าง)
+        // Handle panning with middle mouse or Ctrl+click (check first before everything)
         if (e.button === 1 || (e.button === 0 && e.ctrlKey)) {
             e.preventDefault();
             setIsPanning(true);
@@ -1024,7 +1028,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
             const clickedShape = findShapeAtPoint(point);
 
             if (clickedShape && !e.ctrlKey) {
-                // Select and start dragging (เฉพาะเมื่อไม่กด Ctrl)
+                // Select and start dragging (only when not holding Ctrl)
                 setSelectedShape(clickedShape.id);
                 setIsDragging(true);
 
@@ -1045,7 +1049,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 setIsPanning(true);
                 setLastPanPoint(getRawMousePos(e));
             } else {
-                // คลิกที่องค์ประกอบขณะกด Ctrl - เฉพาะเลือกองค์ประกอบ ไม่ลาก
+                // Click on element while holding Ctrl - only select element, don't drag
                 setSelectedShape(clickedShape.id);
             }
             return;
@@ -1261,10 +1265,10 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
         }
 
         const shapeTypes = {
-            greenhouse: { color: '#10B981', fillColor: '#10B98120', name: '🏠 โรงเรือน' },
-            plot: { color: '#F59E0B', fillColor: '#F59E0B20', name: '🌱 แปลงปลูก' },
-            walkway: { color: '#6B7280', fillColor: '#6B728020', name: '🚶 ทางเดิน' },
-            water: { color: '#3B82F6', fillColor: '#3B82F640', name: '💧 แหล่งน้ำ' },
+            greenhouse: { color: '#10B981', fillColor: '#10B98120', name: '🏠 Greenhouse' },
+            plot: { color: '#F59E0B', fillColor: '#F59E0B20', name: '🌱 Growing Plot' },
+            walkway: { color: '#6B7280', fillColor: '#6B728020', name: '🚶 Walkway' },
+            water: { color: '#3B82F6', fillColor: '#3B82F640', name: '💧 Water Source' },
         };
 
         const config = shapeTypes[selectedTool as keyof typeof shapeTypes];
@@ -1377,18 +1381,18 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
         const plots = shapes.filter((s) => s.type === 'plot');
 
         if (greenhouses.length === 0) {
-            alert('กรุณาวาดโครงสร้างโรงเรือนอย่างน้อย 1 อัน');
+            alert('Please draw at least 1 greenhouse structure');
             return;
         }
 
         if (plots.length === 0) {
-            alert('กรุณาวาดแปลงปลูกอย่างน้อย 1 แปลง');
+            alert('Please draw at least 1 growing plot');
             return;
         }
 
         const queryParams = new URLSearchParams({
             crops: selectedCrops.join(','),
-            shapes: encodeURIComponent(JSON.stringify(shapes)), // ⭐ สำคัญ: ส่งข้อมูล shapes
+            shapes: encodeURIComponent(JSON.stringify(shapes)), // ⭐ Important: Send shapes data
             method: method || 'draw',
         });
 
@@ -1397,7 +1401,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
     };
 
     const handleBack = () => {
-        // บันทึกข้อมูลปัจจุบัน
+        // Save current data
         const currentData = {
             crops: selectedCrops.join(','),
             shapes: shapes,
@@ -1406,7 +1410,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
         };
         localStorage.setItem('plannerData', JSON.stringify(currentData));
 
-        // กลับไปหน้า area-input (planner) พร้อมข้อมูลพืช
+        // Go back to area-input (planner) page with crop data
         const queryParams = new URLSearchParams();
         if (selectedCrops.length > 0) {
             queryParams.set('crops', selectedCrops.join(','));
@@ -1416,584 +1420,592 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
     };
 
     return (
-        <div className="flex h-screen flex-col overflow-hidden bg-gray-900 text-white">
-            {/* Header */}
-            <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-3">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                        <div>
-                            <h1 className="text-xl font-bold">
-                                ออกแบบพื้นที่โรงเรือน พร้อมระบบวัดระยะ
-                            </h1>
-                            <p className="text-sm text-gray-400">
-                                วาดโครงสร้างโรงเรือนและแปลงปลูกของคุณ - พื้นที่ 2400x1600 pixels (1
-                                grid = 1 เมตร)
-                                <span className="ml-2 text-blue-300">
-                                    แสดงการวัดระยะแบบ Real-time
-                                </span>
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center space-x-2 text-sm text-gray-400">
-                        <span className="text-green-400">เลือกพืช</span>
-                        <span>→</span>
-                        <span className="text-green-400">วิธีการวางแผน</span>
-                        <span>→</span>
-                        <span className="font-medium text-blue-400">ออกแบบพื้นที่</span>
-                        <span>→</span>
-                        <span>ระบบน้ำ</span>
-                    </div>
-                </div>
+        <div className="h-screen bg-gray-900 text-white overflow-hidden">
+            {/* Fixed Navbar */}
+            <div className="fixed top-0 left-0 right-0 z-50">
+                <Navbar />
             </div>
 
-            {/* Main Content */}
-            <div className="flex flex-1 overflow-hidden">
-                {/* Toolbar */}
-                <div className="flex w-64 flex-col border-r border-gray-700 bg-gray-800">
-                    <div className="flex-1 overflow-y-auto p-4">
-                        {/* Selected Crops */}
-                        <div className="mb-4">
-                            <h3 className="mb-2 text-sm font-medium text-gray-300">พืชที่เลือก</h3>
-                            <div className="flex flex-wrap gap-1">
-                                {selectedCrops.map((crop, index) => (
-                                    <span
-                                        key={index}
-                                        className="rounded bg-green-600 px-2 py-1 text-xs text-white"
-                                    >
-                                        {crop}
+            {/* Main Content with top padding to account for fixed navbar */}
+            <div className="pt-16 h-full flex flex-col">
+                {/* Header */}
+                <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-3">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                            <div>
+                                <h1 className="text-xl font-bold">
+                                    Greenhouse Area Design with Distance Measurement
+                                </h1>
+                                <p className="text-sm text-gray-400">
+                                    Draw your greenhouse structure and growing plots - Area 2400x1600 pixels (1
+                                    grid = 1 meter)
+                                    <span className="ml-2 text-blue-300">
+                                        Real-time distance measurement display
                                     </span>
-                                ))}
+                                </p>
                             </div>
                         </div>
 
-                        {/* Tools */}
-                        <div className="mb-4">
-                            <h3 className="mb-3 text-sm font-medium text-gray-300">เครื่องมือ</h3>
-                            <div className="space-y-1">
-                                {tools.map((tool) => (
-                                    <div key={tool.id} className="relative">
-                                        <button
-                                            onClick={() => setSelectedTool(tool.id)}
-                                            onMouseEnter={() => setHoveredTool(tool.id)}
-                                            onMouseLeave={() => setHoveredTool(null)}
-                                            className={`w-full rounded p-3 text-left transition-colors ${
-                                                selectedTool === tool.id
-                                                    ? 'bg-blue-600 text-white'
-                                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                            }`}
-                                            title={tool.description}
+                        <div className="flex items-center space-x-2 text-sm text-gray-400">
+                            <span className="text-green-400">✓ Select Crops</span>
+                            <span>→</span>
+                            <span className="text-green-400">✓ Planning Method</span>
+                            <span>→</span>
+                            <span className="font-medium text-blue-400">Design Area</span>
+                            <span>→</span>
+                            <span>Irrigation System</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Main Content */}
+                <div className="flex flex-1 overflow-hidden">
+                    {/* Toolbar */}
+                    <div className="flex w-64 flex-col border-r border-gray-700 bg-gray-800">
+                        <div className="flex-1 overflow-y-auto p-4">
+                            {/* Selected Crops */}
+                            <div className="mb-4">
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">Selected Crops</h3>
+                                <div className="flex flex-wrap gap-1">
+                                    {selectedCrops.map((crop, index) => (
+                                        <span
+                                            key={index}
+                                            className="rounded bg-green-600 px-2 py-1 text-xs text-white"
                                         >
-                                            <div className="flex items-center space-x-2">
-                                                <span className="text-lg">{tool.icon}</span>
-                                                <span className="text-sm">{tool.name}</span>
-                                            </div>
-                                        </button>
+                                            {crop}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
 
-                                        {/* Tooltip */}
-                                        {hoveredTool === tool.id && (
-                                            <div className="absolute left-full top-0 z-50 ml-2 w-64 rounded-lg border border-gray-600 bg-gray-800 p-3 shadow-xl">
-                                                <h4 className="mb-2 text-sm font-medium text-blue-300">
-                                                    {tool.name}
-                                                </h4>
-                                                <div className="space-y-1 text-xs text-gray-300">
-                                                    {tool.instructions.map((instruction, index) => (
-                                                        <p key={index}>• {instruction}</p>
-                                                    ))}
+                            {/* Tools */}
+                            <div className="mb-4">
+                                <h3 className="mb-3 text-sm font-medium text-gray-300">Tools</h3>
+                                <div className="space-y-1">
+                                    {tools.map((tool) => (
+                                        <div key={tool.id} className="relative">
+                                            <button
+                                                onClick={() => setSelectedTool(tool.id)}
+                                                onMouseEnter={() => setHoveredTool(tool.id)}
+                                                onMouseLeave={() => setHoveredTool(null)}
+                                                className={`w-full rounded p-3 text-left transition-colors ${
+                                                    selectedTool === tool.id
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                }`}
+                                                title={tool.description}
+                                            >
+                                                <div className="flex items-center space-x-2">
+                                                    <span className="text-lg">{tool.icon}</span>
+                                                    <span className="text-sm">{tool.name}</span>
                                                 </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
+                                            </button>
+
+                                            {/* Tooltip */}
+                                            {hoveredTool === tool.id && (
+                                                <div className="absolute left-full top-0 z-50 ml-2 w-64 rounded-lg border border-gray-600 bg-gray-800 p-3 shadow-xl">
+                                                    <h4 className="mb-2 text-sm font-medium text-blue-300">
+                                                        {tool.name}
+                                                    </h4>
+                                                    <div className="space-y-1 text-xs text-gray-300">
+                                                        {tool.instructions.map((instruction, index) => (
+                                                            <p key={index}>• {instruction}</p>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
 
-                        {/* Quick Instructions */}
-                        <div className="mb-4">
-                            <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                คำแนะนำทั่วไป
-                            </h3>
-                            <div className="space-y-1">
-                                {generalInstructions.map((instruction, index) => (
-                                    <div
-                                        key={index}
-                                        className="flex cursor-help items-center space-x-2 text-xs text-gray-400 transition-colors hover:text-gray-200"
-                                        onMouseEnter={() => setHoveredInstruction(instruction.text)}
-                                        onMouseLeave={() => setHoveredInstruction(null)}
-                                    >
-                                        <span>{instruction.icon}</span>
-                                        <span className="truncate">{instruction.text}</span>
-                                    </div>
-                                ))}
+                            {/* Quick Instructions */}
+                            <div className="mb-4">
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">
+                                    General Instructions
+                                </h3>
+                                <div className="space-y-1">
+                                    {generalInstructions.map((instruction, index) => (
+                                        <div
+                                            key={index}
+                                            className="flex cursor-help items-center space-x-2 text-xs text-gray-400 transition-colors hover:text-gray-200"
+                                            onMouseEnter={() => setHoveredInstruction(instruction.text)}
+                                            onMouseLeave={() => setHoveredInstruction(null)}
+                                        >
+                                            <span>{instruction.icon}</span>
+                                            <span className="truncate">{instruction.text}</span>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
 
-                        {/* View Controls */}
-                        <div className="mb-4 space-y-2">
-                            <h3 className="text-sm font-medium text-gray-300">ตัวเลือกมุมมอง</h3>
-                            <div className="flex flex-col space-y-2">
-                                <button
-                                    onClick={() => setShowGrid(!showGrid)}
-                                    className={`rounded px-3 py-2 text-xs transition-colors ${
-                                        showGrid
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                    }`}
-                                >
-                                    แสดงกริด (1 ช่อง = 1m)
-                                </button>
-                                <button
-                                    onClick={() => setShowCoordinates(!showCoordinates)}
-                                    className={`rounded px-3 py-2 text-xs transition-colors ${
-                                        showCoordinates
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                    }`}
-                                >
-                                    แสดงพิกัด
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setZoom(1);
-                                        setPan({ x: 0, y: 0 });
-                                    }}
-                                    className="rounded bg-gray-700 px-3 py-2 text-xs text-gray-300 transition-colors hover:bg-gray-600"
-                                >
-                                    🔄 รีเซ็ตมุมมอง
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Canvas Info */}
-                        <div className="mb-4">
-                            <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                ข้อมูล Canvas
-                            </h3>
-                            <div className="space-y-1 text-xs text-gray-400">
-                                <p>
-                                    ขนาด: {CANVAS_SIZE.width} × {CANVAS_SIZE.height} px
-                                </p>
-                                <p>Grid: {GRID_SIZE} px = 1 เมตร</p>
-                                <p>Zoom: {(zoom * 100).toFixed(0)}%</p>
-                                <p>
-                                    Pan: ({pan.x.toFixed(0)}, {pan.y.toFixed(0)})
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Canvas Area */}
-                <div className="relative flex-1 overflow-hidden">
-                    <canvas
-                        ref={canvasRef}
-                        width={CANVAS_SIZE.width}
-                        height={CANVAS_SIZE.height}
-                        onMouseDown={handleMouseDown}
-                        onMouseUp={handleMouseUp}
-                        onMouseMove={handleMouseMove}
-                        onMouseEnter={handleMouseEnter}
-                        onMouseLeave={handleMouseLeave}
-                        onWheel={handleWheel}
-                        onDoubleClick={finishDrawing}
-                        onContextMenu={(e) => e.preventDefault()}
-                        className="block select-none bg-gray-900"
-                        style={{
-                            width: '100%',
-                            height: '100%',
-                            cursor: isDragging
-                                ? 'grabbing'
-                                : isPanning
-                                  ? 'grabbing'
-                                  : selectedTool === 'select' && hoveredShape
-                                    ? 'grab'
-                                    : selectedTool === 'select'
-                                      ? 'default'
-                                      : 'crosshair',
-                        }}
-                    />
-
-                    {/* Coordinates Display - ล่างซ้าย */}
-                    {showCoordinates && (
-                        <div className="absolute bottom-4 left-4 rounded bg-black/50 px-3 py-1 text-sm text-white">
-                            X: {mousePos.x.toFixed(0)}, Y: {mousePos.y.toFixed(0)} | Zoom:{' '}
-                            {(zoom * 100).toFixed(0)}%
-                        </div>
-                    )}
-
-                    {/* Undo/Redo Controls - บนซ้าย */}
-                    <div className="absolute left-4 top-4 flex space-x-2">
-                        <button
-                            onClick={undo}
-                            disabled={historyIndex <= 0}
-                            className={`rounded px-3 py-2 text-sm shadow-lg transition-colors ${
-                                historyIndex <= 0
-                                    ? 'cursor-not-allowed bg-gray-800 text-gray-500'
-                                    : 'bg-gray-700 text-white hover:bg-gray-600'
-                            }`}
-                            title="ย้อนกลับ (Ctrl+Z)"
-                        >
-                            ↶ Undo
-                        </button>
-                        <button
-                            onClick={redo}
-                            disabled={historyIndex >= history.length - 1}
-                            className={`rounded px-3 py-2 text-sm shadow-lg transition-colors ${
-                                historyIndex >= history.length - 1
-                                    ? 'cursor-not-allowed bg-gray-800 text-gray-500'
-                                    : 'bg-gray-700 text-white hover:bg-gray-600'
-                            }`}
-                            title="ทำซ้ำ (Ctrl+Y)"
-                        >
-                            ↷ Redo
-                        </button>
-                    </div>
-
-                    {/* Status Messages */}
-                    {isDrawing && (
-                        <div className="absolute left-4 top-20 rounded bg-blue-600 px-3 py-1 text-sm text-white">
-                            กำลังวาด... 🟢 ระยะต่อเส้น 🟡 ระยะรวม (Enter=จบ, Escape=ยกเลิก)
-                        </div>
-                    )}
-
-                    {measuringMode && !measureEnd && (
-                        <div className="absolute left-4 top-20 rounded bg-red-600 px-3 py-1 text-sm text-white">
-                            คลิกจุดที่สองเพื่อวัดระยะ (1 grid = 1m, Escape เพื่อยกเลิก)
-                        </div>
-                    )}
-
-                    {isDragging && (
-                        <div className="absolute left-4 top-20 rounded bg-yellow-600 px-3 py-1 text-sm text-white">
-                            🤏 กำลังขยับออบเจ็ค... (ไม่กด Ctrl)
-                        </div>
-                    )}
-
-                    {isPanning && (
-                        <div className="absolute left-4 top-20 rounded bg-purple-600 px-3 py-1 text-sm text-white">
-                            🤏 กำลังเลื่อนมุมมอง... (Ctrl+Drag หรือ คลิกพื้นที่ว่าง)
-                        </div>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="absolute right-4 top-4 flex space-x-2">
-                        {selectedShape && selectedTool === 'select' && (
-                            <button
-                                onClick={deleteShape}
-                                className="rounded bg-orange-600 px-4 py-2 text-sm text-white shadow-lg transition-colors hover:bg-orange-700"
-                            >
-                                ❌ ลบออบเจ็คที่เลือก
-                            </button>
-                        )}
-
-                        <button
-                            onClick={clearAll}
-                            className="rounded bg-red-600 px-4 py-2 text-sm text-white shadow-lg transition-colors hover:bg-red-700"
-                        >
-                            🗑️ ล้างทั้งหมด
-                        </button>
-                    </div>
-                </div>
-
-                {/* Properties Panel */}
-                <div className="flex w-64 flex-col border-l border-gray-700 bg-gray-800">
-                    <div className="flex-1 overflow-y-auto p-4">
-                        <h3 className="mb-3 text-sm font-medium text-gray-300">รายการออบเจ็ค</h3>
-
-                        {shapes.length === 0 ? (
-                            <p className="text-sm text-gray-500">ยังไม่มีออบเจ็ค</p>
-                        ) : (
+                            {/* View Controls */}
                             <div className="mb-4 space-y-2">
-                                {shapes.map((shape) => (
-                                    <div
-                                        key={shape.id}
-                                        onClick={() => setSelectedShape(shape.id)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Delete' && selectedShape === shape.id) {
-                                                e.preventDefault();
-                                                deleteShape();
-                                            }
-                                        }}
-                                        tabIndex={0}
-                                        className={`cursor-pointer rounded p-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                            selectedShape === shape.id
-                                                ? 'bg-yellow-600 text-white'
+                                <h3 className="text-sm font-medium text-gray-300">View Options</h3>
+                                <div className="flex flex-col space-y-2">
+                                    <button
+                                        onClick={() => setShowGrid(!showGrid)}
+                                        className={`rounded px-3 py-2 text-xs transition-colors ${
+                                            showGrid
+                                                ? 'bg-blue-600 text-white'
                                                 : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                         }`}
                                     >
-                                        <div className="flex items-center justify-between">
-                                            <span className="truncate">{shape.name}</span>
-                                            <div className="flex items-center space-x-2">
-                                                <span className="ml-2 text-xs text-gray-400">
-                                                    {shape.points.length} จุด
-                                                </span>
-                                                {selectedShape === shape.id && (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            deleteShape();
-                                                        }}
-                                                        className="text-red-400 transition-colors hover:text-red-300"
-                                                        title="ลบออบเจ็ค (Delete)"
-                                                    >
-                                                        🗑️
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
+                                        Show Grid (1 square = 1m)
+                                    </button>
+                                    <button
+                                        onClick={() => setShowCoordinates(!showCoordinates)}
+                                        className={`rounded px-3 py-2 text-xs transition-colors ${
+                                            showCoordinates
+                                                ? 'bg-blue-600 text-white'
+                                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                        }`}
+                                    >
+                                        Show Coordinates
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setZoom(1);
+                                            setPan({ x: 0, y: 0 });
+                                        }}
+                                        className="rounded bg-gray-700 px-3 py-2 text-xs text-gray-300 transition-colors hover:bg-gray-600"
+                                    >
+                                        🔄 Reset View
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Canvas Info */}
+                            <div className="mb-4">
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">
+                                    Canvas Info
+                                </h3>
+                                <div className="space-y-1 text-xs text-gray-400">
+                                    <p>
+                                        Size: {CANVAS_SIZE.width} × {CANVAS_SIZE.height} px
+                                    </p>
+                                    <p>Grid: {GRID_SIZE} px = 1 meter</p>
+                                    <p>Zoom: {(zoom * 100).toFixed(0)}%</p>
+                                    <p>
+                                        Pan: ({pan.x.toFixed(0)}, {pan.y.toFixed(0)})
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Canvas Area */}
+                    <div className="relative flex-1 overflow-hidden">
+                        <canvas
+                            ref={canvasRef}
+                            width={CANVAS_SIZE.width}
+                            height={CANVAS_SIZE.height}
+                            onMouseDown={handleMouseDown}
+                            onMouseUp={handleMouseUp}
+                            onMouseMove={handleMouseMove}
+                            onMouseEnter={handleMouseEnter}
+                            onMouseLeave={handleMouseLeave}
+                            onWheel={handleWheel}
+                            onDoubleClick={finishDrawing}
+                            onContextMenu={(e) => e.preventDefault()}
+                            className="block select-none bg-gray-900"
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                cursor: isDragging
+                                    ? 'grabbing'
+                                    : isPanning
+                                      ? 'grabbing'
+                                      : selectedTool === 'select' && hoveredShape
+                                        ? 'grab'
+                                        : selectedTool === 'select'
+                                          ? 'default'
+                                          : 'crosshair',
+                            }}
+                        />
+
+                        {/* Coordinates Display - bottom left */}
+                        {showCoordinates && (
+                            <div className="absolute bottom-4 left-4 rounded bg-black/50 px-3 py-1 text-sm text-white">
+                                X: {mousePos.x.toFixed(0)}, Y: {mousePos.y.toFixed(0)} | Zoom:{' '}
+                                {(zoom * 100).toFixed(0)}%
                             </div>
                         )}
 
-                        {/* Selected Shape Info */}
-                        {selectedShape && (
-                            <div className="mb-4 border-t border-gray-700 pt-4">
-                                <div className="mb-2 flex items-center justify-between">
-                                    <h4 className="text-sm font-medium text-yellow-300">
-                                        ออบเจ็คที่เลือก
-                                    </h4>
-                                    <button
-                                        onClick={deleteShape}
-                                        className="rounded bg-red-900/30 px-2 py-1 text-xs text-red-400 transition-colors hover:bg-red-900/50 hover:text-red-300"
-                                        title="ลบออบเจ็ค (Delete)"
-                                    >
-                                        🗑️ ลบ
-                                    </button>
+                        {/* Undo/Redo Controls - top left */}
+                        <div className="absolute left-4 top-4 flex space-x-2">
+                            <button
+                                onClick={undo}
+                                disabled={historyIndex <= 0}
+                                className={`rounded px-3 py-2 text-sm shadow-lg transition-colors ${
+                                    historyIndex <= 0
+                                        ? 'cursor-not-allowed bg-gray-800 text-gray-500'
+                                        : 'bg-gray-700 text-white hover:bg-gray-600'
+                                }`}
+                                title="Undo (Ctrl+Z)"
+                            >
+                                ↶ Undo
+                            </button>
+                            <button
+                                onClick={redo}
+                                disabled={historyIndex >= history.length - 1}
+                                className={`rounded px-3 py-2 text-sm shadow-lg transition-colors ${
+                                    historyIndex >= history.length - 1
+                                        ? 'cursor-not-allowed bg-gray-800 text-gray-500'
+                                        : 'bg-gray-700 text-white hover:bg-gray-600'
+                                }`}
+                                title="Redo (Ctrl+Y)"
+                            >
+                                ↷ Redo
+                            </button>
+                        </div>
+
+                        {/* Status Messages */}
+                        {isDrawing && (
+                            <div className="absolute left-4 top-20 rounded bg-blue-600 px-3 py-1 text-sm text-white">
+                                Drawing... 🟢 Edge distance 🟡 Total distance (Enter=finish, Escape=cancel)
+                            </div>
+                        )}
+
+                        {measuringMode && !measureEnd && (
+                            <div className="absolute left-4 top-20 rounded bg-red-600 px-3 py-1 text-sm text-white">
+                                Click second point to measure distance (1 grid = 1m, Escape to cancel)
+                            </div>
+                        )}
+
+                        {isDragging && (
+                            <div className="absolute left-4 top-20 rounded bg-yellow-600 px-3 py-1 text-sm text-white">
+                                🤏 Moving object... (not holding Ctrl)
+                            </div>
+                        )}
+
+                        {isPanning && (
+                            <div className="absolute left-4 top-20 rounded bg-purple-600 px-3 py-1 text-sm text-white">
+                                🤏 Panning view... (Ctrl+Drag or click empty space)
+                            </div>
+                        )}
+
+                        {/* Action Buttons */}
+                        <div className="absolute right-4 top-4 flex space-x-2">
+                            {selectedShape && selectedTool === 'select' && (
+                                <button
+                                    onClick={deleteShape}
+                                    className="rounded bg-orange-600 px-4 py-2 text-sm text-white shadow-lg transition-colors hover:bg-orange-700"
+                                >
+                                    ❌ Delete Selected Object
+                                </button>
+                            )}
+
+                            <button
+                                onClick={clearAll}
+                                className="rounded bg-red-600 px-4 py-2 text-sm text-white shadow-lg transition-colors hover:bg-red-700"
+                            >
+                                🗑️ Clear All
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Properties Panel */}
+                    <div className="flex w-64 flex-col border-l border-gray-700 bg-gray-800">
+                        <div className="flex-1 overflow-y-auto p-4">
+                            <h3 className="mb-3 text-sm font-medium text-gray-300">Object List</h3>
+
+                            {shapes.length === 0 ? (
+                                <p className="text-sm text-gray-500">No objects yet</p>
+                            ) : (
+                                <div className="mb-4 space-y-2">
+                                    {shapes.map((shape) => (
+                                        <div
+                                            key={shape.id}
+                                            onClick={() => setSelectedShape(shape.id)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Delete' && selectedShape === shape.id) {
+                                                    e.preventDefault();
+                                                    deleteShape();
+                                                }
+                                            }}
+                                            tabIndex={0}
+                                            className={`cursor-pointer rounded p-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                                selectedShape === shape.id
+                                                    ? 'bg-yellow-600 text-white'
+                                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <span className="truncate">{shape.name}</span>
+                                                <div className="flex items-center space-x-2">
+                                                    <span className="ml-2 text-xs text-gray-400">
+                                                        {shape.points.length} points
+                                                    </span>
+                                                    {selectedShape === shape.id && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                deleteShape();
+                                                            }}
+                                                            className="text-red-400 transition-colors hover:text-red-300"
+                                                            title="Delete object (Delete)"
+                                                        >
+                                                            🗑️
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
-                                {(() => {
-                                    const shape = shapes.find((s) => s.id === selectedShape);
-                                    if (!shape) return null;
-                                    return (
-                                        <div className="space-y-1 text-xs text-gray-300">
-                                            <p>
-                                                <strong>ชื่อ:</strong> {shape.name}
-                                            </p>
-                                            <p>
-                                                <strong>ประเภท:</strong> {shape.type}
-                                            </p>
-                                            <p>
-                                                <strong>จำนวนจุด:</strong> {shape.points.length}
-                                            </p>
-                                            {shape.type !== 'measurement' &&
-                                                shape.points.length >= 2 && (
-                                                    <>
-                                                        {shape.points.length >= 3 && (
-                                                            <>
+                            )}
+
+                            {/* Selected Shape Info */}
+                            {selectedShape && (
+                                <div className="mb-4 border-t border-gray-700 pt-4">
+                                    <div className="mb-2 flex items-center justify-between">
+                                        <h4 className="text-sm font-medium text-yellow-300">
+                                            Selected Object
+                                        </h4>
+                                        <button
+                                            onClick={deleteShape}
+                                            className="rounded bg-red-900/30 px-2 py-1 text-xs text-red-400 transition-colors hover:bg-red-900/50 hover:text-red-300"
+                                            title="Delete object (Delete)"
+                                        >
+                                            🗑️ Delete
+                                        </button>
+                                    </div>
+                                    {(() => {
+                                        const shape = shapes.find((s) => s.id === selectedShape);
+                                        if (!shape) return null;
+                                        return (
+                                            <div className="space-y-1 text-xs text-gray-300">
+                                                <p>
+                                                    <strong>Name:</strong> {shape.name}
+                                                </p>
+                                                <p>
+                                                    <strong>Type:</strong> {shape.type}
+                                                </p>
+                                                <p>
+                                                    <strong>Points:</strong> {shape.points.length}
+                                                </p>
+                                                {shape.type !== 'measurement' &&
+                                                    shape.points.length >= 2 && (
+                                                        <>
+                                                            {shape.points.length >= 3 && (
+                                                                <>
+                                                                    <p>
+                                                                        <strong>Perimeter:</strong>{' '}
+                                                                        {calculatePerimeter(
+                                                                            shape.points
+                                                                        ).toFixed(1)}
+                                                                        m
+                                                                    </p>
+                                                                    <p>
+                                                                        <strong>Area:</strong>{' '}
+                                                                        {calculatePolygonArea(
+                                                                            shape.points
+                                                                        ).toFixed(1)}
+                                                                        m²
+                                                                    </p>
+                                                                </>
+                                                            )}
+                                                            {shape.points.length === 2 && (
                                                                 <p>
-                                                                    <strong>เส้นรอบรูป:</strong>{' '}
-                                                                    {calculatePerimeter(
-                                                                        shape.points
+                                                                    <strong>Distance:</strong>{' '}
+                                                                    {calculateDistance(
+                                                                        shape.points[0],
+                                                                        shape.points[1]
                                                                     ).toFixed(1)}
                                                                     m
                                                                 </p>
+                                                            )}
+                                                            <div className="mt-2 space-y-1">
                                                                 <p>
-                                                                    <strong>พื้นที่:</strong>{' '}
-                                                                    {calculatePolygonArea(
-                                                                        shape.points
-                                                                    ).toFixed(1)}
-                                                                    m²
+                                                                    <strong>Each side length:</strong>
                                                                 </p>
-                                                            </>
-                                                        )}
-                                                        {shape.points.length === 2 && (
-                                                            <p>
-                                                                <strong>ระยะทาง:</strong>{' '}
-                                                                {calculateDistance(
-                                                                    shape.points[0],
-                                                                    shape.points[1]
-                                                                ).toFixed(1)}
-                                                                m
-                                                            </p>
-                                                        )}
-                                                        <div className="mt-2 space-y-1">
-                                                            <p>
-                                                                <strong>ขนาดแต่ละด้าน:</strong>
-                                                            </p>
-                                                            {shape.points.map((point, i) => {
-                                                                if (
-                                                                    i === shape.points.length - 1 &&
-                                                                    shape.points.length < 3
-                                                                )
-                                                                    return null;
-                                                                const nextPoint =
-                                                                    shape.points[
-                                                                        (i + 1) %
-                                                                            shape.points.length
-                                                                    ];
-                                                                const distance = calculateDistance(
-                                                                    point,
-                                                                    nextPoint
-                                                                );
-                                                                return (
-                                                                    <p
-                                                                        key={i}
-                                                                        className="ml-2 text-xs text-gray-400"
-                                                                    >
-                                                                        ด้านที่ {i + 1}:{' '}
-                                                                        {distance.toFixed(1)}m
-                                                                    </p>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    </>
-                                                )}
-                                            <div className="mt-2 text-xs text-yellow-300">
-                                                <p>• ลากเพื่อขยับ (ไม่กด Ctrl)</p>
-                                                <p>• Ctrl+คลิก เพื่อเลื่อนมุมมอง</p>
-                                                <p>• กด Delete เพื่อลบ</p>
+                                                                {shape.points.map((point, i) => {
+                                                                    if (
+                                                                        i === shape.points.length - 1 &&
+                                                                        shape.points.length < 3
+                                                                    )
+                                                                        return null;
+                                                                    const nextPoint =
+                                                                        shape.points[
+                                                                            (i + 1) %
+                                                                                shape.points.length
+                                                                        ];
+                                                                    const distance = calculateDistance(
+                                                                        point,
+                                                                        nextPoint
+                                                                    );
+                                                                    return (
+                                                                        <p
+                                                                            key={i}
+                                                                            className="ml-2 text-xs text-gray-400"
+                                                                        >
+                                                                            Side {i + 1}:{' '}
+                                                                            {distance.toFixed(1)}m
+                                                                        </p>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                <div className="mt-2 text-xs text-yellow-300">
+                                                    <p>• Drag to move (without holding Ctrl)</p>
+                                                    <p>• Ctrl+click to pan view</p>
+                                                    <p>• Press Delete to remove</p>
+                                                </div>
                                             </div>
-                                        </div>
-                                    );
-                                })()}
-                            </div>
-                        )}
+                                        );
+                                    })()}
+                                </div>
+                            )}
 
-                        {/* Statistics */}
-                        <div className="border-t border-gray-700 pt-4">
-                            <h4 className="mb-2 text-sm font-medium text-gray-300">สถิติ</h4>
-                            <div className="space-y-2">
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-400">โรงเรือน:</span>
-                                    <span>
-                                        {shapes.filter((s) => s.type === 'greenhouse').length}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-400">แปลงปลูก:</span>
-                                    <span>{shapes.filter((s) => s.type === 'plot').length}</span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-400">ทางเดิน:</span>
-                                    <span>{shapes.filter((s) => s.type === 'walkway').length}</span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-400">แหล่งน้ำ:</span>
-                                    <span>
-                                        {shapes.filter((s) => s.type === 'water-source').length}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-400">การวัด:</span>
-                                    <span>
-                                        {shapes.filter((s) => s.type === 'measurement').length}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-400">รวม:</span>
-                                    <span className="font-bold">{shapes.length}</span>
-                                </div>
+                            {/* Statistics */}
+                            <div className="border-t border-gray-700 pt-4">
+                                <h4 className="mb-2 text-sm font-medium text-gray-300">Statistics</h4>
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-400">Greenhouses:</span>
+                                        <span>
+                                            {shapes.filter((s) => s.type === 'greenhouse').length}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-400">Growing plots:</span>
+                                        <span>{shapes.filter((s) => s.type === 'plot').length}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-400">Walkways:</span>
+                                        <span>{shapes.filter((s) => s.type === 'walkway').length}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-400">Water sources:</span>
+                                        <span>
+                                            {shapes.filter((s) => s.type === 'water-source').length}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-400">Measurements:</span>
+                                        <span>
+                                            {shapes.filter((s) => s.type === 'measurement').length}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-400">Total:</span>
+                                        <span className="font-bold">{shapes.length}</span>
+                                    </div>
 
-                                {/* Total Area Statistics */}
-                                {shapes.filter(
-                                    (s) => s.type !== 'measurement' && s.points.length >= 3
-                                ).length > 0 && (
-                                    <>
-                                        <div className="mt-2 border-t border-gray-600 pt-2">
-                                            <h5 className="mb-1 text-xs font-medium text-gray-400">
-                                                พื้นที่รวม (m²)
-                                            </h5>
-                                            {['greenhouse', 'plot', 'walkway', 'water-source'].map(
-                                                (type) => {
-                                                    const typeShapes = shapes.filter(
-                                                        (s) =>
-                                                            s.type === type && s.points.length >= 3
-                                                    );
-                                                    const totalArea = typeShapes.reduce(
-                                                        (sum, shape) =>
-                                                            sum +
-                                                            calculatePolygonArea(shape.points),
-                                                        0
-                                                    );
+                                    {/* Total Area Statistics */}
+                                    {shapes.filter(
+                                        (s) => s.type !== 'measurement' && s.points.length >= 3
+                                    ).length > 0 && (
+                                        <>
+                                            <div className="mt-2 border-t border-gray-600 pt-2">
+                                                <h5 className="mb-1 text-xs font-medium text-gray-400">
+                                                    Total Area (m²)
+                                                </h5>
+                                                {['greenhouse', 'plot', 'walkway', 'water-source'].map(
+                                                    (type) => {
+                                                        const typeShapes = shapes.filter(
+                                                            (s) =>
+                                                                s.type === type && s.points.length >= 3
+                                                        );
+                                                        const totalArea = typeShapes.reduce(
+                                                            (sum, shape) =>
+                                                                sum +
+                                                                calculatePolygonArea(shape.points),
+                                                            0
+                                                        );
 
-                                                    if (totalArea === 0) return null;
+                                                        if (totalArea === 0) return null;
 
-                                                    const typeNames = {
-                                                        greenhouse: 'โรงเรือน',
-                                                        plot: 'แปลงปลูก',
-                                                        walkway: 'ทางเดิน',
-                                                        'water-source': 'แหล่งน้ำ',
-                                                    };
+                                                        const typeNames = {
+                                                            greenhouse: 'Greenhouse',
+                                                            plot: 'Growing plot',
+                                                            walkway: 'Walkway',
+                                                            'water-source': 'Water source',
+                                                        };
 
-                                                    return (
-                                                        <div
-                                                            key={type}
-                                                            className="flex justify-between text-xs"
-                                                        >
-                                                            <span className="text-gray-500">
-                                                                {
-                                                                    typeNames[
-                                                                        type as keyof typeof typeNames
-                                                                    ]
-                                                                }
-                                                                :
-                                                            </span>
-                                                            <span className="text-blue-300">
-                                                                {totalArea.toFixed(1)}m²
-                                                            </span>
-                                                        </div>
-                                                    );
-                                                }
-                                            )}
-                                        </div>
-                                    </>
-                                )}
+                                                        return (
+                                                            <div
+                                                                key={type}
+                                                                className="flex justify-between text-xs"
+                                                            >
+                                                                <span className="text-gray-500">
+                                                                    {
+                                                                        typeNames[
+                                                                            type as keyof typeof typeNames
+                                                                        ]
+                                                                    }
+                                                                    :
+                                                                </span>
+                                                                <span className="text-blue-300">
+                                                                    {totalArea.toFixed(1)}m²
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    }
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Bottom Bar */}
-            <div className="flex-shrink-0 border-t border-gray-700 bg-gray-800 px-6 py-3">
-                <div className="flex justify-between">
-                    <button
-                        onClick={handleBack}
-                        className="flex items-center rounded bg-gray-600 px-4 py-2 text-white transition-colors hover:bg-gray-700"
-                    >
-                        <svg
-                            className="mr-2 h-4 w-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                {/* Bottom Bar */}
+                <div className="flex-shrink-0 border-t border-gray-700 bg-gray-800 px-6 py-3">
+                    <div className="flex justify-between">
+                        <button
+                            onClick={handleBack}
+                            className="flex items-center rounded bg-gray-600 px-4 py-2 text-white transition-colors hover:bg-gray-700"
                         >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                            />
-                        </svg>
-                        กลับ
-                    </button>
+                            <svg
+                                className="mr-2 h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                                />
+                            </svg>
+                            Back
+                        </button>
 
-                    <button
-                        onClick={handleProceed}
-                        className="flex items-center rounded bg-green-600 px-6 py-2 text-white transition-colors hover:bg-green-700"
-                    >
-                        ไปขั้นตอนถัดไป: เลือกระบบน้ำ
-                        <svg
-                            className="ml-2 h-4 w-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                        <button
+                            onClick={handleProceed}
+                            className="flex items-center rounded bg-green-600 px-6 py-2 text-white transition-colors hover:bg-green-700"
                         >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M14 5l7 7m0 0l-7 7m7-7H3"
-                            />
-                        </svg>
-                    </button>
+                            Next Step: Choose Irrigation System
+                            <svg
+                                className="ml-2 h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M14 5l7 7m0 0l-7 7m7-7H3"
+                                />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-            </div>
 
-            {/* Instruction Tooltip */}
-            {hoveredInstruction && (
-                <div className="fixed bottom-20 left-1/2 z-50 max-w-xs -translate-x-1/2 transform rounded-lg border border-gray-600 bg-gray-800 p-3 shadow-xl">
-                    <div className="text-center text-sm text-gray-300">{hoveredInstruction}</div>
-                </div>
-            )}
+                {/* Instruction Tooltip */}
+                {hoveredInstruction && (
+                    <div className="fixed bottom-20 left-1/2 z-50 max-w-xs -translate-x-1/2 transform rounded-lg border border-gray-600 bg-gray-800 p-3 shadow-xl">
+                        <div className="text-center text-sm text-gray-300">{hoveredInstruction}</div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

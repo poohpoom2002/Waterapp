@@ -12,9 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('fields', function (Blueprint $table) {
-            $table->unsignedBigInteger('folder_id')->nullable();
-            $table->foreign('folder_id')->references('id')->on('folders')->onDelete('set null');
-            $table->index('folder_id');
+            $table->foreignId('user_id')->constrained('users')->after('name');
         });
     }
 
@@ -24,9 +22,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('fields', function (Blueprint $table) {
-            $table->dropForeign(['folder_id']);
-            $table->dropIndex(['folder_id']);
-            $table->dropColumn('folder_id');
+            $table->dropForeign(['user_id']);
+            $table->dropColumn('user_id');
         });
     }
 };

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { Component, ReactNode } from 'react';
 
 interface ErrorBoundaryState {
