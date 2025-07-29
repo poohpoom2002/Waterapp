@@ -100,11 +100,11 @@ Route::delete('/folders/{folderId}', [FarmController::class, 'deleteFolder']);
 Route::put('/fields/{fieldId}/status', [FarmController::class, 'updateFieldStatus']);
 
 // Plant management
-Route::get('/api/plant-types', [FarmController::class, 'getPlantTypes']);
-Route::post('/api/get-elevation', [FarmController::class, 'getElevation']);
-Route::post('/api/plant-points/add', [FarmController::class, 'addPlantPoint'])->name('plant-points.add');
-Route::post('/api/plant-points/delete', [FarmController::class, 'deletePlantPoint'])->name('plant-points.delete');
-Route::post('/api/plant-points/move', [FarmController::class, 'movePlantPoint'])->name('plant-points.move');
+Route::get('/plant-types', [FarmController::class, 'getPlantTypes']);
+Route::post('/get-elevation', [FarmController::class, 'getElevation']);
+Route::post('/plant-points/add', [FarmController::class, 'addPlantPoint'])->name('plant-points.add');
+Route::post('/plant-points/delete', [FarmController::class, 'deletePlantPoint'])->name('plant-points.delete');
+Route::post('/plant-points/move', [FarmController::class, 'movePlantPoint'])->name('plant-points.move');
 
 // ==================================================
 // 🏡 HOME GARDEN ROUTES
