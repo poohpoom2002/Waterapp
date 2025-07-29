@@ -2,8 +2,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Navbar from '../../components/Navbar';
-import Footer from '../../components/Footer';
-import { useLanguage } from '../../contexts/LanguageContext';
 
 interface GreenhousePlannerProps {
     crops?: string;
@@ -151,7 +149,6 @@ const GRID_SIZE = 25;
 const CANVAS_SIZE = { width: 2400, height: 1600 };
 
 export default function GreenhousePlanner({ crops, method, irrigation }: GreenhousePlannerProps) {
-    const { t } = useLanguage();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [selectedTool, setSelectedTool] = useState<string>('select');
     const [shapes, setShapes] = useState<Shape[]>([]);
@@ -1422,9 +1419,14 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
     };
 
     return (
-        <div className="flex min-h-screen flex-col bg-gray-900 text-white">
-            <Navbar />
-            <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="h-screen bg-gray-900 text-white overflow-hidden">
+            {/* Fixed Navbar */}
+            <div className="fixed top-0 left-0 right-0 z-50">
+                <Navbar />
+            </div>
+
+            {/* Main Content with top padding to account for fixed navbar */}
+            <div className="pt-16 h-full flex flex-col">
                 {/* Header */}
                 <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-3">
                     <div className="flex items-center justify-between">
@@ -1434,8 +1436,8 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                     Greenhouse Area Design with Distance Measurement
                                 </h1>
                                 <p className="text-sm text-gray-400">
-                                    Draw your greenhouse structure and growing plots - Area
-                                    2400x1600 pixels (1 grid = 1 meter)
+                                    Draw your greenhouse structure and growing plots - Area 2400x1600 pixels (1
+                                    grid = 1 meter)
                                     <span className="ml-2 text-blue-300">
                                         Real-time distance measurement display
                                     </span>
@@ -1462,9 +1464,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                         <div className="flex-1 overflow-y-auto p-4">
                             {/* Selected Crops */}
                             <div className="mb-4">
-                                <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                    Selected Crops
-                                </h3>
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">Selected Crops</h3>
                                 <div className="flex flex-wrap gap-1">
                                     {selectedCrops.map((crop, index) => (
                                         <span
@@ -1507,11 +1507,9 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                                         {tool.name}
                                                     </h4>
                                                     <div className="space-y-1 text-xs text-gray-300">
-                                                        {tool.instructions.map(
-                                                            (instruction, index) => (
-                                                                <p key={index}>• {instruction}</p>
-                                                            )
-                                                        )}
+                                                        {tool.instructions.map((instruction, index) => (
+                                                            <p key={index}>• {instruction}</p>
+                                                        ))}
                                                     </div>
                                                 </div>
                                             )}
@@ -1530,9 +1528,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                         <div
                                             key={index}
                                             className="flex cursor-help items-center space-x-2 text-xs text-gray-400 transition-colors hover:text-gray-200"
-                                            onMouseEnter={() =>
-                                                setHoveredInstruction(instruction.text)
-                                            }
+                                            onMouseEnter={() => setHoveredInstruction(instruction.text)}
                                             onMouseLeave={() => setHoveredInstruction(null)}
                                         >
                                             <span>{instruction.icon}</span>
@@ -1666,15 +1662,13 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                         {/* Status Messages */}
                         {isDrawing && (
                             <div className="absolute left-4 top-20 rounded bg-blue-600 px-3 py-1 text-sm text-white">
-                                Drawing... 🟢 Edge distance 🟡 Total distance (Enter=finish,
-                                Escape=cancel)
+                                Drawing... 🟢 Edge distance 🟡 Total distance (Enter=finish, Escape=cancel)
                             </div>
                         )}
 
                         {measuringMode && !measureEnd && (
                             <div className="absolute left-4 top-20 rounded bg-red-600 px-3 py-1 text-sm text-white">
-                                Click second point to measure distance (1 grid = 1m, Escape to
-                                cancel)
+                                Click second point to measure distance (1 grid = 1m, Escape to cancel)
                             </div>
                         )}
 
@@ -1724,10 +1718,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                             key={shape.id}
                                             onClick={() => setSelectedShape(shape.id)}
                                             onKeyDown={(e) => {
-                                                if (
-                                                    e.key === 'Delete' &&
-                                                    selectedShape === shape.id
-                                                ) {
+                                                if (e.key === 'Delete' && selectedShape === shape.id) {
                                                     e.preventDefault();
                                                     deleteShape();
                                                 }
@@ -1826,15 +1817,11 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                                             )}
                                                             <div className="mt-2 space-y-1">
                                                                 <p>
-                                                                    <strong>
-                                                                        Each side length:
-                                                                    </strong>
+                                                                    <strong>Each side length:</strong>
                                                                 </p>
                                                                 {shape.points.map((point, i) => {
                                                                     if (
-                                                                        i ===
-                                                                            shape.points.length -
-                                                                                1 &&
+                                                                        i === shape.points.length - 1 &&
                                                                         shape.points.length < 3
                                                                     )
                                                                         return null;
@@ -1843,11 +1830,10 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                                                             (i + 1) %
                                                                                 shape.points.length
                                                                         ];
-                                                                    const distance =
-                                                                        calculateDistance(
-                                                                            point,
-                                                                            nextPoint
-                                                                        );
+                                                                    const distance = calculateDistance(
+                                                                        point,
+                                                                        nextPoint
+                                                                    );
                                                                     return (
                                                                         <p
                                                                             key={i}
@@ -1874,9 +1860,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
 
                             {/* Statistics */}
                             <div className="border-t border-gray-700 pt-4">
-                                <h4 className="mb-2 text-sm font-medium text-gray-300">
-                                    Statistics
-                                </h4>
+                                <h4 className="mb-2 text-sm font-medium text-gray-300">Statistics</h4>
                                 <div className="space-y-2">
                                     <div className="flex justify-between text-sm">
                                         <span className="text-gray-400">Greenhouses:</span>
@@ -1886,15 +1870,11 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                     </div>
                                     <div className="flex justify-between text-sm">
                                         <span className="text-gray-400">Growing plots:</span>
-                                        <span>
-                                            {shapes.filter((s) => s.type === 'plot').length}
-                                        </span>
+                                        <span>{shapes.filter((s) => s.type === 'plot').length}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
                                         <span className="text-gray-400">Walkways:</span>
-                                        <span>
-                                            {shapes.filter((s) => s.type === 'walkway').length}
-                                        </span>
+                                        <span>{shapes.filter((s) => s.type === 'walkway').length}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
                                         <span className="text-gray-400">Water sources:</span>
@@ -1922,51 +1902,48 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                                 <h5 className="mb-1 text-xs font-medium text-gray-400">
                                                     Total Area (m²)
                                                 </h5>
-                                                {[
-                                                    'greenhouse',
-                                                    'plot',
-                                                    'walkway',
-                                                    'water-source',
-                                                ].map((type) => {
-                                                    const typeShapes = shapes.filter(
-                                                        (s) =>
-                                                            s.type === type && s.points.length >= 3
-                                                    );
-                                                    const totalArea = typeShapes.reduce(
-                                                        (sum, shape) =>
-                                                            sum +
-                                                            calculatePolygonArea(shape.points),
-                                                        0
-                                                    );
+                                                {['greenhouse', 'plot', 'walkway', 'water-source'].map(
+                                                    (type) => {
+                                                        const typeShapes = shapes.filter(
+                                                            (s) =>
+                                                                s.type === type && s.points.length >= 3
+                                                        );
+                                                        const totalArea = typeShapes.reduce(
+                                                            (sum, shape) =>
+                                                                sum +
+                                                                calculatePolygonArea(shape.points),
+                                                            0
+                                                        );
 
-                                                    if (totalArea === 0) return null;
+                                                        if (totalArea === 0) return null;
 
-                                                    const typeNames = {
-                                                        greenhouse: 'Greenhouse',
-                                                        plot: 'Growing plot',
-                                                        walkway: 'Walkway',
-                                                        'water-source': 'Water source',
-                                                    };
+                                                        const typeNames = {
+                                                            greenhouse: 'Greenhouse',
+                                                            plot: 'Growing plot',
+                                                            walkway: 'Walkway',
+                                                            'water-source': 'Water source',
+                                                        };
 
-                                                    return (
-                                                        <div
-                                                            key={type}
-                                                            className="flex justify-between text-xs"
-                                                        >
-                                                            <span className="text-gray-500">
-                                                                {
-                                                                    typeNames[
-                                                                        type as keyof typeof typeNames
-                                                                    ]
-                                                                }
-                                                                :
-                                                            </span>
-                                                            <span className="text-blue-300">
-                                                                {totalArea.toFixed(1)}m²
-                                                            </span>
-                                                        </div>
-                                                    );
-                                                })}
+                                                        return (
+                                                            <div
+                                                                key={type}
+                                                                className="flex justify-between text-xs"
+                                                            >
+                                                                <span className="text-gray-500">
+                                                                    {
+                                                                        typeNames[
+                                                                            type as keyof typeof typeNames
+                                                                        ]
+                                                                    }
+                                                                    :
+                                                                </span>
+                                                                <span className="text-blue-300">
+                                                                    {totalArea.toFixed(1)}m²
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    }
+                                                )}
                                             </div>
                                         </>
                                     )}
@@ -2024,13 +2001,10 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 {/* Instruction Tooltip */}
                 {hoveredInstruction && (
                     <div className="fixed bottom-20 left-1/2 z-50 max-w-xs -translate-x-1/2 transform rounded-lg border border-gray-600 bg-gray-800 p-3 shadow-xl">
-                        <div className="text-center text-sm text-gray-300">
-                            {hoveredInstruction}
-                        </div>
+                        <div className="text-center text-sm text-gray-300">{hoveredInstruction}</div>
                     </div>
                 )}
             </div>
-            <Footer />
         </div>
     );
 }
