@@ -21,7 +21,7 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
             const cropArray = crops.split(',').filter(Boolean);
             setSelectedCrops(cropArray);
         }
-    }, [cropType, crops]);
+    }, [cropType, crops, selectedCrops]);
 
     const handleCropToggle = useCallback((cropValue: string) => {
         setSelectedCrops((prev) => {

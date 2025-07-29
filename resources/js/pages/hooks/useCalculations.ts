@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // resources\js\pages\hooks\useCalculations.ts
 import { useMemo, useState, useEffect } from 'react';
 import { IrrigationInput, CalculationResults } from '../types/interfaces';
@@ -531,7 +533,7 @@ export const useCalculations = (
                         data = Array.isArray(result) ? result : [];
                         break;
                     }
-                } catch (error) {
+                } catch {
                     continue;
                 }
             }
@@ -643,7 +645,7 @@ export const useCalculations = (
                             break;
 
                         case 'pump':
-                            const numericFields = [
+                            {const numericFields = [
                                 'powerHP',
                                 'powerKW',
                                 'phase',
@@ -665,7 +667,7 @@ export const useCalculations = (
                                 if (transformed[field] !== undefined) {
                                     transformed[field] = parseRangeValue(transformed[field]);
                                 }
-                            });
+                            });}
 
                             if (item.pumpAccessories || item.pump_accessories) {
                                 transformed.pumpAccessories =

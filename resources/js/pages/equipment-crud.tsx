@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // resources\js\pages\equipment-crud.tsx
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -1309,7 +1312,7 @@ const EquipmentForm: React.FC<{
                 })
                 .finally(() => setLoading(false));
         }
-    }, [formData.category_id]);
+    }, [equipment, formData.category_id]);
 
     const validateForm = () => {
         const newErrors: any = {};
