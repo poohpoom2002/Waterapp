@@ -114,11 +114,28 @@ const DEFAULT_IRRIGATION_SETTINGS = {
     },
 } as const;
 
-const getGoogleMapsConfig = () => ({
-    apiKey: import.meta.env.VITE_Maps_API_KEY || '',
-    libraries: ['drawing', 'geometry', 'places'] as const,
-    defaultZoom: 15,
-});
+const getGoogleMapsConfig = () => {
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+    
+    if (!apiKey) {
+        console.error('❌ Google Maps API Key not found! Please set VITE_GOOGLE_MAPS_API_KEY in .env file');
+        console.log('Environment variables:', {
+            NODE_ENV: import.meta.env.MODE,
+            Available_VITE_vars: Object.keys(import.meta.env).filter(key => key.startsWith('VITE_'))
+        });
+    } else {
+        console.log('✅ Google Maps API Key loaded:', {
+            length: apiKey.length,
+            preview: `${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)}`
+        });
+    }
+
+    return {
+        apiKey,
+        libraries: ['drawing', 'geometry', 'places'] as const,
+        defaultZoom: 15,
+    };
+};
 
 interface GoogleMapComponentProps {
     center: google.maps.LatLngLiteral;

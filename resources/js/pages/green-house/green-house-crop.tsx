@@ -84,7 +84,7 @@ export default function GreenhouseCrop({ cropType, crops }) {
                     <div className="border-b border-gray-700 p-6">
                         <div className="mb-4 flex items-center justify-between">
                             <a
-                                href="/planner"
+                                href="/"
                                 className="flex items-center text-sm text-blue-400 hover:text-blue-300"
                             >
                                 <svg
