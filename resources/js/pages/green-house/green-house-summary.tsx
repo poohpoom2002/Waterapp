@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// green-house-summary.tsx - Updated to integrate with product page
+// green-house-summary.tsx - Updated to integrate with product page and include Navbar
 
 import { Head } from '@inertiajs/react';
 import { useState, useEffect, useRef } from 'react';
@@ -8,6 +8,7 @@ import html2canvas from 'html2canvas';
 import { router } from '@inertiajs/react';
 import { greenhouseCrops, getCropByValue } from '../components/Greenhouse/CropData';
 import { saveGreenhouseData, GreenhousePlanningData, calculateAllGreenhouseStats } from '@/utils/greenHouseData';
+import Navbar from '../../components/Navbar';
 
 interface Point {
     x: number;
@@ -323,7 +324,7 @@ export default function GreenhouseSummary() {
             );
         }
 
-        return crop ? crop.icon : '�';
+        return crop ? crop.icon : '🌱';
     };
 
     // Calculate cumulative pipe lengths for each plot (Enhanced version)
@@ -1050,6 +1051,9 @@ export default function GreenhouseSummary() {
         return (
             <div className="min-h-screen bg-gray-900 text-white">
                 <Head title="Greenhouse Summary - Growing System Planning" />
+                
+                {/* Add Navbar at the top */}
+                <Navbar />
 
                 <div className="border-b border-gray-700 bg-gray-800">
                     <div className="container mx-auto px-4 py-6">
@@ -1153,6 +1157,14 @@ export default function GreenhouseSummary() {
     return (
         <div className="min-h-screen bg-gray-900 text-white print:bg-white print:text-black">
             <Head title="Greenhouse Summary - Growing System Planning" />
+            
+            {/* Add Navbar at the top - fixed position, hidden in print */}
+            <div className="fixed top-0 left-0 right-0 z-50 print:hidden">
+                <Navbar />
+            </div>
+            
+            {/* Add padding top to account for fixed navbar */}
+            <div className="pt-16 print:pt-0"></div>
 
             <div className="border-b border-gray-700 bg-gray-800 print:hidden print:border-gray-300 print:bg-white">
                 <div className="container mx-auto px-4 py-4">
