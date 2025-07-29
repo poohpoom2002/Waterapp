@@ -70,14 +70,16 @@ export default function GreenhouseCrop({ cropType, crops }) {
     const canProceed = selectedCrops.length > 0;
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white">
-            {/* Navbar */}
-            <Navbar />
+        <div className="h-screen bg-gray-900 text-white overflow-hidden">
+            {/* Fixed Navbar */}
+            <div className="fixed top-0 left-0 right-0 z-50">
+                <Navbar />
+            </div>
             
-            {/* Main Content with adjusted height to account for navbar */}
-            <div className="flex" style={{ height: 'calc(100vh - 64px)' }}>
+            {/* Main Content with top padding to account for fixed navbar */}
+            <div className="flex pt-16 h-full">
                 {/* Sidebar - Fixed Summary Panel */}
-                <div className="flex w-80 flex-col overflow-hidden border-r border-gray-700 bg-gray-800">
+                <div className="flex w-80 flex-col overflow-hidden border-r border-gray-700 bg-gray-800 h-full">
                     {/* Header */}
                     <div className="border-b border-gray-700 p-6">
                         <div className="mb-4 flex items-center justify-between">
@@ -224,7 +226,7 @@ export default function GreenhouseCrop({ cropType, crops }) {
                 </div>
 
                 {/* Main Content Area */}
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto h-full">
                     <div className="p-8">
                         <div className="mb-6">
                             <h2 className="mb-2 text-3xl font-bold">Select Greenhouse Crops</h2>
