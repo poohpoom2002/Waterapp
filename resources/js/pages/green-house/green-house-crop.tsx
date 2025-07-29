@@ -75,7 +75,7 @@ export default function GreenhouseCrop({ cropType, crops }) {
         <div className="min-h-screen bg-gray-900 text-white">
             {/* Navbar */}
             <Navbar />
-            
+
             {/* Main Content with adjusted height to account for navbar */}
             <div className="flex" style={{ height: 'calc(100vh - 64px)' }}>
                 {/* Sidebar - Fixed Summary Panel */}
@@ -231,7 +231,8 @@ export default function GreenhouseCrop({ cropType, crops }) {
                         <div className="mb-6">
                             <h2 className="mb-2 text-3xl font-bold">Select Greenhouse Crops</h2>
                             <p className="text-gray-400">
-                                Choose the crops you want to grow in your greenhouse. You can select multiple types.
+                                Choose the crops you want to grow in your greenhouse. You can select
+                                multiple types.
                             </p>
                         </div>
 
@@ -306,7 +307,9 @@ export default function GreenhouseCrop({ cropType, crops }) {
                                 <h3 className="mb-2 text-xl font-semibold text-gray-400">
                                     No crops found
                                 </h3>
-                                <p className="text-gray-500">Try adjusting your search or filters</p>
+                                <p className="text-gray-500">
+                                    Try adjusting your search or filters
+                                </p>
                             </div>
                         )}
 
@@ -319,8 +322,8 @@ export default function GreenhouseCrop({ cropType, crops }) {
                                             Ready to choose planning method?
                                         </h3>
                                         <p className="text-sm text-gray-400">
-                                            You have selected {selectedCrops.length} crop types.
-                                            Go to choose area planning method.
+                                            You have selected {selectedCrops.length} crop types. Go
+                                            to choose area planning method.
                                         </p>
                                     </div>
                                     <a

@@ -90,14 +90,14 @@ const buildFolderTree = (folders: Folder[]): FolderWithChildren[] => {
     const rootFolders: FolderWithChildren[] = [];
 
     // Create a map of all folders
-    folders.forEach(folder => {
+    folders.forEach((folder) => {
         folderMap.set(folder.id, { ...folder, children: [] });
     });
 
     // Build the tree structure
-    folders.forEach(folder => {
+    folders.forEach((folder) => {
         const folderWithChildren = folderMap.get(folder.id)!;
-        
+
         if (folder.parent_id && folderMap.has(folder.parent_id)) {
             // This is a child folder
             const parent = folderMap.get(folder.parent_id)!;
@@ -224,15 +224,15 @@ const FieldCard = ({
     const isFinished = field.status === 'finished' || field.isCompleted;
 
     return (
-        <div 
+        <div
             className={`group relative overflow-hidden rounded-lg border border-gray-700 bg-gray-800 p-6 transition-all duration-200 hover:border-blue-500 hover:bg-blue-900/10 ${
-                isDragging ? 'opacity-50 scale-95' : ''
+                isDragging ? 'scale-95 opacity-50' : ''
             }`}
             draggable
             onDragStart={() => onDragStart?.(field)}
             onDragEnd={() => onDragEnd?.()}
         >
-            {/* Status Badge */} 
+            {/* Status Badge */}
             <div className="absolute right-3 top-3">
                 <button
                     onClick={(e) => {
@@ -557,8 +557,6 @@ const FolderCard = ({
         </div>
     );
 };
-
-
 
 const CreateFolderModal = ({
     isOpen,
@@ -900,7 +898,7 @@ export default function Home() {
     // Get all folders including system folders
     const getAllFolders = () => {
         // Only return root folders (folders without parent_id)
-        return folders.filter(folder => !folder.parent_id);
+        return folders.filter((folder) => !folder.parent_id);
     };
 
     // Get fields for current view
@@ -913,9 +911,11 @@ export default function Home() {
         }
         if (selectedFolder.name === t('unfinished') || selectedFolder.name === 'Unfinished') {
             // Show fields that are unfinished AND either have no folderId or are assigned to this folder
-            return fields.filter((field) => 
-                (field.status !== 'finished' && !field.isCompleted) && 
-                (!field.folderId || field.folderId === selectedFolder.id)
+            return fields.filter(
+                (field) =>
+                    field.status !== 'finished' &&
+                    !field.isCompleted &&
+                    (!field.folderId || field.folderId === selectedFolder.id)
             );
         }
 
@@ -931,9 +931,11 @@ export default function Home() {
         }
         if (folder.name === t('unfinished') || folder.name === 'Unfinished') {
             // Count fields that are unfinished AND either have no folderId or are assigned to this folder
-            return fields.filter((field) => 
-                (field.status !== 'finished' && !field.isCompleted) && 
-                (!field.folderId || field.folderId === folder.id)
+            return fields.filter(
+                (field) =>
+                    field.status !== 'finished' &&
+                    !field.isCompleted &&
+                    (!field.folderId || field.folderId === folder.id)
             ).length;
         }
 
@@ -951,7 +953,7 @@ export default function Home() {
 
                 if (fieldsResponse.data.fields) {
                     setFields(fieldsResponse.data.fields);
-                    
+
                     // Create a mock field for testing if no fields exist
                     if (fieldsResponse.data.fields.length === 0) {
                         createMockField();
@@ -987,8 +989,8 @@ export default function Home() {
             area: [
                 { lat: 13.7563, lng: 100.5018 },
                 { lat: 13.7564, lng: 100.5019 },
-                { lat: 13.7565, lng: 100.5020 },
-                { lat: 13.7563, lng: 100.5018 }
+                { lat: 13.7565, lng: 100.502 },
+                { lat: 13.7563, lng: 100.5018 },
             ],
             plantType: {
                 id: 1,
@@ -996,18 +998,18 @@ export default function Home() {
                 type: 'vegetable',
                 plant_spacing: 0.5,
                 row_spacing: 1.0,
-                water_needed: 2.5
+                water_needed: 2.5,
             },
             totalPlants: 100,
             totalArea: 50.0,
             total_water_need: 125.0,
             createdAt: new Date().toISOString(),
-            layers: []
+            layers: [],
         };
 
         // Add to fields state
-        setFields(prev => [...prev, mockField]);
-        
+        setFields((prev) => [...prev, mockField]);
+
         console.log('Mock field created for testing:', mockField);
     };
 
@@ -1170,7 +1172,11 @@ export default function Home() {
                 );
 
                 // Remove folder and all its sub-folders
-                setFolders((prev) => prev.filter((f) => f.id !== folderToDelete.id && f.parent_id !== folderToDelete.id));
+                setFolders((prev) =>
+                    prev.filter(
+                        (f) => f.id !== folderToDelete.id && f.parent_id !== folderToDelete.id
+                    )
+                );
                 setShowFolderDeleteConfirm(false);
                 setFolderToDelete(null);
 
@@ -1207,33 +1213,39 @@ export default function Home() {
             try {
                 // Update field in backend
                 const response = await axios.put(`/api/fields/${draggedField.id}/folder`, {
-                    folder_id: parseInt(targetFolderId)
+                    folder_id: parseInt(targetFolderId),
                 });
 
                 if (response.data.success) {
                     console.log('Field moved successfully:', {
                         fieldId: draggedField.id,
                         oldFolderId: draggedField.folderId,
-                        newFolderId: targetFolderId
+                        newFolderId: targetFolderId,
                     });
-                    
+
                     // Update field in frontend
                     setFields((prev) =>
-                        prev.map((f) => (f.id === draggedField.id ? { ...f, folderId: targetFolderId } : f))
+                        prev.map((f) =>
+                            f.id === draggedField.id ? { ...f, folderId: targetFolderId } : f
+                        )
                     );
                 }
             } catch (error: any) {
                 console.error('Error moving field to folder:', error);
                 console.error('Error details:', error.response?.data);
-                
+
                 // For mock fields, still update the frontend state even if backend fails
                 if (draggedField.id.startsWith('mock-')) {
                     console.log('Mock field - updating frontend state only');
                     setFields((prev) =>
-                        prev.map((f) => (f.id === draggedField.id ? { ...f, folderId: targetFolderId } : f))
+                        prev.map((f) =>
+                            f.id === draggedField.id ? { ...f, folderId: targetFolderId } : f
+                        )
                     );
                 } else {
-                    alert(`Error moving field to folder: ${error.response?.data?.message || error.message}`);
+                    alert(
+                        `Error moving field to folder: ${error.response?.data?.message || error.message}`
+                    );
                 }
             }
         }
@@ -1347,19 +1359,25 @@ export default function Home() {
                                         {t('click_field_manage')}
                                     </div>
                                 </div>
-                                
+
                                 {/* Sub-folders Section */}
                                 {(() => {
-                                    const subFolders = folders.filter(f => f.parent_id === selectedFolder.id);
+                                    const subFolders = folders.filter(
+                                        (f) => f.parent_id === selectedFolder.id
+                                    );
                                     return subFolders.length > 0 ? (
                                         <div className="mb-8">
-                                            <h3 className="mb-4 text-lg font-semibold text-white">Sub-folders</h3>
+                                            <h3 className="mb-4 text-lg font-semibold text-white">
+                                                Sub-folders
+                                            </h3>
                                             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                                                 {subFolders.map((subFolder) => (
                                                     <FolderCard
                                                         key={subFolder.id}
                                                         folder={subFolder}
-                                                        fieldCount={getFieldCountForFolder(subFolder)}
+                                                        fieldCount={getFieldCountForFolder(
+                                                            subFolder
+                                                        )}
                                                         onSelect={setSelectedFolder}
                                                         onEdit={handleEditFolder}
                                                         onDelete={handleDeleteFolder}
@@ -1372,11 +1390,13 @@ export default function Home() {
                                         </div>
                                     ) : null;
                                 })()}
-                                
+
                                 {/* Fields Section */}
                                 {getCurrentFields().length > 0 && (
                                     <div>
-                                        <h3 className="mb-4 text-lg font-semibold text-white">Fields</h3>
+                                        <h3 className="mb-4 text-lg font-semibold text-white">
+                                            Fields
+                                        </h3>
                                         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                                             {getCurrentFields().map((field) => (
                                                 <FieldCard
@@ -1387,14 +1407,16 @@ export default function Home() {
                                                     onStatusChange={handleFieldStatusChange}
                                                     onDragStart={handleFieldDragStart}
                                                     onDragEnd={handleFieldDragEnd}
-                                                    isDragging={isDragging && draggedField?.id === field.id}
+                                                    isDragging={
+                                                        isDragging && draggedField?.id === field.id
+                                                    }
                                                     t={t}
                                                 />
                                             ))}
                                         </div>
                                     </div>
                                 )}
-                                
+
                                 {/* Create Sub-folder Button */}
                                 <div className="mt-6">
                                     <button

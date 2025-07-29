@@ -825,7 +825,39 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                 console.error('Error handling mouse down:', error);
             }
         },
-        [editMode, currentPolygon, sprinklers, waterSource, pipes, isDrawing, measurementMode, isScaleSet, handleMeasurementClick, imageData, dimensionMode, tempDimensionPoints, currentZoneTool, enhancedDrawing, createRectangleZone, createCircleZone, createRegularPolygon, finalizeEnhancedZone, checkDimensionLineClick, removeDimensionLine, findSprinklerAtPosition, getCanvasCoordinate, panOffset, draggedItem, pipeEditMode, distanceToLine, onSprinklerPlaced, onWaterSourcePlaced, onMainPipePoint, onSprinklerClick, onPipeClick]
+        [
+            editMode,
+            currentPolygon,
+            sprinklers,
+            waterSource,
+            pipes,
+            isDrawing,
+            measurementMode,
+            isScaleSet,
+            handleMeasurementClick,
+            imageData,
+            dimensionMode,
+            tempDimensionPoints,
+            currentZoneTool,
+            enhancedDrawing,
+            createRectangleZone,
+            createCircleZone,
+            createRegularPolygon,
+            finalizeEnhancedZone,
+            checkDimensionLineClick,
+            removeDimensionLine,
+            findSprinklerAtPosition,
+            getCanvasCoordinate,
+            panOffset,
+            draggedItem,
+            pipeEditMode,
+            distanceToLine,
+            onSprinklerPlaced,
+            onWaterSourcePlaced,
+            onMainPipePoint,
+            onSprinklerClick,
+            onPipeClick,
+        ]
     );
 
     const handleMouseMove = useCallback(

@@ -216,7 +216,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
             {/* Step 1: Field Drawing */}
             {currentStep === 1 && (
                 <div className="space-y-3">
-                    <div className="rounded-lg border border-white p-3 bg-orange-500/10">
+                    <div className="rounded-lg border border-white bg-orange-500/10 p-3">
                         <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-orange-300">
                                 🏗️ Step 1: Field Drawing
@@ -229,7 +229,10 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                     </div>
 
                     {selectedCropObjects.length > 0 && (
-                        <div className="rounded border border-white p-2" style={{backgroundColor: '#000005'}}>
+                        <div
+                            className="rounded border border-white p-2"
+                            style={{ backgroundColor: '#000005' }}
+                        >
                             <FieldMapCropSpacing
                                 selectedCropObjects={selectedCropObjects}
                                 rowSpacing={rowSpacing}
@@ -251,7 +254,10 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                     )}
 
                     {mainField && (
-                        <div className="rounded-lg border border-white p-3" style={{backgroundColor: '#000005'}}>
+                        <div
+                            className="rounded-lg border border-white p-3"
+                            style={{ backgroundColor: '#000005' }}
+                        >
                             <div className="mb-2 text-sm text-gray-300">📐 Field Info</div>
                             <div className="space-y-1">
                                 <div className="flex justify-between text-xs">
@@ -272,7 +278,10 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                         </div>
                     )}
 
-                    <div className="rounded-lg border border-white p-3" style={{backgroundColor: '#000005'}}>
+                    <div
+                        className="rounded-lg border border-white p-3"
+                        style={{ backgroundColor: '#000005' }}
+                    >
                         <div className="flex items-center justify-between">
                             <button
                                 onClick={resetAll}
@@ -288,7 +297,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                         ? 'bg-orange-600 text-white hover:bg-orange-700'
                                         : 'cursor-not-allowed text-gray-400'
                                 }`}
-                                style={{backgroundColor: validateStep(1) ? undefined : '#000005'}}
+                                style={{ backgroundColor: validateStep(1) ? undefined : '#000005' }}
                             >
                                 Next Step ➡️
                             </button>
@@ -300,7 +309,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
             {/* Step 2: Zones & Obstacles */}
             {currentStep === 2 && (
                 <div className="space-y-3">
-                    <div className="rounded-lg border border-white p-3 bg-blue-500/10">
+                    <div className="rounded-lg border border-white bg-blue-500/10 p-3">
                         <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-blue-300">
                                 🎯 Step 2: Zones & Obstacles
@@ -312,7 +321,10 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                         </div>
                     </div>
 
-                    <div className="rounded-lg border border-white p-3" style={{backgroundColor: '#000005'}}>
+                    <div
+                        className="rounded-lg border border-white p-3"
+                        style={{ backgroundColor: '#000005' }}
+                    >
                         <div className="mb-2 flex items-center justify-between">
                             <span className="text-sm font-medium text-gray-300">Drawing Mode</span>
                         </div>
@@ -324,7 +336,9 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                         ? 'bg-blue-600 text-white'
                                         : 'text-gray-300 hover:bg-gray-500'
                                 }`}
-                                style={{backgroundColor: drawingMode === 'zone' ? undefined : '#000005'}}
+                                style={{
+                                    backgroundColor: drawingMode === 'zone' ? undefined : '#000005',
+                                }}
                             >
                                 🎯 Zones
                             </button>
@@ -335,7 +349,10 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                         ? 'bg-orange-600 text-white'
                                         : 'text-gray-300 hover:bg-gray-500'
                                 }`}
-                                style={{backgroundColor: drawingMode === 'obstacle' ? undefined : '#000005'}}
+                                style={{
+                                    backgroundColor:
+                                        drawingMode === 'obstacle' ? undefined : '#000005',
+                                }}
                             >
                                 ⛔ Obstacles
                             </button>
@@ -343,7 +360,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                     </div>
 
                     {drawingMode === 'obstacle' && (
-                        <div className="rounded-lg border border-white p-3 bg-orange-500/10">
+                        <div className="rounded-lg border border-white bg-orange-500/10 p-3">
                             <div className="mb-2 flex items-center justify-between">
                                 <span className="text-sm font-medium text-orange-300">
                                     Obstacle Type
@@ -374,7 +391,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                     )}
 
                     {zones.length > 0 && selectedCrops.length > 0 && (
-                        <div className="rounded-lg border border-white p-4 bg-purple-500/10">
+                        <div className="rounded-lg border border-white bg-purple-500/10 p-4">
                             <div className="mb-3 flex items-center justify-between">
                                 <div className="flex items-center space-x-2">
                                     <span className="font-medium text-purple-300">
@@ -397,7 +414,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                         <div
                                             key={zone.id}
                                             className="relative rounded-lg border border-white p-3 transition-all hover:bg-gray-700/70"
-                                            style={{backgroundColor: '#000005'}}
+                                            style={{ backgroundColor: '#000005' }}
                                         >
                                             <button
                                                 onClick={() => deleteZone(zone.id.toString())}
@@ -459,7 +476,10 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                     )}
 
                     {zones.length > 0 && (
-                        <div className="rounded-lg border border-white p-3" style={{backgroundColor: '#000005'}}>
+                        <div
+                            className="rounded-lg border border-white p-3"
+                            style={{ backgroundColor: '#000005' }}
+                        >
                             <div className="mb-2 text-sm text-gray-300">📊 Zone Summary</div>
                             <div className="grid grid-cols-3 gap-2 text-xs">
                                 <div>
@@ -480,12 +500,15 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                         </div>
                     )}
 
-                    <div className="rounded-lg border border-white p-3" style={{backgroundColor: '#000005'}}>
+                    <div
+                        className="rounded-lg border border-white p-3"
+                        style={{ backgroundColor: '#000005' }}
+                    >
                         <div className="flex items-center justify-between">
                             <button
                                 onClick={previousStep}
                                 className="rounded border border-white px-3 py-1 text-sm text-white transition-colors hover:bg-gray-500"
-                                style={{backgroundColor: '#000005'}}
+                                style={{ backgroundColor: '#000005' }}
                             >
                                 ⬅️ Previous
                             </button>
@@ -497,7 +520,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                         ? 'bg-green-600 text-white hover:bg-green-700'
                                         : 'cursor-not-allowed text-gray-400'
                                 }`}
-                                style={{backgroundColor: validateStep(2) ? undefined : '#000005'}}
+                                style={{ backgroundColor: validateStep(2) ? undefined : '#000005' }}
                             >
                                 Next Step ➡️
                             </button>
@@ -509,7 +532,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
             {/* Step 3: Pipe System */}
             {currentStep === 3 && (
                 <div className="space-y-3">
-                    <div className="rounded-lg border border-white p-3 bg-purple-500/10">
+                    <div className="rounded-lg border border-white bg-purple-500/10 p-3">
                         <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-purple-300">
                                 🚰 Step 3: Pipe System
@@ -521,7 +544,10 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                         </div>
                     </div>
 
-                    <div className="rounded-lg border border-white p-3" style={{backgroundColor: '#000005'}}>
+                    <div
+                        className="rounded-lg border border-white p-3"
+                        style={{ backgroundColor: '#000005' }}
+                    >
                         <div className="mb-2 flex items-center justify-between">
                             <span className="text-sm font-medium text-gray-300">
                                 Manual Drawing
@@ -543,7 +569,10 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                 ? 'bg-purple-600 text-white'
                                                 : 'text-gray-300 hover:bg-gray-500'
                                         }`}
-                                        style={{backgroundColor: currentPipeType === key ? undefined : '#000005'}}
+                                        style={{
+                                            backgroundColor:
+                                                currentPipeType === key ? undefined : '#000005',
+                                        }}
                                     >
                                         <div className="flex items-center space-x-2">
                                             <span>{config.icon}</span>
@@ -558,7 +587,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                         </div>
                     </div>
 
-                    <div className="rounded-lg border border-white p-3 bg-yellow-500/10">
+                    <div className="rounded-lg border border-white bg-yellow-500/10 p-3">
                         <div className="mb-2 flex items-center justify-between">
                             <span className="text-sm font-medium text-yellow-300">
                                 ⚡ Auto Generate
@@ -582,7 +611,13 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                           ? 'cursor-not-allowed bg-yellow-500/50 text-gray-300'
                                           : 'bg-yellow-600 text-white hover:bg-yellow-700'
                                 }`}
-                                style={{backgroundColor: (pipes.filter((p) => p.type === 'submain').length === 0 || isGeneratingPipes) ? '#000005' : undefined}}
+                                style={{
+                                    backgroundColor:
+                                        pipes.filter((p) => p.type === 'submain').length === 0 ||
+                                        isGeneratingPipes
+                                            ? '#000005'
+                                            : undefined,
+                                }}
                             >
                                 {isGeneratingPipes ? '⏳ Generating...' : '⚡ Generate Laterals'}
                             </button>
@@ -605,7 +640,10 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                     </div>
 
                     {pipes.length > 0 && (
-                        <div className="rounded-lg border border-white p-3" style={{backgroundColor: '#000005'}}>
+                        <div
+                            className="rounded-lg border border-white p-3"
+                            style={{ backgroundColor: '#000005' }}
+                        >
                             <div className="mb-2 text-sm text-gray-300">📊 Pipe Summary</div>
                             <div className="grid grid-cols-2 gap-2 text-xs">
                                 <div>
@@ -634,12 +672,15 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                         </div>
                     )}
 
-                    <div className="rounded-lg border border-white p-3" style={{backgroundColor: '#000005'}}>
+                    <div
+                        className="rounded-lg border border-white p-3"
+                        style={{ backgroundColor: '#000005' }}
+                    >
                         <div className="flex items-center justify-between">
                             <button
                                 onClick={previousStep}
                                 className="rounded border border-white px-3 py-1 text-sm text-white transition-colors hover:bg-gray-500"
-                                style={{backgroundColor: '#000005'}}
+                                style={{ backgroundColor: '#000005' }}
                             >
                                 ⬅️ Previous
                             </button>
@@ -651,7 +692,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                         ? 'bg-cyan-600 text-white hover:bg-cyan-700'
                                         : 'cursor-not-allowed text-gray-400'
                                 }`}
-                                style={{backgroundColor: validateStep(3) ? undefined : '#000005'}}
+                                style={{ backgroundColor: validateStep(3) ? undefined : '#000005' }}
                             >
                                 Next Step ➡️
                             </button>
@@ -663,7 +704,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
             {/* Step 4: Irrigation System */}
             {currentStep === 4 && (
                 <div className="space-y-3">
-                    <div className="rounded-lg border border-white p-3 bg-cyan-500/10">
+                    <div className="rounded-lg border border-white bg-cyan-500/10 p-3">
                         <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-cyan-300">
                                 🚿 Step 4: Irrigation System
@@ -678,7 +719,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                     </div>
 
                     {zones.length > 0 && (
-                        <div className="rounded-lg border border-white p-4 bg-cyan-500/10">
+                        <div className="rounded-lg border border-white bg-cyan-500/10 p-4">
                             <div className="mb-3 flex items-center justify-between">
                                 <div className="flex items-center space-x-2">
                                     <span className="font-medium text-cyan-300">
@@ -708,7 +749,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                         <div
                                             key={zone.id}
                                             className="relative rounded-lg border border-white p-3 transition-all hover:bg-gray-700/70"
-                                            style={{backgroundColor: '#000005'}}
+                                            style={{ backgroundColor: '#000005' }}
                                         >
                                             <div className="mb-3 flex items-center justify-between">
                                                 <div className="flex items-center space-x-3">
@@ -801,7 +842,8 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                                     </span>
                                                                 </div>
                                                                 <div className="text-xs text-gray-500">
-                                                                    Spacing between emitters on the tape
+                                                                    Spacing between emitters on the
+                                                                    tape
                                                                 </div>
                                                             </div>
                                                             {dripPointCount > 0 && (
@@ -897,13 +939,22 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
 
                                                     <div className="mt-3 flex space-x-2">
                                                         <button
-                                                            onClick={() => generateIrrigationForZone(zone, irrigationType)}
+                                                            onClick={() =>
+                                                                generateIrrigationForZone(
+                                                                    zone,
+                                                                    irrigationType
+                                                                )
+                                                            }
                                                             className="flex-1 rounded border border-white bg-cyan-600 px-3 py-1 text-xs text-white transition-colors hover:bg-cyan-700"
                                                         >
                                                             🚿 Generate/Update System
                                                         </button>
                                                         <button
-                                                            onClick={() => clearIrrigationForZone(zone.id.toString())}
+                                                            onClick={() =>
+                                                                clearIrrigationForZone(
+                                                                    zone.id.toString()
+                                                                )
+                                                            }
                                                             className="rounded border border-white bg-red-600 px-3 py-1 text-xs text-white transition-colors hover:bg-red-700"
                                                         >
                                                             🗑️ Delete
@@ -918,12 +969,15 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                         </div>
                     )}
 
-                    <div className="rounded-lg border border-white p-3" style={{backgroundColor: '#000005'}}>
+                    <div
+                        className="rounded-lg border border-white p-3"
+                        style={{ backgroundColor: '#000005' }}
+                    >
                         <div className="flex items-center justify-between">
                             <button
                                 onClick={previousStep}
                                 className="rounded border border-white px-3 py-1 text-sm text-white transition-colors hover:bg-gray-500"
-                                style={{backgroundColor: '#000005'}}
+                                style={{ backgroundColor: '#000005' }}
                             >
                                 ⬅️ Previous
                             </button>
@@ -935,7 +989,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                     </div>
 
                     {validateStep(4) && handleCaptureMapAndSummary && (
-                        <div className="rounded-lg border border-white p-3 bg-green-500/10">
+                        <div className="rounded-lg border border-white bg-green-500/10 p-3">
                             <div className="text-center">
                                 <div className="mb-2 text-sm font-medium text-green-300">
                                     🎉 Project Complete!

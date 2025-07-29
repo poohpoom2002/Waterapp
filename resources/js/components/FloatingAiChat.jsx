@@ -164,7 +164,7 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
         setShowSuggestions(!showSuggestions);
     };
 
-    const API_BASE_URL = 'https://chaiyopipeandfitting.com' || window.location.origin || '';
+    const API_BASE_URL = '';
 
     const sendMessage = async (messageToSend = message) => {
         if (!messageToSend.trim() || isTyping) return;

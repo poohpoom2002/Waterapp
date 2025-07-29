@@ -1,7 +1,7 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
-import { useLanguage } from '../../contexts/LanguageContext';
 
 // Types
 interface Point {
@@ -107,7 +107,7 @@ const GRID_SIZE = 25;
 const CANVAS_SIZE = { width: 2400, height: 1600 };
 
 export default function GreenhouseMap() {
-    const { t } = useLanguage();
+    // Remove unused 't' variable
     // Canvas and interaction states
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [selectedTool, setSelectedTool] = useState('select');
@@ -958,13 +958,7 @@ export default function GreenhouseMap() {
 
     // Effect for drawing with throttling
     useEffect(() => {
-        let animationId: number;
-
-        const throttledDraw = () => {
-            draw();
-        };
-
-        animationId = requestAnimationFrame(throttledDraw);
+        const animationId: number = requestAnimationFrame(draw);
 
         return () => {
             if (animationId) {
@@ -1055,7 +1049,7 @@ export default function GreenhouseMap() {
                     if (config) {
                         const newElement: IrrigationElement = {
                             id: `${selectedTool}-${Date.now()}`,
-                            type: selectedTool as any,
+                            type: selectedTool as IrrigationElement['type'],
                             points: [point],
                             color: config.color,
                             width: config.width,
@@ -1249,7 +1243,7 @@ export default function GreenhouseMap() {
 
         const newElement: IrrigationElement = {
             id: `${selectedTool}-${Date.now()}`,
-            type: selectedTool as any,
+            type: selectedTool as IrrigationElement['type'],
             points: [...currentPath],
             color: config.color,
             width: config.width,
@@ -1700,14 +1694,12 @@ export default function GreenhouseMap() {
                         <h1 className="text-xl font-bold">💧 Greenhouse Irrigation System Design (Large)</h1>
                         <p className="text-sm text-gray-400">
                             Irrigation system design:{' '}
->>>>>>> 0295538755fa4f41c4e2f5f543e0e7d77c907e5c
                             {
                                 irrigationMethods[
                                     selectedIrrigationMethod as keyof typeof irrigationMethods
                                 ]?.name
                             }{' '}
                             - Area 2400x1600 pixels
->>>>>>> 0295538755fa4f41c4e2f5f543e0e7d77c907e5c
                         </p>
                     </div>
                     <div className="flex items-center space-x-2 text-sm text-gray-400">
@@ -1751,7 +1743,6 @@ export default function GreenhouseMap() {
                         <div className="mb-4">
                             <h3 className="mb-2 text-sm font-medium text-gray-300">
                                 Selected Irrigation Method
->>>>>>> 0295538755fa4f41c4e2f5f543e0e7d77c907e5c
                             </h3>
                             <div className="rounded border border-blue-500 bg-blue-600 px-3 py-2 text-sm text-white">
                                 {
