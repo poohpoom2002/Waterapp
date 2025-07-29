@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import { MapContainer, TileLayer, Polygon, useMap } from 'react-leaflet';
@@ -52,11 +54,15 @@ type Folder = {
     id: string;
     name: string;
     type: 'finished' | 'unfinished' | 'custom' | 'customer' | 'category';
-    parentId?: string;
+    parent_id?: string;
     color?: string;
     icon?: string;
     createdAt: string;
     updatedAt: string;
+};
+
+type FolderWithChildren = Folder & {
+    children?: FolderWithChildren[];
 };
 
 type FolderStructure = {
@@ -77,6 +83,34 @@ type PlantCategory = {
 
 // Constants
 const DEFAULT_CENTER: [number, number] = [13.7563, 100.5018];
+
+// Helper function to build folder tree from flat list
+const buildFolderTree = (folders: Folder[]): FolderWithChildren[] => {
+    const folderMap = new Map<string, FolderWithChildren>();
+    const rootFolders: FolderWithChildren[] = [];
+
+    // Create a map of all folders
+    folders.forEach(folder => {
+        folderMap.set(folder.id, { ...folder, children: [] });
+    });
+
+    // Build the tree structure
+    folders.forEach(folder => {
+        const folderWithChildren = folderMap.get(folder.id)!;
+        
+        if (folder.parent_id && folderMap.has(folder.parent_id)) {
+            // This is a child folder
+            const parent = folderMap.get(folder.parent_id)!;
+            if (!parent.children) parent.children = [];
+            parent.children.push(folderWithChildren);
+        } else {
+            // This is a root folder
+            rootFolders.push(folderWithChildren);
+        }
+    });
+
+    return rootFolders;
+};
 
 const getPlantCategories = (t: (key: string) => string): PlantCategory[] => [
     {
@@ -163,12 +197,18 @@ const FieldCard = ({
     onSelect,
     onDelete,
     onStatusChange,
+    onDragStart,
+    onDragEnd,
+    isDragging,
     t,
 }: {
     field: Field;
     onSelect: (field: Field) => void;
     onDelete: (fieldId: string) => void;
     onStatusChange?: (fieldId: string, status: string, isCompleted: boolean) => void;
+    onDragStart?: (field: Field) => void;
+    onDragEnd?: () => void;
+    isDragging?: boolean;
     t: (key: string) => string;
 }) => {
     const getCategoryDisplay = (category: string) => {
@@ -184,8 +224,15 @@ const FieldCard = ({
     const isFinished = field.status === 'finished' || field.isCompleted;
 
     return (
-        <div className="group relative overflow-hidden rounded-lg border border-gray-700 bg-gray-800 p-6 transition-all duration-200 hover:border-blue-500 hover:bg-blue-900/10">
-            {/* Status Badge */}
+        <div 
+            className={`group relative overflow-hidden rounded-lg border border-gray-700 bg-gray-800 p-6 transition-all duration-200 hover:border-blue-500 hover:bg-blue-900/10 ${
+                isDragging ? 'opacity-50 scale-95' : ''
+            }`}
+            draggable
+            onDragStart={() => onDragStart?.(field)}
+            onDragEnd={() => onDragEnd?.()}
+        >
+            {/* Status Badge */} 
             <div className="absolute right-3 top-3">
                 <button
                     onClick={(e) => {
@@ -414,6 +461,7 @@ const FolderCard = ({
     onSelect,
     onEdit,
     onDelete,
+    onDrop,
     isSelected,
     t,
 }: {
@@ -422,6 +470,7 @@ const FolderCard = ({
     onSelect: (folder: Folder) => void;
     onEdit: (folder: Folder) => void;
     onDelete: (folder: Folder) => void;
+    onDrop?: (folderId: string) => void;
     isSelected: boolean;
     t: (key: string) => string;
 }) => {
@@ -459,6 +508,18 @@ const FolderCard = ({
                 isSelected ? 'ring-2 ring-blue-400' : ''
             } ${getFolderColor()}`}
             onClick={() => onSelect(folder)}
+            onDragOver={(e) => {
+                e.preventDefault();
+                e.currentTarget.classList.add('border-blue-400', 'bg-blue-900/20');
+            }}
+            onDragLeave={(e) => {
+                e.currentTarget.classList.remove('border-blue-400', 'bg-blue-900/20');
+            }}
+            onDrop={(e) => {
+                e.preventDefault();
+                e.currentTarget.classList.remove('border-blue-400', 'bg-blue-900/20');
+                onDrop?.(folder.id);
+            }}
         >
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -497,6 +558,8 @@ const FolderCard = ({
     );
 };
 
+
+
 const CreateFolderModal = ({
     isOpen,
     onClose,
@@ -507,7 +570,7 @@ const CreateFolderModal = ({
     isOpen: boolean;
     onClose: () => void;
     onCreate: (folder: Omit<Folder, 'id' | 'createdAt' | 'updatedAt'>) => void;
-    parentFolder?: Folder;
+    parentFolder?: Folder | null;
     t: (key: string) => string;
 }) => {
     const [folderName, setFolderName] = useState('');
@@ -533,7 +596,7 @@ const CreateFolderModal = ({
         onCreate({
             name: folderName.trim(),
             type: folderType,
-            parentId: parentFolder?.id,
+            parent_id: parentFolder?.id,
             color: folderColor,
             icon: folderIcon,
         });
@@ -552,7 +615,7 @@ const CreateFolderModal = ({
                 <div className="mb-4 flex items-center justify-between">
                     <h2 className="text-xl font-semibold text-white">
                         {parentFolder
-                            ? `${t('create_folder_in')} ${parentFolder.name}`
+                            ? `Create Sub-folder in "${parentFolder.name}"`
                             : t('create_folder')}
                     </h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-white">
@@ -818,6 +881,8 @@ export default function Home() {
     const [showFolderDeleteConfirm, setShowFolderDeleteConfirm] = useState(false);
     const [draggedField, setDraggedField] = useState<Field | null>(null);
     const [draggedFolder, setDraggedFolder] = useState<Folder | null>(null);
+    const [parentFolderForModal, setParentFolderForModal] = useState<Folder | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
 
     const plantCategories = getPlantCategories(t);
 
@@ -829,13 +894,13 @@ export default function Home() {
 
     // Group fields by folder
     const getFieldsByFolder = (folderId: string) => {
-        return fields.filter((field) => field.folderId === folderId);
+        return fields.filter((field) => String(field.folderId) === String(folderId));
     };
 
     // Get all folders including system folders
     const getAllFolders = () => {
-        // System folders are created in the backend, so we just return all folders
-        return folders;
+        // Only return root folders (folders without parent_id)
+        return folders.filter(folder => !folder.parent_id);
     };
 
     // Get fields for current view
@@ -847,7 +912,11 @@ export default function Home() {
             return fields.filter((field) => field.status === 'finished' || field.isCompleted);
         }
         if (selectedFolder.name === t('unfinished') || selectedFolder.name === 'Unfinished') {
-            return fields.filter((field) => field.status !== 'finished' && !field.isCompleted);
+            // Show fields that are unfinished AND either have no folderId or are assigned to this folder
+            return fields.filter((field) => 
+                (field.status !== 'finished' && !field.isCompleted) && 
+                (!field.folderId || field.folderId === selectedFolder.id)
+            );
         }
 
         return getFieldsByFolder(selectedFolder.id);
@@ -861,8 +930,11 @@ export default function Home() {
                 .length;
         }
         if (folder.name === t('unfinished') || folder.name === 'Unfinished') {
-            return fields.filter((field) => field.status !== 'finished' && !field.isCompleted)
-                .length;
+            // Count fields that are unfinished AND either have no folderId or are assigned to this folder
+            return fields.filter((field) => 
+                (field.status !== 'finished' && !field.isCompleted) && 
+                (!field.folderId || field.folderId === folder.id)
+            ).length;
         }
 
         return getFieldsByFolder(folder.id).length;
@@ -879,6 +951,11 @@ export default function Home() {
 
                 if (fieldsResponse.data.fields) {
                     setFields(fieldsResponse.data.fields);
+                    
+                    // Create a mock field for testing if no fields exist
+                    if (fieldsResponse.data.fields.length === 0) {
+                        createMockField();
+                    }
                 }
 
                 if (foldersResponse.data.folders) {
@@ -896,6 +973,42 @@ export default function Home() {
 
     const handleAddField = () => {
         setShowCategoryModal(true);
+    };
+
+    const createMockField = () => {
+        const mockField: Field = {
+            id: `mock-${Date.now()}`,
+            name: 'Test Field',
+            customerName: 'Test Customer',
+            category: 'horticulture',
+            status: 'unfinished',
+            isCompleted: false,
+            folderId: undefined, // Will be assigned to "Unfinished" folder
+            area: [
+                { lat: 13.7563, lng: 100.5018 },
+                { lat: 13.7564, lng: 100.5019 },
+                { lat: 13.7565, lng: 100.5020 },
+                { lat: 13.7563, lng: 100.5018 }
+            ],
+            plantType: {
+                id: 1,
+                name: 'Tomato',
+                type: 'vegetable',
+                plant_spacing: 0.5,
+                row_spacing: 1.0,
+                water_needed: 2.5
+            },
+            totalPlants: 100,
+            totalArea: 50.0,
+            total_water_need: 125.0,
+            createdAt: new Date().toISOString(),
+            layers: []
+        };
+
+        // Add to fields state
+        setFields(prev => [...prev, mockField]);
+        
+        console.log('Mock field created for testing:', mockField);
     };
 
     const handleCategorySelect = (category: PlantCategory) => {
@@ -1009,6 +1122,11 @@ export default function Home() {
         }
     };
 
+    const handleCreateSubFolder = (parentFolder: Folder) => {
+        setParentFolderForModal(parentFolder);
+        setShowCreateFolderModal(true);
+    };
+
     const handleEditFolder = (folder: Folder) => {
         setFolderToEdit(folder);
         setShowEditFolderModal(true);
@@ -1051,8 +1169,8 @@ export default function Home() {
                     )
                 );
 
-                // Remove folder
-                setFolders((prev) => prev.filter((f) => f.id !== folderToDelete.id));
+                // Remove folder and all its sub-folders
+                setFolders((prev) => prev.filter((f) => f.id !== folderToDelete.id && f.parent_id !== folderToDelete.id));
                 setShowFolderDeleteConfirm(false);
                 setFolderToDelete(null);
 
@@ -1076,17 +1194,48 @@ export default function Home() {
     // Drag and drop functions
     const handleFieldDragStart = (field: Field) => {
         setDraggedField(field);
+        setIsDragging(true);
     };
 
     const handleFieldDragEnd = () => {
         setDraggedField(null);
+        setIsDragging(false);
     };
 
-    const handleFolderDrop = (targetFolderId: string) => {
+    const handleFolderDrop = async (targetFolderId: string) => {
         if (draggedField && draggedField.folderId !== targetFolderId) {
-            setFields((prev) =>
-                prev.map((f) => (f.id === draggedField.id ? { ...f, folderId: targetFolderId } : f))
-            );
+            try {
+                // Update field in backend
+                const response = await axios.put(`/api/fields/${draggedField.id}/folder`, {
+                    folder_id: parseInt(targetFolderId)
+                });
+
+                if (response.data.success) {
+                    console.log('Field moved successfully:', {
+                        fieldId: draggedField.id,
+                        oldFolderId: draggedField.folderId,
+                        newFolderId: targetFolderId
+                    });
+                    
+                    // Update field in frontend
+                    setFields((prev) =>
+                        prev.map((f) => (f.id === draggedField.id ? { ...f, folderId: targetFolderId } : f))
+                    );
+                }
+            } catch (error: any) {
+                console.error('Error moving field to folder:', error);
+                console.error('Error details:', error.response?.data);
+                
+                // For mock fields, still update the frontend state even if backend fails
+                if (draggedField.id.startsWith('mock-')) {
+                    console.log('Mock field - updating frontend state only');
+                    setFields((prev) =>
+                        prev.map((f) => (f.id === draggedField.id ? { ...f, folderId: targetFolderId } : f))
+                    );
+                } else {
+                    alert(`Error moving field to folder: ${error.response?.data?.message || error.message}`);
+                }
+            }
         }
     };
 
@@ -1123,6 +1272,7 @@ export default function Home() {
                                         <FaPlus className="h-4 w-4" />
                                         {t('create_folder')}
                                     </button>
+
                                     <button
                                         onClick={handleAddField}
                                         className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition-colors duration-200 hover:bg-blue-700"
@@ -1179,6 +1329,7 @@ export default function Home() {
                                             onSelect={setSelectedFolder}
                                             onEdit={handleEditFolder}
                                             onDelete={handleDeleteFolder}
+                                            onDrop={handleFolderDrop}
                                             isSelected={false}
                                             t={t}
                                         />
@@ -1186,7 +1337,7 @@ export default function Home() {
                                 </div>
                             </div>
                         ) : (
-                            // Show fields in selected folder
+                            // Show fields and sub-folders in selected folder
                             <div>
                                 <div className="mb-6 flex items-center justify-between">
                                     <h2 className="text-xl font-semibold text-white">
@@ -1196,17 +1347,63 @@ export default function Home() {
                                         {t('click_field_manage')}
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                                    {getCurrentFields().map((field) => (
-                                        <FieldCard
-                                            key={field.id}
-                                            field={field}
-                                            onSelect={handleFieldSelect}
-                                            onDelete={handleFieldDelete}
-                                            onStatusChange={handleFieldStatusChange}
-                                            t={t}
-                                        />
-                                    ))}
+                                
+                                {/* Sub-folders Section */}
+                                {(() => {
+                                    const subFolders = folders.filter(f => f.parent_id === selectedFolder.id);
+                                    return subFolders.length > 0 ? (
+                                        <div className="mb-8">
+                                            <h3 className="mb-4 text-lg font-semibold text-white">Sub-folders</h3>
+                                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                                                {subFolders.map((subFolder) => (
+                                                    <FolderCard
+                                                        key={subFolder.id}
+                                                        folder={subFolder}
+                                                        fieldCount={getFieldCountForFolder(subFolder)}
+                                                        onSelect={setSelectedFolder}
+                                                        onEdit={handleEditFolder}
+                                                        onDelete={handleDeleteFolder}
+                                                        onDrop={handleFolderDrop}
+                                                        isSelected={false}
+                                                        t={t}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : null;
+                                })()}
+                                
+                                {/* Fields Section */}
+                                {getCurrentFields().length > 0 && (
+                                    <div>
+                                        <h3 className="mb-4 text-lg font-semibold text-white">Fields</h3>
+                                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                                            {getCurrentFields().map((field) => (
+                                                <FieldCard
+                                                    key={field.id}
+                                                    field={field}
+                                                    onSelect={handleFieldSelect}
+                                                    onDelete={handleFieldDelete}
+                                                    onStatusChange={handleFieldStatusChange}
+                                                    onDragStart={handleFieldDragStart}
+                                                    onDragEnd={handleFieldDragEnd}
+                                                    isDragging={isDragging && draggedField?.id === field.id}
+                                                    t={t}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {/* Create Sub-folder Button */}
+                                <div className="mt-6">
+                                    <button
+                                        onClick={() => handleCreateSubFolder(selectedFolder)}
+                                        className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white transition-colors duration-200 hover:bg-blue-700"
+                                    >
+                                        <FaPlus className="h-4 w-4" />
+                                        Create Sub-folder in "{selectedFolder.name}"
+                                    </button>
                                 </div>
                             </div>
                         )}
@@ -1226,8 +1423,12 @@ export default function Home() {
 
             <CreateFolderModal
                 isOpen={showCreateFolderModal}
-                onClose={() => setShowCreateFolderModal(false)}
+                onClose={() => {
+                    setShowCreateFolderModal(false);
+                    setParentFolderForModal(null);
+                }}
                 onCreate={handleCreateFolder}
+                parentFolder={parentFolderForModal}
                 t={t}
             />
 

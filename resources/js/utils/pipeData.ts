@@ -212,7 +212,7 @@ export const calculatePipeIntersections = (
 // Helper function to calculate plants served by a pipe
 export const calculatePlantsServedByPipe = (
     pipeCoords: [number, number][],
-    plantLocations: unknown[]
+    plantLocations: Array<{ lat: number; lng: number }>
 ): number => {
     let plantCount = 0;
     const tolerance = 0.0001; // About 10 meters
