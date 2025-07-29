@@ -34,7 +34,6 @@ const getGoogleMapsConfig = () => {
                 style: 'HORIZONTAL_BAR' as any,
                 mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain'],
             },
-            minZoom: 1,
             gestureHandling: 'greedy' as const,
             clickableIcons: true,
             scrollwheel: true,
@@ -102,6 +101,61 @@ const MapComponent: React.FC<{
                     center,
                     zoom,
                     ...mergedOptions,
+                });
+
+                newMap.setOptions({
+                    minZoom: null,
+                    maxZoom: null,
+                    restriction: null,
+                    zoomControl: true,
+                    scrollwheel: true,
+                    gestureHandling: 'greedy',
+                });
+
+                let isZooming = false;
+                const customZoomHandler = (e: WheelEvent) => {
+                    if (isZooming) return;
+                    isZooming = true;
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    const currentZoom = newMap.getZoom() || 10;
+                    const delta = e.deltaY > 0 ? -0.5 : 0.5;
+                    const newZoom = currentZoom + delta;
+
+                    if (newZoom >= 1 && newZoom <= 50) {
+                        newMap.setZoom(newZoom);
+
+                        if (newZoom > 25) {
+                            const center = newMap.getCenter();
+                            if (center) {
+                                setTimeout(() => {
+                                    newMap.panTo(center);
+                                }, 10);
+                            }
+                        }
+                    }
+
+                    setTimeout(() => {
+                        isZooming = false;
+                    }, 50);
+                };
+
+                const mapContainer = ref.current;
+                mapContainer.addEventListener('wheel', customZoomHandler, {
+                    passive: false,
+                    capture: true,
+                });
+
+                newMap.addListener('zoom_changed', () => {
+                    const currentZoom = newMap.getZoom();
+                    if (currentZoom && currentZoom > 25) {
+                        newMap.setOptions({
+                            minZoom: null,
+                            maxZoom: null,
+                        });
+                    }
                 });
 
                 setMap(newMap);

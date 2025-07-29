@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react'; // Fanggy005 EDIT: Import router
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
 import { useState, useEffect, useRef } from 'react';
 import {
@@ -15,6 +15,8 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import * as turf from '@turf/turf';
 import { getCropByValue } from '@/pages/utils/cropData';
+// FIXED: Import helpers from fieldCropData with correct path
+import { calculateAllFieldStats, saveFieldCropData, FieldCropData } from '@/utils/fieldCropData';
 import {
     ZONE_COLORS,
     OBSTACLE_TYPES,
@@ -643,6 +645,29 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
             console.log('✅ Zone calculations completed with cropData (per irrigation):', newZoneSummaries);
         }
     }, [summaryData, zones, zoneAssignments, rowSpacing, plantSpacing, irrigationAssignments]);
+    
+    // Fanggy005 EDIT: Add handler for the calculation button
+    const handleCalculateEquipment = () => {
+        if (!summaryData) {
+            alert("ไม่พบข้อมูลโปรเจกต์สำหรับคำนวณ");
+            return;
+        }
+
+        console.log("🚀 Preparing data for product page...");
+
+        // ใช้ฟังก์ชัน calculateAllFieldStats เพื่อสร้างออบเจกต์ FieldCropData ที่สมบูรณ์
+        const fieldData: FieldCropData = calculateAllFieldStats(summaryData);
+
+        // บันทึกข้อมูลที่จัดโครงสร้างแล้วลง localStorage
+        saveFieldCropData(fieldData);
+        
+        // ตั้งค่าประเภทโปรเจกต์เพื่อให้หน้า product รู้ว่าต้องโหลดข้อมูลอะไร
+        localStorage.setItem('projectType', 'field-crop');
+
+        // นำทางไปยังหน้า product
+        console.log("Navigating to /product?mode=field-crop");
+        router.visit('/product?mode=field-crop');
+    };
 
     // Handle case where zones might be just a number (from minimal data)
     const actualZones = Array.isArray(zones) ? zones : [];
@@ -856,24 +881,27 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
     // Show loading or no data message
     if (!summaryData) {
         return (
-            <div className="min-h-screen bg-gray-900 text-white">
+            <div className="flex h-screen flex-col overflow-hidden bg-gray-900 text-white">
                 <Head title="Field Crop Summary - No Data" />
-                <div className="container mx-auto px-4 py-6">
-                    <div className="rounded-lg bg-gray-800 p-8 text-center">
-                        <div className="mb-4 text-6xl">📋</div>
-                        <h2 className="mb-4 text-2xl font-bold text-yellow-400">
-                            No Project Data Found
-                        </h2>
-                        <p className="mb-6 text-gray-400">
-                            Please return to the Field Map page, complete the steps, and click "View
-                            Summary".
-                        </p>
-                        <Link
-                            href="/field-map"
-                            className="inline-flex items-center rounded-lg bg-blue-600 px-6 py-3 text-white transition-colors hover:bg-blue-700"
-                        >
-                            🗺️ Go to Field Map
-                        </Link>
+                <Navbar />
+                <div className="flex flex-1 items-center justify-center overflow-y-auto">
+                    <div className="container mx-auto px-4 py-6">
+                        <div className="rounded-lg bg-gray-800 p-8 text-center">
+                            <div className="mb-4 text-6xl">📋</div>
+                            <h2 className="mb-4 text-2xl font-bold text-yellow-400">
+                                No Project Data Found
+                            </h2>
+                            <p className="mb-6 text-gray-400">
+                                Please return to the Field Map page, complete the steps, and click "View
+                                Summary".
+                            </p>
+                            <Link
+                                href="/field-map"
+                                className="inline-flex items-center rounded-lg bg-blue-600 px-6 py-3 text-white transition-colors hover:bg-blue-700"
+                            >
+                                🗺️ Go to Field Map
+                            </Link>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -881,37 +909,69 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
     }
 
     return (
-        <div className="min-h-screen flex flex-col bg-gray-900 text-white print:bg-white print:text-black">
-            <Navbar />
+        <div className="flex h-screen flex-col overflow-hidden bg-gray-900 text-white print:bg-white print:text-black">
             <Head title="Field Crop Summary - Irrigation Planning" />
 
-            {/* Header */}
+            {/* Navbar - Fixed at top */}
+            <Navbar />
+
+            {/* Header - Hidden on print */}
             <div className="border-b border-gray-700 bg-gray-800 print:hidden">
                 <div className="container mx-auto px-4 py-4">
                     <div className="mx-auto max-w-7xl">
-                        <Link
-                            href="/field-map?edit=true&step=4"
-                            className="mb-2 inline-flex items-center text-blue-400 hover:text-blue-300"
-                        >
-                            <svg
-                                className="mr-2 h-5 w-5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                                />
-                            </svg>
-                            Back to Field Map
-                        </Link>
-                        <h1 className="mb-1 text-3xl font-bold">📊 Field Crop Summary</h1>
-                        <p className="mb-2 text-gray-400">
-                            Complete overview of your irrigation planning project
-                        </p>
+                        {/* Enhanced Header with Equipment Calculator Button */}
+                        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                            {/* Left side: Back button and title */}
+                            <div className="flex-1">
+                                <Link
+                                    href="/field-map?edit=true&step=4"
+                                    className="mb-2 inline-flex items-center text-blue-400 hover:text-blue-300"
+                                >
+                                    <svg
+                                        className="mr-2 h-5 w-5"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                                        />
+                                    </svg>
+                                    Back to Field Map
+                                </Link>
+                                <h1 className="mb-1 text-3xl font-bold">📊 Field Crop Summary</h1>
+                                <p className="mb-2 text-gray-400">
+                                    Complete overview of your irrigation planning project
+                                </p>
+                            </div>
+
+                            {/* Right side: Equipment Calculator Button */}
+                            <div className="flex-shrink-0">
+                                {/* Fanggy005 EDIT: Changed Link to button with onClick handler */}
+                                <button
+                                    onClick={handleCalculateEquipment}
+                                    className="inline-flex items-center rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 text-white font-semibold transition-all duration-200 hover:from-purple-700 hover:to-blue-700 hover:shadow-lg transform hover:scale-105"
+                                >
+                                    <svg 
+                                        className="mr-2 h-5 w-5" 
+                                        fill="none" 
+                                        stroke="currentColor" 
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path 
+                                            strokeLinecap="round" 
+                                            strokeLinejoin="round" 
+                                            strokeWidth={2} 
+                                            d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" 
+                                        />
+                                    </svg>
+                                    🧮 คำนวณอุปกรณ์
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -923,841 +983,843 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                 <hr className="my-2 border-gray-300" />
             </div>
 
-            {/* Main Content */}
-            <div className="print:print-layout container mx-auto px-4 py-4">
-                <div className="mx-auto max-w-7xl print:max-w-none">
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 print:grid-cols-2 print:gap-6">
-                        {/* Left Column: Project Overview & Details */}
-                        <div className="print:print-summary-section space-y-4">
-                            {/* Map Visualization - ย้ายมาด้านบนสุด */}
-                            <div className="print:print-map-container overflow-hidden rounded-lg bg-gray-800 print:border">
-                                <div className="flex h-full flex-col">
-                                    <div className="print:print-map-header border-b border-gray-600 bg-gray-700 p-2">
-                                        <h3 className="text-sm font-semibold text-white print:text-black">
-                                            🗺️ Project Map Overview
-                                        </h3>
-                                    </div>
-                                    <div
-                                        className="print:print-map-container relative"
-                                        style={{ minHeight: 300, height: '400px' }}
-                                    >
-                                        <MapContainer
-                                            center={optimalCenter}
-                                            zoom={optimalZoom}
-                                            maxZoom={20}
-                                            style={{ height: '100%', width: '100%' }}
-                                            scrollWheelZoom={true}
+            {/* Main Content - Scrollable */}
+            <div className="flex-1 overflow-y-auto print:print-layout">
+                <div className="container mx-auto px-4 py-4">
+                    <div className="mx-auto max-w-7xl print:max-w-none">
+                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 print:grid-cols-2 print:gap-6">
+                            {/* Left Column: Project Overview & Details */}
+                            <div className="print:print-summary-section space-y-4">
+                                {/* Map Visualization - ย้ายมาด้านบนสุด */}
+                                <div className="print:print-map-container overflow-hidden rounded-lg bg-gray-800 print:border">
+                                    <div className="flex h-full flex-col">
+                                        <div className="print:print-map-header border-b border-gray-600 bg-gray-700 p-2">
+                                            <h3 className="text-sm font-semibold text-white print:text-black">
+                                                🗺️ Project Map Overview
+                                            </h3>
+                                        </div>
+                                        <div
+                                            className="print:print-map-container relative"
+                                            style={{ minHeight: 300, height: '400px' }}
                                         >
-                                            <TileLayer
-                                                url={
-                                                    MAP_TILES[mapType]?.url ||
-                                                    MAP_TILES.satellite.url
-                                                }
-                                                attribution={
-                                                    MAP_TILES[mapType]?.attribution ||
-                                                    MAP_TILES.satellite.attribution
-                                                }
+                                            <MapContainer
+                                                center={optimalCenter}
+                                                zoom={optimalZoom}
                                                 maxZoom={20}
-                                            />
-                                            <FeatureGroup>
-                                                {mainField &&
-                                                    mainField.coordinates &&
-                                                    Array.isArray(mainField.coordinates) && (
-                                                        <Polygon
-                                                            positions={mainField.coordinates}
-                                                            pathOptions={{
-                                                                color: '#22C55E',
-                                                                fillColor: '#22C55E',
-                                                                fillOpacity: 0.2,
-                                                                weight: 2,
-                                                            }}
-                                                        />
-                                                    )}
-                                                {actualZones.map((zone) =>
-                                                    zone.coordinates &&
-                                                    Array.isArray(zone.coordinates) ? (
-                                                        <Polygon
-                                                            key={zone.id}
-                                                            positions={zone.coordinates}
-                                                            pathOptions={{
-                                                                color: zone.color || '#3B82F6',
-                                                                fillColor: zone.color || '#3B82F6',
-                                                                fillOpacity: 0.3,
-                                                                weight: 2,
-                                                            }}
-                                                        />
-                                                    ) : null
-                                                )}
-                                                {actualPipes.map((pipe) => {
-                                                    // **IMPROVED LOGIC**
-                                                    const pipeConfig = PIPE_TYPES[pipe.type as PipeType] || { color: '#888888', weight: 3 };
-                                                    
-                                                    return pipe.coordinates &&
-                                                        Array.isArray(pipe.coordinates) ? (
-                                                        <Polyline
-                                                            key={pipe.id}
-                                                            positions={pipe.coordinates}
-                                                            pathOptions={{
-                                                                color: pipeConfig.color,
-                                                                weight: pipeConfig.weight,
-                                                                opacity: 0.9,
-                                                            }}
-                                                        />
-                                                    ) : null;
-                                                })}
-                                                {uniqueEquipment.map((equipment) => {
-                                                    const customIcon =
-                                                        createEquipmentIcon(equipment);
-                                                    return customIcon &&
-                                                        equipment.lat &&
-                                                        equipment.lng ? (
-                                                        <Marker
-                                                            key={equipment.id}
-                                                            position={[
-                                                                equipment.lat,
-                                                                equipment.lng,
-                                                            ]}
-                                                            icon={customIcon}
-                                                        />
-                                                    ) : null;
-                                                })}
-                                                {filteredIrrigationPoints.map((point, index) => {
-                                                    let lat, lng;
-                                                    if (point.lat && point.lng) {
-                                                        [lat, lng] = [point.lat, point.lng];
-                                                    } else if (Array.isArray(point.position)) {
-                                                        [lat, lng] = point.position;
-                                                    }
-                                                    if (!lat || !lng) return null;
-
-                                                    // **IMPROVED LOGIC**
-                                                    const normalizedType = normalizeIrrigationType(
-                                                        point.type
-                                                    );
-                                                    let color = '#06b6d4'; // Default (cyan)
-                                                    if (normalizedType === 'sprinkler')
-                                                        color = '#22c55e'; // Green
-                                                    else if (normalizedType === 'mini_sprinkler')
-                                                        color = '#3b82f6'; // Blue
-                                                    else if (normalizedType === 'micro_spray')
-                                                        color = '#f97316'; // Orange
-                                                    
-                                                    return (
-                                                        <CircleMarker
-                                                            key={point.id || `irrigation-${index}`}
-                                                            center={[lat, lng]}
-                                                            radius={4}
-                                                            pathOptions={{
-                                                                color: color,
-                                                                fillColor: color,
-                                                                fillOpacity: 0.9,
-                                                                weight: 2,
-                                                            }}
-                                                        />
-                                                    );
-                                                })}
-                                                {uniqueIrrigationLines.map((line) =>
-                                                    line.coordinates &&
-                                                    Array.isArray(line.coordinates) ? (
-                                                        <Polyline
-                                                            key={line.id}
-                                                            positions={line.coordinates}
-                                                            pathOptions={{
-                                                                color: '#06B6D4',
-                                                                weight: 3,
-                                                                opacity: 0.8,
-                                                            }}
-                                                        />
-                                                    ) : null
-                                                )}
-                                                {filteredIrrigationPoints.map((point, index) => {
-                                                    let lat, lng;
-                                                    if (point.lat && point.lng) {
-                                                        [lat, lng] = [point.lat, point.lng];
-                                                    } else if (Array.isArray(point.position)) {
-                                                        [lat, lng] = point.position;
-                                                    }
-                                                    if (
-                                                        !lat ||
-                                                        !lng ||
-                                                        !point.radius ||
-                                                        normalizeIrrigationType(point.type) ===
-                                                            'drip_tape'
-                                                    )
-                                                        return null;
-                                                    
-                                                    // **IMPROVED LOGIC**
-                                                    const normalizedType = normalizeIrrigationType(
-                                                        point.type
-                                                    );
-                                                    let color = '#06b6d4'; // Default (cyan)
-                                                    if (normalizedType === 'sprinkler')
-                                                        color = '#22c55e'; // Green
-                                                    else if (normalizedType === 'mini_sprinkler')
-                                                        color = '#3b82f6'; // Blue
-                                                    else if (normalizedType === 'micro_spray')
-                                                        color = '#f97316'; // Orange
-
-                                                    return (
-                                                        <Circle
-                                                            key={`${point.id || index}-coverage`}
-                                                            center={[lat, lng]}
-                                                            radius={point.radius}
-                                                            pathOptions={{
-                                                                color: color,
-                                                                fillColor: color,
-                                                                fillOpacity: 0.1,
-                                                                weight: 1,
-                                                                opacity: 0.6,
-                                                            }}
-                                                        />
-                                                    );
-                                                })}
-                                            </FeatureGroup>
-                                        </MapContainer>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Project Overview */}
-                            <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
-                                <h2 className="mb-3 text-lg font-bold text-green-400 print:text-base print:text-black">
-                                    🏡 Project Overview
-                                </h2>
-                                <div className="grid grid-cols-4 gap-2 print:gap-1">
-                                    <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-1">
-                                        <div className="text-lg font-bold text-blue-400 print:text-sm print:text-black">
-                                            {areaInRai.toFixed(2)}
-                                        </div>
-                                        <div className="text-xs text-gray-400 print:text-gray-600">
-                                            ไร่
-                                        </div>
-                                    </div>
-                                    <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-1">
-                                        <div className="text-lg font-bold text-green-400 print:text-sm print:text-black">
-                                            {totalZones}
-                                        </div>
-                                        <div className="text-xs text-gray-400 print:text-gray-600">
-                                            โซน
-                                        </div>
-                                    </div>
-                                    <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-1">
-                                        <div className="text-lg font-bold text-purple-400 print:text-sm print:text-black">
-                                            {totalPlantingPoints.toLocaleString()}
-                                        </div>
-                                        <div className="text-xs text-gray-400 print:text-gray-600">
-                                            จุดปลูก
-                                        </div>
-                                    </div>
-                                    <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-1">
-                                        <div className="text-lg font-bold text-yellow-400 print:text-sm print:text-black">
-                                            {totalEstimatedYield.toLocaleString()}
-                                        </div>
-                                        <div className="text-xs text-gray-400 print:text-gray-600">
-                                            กก.
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Crop Information - ซ่อนการแสดงผลแต่เก็บโครงสร้างข้อมูลไว้ */}
-                            <div style={{ display: 'none' }} className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
-                                <h2 className="mb-3 text-lg font-bold text-green-400 print:text-base print:text-black">
-                                    🌱 Crop Information (from cropData)
-                                </h2>
-                                <div className="space-y-2 print:space-y-1">
-                                    {selectedCropObjects.map(
-                                        (crop) =>
-                                            crop && (
-                                                <div
-                                                    key={crop.value}
-                                                    className="rounded-lg bg-gray-700 p-2 print:border print:border-gray-200 print:bg-gray-50 print:p-1"
-                                                >
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex items-center space-x-2">
-                                                            <span className="text-lg print:text-sm">
-                                                                {crop.icon}
-                                                            </span>
-                                                            <div>
-                                                                <h3 className="text-sm font-semibold text-white print:text-xs print:text-black">
-                                                                    {crop.name}
-                                                                </h3>
-                                                                <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                    {crop.category} • {crop.irrigationNeeds} water needs
-                                                                </div>
-                                                                <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                    Growth: {crop.growthPeriod} days
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                <strong>Spacing:</strong>
-                                                            </div>
-                                                            <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                แถว: {crop.rowSpacing} ซม.
-                                                            </div>
-                                                            <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                ต้น: {crop.plantSpacing} ซม.
-                                                            </div>
-                                                            <div className="text-xs text-gray-400 print:text-gray-600 mt-1">
-                                                                <strong>Production:</strong>
-                                                            </div>
-                                                            <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                {crop.yield} กก./ไร่
-                                                            </div>
-                                                            <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                {crop.price} บาท/กก.
-                                                            </div>
-                                                            <div className="text-xs text-gray-400 print:text-gray-600 mt-1">
-                                                                <strong>Water:</strong>
-                                                            </div>
-                                                            <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                {crop.waterRequirement} ล./ต้น/ครั้ง
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Infrastructure Summary */}
-                            <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
-                                <h2 className="mb-3 text-lg font-bold text-purple-400 print:text-base print:text-black">
-                                    🔧 Infrastructure Summary
-                                </h2>
-                                <div className="mb-3">
-                                    <h3 className="mb-2 text-sm font-semibold text-blue-400 print:text-xs print:text-black">
-                                        📏 Pipe System (วาดเสร็จแล้วเท่านั้น)
-                                    </h3>
-                                    <div className="space-y-2">
-                                        {/* Main Pipes */}
-                                        <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
-                                            <div className="flex justify-between items-center mb-1">
-                                                <span className="text-xs font-medium text-blue-300 print:text-black">Main Pipes</span>
-                                                <span className="text-xs font-bold text-blue-400 print:text-black">{mainPipeStats.count} ท่อ</span>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-1 text-xs">
-                                                <div>
-                                                    <span className="text-gray-400 print:text-gray-600">ยาวสุด: </span>
-                                                    <span className="text-blue-300 print:text-black font-medium">{mainPipeStats.longestLength.toLocaleString()} ม.</span>
-                                                </div>
-                                                <div>
-                                                    <span className="text-gray-400 print:text-gray-600">รวม: </span>
-                                                    <span className="text-blue-300 print:text-black font-medium">{mainPipeStats.totalLength.toLocaleString()} ม.</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        {/* Submain Pipes */}
-                                        <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
-                                            <div className="flex justify-between items-center mb-1">
-                                                <span className="text-xs font-medium text-green-300 print:text-black">Submain Pipes</span>
-                                                <span className="text-xs font-bold text-green-400 print:text-black">{submainPipeStats.count} ท่อ</span>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-1 text-xs">
-                                                <div>
-                                                    <span className="text-gray-400 print:text-gray-600">ยาวสุด: </span>
-                                                    <span className="text-green-300 print:text-black font-medium">{submainPipeStats.longestLength.toLocaleString()} ม.</span>
-                                                </div>
-                                                <div>
-                                                    <span className="text-gray-400 print:text-gray-600">รวม: </span>
-                                                    <span className="text-green-300 print:text-black font-medium">{submainPipeStats.totalLength.toLocaleString()} ม.</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        {/* Lateral Pipes */}
-                                        <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
-                                            <div className="flex justify-between items-center mb-1">
-                                                <span className="text-xs font-medium text-purple-300 print:text-black">Lateral Pipes</span>
-                                                <span className="text-xs font-bold text-purple-400 print:text-black">{lateralPipeStats.count} ท่อ</span>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-1 text-xs">
-                                                <div>
-                                                    <span className="text-gray-400 print:text-gray-600">ยาวสุด: </span>
-                                                    <span className="text-purple-300 print:text-black font-medium">{lateralPipeStats.longestLength.toLocaleString()} ม.</span>
-                                                </div>
-                                                <div>
-                                                    <span className="text-gray-400 print:text-gray-600">รวม: </span>
-                                                    <span className="text-purple-300 print:text-black font-medium">{lateralPipeStats.totalLength.toLocaleString()} ม.</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        {/* Total Summary */}
-                                        <div className="rounded bg-blue-900/30 p-2 print:border print:bg-blue-50">
-                                            <div className="text-center">
-                                                <span className="text-xs font-medium text-blue-300 print:text-blue-800">ความยาวท่อที่ยาวสุดรวม: </span>
-                                                <span className="text-sm font-bold text-blue-100 print:text-blue-900">
-                                                    {(mainPipeStats.longestLength + submainPipeStats.longestLength + lateralPipeStats.longestLength).toLocaleString()} ม.
-                                                </span>
-                                            </div>
-                                            <div className="text-center mt-1">
-                                                <span className="text-xs font-medium text-blue-300 print:text-blue-800">ความยาวท่อรวมทั้งหมด: </span>
-                                                <span className="text-sm font-bold text-blue-100 print:text-blue-900">
-                                                    {(mainPipeStats.totalLength + submainPipeStats.totalLength + lateralPipeStats.totalLength).toLocaleString()} ม.
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="mb-3">
-                                    <h3 className="mb-2 text-sm font-semibold text-orange-400 print:text-xs print:text-black">
-                                        ⚙️ Equipment
-                                    </h3>
-                                    <div className="grid grid-cols-3 gap-1">
-                                        <div className="rounded bg-gray-700 p-1 text-center print:border">
-                                            <div className="text-sm font-bold text-orange-400">
-                                                {pumpCount}
-                                            </div>
-                                            <div className="text-xs text-gray-400">Pumps</div>
-                                        </div>
-                                        <div className="rounded bg-gray-700 p-1 text-center print:border">
-                                            <div className="text-sm font-bold text-red-400">
-                                                {valveCount}
-                                            </div>
-                                            <div className="text-xs text-gray-400">Valves</div>
-                                        </div>
-                                        <div className="rounded bg-gray-700 p-1 text-center print:border">
-                                            <div className="text-sm font-bold text-yellow-400">
-                                                {solenoidCount}
-                                            </div>
-                                            <div className="text-xs text-gray-400">Solenoids</div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div>
-                                    <h3 className="mb-2 text-sm font-semibold text-cyan-400 print:text-xs print:text-black">
-                                        💧 Irrigation System
-                                    </h3>
-                                    <div className="grid grid-cols-2 gap-1">
-                                        <div className="rounded bg-gray-700 p-1 text-center print:border">
-                                            <div className="text-sm font-bold text-green-400">
-                                                {sprinklerPoints}
-                                            </div>
-                                            <div className="text-xs text-gray-400">Sprinklers</div>
-                                        </div>
-                                        <div className="rounded bg-gray-700 p-1 text-center print:border">
-                                            <div className="text-sm font-bold text-blue-400">
-                                                {miniSprinklerPoints}
-                                            </div>
-                                            <div className="text-xs text-gray-400">
-                                                Mini Sprinklers
-                                            </div>
-                                        </div>
-                                        <div className="rounded bg-gray-700 p-1 text-center print:border">
-                                            <div className="text-sm font-bold text-orange-400">
-                                                {microSprayPoints}
-                                            </div>
-                                            <div className="text-xs text-gray-400">
-                                                Micro Sprays
-                                            </div>
-                                        </div>
-                                        <div className="rounded bg-gray-700 p-1 text-center print:border">
-                                            <div className="text-sm font-bold text-cyan-400">
-                                                {dripPoints + dripLines}
-                                            </div>
-                                            <div className="text-xs text-gray-400">Drip Points</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Financial & Water Summary */}
-                            <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
-                                <h2 className="mb-3 text-lg font-bold text-green-400 print:text-base print:text-black">
-                                    💰 Financial & Water Summary
-                                </h2>
-                                <div className="space-y-3 print:space-y-2">
-                                    {/* Financial Summary */}
-                                    <div className="space-y-2">
-                                        <div className="rounded-lg bg-gray-700 p-2 print:border print:bg-gray-50">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm text-gray-400 print:text-gray-700">
-                                                    Total Estimated Yield
-                                                </span>
-                                                <span className="text-sm font-bold text-yellow-400 print:text-black">
-                                                    {totalEstimatedYield.toLocaleString()} กก.
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="rounded-lg bg-gray-700 p-2 print:border print:bg-gray-50">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm text-gray-400 print:text-gray-700">
-                                                    Total Estimated Income
-                                                </span>
-                                                <span className="text-sm font-bold text-green-400 print:text-black">
-                                                    ฿{totalEstimatedIncome.toLocaleString()}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Water Requirements Summary - เปลี่ยนเป็นลิตรต่อครั้ง */}
-                                    <div className="bg-cyan-900/30 p-3 rounded-lg print:bg-cyan-50 print:border-2 print:border-cyan-200">
-                                        <h3 className="text-sm font-semibold text-cyan-300 mb-2 print:text-cyan-800">
-                                            💧 Total Water Requirements (ลิตรต่อครั้ง - from cropData)
-                                        </h3>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div className="space-y-1">
-                                                <div className="text-xs text-cyan-200 print:text-cyan-700">
-                                                    Total Farm Area: {areaInRai.toFixed(2)} ไร่
-                                                </div>
-                                                <div className="text-xs text-cyan-200 print:text-cyan-700">
-                                                    Total Plants: {totalPlantingPoints.toLocaleString()} ต้น
-                                                </div>
-                                                <div className="text-xs text-cyan-200 print:text-cyan-700">
-                                                    Active Zones: {Object.keys(calculatedZoneSummaries).filter(id => calculatedZoneSummaries[id].cropValue).length} zones
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="text-xs text-cyan-200 print:text-cyan-700 mb-1">
-                                                    Water Need per Irrigation:
-                                                </div>
-                                                <div className="font-bold text-cyan-100 print:text-cyan-800 text-xl">
-                                                    {totalWaterRequirementPerIrrigation.toLocaleString()}
-                                                </div>
-                                                <div className="text-xs text-cyan-200 print:text-cyan-700">
-                                                    ลิตร/ครั้ง
-                                                </div>
-                                                <div className="text-xs text-cyan-200 print:text-cyan-700 mt-1">
-                                                    ({(totalWaterRequirementPerIrrigation / 1000).toFixed(1)} ลบ.ม./ครั้ง)
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        {/* Water breakdown by zone */}
-                                        <div className="mt-3 pt-2 border-t border-cyan-700 print:border-cyan-300">
-                                            <div className="text-xs text-cyan-200 print:text-cyan-700 mb-2 font-medium">
-                                                Water Requirements by Zone (per irrigation):
-                                            </div>
-                                            <div className="space-y-1 max-h-24 overflow-y-auto">
-                                                {Object.values(calculatedZoneSummaries)
-                                                    .filter((summary: any) => summary.cropValue)
-                                                    .map((summary: any) => (
-                                                        <div key={summary.zoneId} className="flex justify-between text-xs">
-                                                            <span className="text-cyan-200 print:text-cyan-700">
-                                                                {summary.zoneName} ({summary.zoneAreaRai} ไร่)
-                                                            </span>
-                                                            <span className="text-cyan-100 print:text-cyan-800 font-medium">
-                                                                {summary.waterRequirementPerIrrigation.toLocaleString()} ล./ครั้ง
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                            </div>
-                                        </div>
-
-                                        {/* Monthly and yearly projections - อัปเดตให้ใช้ข้อมูลใหม่ */}
-                                        <div className="mt-3 pt-2 border-t border-cyan-700 print:border-cyan-300">
-                                            <div className="grid grid-cols-2 gap-2 text-xs">
-                                                <div className="text-center bg-cyan-800/50 p-2 rounded print:bg-cyan-100">
-                                                    <div className="text-cyan-200 print:text-cyan-700">Monthly</div>
-                                                    <div className="font-bold text-cyan-100 print:text-cyan-800">
-                                                        {(totalWaterRequirementPerIrrigation * 30 / 1000).toFixed(1)}
-                                                    </div>
-                                                    <div className="text-cyan-200 print:text-cyan-700">ลบ.ม./เดือน</div>
-                                                </div>
-                                                <div className="text-center bg-cyan-800/50 p-2 rounded print:bg-cyan-100">
-                                                    <div className="text-cyan-200 print:text-cyan-700">Yearly</div>
-                                                    <div className="font-bold text-cyan-100 print:text-cyan-800">
-                                                        {(totalWaterRequirementPerIrrigation * 365 / 1000).toFixed(0)}
-                                                    </div>
-                                                    <div className="text-cyan-200 print:text-cyan-700">ลบ.ม./ปี</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="rounded-lg bg-gray-800 p-4 print:hidden">
-                                <h2 className="mb-3 text-lg font-bold text-purple-400">
-                                    📋 Actions
-                                </h2>
-                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                    <Link
-                                        href="/field-map?edit=true&step=4"
-                                        className="rounded-lg bg-blue-600 px-4 py-2 text-center font-semibold text-white hover:bg-blue-700"
-                                    >
-                                        🔄 Edit Project
-                                    </Link>
-                                    <button
-                                        onClick={() => window.print()}
-                                        className="rounded-lg bg-green-600 px-4 py-2 font-semibold text-white hover:bg-green-700"
-                                    >
-                                        🖨️ Print Summary
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Right Column: Zone Details */}
-                        <div className="space-y-4 print:contents">
-                            {/* Zone Details */}
-                            <div className="print:print-other-content rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
-                                <h2 className="mb-3 text-lg font-bold text-blue-400 print:text-base print:text-black">
-                                    🎯 Zone Details & Irrigation Systems (ลิตรต่อครั้ง)
-                                </h2>
-                                <div className="space-y-3 print:space-y-2">
-                                    {actualZones.map((zone) => {
-                                        const summary = calculatedZoneSummaries[zone.id];
-                                        const assignedCrop = zoneAssignments[zone.id]
-                                            ? getCropByValue(zoneAssignments[zone.id])
-                                            : null;
-                                        const irrigationType = irrigationAssignments[zone.id];
-                                        const zonePipeStats = calculateZonePipeStats(actualPipes, zone.id.toString(), actualZones);
-                                        return (
-                                            <div
-                                                key={zone.id}
-                                                className="rounded-lg bg-gray-700 p-3 print:border print:bg-gray-50"
+                                                style={{ height: '100%', width: '100%' }}
+                                                scrollWheelZoom={true}
                                             >
-                                                <div className="mb-2 flex items-center justify-between">
-                                                    <div className="flex items-center space-x-2">
-                                                        <div
-                                                            className="h-3 w-3 rounded-full"
-                                                            style={{ backgroundColor: zone.color }}
-                                                        ></div>
-                                                        <h3 className="text-sm font-semibold text-white print:text-black">
-                                                            {zone.name}
-                                                        </h3>
+                                                <TileLayer
+                                                    url={
+                                                        MAP_TILES[mapType]?.url ||
+                                                        MAP_TILES.satellite.url
+                                                    }
+                                                    attribution={
+                                                        MAP_TILES[mapType]?.attribution ||
+                                                        MAP_TILES.satellite.attribution
+                                                    }
+                                                    maxZoom={20}
+                                                />
+                                                <FeatureGroup>
+                                                    {mainField &&
+                                                        mainField.coordinates &&
+                                                        Array.isArray(mainField.coordinates) && (
+                                                            <Polygon
+                                                                positions={mainField.coordinates}
+                                                                pathOptions={{
+                                                                    color: '#22C55E',
+                                                                    fillColor: '#22C55E',
+                                                                    fillOpacity: 0.2,
+                                                                    weight: 2,
+                                                                }}
+                                                            />
+                                                        )}
+                                                    {actualZones.map((zone) =>
+                                                        zone.coordinates &&
+                                                        Array.isArray(zone.coordinates) ? (
+                                                            <Polygon
+                                                                key={zone.id}
+                                                                positions={zone.coordinates}
+                                                                pathOptions={{
+                                                                    color: zone.color || '#3B82F6',
+                                                                    fillColor: zone.color || '#3B82F6',
+                                                                    fillOpacity: 0.3,
+                                                                    weight: 2,
+                                                                }}
+                                                            />
+                                                        ) : null
+                                                    )}
+                                                    {actualPipes.map((pipe) => {
+                                                        // **IMPROVED LOGIC**
+                                                        const pipeConfig = PIPE_TYPES[pipe.type as PipeType] || { color: '#888888', weight: 3 };
+                                                        
+                                                        return pipe.coordinates &&
+                                                            Array.isArray(pipe.coordinates) ? (
+                                                            <Polyline
+                                                                key={pipe.id}
+                                                                positions={pipe.coordinates}
+                                                                pathOptions={{
+                                                                    color: pipeConfig.color,
+                                                                    weight: pipeConfig.weight,
+                                                                    opacity: 0.9,
+                                                                }}
+                                                            />
+                                                        ) : null;
+                                                    })}
+                                                    {uniqueEquipment.map((equipment) => {
+                                                        const customIcon =
+                                                            createEquipmentIcon(equipment);
+                                                        return customIcon &&
+                                                            equipment.lat &&
+                                                            equipment.lng ? (
+                                                            <Marker
+                                                                key={equipment.id}
+                                                                position={[
+                                                                    equipment.lat,
+                                                                    equipment.lng,
+                                                                ]}
+                                                                icon={customIcon}
+                                                            />
+                                                        ) : null;
+                                                    })}
+                                                    {filteredIrrigationPoints.map((point, index) => {
+                                                        let lat, lng;
+                                                        if (point.lat && point.lng) {
+                                                            [lat, lng] = [point.lat, point.lng];
+                                                        } else if (Array.isArray(point.position)) {
+                                                            [lat, lng] = point.position;
+                                                        }
+                                                        if (!lat || !lng) return null;
+
+                                                        // **IMPROVED LOGIC**
+                                                        const normalizedType = normalizeIrrigationType(
+                                                            point.type
+                                                        );
+                                                        let color = '#06b6d4'; // Default (cyan)
+                                                        if (normalizedType === 'sprinkler')
+                                                            color = '#22c55e'; // Green
+                                                        else if (normalizedType === 'mini_sprinkler')
+                                                            color = '#3b82f6'; // Blue
+                                                        else if (normalizedType === 'micro_spray')
+                                                            color = '#f97316'; // Orange
+                                                        
+                                                        return (
+                                                            <CircleMarker
+                                                                key={point.id || `irrigation-${index}`}
+                                                                center={[lat, lng]}
+                                                                radius={4}
+                                                                pathOptions={{
+                                                                    color: color,
+                                                                    fillColor: color,
+                                                                    fillOpacity: 0.9,
+                                                                    weight: 2,
+                                                                }}
+                                                            />
+                                                        );
+                                                    })}
+                                                    {uniqueIrrigationLines.map((line) =>
+                                                        line.coordinates &&
+                                                        Array.isArray(line.coordinates) ? (
+                                                            <Polyline
+                                                                key={line.id}
+                                                                positions={line.coordinates}
+                                                                pathOptions={{
+                                                                    color: '#06B6D4',
+                                                                    weight: 3,
+                                                                    opacity: 0.8,
+                                                                }}
+                                                            />
+                                                        ) : null
+                                                    )}
+                                                    {filteredIrrigationPoints.map((point, index) => {
+                                                        let lat, lng;
+                                                        if (point.lat && point.lng) {
+                                                            [lat, lng] = [point.lat, point.lng];
+                                                        } else if (Array.isArray(point.position)) {
+                                                            [lat, lng] = point.position;
+                                                        }
+                                                        if (
+                                                            !lat ||
+                                                            !lng ||
+                                                            !point.radius ||
+                                                            normalizeIrrigationType(point.type) ===
+                                                                'drip_tape'
+                                                        )
+                                                            return null;
+                                                        
+                                                        // **IMPROVED LOGIC**
+                                                        const normalizedType = normalizeIrrigationType(
+                                                            point.type
+                                                        );
+                                                        let color = '#06b6d4'; // Default (cyan)
+                                                        if (normalizedType === 'sprinkler')
+                                                            color = '#22c55e'; // Green
+                                                        else if (normalizedType === 'mini_sprinkler')
+                                                            color = '#3b82f6'; // Blue
+                                                        else if (normalizedType === 'micro_spray')
+                                                            color = '#f97316'; // Orange
+
+                                                        return (
+                                                            <Circle
+                                                                key={`${point.id || index}-coverage`}
+                                                                center={[lat, lng]}
+                                                                radius={point.radius}
+                                                                pathOptions={{
+                                                                    color: color,
+                                                                    fillColor: color,
+                                                                    fillOpacity: 0.1,
+                                                                    weight: 1,
+                                                                    opacity: 0.6,
+                                                                }}
+                                                            />
+                                                        );
+                                                    })}
+                                                </FeatureGroup>
+                                            </MapContainer>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Project Overview */}
+                                <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
+                                    <h2 className="mb-3 text-lg font-bold text-green-400 print:text-base print:text-black">
+                                        🏡 Project Overview
+                                    </h2>
+                                    <div className="grid grid-cols-4 gap-2 print:gap-1">
+                                        <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-1">
+                                            <div className="text-lg font-bold text-blue-400 print:text-sm print:text-black">
+                                                {areaInRai.toFixed(2)}
+                                            </div>
+                                            <div className="text-xs text-gray-400 print:text-gray-600">
+                                                ไร่
+                                            </div>
+                                        </div>
+                                        <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-1">
+                                            <div className="text-lg font-bold text-green-400 print:text-sm print:text-black">
+                                                {totalZones}
+                                            </div>
+                                            <div className="text-xs text-gray-400 print:text-gray-600">
+                                                โซน
+                                            </div>
+                                        </div>
+                                        <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-1">
+                                            <div className="text-lg font-bold text-purple-400 print:text-sm print:text-black">
+                                                {totalPlantingPoints.toLocaleString()}
+                                            </div>
+                                            <div className="text-xs text-gray-400 print:text-gray-600">
+                                                จุดปลูก
+                                            </div>
+                                        </div>
+                                        <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-1">
+                                            <div className="text-lg font-bold text-yellow-400 print:text-sm print:text-black">
+                                                {totalEstimatedYield.toLocaleString()}
+                                            </div>
+                                            <div className="text-xs text-gray-400 print:text-gray-600">
+                                                กก.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Crop Information - ซ่อนการแสดงผลแต่เก็บโครงสร้างข้อมูลไว้ */}
+                                <div style={{ display: 'none' }} className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
+                                    <h2 className="mb-3 text-lg font-bold text-green-400 print:text-base print:text-black">
+                                        🌱 Crop Information (from cropData)
+                                    </h2>
+                                    <div className="space-y-2 print:space-y-1">
+                                        {selectedCropObjects.map(
+                                            (crop) =>
+                                                crop && (
+                                                    <div
+                                                        key={crop.value}
+                                                        className="rounded-lg bg-gray-700 p-2 print:border print:border-gray-200 print:bg-gray-50 print:p-1"
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center space-x-2">
+                                                                <span className="text-lg print:text-sm">
+                                                                    {crop.icon}
+                                                                </span>
+                                                                <div>
+                                                                    <h3 className="text-sm font-semibold text-white print:text-xs print:text-black">
+                                                                        {crop.name}
+                                                                    </h3>
+                                                                    <div className="text-xs text-gray-400 print:text-gray-600">
+                                                                        {crop.category} • {crop.irrigationNeeds} water needs
+                                                                    </div>
+                                                                    <div className="text-xs text-gray-400 print:text-gray-600">
+                                                                        Growth: {crop.growthPeriod} days
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <div className="text-xs text-gray-400 print:text-gray-600">
+                                                                    <strong>Spacing:</strong>
+                                                                </div>
+                                                                <div className="text-xs text-gray-400 print:text-gray-600">
+                                                                    แถว: {crop.rowSpacing} ซม.
+                                                                </div>
+                                                                <div className="text-xs text-gray-400 print:text-gray-600">
+                                                                    ต้น: {crop.plantSpacing} ซม.
+                                                                </div>
+                                                                <div className="text-xs text-gray-400 print:text-gray-600 mt-1">
+                                                                    <strong>Production:</strong>
+                                                                </div>
+                                                                <div className="text-xs text-gray-400 print:text-gray-600">
+                                                                    {crop.yield} กก./ไร่
+                                                                </div>
+                                                                <div className="text-xs text-gray-400 print:text-gray-600">
+                                                                    {crop.price} บาท/กก.
+                                                                </div>
+                                                                <div className="text-xs text-gray-400 print:text-gray-600 mt-1">
+                                                                    <strong>Water:</strong>
+                                                                </div>
+                                                                <div className="text-xs text-gray-400 print:text-gray-600">
+                                                                    {crop.waterRequirement} ล./ต้น/ครั้ง
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    {assignedCrop && (
-                                                        <span className="text-lg">
-                                                            {assignedCrop.icon}
-                                                        </span>
+                                                )
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Infrastructure Summary */}
+                                <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
+                                    <h2 className="mb-3 text-lg font-bold text-purple-400 print:text-base print:text-black">
+                                        🔧 Infrastructure Summary
+                                    </h2>
+                                    <div className="mb-3">
+                                        <h3 className="mb-2 text-sm font-semibold text-blue-400 print:text-xs print:text-black">
+                                            📏 Pipe System (วาดเสร็จแล้วเท่านั้น)
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {/* Main Pipes */}
+                                            <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <span className="text-xs font-medium text-blue-300 print:text-black">Main Pipes</span>
+                                                    <span className="text-xs font-bold text-blue-400 print:text-black">{mainPipeStats.count} ท่อ</span>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-1 text-xs">
+                                                    <div>
+                                                        <span className="text-gray-400 print:text-gray-600">ยาวสุด: </span>
+                                                        <span className="text-blue-300 print:text-black font-medium">{mainPipeStats.longestLength.toLocaleString()} ม.</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-gray-400 print:text-gray-600">รวม: </span>
+                                                        <span className="text-blue-300 print:text-black font-medium">{mainPipeStats.totalLength.toLocaleString()} ม.</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Submain Pipes */}
+                                            <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <span className="text-xs font-medium text-green-300 print:text-black">Submain Pipes</span>
+                                                    <span className="text-xs font-bold text-green-400 print:text-black">{submainPipeStats.count} ท่อ</span>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-1 text-xs">
+                                                    <div>
+                                                        <span className="text-gray-400 print:text-gray-600">ยาวสุด: </span>
+                                                        <span className="text-green-300 print:text-black font-medium">{submainPipeStats.longestLength.toLocaleString()} ม.</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-gray-400 print:text-gray-600">รวม: </span>
+                                                        <span className="text-green-300 print:text-black font-medium">{submainPipeStats.totalLength.toLocaleString()} ม.</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Lateral Pipes */}
+                                            <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <span className="text-xs font-medium text-purple-300 print:text-black">Lateral Pipes</span>
+                                                    <span className="text-xs font-bold text-purple-400 print:text-black">{lateralPipeStats.count} ท่อ</span>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-1 text-xs">
+                                                    <div>
+                                                        <span className="text-gray-400 print:text-gray-600">ยาวสุด: </span>
+                                                        <span className="text-purple-300 print:text-black font-medium">{lateralPipeStats.longestLength.toLocaleString()} ม.</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-gray-400 print:text-gray-600">รวม: </span>
+                                                        <span className="text-purple-300 print:text-black font-medium">{lateralPipeStats.totalLength.toLocaleString()} ม.</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Total Summary */}
+                                            <div className="rounded bg-blue-900/30 p-2 print:border print:bg-blue-50">
+                                                <div className="text-center">
+                                                    <span className="text-xs font-medium text-blue-300 print:text-blue-800">ความยาวท่อที่ยาวสุดรวม: </span>
+                                                    <span className="text-sm font-bold text-blue-100 print:text-blue-900">
+                                                        {(mainPipeStats.longestLength + submainPipeStats.longestLength + lateralPipeStats.longestLength).toLocaleString()} ม.
+                                                    </span>
+                                                </div>
+                                                <div className="text-center mt-1">
+                                                    <span className="text-xs font-medium text-blue-300 print:text-blue-800">ความยาวท่อรวมทั้งหมด: </span>
+                                                    <span className="text-sm font-bold text-blue-100 print:text-blue-900">
+                                                        {(mainPipeStats.totalLength + submainPipeStats.totalLength + lateralPipeStats.totalLength).toLocaleString()} ม.
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="mb-3">
+                                        <h3 className="mb-2 text-sm font-semibold text-orange-400 print:text-xs print:text-black">
+                                            ⚙️ Equipment
+                                        </h3>
+                                        <div className="grid grid-cols-3 gap-1">
+                                            <div className="rounded bg-gray-700 p-1 text-center print:border">
+                                                <div className="text-sm font-bold text-orange-400">
+                                                    {pumpCount}
+                                                </div>
+                                                <div className="text-xs text-gray-400">Pumps</div>
+                                            </div>
+                                            <div className="rounded bg-gray-700 p-1 text-center print:border">
+                                                <div className="text-sm font-bold text-red-400">
+                                                    {valveCount}
+                                                </div>
+                                                <div className="text-xs text-gray-400">Valves</div>
+                                            </div>
+                                            <div className="rounded bg-gray-700 p-1 text-center print:border">
+                                                <div className="text-sm font-bold text-yellow-400">
+                                                    {solenoidCount}
+                                                </div>
+                                                <div className="text-xs text-gray-400">Solenoids</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <h3 className="mb-2 text-sm font-semibold text-cyan-400 print:text-xs print:text-black">
+                                            💧 Irrigation System
+                                        </h3>
+                                        <div className="grid grid-cols-2 gap-1">
+                                            <div className="rounded bg-gray-700 p-1 text-center print:border">
+                                                <div className="text-sm font-bold text-green-400">
+                                                    {sprinklerPoints}
+                                                </div>
+                                                <div className="text-xs text-gray-400">Sprinklers</div>
+                                            </div>
+                                            <div className="rounded bg-gray-700 p-1 text-center print:border">
+                                                <div className="text-sm font-bold text-blue-400">
+                                                    {miniSprinklerPoints}
+                                                </div>
+                                                <div className="text-xs text-gray-400">
+                                                    Mini Sprinklers
+                                                </div>
+                                            </div>
+                                            <div className="rounded bg-gray-700 p-1 text-center print:border">
+                                                <div className="text-sm font-bold text-orange-400">
+                                                    {microSprayPoints}
+                                                </div>
+                                                <div className="text-xs text-gray-400">
+                                                    Micro Sprays
+                                                </div>
+                                            </div>
+                                            <div className="rounded bg-gray-700 p-1 text-center print:border">
+                                                <div className="text-sm font-bold text-cyan-400">
+                                                    {dripPoints + dripLines}
+                                                </div>
+                                                <div className="text-xs text-gray-400">Drip Points</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Financial & Water Summary */}
+                                <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
+                                    <h2 className="mb-3 text-lg font-bold text-green-400 print:text-base print:text-black">
+                                        💰 Financial & Water Summary
+                                    </h2>
+                                    <div className="space-y-3 print:space-y-2">
+                                        {/* Financial Summary */}
+                                        <div className="space-y-2">
+                                            <div className="rounded-lg bg-gray-700 p-2 print:border print:bg-gray-50">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sm text-gray-400 print:text-gray-700">
+                                                        Total Estimated Yield
+                                                    </span>
+                                                    <span className="text-sm font-bold text-yellow-400 print:text-black">
+                                                        {totalEstimatedYield.toLocaleString()} กก.
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="rounded-lg bg-gray-700 p-2 print:border print:bg-gray-50">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sm text-gray-400 print:text-gray-700">
+                                                        Total Estimated Income
+                                                    </span>
+                                                    <span className="text-sm font-bold text-green-400 print:text-black">
+                                                        ฿{totalEstimatedIncome.toLocaleString()}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Water Requirements Summary - เปลี่ยนเป็นลิตรต่อครั้ง */}
+                                        <div className="bg-cyan-900/30 p-3 rounded-lg print:bg-cyan-50 print:border-2 print:border-cyan-200">
+                                            <h3 className="text-sm font-semibold text-cyan-300 mb-2 print:text-cyan-800">
+                                                💧 Total Water Requirements (ลิตรต่อครั้ง - from cropData)
+                                            </h3>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="space-y-1">
+                                                    <div className="text-xs text-cyan-200 print:text-cyan-700">
+                                                        Total Farm Area: {areaInRai.toFixed(2)} ไร่
+                                                    </div>
+                                                    <div className="text-xs text-cyan-200 print:text-cyan-700">
+                                                        Total Plants: {totalPlantingPoints.toLocaleString()} ต้น
+                                                    </div>
+                                                    <div className="text-xs text-cyan-200 print:text-cyan-700">
+                                                        Active Zones: {Object.keys(calculatedZoneSummaries).filter(id => calculatedZoneSummaries[id].cropValue).length} zones
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-xs text-cyan-200 print:text-cyan-700 mb-1">
+                                                        Water Need per Irrigation:
+                                                    </div>
+                                                    <div className="font-bold text-cyan-100 print:text-cyan-800 text-xl">
+                                                        {totalWaterRequirementPerIrrigation.toLocaleString()}
+                                                    </div>
+                                                    <div className="text-xs text-cyan-200 print:text-cyan-700">
+                                                        ลิตร/ครั้ง
+                                                    </div>
+                                                    <div className="text-xs text-cyan-200 print:text-cyan-700 mt-1">
+                                                        ({(totalWaterRequirementPerIrrigation / 1000).toFixed(1)} ลบ.ม./ครั้ง)
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Water breakdown by zone */}
+                                            <div className="mt-3 pt-2 border-t border-cyan-700 print:border-cyan-300">
+                                                <div className="text-xs text-cyan-200 print:text-cyan-700 mb-2 font-medium">
+                                                    Water Requirements by Zone (per irrigation):
+                                                </div>
+                                                <div className="space-y-1 max-h-24 overflow-y-auto">
+                                                    {Object.values(calculatedZoneSummaries)
+                                                        .filter((summary: any) => summary.cropValue)
+                                                        .map((summary: any) => (
+                                                            <div key={summary.zoneId} className="flex justify-between text-xs">
+                                                                <span className="text-cyan-200 print:text-cyan-700">
+                                                                    {summary.zoneName} ({summary.zoneAreaRai} ไร่)
+                                                                </span>
+                                                                <span className="text-cyan-100 print:text-cyan-800 font-medium">
+                                                                    {summary.waterRequirementPerIrrigation.toLocaleString()} ล./ครั้ง
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Monthly and yearly projections - อัปเดตให้ใช้ข้อมูลใหม่ */}
+                                            <div className="mt-3 pt-2 border-t border-cyan-700 print:border-cyan-300">
+                                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                                    <div className="text-center bg-cyan-800/50 p-2 rounded print:bg-cyan-100">
+                                                        <div className="text-cyan-200 print:text-cyan-700">Monthly</div>
+                                                        <div className="font-bold text-cyan-100 print:text-cyan-800">
+                                                            {(totalWaterRequirementPerIrrigation * 30 / 1000).toFixed(1)}
+                                                        </div>
+                                                        <div className="text-cyan-200 print:text-cyan-700">ลบ.ม./เดือน</div>
+                                                    </div>
+                                                    <div className="text-center bg-cyan-800/50 p-2 rounded print:bg-cyan-100">
+                                                        <div className="text-cyan-200 print:text-cyan-700">Yearly</div>
+                                                        <div className="font-bold text-cyan-100 print:text-cyan-800">
+                                                            {(totalWaterRequirementPerIrrigation * 365 / 1000).toFixed(0)}
+                                                        </div>
+                                                        <div className="text-cyan-200 print:text-cyan-700">ลบ.ม./ปี</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div className="rounded-lg bg-gray-800 p-4 print:hidden">
+                                    <h2 className="mb-3 text-lg font-bold text-purple-400">
+                                        📋 Actions
+                                    </h2>
+                                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                        <Link
+                                            href="/field-map?edit=true&step=4"
+                                            className="rounded-lg bg-blue-600 px-4 py-2 text-center font-semibold text-white hover:bg-blue-700"
+                                        >
+                                            🔄 Edit Project
+                                        </Link>
+                                        <button
+                                            onClick={() => window.print()}
+                                            className="rounded-lg bg-green-600 px-4 py-2 font-semibold text-white hover:bg-green-700"
+                                        >
+                                            🖨️ Print Summary
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Right Column: Zone Details */}
+                            <div className="space-y-4 print:contents">
+                                {/* Zone Details */}
+                                <div className="print:print-other-content rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
+                                    <h2 className="mb-3 text-lg font-bold text-blue-400 print:text-base print:text-black">
+                                        🎯 Zone Details & Irrigation Systems (ลิตรต่อครั้ง)
+                                    </h2>
+                                    <div className="space-y-3 print:space-y-2">
+                                        {actualZones.map((zone) => {
+                                            const summary = calculatedZoneSummaries[zone.id];
+                                            const assignedCrop = zoneAssignments[zone.id]
+                                                ? getCropByValue(zoneAssignments[zone.id])
+                                                : null;
+                                            const irrigationType = irrigationAssignments[zone.id];
+                                            const zonePipeStats = calculateZonePipeStats(actualPipes, zone.id.toString(), actualZones);
+                                            return (
+                                                <div
+                                                    key={zone.id}
+                                                    className="rounded-lg bg-gray-700 p-3 print:border print:bg-gray-50"
+                                                >
+                                                    <div className="mb-2 flex items-center justify-between">
+                                                        <div className="flex items-center space-x-2">
+                                                            <div
+                                                                className="h-3 w-3 rounded-full"
+                                                                style={{ backgroundColor: zone.color }}
+                                                            ></div>
+                                                            <h3 className="text-sm font-semibold text-white print:text-black">
+                                                                {zone.name}
+                                                            </h3>
+                                                        </div>
+                                                        {assignedCrop && (
+                                                            <span className="text-lg">
+                                                                {assignedCrop.icon}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {summary ? (
+                                                        <div className="space-y-3">
+                                                            {/* Zone Basic Info */}
+                                                            <div className="grid grid-cols-3 gap-2 text-xs">
+                                                                <div className="text-center bg-gray-600 p-2 rounded print:bg-gray-100">
+                                                                    <div className="text-gray-400 print:text-gray-600">Area</div>
+                                                                    <div className="font-semibold text-blue-400 print:text-black">
+                                                                        {summary.zoneAreaRai} ไร่
+                                                                    </div>
+                                                                    <div className="text-gray-400 text-xs print:text-gray-600">
+                                                                        {summary.zoneArea} ตร.ม.
+                                                                    </div>
+                                                                </div>
+                                                                <div className="text-center bg-gray-600 p-2 rounded print:bg-gray-100">
+                                                                    <div className="text-gray-400 print:text-gray-600">Plants</div>
+                                                                    <div className="font-semibold text-green-400 print:text-black">
+                                                                        {summary.totalPlantingPoints.toLocaleString()}
+                                                                    </div>
+                                                                    <div className="text-gray-400 text-xs print:text-gray-600">
+                                                                        ต้น
+                                                                    </div>
+                                                                </div>
+                                                                <div className="text-center bg-gray-600 p-2 rounded print:bg-gray-100">
+                                                                    <div className="text-gray-400 print:text-gray-600">Crop</div>
+                                                                    <div className="font-semibold text-white print:text-black text-xs">
+                                                                        {summary.cropName}
+                                                                    </div>
+                                                                    <div className="text-gray-400 text-xs print:text-gray-600">
+                                                                        {summary.cropCategory}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Water Requirements Section - เปลี่ยนเป็นลิตรต่อครั้ง */}
+                                                            <div className="bg-cyan-900/30 p-3 rounded-lg print:bg-cyan-50 print:border">
+                                                                <h4 className="text-sm font-semibold text-cyan-300 mb-2 print:text-cyan-800">
+                                                                    💧 Water Requirements (ลิตรต่อครั้ง - from cropData)
+                                                                </h4>
+                                                                <div className="grid grid-cols-2 gap-3 text-xs">
+                                                                    <div>
+                                                                        <div className="text-cyan-200 print:text-cyan-700 mb-1">
+                                                                            Zone Area: {summary.zoneAreaRai} ไร่
+                                                                        </div>
+                                                                        <div className="text-cyan-200 print:text-cyan-700 mb-1">
+                                                                            Plants: {summary.totalPlantingPoints.toLocaleString()} ต้น
+                                                                        </div>
+                                                                        <div className="text-cyan-200 print:text-cyan-700 mb-1">
+                                                                            Rate: {summary.cropWaterPerPlantPerIrrigation.toFixed(1)} ลิตร/ต้น/ครั้ง
+                                                                        </div>
+                                                                        <div className="text-cyan-200 print:text-cyan-700">
+                                                                            (จาก cropData: {summary.cropWaterPerPlant} ลิตร/ต้น/ครั้ง)
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="text-right">
+                                                                        <div className="text-cyan-200 print:text-cyan-700 text-xs mb-1">
+                                                                            Water Need per Irrigation:
+                                                                        </div>
+                                                                        <div className="font-bold text-cyan-100 print:text-cyan-800 text-lg">
+                                                                            {summary.waterRequirementPerIrrigation.toLocaleString()}
+                                                                        </div>
+                                                                        <div className="text-cyan-200 print:text-cyan-700 text-xs">
+                                                                            ลิตร/ครั้ง
+                                                                        </div>
+                                                                        <div className="text-cyan-200 print:text-cyan-700 text-xs mt-1">
+                                                                            ({(summary.waterRequirementPerIrrigation / 1000).toFixed(1)} ลบ.ม./ครั้ง)
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="mt-2 text-xs text-cyan-200 print:text-cyan-700 bg-cyan-800/30 p-2 rounded print:bg-cyan-100">
+                                                                    <strong>การคำนวณ:</strong> {summary.totalPlantingPoints.toLocaleString()} ต้น × {summary.cropWaterPerPlantPerIrrigation.toFixed(1)} ลิตร/ต้น/ครั้ง = {summary.waterRequirementPerIrrigation.toLocaleString()} ลิตร/ครั้ง
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Irrigation System Section - เพิ่มข้อมูล pipe system */}
+                                                            <div className="bg-blue-900/30 p-3 rounded-lg print:bg-blue-50 print:border">
+                                                                <h4 className="text-sm font-semibold text-blue-300 mb-2 print:text-blue-800">
+                                                                    🔧 Irrigation System & Pipe Network
+                                                                </h4>
+                                                                
+                                                                {/* Irrigation Type */}
+                                                                <div className="mb-3">
+                                                                    <div className="text-blue-200 print:text-blue-700 mb-1 font-medium text-xs">
+                                                                        Irrigation Type:
+                                                                    </div>
+                                                                    <div className="font-semibold text-blue-100 print:text-blue-900 text-sm">
+                                                                        {irrigationType || 'ไม่ได้กำหนด'}
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Pipe System Details */}
+                                                                <div className="space-y-3">
+                                                                    <div className="text-blue-200 print:text-blue-700 font-medium text-xs border-b border-blue-700 print:border-blue-300 pb-1">
+                                                                        Pipe System Details in Zone:
+                                                                    </div>
+                                                                    
+                                                                    {/* Zone Pipe Summary Table - แสดงเฉพาะตารางเท่านั้น */}
+                                                                    <div className="bg-cyan-800/40 p-3 rounded print:bg-cyan-100 border border-cyan-600 print:border-cyan-300">
+                                                                        <div className="text-center mb-3">
+                                                                            <div className="text-cyan-200 print:text-cyan-800 font-bold text-sm">📊 Zone Pipe Summary</div>
+                                                                        </div>
+                                                                        
+                                                                        {/* Summary table แสดงแต่ละประเภทท่อ */}
+                                                                        <div className="mb-3">
+                                                                            <div className="grid grid-cols-4 gap-1 text-xs mb-2">
+                                                                                <div className="text-cyan-200 print:text-cyan-700 font-medium">ประเภทท่อ</div>
+                                                                                <div className="text-cyan-200 print:text-cyan-700 font-medium text-center">จำนวน</div>
+                                                                                <div className="text-cyan-200 print:text-cyan-700 font-medium text-center">ยาวสุด(ม.)</div>
+                                                                                <div className="text-cyan-200 print:text-cyan-700 font-medium text-center">รวม(ม.)</div>
+                                                                            </div>
+                                                                            <div className="space-y-1">
+                                                                                <div className="grid grid-cols-4 gap-1 text-xs bg-blue-700/20 p-1 rounded print:bg-blue-50">
+                                                                                    <div className="text-blue-200 print:text-blue-800">🔵 Main Pipes</div>
+                                                                                    <div className="text-blue-100 print:text-blue-900 text-center font-semibold">{zonePipeStats.main.count}</div>
+                                                                                    <div className="text-blue-100 print:text-blue-900 text-center font-semibold">{zonePipeStats.main.longestLength.toLocaleString()}</div>
+                                                                                    <div className="text-blue-100 print:text-blue-900 text-center font-semibold">{zonePipeStats.main.totalLength.toLocaleString()}</div>
+                                                                                </div>
+                                                                                <div className="grid grid-cols-4 gap-1 text-xs bg-green-700/20 p-1 rounded print:bg-green-50">
+                                                                                    <div className="text-green-200 print:text-green-800">🟢 Submain Pipes</div>
+                                                                                    <div className="text-green-100 print:text-green-900 text-center font-semibold">{zonePipeStats.submain.count}</div>
+                                                                                    <div className="text-green-100 print:text-green-900 text-center font-semibold">{zonePipeStats.submain.longestLength.toLocaleString()}</div>
+                                                                                    <div className="text-green-100 print:text-green-900 text-center font-semibold">{zonePipeStats.submain.totalLength.toLocaleString()}</div>
+                                                                                </div>
+                                                                                <div className="grid grid-cols-4 gap-1 text-xs bg-purple-700/20 p-1 rounded print:bg-purple-50">
+                                                                                    <div className="text-purple-200 print:text-purple-800">🟣 Lateral Pipes</div>
+                                                                                    <div className="text-purple-100 print:text-purple-900 text-center font-semibold">{zonePipeStats.lateral.count}</div>
+                                                                                    <div className="text-purple-100 print:text-purple-900 text-center font-semibold">{zonePipeStats.lateral.longestLength.toLocaleString()}</div>
+                                                                                    <div className="text-purple-100 print:text-purple-900 text-center font-semibold">{zonePipeStats.lateral.totalLength.toLocaleString()}</div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* Overall totals */}
+                                                                        <div className="grid grid-cols-2 gap-2 text-xs border-t border-cyan-600 print:border-cyan-300 pt-2">
+                                                                            <div className="text-center bg-cyan-700/30 p-2 rounded print:bg-cyan-50">
+                                                                                <div className="text-cyan-200 print:text-cyan-700 text-xs mb-1">ความยาวท่อที่ยาวสุดรวม</div>
+                                                                                <div className="font-bold text-cyan-100 print:text-cyan-900 text-sm">
+                                                                                    {zonePipeStats.totalLongestLength.toLocaleString()} ม.
+                                                                                </div>
+                                                                                <div className="text-cyan-300 print:text-cyan-600 text-xs mt-1">
+                                                                                    ({zonePipeStats.main.longestLength} + {zonePipeStats.submain.longestLength} + {zonePipeStats.lateral.longestLength})
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="text-center bg-cyan-700/30 p-2 rounded print:bg-cyan-50">
+                                                                                <div className="text-cyan-200 print:text-cyan-700 text-xs mb-1">ความยาวท่อรวมทั้งหมด</div>
+                                                                                <div className="font-bold text-cyan-100 print:text-cyan-900 text-sm">
+                                                                                    {zonePipeStats.totalLength.toLocaleString()} ม.
+                                                                                </div>
+                                                                                <div className="text-cyan-300 print:text-cyan-600 text-xs mt-1">
+                                                                                    ({zonePipeStats.main.totalLength} + {zonePipeStats.submain.totalLength} + {zonePipeStats.lateral.totalLength})
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                        
+                                                                        <div className="text-center mt-2 pt-2 border-t border-cyan-600 print:border-cyan-300">
+                                                                            <div className="text-cyan-200 print:text-cyan-700 text-xs">
+                                                                                Total Pipes in Zone: <span className="font-bold text-cyan-100 print:text-cyan-900">{zonePipeStats.total} ท่อ</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Hidden sections - เก็บโค้ดโครงสร้างไว้แต่ไม่แสดงผล */}
+                                                            <div style={{ display: 'none' }}>
+                                                                {/* Production & Income - ซ่อนการแสดงผล */}
+                                                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                                                    <div className="bg-yellow-900/30 p-2 rounded print:bg-yellow-50">
+                                                                        <div className="text-yellow-300 print:text-yellow-800 mb-1">
+                                                                            Expected Yield
+                                                                        </div>
+                                                                        <div className="font-semibold text-yellow-100 print:text-yellow-900">
+                                                                            {summary.estimatedYield.toLocaleString()} กก.
+                                                                        </div>
+                                                                        <div className="text-yellow-300 text-xs print:text-yellow-700">
+                                                                            @ {summary.cropYieldPerRai} กก./ไร่
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="bg-green-900/30 p-2 rounded print:bg-green-50">
+                                                                        <div className="text-green-300 print:text-green-800 mb-1">
+                                                                            Expected Income
+                                                                        </div>
+                                                                        <div className="font-semibold text-green-100 print:text-green-900">
+                                                                            ฿{summary.estimatedPrice.toLocaleString()}
+                                                                        </div>
+                                                                        <div className="text-green-300 text-xs print:text-green-700">
+                                                                            @ {summary.cropPricePerKg} บาท/กก.
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Additional Info - ซ่อนการแสดงผล */}
+                                                                <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-gray-600 print:border-gray-300">
+                                                                    <div>
+                                                                        <div className="text-gray-400 print:text-gray-600">
+                                                                            Plant Spacing
+                                                                        </div>
+                                                                        <div className="font-semibold text-blue-400 print:text-black">
+                                                                            แถว: {(summary.rowSpacing * 100)} ซม.
+                                                                        </div>
+                                                                        <div className="font-semibold text-blue-400 print:text-black">
+                                                                            ต้น: {(summary.plantSpacing * 100)} ซม.
+                                                                        </div>
+                                                                    </div>
+                                                                    <div>
+                                                                        <div className="text-gray-400 print:text-gray-600">
+                                                                            Growth Info
+                                                                        </div>
+                                                                        <div className="font-semibold text-purple-400 print:text-black">
+                                                                            {summary.growthPeriod} วัน
+                                                                        </div>
+                                                                        <div className="font-semibold text-purple-400 print:text-black">
+                                                                            น้ำ: {summary.irrigationNeeds}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-center text-gray-400 print:text-gray-600 py-4">
+                                                            <div className="text-4xl mb-2">❓</div>
+                                                            <div className="text-sm">No crop assigned to this zone</div>
+                                                            <div className="text-xs">Cannot calculate water requirements</div>
+                                                        </div>
                                                     )}
                                                 </div>
-                                                {summary ? (
-                                                    <div className="space-y-3">
-                                                        {/* Zone Basic Info */}
-                                                        <div className="grid grid-cols-3 gap-2 text-xs">
-                                                            <div className="text-center bg-gray-600 p-2 rounded print:bg-gray-100">
-                                                                <div className="text-gray-400 print:text-gray-600">Area</div>
-                                                                <div className="font-semibold text-blue-400 print:text-black">
-                                                                    {summary.zoneAreaRai} ไร่
-                                                                </div>
-                                                                <div className="text-gray-400 text-xs print:text-gray-600">
-                                                                    {summary.zoneArea} ตร.ม.
-                                                                </div>
-                                                            </div>
-                                                            <div className="text-center bg-gray-600 p-2 rounded print:bg-gray-100">
-                                                                <div className="text-gray-400 print:text-gray-600">Plants</div>
-                                                                <div className="font-semibold text-green-400 print:text-black">
-                                                                    {summary.totalPlantingPoints.toLocaleString()}
-                                                                </div>
-                                                                <div className="text-gray-400 text-xs print:text-gray-600">
-                                                                    ต้น
-                                                                </div>
-                                                            </div>
-                                                            <div className="text-center bg-gray-600 p-2 rounded print:bg-gray-100">
-                                                                <div className="text-gray-400 print:text-gray-600">Crop</div>
-                                                                <div className="font-semibold text-white print:text-black text-xs">
-                                                                    {summary.cropName}
-                                                                </div>
-                                                                <div className="text-gray-400 text-xs print:text-gray-600">
-                                                                    {summary.cropCategory}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Water Requirements Section - เปลี่ยนเป็นลิตรต่อครั้ง */}
-                                                        <div className="bg-cyan-900/30 p-3 rounded-lg print:bg-cyan-50 print:border">
-                                                            <h4 className="text-sm font-semibold text-cyan-300 mb-2 print:text-cyan-800">
-                                                                💧 Water Requirements (ลิตรต่อครั้ง - from cropData)
-                                                            </h4>
-                                                            <div className="grid grid-cols-2 gap-3 text-xs">
-                                                                <div>
-                                                                    <div className="text-cyan-200 print:text-cyan-700 mb-1">
-                                                                        Zone Area: {summary.zoneAreaRai} ไร่
-                                                                    </div>
-                                                                    <div className="text-cyan-200 print:text-cyan-700 mb-1">
-                                                                        Plants: {summary.totalPlantingPoints.toLocaleString()} ต้น
-                                                                    </div>
-                                                                    <div className="text-cyan-200 print:text-cyan-700 mb-1">
-                                                                        Rate: {summary.cropWaterPerPlantPerIrrigation.toFixed(1)} ลิตร/ต้น/ครั้ง
-                                                                    </div>
-                                                                    <div className="text-cyan-200 print:text-cyan-700">
-                                                                        (จาก cropData: {summary.cropWaterPerPlant} ลิตร/ต้น/ครั้ง)
-                                                                    </div>
-                                                                </div>
-                                                                <div className="text-right">
-                                                                    <div className="text-cyan-200 print:text-cyan-700 text-xs mb-1">
-                                                                        Water Need per Irrigation:
-                                                                    </div>
-                                                                    <div className="font-bold text-cyan-100 print:text-cyan-800 text-lg">
-                                                                        {summary.waterRequirementPerIrrigation.toLocaleString()}
-                                                                    </div>
-                                                                    <div className="text-cyan-200 print:text-cyan-700 text-xs">
-                                                                        ลิตร/ครั้ง
-                                                                    </div>
-                                                                    <div className="text-cyan-200 print:text-cyan-700 text-xs mt-1">
-                                                                        ({(summary.waterRequirementPerIrrigation / 1000).toFixed(1)} ลบ.ม./ครั้ง)
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div className="mt-2 text-xs text-cyan-200 print:text-cyan-700 bg-cyan-800/30 p-2 rounded print:bg-cyan-100">
-                                                                <strong>การคำนวณ:</strong> {summary.totalPlantingPoints.toLocaleString()} ต้น × {summary.cropWaterPerPlantPerIrrigation.toFixed(1)} ลิตร/ต้น/ครั้ง = {summary.waterRequirementPerIrrigation.toLocaleString()} ลิตร/ครั้ง
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Irrigation System Section - เพิ่มข้อมูล pipe system */}
-                                                        <div className="bg-blue-900/30 p-3 rounded-lg print:bg-blue-50 print:border">
-                                                            <h4 className="text-sm font-semibold text-blue-300 mb-2 print:text-blue-800">
-                                                                🔧 Irrigation System & Pipe Network
-                                                            </h4>
-                                                            
-                                                            {/* Irrigation Type */}
-                                                            <div className="mb-3">
-                                                                <div className="text-blue-200 print:text-blue-700 mb-1 font-medium text-xs">
-                                                                    Irrigation Type:
-                                                                </div>
-                                                                <div className="font-semibold text-blue-100 print:text-blue-900 text-sm">
-                                                                    {irrigationType || 'ไม่ได้กำหนด'}
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Pipe System Details */}
-                                                            <div className="space-y-3">
-                                                                <div className="text-blue-200 print:text-blue-700 font-medium text-xs border-b border-blue-700 print:border-blue-300 pb-1">
-                                                                    Pipe System Details in Zone:
-                                                                </div>
-                                                                
-                                                                {/* Zone Pipe Summary Table - แสดงเฉพาะตารางเท่านั้น */}
-                                                                <div className="bg-cyan-800/40 p-3 rounded print:bg-cyan-100 border border-cyan-600 print:border-cyan-300">
-                                                                    <div className="text-center mb-3">
-                                                                        <div className="text-cyan-200 print:text-cyan-800 font-bold text-sm">📊 Zone Pipe Summary</div>
-                                                                    </div>
-                                                                    
-                                                                    {/* Summary table แสดงแต่ละประเภทท่อ */}
-                                                                    <div className="mb-3">
-                                                                        <div className="grid grid-cols-4 gap-1 text-xs mb-2">
-                                                                            <div className="text-cyan-200 print:text-cyan-700 font-medium">ประเภทท่อ</div>
-                                                                            <div className="text-cyan-200 print:text-cyan-700 font-medium text-center">จำนวน</div>
-                                                                            <div className="text-cyan-200 print:text-cyan-700 font-medium text-center">ยาวสุด(ม.)</div>
-                                                                            <div className="text-cyan-200 print:text-cyan-700 font-medium text-center">รวม(ม.)</div>
-                                                                        </div>
-                                                                        <div className="space-y-1">
-                                                                            <div className="grid grid-cols-4 gap-1 text-xs bg-blue-700/20 p-1 rounded print:bg-blue-50">
-                                                                                <div className="text-blue-200 print:text-blue-800">🔵 Main Pipes</div>
-                                                                                <div className="text-blue-100 print:text-blue-900 text-center font-semibold">{zonePipeStats.main.count}</div>
-                                                                                <div className="text-blue-100 print:text-blue-900 text-center font-semibold">{zonePipeStats.main.longestLength.toLocaleString()}</div>
-                                                                                <div className="text-blue-100 print:text-blue-900 text-center font-semibold">{zonePipeStats.main.totalLength.toLocaleString()}</div>
-                                                                            </div>
-                                                                            <div className="grid grid-cols-4 gap-1 text-xs bg-green-700/20 p-1 rounded print:bg-green-50">
-                                                                                <div className="text-green-200 print:text-green-800">🟢 Submain Pipes</div>
-                                                                                <div className="text-green-100 print:text-green-900 text-center font-semibold">{zonePipeStats.submain.count}</div>
-                                                                                <div className="text-green-100 print:text-green-900 text-center font-semibold">{zonePipeStats.submain.longestLength.toLocaleString()}</div>
-                                                                                <div className="text-green-100 print:text-green-900 text-center font-semibold">{zonePipeStats.submain.totalLength.toLocaleString()}</div>
-                                                                            </div>
-                                                                            <div className="grid grid-cols-4 gap-1 text-xs bg-purple-700/20 p-1 rounded print:bg-purple-50">
-                                                                                <div className="text-purple-200 print:text-purple-800">🟣 Lateral Pipes</div>
-                                                                                <div className="text-purple-100 print:text-purple-900 text-center font-semibold">{zonePipeStats.lateral.count}</div>
-                                                                                <div className="text-purple-100 print:text-purple-900 text-center font-semibold">{zonePipeStats.lateral.longestLength.toLocaleString()}</div>
-                                                                                <div className="text-purple-100 print:text-purple-900 text-center font-semibold">{zonePipeStats.lateral.totalLength.toLocaleString()}</div>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-
-                                                                    {/* Overall totals */}
-                                                                    <div className="grid grid-cols-2 gap-2 text-xs border-t border-cyan-600 print:border-cyan-300 pt-2">
-                                                                        <div className="text-center bg-cyan-700/30 p-2 rounded print:bg-cyan-50">
-                                                                            <div className="text-cyan-200 print:text-cyan-700 text-xs mb-1">ความยาวท่อที่ยาวสุดรวม</div>
-                                                                            <div className="font-bold text-cyan-100 print:text-cyan-900 text-sm">
-                                                                                {zonePipeStats.totalLongestLength.toLocaleString()} ม.
-                                                                            </div>
-                                                                            <div className="text-cyan-300 print:text-cyan-600 text-xs mt-1">
-                                                                                ({zonePipeStats.main.longestLength} + {zonePipeStats.submain.longestLength} + {zonePipeStats.lateral.longestLength})
-                                                                            </div>
-                                                                        </div>
-                                                                        <div className="text-center bg-cyan-700/30 p-2 rounded print:bg-cyan-50">
-                                                                            <div className="text-cyan-200 print:text-cyan-700 text-xs mb-1">ความยาวท่อรวมทั้งหมด</div>
-                                                                            <div className="font-bold text-cyan-100 print:text-cyan-900 text-sm">
-                                                                                {zonePipeStats.totalLength.toLocaleString()} ม.
-                                                                            </div>
-                                                                            <div className="text-cyan-300 print:text-cyan-600 text-xs mt-1">
-                                                                                ({zonePipeStats.main.totalLength} + {zonePipeStats.submain.totalLength} + {zonePipeStats.lateral.totalLength})
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                    
-                                                                    <div className="text-center mt-2 pt-2 border-t border-cyan-600 print:border-cyan-300">
-                                                                        <div className="text-cyan-200 print:text-cyan-700 text-xs">
-                                                                            Total Pipes in Zone: <span className="font-bold text-cyan-100 print:text-cyan-900">{zonePipeStats.total} ท่อ</span>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Hidden sections - เก็บโค้ดโครงสร้างไว้แต่ไม่แสดงผล */}
-                                                        <div style={{ display: 'none' }}>
-                                                            {/* Production & Income - ซ่อนการแสดงผล */}
-                                                            <div className="grid grid-cols-2 gap-2 text-xs">
-                                                                <div className="bg-yellow-900/30 p-2 rounded print:bg-yellow-50">
-                                                                    <div className="text-yellow-300 print:text-yellow-800 mb-1">
-                                                                        Expected Yield
-                                                                    </div>
-                                                                    <div className="font-semibold text-yellow-100 print:text-yellow-900">
-                                                                        {summary.estimatedYield.toLocaleString()} กก.
-                                                                    </div>
-                                                                    <div className="text-yellow-300 text-xs print:text-yellow-700">
-                                                                        @ {summary.cropYieldPerRai} กก./ไร่
-                                                                    </div>
-                                                                </div>
-                                                                <div className="bg-green-900/30 p-2 rounded print:bg-green-50">
-                                                                    <div className="text-green-300 print:text-green-800 mb-1">
-                                                                        Expected Income
-                                                                    </div>
-                                                                    <div className="font-semibold text-green-100 print:text-green-900">
-                                                                        ฿{summary.estimatedPrice.toLocaleString()}
-                                                                    </div>
-                                                                    <div className="text-green-300 text-xs print:text-green-700">
-                                                                        @ {summary.cropPricePerKg} บาท/กก.
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Additional Info - ซ่อนการแสดงผล */}
-                                                            <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-gray-600 print:border-gray-300">
-                                                                <div>
-                                                                    <div className="text-gray-400 print:text-gray-600">
-                                                                        Plant Spacing
-                                                                    </div>
-                                                                    <div className="font-semibold text-blue-400 print:text-black">
-                                                                        แถว: {(summary.rowSpacing * 100)} ซม.
-                                                                    </div>
-                                                                    <div className="font-semibold text-blue-400 print:text-black">
-                                                                        ต้น: {(summary.plantSpacing * 100)} ซม.
-                                                                    </div>
-                                                                </div>
-                                                                <div>
-                                                                    <div className="text-gray-400 print:text-gray-600">
-                                                                        Growth Info
-                                                                    </div>
-                                                                    <div className="font-semibold text-purple-400 print:text-black">
-                                                                        {summary.growthPeriod} วัน
-                                                                    </div>
-                                                                    <div className="font-semibold text-purple-400 print:text-black">
-                                                                        น้ำ: {summary.irrigationNeeds}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <div className="text-center text-gray-400 print:text-gray-600 py-4">
-                                                        <div className="text-4xl mb-2">❓</div>
-                                                        <div className="text-sm">No crop assigned to this zone</div>
-                                                        <div className="text-xs">Cannot calculate water requirements</div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             </div>
                         </div>

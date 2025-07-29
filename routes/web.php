@@ -250,6 +250,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     
     // Field Status Management
     Route::put('/api/fields/{fieldId}/status', [FarmController::class, 'updateFieldStatus'])->name('update-field-status');
+    Route::put('/api/fields/{fieldId}/folder', [FarmController::class, 'updateFieldFolder'])->name('update-field-folder');
     
     // Profile Photo Routes
     Route::post('/api/profile-photo/upload', [ProfilePhotoController::class, 'upload'])->name('profile-photo.upload');

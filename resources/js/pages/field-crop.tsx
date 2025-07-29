@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { cropTypes, getCropByValue, searchCrops, type Crop } from '@/pages/utils/cropData';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -55,16 +55,19 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
     }, [selectedCrops.length]);
 
     return (
-        <div className="min-h-screen flex flex-col bg-gray-900 text-white">
+        <div className="min-h-screen bg-gray-900 text-white">
+            {/* Navbar */}
             <Navbar />
-            <div className="flex-1 flex">
+            
+            {/* Main Content with adjusted height to account for navbar */}
+            <div className="flex" style={{ height: 'calc(100vh - 64px)' }}>
                 {/* Sidebar - Fixed Summary Panel */}
                 <div className="flex w-80 flex-col overflow-hidden border-r border-gray-700 bg-gray-800">
                     {/* Header */}
                     <div className="border-b border-gray-700 p-6">
                         <div className="mb-4 flex items-center justify-between">
                             <button
-                                onClick={() => (window.location.href = "/planner")}
+                                onClick={() => (window.location.href = '/planner')}
                                 className="flex items-center text-sm text-blue-400 hover:text-blue-300"
                             >
                                 <svg

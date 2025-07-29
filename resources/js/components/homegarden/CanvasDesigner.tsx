@@ -1,4 +1,4 @@
-// resources/js/components/homegarden/CanvasDesigner.tsx - Enhanced with pipe editing support
+// resources/js/components/homegarden/CanvasDesigner.tsx
 import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import {
     CanvasCoordinate,
@@ -17,8 +17,7 @@ import {
     clipCircleToPolygon,
     canvasToGPS,
 } from '../../utils/homeGardenData';
-
-// ===== ENHANCED TYPES =====
+import { useLanguage } from '../../contexts/LanguageContext';
 interface ZoneDrawingTool {
     id: string;
     name: string;
@@ -103,11 +102,11 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
     hasMainArea,
     pipeEditMode,
 }) => {
+    const { t } = useLanguage();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const animationFrameRef = useRef<number>();
 
-    // ===== VIEWPORT & ZOOM STATES =====
     const [viewport, setViewport] = useState<ViewportState>({
         zoom: 1,
         panX: 0,
@@ -115,11 +114,9 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         scale: 20,
     });
 
-    // ===== ENHANCED MODE STATES =====
     const [enhancedMode, setEnhancedMode] = useState(false);
     const [currentZoneTool, setCurrentZoneTool] = useState<string>('rectangle');
 
-    // Enhanced drawing states
     const [enhancedDrawing, setEnhancedDrawing] = useState({
         isDrawing: false,
         startPoint: null as CanvasCoordinate | null,
@@ -127,7 +124,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         previewShape: null as CanvasCoordinate[] | null,
     });
 
-    // ===== DIMENSION LINES =====
     const [dimensionLines, setDimensionLines] = useState<DimensionLine[]>([]);
     const [dimensionMode, setDimensionMode] = useState(false);
     const [tempDimensionPoints, setTempDimensionPoints] = useState<CanvasCoordinate[]>([]);
@@ -136,7 +132,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
     >('auto');
     const [showDimensionDirectionDialog, setShowDimensionDirectionDialog] = useState(false);
 
-    // Display and snap settings
     const [showGrid, setShowGrid] = useState(true);
     const [showRuler, setShowRuler] = useState(true);
     const [showSprinklerRadius, setShowSprinklerRadius] = useState(true);
@@ -147,14 +142,12 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
     const [snapDistance, setSnapDistance] = useState(15);
     const [hoveredSnapPoint, setHoveredSnapPoint] = useState<SnapPoint | null>(null);
 
-    // Scale and measurement
     const [enhancedScale, setEnhancedScale] = useState(20);
     const [isSettingScale, setIsSettingScale] = useState(false);
     const [scalePoints, setScalePoints] = useState<CanvasCoordinate[]>([]);
     const [showScaleDialog, setShowScaleDialog] = useState(false);
     const [realDistance, setRealDistance] = useState<string>('');
 
-    // UI states
     const [mousePos, setMousePos] = useState<CanvasCoordinate>({ x: 0, y: 0 });
     const [hoveredItem, setHoveredItem] = useState<{ type: string; id: string } | null>(null);
     const [draggedSprinkler, setDraggedSprinkler] = useState<string | null>(null);
@@ -164,39 +157,41 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         distance: 0,
     });
 
-    // Canvas size - Dynamic based on container
     const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
 
-    // Original states for compatibility
     const [currentPolygon, setCurrentPolygon] = useState<CanvasCoordinate[]>([]);
     const [isDrawing, setIsDrawing] = useState(false);
 
-    // ===== ZONE DRAWING TOOLS CONFIGURATION =====
+    const [isPanning, setIsPanning] = useState(false);
+    const [panStart, setPanStart] = useState<{ x: number; y: number } | null>(null);
+    const [lastPanPosition, setLastPanPosition] = useState<{ panX: number; panY: number } | null>(
+        null
+    );
+
     const zoneDrawingTools: ZoneDrawingTool[] = [
         {
             id: 'rectangle',
-            name: 'สี่เหลี่ยม',
+            name: t('สี่เหลี่ยม'),
             icon: '⬜',
-            description: 'วาดโซนสี่เหลี่ยมผืน',
+            description: t('วาดโซนสี่เหลี่ยมผืน'),
             type: 'rectangle',
         },
         {
             id: 'freehand',
-            name: 'วาดอิสระ',
+            name: t('วาดอิสระ'),
             icon: '✏️',
-            description: 'วาดโซนด้วยการคลิกทีละจุด',
+            description: t('วาดโซนด้วยการคลิกทีละจุด'),
             type: 'freehand',
         },
         {
             id: 'circle',
-            name: 'วาดวงกลม',
+            name: t('วาดวงกลม'),
             icon: '🔴',
-            description: 'วาดโซนวงกลม',
+            description: t('วาดโซนวงกลม'),
             type: 'circle',
         },
     ];
 
-    // ===== UTILITY FUNCTIONS =====
     const getEffectiveScale = useCallback(() => {
         return (enhancedMode ? enhancedScale : canvasData.scale) * viewport.zoom;
     }, [enhancedMode, enhancedScale, canvasData.scale, viewport.zoom]);
@@ -251,7 +246,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         [getEffectiveScale]
     );
 
-    // ===== PIPE RELATED FUNCTIONS =====
     const distanceToLine = useCallback(
         (
             point: CanvasCoordinate,
@@ -284,7 +278,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         []
     );
 
-    // ===== DIMENSION LINE FUNCTIONS =====
     const addDimensionLine = useCallback(
         (
             start: CanvasCoordinate,
@@ -383,7 +376,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         [dimensionLines, worldToScreen, viewport]
     );
 
-    // ===== SNAP FUNCTIONS =====
     const getSnapPoints = useCallback((): SnapPoint[] => {
         const snapPoints: SnapPoint[] = [];
 
@@ -465,7 +457,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         [getSnapPoints, snapDistance, viewport.zoom, snapToGrid, snapToVertex]
     );
 
-    // ===== ENHANCED ZONE CREATION FUNCTIONS =====
     const createRectangleZone = useCallback(
         (start: CanvasCoordinate, end: CanvasCoordinate): CanvasCoordinate[] => {
             return [
@@ -508,7 +499,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         []
     );
 
-    // ===== ZONE FINALIZATION =====
     const finalizeEnhancedZone = useCallback(
         (coordinates: CanvasCoordinate[]) => {
             const scale = enhancedMode ? enhancedScale : canvasData.scale;
@@ -535,7 +525,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         [enhancedMode, enhancedScale, canvasData.scale, onZoneCreated]
     );
 
-    // ===== ZOOM FUNCTIONS =====
     const handleZoom = useCallback(
         (delta: number, centerX: number, centerY: number) => {
             setViewport((prev) => {
@@ -557,7 +546,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         [screenToWorld]
     );
 
-    // ===== DRAWING FUNCTIONS =====
     const drawGrid = useCallback(
         (ctx: CanvasRenderingContext2D) => {
             if (!showGrid) return;
@@ -1168,7 +1156,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         [pipes, worldToScreen, viewport, selectedPipes]
     );
 
-    // ===== MAIN DRAW FUNCTION =====
     const draw = useCallback(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -1319,7 +1306,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         worldToScreen,
     ]);
 
-    // ===== EVENT HANDLERS =====
     const handleMouseMove = useCallback(
         (e: React.MouseEvent<HTMLCanvasElement>) => {
             const canvas = canvasRef.current;
@@ -1328,6 +1314,18 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             const rect = canvas.getBoundingClientRect();
             let x = e.clientX - rect.left;
             let y = e.clientY - rect.top;
+
+            if (isPanning && panStart && lastPanPosition) {
+                const deltaX = x - panStart.x;
+                const deltaY = y - panStart.y;
+
+                setViewport((prev) => ({
+                    ...prev,
+                    panX: lastPanPosition.panX + deltaX / prev.zoom,
+                    panY: lastPanPosition.panY + deltaY / prev.zoom,
+                }));
+                return;
+            }
 
             let worldPos = screenToWorld({ x, y });
 
@@ -1402,6 +1400,9 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             }
         },
         [
+            isPanning,
+            panStart,
+            lastPanPosition,
             enhancedMode,
             snapToGrid,
             snapToVertex,
@@ -1429,6 +1430,25 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             const rect = canvas.getBoundingClientRect();
             let x = e.clientX - rect.left;
             let y = e.clientY - rect.top;
+
+            const isMainClick =
+                editMode === 'view' ||
+                (!dimensionMode &&
+                    !isSettingScale &&
+                    editMode !== 'draw' &&
+                    editMode !== 'place' &&
+                    editMode !== 'edit' &&
+                    editMode !== 'main-pipe' &&
+                    editMode !== 'drag-sprinkler' &&
+                    editMode !== 'connect-sprinklers' &&
+                    !pipeEditMode);
+
+            if (isMainClick && e.button === 0) {
+                setIsPanning(true);
+                setPanStart({ x, y });
+                setLastPanPosition({ panX: viewport.panX, panY: viewport.panY });
+                return;
+            }
 
             let worldPos = screenToWorld({ x, y });
 
@@ -1478,7 +1498,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 return;
             }
 
-            // Handle pipe click for pipe selection
             if (editMode === 'select-pipes' || pipeEditMode) {
                 for (const pipe of pipes) {
                     if (!pipe.canvasStart || !pipe.canvasEnd) continue;
@@ -1610,6 +1629,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             }
         },
         [
+            editMode,
             enhancedMode,
             snapToGrid,
             snapToVertex,
@@ -1620,7 +1640,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             addDimensionLine,
             isSettingScale,
             scalePoints,
-            editMode,
             currentZoneTool,
             enhancedDrawing,
             createRectangleZone,
@@ -1714,7 +1733,12 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         if (draggedSprinkler) {
             setDraggedSprinkler(null);
         }
-    }, [draggedSprinkler]);
+        if (isPanning) {
+            setIsPanning(false);
+            setPanStart(null);
+            setLastPanPosition(null);
+        }
+    }, [draggedSprinkler, isPanning]);
 
     const handleWheel = useCallback(
         (e: React.WheelEvent<HTMLCanvasElement>) => {
@@ -1746,8 +1770,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
 
     useEffect(() => {
         const handleCancelDrawing = () => {
-            console.log('🛑 Canceling drawing in Canvas Designer');
-
             setEnhancedDrawing({
                 isDrawing: false,
                 startPoint: null,
@@ -1762,8 +1784,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             setDimensionMode(false);
             setTempDimensionPoints([]);
             setShowDimensionDirectionDialog(false);
-
-            console.log('✅ Canvas drawing cancelled successfully');
         };
 
         window.addEventListener('cancelDrawing', handleCancelDrawing);
@@ -2003,10 +2023,10 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                             : 'bg-gray-600 text-gray-200 hover:bg-gray-500'
                     }`}
                 >
-                    🛠️ {enhancedMode ? 'โหมดขั้นสูง' : 'เครื่องมือขั้นสูง'}
+                    🛠️ {enhancedMode ? t('โหมดขั้นสูง') : t('เครื่องมือขั้นสูง')}
                 </button>
                 <div className="rounded bg-gray-800/90 px-2 py-1 text-xs text-white">
-                    ซูม: {(viewport.zoom * 100).toFixed(0)}%
+                    {t('ซูม:')} {(viewport.zoom * 100).toFixed(0)}%
                 </div>
             </div>
 
@@ -2015,7 +2035,14 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 width={canvasSize.width}
                 height={canvasSize.height}
                 className="h-full w-full bg-gray-900"
-                style={{ cursor: isSettingScale || dimensionMode ? 'crosshair' : 'default' }}
+                style={{
+                    cursor:
+                        isSettingScale || dimensionMode
+                            ? 'crosshair'
+                            : isPanning
+                              ? 'grabbing'
+                              : 'default',
+                }}
                 onMouseMove={handleMouseMove}
                 onMouseDown={handleMouseDown}
                 onMouseUp={handleMouseUp}
@@ -2040,9 +2067,9 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             )}
 
             {enhancedMode && (
-                <div className="absolute left-8 top-8 max-w-xs space-y-3 rounded-lg bg-gray-800/95 p-4 backdrop-blur">
+                <div className="absolute right-0 top-8 max-w-xs space-y-3 rounded-lg bg-gray-800/95 p-4 backdrop-blur">
                     <h4 className="text-sm font-semibold text-blue-400">
-                        🏗️ เครื่องมือวาดโซนขั้นสูง
+                        🏗️ {t('เครื่องมือวาดโซนขั้นสูง')}
                     </h4>
 
                     <div className="grid grid-cols-2 gap-2">
@@ -2073,7 +2100,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
 
                     <div className="border-t border-gray-600 pt-3">
                         <div className="mb-2 text-xs font-medium text-gray-300">
-                            📐 เครื่องมือวัด:
+                            📐 {t('เครื่องมือวัด:')}
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                             <button
@@ -2087,7 +2114,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                         : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
                                 }`}
                             >
-                                📏 เพิ่มเส้นวัด
+                                📏 {t('เพิ่มเส้นวัด')}
                             </button>
                             <button
                                 onClick={() => {
@@ -2104,36 +2131,38 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                 disabled={dimensionLines.length === 0}
                                 className="rounded bg-red-600 p-2 text-xs text-white transition-colors hover:bg-red-700 disabled:bg-gray-600 disabled:text-gray-400"
                             >
-                                🗑️ ลบเส้นวัด
+                                🗑️ {t('ลบเส้นวัด')}
                             </button>
                         </div>
                     </div>
 
                     <div className="border-t border-gray-600 pt-3">
-                        <div className="mb-2 text-xs font-medium text-gray-300">👁️ การแสดงผล:</div>
+                        <div className="mb-2 text-xs font-medium text-gray-300">
+                            👁️ {t('การแสดงผล:')}
+                        </div>
                         <div className="grid grid-cols-2 gap-2">
                             {[
                                 {
                                     key: 'showMeasurements',
-                                    label: 'แสดงการวัด',
+                                    label: t('แสดงการวัด'),
                                     state: showMeasurements,
                                     setState: setShowMeasurements,
                                 },
                                 {
                                     key: 'showDimensions',
-                                    label: 'แสดงเส้นวัด',
+                                    label: t('แสดงเส้นวัด'),
                                     state: showDimensions,
                                     setState: setShowDimensions,
                                 },
                                 {
                                     key: 'snapToGrid',
-                                    label: 'ดึงไปตาราง',
+                                    label: t('ดึงไปตาราง'),
                                     state: snapToGrid,
                                     setState: setSnapToGrid,
                                 },
                                 {
                                     key: 'snapToVertex',
-                                    label: 'ดึงไปจุดยอด',
+                                    label: t('ดึงไปจุดยอด'),
                                     state: snapToVertex,
                                     setState: setSnapToVertex,
                                 },
@@ -2152,7 +2181,9 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                     </div>
 
                     <div className="border-t border-gray-600 pt-3">
-                        <div className="mb-2 text-xs font-medium text-gray-300">🔍 การซูม:</div>
+                        <div className="mb-2 text-xs font-medium text-gray-300">
+                            🔍 {t('การซูม:')}
+                        </div>
                         <div className="flex gap-1">
                             <button
                                 onClick={() =>
@@ -2160,7 +2191,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                 }
                                 className="flex-1 rounded bg-gray-600 p-1 text-xs text-white hover:bg-gray-500"
                             >
-                                ลด
+                                {t('ลด')}
                             </button>
                             <button
                                 onClick={() => {
@@ -2173,7 +2204,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                 }}
                                 className="flex-1 rounded bg-gray-600 p-1 text-xs text-white hover:bg-gray-500"
                             >
-                                รีเซ็ต
+                                {t('รีเซ็ต')}
                             </button>
                             <button
                                 onClick={() =>
@@ -2181,7 +2212,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                 }
                                 className="flex-1 rounded bg-gray-600 p-1 text-xs text-white hover:bg-gray-500"
                             >
-                                เพิ่ม
+                                {t('เพิ่ม')}
                             </button>
                         </div>
                     </div>
@@ -2190,7 +2221,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
 
             {!enhancedMode && (
                 <div className="absolute right-4 top-4 space-y-2 rounded-lg bg-gray-800/90 p-4 backdrop-blur">
-                    <h4 className="text-sm font-semibold text-blue-400">🎛️ การแสดงผล</h4>
+                    <h4 className="text-sm font-semibold text-blue-400">🎛️ {t('การแสดงผล')}</h4>
 
                     <label className="flex items-center gap-2 text-sm text-white">
                         <input
@@ -2199,7 +2230,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                             onChange={(e) => setShowGrid(e.target.checked)}
                             className="rounded"
                         />
-                        🔲 แสดงตาราง
+                        🔲 {t('แสดงตาราง')}
                     </label>
 
                     <label className="flex items-center gap-2 text-sm text-white">
@@ -2209,7 +2240,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                             onChange={(e) => setShowSprinklerRadius(e.target.checked)}
                             className="rounded"
                         />
-                        💧 แสดงรัศมีหัวฉีด
+                        💧 {t('แสดงรัศมีหัวฉีด')}
                     </label>
 
                     <label className="flex items-center gap-2 text-sm text-white">
@@ -2219,11 +2250,13 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                             onChange={(e) => setSnapToGrid(e.target.checked)}
                             className="rounded"
                         />
-                        🔗 ดึงไปตาราง
+                        🔗 {t('ดึงไปตาราง')}
                     </label>
 
                     <div className="border-t border-gray-600 pt-3">
-                        <div className="mb-2 text-xs font-medium text-gray-300">🔍 การซูม:</div>
+                        <div className="mb-2 text-xs font-medium text-gray-300">
+                            🔍 {t('การซูม:')}
+                        </div>
                         <div className="flex gap-1">
                             <button
                                 onClick={() =>
@@ -2231,7 +2264,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                 }
                                 className="flex-1 rounded bg-gray-600 p-1 text-xs text-white hover:bg-gray-500"
                             >
-                                ลด
+                                {t('ลด')}
                             </button>
                             <button
                                 onClick={() => {
@@ -2244,7 +2277,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                 }}
                                 className="flex-1 rounded bg-gray-600 p-1 text-xs text-white hover:bg-gray-500"
                             >
-                                รีเซ็ต
+                                {t('รีเซ็ต')}
                             </button>
                             <button
                                 onClick={() =>
@@ -2252,7 +2285,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                 }
                                 className="flex-1 rounded bg-gray-600 p-1 text-xs text-white hover:bg-gray-500"
                             >
-                                เพิ่ม
+                                {t('เพิ่ม')}
                             </button>
                         </div>
                     </div>
@@ -2263,16 +2296,16 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
                     <div className="mx-4 w-full max-w-md rounded-lg bg-gray-800 p-6">
                         <h3 className="mb-4 text-lg font-semibold text-yellow-400">
-                            📐 เลือกทิศทางเส้นวัด
+                            📐 {t('เลือกทิศทางเส้นวัด')}
                         </h3>
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-3">
                                 {[
-                                    { id: 'auto', label: 'อัตโนมัติ', icon: '🔄' },
-                                    { id: 'top', label: 'บน', icon: '⬆️' },
-                                    { id: 'bottom', label: 'ล่าง', icon: '⬇️' },
-                                    { id: 'left', label: 'ซ้าย', icon: '⬅️' },
-                                    { id: 'right', label: 'ขวา', icon: '➡️' },
+                                    { id: 'auto', label: t('อัตโนมัติ'), icon: '🔄' },
+                                    { id: 'top', label: t('บน'), icon: '⬆️' },
+                                    { id: 'bottom', label: t('ล่าง'), icon: '⬇️' },
+                                    { id: 'left', label: t('ซ้าย'), icon: '⬅️' },
+                                    { id: 'right', label: t('ขวา'), icon: '➡️' },
                                 ].map((dir) => (
                                     <button
                                         key={dir.id}
@@ -2304,7 +2337,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                     }}
                                     className="flex-1 rounded-lg bg-yellow-600 px-4 py-2 font-medium transition-colors hover:bg-yellow-700"
                                 >
-                                    สร้างเส้นวัด
+                                    {t('สร้างเส้นวัด')}
                                 </button>
                                 <button
                                     onClick={() => {
@@ -2314,7 +2347,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                     }}
                                     className="flex-1 rounded-lg bg-gray-600 px-4 py-2 font-medium transition-colors hover:bg-gray-700"
                                 >
-                                    ยกเลิก
+                                    {t('ยกเลิก')}
                                 </button>
                             </div>
                         </div>
@@ -2326,25 +2359,25 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
                     <div className="mx-4 w-full max-w-md rounded-lg bg-gray-800 p-6">
                         <h3 className="mb-4 text-lg font-semibold text-yellow-400">
-                            📐 ตั้งค่ามาตราส่วน
+                            📐 {t('ตั้งค่ามาตราส่วน')}
                         </h3>
                         <div className="space-y-4">
                             <div>
                                 <label className="mb-2 block text-sm font-medium text-gray-300">
-                                    ระยะทางจริงระหว่าง 2 จุดที่วัด (เมตร):
+                                    {t('ระยะทางจริงระหว่าง 2 จุดที่วัด (เมตร):')}
                                 </label>
                                 <input
                                     type="number"
                                     value={realDistance}
                                     onChange={(e) => setRealDistance(e.target.value)}
                                     className="w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-white"
-                                    placeholder="เช่น 5.5"
+                                    placeholder={t('เช่น 5.5')}
                                     step="0.1"
                                     min="0.1"
                                 />
                             </div>
                             <div className="text-sm text-gray-400">
-                                ระยะทางในพิกเซล:{' '}
+                                {t('ระยะทางในพิกเซล:')}{' '}
                                 {scalePoints.length === 2
                                     ? formatEnhancedDistance(
                                           calculateDistance(scalePoints[0], scalePoints[1])
@@ -2357,7 +2390,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                     disabled={!realDistance || scalePoints.length !== 2}
                                     className="flex-1 rounded-lg bg-yellow-600 px-4 py-2 font-medium transition-colors hover:bg-yellow-700 disabled:bg-gray-600"
                                 >
-                                    ตั้งค่า
+                                    {t('ตั้งค่า')}
                                 </button>
                                 <button
                                     onClick={() => {
@@ -2368,7 +2401,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                     }}
                                     className="flex-1 rounded-lg bg-gray-600 px-4 py-2 font-medium transition-colors hover:bg-gray-700"
                                 >
-                                    ยกเลิก
+                                    {t('ยกเลิก')}
                                 </button>
                             </div>
                         </div>
@@ -2380,37 +2413,41 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 <div className="absolute bottom-4 right-4 max-w-sm rounded-lg border border-blue-500 bg-gray-800/95 p-3 text-sm text-white backdrop-blur">
                     <div className="mb-2 flex items-center gap-2">
                         <span className="text-blue-400">🛠️</span>
-                        <span className="font-semibold">โหมดวาดโซนขั้นสูง</span>
+                        <span className="font-semibold">{t('โหมดวาดโซนขั้นสูง')}</span>
                     </div>
                     {dimensionMode ? (
                         <div>
-                            <div className="mb-1 font-semibold text-yellow-400">📐 โหมดวัดระยะ</div>
+                            <div className="mb-1 font-semibold text-yellow-400">
+                                📐 {t('โหมดวัดระยะ')}
+                            </div>
                             <div>
-                                คลิกจุดที่ 1 และจุดที่ 2 เพื่อสร้างเส้นวัด (
+                                {t('คลิกจุดที่ 1 และจุดที่ 2 เพื่อสร้างเส้นวัด')} (
                                 {tempDimensionPoints.length}/2)
                             </div>
                         </div>
                     ) : isSettingScale ? (
                         <div>
                             <div className="mb-1 font-semibold text-yellow-400">
-                                📐 ตั้งค่ามาตราส่วน
+                                📐 {t('ตั้งค่ามาตราส่วน')}
                             </div>
-                            <div>คลิก 2 จุดเพื่อวัดระยะ ({scalePoints.length}/2)</div>
+                            <div>
+                                {t('คลิก 2 จุดเพื่อวัดระยะ')} ({scalePoints.length}/2)
+                            </div>
                         </div>
                     ) : editMode === 'draw' ? (
                         <div>
                             <div className="mb-1 font-semibold text-blue-400">
-                                ✏️ กำลังวาดโซน -{' '}
+                                ✏️ {t('กำลังวาดโซน')} -{' '}
                                 {zoneDrawingTools.find((t) => t.id === currentZoneTool)?.name}
                             </div>
                             {currentZoneTool === 'freehand' ? (
                                 <div>
                                     {enhancedDrawing.isDrawing
-                                        ? `คลิกเพื่อเพิ่มจุด (${enhancedDrawing.currentPoints.length} จุด) • คลิกขวาเพื่อจบ`
-                                        : 'คลิกเพื่อเริ่มวาดโซน'}
+                                        ? `${t('คลิกเพื่อเพิ่มจุด')} (${enhancedDrawing.currentPoints.length} {t('จุด')}) • ${t('คลิกขวาเพื่อจบ')}`
+                                        : `${t('คลิกเพื่อเริ่มวาดโซน')}`}
                                     {distanceCursor.show && (
                                         <div className="mt-1 text-green-400">
-                                            ระยะทาง:{' '}
+                                            {t('ระยะทาง:')}{' '}
                                             {formatEnhancedDistance(distanceCursor.distance)}
                                         </div>
                                     )}
@@ -2418,11 +2455,11 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                             ) : (
                                 <div>
                                     {enhancedDrawing.isDrawing
-                                        ? 'คลิกจุดที่ 2 เพื่อกำหนดขนาด'
-                                        : 'คลิกจุดแรกเพื่อเริ่มวาด'}
+                                        ? `${t('คลิกจุดที่ 2 เพื่อกำหนดขนาด')}`
+                                        : `${t('คลิกจุดแรกเพื่อเริ่มวาด')}`}
                                     {distanceCursor.show && (
                                         <div className="mt-1 text-green-400">
-                                            ระยะทาง:{' '}
+                                            {t('ระยะทาง:')}{' '}
                                             {formatEnhancedDistance(distanceCursor.distance)}
                                         </div>
                                     )}
@@ -2434,23 +2471,28 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                             <div className="mb-1 font-semibold text-purple-400">
                                 🔧{' '}
                                 {pipeEditMode === 'add'
-                                    ? 'เพิ่มท่อ'
+                                    ? t('เพิ่มท่อ')
                                     : pipeEditMode === 'remove'
-                                      ? 'ลบท่อ'
-                                      : 'แก้ไขท่อ'}
+                                      ? t('ลบท่อ')
+                                      : t('แก้ไขท่อ')}
                             </div>
                             <div>
                                 {pipeEditMode === 'add'
-                                    ? `เลือกหัวฉีด 2 ตัวเพื่อเชื่อมต่อ (${selectedSprinklersForPipe.length}/2)`
+                                    ? `${t('เลือกหัวฉีด 2 ตัวเพื่อเชื่อมต่อ')} (${selectedSprinklersForPipe.length}/2)`
                                     : pipeEditMode === 'remove'
-                                      ? `เลือกหัวฉีด 2 ตัวเพื่อลบท่อ (${selectedSprinklersForPipe.length}/2)`
-                                      : 'คลิกหัวฉีดเพื่อเลือก หรือคลิกท่อเพื่อลบ'}
+                                      ? `${t('เลือกหัวฉีด 2 ตัวเพื่อลบท่อ')} (${selectedSprinklersForPipe.length}/2)`
+                                      : `${t('คลิกหัวฉีดเพื่อเลือก หรือ คลิกท่อเพื่อลบ')}`}
                             </div>
                         </div>
                     ) : (
                         <div>
-                            <div className="mb-1 font-semibold text-gray-400">เลือกเครื่องมือ</div>
-                            <div>เลือกเครื่องมือวาดโซนจากแผงด้านซ้าย • ใช้ล้อเมาส์เพื่อซูม</div>
+                            <div className="mb-1 font-semibold text-gray-400">
+                                {t('เลือกเครื่องมือ')}
+                            </div>
+                            <div>
+                                {t('เลือกเครื่องมือวาดโซนจากแผงด้านบน')} •{' '}
+                                {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนตาราง')}
+                            </div>
                         </div>
                     )}
                 </div>
@@ -2460,21 +2502,28 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                         <div className="absolute bottom-4 right-4 max-w-sm rounded-lg border border-blue-500 bg-gray-800/90 p-4 text-sm text-white backdrop-blur">
                             <div className="mb-2 flex items-center gap-2">
                                 <span className="text-blue-400">✏️</span>
-                                <span className="font-semibold">โหมดวาดโซน</span>
+                                <span className="font-semibold">{t('โหมดวาดโซน')}</span>
                             </div>
                             {isDrawing ? (
                                 <div className="space-y-1">
-                                    <div>📍 คลิกเพื่อเพิ่มจุด ({currentPolygon.length} จุด)</div>
-                                    <div>🖱️ คลิกขวาเพื่อจบการวาด</div>
-                                    <div>🔍 ใช้ล้อเมาส์เพื่อซูม</div>
+                                    <div>
+                                        📍 {t('คลิกเพื่อเพิ่มจุด')} ({currentPolygon.length}{' '}
+                                        {t('จุด')})
+                                    </div>
+                                    <div>🖱️ {t('คลิกขวาเพื่อจบการวาด')}</div>
+                                    <div>
+                                        🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนตาราง')}
+                                    </div>
                                 </div>
                             ) : (
                                 <div>
                                     <div>
-                                        🎯 คลิกเพื่อเริ่มวาดโซน{' '}
+                                        🎯 {t('คลิกเพื่อเริ่มวาดโซน')}{' '}
                                         {ZONE_TYPES.find((z) => z.id === selectedZoneType)?.name}
                                     </div>
-                                    <div>🔍 ใช้ล้อเมาส์เพื่อซูม</div>
+                                    <div>
+                                        🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนตาราง')}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -2484,11 +2533,13 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                         <div className="absolute bottom-4 left-4 rounded-lg border border-green-500 bg-gray-800/90 p-4 text-sm text-white backdrop-blur">
                             <div className="mb-2 flex items-center gap-2">
                                 <span className="text-green-400">💧</span>
-                                <span className="font-semibold">โหมดวางหัวฉีด</span>
+                                <span className="font-semibold">{t('โหมดวางหัวฉีด')}</span>
                             </div>
-                            <div>🎯 คลิกเพื่อวางหัวฉีด</div>
+                            <div>🎯 {t('คลิกเพื่อวางหัวฉีด')}</div>
                             <div className="mt-1 text-xs text-gray-300">
-                                รัศมี: {manualSprinklerRadius}ม. • 🔍 ใช้ล้อเมาส์เพื่อซูม
+                                {t('รัศมี:')} {manualSprinklerRadius}
+                                {t('ม.')} • 🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} •{' '}
+                                {t('ลากเพื่อเลื่อนตาราง')}
                             </div>
                         </div>
                     )}
@@ -2497,11 +2548,13 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                         <div className="absolute bottom-4 left-4 rounded-lg border border-yellow-500 bg-gray-800/90 p-4 text-sm text-white backdrop-blur">
                             <div className="mb-2 flex items-center gap-2">
                                 <span className="text-yellow-400">🚰</span>
-                                <span className="font-semibold">โหมดจัดการแหล่งน้ำ</span>
+                                <span className="font-semibold">{t('โหมดจัดการแหล่งน้ำ')}</span>
                             </div>
-                            <div>🎯 คลิกเพื่อวางแหล่งน้ำ</div>
-                            <div>🖱️ คลิกขวาบนแหล่งน้ำเพื่อลบ</div>
-                            <div className="text-xs text-gray-300">🔍 ใช้ล้อเมาส์เพื่อซูม</div>
+                            <div>🎯 {t('คลิกเพื่อวางแหล่งน้ำ')}</div>
+                            <div>🖱️ {t('คลิกขวาบนแหล่งน้ำเพื่อลบ')}</div>
+                            <div className="text-xs text-gray-300">
+                                🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนตาราง')}
+                            </div>
                         </div>
                     )}
 
@@ -2509,34 +2562,49 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                         <div className="absolute bottom-4 left-4 rounded-lg border border-orange-500 bg-gray-800/90 p-4 text-sm text-white backdrop-blur">
                             <div className="mb-2 flex items-center gap-2">
                                 <span className="text-orange-400">↔️</span>
-                                <span className="font-semibold">โหมดย้ายหัวฉีด</span>
+                                <span className="font-semibold">{t('โหมดย้ายหัวฉีด')}</span>
                             </div>
-                            <div>🖱️ ลากหัวฉีดเพื่อย้ายตำแหน่ง</div>
-                            <div>🖱️ คลิกขวาเพื่อลบหัวฉีด</div>
-                            <div className="text-xs text-gray-300">🔍 ใช้ล้อเมาส์เพื่อซูม</div>
+                            <div>🖱️ {t('ลากหัวฉีดเพื่อย้ายตำแหน่ง')}</div>
+                            <div>🖱️ {t('คลิกขวาเพื่อลบหัวฉีด')}</div>
+                            <div className="text-xs text-gray-300">
+                                🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนตาราง')}
+                            </div>
                         </div>
                     )}
 
                     {(editMode === 'connect-sprinklers' || pipeEditMode) && (
-                        <div className="absolute bottom-4 left-4 rounded-lg border border-purple-500 bg-gray-800/90 p-4 text-sm text-white backdrop-blur">
+                        <div className="absolute bottom-12 left-4 rounded-lg border border-purple-500 bg-gray-800/90 p-4 text-sm text-white backdrop-blur">
                             <div className="mb-2 flex items-center gap-2">
                                 <span className="text-purple-400">🔧</span>
                                 <span className="font-semibold">
                                     {pipeEditMode === 'add'
-                                        ? 'เพิ่มท่อ'
+                                        ? t('เพิ่มท่อ')
                                         : pipeEditMode === 'remove'
-                                          ? 'ลบท่อ'
-                                          : 'แก้ไขท่อ'}
+                                          ? t('ลบท่อ')
+                                          : t('แก้ไขท่อ')}
                                 </span>
                             </div>
                             <div>
                                 {pipeEditMode === 'add'
-                                    ? `🎯 เลือกหัวฉีด 2 ตัวเพื่อเชื่อมต่อ (${selectedSprinklersForPipe.length}/2)`
+                                    ? `🎯 ${t('เลือกหัวฉีด 2 ตัวเพื่อเชื่อมต่อ')} (${selectedSprinklersForPipe.length}/2)`
                                     : pipeEditMode === 'remove'
-                                      ? `🎯 เลือกหัวฉีด 2 ตัวเพื่อลบท่อ (${selectedSprinklersForPipe.length}/2)`
-                                      : '🎯 คลิกหัวฉีดเพื่อเลือก หรือคลิกท่อเพื่อลบ'}
+                                      ? `🎯 ${t('เลือกหัวฉีด 2 ตัวเพื่อลบท่อ')} (${selectedSprinklersForPipe.length}/2)`
+                                      : `🎯 ${t('คลิกหัวฉีดเพื่อเลือก หรือ คลิกท่อเพื่อลบ')}`}
                             </div>
-                            <div className="text-xs text-gray-300">🔍 ใช้ล้อเมาส์เพื่อซูม</div>
+                            <div className="text-xs text-gray-300">
+                                🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนตาราง')}
+                            </div>
+                        </div>
+                    )}
+
+                    {editMode === 'view' && (
+                        <div className="absolute bottom-4 right-4 max-w-sm rounded-lg border border-gray-500 bg-gray-800/90 p-4 text-sm text-white backdrop-blur">
+                            <div className="mb-2 flex items-center gap-2">
+                                <span className="text-gray-400">👁️</span>
+                                <span className="font-semibold">{t('โหมดดู')}</span>
+                            </div>
+                            <div>🔍 {t('ใช้ล้อเมาส์เพื่อซูม')}</div>
+                            <div>🖱️ {t('ลากเพื่อเลื่อนตาราง')}</div>
                         </div>
                     )}
                 </>
