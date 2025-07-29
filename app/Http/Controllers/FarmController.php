@@ -15,7 +15,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Http;
-use Exception;
 
 class FarmController extends Controller
 {
@@ -1834,10 +1833,9 @@ class FarmController extends Controller
             foreach ($systemFolders as $systemFolder) {
                 $exists = $folders->where('name', $systemFolder['name'])->first();
                 if (!$exists) {
-                    Folder::create([
-                        ...$systemFolder,
+                    Folder::create(array_merge($systemFolder, [
                         'user_id' => $user->id,
-                    ]);
+                    ]));
                 }
             }
 
@@ -1850,11 +1848,11 @@ class FarmController extends Controller
                 'success' => true,
                 'folders' => $folders
             ]);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             \Log::error('Error fetching folders: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Error fetching folders'
+                'message' => 'Error fetching folders: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -1871,20 +1869,19 @@ class FarmController extends Controller
             ]);
 
             $user = auth()->user();
-            $folder = Folder::create([
-                ...$validated,
+            $folder = Folder::create(array_merge($validated, [
                 'user_id' => $user->id,
-            ]);
+            ]));
 
             return response()->json([
                 'success' => true,
                 'folder' => $folder
             ]);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             \Log::error('Error creating folder: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Error creating folder'
+                'message' => 'Error creating folder: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -1908,7 +1905,7 @@ class FarmController extends Controller
                 'success' => true,
                 'folder' => $folder
             ]);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             \Log::error('Error updating folder: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
@@ -1975,11 +1972,11 @@ class FarmController extends Controller
                 'success' => true,
                 'message' => 'Folder deleted successfully'
             ]);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             \Log::error('Error deleting folder: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Error deleting folder'
+                'message' => 'Error deleting folder: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -2002,7 +1999,7 @@ class FarmController extends Controller
                 'success' => true,
                 'field' => $field
             ]);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             \Log::error('Error updating field status: ' . $e->getMessage());
             return response()->json([
                 'success' => false,

@@ -52,7 +52,6 @@ import CostSummary from './components/CostSummary';
 import QuotationModal from './components/QuotationModal';
 import QuotationDocument from './components/QuotationDocument';
 
-import ChatBox from '@/components/ChatBox';
 import { useLanguage } from '../contexts/LanguageContext';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { router } from '@inertiajs/react';
