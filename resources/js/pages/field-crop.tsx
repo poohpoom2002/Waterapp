@@ -58,7 +58,7 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
         <div className="min-h-screen bg-gray-900 text-white">
             {/* Navbar */}
             <Navbar />
-            
+
             {/* Main Content with adjusted height to account for navbar */}
             <div className="flex" style={{ height: 'calc(100vh - 64px)' }}>
                 {/* Sidebar - Fixed Summary Panel */}

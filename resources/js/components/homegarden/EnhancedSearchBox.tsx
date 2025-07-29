@@ -138,54 +138,57 @@ const EnhancedSearchBox: React.FC<EnhancedSearchBoxProps> = ({
         };
     }, [isGoogleMapsReady, onPlaceSelect, t]);
 
-    const searchWithPlacesAPI = useCallback(async (query: string) => {
-        if (!placesServiceRef.current || !query.trim() || query.length < 1) {
-            setSuggestions([]);
-            setShowSuggestions(false);
-            return;
-        }
-
-        setIsLoading(true);
-        setError(null);
-
-        try {
-            const searchResult = await placesServiceRef.current.textSearch(query, {
-                maxResults: 6,
-            });
-
-            if (searchResult.error) {
-                setError(searchResult.error);
+    const searchWithPlacesAPI = useCallback(
+        async (query: string) => {
+            if (!placesServiceRef.current || !query.trim() || query.length < 1) {
                 setSuggestions([]);
                 setShowSuggestions(false);
-            } else if (searchResult.results.length > 0) {
-                const processedResults: SearchResult[] = searchResult.results.map((place) => ({
-                    place_id: place.place_id || '',
-                    name: place.name || '',
-                    formatted_address: place.formatted_address || '',
-                    geometry: place.geometry!,
-                    types: place.types || [],
-                    rating: place.rating,
-                    photos: place.photos,
-                    vicinity: place.vicinity,
-                    business_status: place.business_status,
-                }));
-
-                setSuggestions(processedResults);
-                setShowSuggestions(true);
-                setSelectedIndex(-1);
-            } else {
-                setSuggestions([]);
-                setShowSuggestions(true);
+                return;
             }
-        } catch (error) {
-            console.error('❌ Places search error:', error);
-            setError(t('เกิดข้อผิดพลาดในการค้นหา'));
-            setSuggestions([]);
-            setShowSuggestions(false);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [t]);
+
+            setIsLoading(true);
+            setError(null);
+
+            try {
+                const searchResult = await placesServiceRef.current.textSearch(query, {
+                    maxResults: 6,
+                });
+
+                if (searchResult.error) {
+                    setError(searchResult.error);
+                    setSuggestions([]);
+                    setShowSuggestions(false);
+                } else if (searchResult.results.length > 0) {
+                    const processedResults: SearchResult[] = searchResult.results.map((place) => ({
+                        place_id: place.place_id || '',
+                        name: place.name || '',
+                        formatted_address: place.formatted_address || '',
+                        geometry: place.geometry!,
+                        types: place.types || [],
+                        rating: place.rating,
+                        photos: place.photos,
+                        vicinity: place.vicinity,
+                        business_status: place.business_status,
+                    }));
+
+                    setSuggestions(processedResults);
+                    setShowSuggestions(true);
+                    setSelectedIndex(-1);
+                } else {
+                    setSuggestions([]);
+                    setShowSuggestions(true);
+                }
+            } catch (error) {
+                console.error('❌ Places search error:', error);
+                setError(t('เกิดข้อผิดพลาดในการค้นหา'));
+                setSuggestions([]);
+                setShowSuggestions(false);
+            } finally {
+                setIsLoading(false);
+            }
+        },
+        [t]
+    );
 
     const handleInputChange = useCallback(
         (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
@@ -1420,487 +1422,512 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
     };
 
     return (
-        <div className="min-h-screen flex flex-col bg-gray-900 text-white">
+        <div className="flex min-h-screen flex-col bg-gray-900 text-white">
             <Navbar />
             <div className="flex flex-1 flex-col overflow-hidden">
                 {/* Header */}
                 <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-3">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                        <div>
-                            <h1 className="text-xl font-bold">
-                                Greenhouse Area Design with Distance Measurement
-                            </h1>
-                            <p className="text-sm text-gray-400">
-                                Draw your greenhouse structure and growing plots - Area 2400x1600 pixels (1
-                                grid = 1 meter)
-                                <span className="ml-2 text-blue-300">
-                                    Real-time distance measurement display
-                                </span>
-                            </p>
->>>>>>> 0295538755fa4f41c4e2f5f543e0e7d77c907e5c
-                        </div>
-                    </div>
-
-                    <div className="flex items-center space-x-2 text-sm text-gray-400">
-                        <span className="text-green-400">✓ Select Crops</span>
-                        <span>→</span>
-                        <span className="text-green-400">✓ Planning Method</span>
-                        <span>→</span>
-                        <span className="font-medium text-blue-400">Design Area</span>
-                        <span>→</span>
-                        <span>Irrigation System</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* Main Content */}
-            <div className="flex flex-1 overflow-hidden">
-                {/* Toolbar */}
-                <div className="flex w-64 flex-col border-r border-gray-700 bg-gray-800">
-                    <div className="flex-1 overflow-y-auto p-4">
-                        {/* Selected Crops */}
-                        <div className="mb-4">
-                            <h3 className="mb-2 text-sm font-medium text-gray-300">Selected Crops</h3>
-                            <div className="flex flex-wrap gap-1">
-                                {selectedCrops.map((crop, index) => (
-                                    <span
-                                        key={index}
-                                        className="rounded bg-green-600 px-2 py-1 text-xs text-white"
-                                    >
-                                        {crop}
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                            <div>
+                                <h1 className="text-xl font-bold">
+                                    Greenhouse Area Design with Distance Measurement
+                                </h1>
+                                <p className="text-sm text-gray-400">
+                                    Draw your greenhouse structure and growing plots - Area
+                                    2400x1600 pixels (1 grid = 1 meter)
+                                    <span className="ml-2 text-blue-300">
+                                        Real-time distance measurement display
                                     </span>
-                                ))}
+                                </p>
                             </div>
                         </div>
 
-                        {/* Tools */}
-                        <div className="mb-4">
-                            <h3 className="mb-3 text-sm font-medium text-gray-300">Tools</h3>
-                            <div className="space-y-1">
-                                {tools.map((tool) => (
-                                    <div key={tool.id} className="relative">
-                                        <button
-                                            onClick={() => setSelectedTool(tool.id)}
-                                            onMouseEnter={() => setHoveredTool(tool.id)}
-                                            onMouseLeave={() => setHoveredTool(null)}
-                                            className={`w-full rounded p-3 text-left transition-colors ${
-                                                selectedTool === tool.id
-                                                    ? 'bg-blue-600 text-white'
-                                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                            }`}
-                                            title={tool.description}
+                        <div className="flex items-center space-x-2 text-sm text-gray-400">
+                            <span className="text-green-400">✓ Select Crops</span>
+                            <span>→</span>
+                            <span className="text-green-400">✓ Planning Method</span>
+                            <span>→</span>
+                            <span className="font-medium text-blue-400">Design Area</span>
+                            <span>→</span>
+                            <span>Irrigation System</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Main Content */}
+                <div className="flex flex-1 overflow-hidden">
+                    {/* Toolbar */}
+                    <div className="flex w-64 flex-col border-r border-gray-700 bg-gray-800">
+                        <div className="flex-1 overflow-y-auto p-4">
+                            {/* Selected Crops */}
+                            <div className="mb-4">
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">
+                                    Selected Crops
+                                </h3>
+                                <div className="flex flex-wrap gap-1">
+                                    {selectedCrops.map((crop, index) => (
+                                        <span
+                                            key={index}
+                                            className="rounded bg-green-600 px-2 py-1 text-xs text-white"
                                         >
-                                            <div className="flex items-center space-x-2">
-                                                <span className="text-lg">{tool.icon}</span>
-                                                <span className="text-sm">{tool.name}</span>
-                                            </div>
-                                        </button>
+                                            {crop}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
 
-                                        {/* Tooltip */}
-                                        {hoveredTool === tool.id && (
-                                            <div className="absolute left-full top-0 z-50 ml-2 w-64 rounded-lg border border-gray-600 bg-gray-800 p-3 shadow-xl">
-                                                <h4 className="mb-2 text-sm font-medium text-blue-300">
-                                                    {tool.name}
-                                                </h4>
-                                                <div className="space-y-1 text-xs text-gray-300">
-                                                    {tool.instructions.map((instruction, index) => (
-                                                        <p key={index}>• {instruction}</p>
-                                                    ))}
+                            {/* Tools */}
+                            <div className="mb-4">
+                                <h3 className="mb-3 text-sm font-medium text-gray-300">Tools</h3>
+                                <div className="space-y-1">
+                                    {tools.map((tool) => (
+                                        <div key={tool.id} className="relative">
+                                            <button
+                                                onClick={() => setSelectedTool(tool.id)}
+                                                onMouseEnter={() => setHoveredTool(tool.id)}
+                                                onMouseLeave={() => setHoveredTool(null)}
+                                                className={`w-full rounded p-3 text-left transition-colors ${
+                                                    selectedTool === tool.id
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                }`}
+                                                title={tool.description}
+                                            >
+                                                <div className="flex items-center space-x-2">
+                                                    <span className="text-lg">{tool.icon}</span>
+                                                    <span className="text-sm">{tool.name}</span>
                                                 </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
+                                            </button>
+
+                                            {/* Tooltip */}
+                                            {hoveredTool === tool.id && (
+                                                <div className="absolute left-full top-0 z-50 ml-2 w-64 rounded-lg border border-gray-600 bg-gray-800 p-3 shadow-xl">
+                                                    <h4 className="mb-2 text-sm font-medium text-blue-300">
+                                                        {tool.name}
+                                                    </h4>
+                                                    <div className="space-y-1 text-xs text-gray-300">
+                                                        {tool.instructions.map(
+                                                            (instruction, index) => (
+                                                                <p key={index}>• {instruction}</p>
+                                                            )
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
 
-                        {/* Quick Instructions */}
-                        <div className="mb-4">
-                            <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                General Instructions
-                            </h3>
-                            <div className="space-y-1">
-                                {generalInstructions.map((instruction, index) => (
-                                    <div
-                                        key={index}
-                                        className="flex cursor-help items-center space-x-2 text-xs text-gray-400 transition-colors hover:text-gray-200"
-                                        onMouseEnter={() => setHoveredInstruction(instruction.text)}
-                                        onMouseLeave={() => setHoveredInstruction(null)}
-                                    >
-                                        <span>{instruction.icon}</span>
-                                        <span className="truncate">{instruction.text}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* View Controls */}
-                        <div className="mb-4 space-y-2">
-                            <h3 className="text-sm font-medium text-gray-300">View Options</h3>
-                            <div className="flex flex-col space-y-2">
-                                <button
-                                    onClick={() => setShowGrid(!showGrid)}
-                                    className={`rounded px-3 py-2 text-xs transition-colors ${
-                                        showGrid
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                    }`}
-                                >
-                                    Show Grid (1 square = 1m)
-                                </button>
-                                <button
-                                    onClick={() => setShowCoordinates(!showCoordinates)}
-                                    className={`rounded px-3 py-2 text-xs transition-colors ${
-                                        showCoordinates
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                    }`}
-                                >
-                                    Show Coordinates
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setZoom(1);
-                                        setPan({ x: 0, y: 0 });
-                                    }}
-                                    className="rounded bg-gray-700 px-3 py-2 text-xs text-gray-300 transition-colors hover:bg-gray-600"
-                                >
-                                    🔄 Reset View
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Canvas Info */}
-                        <div className="mb-4">
-                            <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                Canvas Info
-                            </h3>
-                            <div className="space-y-1 text-xs text-gray-400">
-                                <p>
-                                    Size: {CANVAS_SIZE.width} × {CANVAS_SIZE.height} px
-                                </p>
-                                <p>Grid: {GRID_SIZE} px = 1 meter</p>
-                                <p>Zoom: {(zoom * 100).toFixed(0)}%</p>
-                                <p>
-                                    Pan: ({pan.x.toFixed(0)}, {pan.y.toFixed(0)})
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Canvas Area */}
-                <div className="relative flex-1 overflow-hidden">
-                    <canvas
-                        ref={canvasRef}
-                        width={CANVAS_SIZE.width}
-                        height={CANVAS_SIZE.height}
-                        onMouseDown={handleMouseDown}
-                        onMouseUp={handleMouseUp}
-                        onMouseMove={handleMouseMove}
-                        onMouseEnter={handleMouseEnter}
-                        onMouseLeave={handleMouseLeave}
-                        onWheel={handleWheel}
-                        onDoubleClick={finishDrawing}
-                        onContextMenu={(e) => e.preventDefault()}
-                        className="block select-none bg-gray-900"
-                        style={{
-                            width: '100%',
-                            height: '100%',
-                            cursor: isDragging
-                                ? 'grabbing'
-                                : isPanning
-                                  ? 'grabbing'
-                                  : selectedTool === 'select' && hoveredShape
-                                    ? 'grab'
-                                    : selectedTool === 'select'
-                                      ? 'default'
-                                      : 'crosshair',
-                        }}
-                    />
-
-                    {/* Coordinates Display - bottom left */}
-                    {showCoordinates && (
-                        <div className="absolute bottom-4 left-4 rounded bg-black/50 px-3 py-1 text-sm text-white">
-                            X: {mousePos.x.toFixed(0)}, Y: {mousePos.y.toFixed(0)} | Zoom:{' '}
-                            {(zoom * 100).toFixed(0)}%
-                        </div>
-                    )}
-
-                    {/* Undo/Redo Controls - top left */}
-                    <div className="absolute left-4 top-4 flex space-x-2">
-                        <button
-                            onClick={undo}
-                            disabled={historyIndex <= 0}
-                            className={`rounded px-3 py-2 text-sm shadow-lg transition-colors ${
-                                historyIndex <= 0
-                                    ? 'cursor-not-allowed bg-gray-800 text-gray-500'
-                                    : 'bg-gray-700 text-white hover:bg-gray-600'
-                            }`}
-                            title="Undo (Ctrl+Z)"
-                        >
-                            ↶ Undo
-                        </button>
-                        <button
-                            onClick={redo}
-                            disabled={historyIndex >= history.length - 1}
-                            className={`rounded px-3 py-2 text-sm shadow-lg transition-colors ${
-                                historyIndex >= history.length - 1
-                                    ? 'cursor-not-allowed bg-gray-800 text-gray-500'
-                                    : 'bg-gray-700 text-white hover:bg-gray-600'
-                            }`}
-                            title="Redo (Ctrl+Y)"
-                        >
-                            ↷ Redo
-                        </button>
-                    </div>
-
-                    {/* Status Messages */}
-                    {isDrawing && (
-                        <div className="absolute left-4 top-20 rounded bg-blue-600 px-3 py-1 text-sm text-white">
-                            Drawing... 🟢 Edge distance 🟡 Total distance (Enter=finish, Escape=cancel)
-                        </div>
-                    )}
-
-                    {measuringMode && !measureEnd && (
-                        <div className="absolute left-4 top-20 rounded bg-red-600 px-3 py-1 text-sm text-white">
-                            Click second point to measure distance (1 grid = 1m, Escape to cancel)
-                        </div>
-                    )}
-
-                    {isDragging && (
-                        <div className="absolute left-4 top-20 rounded bg-yellow-600 px-3 py-1 text-sm text-white">
-                            🤏 Moving object... (not holding Ctrl)
-                        </div>
-                    )}
-
-                    {isPanning && (
-                        <div className="absolute left-4 top-20 rounded bg-purple-600 px-3 py-1 text-sm text-white">
-                            🤏 Panning view... (Ctrl+Drag or click empty space)
-                        </div>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="absolute right-4 top-4 flex space-x-2">
-                        {selectedShape && selectedTool === 'select' && (
-                            <button
-                                onClick={deleteShape}
-                                className="rounded bg-orange-600 px-4 py-2 text-sm text-white shadow-lg transition-colors hover:bg-orange-700"
-                            >
-                                ❌ Delete Selected Object
-                            </button>
-                        )}
-
-                        <button
-                            onClick={clearAll}
-                            className="rounded bg-red-600 px-4 py-2 text-sm text-white shadow-lg transition-colors hover:bg-red-700"
-                        >
-                            🗑️ Clear All
-                        </button>
-                    </div>
-                </div>
-
-                {/* Properties Panel */}
-                <div className="flex w-64 flex-col border-l border-gray-700 bg-gray-800">
-                    <div className="flex-1 overflow-y-auto p-4">
-                        <h3 className="mb-3 text-sm font-medium text-gray-300">Object List</h3>
-
-                        {shapes.length === 0 ? (
-                            <p className="text-sm text-gray-500">No objects yet</p>
-                        ) : (
-                            <div className="mb-4 space-y-2">
-                                {shapes.map((shape) => (
-                                    <div
-                                        key={shape.id}
-                                        onClick={() => setSelectedShape(shape.id)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Delete' && selectedShape === shape.id) {
-                                                e.preventDefault();
-                                                deleteShape();
+                            {/* Quick Instructions */}
+                            <div className="mb-4">
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">
+                                    General Instructions
+                                </h3>
+                                <div className="space-y-1">
+                                    {generalInstructions.map((instruction, index) => (
+                                        <div
+                                            key={index}
+                                            className="flex cursor-help items-center space-x-2 text-xs text-gray-400 transition-colors hover:text-gray-200"
+                                            onMouseEnter={() =>
+                                                setHoveredInstruction(instruction.text)
                                             }
-                                        }}
-                                        tabIndex={0}
-                                        className={`cursor-pointer rounded p-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                            selectedShape === shape.id
-                                                ? 'bg-yellow-600 text-white'
+                                            onMouseLeave={() => setHoveredInstruction(null)}
+                                        >
+                                            <span>{instruction.icon}</span>
+                                            <span className="truncate">{instruction.text}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* View Controls */}
+                            <div className="mb-4 space-y-2">
+                                <h3 className="text-sm font-medium text-gray-300">View Options</h3>
+                                <div className="flex flex-col space-y-2">
+                                    <button
+                                        onClick={() => setShowGrid(!showGrid)}
+                                        className={`rounded px-3 py-2 text-xs transition-colors ${
+                                            showGrid
+                                                ? 'bg-blue-600 text-white'
                                                 : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                         }`}
                                     >
-                                        <div className="flex items-center justify-between">
-                                            <span className="truncate">{shape.name}</span>
-                                            <div className="flex items-center space-x-2">
-                                                <span className="ml-2 text-xs text-gray-400">
-                                                    {shape.points.length} points
-                                                </span>
-                                                {selectedShape === shape.id && (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            deleteShape();
-                                                        }}
-                                                        className="text-red-400 transition-colors hover:text-red-300"
-                                                        title="Delete object (Delete)"
-                                                    >
-                                                        🗑️
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
+                                        Show Grid (1 square = 1m)
+                                    </button>
+                                    <button
+                                        onClick={() => setShowCoordinates(!showCoordinates)}
+                                        className={`rounded px-3 py-2 text-xs transition-colors ${
+                                            showCoordinates
+                                                ? 'bg-blue-600 text-white'
+                                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                        }`}
+                                    >
+                                        Show Coordinates
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setZoom(1);
+                                            setPan({ x: 0, y: 0 });
+                                        }}
+                                        className="rounded bg-gray-700 px-3 py-2 text-xs text-gray-300 transition-colors hover:bg-gray-600"
+                                    >
+                                        🔄 Reset View
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Canvas Info */}
+                            <div className="mb-4">
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">
+                                    Canvas Info
+                                </h3>
+                                <div className="space-y-1 text-xs text-gray-400">
+                                    <p>
+                                        Size: {CANVAS_SIZE.width} × {CANVAS_SIZE.height} px
+                                    </p>
+                                    <p>Grid: {GRID_SIZE} px = 1 meter</p>
+                                    <p>Zoom: {(zoom * 100).toFixed(0)}%</p>
+                                    <p>
+                                        Pan: ({pan.x.toFixed(0)}, {pan.y.toFixed(0)})
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Canvas Area */}
+                    <div className="relative flex-1 overflow-hidden">
+                        <canvas
+                            ref={canvasRef}
+                            width={CANVAS_SIZE.width}
+                            height={CANVAS_SIZE.height}
+                            onMouseDown={handleMouseDown}
+                            onMouseUp={handleMouseUp}
+                            onMouseMove={handleMouseMove}
+                            onMouseEnter={handleMouseEnter}
+                            onMouseLeave={handleMouseLeave}
+                            onWheel={handleWheel}
+                            onDoubleClick={finishDrawing}
+                            onContextMenu={(e) => e.preventDefault()}
+                            className="block select-none bg-gray-900"
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                cursor: isDragging
+                                    ? 'grabbing'
+                                    : isPanning
+                                      ? 'grabbing'
+                                      : selectedTool === 'select' && hoveredShape
+                                        ? 'grab'
+                                        : selectedTool === 'select'
+                                          ? 'default'
+                                          : 'crosshair',
+                            }}
+                        />
+
+                        {/* Coordinates Display - bottom left */}
+                        {showCoordinates && (
+                            <div className="absolute bottom-4 left-4 rounded bg-black/50 px-3 py-1 text-sm text-white">
+                                X: {mousePos.x.toFixed(0)}, Y: {mousePos.y.toFixed(0)} | Zoom:{' '}
+                                {(zoom * 100).toFixed(0)}%
                             </div>
                         )}
 
-                        {/* Selected Shape Info */}
-                        {selectedShape && (
-                            <div className="mb-4 border-t border-gray-700 pt-4">
-                                <div className="mb-2 flex items-center justify-between">
-                                    <h4 className="text-sm font-medium text-yellow-300">
-                                        Selected Object
-                                    </h4>
-                                    <button
-                                        onClick={deleteShape}
-                                        className="rounded bg-red-900/30 px-2 py-1 text-xs text-red-400 transition-colors hover:bg-red-900/50 hover:text-red-300"
-                                        title="Delete object (Delete)"
-                                    >
-                                        🗑️ Delete
-                                    </button>
+                        {/* Undo/Redo Controls - top left */}
+                        <div className="absolute left-4 top-4 flex space-x-2">
+                            <button
+                                onClick={undo}
+                                disabled={historyIndex <= 0}
+                                className={`rounded px-3 py-2 text-sm shadow-lg transition-colors ${
+                                    historyIndex <= 0
+                                        ? 'cursor-not-allowed bg-gray-800 text-gray-500'
+                                        : 'bg-gray-700 text-white hover:bg-gray-600'
+                                }`}
+                                title="Undo (Ctrl+Z)"
+                            >
+                                ↶ Undo
+                            </button>
+                            <button
+                                onClick={redo}
+                                disabled={historyIndex >= history.length - 1}
+                                className={`rounded px-3 py-2 text-sm shadow-lg transition-colors ${
+                                    historyIndex >= history.length - 1
+                                        ? 'cursor-not-allowed bg-gray-800 text-gray-500'
+                                        : 'bg-gray-700 text-white hover:bg-gray-600'
+                                }`}
+                                title="Redo (Ctrl+Y)"
+                            >
+                                ↷ Redo
+                            </button>
+                        </div>
+
+                        {/* Status Messages */}
+                        {isDrawing && (
+                            <div className="absolute left-4 top-20 rounded bg-blue-600 px-3 py-1 text-sm text-white">
+                                Drawing... 🟢 Edge distance 🟡 Total distance (Enter=finish,
+                                Escape=cancel)
+                            </div>
+                        )}
+
+                        {measuringMode && !measureEnd && (
+                            <div className="absolute left-4 top-20 rounded bg-red-600 px-3 py-1 text-sm text-white">
+                                Click second point to measure distance (1 grid = 1m, Escape to
+                                cancel)
+                            </div>
+                        )}
+
+                        {isDragging && (
+                            <div className="absolute left-4 top-20 rounded bg-yellow-600 px-3 py-1 text-sm text-white">
+                                🤏 Moving object... (not holding Ctrl)
+                            </div>
+                        )}
+
+                        {isPanning && (
+                            <div className="absolute left-4 top-20 rounded bg-purple-600 px-3 py-1 text-sm text-white">
+                                🤏 Panning view... (Ctrl+Drag or click empty space)
+                            </div>
+                        )}
+
+                        {/* Action Buttons */}
+                        <div className="absolute right-4 top-4 flex space-x-2">
+                            {selectedShape && selectedTool === 'select' && (
+                                <button
+                                    onClick={deleteShape}
+                                    className="rounded bg-orange-600 px-4 py-2 text-sm text-white shadow-lg transition-colors hover:bg-orange-700"
+                                >
+                                    ❌ Delete Selected Object
+                                </button>
+                            )}
+
+                            <button
+                                onClick={clearAll}
+                                className="rounded bg-red-600 px-4 py-2 text-sm text-white shadow-lg transition-colors hover:bg-red-700"
+                            >
+                                🗑️ Clear All
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Properties Panel */}
+                    <div className="flex w-64 flex-col border-l border-gray-700 bg-gray-800">
+                        <div className="flex-1 overflow-y-auto p-4">
+                            <h3 className="mb-3 text-sm font-medium text-gray-300">Object List</h3>
+
+                            {shapes.length === 0 ? (
+                                <p className="text-sm text-gray-500">No objects yet</p>
+                            ) : (
+                                <div className="mb-4 space-y-2">
+                                    {shapes.map((shape) => (
+                                        <div
+                                            key={shape.id}
+                                            onClick={() => setSelectedShape(shape.id)}
+                                            onKeyDown={(e) => {
+                                                if (
+                                                    e.key === 'Delete' &&
+                                                    selectedShape === shape.id
+                                                ) {
+                                                    e.preventDefault();
+                                                    deleteShape();
+                                                }
+                                            }}
+                                            tabIndex={0}
+                                            className={`cursor-pointer rounded p-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                                selectedShape === shape.id
+                                                    ? 'bg-yellow-600 text-white'
+                                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <span className="truncate">{shape.name}</span>
+                                                <div className="flex items-center space-x-2">
+                                                    <span className="ml-2 text-xs text-gray-400">
+                                                        {shape.points.length} points
+                                                    </span>
+                                                    {selectedShape === shape.id && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                deleteShape();
+                                                            }}
+                                                            className="text-red-400 transition-colors hover:text-red-300"
+                                                            title="Delete object (Delete)"
+                                                        >
+                                                            🗑️
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
-                                {(() => {
-                                    const shape = shapes.find((s) => s.id === selectedShape);
-                                    if (!shape) return null;
-                                    return (
-                                        <div className="space-y-1 text-xs text-gray-300">
-                                            <p>
-                                                <strong>Name:</strong> {shape.name}
-                                            </p>
-                                            <p>
-                                                <strong>Type:</strong> {shape.type}
-                                            </p>
-                                            <p>
-                                                <strong>Points:</strong> {shape.points.length}
-                                            </p>
-                                            {shape.type !== 'measurement' &&
-                                                shape.points.length >= 2 && (
-                                                    <>
-                                                        {shape.points.length >= 3 && (
-                                                            <>
+                            )}
+
+                            {/* Selected Shape Info */}
+                            {selectedShape && (
+                                <div className="mb-4 border-t border-gray-700 pt-4">
+                                    <div className="mb-2 flex items-center justify-between">
+                                        <h4 className="text-sm font-medium text-yellow-300">
+                                            Selected Object
+                                        </h4>
+                                        <button
+                                            onClick={deleteShape}
+                                            className="rounded bg-red-900/30 px-2 py-1 text-xs text-red-400 transition-colors hover:bg-red-900/50 hover:text-red-300"
+                                            title="Delete object (Delete)"
+                                        >
+                                            🗑️ Delete
+                                        </button>
+                                    </div>
+                                    {(() => {
+                                        const shape = shapes.find((s) => s.id === selectedShape);
+                                        if (!shape) return null;
+                                        return (
+                                            <div className="space-y-1 text-xs text-gray-300">
+                                                <p>
+                                                    <strong>Name:</strong> {shape.name}
+                                                </p>
+                                                <p>
+                                                    <strong>Type:</strong> {shape.type}
+                                                </p>
+                                                <p>
+                                                    <strong>Points:</strong> {shape.points.length}
+                                                </p>
+                                                {shape.type !== 'measurement' &&
+                                                    shape.points.length >= 2 && (
+                                                        <>
+                                                            {shape.points.length >= 3 && (
+                                                                <>
+                                                                    <p>
+                                                                        <strong>Perimeter:</strong>{' '}
+                                                                        {calculatePerimeter(
+                                                                            shape.points
+                                                                        ).toFixed(1)}
+                                                                        m
+                                                                    </p>
+                                                                    <p>
+                                                                        <strong>Area:</strong>{' '}
+                                                                        {calculatePolygonArea(
+                                                                            shape.points
+                                                                        ).toFixed(1)}
+                                                                        m²
+                                                                    </p>
+                                                                </>
+                                                            )}
+                                                            {shape.points.length === 2 && (
                                                                 <p>
-                                                                    <strong>Perimeter:</strong>{' '}
-                                                                    {calculatePerimeter(
-                                                                        shape.points
+                                                                    <strong>Distance:</strong>{' '}
+                                                                    {calculateDistance(
+                                                                        shape.points[0],
+                                                                        shape.points[1]
                                                                     ).toFixed(1)}
                                                                     m
                                                                 </p>
+                                                            )}
+                                                            <div className="mt-2 space-y-1">
                                                                 <p>
-                                                                    <strong>Area:</strong>{' '}
-                                                                    {calculatePolygonArea(
-                                                                        shape.points
-                                                                    ).toFixed(1)}
-                                                                    m²
+                                                                    <strong>
+                                                                        Each side length:
+                                                                    </strong>
                                                                 </p>
-                                                            </>
-                                                        )}
-                                                        {shape.points.length === 2 && (
-                                                            <p>
-                                                                <strong>Distance:</strong>{' '}
-                                                                {calculateDistance(
-                                                                    shape.points[0],
-                                                                    shape.points[1]
-                                                                ).toFixed(1)}
-                                                                m
-                                                            </p>
-                                                        )}
-                                                        <div className="mt-2 space-y-1">
-                                                            <p>
-                                                                <strong>Each side length:</strong>
-                                                            </p>
-                                                            {shape.points.map((point, i) => {
-                                                                if (
-                                                                    i === shape.points.length - 1 &&
-                                                                    shape.points.length < 3
-                                                                )
-                                                                    return null;
-                                                                const nextPoint =
-                                                                    shape.points[
-                                                                        (i + 1) %
-                                                                            shape.points.length
-                                                                    ];
-                                                                const distance = calculateDistance(
-                                                                    point,
-                                                                    nextPoint
-                                                                );
-                                                                return (
-                                                                    <p
-                                                                        key={i}
-                                                                        className="ml-2 text-xs text-gray-400"
-                                                                    >
-                                                                        Side {i + 1}:{' '}
-                                                                        {distance.toFixed(1)}m
-                                                                    </p>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    </>
-                                                )}
-                                            <div className="mt-2 text-xs text-yellow-300">
-                                                <p>• Drag to move (without holding Ctrl)</p>
-                                                <p>• Ctrl+click to pan view</p>
-                                                <p>• Press Delete to remove</p>
+                                                                {shape.points.map((point, i) => {
+                                                                    if (
+                                                                        i ===
+                                                                            shape.points.length -
+                                                                                1 &&
+                                                                        shape.points.length < 3
+                                                                    )
+                                                                        return null;
+                                                                    const nextPoint =
+                                                                        shape.points[
+                                                                            (i + 1) %
+                                                                                shape.points.length
+                                                                        ];
+                                                                    const distance =
+                                                                        calculateDistance(
+                                                                            point,
+                                                                            nextPoint
+                                                                        );
+                                                                    return (
+                                                                        <p
+                                                                            key={i}
+                                                                            className="ml-2 text-xs text-gray-400"
+                                                                        >
+                                                                            Side {i + 1}:{' '}
+                                                                            {distance.toFixed(1)}m
+                                                                        </p>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                <div className="mt-2 text-xs text-yellow-300">
+                                                    <p>• Drag to move (without holding Ctrl)</p>
+                                                    <p>• Ctrl+click to pan view</p>
+                                                    <p>• Press Delete to remove</p>
+                                                </div>
                                             </div>
-                                        </div>
-                                    );
-                                })()}
-                            </div>
-                        )}
+                                        );
+                                    })()}
+                                </div>
+                            )}
 
-                        {/* Statistics */}
-                        <div className="border-t border-gray-700 pt-4">
-                            <h4 className="mb-2 text-sm font-medium text-gray-300">Statistics</h4>
-                            <div className="space-y-2">
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-400">Greenhouses:</span>
-                                    <span>
-                                        {shapes.filter((s) => s.type === 'greenhouse').length}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-400">Growing plots:</span>
-                                    <span>{shapes.filter((s) => s.type === 'plot').length}</span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-400">Walkways:</span>
-                                    <span>{shapes.filter((s) => s.type === 'walkway').length}</span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-400">Water sources:</span>
-                                    <span>
-                                        {shapes.filter((s) => s.type === 'water-source').length}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-400">Measurements:</span>
-                                    <span>
-                                        {shapes.filter((s) => s.type === 'measurement').length}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-400">Total:</span>
-                                    <span className="font-bold">{shapes.length}</span>
-                                </div>
+                            {/* Statistics */}
+                            <div className="border-t border-gray-700 pt-4">
+                                <h4 className="mb-2 text-sm font-medium text-gray-300">
+                                    Statistics
+                                </h4>
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-400">Greenhouses:</span>
+                                        <span>
+                                            {shapes.filter((s) => s.type === 'greenhouse').length}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-400">Growing plots:</span>
+                                        <span>
+                                            {shapes.filter((s) => s.type === 'plot').length}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-400">Walkways:</span>
+                                        <span>
+                                            {shapes.filter((s) => s.type === 'walkway').length}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-400">Water sources:</span>
+                                        <span>
+                                            {shapes.filter((s) => s.type === 'water-source').length}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-400">Measurements:</span>
+                                        <span>
+                                            {shapes.filter((s) => s.type === 'measurement').length}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-400">Total:</span>
+                                        <span className="font-bold">{shapes.length}</span>
+                                    </div>
 
-                                {/* Total Area Statistics */}
-                                {shapes.filter(
-                                    (s) => s.type !== 'measurement' && s.points.length >= 3
-                                ).length > 0 && (
-                                    <>
-                                        <div className="mt-2 border-t border-gray-600 pt-2">
-                                            <h5 className="mb-1 text-xs font-medium text-gray-400">
-                                                Total Area (m²)
-                                            </h5>
-                                            {['greenhouse', 'plot', 'walkway', 'water-source'].map(
-                                                (type) => {
+                                    {/* Total Area Statistics */}
+                                    {shapes.filter(
+                                        (s) => s.type !== 'measurement' && s.points.length >= 3
+                                    ).length > 0 && (
+                                        <>
+                                            <div className="mt-2 border-t border-gray-600 pt-2">
+                                                <h5 className="mb-1 text-xs font-medium text-gray-400">
+                                                    Total Area (m²)
+                                                </h5>
+                                                {[
+                                                    'greenhouse',
+                                                    'plot',
+                                                    'walkway',
+                                                    'water-source',
+                                                ].map((type) => {
                                                     const typeShapes = shapes.filter(
                                                         (s) =>
                                                             s.type === type && s.points.length >= 3
@@ -1939,68 +1966,69 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                                             </span>
                                                         </div>
                                                     );
-                                                }
-                                            )}
-                                        </div>
-                                    </>
-                                )}
+                                                })}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Bottom Bar */}
-            <div className="flex-shrink-0 border-t border-gray-700 bg-gray-800 px-6 py-3">
-                <div className="flex justify-between">
-                    <button
-                        onClick={handleBack}
-                        className="flex items-center rounded bg-gray-600 px-4 py-2 text-white transition-colors hover:bg-gray-700"
-                    >
-                        <svg
-                            className="mr-2 h-4 w-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                {/* Bottom Bar */}
+                <div className="flex-shrink-0 border-t border-gray-700 bg-gray-800 px-6 py-3">
+                    <div className="flex justify-between">
+                        <button
+                            onClick={handleBack}
+                            className="flex items-center rounded bg-gray-600 px-4 py-2 text-white transition-colors hover:bg-gray-700"
                         >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                            />
-                        </svg>
-                        Back
-                    </button>
+                            <svg
+                                className="mr-2 h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                                />
+                            </svg>
+                            Back
+                        </button>
 
-                    <button
-                        onClick={handleProceed}
-                        className="flex items-center rounded bg-green-600 px-6 py-2 text-white transition-colors hover:bg-green-700"
-                    >
-                        Next Step: Choose Irrigation System
-                        <svg
-                            className="ml-2 h-4 w-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                        <button
+                            onClick={handleProceed}
+                            className="flex items-center rounded bg-green-600 px-6 py-2 text-white transition-colors hover:bg-green-700"
                         >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M14 5l7 7m0 0l-7 7m7-7H3"
-                            />
-                        </svg>
-                    </button>
+                            Next Step: Choose Irrigation System
+                            <svg
+                                className="ml-2 h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M14 5l7 7m0 0l-7 7m7-7H3"
+                                />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-            </div>
 
-            {/* Instruction Tooltip */}
-            {hoveredInstruction && (
-                <div className="fixed bottom-20 left-1/2 z-50 max-w-xs -translate-x-1/2 transform rounded-lg border border-gray-600 bg-gray-800 p-3 shadow-xl">
-                    <div className="text-center text-sm text-gray-300">{hoveredInstruction}</div>
-                </div>
-            )}
+                {/* Instruction Tooltip */}
+                {hoveredInstruction && (
+                    <div className="fixed bottom-20 left-1/2 z-50 max-w-xs -translate-x-1/2 transform rounded-lg border border-gray-600 bg-gray-800 p-3 shadow-xl">
+                        <div className="text-center text-sm text-gray-300">
+                            {hoveredInstruction}
+                        </div>
+                    </div>
+                )}
             </div>
             <Footer />
         </div>

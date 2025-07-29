@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
-import { useLanguage } from '../../contexts/LanguageContext';
 
 interface AreaInputMethodProps {
     crops?: string;
 }
 
 export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
-    const { t } = useLanguage();
     const [selectedCrops, setSelectedCrops] = useState<string[]>([]);
     const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
 
@@ -30,7 +28,9 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
             window.location.href = `/greenhouse-planner?crops=${selectedCrops.join(',')}&method=draw`;
         } else if (selectedMethod === 'import') {
             // Navigate to file import page (not yet created)
-            alert('File import feature is under development. Please select "Draw Area Yourself" first.');
+            alert(
+                'File import feature is under development. Please select "Draw Area Yourself" first.'
+            );
             // window.location.href = `/greenhouse-import?crops=${selectedCrops.join(',')}&method=import`;
         }
     };
@@ -54,9 +54,9 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
     };
 
     return (
-        <div className="min-h-screen flex flex-col bg-gray-900 text-white">
+        <div className="flex min-h-screen flex-col bg-gray-900 text-white">
             <Navbar />
-            <div className="flex-1 mx-auto max-w-6xl p-6">
+            <div className="mx-auto max-w-6xl flex-1 p-6">
                 {/* Header */}
                 <div className="mb-8">
                     <div className="mb-4 flex items-center justify-between">
@@ -130,11 +130,14 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                     >
                         <div className="text-center">
                             <div className="mb-4 text-6xl">✏️</div>
-                            <h3 className="mb-3 text-xl font-bold text-white">Draw Area Yourself</h3>
+                            <h3 className="mb-3 text-xl font-bold text-white">
+                                Draw Area Yourself
+                            </h3>
                             <p className="mb-4 text-gray-400">
-                                Use the drawing tools in the system to define the shape and size of your greenhouse
-
-                            </p>                            <div className="space-y-2 text-left">
+                                Use the drawing tools in the system to define the shape and size of
+                                your greenhouse
+                            </p>{' '}
+                            <div className="space-y-2 text-left">
                                 <div className="flex items-center text-sm text-gray-300">
                                     <svg
                                         className="mr-2 h-4 w-4 text-green-400"
@@ -192,7 +195,6 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                     Templates available
                                 </div>
                             </div>
-
                             {selectedMethod === 'draw' && (
                                 <div className="mt-4">
                                     <span className="inline-flex items-center rounded-full bg-blue-500 px-3 py-1 text-sm font-medium text-white">
@@ -214,11 +216,14 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                     >
                         <div className="text-center">
                             <div className="mb-4 text-6xl">📁</div>
-                            <h3 className="mb-3 text-xl font-bold text-white">Import Blueprint File</h3>
+                            <h3 className="mb-3 text-xl font-bold text-white">
+                                Import Blueprint File
+                            </h3>
                             <p className="mb-4 text-gray-400">
-
+                                Import your existing blueprint files to define the greenhouse area
+                            </p>
                             <div className="space-y-2 text-left">
-                            </p>                                <div className="flex items-center text-sm text-gray-300">
+                                <div className="flex items-center text-sm text-gray-300">
                                     <svg
                                         className="mr-2 h-4 w-4 text-green-400"
                                         fill="currentColor"
@@ -296,9 +301,9 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                 Recommendation for Beginners
                             </h4>
                             <p className="text-blue-100">
-                                If you're a beginner or don't have blueprint files, we recommend choosing{' '}
-                                <strong>"Draw Area Yourself"</strong>
-                                {' '}as it's easier and includes standard greenhouse templates
+                                If you're a beginner or don't have blueprint files, we recommend
+                                choosing <strong>"Draw Area Yourself"</strong> as it's easier and
+                                includes standard greenhouse templates
                             </p>
                         </div>
                     </div>

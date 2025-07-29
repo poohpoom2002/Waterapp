@@ -1282,7 +1282,27 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         } catch {
             console.error('Error during canvas drawing');
         }
-    }, [canvasSize, gardenZones, sprinklers, enhancedMode, hoveredSnapPoint, scalePoints, dimensionMode, tempDimensionPoints, drawGrid, drawZone, drawEnhancedPreview, drawPipes, drawSprinkler, drawWaterSource, drawCurrentPolygon, drawRuler, drawDimensionLines, drawDistanceCursor, worldToScreen]);
+    }, [
+        canvasSize,
+        gardenZones,
+        sprinklers,
+        enhancedMode,
+        hoveredSnapPoint,
+        scalePoints,
+        dimensionMode,
+        tempDimensionPoints,
+        drawGrid,
+        drawZone,
+        drawEnhancedPreview,
+        drawPipes,
+        drawSprinkler,
+        drawWaterSource,
+        drawCurrentPolygon,
+        drawRuler,
+        drawDimensionLines,
+        drawDistanceCursor,
+        worldToScreen,
+    ]);
 
     const handleMouseMove = useCallback(
         (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -1612,7 +1632,42 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 }
             }
         },
-        [editMode, dimensionMode, isSettingScale, pipeEditMode, screenToWorld, enhancedMode, snapToGrid, snapToVertex, checkDimensionLineClick, waterSource, viewport.panX, viewport.panY, viewport.zoom, findNearestSnapPoint, tempDimensionPoints, removeDimensionLine, scalePoints, pipes, distanceToLine, onPipeClick, currentZoneTool, enhancedDrawing.isDrawing, enhancedDrawing.startPoint, finalizeEnhancedZone, createRectangleZone, createCircleZone, createRegularPolygon, sprinklers, onSprinklerClick, isDrawing, currentPolygon, onSprinklerPlaced, onWaterSourcePlaced, onMainPipePoint]
+        [
+            editMode,
+            dimensionMode,
+            isSettingScale,
+            pipeEditMode,
+            screenToWorld,
+            enhancedMode,
+            snapToGrid,
+            snapToVertex,
+            checkDimensionLineClick,
+            waterSource,
+            viewport.panX,
+            viewport.panY,
+            viewport.zoom,
+            findNearestSnapPoint,
+            tempDimensionPoints,
+            removeDimensionLine,
+            scalePoints,
+            pipes,
+            distanceToLine,
+            onPipeClick,
+            currentZoneTool,
+            enhancedDrawing.isDrawing,
+            enhancedDrawing.startPoint,
+            finalizeEnhancedZone,
+            createRectangleZone,
+            createCircleZone,
+            createRegularPolygon,
+            sprinklers,
+            onSprinklerClick,
+            isDrawing,
+            currentPolygon,
+            onSprinklerPlaced,
+            onWaterSourcePlaced,
+            onMainPipePoint,
+        ]
     );
 
     const handleRightClick = useCallback(

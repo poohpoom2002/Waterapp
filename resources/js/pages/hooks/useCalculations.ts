@@ -645,29 +645,31 @@ export const useCalculations = (
                             break;
 
                         case 'pump':
-                            {const numericFields = [
-                                'powerHP',
-                                'powerKW',
-                                'phase',
-                                'inlet_size_inch',
-                                'outlet_size_inch',
-                                'max_head_m',
-                                'max_flow_rate_lpm',
-                                'suction_depth_m',
-                                'weight_kg',
-                            ];
-                            numericFields.forEach((field) => {
-                                if (transformed[field] !== undefined) {
-                                    transformed[field] = Number(transformed[field]) || 0;
-                                }
-                            });
+                            {
+                                const numericFields = [
+                                    'powerHP',
+                                    'powerKW',
+                                    'phase',
+                                    'inlet_size_inch',
+                                    'outlet_size_inch',
+                                    'max_head_m',
+                                    'max_flow_rate_lpm',
+                                    'suction_depth_m',
+                                    'weight_kg',
+                                ];
+                                numericFields.forEach((field) => {
+                                    if (transformed[field] !== undefined) {
+                                        transformed[field] = Number(transformed[field]) || 0;
+                                    }
+                                });
 
-                            const rangeFields = ['flow_rate_lpm', 'head_m'];
-                            rangeFields.forEach((field) => {
-                                if (transformed[field] !== undefined) {
-                                    transformed[field] = parseRangeValue(transformed[field]);
-                                }
-                            });}
+                                const rangeFields = ['flow_rate_lpm', 'head_m'];
+                                rangeFields.forEach((field) => {
+                                    if (transformed[field] !== undefined) {
+                                        transformed[field] = parseRangeValue(transformed[field]);
+                                    }
+                                });
+                            }
 
                             if (item.pumpAccessories || item.pump_accessories) {
                                 transformed.pumpAccessories =

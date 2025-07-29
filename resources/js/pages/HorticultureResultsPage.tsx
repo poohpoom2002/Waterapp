@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import Footer from '../components/Footer';
@@ -730,9 +732,9 @@ function EnhancedHorticultureResultsPageContent() {
                 <div className="mx-auto w-full">
                     {/* Header */}
                     <div className="mx-4 mb-4 flex justify-between text-left">
-                        <div className="mb-4">
+                        <div className="my-4 flex justify-start">
                             <h1 className="mb-2 text-2xl font-bold text-green-400">
-                                🌱 {t('รายงานการออกแบบระบบน้ำพืชสวน')}
+                            {t('รายงานการออกแบบระบบน้ำพืชสวน')}
                             </h1>
                             <h2 className="text-xl text-gray-300">{projectData.projectName}</h2>
                         </div>

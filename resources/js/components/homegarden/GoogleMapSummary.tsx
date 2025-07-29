@@ -635,7 +635,7 @@ const GoogleMapSummary: React.FC<GoogleMapSummaryProps> = (props) => {
     }
 
     return (
-        <SummaryErrorBoundary t={t}>
+        <SummaryErrorBoundary t={t}>    
             <Wrapper
                 apiKey={config.apiKey}
                 render={(status) => renderSummaryMap(status, t)}

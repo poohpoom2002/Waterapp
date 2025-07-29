@@ -7,7 +7,11 @@ import { useState, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import { router } from '@inertiajs/react';
 import { greenhouseCrops, getCropByValue } from '../components/Greenhouse/CropData';
-import { saveGreenhouseData, GreenhousePlanningData, calculateAllGreenhouseStats } from '@/utils/greenHouseData';
+import {
+    saveGreenhouseData,
+    GreenhousePlanningData,
+    calculateAllGreenhouseStats,
+} from '@/utils/greenHouseData';
 
 interface Point {
     x: number;
@@ -246,11 +250,15 @@ export default function GreenhouseSummary() {
         let j = polygon.length - 1;
 
         for (let i = 0; i < polygon.length; i++) {
-            const xi = polygon[i].x, yi = polygon[i].y;
-            const xj = polygon[j].x, yj = polygon[j].y;
-            
-            if (((yi > point.y) !== (yj > point.y)) && 
-                (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi)) {
+            const xi = polygon[i].x,
+                yi = polygon[i].y;
+            const xj = polygon[j].x,
+                yj = polygon[j].y;
+
+            if (
+                yi > point.y !== yj > point.y &&
+                point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi
+            ) {
                 isInside = !isInside;
             }
             j = i;
@@ -876,7 +884,9 @@ export default function GreenhouseSummary() {
 
     // Temporarily disable the save data button
     const handleSaveData = () => {
-        alert('The save feature is still under development. Please wait for the next version update.');
+        alert(
+            'The save feature is still under development. Please wait for the next version update.'
+        );
     };
 
     // Update canvas when data changes
@@ -1054,7 +1064,7 @@ export default function GreenhouseSummary() {
                 <div className="border-b border-gray-700 bg-gray-800">
                     <div className="container mx-auto px-4 py-6">
                         <div className="mx-auto max-w-7xl">
-                            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                 <div className="flex-1">
                                     <button
                                         onClick={handleBackNavigation}
@@ -1075,7 +1085,9 @@ export default function GreenhouseSummary() {
                                         </svg>
                                         Back to Greenhouse Map
                                     </button>
-                                    <h1 className="mb-2 text-4xl font-bold">🏠 Greenhouse Summary</h1>
+                                    <h1 className="mb-2 text-4xl font-bold">
+                                        🏠 Greenhouse Summary
+                                    </h1>
                                     <p className="mb-6 text-gray-400">
                                         Complete overview of your greenhouse system planning project
                                     </p>
@@ -1084,19 +1096,19 @@ export default function GreenhouseSummary() {
                                 <div className="flex-shrink-0">
                                     <button
                                         onClick={handleCalculateEquipment}
-                                        className="inline-flex items-center rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 text-white font-semibold transition-all duration-200 hover:from-purple-700 hover:to-blue-700 hover:shadow-lg transform hover:scale-105"
+                                        className="inline-flex transform items-center rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 font-semibold text-white transition-all duration-200 hover:scale-105 hover:from-purple-700 hover:to-blue-700 hover:shadow-lg"
                                     >
-                                        <svg 
-                                            className="mr-2 h-5 w-5" 
-                                            fill="none" 
-                                            stroke="currentColor" 
+                                        <svg
+                                            className="mr-2 h-5 w-5"
+                                            fill="none"
+                                            stroke="currentColor"
                                             viewBox="0 0 24 24"
                                         >
-                                            <path 
-                                                strokeLinecap="round" 
-                                                strokeLinejoin="round" 
-                                                strokeWidth={2} 
-                                                d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" 
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
                                             />
                                         </svg>
                                         🧮 Calculate Equipment
@@ -1157,7 +1169,7 @@ export default function GreenhouseSummary() {
             <div className="border-b border-gray-700 bg-gray-800 print:hidden print:border-gray-300 print:bg-white">
                 <div className="container mx-auto px-4 py-4">
                     <div className="mx-auto max-w-7xl">
-                        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                             <div className="flex-1">
                                 <button
                                     onClick={handleBackNavigation}
@@ -1179,7 +1191,9 @@ export default function GreenhouseSummary() {
                                     Back to Greenhouse Map
                                 </button>
 
-                                <h1 className="mb-1 text-3xl font-bold">🏠 Greenhouse Planning Summary</h1>
+                                <h1 className="mb-1 text-3xl font-bold">
+                                    🏠 Greenhouse Planning Summary
+                                </h1>
                                 <p className="mb-4 text-gray-400">
                                     Overview of the greenhouse and irrigation system design.
                                 </p>
@@ -1188,20 +1202,20 @@ export default function GreenhouseSummary() {
                             <div className="flex-shrink-0">
                                 <button
                                     onClick={handleCalculateEquipment}
-                                    className="inline-flex items-center rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 text-white font-semibold transition-all duration-200 hover:from-purple-700 hover:to-blue-700 hover:shadow-lg transform hover:scale-105"
+                                    className="inline-flex transform items-center rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 font-semibold text-white transition-all duration-200 hover:scale-105 hover:from-purple-700 hover:to-blue-700 hover:shadow-lg"
                                 >
-                                    <svg 
-                                        className="mr-2 h-5 w-5" 
-                                        fill="none" 
-                                        stroke="currentColor" 
+                                    <svg
+                                        className="mr-2 h-5 w-5"
+                                        fill="none"
+                                        stroke="currentColor"
                                         viewBox="0 0 24 24"
                                     >
-                                        <path 
-                                            strokeLinecap="round" 
-                                            strokeLinejoin="round" 
-                                            strokeWidth={2} 
-                                            d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" 
-                                            />
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                                        />
                                     </svg>
                                     🧮 Calculate Equipment
                                 </button>
@@ -1213,7 +1227,9 @@ export default function GreenhouseSummary() {
 
             <div className="hidden print:mb-6 print:block">
                 <h1 className="text-2xl font-bold text-black">🏠 Greenhouse Planning Summary</h1>
-                <p className="text-gray-600">Overview of the greenhouse and irrigation system design.</p>
+                <p className="text-gray-600">
+                    Overview of the greenhouse and irrigation system design.
+                </p>
                 <hr className="my-2 border-gray-300" />
                 <p className="text-sm text-gray-500">
                     Date: {new Date().toLocaleDateString('en-US')}
@@ -1503,7 +1519,8 @@ export default function GreenhouseSummary() {
                                     />
                                 </div>
                                 <div className="mt-2 text-center text-xs text-gray-400 print:hidden">
-                                    Greenhouse layout with all irrigation systems and equipment (centered).
+                                    Greenhouse layout with all irrigation systems and equipment
+                                    (centered).
                                 </div>
                             </div>
 
@@ -1514,13 +1531,16 @@ export default function GreenhouseSummary() {
                                     </h3>
                                     <div className="space-y-1 text-xs text-gray-700">
                                         <p>
-                                            • This plan shows the positions of all greenhouse structures and irrigation systems.
+                                            • This plan shows the positions of all greenhouse
+                                            structures and irrigation systems.
                                         </p>
                                         <p>
-                                            • Blue: Main and sub-pipes | Green: Plot areas | Brown: Greenhouse structure.
+                                            • Blue: Main and sub-pipes | Green: Plot areas | Brown:
+                                            Greenhouse structure.
                                         </p>
                                         <p>
-                                            • Symbols indicate the positions of irrigation equipment such as pumps, valves, and sprinklers.
+                                            • Symbols indicate the positions of irrigation equipment
+                                            such as pumps, valves, and sprinklers.
                                         </p>
                                         <p>• ขนาดและตำแหน่งอาจต้องปรับตามสภาพพื้นที่จริง</p>
                                         <p>
@@ -1813,7 +1833,8 @@ export default function GreenhouseSummary() {
 
                             <div className="hidden print:mt-8 print:block print:text-center">
                                 <p className="text-xs text-gray-500">
-                                    This document was generated by the automated greenhouse planning system - Page 2/2
+                                    This document was generated by the automated greenhouse planning
+                                    system - Page 2/2
                                 </p>
                             </div>
                         </div>
@@ -1823,7 +1844,8 @@ export default function GreenhouseSummary() {
 
             <div className="print:page-break-after-avoid hidden print:mt-8 print:block print:text-center">
                 <p className="text-xs text-gray-500">
-                    This document was generated by the automated greenhouse planning system - Page 1/2
+                    This document was generated by the automated greenhouse planning system - Page
+                    1/2
                 </p>
             </div>
         </div>
