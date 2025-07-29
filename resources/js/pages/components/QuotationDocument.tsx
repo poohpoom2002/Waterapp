@@ -1,6 +1,9 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // resources\js\pages\components\QuotationDocument.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { CalculationResults, QuotationData, QuotationDataCustomer } from '../types/interfaces';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface QuotationItem {
     id: string;
@@ -69,6 +72,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     showPump,
     onClose,
 }) => {
+    const { t } = useLanguage();
     const [items, setItems] = useState<QuotationItem[]>([]);
     const [currentPage, setCurrentPage] = useState(1);
     const [isEditing, setIsEditing] = useState(false);
@@ -112,13 +116,17 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     };
 
     const calculateTotalPages = (totalItems: number) => {
-        if (totalItems <= 7) return 1;
+        if (totalItems === 0) return hasProjectImagePage ? 1 : 0; // ถ้าไม่มี items แต่มีรูป ให้แสดง 1 หน้า
+
+        if (totalItems <= 10) {
+            return 1 + (hasProjectImagePage ? 1 : 0); // หน้าเดียวพอ + หน้ารูป (ถ้ามี)
+        }
 
         let remainingItems = totalItems - 10; // หักหน้าแรก 10 รายการ
         let additionalPages = 0;
 
         while (remainingItems > 0) {
-            if (remainingItems <= 11) {
+            if (remainingItems <= 14) {
                 additionalPages += 1;
                 break;
             } else {
@@ -127,7 +135,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             }
         }
 
-        return 1 + additionalPages + imagePageOffset;
+        return 1 + additionalPages + (hasProjectImagePage ? 1 : 0);
     };
 
     const totalPages = calculateTotalPages(items.length);
@@ -285,7 +293,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     };
 
     useEffect(() => {
-        if (!show) return;
+        if (show) return;
 
         if (!results) {
             return;
@@ -582,7 +590,20 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         }
 
         setItems(initialItems);
-        setCurrentPage(hasProjectImagePage ? 1 : 1);
+        if (hasProjectImagePage && initialItems.length > 0) {
+            // ถ้ามีรูปและมี items ให้เริ่มที่หน้ารูป (หน้า 1)
+            setCurrentPage(1);
+        } else if (hasProjectImagePage && initialItems.length === 0) {
+            // ถ้ามีรูปแต่ไม่มี items ให้แสดงหน้ารูปเท่านั้น
+            setCurrentPage(1);
+        } else if (!hasProjectImagePage && initialItems.length > 0) {
+            // ถ้าไม่มีรูปแต่มี items ให้เริ่มที่หน้าแรกของอุปกรณ์
+            setCurrentPage(1);
+        } else {
+            // ไม่มีรูปและไม่มี items
+            setCurrentPage(1);
+        }
+        //  setCurrentPage(hasProjectImagePage ? 1 : 1);
     }, [
         show,
         selectedSprinkler,
@@ -720,7 +741,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 <div className="max-h-[80vh] w-[800px] overflow-auto rounded-lg bg-white p-6">
                     <div className="mb-4 flex items-center justify-between">
                         <h3 className="text-lg font-semibold text-gray-800">
-                            เลือกอุปกรณ์จากฐานข้อมูล
+                            {t('เลือกอุปกรณ์จากฐานข้อมูล')}
                         </h3>
                         <button
                             onClick={() => {
@@ -736,14 +757,14 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
                     <div className="mb-4">
                         <label className="mb-2 block text-sm font-medium text-gray-700">
-                            เลือกประเภทอุปกรณ์
+                            {t('เลือกประเภทอุปกรณ์')}
                         </label>
                         <select
                             value={localSelectedCategory}
                             onChange={(e) => setLocalSelectedCategory(e.target.value)}
                             className="w-full rounded border border-gray-300 p-2 text-gray-800 focus:border-blue-500 focus:outline-none"
                         >
-                            <option value="">-- เลือกประเภท --</option>
+                            <option value="">-- {t('เลือกประเภท')} --</option>
                             {equipmentCategories.map((category) => (
                                 <option key={category.id} value={category.id}>
                                     {category.display_name}
@@ -755,14 +776,14 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     {localSelectedCategory && (
                         <div className="mb-4">
                             <label className="mb-2 block text-sm font-medium text-gray-700">
-                                ค้นหาอุปกรณ์
+                                {t('ค้นหาอุปกรณ์')}
                             </label>
                             <input
                                 key={`search-${localSelectedCategory}`}
                                 type="text"
                                 value={localSearchTerm}
                                 onChange={(e) => setLocalSearchTerm(e.target.value)}
-                                placeholder="ชื่อ, รุ่น, แบรนด์..."
+                                placeholder={t('ชื่อ, รุ่น, แบรนด์...')}
                                 className="w-full rounded border border-gray-300 bg-white p-2 text-gray-800 focus:border-blue-500 focus:outline-none"
                                 autoComplete="off"
                             />
@@ -771,12 +792,12 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
                     {isLoadingEquipment ? (
                         <div className="flex items-center justify-center py-8">
-                            <div className="text-gray-500">กำลังโหลด...</div>
+                            <div className="text-gray-500">{t('กำลังโหลด...')}</div>
                         </div>
                     ) : (
                         <div className="max-h-[400px] overflow-auto">
                             {equipmentList.length === 0 && localSelectedCategory ? (
-                                <div className="py-8 text-center text-gray-500">ไม่พบอุปกรณ์</div>
+                                <div className="py-8 text-center text-gray-500">{t('ไม่พบอุปกรณ์')}</div>
                             ) : (
                                 <div className="space-y-2">
                                     {equipmentList.map((equipment) => (
@@ -831,7 +852,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                                 }}
                                                 className="rounded bg-blue-500 px-3 py-1 text-sm text-white transition-colors hover:bg-blue-600"
                                             >
-                                                เพิ่ม
+                                                {t('เพิ่ม')}
                                             </button>
                                         </div>
                                     ))}
@@ -863,7 +884,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             ${renderHeader()}
                             
                             <div class="flex flex-col items-center justify-center">
-                                <h1 class="text-2xl font-bold mb-8 text-center">แผนผังโครงการระบบชลประทาน</h1>
+                                <h1 class="text-2xl font-bold mb-8 text-center">{t('แผนผังโครงการระบบชลประทาน')}</h1>
                                 <div class="flex items-center justify-center w-full max-h-[800px]">
                                     <img
                                         src="${editableProjectImage}"
@@ -935,23 +956,23 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 <thead>
                     <tr class="bg-gray-100">
                         <th class="border border-gray-400 p-2 text-center" colspan="5">
-                            Commitment
+                            ${t('Commitment')}
                         </th>
                         <th class="border border-gray-400 p-2 text-center" colspan="5">
-                            Disc. Fixed
+                            ${t('Disc. Fixed')}
                         </th>
                     </tr>
                     <tr class="bg-gray-100">
-                        <th class="w-[50px] border border-gray-400 p-1 text-center">Seq</th>
-                        <th class="w-[60px] border border-gray-400 p-1 text-center">Image</th>
-                        <th class="w-[80px] border border-gray-400 p-1 text-center">Date</th>
-                        <th class="w-[250px] border border-gray-400 p-1 text-center">Description</th>
-                        <th class="w-[80px] border border-gray-400 p-1 text-center">Quantity</th>
-                        <th class="w-[80px] border border-gray-400 p-1 text-center">Unit Price</th>
-                        <th class="w-[80px] border border-gray-400 p-1 text-center">Disc.(%)</th>
-                        <th class="w-[80px] border border-gray-400 p-1 text-center">Amount</th>
-                        <th class="w-[80px] border border-gray-400 p-1 text-center">Taxes</th>
-                        <th class="w-[80px] border border-gray-400 p-1 text-center">Amount</th>
+                        <th class="w-[50px] border border-gray-400 p-1 text-center">${t('Seq')}</th>
+                        <th class="w-[60px] border border-gray-400 p-1 text-center">${t('Image')}</th>
+                        <th class="w-[80px] border border-gray-400 p-1 text-center">${t('Date')}</th>
+                        <th class="w-[250px] border border-gray-400 p-1 text-center">${t('Description')}</th>
+                        <th class="w-[80px] border border-gray-400 p-1 text-center">${t('Quantity')}</th>
+                        <th class="w-[80px] border border-gray-400 p-1 text-center">${t('Unit Price')}</th>
+                        <th class="w-[80px] border border-gray-400 p-1 text-center">${t('Disc.(%)')}</th>
+                        <th class="w-[80px] border border-gray-400 p-1 text-center">${t('Amount')}</th>
+                        <th class="w-[80px] border border-gray-400 p-1 text-center">${t('Taxes')}</th>
+                        <th class="w-[80px] border border-gray-400 p-1 text-center">${t('Amount')}</th>
                     </tr>
                 </thead>
             `;
@@ -971,7 +992,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         <td class="border border-gray-400 p-1 text-center align-top">${item.date}</td>
                         <td class="border border-gray-400 p-1 text-left align-top">${item.description}</td>
                         <td class="border border-gray-400 p-1 text-right align-top">
-                            ${item.quantity.toFixed(4)}<br />Unit
+                            ${item.quantity.toFixed(4)}<br />${t('Unit')}
                         </td>
                         <td class="border border-gray-400 p-1 text-right align-top">${item.unitPrice.toFixed(4)}</td>
                         <td class="border border-gray-400 p-1 text-right align-top">${item.discount.toFixed(3)}</td>
@@ -1046,18 +1067,18 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         </div>
         <hr class="print-hr mb-4 border-gray-800" />
         <div class="print-company-info mb-4 self-start text-sm">
-            <p class="font-semibold">บจก. กนกโปรดักส์ (สำนักงานใหญ่)</p>
-            <p>15 ซ. พระยามนธาตุ แยก 10</p>
-            <p>แขวงคลองบางบอน เขตบางบอน</p>
-            <p>กรุงเทพมหานคร 10150</p>
+            <p class="font-semibold">${t('บจก. กนกโปรดักส์ (สำนักงานใหญ่)')}</p> 
+            <p>${t('15 ซ. พระยามนธาตุ แยก 10')}</p>
+            <p>${t('แขวงคลองบางบอน เขตบางบอน')}</p>
+            <p>${t('กรุงเทพมหานคร 10150')}</p>
         </div>`;
 
     const renderFooter = (page: number) =>
         `<div class="print-footer-container mt-auto text-center text-xs">
             <hr class="print-footer-hr mb-2 border-gray-800" />
             <div class="print-footer">
-                <p>Phone: 02-451-1111 Tax ID: 0105549044446</p>
-                <p>Page: ${page} / ${totalPages}</p>
+                <p>${t('Phone:')} 02-451-1111 ${t('Tax ID:')} 0105549044446</p>
+                <p>${t('Page:')} ${page} / ${totalPages}</p>
             </div>
         </div>`;
 
@@ -1141,7 +1162,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         <div
                             className="group relative mx-auto flex h-10 w-10 cursor-pointer items-center justify-center rounded border-2 border-dashed border-gray-300 hover:border-blue-400"
                             onClick={() => openFileDialog(item.id)}
-                            title="คลิกเพื่อเพิ่มรูปภาพ"
+                            title={t('คลิกเพื่อเพิ่มรูปภาพ')}
                         >
                             {imageUrl ? (
                                 <img
@@ -1205,7 +1226,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         `${item.quantity.toFixed(4)}`
                     )}
                     <br />
-                    Unit
+                    {t('Unit')}
                 </td>
                 <td className="border border-gray-400 p-1 text-right align-top">
                     {isEditing ? (
@@ -1261,7 +1282,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                     onClick={() => moveItem(absoluteIndex, 'up')}
                                     disabled={absoluteIndex === 0}
                                     className="rounded px-1 py-0.5 text-xs text-blue-500 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                                    title="ขึ้น"
+                                    title={t('ขึ้น')}
                                 >
                                     ↑
                                 </button>
@@ -1269,7 +1290,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                     onClick={() => moveItem(absoluteIndex, 'down')}
                                     disabled={absoluteIndex === items.length - 1}
                                     className="rounded px-1 py-0.5 text-xs text-blue-500 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                                    title="ลง"
+                                    title={t('ลง')}
                                 >
                                     ↓
                                 </button>
@@ -1278,7 +1299,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                 onClick={() => removeItem(item.id)}
                                 className="rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50 hover:text-red-700"
                             >
-                                ลบ
+                                {t('ลบ')}
                             </button>
                         </div>
                     </td>
@@ -1302,14 +1323,14 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 <hr className="print-hr mb-4 border-gray-800" />
                 <div className="print-company-info mb-4 self-start text-sm">
                     <p className="font-semibold">บจก. กนกโปรดักส์ (สำนักงานใหญ่)</p>
-                    <p>15 ซ. พระยามนธาตุ แยก 10</p>
-                    <p>แขวงคลองบางบอน เขตบางบอน</p>
-                    <p>กรุงเทพมหานคร 10150</p>
+                    <p>{t('15 ซ. พระยามนธาตุ แยก 10')}</p>
+                    <p>{t('แขวงคลองบางบอน เขตบางบอน')}</p>
+                    <p>{t('กรุงเทพมหานคร 10150')}</p>
                 </div>
 
                 <div className="flex flex-col items-center justify-center">
                     <h1 className="mb-8 text-center text-2xl font-bold">
-                        แผนผังโครงการระบบชลประทาน
+                        {t('แผนผังโครงการระบบชลประทาน')}
                     </h1>
                     <div className="relative flex max-h-[800px] w-full items-center justify-center">
                         {isEditing ? (
@@ -1320,17 +1341,17 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                         alt="Project Layout"
                                         className="max-h-full max-w-full cursor-pointer rounded-lg object-contain shadow-lg"
                                         onClick={openProjectImageDialog}
-                                        title="คลิกเพื่อเปลี่ยนรูปภาพ"
+                                        title={t('คลิกเพื่อเปลี่ยนรูปภาพ')}
                                     />
                                 ) : (
                                     <div
                                         className="flex h-[400px] w-[600px] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 hover:border-blue-400"
                                         onClick={openProjectImageDialog}
-                                        title="คลิกเพื่อเพิ่มรูปภาพ"
+                                        title={t('คลิกเพื่อเพิ่มรูปภาพ')}
                                     >
                                         <div className="text-center">
                                             <div className="mb-4 text-6xl text-gray-400">📷</div>
-                                            <p className="text-gray-500">คลิกเพื่อเพิ่มรูปแผนผัง</p>
+                                            <p className="text-gray-500">{t('คลิกเพื่อเพิ่มรูปแผนผัง')}</p>
                                         </div>
                                     </div>
                                 )}
@@ -1342,7 +1363,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                                 openProjectImageDialog();
                                             }}
                                             className="rounded-full bg-blue-500 p-2 text-white shadow-lg hover:bg-blue-600"
-                                            title="เปลี่ยนรูปภาพ"
+                                            title={t('เปลี่ยนรูปภาพ')}
                                         >
                                             📷
                                         </button>
@@ -1352,7 +1373,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                                 handleProjectImageDelete();
                                             }}
                                             className="rounded-full bg-red-500 p-2 text-white shadow-lg hover:bg-red-600"
-                                            title="ลบรูปภาพ"
+                                            title={t('ลบรูปภาพ')}
                                         >
                                             ×
                                         </button>
@@ -1369,18 +1390,28 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             <div className="flex h-[400px] w-[600px] items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50">
                                 <div className="text-center">
                                     <div className="mb-4 text-6xl text-gray-400">📷</div>
-                                    <p className="text-gray-500">ไม่มีรูปแผนผัง</p>
+                                    <p className="text-gray-500">{t('ไม่มีรูปแผนผัง')}</p>
                                 </div>
                             </div>
                         )}
                     </div>
+                    {!isEditing && totalPages > 1 && (
+                        <div className="no-print mt-4 rounded bg-blue-100 p-4 text-center text-blue-800">
+                            <p className="text-sm font-medium">
+                                📋 {t('กดปุ่ม')} "{t('ถัดไป')}" {t('ด้านบนเพื่อดูรายการอุปกรณ์')}
+                            </p>
+                            <p className="text-xs text-blue-600">
+                                {t('หน้านี้แสดงแผนผังโปรเจค')} {t('หน้าถัดไปจะแสดงตารางอุปกรณ์และราคา')}
+                            </p>
+                        </div>
+                    )}
                 </div>
 
                 <div className="print-footer-container mt-auto text-center text-xs">
                     <hr className="print-footer-hr mb-2 border-gray-800" />
                     <div className="print-footer">
-                        <p>Phone: 02-451-1111 Tax ID: 0105549044446</p>
-                        <p>Page: 1 / {totalPages}</p>
+                        <p>{t('Phone:')} 02-451-1111 {t('Tax ID:')} 0105549044446</p>
+                        <p>{t('Page:')} 1 / {totalPages}</p>
                     </div>
                 </div>
             </div>
@@ -1542,10 +1573,10 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                 </svg>
                             </div>
                             <div>
-                                <p className="font-bold">หมายเหตุ:</p>
+                                <p className="font-bold">{t('หมายเหตุ:')}</p>
                                 <p className="text-sm">
-                                    รายการที่เพิ่มใหม่จะหายไปเมื่อรีเฟรชหน้า
-                                    เนื่องจากข้อจำกัดของระบบ กรุณาพิมพ์หรือบันทึกก่อนออกจากหน้านี้
+                                    {t('รายการที่เพิ่มใหม่จะหายไปเมื่อรีเฟรชหน้า')}
+                                    {t('เนื่องจากข้อจำกัดของระบบ')} {t('กรุณาพิมพ์หรือบันทึกก่อนออกจากหน้านี้')}
                                 </p>
                             </div>
                         </div>
@@ -1558,7 +1589,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             onClick={onClose}
                             className="rounded bg-gray-500 px-4 py-2 text-white hover:bg-gray-600"
                         >
-                            ปิด
+                            {t('ปิด')}
                         </button>
                         <button
                             onClick={() => setIsEditing(!isEditing)}
@@ -1568,7 +1599,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                     : 'bg-yellow-500 hover:bg-yellow-600'
                             }`}
                         >
-                            {isEditing ? 'เสร็จสิ้น' : 'แก้ไข'}
+                            {isEditing ? t('เสร็จสิ้น') : t('แก้ไข')}
                         </button>
                         {isEditing && !isImagePage && (
                             <>
@@ -1576,13 +1607,13 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                     onClick={addNewItem}
                                     className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
                                 >
-                                    เพิ่มรายการ
+                                    {t('เพิ่มรายการ')}
                                 </button>
                                 <button
                                     onClick={() => setShowEquipmentSelector(true)}
                                     className="rounded bg-purple-500 px-4 py-2 text-white hover:bg-purple-600"
                                 >
-                                    เลือกจากฐานข้อมูล
+                                    {t('เลือกจากฐานข้อมูล')}
                                 </button>
                             </>
                         )}
@@ -1590,28 +1621,58 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
                     <div className="flex items-center space-x-4">
                         {totalPages > 1 && (
-                            <div className="flex items-center space-x-2">
-                                <button
-                                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                                    disabled={currentPage === 1}
-                                    className="rounded bg-gray-600 px-3 py-1 text-white disabled:opacity-50"
-                                >
-                                    ก่อนหน้า
-                                </button>
-                                <span className="text-white">
-                                    หน้า {currentPage} / {totalPages}
-                                    {isImagePage && ' (แผนผัง)'}
-                                    {!isImagePage && hasProjectImagePage && ' (อุปกรณ์)'}
-                                </span>
-                                <button
-                                    onClick={() =>
-                                        setCurrentPage(Math.min(totalPages, currentPage + 1))
-                                    }
-                                    disabled={currentPage === totalPages}
-                                    className="rounded bg-gray-600 px-3 py-1 text-white disabled:opacity-50"
-                                >
-                                    ถัดไป
-                                </button>
+                            <div className="flex items-center space-x-4">
+                                <div className="flex items-center space-x-2">
+                                    <button
+                                        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                                        disabled={currentPage === 1}
+                                        className="rounded bg-gray-600 px-3 py-1 text-white disabled:opacity-50"
+                                    >
+                                        ← {t('ก่อนหน้า')}
+                                    </button>
+
+                                    {/* แสดงข้อมูลหน้าปัจจุบันให้ชัดเจน */}
+                                    <div className="text-center text-white">
+                                        <div className="text-sm">
+                                            {t('หน้า')} {currentPage} / {totalPages}
+                                        </div>
+                                        <div className="text-xs text-gray-300">
+                                            {isImagePage && '📷 ' + t('แผนผัง')}
+                                            {!isImagePage && hasProjectImagePage && '📋 ' + t('อุปกรณ์')}
+                                            {!isImagePage && !hasProjectImagePage && '📋 ' + t('รายการ')}
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={() =>
+                                            setCurrentPage(Math.min(totalPages, currentPage + 1))
+                                        }
+                                        disabled={currentPage === totalPages}
+                                        className="rounded bg-gray-600 px-3 py-1 text-white disabled:opacity-50"
+                                    >
+                                        {t('ถัดไป')} →
+                                    </button>
+                                </div>
+
+                                {/* เพิ่มปุ่มข้ามไปหน้าอุปกรณ์โดยตรง */}
+                                {hasProjectImagePage && isImagePage && totalPages > 1 && (
+                                    <button
+                                        onClick={() => setCurrentPage(2)}
+                                        className="rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700"
+                                    >
+                                        📋 {t('ดูรายการอุปกรณ์')}
+                                    </button>
+                                )}
+
+                                {/* เพิ่มปุ่มกลับไปหน้าแผนผัง */}
+                                {hasProjectImagePage && !isImagePage && (
+                                    <button
+                                        onClick={() => setCurrentPage(1)}
+                                        className="rounded bg-green-600 px-3 py-1 text-sm text-white hover:bg-green-700"
+                                    >
+                                        📷 {t('ดูแผนผัง')}
+                                    </button>
+                                )}
                             </div>
                         )}
 
@@ -1620,7 +1681,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                 onClick={handlePrint}
                                 className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
                             >
-                                พิมพ์
+                                {t('พิมพ์')}
                             </button>
                         )}
                     </div>
@@ -1631,6 +1692,37 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 {/* Render project image page or equipment page */}
                 {isImagePage ? (
                     renderProjectImagePage()
+                ) : items.length === 0 ? (
+                    // แสดงเมื่อไม่มีรายการอุปกรณ์
+                    <div className="mx-auto flex h-[1123px] w-[794px] flex-col bg-white p-8 text-black shadow-lg">
+                        <div className="print-page flex min-h-full flex-col">
+                            {/* header */}
+                            {renderHeader()}
+
+                            <div className="flex flex-1 items-center justify-center">
+                                <div className="text-center">
+                                    <div className="mb-4 text-6xl text-gray-400">📋</div>
+                                    <h2 className="mb-2 text-xl font-bold text-gray-600">
+                                        {t('ไม่พบรายการอุปกรณ์')}
+                                    </h2>
+                                    <p className="text-gray-500">
+                                        {t('กรุณาเลือกสปริงเกอร์และอุปกรณ์อื่นๆ ก่อนออกใบเสนอราคา')}
+                                    </p>
+                                    {hasProjectImagePage && (
+                                        <button
+                                            onClick={() => setCurrentPage(1)}
+                                            className="no-print mt-4 rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
+                                        >
+                                            📷 {t('ดูแผนผังโปรเจค')}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* footer */}
+                            {renderFooter(currentPage)}
+                        </div>
+                    </div>
                 ) : (
                     <div className="mx-auto flex h-[1123px] w-[794px] flex-col bg-white p-8 text-black shadow-lg">
                         <div className="print-page flex min-h-full flex-col">
@@ -1645,10 +1737,10 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             </div>
                             <hr className="print-hr mb-4 border-gray-800" />
                             <div className="print-company-info mb-4 self-start text-sm">
-                                <p className="font-semibold">บจก. กนกโปรดักส์ (สำนักงานใหญ่)</p>
-                                <p>15 ซ. พระยามนธาตุ แยก 10</p>
-                                <p>แขวงคลองบางบอน เขตบางบอน</p>
-                                <p>กรุงเทพมหานคร 10150</p>
+                                <p className="font-semibold">{t('บจก. กนกโปรดักส์ (สำนักงานใหญ่)')}</p>
+                                <p>{t('15 ซ. พระยามนธาตุ แยก 10')}</p>
+                                <p>{t('แขวงคลองบางบอน เขตบางบอน')}</p>
+                                <p>{t('กรุงเทพมหานคร 10150')}</p>
                             </div>
 
                             {currentPage === 1 + imagePageOffset && (
@@ -1673,42 +1765,42 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                         <tbody>
                                             <tr className="border-gray-400">
                                                 <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
-                                                    Subtotal
+                                                    {t('Subtotal')}
                                                 </td>
                                                 <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
-                                                    {calculateTotal().toFixed(2)} ฿
+                                                    {calculateTotal().toFixed(2)} {t('฿')}
                                                 </td>
                                             </tr>
                                             <tr className="border-gray-400">
                                                 <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
-                                                    Vat 7%
+                                                    {t('Vat 7%')}
                                                 </td>
                                                 <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
-                                                    {(calculateTotal() * 0.07).toFixed(2)} ฿
+                                                    {(calculateTotal() * 0.07).toFixed(2)} {t('฿')}
                                                 </td>
                                             </tr>
                                             <tr className="border-gray-400">
                                                 <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
-                                                    Subtotal Without Discount
+                                                    {t('Subtotal Without Discount')}
                                                 </td>
                                                 <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
-                                                    {(calculateTotal() * 1.07).toFixed(2)} ฿
+                                                    {(calculateTotal() * 1.07).toFixed(2)} {t('฿')}
                                                 </td>
                                             </tr>
                                             <tr className="border-gray-400">
                                                 <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
-                                                    Discount Subtotal
+                                                    {t('Discount Subtotal')}
                                                 </td>
                                                 <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
-                                                    0.00 ฿
+                                                    0.00 {t('฿')}
                                                 </td>
                                             </tr>
                                             <tr className="border-gray-400">
                                                 <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
-                                                    Total
+                                                    {t('Total')}
                                                 </td>
                                                 <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
-                                                    {(calculateTotal() * 1.07).toFixed(2)} ฿
+                                                    {(calculateTotal() * 1.07).toFixed(2)} {t('฿')}
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -1719,9 +1811,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             <div className="print-footer-container mt-auto text-center text-xs">
                                 <hr className="print-footer-hr mb-2 border-gray-800" />
                                 <div className="print-footer">
-                                    <p>Phone: 02-451-1111 Tax ID: 0105549044446</p>
+                                    <p>{t('Phone:')} 02-451-1111 {t('Tax ID:')} 0105549044446</p>
                                     <p>
-                                        Page: {currentPage} / {totalPages}
+                                        {t('Page:')} {currentPage} / {totalPages}
                                     </p>
                                 </div>
                             </div>

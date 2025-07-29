@@ -10,7 +10,7 @@ use App\Http\Controllers\Api\EquipmentCategoryController;
 use App\Http\Controllers\Api\EquipmentController;
 use App\Http\Controllers\Api\PumpAccessoryController;
 use App\Http\Controllers\Api\ImageUploadController;
-use App\Http\Controllers\ProfilePhotoController; // เพิ่มเข้ามา
+use App\Http\Controllers\ProfilePhotoController;
 
 /*
 |--------------------------------------------------------------------------
@@ -23,7 +23,8 @@ use App\Http\Controllers\ProfilePhotoController; // เพิ่มเข้า�
 |
 */
 
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+// User info endpoint for API (works with both sanctum and web auth)
+Route::middleware(['auth:sanctum,web'])->get('/user', function (Request $request) {
     return $request->user();
 });
 
@@ -70,47 +71,44 @@ Route::apiResource('pump-accessories', PumpAccessoryController::class);
 Route::get('/sprinklers', [SprinklerController::class, 'index']); 
 Route::post('/calculate-pipe-layout', [SprinklerController::class, 'calculatePipeLayout']);
 
-// Quick equipment access routes - เปลี่ยนจาก /api/sprinklers เป็น /sprinklers
+// Quick equipment access routes
 Route::get('/sprinklers', fn() => app(EquipmentController::class)->getByCategory('sprinkler'));
 Route::get('/pumps', fn() => app(EquipmentController::class)->getByCategory('pump'));
 Route::get('/pipes', fn() => app(EquipmentController::class)->getByCategory('pipe'));
 
 // ==================================================
 // 🌱 FARM PLANNING & MANAGEMENT ROUTES
-// (ย้ายมาจาก web.php และปรับ Path)
 // ==================================================
 
-// General Farm & Planner API Routes
+// Public Farm & Planner API Routes (No authentication required)
 Route::post('/generate-planting-points', [FarmController::class, 'generatePlantingPoints']);
 Route::post('/generate-pipe-layout', [FarmController::class, 'generatePipeLayout']); 
+Route::get('/plant-types', [FarmController::class, 'getPlantTypes']);
+Route::post('/get-elevation', [FarmController::class, 'getElevation']);
 
-// Field Management API Routes - Require authentication
-Route::middleware('auth:web')->group(function () {
-    Route::get('/fields', [FarmController::class, 'getFields']); // แก้ name() ถ้ามันซ้ำ
+// Plant points management (No authentication required for now)
+Route::post('/plant-points/add', [FarmController::class, 'addPlantPoint']);
+Route::post('/plant-points/delete', [FarmController::class, 'deletePlantPoint']);
+Route::post('/plant-points/move', [FarmController::class, 'movePlantPoint']);
+
+// Field Management API Routes - Use web authentication (same as Inertia)
+Route::middleware(['web', 'auth'])->group(function () {
+    Route::get('/fields', [FarmController::class, 'getFields']);
     Route::get('/fields/{fieldId}', [FarmController::class, 'getField']);
     Route::post('/save-field', [FarmController::class, 'saveField']);
     Route::put('/fields/{fieldId}', [FarmController::class, 'updateField']);
     Route::delete('/fields/{fieldId}', [FarmController::class, 'deleteField']);
 
     // Folder Management API Routes
-    Route::get('/folders', [FarmController::class, 'getFolders']); // แก้ name() ถ้ามันซ้ำ
+    Route::get('/folders', [FarmController::class, 'getFolders']);
     Route::post('/folders', [FarmController::class, 'createFolder']);
     Route::put('/folders/{folderId}', [FarmController::class, 'updateFolder']);
     Route::delete('/folders/{folderId}', [FarmController::class, 'deleteFolder']);
 
     // Field Status Management
     Route::put('/fields/{fieldId}/status', [FarmController::class, 'updateFieldStatus']);
+    Route::put('/fields/{fieldId}/folder', [FarmController::class, 'updateFieldFolder']);
 });
-
-// Plant management (ย้ายมาจาก web.php และปรับ Path)
-Route::get('/plant-types', [FarmController::class, 'getPlantTypes']); // แก้ name() ถ้ามันซ้ำ
-Route::post('/get-elevation', [FarmController::class, 'getElevation']);
-// THESE ARE THE ONES WITH DUPLICATE NAMES WE KEPT ON WEB.PHP ORIGINALLY
-// Adjust names if needed, or remove if not used elsewhere
-Route::post('/plant-points/add', [FarmController::class, 'addPlantPoint'])->name('plant-points.add');
-Route::post('/plant-points/delete', [FarmController::class, 'deletePlantPoint'])->name('plant-points.delete');
-Route::post('/plant-points/move', [FarmController::class, 'movePlantPoint'])->name('plant-points.move');
-
 
 // ==================================================
 // 🏡 HOME GARDEN ROUTES
@@ -123,12 +121,13 @@ Route::prefix('home-garden')->group(function () {
 
 // ==================================================
 // 📸 IMAGE MANAGEMENT ROUTES
-// (ย้ายมาจาก web.php และปรับ Path)
 // ==================================================
 
-// Profile Photo Routes (ย้ายมาจาก web.php)
-Route::post('/profile-photo/upload', [ProfilePhotoController::class, 'upload'])->name('profile-photo.upload');
-Route::delete('/profile-photo/delete', [ProfilePhotoController::class, 'delete'])->name('profile-photo.delete');
+// Profile Photo Routes - Use web authentication
+Route::middleware(['web', 'auth'])->group(function () {
+    Route::post('/profile-photo/upload', [ProfilePhotoController::class, 'upload']);
+    Route::delete('/profile-photo/delete', [ProfilePhotoController::class, 'delete']);
+});
 
 Route::prefix('images')->group(function () {
     Route::post('upload', [ImageUploadController::class, 'store']);
@@ -260,6 +259,58 @@ if (app()->environment('local')) {
             }
         });
 
+        // Test auth status (compatible with Inertia)
+        Route::get('/auth-test', function () {
+            try {
+                $user = auth()->user();
+                $guards = [];
+                
+                // Test different guards
+                foreach (['web', 'sanctum'] as $guard) {
+                    try {
+                        $guardUser = auth($guard)->user();
+                        $guards[$guard] = $guardUser ? [
+                            'id' => $guardUser->id,
+                            'name' => $guardUser->name,
+                            'email' => $guardUser->email
+                        ] : null;
+                    } catch (\Exception $e) {
+                        $guards[$guard] = null;
+                    }
+                }
+                
+                return response()->json([
+                    'authenticated' => !!$user,
+                    'user' => $user ? [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'is_super_user' => $user->is_super_user ?? false
+                    ] : null,
+                    'guards' => $guards,
+                    'session_id' => session()->getId(),
+                    'csrf_token' => csrf_token(),
+                    'auth_config' => [
+                        'default_guard' => config('auth.defaults.guard'),
+                        'web_driver' => config('auth.guards.web.driver'),
+                        'session_driver' => config('session.driver')
+                    ],
+                    'headers' => [
+                        'user_agent' => request()->header('User-Agent'),
+                        'x_requested_with' => request()->header('X-Requested-With'),
+                        'accept' => request()->header('Accept')
+                    ],
+                    'timestamp' => now()
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                    'timestamp' => now()
+                ], 500);
+            }
+        });
+
         // Test farm controller
         Route::get('/farm-test', function () {
             try {
@@ -294,7 +345,6 @@ if (app()->environment('local')) {
             $endpointsToTest = [
                 'GET /api/equipments' => '/api/equipments',
                 'GET /api/equipment-categories' => '/api/equipment-categories', 
-                'GET /api/fields' => '/api/fields',
                 'GET /api/images' => '/api/images',
                 'GET /api/ai/health' => '/api/ai/health',
                 'GET /api/health' => '/api/health',
@@ -344,7 +394,7 @@ Route::fallback(function () {
             'POST /api/ai-chat' => 'Chaiyo AI chat interface',
             'GET /api/equipments' => 'Equipment catalog',
             'GET /api/equipment-categories' => 'Equipment categories',
-            'GET /api/fields' => 'Field management',
+            'GET /api/fields' => 'Field management (requires auth)',
             'POST /api/generate-pipe-layout' => 'Farm pipe layout generation',
             'POST /api/home-garden/generate-pipe-layout' => 'Home garden layout',
             'POST /api/images/upload' => 'Image upload',
@@ -352,6 +402,11 @@ Route::fallback(function () {
             'GET /api/health' => 'System health check',
             'GET /api/info' => 'API information',
             'POST /api/ai/test' => 'Test AI with custom message',
+        ],
+        'authentication_required' => [
+            '/api/fields',
+            '/api/folders',
+            '/api/profile-photo'
         ],
         'documentation' => [
             'ai_endpoints' => '/api/ai/*',

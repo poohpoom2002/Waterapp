@@ -188,24 +188,24 @@ const MapErrorComponent: React.FC<{
                 <h3 className="mb-2 text-lg font-bold">ไม่สามารถโหลด Google Maps ได้</h3>
                 <p className="mb-4 text-sm text-gray-300">{getErrorMessage()}</p>
                 {!config.apiKey && (
-                                    <div className="mb-4 rounded bg-yellow-900 p-3 text-left text-xs">
-                    <p className="font-bold">วิธีแก้ไข:</p>
-                    <ol className="mt-2 list-inside list-decimal space-y-1">
-                        <li>หยุด dev server (Ctrl+C)</li>
-                        <li>ตรวจสอบไฟล์ .env</li>
-                        <li>เพิ่ม VITE_GOOGLE_MAPS_API_KEY</li>
-                        <li>เปิดใช้งาน Places API ใน Google Cloud Console</li>
-                        <li>รัน npm run dev ใหม่</li>
-                    </ol>
-                    {import.meta.env.DEV && (
-                        <div className="mt-3 rounded bg-gray-800 p-2">
-                            <p className="font-bold text-yellow-300">Debug Info:</p>
-                            <p className="text-xs">API Key Length: {config.apiKey.length}</p>
-                            <p className="text-xs">Environment: {import.meta.env.MODE}</p>
-                            <p className="text-xs">Error: {error}</p>
-                        </div>
-                    )}
-                </div>
+                    <div className="mb-4 rounded bg-yellow-900 p-3 text-left text-xs">
+                        <p className="font-bold">วิธีแก้ไข:</p>
+                        <ol className="mt-2 list-inside list-decimal space-y-1">
+                            <li>หยุด dev server (Ctrl+C)</li>
+                            <li>ตรวจสอบไฟล์ .env</li>
+                            <li>เพิ่ม VITE_GOOGLE_MAPS_API_KEY</li>
+                            <li>เปิดใช้งาน Places API ใน Google Cloud Console</li>
+                            <li>รัน npm run dev ใหม่</li>
+                        </ol>
+                        {import.meta.env.DEV && (
+                            <div className="mt-3 rounded bg-gray-800 p-2">
+                                <p className="font-bold text-yellow-300">Debug Info:</p>
+                                <p className="text-xs">API Key Length: {config.apiKey.length}</p>
+                                <p className="text-xs">Environment: {import.meta.env.MODE}</p>
+                                <p className="text-xs">Error: {error}</p>
+                            </div>
+                        )}
+                    </div>
                 )}
                 <div className="space-y-2">
                     {onRetry && (
@@ -1005,7 +1005,30 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
             clearTimeout(timer);
             clearOverlays();
         };
-    }, [props.map, props.gardenZones, props.sprinklers, props.waterSource, props.pipes, props.mainPipeDrawing, props.selectedSprinkler, props.selectedSprinklersForPipe, props.selectedPipes, props.editMode, props.pipeEditMode, clearOverlays, createSprinklerIcon, createWaterSourceIcon, props.onSprinklerClick, props.onSprinklerDelete, props.onSprinklerDragged, props.onWaterSourceDelete, props.onPipeClick, isDragging, isMapStable, props]);
+    }, [
+        props.map,
+        props.gardenZones,
+        props.sprinklers,
+        props.waterSource,
+        props.pipes,
+        props.mainPipeDrawing,
+        props.selectedSprinkler,
+        props.selectedSprinklersForPipe,
+        props.selectedPipes,
+        props.editMode,
+        props.pipeEditMode,
+        clearOverlays,
+        createSprinklerIcon,
+        createWaterSourceIcon,
+        props.onSprinklerClick,
+        props.onSprinklerDelete,
+        props.onSprinklerDragged,
+        props.onWaterSourceDelete,
+        props.onPipeClick,
+        isDragging,
+        isMapStable,
+        props,
+    ]);
 
     return (
         <>
