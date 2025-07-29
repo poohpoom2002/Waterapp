@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Head, Link, router } from '@inertiajs/react'; // Fanggy005 EDIT: Import router
-import Navbar from '../components/Navbar';
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
 import { useState, useEffect, useRef } from 'react';
 import {
@@ -30,6 +29,8 @@ import {
     type EquipmentType,
     type ObstacleType,
 } from '@/pages/utils/fieldMapConstants';
+import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 
 // Fix leaflet icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -1827,6 +1828,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                     </div>
                 </div>
             </div>
+            <Footer />
         </div>
     );
 }

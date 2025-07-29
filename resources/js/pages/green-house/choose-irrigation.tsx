@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react';
+import Navbar from '../../components/Navbar';
+import Footer from '../../components/Footer';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 // --- Definition of irrigation system options ---
 interface IrrigationOption {
@@ -35,6 +38,7 @@ const irrigationOptions: IrrigationOption[] = [
 
 // --- React Component ---
 export default function ChooseIrrigationMethod() {
+    const { t } = useLanguage();
     const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
     const [crops, setCrops] = useState<string>('');
     const [shapes, setShapes] = useState<string>('');
@@ -112,8 +116,10 @@ export default function ChooseIrrigationMethod() {
     };
 
     return (
-        <div className="flex min-h-screen flex-col items-center justify-center bg-gray-900 p-4 text-white">
-            <div className="w-full max-w-4xl">
+        <div className="min-h-screen flex flex-col bg-gray-900 text-white">
+            <Navbar />
+            <div className="flex-1 flex flex-col items-center justify-center p-4">
+                <div className="w-full max-w-4xl">
                 {/* Header */}
                 <div className="mb-10 text-center">
                     <h1 className="text-3xl font-bold text-white">Choose Irrigation System</h1>
@@ -290,6 +296,8 @@ export default function ChooseIrrigationMethod() {
                     </button>
                 </div>
             </div>
+            </div>
+            <Footer />
         </div>
     );
 }

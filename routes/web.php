@@ -220,6 +220,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->name('field-crop-summary.post');
 
+    // Farm-related API calls that might be using web sessions
+    Route::get('/api/plant-types', [FarmController::class, 'getPlantTypes']);
+    Route::post('/api/get-elevation', [FarmController::class, 'getElevation']);
+    Route::post('/api/plant-points/add', [FarmController::class, 'addPlantPoint'])->name('plant-points.add');
+    Route::post('/api/plant-points/delete', [FarmController::class, 'deletePlantPoint'])->name('plant-points.delete');
+    Route::post('/api/plant-points/move', [FarmController::class, 'movePlantPoint'])->name('plant-points.move');
+
+    // =======================================================
+
+    // Field Management Routes
+    Route::post('/api/save-field', [FarmController::class, 'saveField'])->name('save-field');
+    Route::get('/api/fields', [FarmController::class, 'getFields'])->name('get-fields');
+    Route::put('/api/fields/{fieldId}', [FarmController::class, 'updateField'])->name('update-field');
+    Route::delete('/api/fields/{fieldId}', [FarmController::class, 'deleteField'])->name('delete-field');
+    
+    // Folder Management Routes
+    Route::get('/api/folders', [FarmController::class, 'getFolders'])->name('get-folders');
+    Route::post('/api/folders', [FarmController::class, 'createFolder'])->name('create-folder');
+    Route::put('/api/folders/{folderId}', [FarmController::class, 'updateFolder'])->name('update-folder');
+    Route::delete('/api/folders/{folderId}', [FarmController::class, 'deleteFolder'])->name('delete-folder');
+    
+    // Field Status Management
+    Route::put('/api/fields/{fieldId}/status', [FarmController::class, 'updateFieldStatus'])->name('update-field-status');
+    Route::put('/api/fields/{fieldId}/folder', [FarmController::class, 'updateFieldFolder'])->name('update-field-folder');
+    
+    // Profile Photo Routes
+    Route::post('/api/profile-photo/upload', [ProfilePhotoController::class, 'upload'])->name('profile-photo.upload');
+    Route::delete('/api/profile-photo/delete', [ProfilePhotoController::class, 'delete'])->name('profile-photo.delete');
+  
     // Super User Routes
     Route::prefix('super')->name('super.')->group(function () {
         Route::get('/dashboard', function () {

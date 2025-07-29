@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback, useRef } from 'react';
-import Navbar from '../components/Navbar';
 import { Head, Link, router } from '@inertiajs/react';
 import { Wrapper, Status } from '@googlemaps/react-wrapper';
 import * as turf from '@turf/turf';
@@ -27,6 +26,8 @@ import FieldMapSmartControls from '@/pages/components/Fieldcrop/FieldMapSmartCon
 import ErrorBoundary from '@/pages/components/ErrorBoundary';
 import ErrorMessage from '@/pages/components/ErrorMessage';
 import LoadingSpinner from '@/pages/components/LoadingSpinner';
+import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 
 interface Coordinate {
     lat: number;
@@ -3556,6 +3557,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     </div>
                 )}
             </div>
+            <Footer />
         </ErrorBoundary>
     );
 }

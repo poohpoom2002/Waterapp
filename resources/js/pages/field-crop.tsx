@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import Navbar from '../components/Navbar';
 import { cropTypes, getCropByValue, searchCrops, type Crop } from '@/pages/utils/cropData';
+import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 
 interface FieldCropProps {
     cropType?: string;
@@ -280,6 +281,7 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
                     </div>
                 </div>
             </div>
+            <Footer />
         </div>
     );
 }
