@@ -16,139 +16,139 @@ export interface Category {
 
 // Greenhouse crop data
 export const greenhouseCrops: Crop[] = [
-    // พืชผัก (Vegetables)
+    // Vegetables
     {
         value: 'tomato',
-        name: 'มะเขือเทศ',
+        name: 'Tomato',
         nameEn: 'Tomato',
-        description: 'ผลไม้ที่เป็นผักอเนกประสงค์ เหมาะสำหรับโรงเรือน',
+        description: 'Versatile fruit-vegetable suitable for greenhouse cultivation',
         icon: '🍅',
         category: 'vegetables',
     },
     {
         value: 'bell-pepper',
-        name: 'พริกหวาน',
+        name: 'Bell Pepper',
         nameEn: 'Bell Pepper',
-        description: 'พริกหวานหลากสี อุดมด้วยวิตามิน',
+        description: 'Colorful sweet pepper rich in vitamins',
         icon: '🫑',
         category: 'vegetables',
     },
     {
         value: 'cucumber',
-        name: 'แตงกวา',
+        name: 'Cucumber',
         nameEn: 'Cucumber',
-        description: 'ผักเปรี้ยว สดชื่น เหมาะปลูกในโรงเรือน',
+        description: 'Fresh, crisp vegetable suitable for greenhouse growing',
         icon: '🥒',
         category: 'vegetables',
     },
     {
         value: 'melon',
-        name: 'เมล่อน',
+        name: 'Melon',
         nameEn: 'Melon',
-        description: 'ผลไม้หวาน เนื้อนุ่ม ปลูกในโรงเรือนได้ดี',
+        description: 'Sweet fruit with tender flesh, grows well in greenhouses',
         icon: '🍈',
         category: 'vegetables',
     },
     {
         value: 'lettuce',
-        name: 'ผักกาดหอม',
+        name: 'Lettuce',
         nameEn: 'Lettuce',
-        description: 'ผักสลัดชนิดต่าง ๆ เช่น เรดโอ๊ค กรีนโอ๊ค',
+        description: 'Various salad greens such as red oak and green oak varieties',
         icon: '🥬',
         category: 'vegetables',
     },
     {
         value: 'kale',
-        name: 'ผักเคล',
+        name: 'Kale',
         nameEn: 'Kale',
-        description: 'ผักใบเขียวเข้ม อุดมด้วยสารอาหาร',
+        description: 'Dark green leafy vegetable rich in nutrients',
         icon: '🥬',
         category: 'vegetables',
     },
     {
         value: 'pak-choi',
-        name: 'ปวยเล้ง',
+        name: 'Pak Choi',
         nameEn: 'Pak Choi',
-        description: 'ผักใบเขียวจีน เติบโตเร็ว',
+        description: 'Chinese green leafy vegetable with fast growth',
         icon: '🥬',
         category: 'vegetables',
     },
     {
         value: 'chinese-kale',
-        name: 'คะน้า',
+        name: 'Chinese Kale',
         nameEn: 'Chinese Kale',
-        description: 'ผักใบเขียวไทย เติบโตเร็ว',
+        description: 'Thai green leafy vegetable with fast growth',
         icon: '🥬',
         category: 'vegetables',
     },
     {
         value: 'cabbage',
-        name: 'กะหล่ำปลี',
+        name: 'Cabbage',
         nameEn: 'Cabbage',
-        description: 'ผักหัวกะทัดรัด เหมาะสำหรับโรงเรือน',
+        description: 'Compact head vegetable suitable for greenhouse cultivation',
         icon: '🥬',
         category: 'vegetables',
     },
     {
         value: 'cauliflower',
-        name: 'กะหล่ำดอก',
+        name: 'Cauliflower',
         nameEn: 'Cauliflower',
-        description: 'ผักดอกสีขาว อุดมด้วยวิตามิน',
+        description: 'White flowering vegetable rich in vitamins',
         icon: '🥦',
         category: 'vegetables',
     },
     {
         value: 'broccoli',
-        name: 'บรอกโคลี',
+        name: 'Broccoli',
         nameEn: 'Broccoli',
-        description: 'ผักดอกสีเขียว อุดมด้วยสารอาหาร',
+        description: 'Green flowering vegetable rich in nutrients',
         icon: '🥦',
         category: 'vegetables',
     },
-    // ผลไม้ (Fruits)
+    // Fruits
     {
         value: 'strawberry',
-        name: 'สตรอว์เบอร์รี',
+        name: 'Strawberry',
         nameEn: 'Strawberry',
-        description: 'ผลไม้หวานฉ่ำ เหมาะปลูกในโรงเรือน',
+        description: 'Sweet, juicy fruit suitable for greenhouse cultivation',
         icon: '🍓',
         category: 'fruits',
     },
     {
         value: 'seedless-grape',
-        name: 'องุ่นไร้เมล็ด',
+        name: 'Seedless Grape',
         nameEn: 'Seedless Grape',
-        description: 'องุ่นหวานไร้เมล็ด คุณภาพพรีเมี่ยม',
+        description: 'Sweet seedless grapes of premium quality',
         icon: '🍇',
         category: 'fruits',
     },
     {
         value: 'cantaloupe',
-        name: 'แคนตาลูป',
+        name: 'Cantaloupe',
         nameEn: 'Cantaloupe',
-        description: 'เมล่อนเนื้อส้ม หวานหอม',
+        description: 'Orange-fleshed melon, sweet and aromatic',
         icon: '🍈',
         category: 'fruits',
     },
     {
         value: 'japanese-melon',
-        name: 'เมล่อนญี่ปุ่น',
+        name: 'Japanese Melon',
         nameEn: 'Japanese Melon',
-        description: 'เมล่อนพรีเมี่ยม เนื้อนุ่ม หวานเข้มข้น',
+        description: 'Premium melon with tender flesh and intense sweetness',
         icon: '🍈',
         category: 'fruits',
     },
 ];
 
-// สำหรับโรงเรือนเท่านั้น - ตัดส่วนอื่นออก
+// For greenhouse only - other sections removed
 
-// Categories definition (เฉพาะโรงเรือน)
+// Categories definition (greenhouse only)
 export const categories: Record<string, Category> = {
-    vegetables: { name: 'พืชผัก', nameEn: 'Vegetables', icon: '🥬' },
-    fruits: { name: 'ผลไม้', nameEn: 'Fruits', icon: '🍓' },
+    vegetables: { name: 'Vegetables', nameEn: 'Vegetables', icon: '🥬' },
+    fruits: { name: 'Fruits', nameEn: 'Fruits', icon: '🍓' },
 };
 
-// Helper functions (เฉพาะโรงเรือน)
+// Helper functions (greenhouse only)
 export const getCropByValue = (value: string): Crop | undefined => {
     return greenhouseCrops.find((crop) => crop.value === value);
 };

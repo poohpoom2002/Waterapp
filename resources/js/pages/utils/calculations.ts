@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // resources\js\pages\utils\calculations.ts
 export const calculatePipeRolls = (totalLength: number, rollLength: number): number => {
     return Math.ceil(totalLength / rollLength);
@@ -404,8 +406,15 @@ export const parseRangeValue = (value: any): [number, number] | number => {
     return isNaN(numValue) ? 0 : numValue;
 };
 
-export const formatNumber = (value: number, decimals: number = 3): number => {
-    return Math.round(value * Math.pow(10, decimals)) / Math.pow(10, decimals);
+export const formatNumber = (
+    value: number | string | null | undefined,
+    decimals: number = 3
+): number => {
+    const numValue = Number(value);
+    if (isNaN(numValue)) {
+        return 0;
+    }
+    return Math.round(numValue * Math.pow(10, decimals)) / Math.pow(10, decimals);
 };
 
 export const evaluatePipeOverall = (
@@ -636,7 +645,7 @@ export const selectBestEquipmentByPrice = (
         (item) => item.isUsable && !item.isGoodChoice && !item.isRecommended
     );
 
-    let targetGroup =
+    const targetGroup =
         recommended.length > 0
             ? recommended
             : goodChoice.length > 0
@@ -763,29 +772,31 @@ export const normalizeEquipmentData = (
             break;
 
         case 'pump':
-            const numericFields = [
-                'powerHP',
-                'powerKW',
-                'phase',
-                'inlet_size_inch',
-                'outlet_size_inch',
-                'max_head_m',
-                'max_flow_rate_lpm',
-                'suction_depth_m',
-                'weight_kg',
-            ];
-            numericFields.forEach((field) => {
-                if (normalized[field] !== undefined) {
-                    normalized[field] = Number(normalized[field]) || 0;
-                }
-            });
+            {
+                const numericFields = [
+                    'powerHP',
+                    'powerKW',
+                    'phase',
+                    'inlet_size_inch',
+                    'outlet_size_inch',
+                    'max_head_m',
+                    'max_flow_rate_lpm',
+                    'suction_depth_m',
+                    'weight_kg',
+                ];
+                numericFields.forEach((field) => {
+                    if (normalized[field] !== undefined) {
+                        normalized[field] = Number(normalized[field]) || 0;
+                    }
+                });
 
-            const rangeFields = ['flow_rate_lpm', 'head_m'];
-            rangeFields.forEach((field) => {
-                if (normalized[field] !== undefined) {
-                    normalized[field] = parseRangeValue(normalized[field]);
-                }
-            });
+                const rangeFields = ['flow_rate_lpm', 'head_m'];
+                rangeFields.forEach((field) => {
+                    if (normalized[field] !== undefined) {
+                        normalized[field] = parseRangeValue(normalized[field]);
+                    }
+                });
+            }
             break;
 
         case 'pipe':

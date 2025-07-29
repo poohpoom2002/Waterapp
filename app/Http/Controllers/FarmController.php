@@ -15,7 +15,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Http;
-use Exception;
 
 class FarmController extends Controller
 {
@@ -1810,10 +1809,29 @@ class FarmController extends Controller
     public function getFolders(): JsonResponse
     {
         try {
+            // Check if user is authenticated
             $user = auth()->user();
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated',
+                    'error' => 'Authentication required'
+                ], 401);
+            }
+
+            \Log::info('Fetching folders for user', [
+                'user_id' => $user->id,
+                'user_email' => $user->email
+            ]);
+
             $folders = Folder::where('user_id', $user->id)
                 ->orderBy('name')
                 ->get();
+
+            \Log::info('Found existing folders', [
+                'count' => $folders->count(),
+                'folders' => $folders->pluck('name')->toArray()
+            ]);
 
             // Create default system folders if they don't exist
             $systemFolders = [
@@ -1831,30 +1849,68 @@ class FarmController extends Controller
                 ],
             ];
 
+            $foldersCreated = 0;
             foreach ($systemFolders as $systemFolder) {
                 $exists = $folders->where('name', $systemFolder['name'])->first();
                 if (!$exists) {
-                    Folder::create([
-                        ...$systemFolder,
-                        'user_id' => $user->id,
-                    ]);
+                    try {
+                        Folder::create(array_merge($systemFolder, [
+                            'user_id' => $user->id,
+                        ]));
+                        $foldersCreated++;
+                        \Log::info('Created system folder', [
+                            'folder_name' => $systemFolder['name'],
+                            'user_id' => $user->id
+                        ]);
+                    } catch (\Exception $e) {
+                        \Log::error('Failed to create system folder', [
+                            'folder_name' => $systemFolder['name'],
+                            'error' => $e->getMessage()
+                        ]);
+                    }
                 }
             }
 
-            // Refresh the folders list
-            $folders = Folder::where('user_id', $user->id)
-                ->orderBy('name')
-                ->get();
+            // Refresh the folders list if we created any new folders
+            if ($foldersCreated > 0) {
+                $folders = Folder::where('user_id', $user->id)
+                    ->orderBy('name')
+                    ->get();
+            }
+
+            \Log::info('Returning folders', [
+                'final_count' => $folders->count(),
+                'created_new' => $foldersCreated
+            ]);
 
             return response()->json([
                 'success' => true,
-                'folders' => $folders
+                'folders' => $folders->map(function ($folder) {
+                    return [
+                        'id' => $folder->id,
+                        'name' => $folder->name,
+                        'type' => $folder->type,
+                        'color' => $folder->color ?? '#6366f1',
+                        'icon' => $folder->icon ?? '📁',
+                        'parent_id' => $folder->parent_id,
+                        'field_count' => $folder->fields()->count(),
+                        'created_at' => $folder->created_at,
+                        'updated_at' => $folder->updated_at,
+                    ];
+                })
             ]);
-        } catch (Exception $e) {
-            \Log::error('Error fetching folders: ' . $e->getMessage());
+
+        } catch (\Exception $e) {
+            \Log::error('Error fetching folders', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => auth()->id() ?? 'not_authenticated'
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Error fetching folders'
+                'message' => 'Error fetching folders: ' . $e->getMessage(),
+                'error' => $e->getMessage()
             ], 500);
         }
     }
@@ -1871,20 +1927,19 @@ class FarmController extends Controller
             ]);
 
             $user = auth()->user();
-            $folder = Folder::create([
-                ...$validated,
+            $folder = Folder::create(array_merge($validated, [
                 'user_id' => $user->id,
-            ]);
+            ]));
 
             return response()->json([
                 'success' => true,
                 'folder' => $folder
             ]);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             \Log::error('Error creating folder: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Error creating folder'
+                'message' => 'Error creating folder: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -1908,7 +1963,7 @@ class FarmController extends Controller
                 'success' => true,
                 'folder' => $folder
             ]);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             \Log::error('Error updating folder: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
@@ -1963,17 +2018,23 @@ class FarmController extends Controller
                     ->update(['folder_id' => $unfinishedFolder->id]);
             }
 
+            // Delete all sub-folders first
+            Folder::where('user_id', $user->id)
+                ->where('parent_id', $folder->id)
+                ->delete();
+
+            // Delete the main folder
             $folder->delete();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Folder deleted successfully'
             ]);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             \Log::error('Error deleting folder: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Error deleting folder'
+                'message' => 'Error deleting folder: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -1996,11 +2057,58 @@ class FarmController extends Controller
                 'success' => true,
                 'field' => $field
             ]);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             \Log::error('Error updating field status: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Error updating field status'
+            ], 500);
+        }
+    }
+
+    public function updateFieldFolder(Request $request, $fieldId): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+            
+            // Check if this is a mock field (starts with 'mock-')
+            if (str_starts_with($fieldId, 'mock-')) {
+                \Log::info('Mock field folder update - skipping database update', [
+                    'field_id' => $fieldId,
+                    'folder_id' => $request->input('folder_id'),
+                    'user_id' => $user->id
+                ]);
+                
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Mock field updated successfully'
+                ]);
+            }
+            
+            $field = Field::where('user_id', $user->id)
+                ->findOrFail($fieldId);
+
+            \Log::info('Updating field folder', [
+                'field_id' => $fieldId,
+                'folder_id' => $request->input('folder_id'),
+                'user_id' => $user->id
+            ]);
+
+            $validated = $request->validate([
+                'folder_id' => 'required|integer',
+            ]);
+
+            $field->update($validated);
+
+            return response()->json([
+                'success' => true,
+                'field' => $field
+            ]);
+        } catch (Exception $e) {
+            \Log::error('Error updating field folder: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error updating field folder'
             ], 500);
         }
     }

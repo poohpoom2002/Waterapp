@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // @/pages/utils/fieldCropData.ts
 
 import * as turf from '@turf/turf';
@@ -114,12 +116,12 @@ export interface FieldCropData {
 const calculateArea = (coordinates: Coordinate[]): number => {
     if (!coordinates || coordinates.length < 3) return 0;
     try {
-        const turfCoords = coordinates.map(c => [c.lng, c.lat]);
+        const turfCoords = coordinates.map((c) => [c.lng, c.lat]);
         turfCoords.push(turfCoords[0]); // Close the polygon
         const polygon = turf.polygon([turfCoords]);
         return turf.area(polygon);
     } catch (e) {
-        console.error("Area calculation error:", e);
+        console.error('Area calculation error:', e);
         return 0;
     }
 };
@@ -139,7 +141,7 @@ const calculatePipeLength = (coordinates: Coordinate[]): number => {
         }
         return totalLength;
     } catch (e) {
-        console.error("Pipe length calculation error:", e);
+        console.error('Pipe length calculation error:', e);
         return 0;
     }
 };
@@ -162,7 +164,7 @@ export const calculateAllFieldStats = (rawData: any): FieldCropData => {
         ...pipe,
         length: calculatePipeLength(pipe.coordinates),
     }));
-    
+
     const pipeStatsCalc = (type: 'main' | 'submain' | 'lateral'): PipeStats => {
         const typePipes = pipeConnections.filter((p: PipeConnection) => p.type === type);
         const lengths = typePipes.map((p: PipeConnection) => p.length);
@@ -175,7 +177,7 @@ export const calculateAllFieldStats = (rawData: any): FieldCropData => {
     const mainPipeStats = pipeStatsCalc('main');
     const submainPipeStats = pipeStatsCalc('submain');
     const lateralPipeStats = pipeStatsCalc('lateral');
-    
+
     // Summary Calculations
     let totalPlantingPoints = 0;
     let totalWaterRequirement = 0;
@@ -187,8 +189,8 @@ export const calculateAllFieldStats = (rawData: any): FieldCropData => {
         if (cropValue) {
             const crop = getCropByValue(cropValue);
             if (crop) {
-                const rowSpacing = rawData.rowSpacing?.[cropValue] || (crop.rowSpacing / 100);
-                const plantSpacing = rawData.plantSpacing?.[cropValue] || (crop.plantSpacing / 100);
+                const rowSpacing = rawData.rowSpacing?.[cropValue] || crop.rowSpacing / 100;
+                const plantSpacing = rawData.plantSpacing?.[cropValue] || crop.plantSpacing / 100;
 
                 if (rowSpacing > 0 && plantSpacing > 0) {
                     const plantsPerSqm = (1 / rowSpacing) * (1 / plantSpacing);
@@ -198,7 +200,7 @@ export const calculateAllFieldStats = (rawData: any): FieldCropData => {
                     if (crop.waterRequirement) {
                         totalWaterRequirement += zonePlants * crop.waterRequirement;
                     }
-                    
+
                     const areaInRai = zone.area / 1600;
                     if (crop.yield) {
                         const zoneYield = areaInRai * crop.yield;
@@ -236,16 +238,25 @@ export const calculateAllFieldStats = (rawData: any): FieldCropData => {
                 main: mainPipeStats,
                 submain: submainPipeStats,
                 lateral: lateralPipeStats,
-                totalLength: mainPipeStats.totalLength + submainPipeStats.totalLength + lateralPipeStats.totalLength,
+                totalLength:
+                    mainPipeStats.totalLength +
+                    submainPipeStats.totalLength +
+                    lateralPipeStats.totalLength,
             },
         },
         equipment: {
             positions: rawData.equipmentIcons || [],
             totalCount: (rawData.equipmentIcons || []).length,
             types: {
-                pumps: (rawData.equipmentIcons || []).filter((e: EquipmentPosition) => e.type === 'pump').length,
-                valves: (rawData.equipmentIcons || []).filter((e: EquipmentPosition) => e.type === 'ballvalve').length,
-                solenoids: (rawData.equipmentIcons || []).filter((e: EquipmentPosition) => e.type === 'solenoid').length,
+                pumps: (rawData.equipmentIcons || []).filter(
+                    (e: EquipmentPosition) => e.type === 'pump'
+                ).length,
+                valves: (rawData.equipmentIcons || []).filter(
+                    (e: EquipmentPosition) => e.type === 'ballvalve'
+                ).length,
+                solenoids: (rawData.equipmentIcons || []).filter(
+                    (e: EquipmentPosition) => e.type === 'solenoid'
+                ).length,
             },
         },
         summary: {
@@ -298,13 +309,13 @@ export const migrateFromFieldMapData = (): FieldCropData | null => {
     if (!oldData) return null;
 
     try {
-        console.log("🔄 Migrating old fieldMapData...");
+        console.log('🔄 Migrating old fieldMapData...');
         const parsedOldData = JSON.parse(oldData);
         // ใช้ฟังก์ชันคำนวณหลักเพื่อแปลงข้อมูลเก่าให้เป็นโครงสร้างใหม่ที่สมบูรณ์
         const migratedData = calculateAllFieldStats(parsedOldData);
         saveFieldCropData(migratedData); // บันทึกข้อมูลใหม่
         // localStorage.removeItem('fieldMapData'); // (Optional) ลบข้อมูลเก่าทิ้ง
-        console.log("✅ Migration successful!");
+        console.log('✅ Migration successful!');
         return migratedData;
     } catch (e) {
         console.error('Error migrating field map data:', e);
