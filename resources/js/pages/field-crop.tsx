@@ -1,7 +1,6 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { cropTypes, getCropByValue, searchCrops, type Crop } from '@/pages/utils/cropData';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
+import { cropTypes, getCropByValue, searchCrops, type Crop } from '@/pages/utils/cropData';
 
 interface FieldCropProps {
     cropType?: string;
@@ -22,7 +21,7 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
             const cropArray = crops.split(',').filter(Boolean);
             setSelectedCrops(cropArray);
         }
-    }, [cropType, crops, selectedCrops]);
+    }, [cropType, crops]);
 
     const handleCropToggle = useCallback((cropValue: string) => {
         setSelectedCrops((prev) => {
@@ -67,7 +66,7 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
                     <div className="border-b border-gray-700 p-6">
                         <div className="mb-4 flex items-center justify-between">
                             <button
-                                onClick={() => (window.location.href = '/planner')}
+                                onClick={() => (window.location.href = "/planner")}
                                 className="flex items-center text-sm text-blue-400 hover:text-blue-300"
                             >
                                 <svg
@@ -281,7 +280,6 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
                     </div>
                 </div>
             </div>
-            <Footer />
         </div>
     );
 }

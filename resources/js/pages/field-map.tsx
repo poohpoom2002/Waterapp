@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback, useRef } from 'react';
+import Navbar from '../components/Navbar';
 import { Head, Link, router } from '@inertiajs/react';
 import { Wrapper, Status } from '@googlemaps/react-wrapper';
 import * as turf from '@turf/turf';
@@ -27,8 +28,6 @@ import FieldMapSmartControls from '@/pages/components/Fieldcrop/FieldMapSmartCon
 import ErrorBoundary from '@/pages/components/ErrorBoundary';
 import ErrorMessage from '@/pages/components/ErrorMessage';
 import LoadingSpinner from '@/pages/components/LoadingSpinner';
-import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
 
 interface Coordinate {
     lat: number;
@@ -116,11 +115,28 @@ const DEFAULT_IRRIGATION_SETTINGS = {
     },
 } as const;
 
-const getGoogleMapsConfig = () => ({
-    apiKey: import.meta.env.VITE_Maps_API_KEY || '',
-    libraries: ['drawing', 'geometry', 'places'] as const,
-    defaultZoom: 15,
-});
+const getGoogleMapsConfig = () => {
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+    
+    if (!apiKey) {
+        console.error('❌ Google Maps API Key not found! Please set VITE_GOOGLE_MAPS_API_KEY in .env file');
+        console.log('Environment variables:', {
+            NODE_ENV: import.meta.env.MODE,
+            Available_VITE_vars: Object.keys(import.meta.env).filter(key => key.startsWith('VITE_'))
+        });
+    } else {
+        console.log('✅ Google Maps API Key loaded:', {
+            length: apiKey.length,
+            preview: `${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)}`
+        });
+    }
+
+    return {
+        apiKey,
+        libraries: ['drawing', 'geometry', 'places'] as const,
+        defaultZoom: 15,
+    };
+};
 
 interface GoogleMapComponentProps {
     center: google.maps.LatLngLiteral;
@@ -254,8 +270,8 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
             setDrawingManager(drawingMgr);
             onLoad(newMap);
         }
-    }, [center, map, mapType, onCenterChanged, onDrawCreated, onLoad, onZoomChanged, zoom]);
-
+    }, [center, map, mapType, onCenterChanged, onDrawCreated, onLoad, onZoomChanged, zoom, ref]);
+    
     useEffect(() => {
         if (map && onMapClick) {
             const clickListener = google.maps.event.addListener(
@@ -289,7 +305,7 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                 isInternalChange.current = false;
             }, 100);
         }
-    }, [map, center.lat, center.lng, zoom, center]);
+    }, [map, center.lat, center.lng, zoom]);
 
     // Get current drawing options
     const getCurrentDrawingOptions = useCallback(() => {
@@ -414,7 +430,7 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
         if (drawingManager && currentDrawingMode) {
             stopDrawing();
         }
-    }, [currentDrawingMode, drawingManager, drawingMode, drawingStage, stopDrawing]);
+    }, [drawingMode, drawingStage]);
 
     // Update cursor for equipment placement
     useEffect(() => {
@@ -3856,7 +3872,6 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     </div>
                 )}
             </div>
-            <Footer />
         </ErrorBoundary>
     );
 }
