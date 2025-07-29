@@ -84,21 +84,23 @@ Route::get('/pipes', fn() => app(EquipmentController::class)->getByCategory('pip
 Route::post('/generate-planting-points', [FarmController::class, 'generatePlantingPoints']);
 Route::post('/generate-pipe-layout', [FarmController::class, 'generatePipeLayout']); 
 
-// Field Management API Routes
-Route::get('/fields', [FarmController::class, 'getFields']); // แก้ name() ถ้ามันซ้ำ
-Route::get('/fields/{fieldId}', [FarmController::class, 'getField']);
-Route::post('/save-field', [FarmController::class, 'saveField']);
-Route::put('/fields/{fieldId}', [FarmController::class, 'updateField']);
-Route::delete('/fields/{fieldId}', [FarmController::class, 'deleteField']);
+// Field Management API Routes - Require authentication
+Route::middleware('auth:web')->group(function () {
+    Route::get('/fields', [FarmController::class, 'getFields']); // แก้ name() ถ้ามันซ้ำ
+    Route::get('/fields/{fieldId}', [FarmController::class, 'getField']);
+    Route::post('/save-field', [FarmController::class, 'saveField']);
+    Route::put('/fields/{fieldId}', [FarmController::class, 'updateField']);
+    Route::delete('/fields/{fieldId}', [FarmController::class, 'deleteField']);
 
-// Folder Management API Routes
-Route::get('/folders', [FarmController::class, 'getFolders']); // แก้ name() ถ้ามันซ้ำ
-Route::post('/folders', [FarmController::class, 'createFolder']);
-Route::put('/folders/{folderId}', [FarmController::class, 'updateFolder']);
-Route::delete('/folders/{folderId}', [FarmController::class, 'deleteFolder']);
+    // Folder Management API Routes
+    Route::get('/folders', [FarmController::class, 'getFolders']); // แก้ name() ถ้ามันซ้ำ
+    Route::post('/folders', [FarmController::class, 'createFolder']);
+    Route::put('/folders/{folderId}', [FarmController::class, 'updateFolder']);
+    Route::delete('/folders/{folderId}', [FarmController::class, 'deleteFolder']);
 
-// Field Status Management
-Route::put('/fields/{fieldId}/status', [FarmController::class, 'updateFieldStatus']);
+    // Field Status Management
+    Route::put('/fields/{fieldId}/status', [FarmController::class, 'updateFieldStatus']);
+});
 
 // Plant management (ย้ายมาจาก web.php และปรับ Path)
 Route::get('/plant-types', [FarmController::class, 'getPlantTypes']); // แก้ name() ถ้ามันซ้ำ
