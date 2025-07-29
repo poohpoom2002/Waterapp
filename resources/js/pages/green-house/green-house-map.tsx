@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Navbar from '../../components/Navbar';
-import Footer from '../../components/Footer';
 
 // Types
 interface Point {
@@ -107,7 +106,6 @@ const GRID_SIZE = 25;
 const CANVAS_SIZE = { width: 2400, height: 1600 };
 
 export default function GreenhouseMap() {
-    // Remove unused 't' variable
     // Canvas and interaction states
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [selectedTool, setSelectedTool] = useState('select');
@@ -1684,994 +1682,998 @@ export default function GreenhouseMap() {
     }, [irrigationElements]);
 
     return (
-        <div className="min-h-screen flex flex-col bg-gray-900 text-white">
-            <Navbar />
-            <div className="flex flex-1 flex-col overflow-hidden">
-                {/* Header */}
-                <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-3">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-xl font-bold">💧 Greenhouse Irrigation System Design (Large)</h1>
-                        <p className="text-sm text-gray-400">
-                            Irrigation system design:{' '}
-                            {
-                                irrigationMethods[
-                                    selectedIrrigationMethod as keyof typeof irrigationMethods
-                                ]?.name
-                            }{' '}
-                            - Area 2400x1600 pixels
-                        </p>
-                    </div>
-                    <div className="flex items-center space-x-2 text-sm text-gray-400">
-                        <span className="text-green-400">✓ Select Crops</span>
-                        <span>→</span>
-                        <span className="text-green-400">✓ Planning</span>
-                        <span>→</span>
-                        <span className="text-green-400">✓ Design Area</span>
-                        <span>→</span>
-                        <span className="text-green-400">✓ Choose Irrigation</span>
-                        <span>→</span>
-                        <span className="font-medium text-blue-400">Design Irrigation System</span>
-                    </div>
-                </div>
+        <div className="h-screen bg-gray-900 text-white overflow-hidden">
+            {/* Fixed Navbar */}
+            <div className="fixed top-0 left-0 right-0 z-50">
+                <Navbar />
             </div>
 
-            {/* Main Content */}
-            <div className="flex flex-1 overflow-hidden">
-                {/* Toolbar */}
-                <div className="flex w-80 flex-col border-r border-gray-700 bg-gray-800">
-                    <div className="flex-1 overflow-y-auto p-4">
-                        {/* Selected Crops */}
-                        <div className="mb-4">
-                            <h3 className="mb-2 text-sm font-medium text-gray-300">Selected Crops</h3>
-                            <div className="flex flex-wrap gap-1">
-                                {selectedCrops.map((cropValue, index) => {
-                                    const crop = getCropByValue(cropValue);
-                                    return (
-                                        <span
-                                            key={index}
-                                            className="flex items-center rounded bg-green-600 px-2 py-1 text-xs text-white"
-                                        >
-                                            {crop?.icon} {crop?.name || cropValue}
-                                        </span>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Irrigation Method */}
-                        <div className="mb-4">
-                            <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                Selected Irrigation Method
-                            </h3>
-                            <div className="rounded border border-blue-500 bg-blue-600 px-3 py-2 text-sm text-white">
+            {/* Main Content with top padding to account for fixed navbar */}
+            <div className="pt-16 h-full flex flex-col">
+                {/* Header */}
+                <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-3">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h1 className="text-xl font-bold">💧 Greenhouse Irrigation System Design (Large)</h1>
+                            <p className="text-sm text-gray-400">
+                                Irrigation system design:{' '}
                                 {
                                     irrigationMethods[
                                         selectedIrrigationMethod as keyof typeof irrigationMethods
                                     ]?.name
-                                }
-                            </div>
+                                }{' '}
+                                - Area 2400x1600 pixels
+                            </p>
                         </div>
-
-                        {/* Tools */}
-                        <div className="mb-4">
-                            <h3 className="mb-3 text-sm font-medium text-gray-300">Tools</h3>
-                            <div className="space-y-1">
-                                {tools.map((tool) => (
-                                    <button
-                                        key={tool.id}
-                                        onClick={() => setSelectedTool(tool.id)}
-                                        className={`w-full rounded p-2 text-left transition-colors ${
-                                            selectedTool === tool.id
-                                                ? 'bg-blue-600 text-white'
-                                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                        }`}
-                                        title={tool.description}
-                                    >
-                                        <div className="flex items-center space-x-2">
-                                            <span className="text-sm">{tool.icon}</span>
-                                            <span className="text-xs">{tool.name}</span>
-                                        </div>
-                                        {tool.id === 'select' && (
-                                            <div className="mt-1 text-xs text-gray-400">
-                                                Ctrl+Click = Pan view
-                                            </div>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
+                        <div className="flex items-center space-x-2 text-sm text-gray-400">
+                            <span className="text-green-400">✓ Select Crops</span>
+                            <span>→</span>
+                            <span className="text-green-400">✓ Planning</span>
+                            <span>→</span>
+                            <span className="text-green-400">✓ Design Area</span>
+                            <span>→</span>
+                            <span className="text-green-400">✓ Choose Irrigation</span>
+                            <span>→</span>
+                            <span className="font-medium text-blue-400">Design Irrigation System</span>
                         </div>
+                    </div>
+                </div>
 
-                        {/* Prerequisites Check */}
-                        <div className="mb-4">
-                            <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                Prerequisites
-                            </h3>
-                            <div className="space-y-1 text-xs">
-                                <div
-                                    className={`flex items-center space-x-2 ${
-                                        irrigationElements.some((el) => el.type === 'main-pipe')
-                                            ? 'text-green-400'
-                                            : 'text-red-400'
-                                    }`}
-                                >
-                                    <span>
-                                        {irrigationElements.some((el) => el.type === 'main-pipe')
-                                            ? '✓'
-                                            : '✗'}
-                                    </span>
-                                    <span>Main Pipe</span>
-                                </div>
-                                <div
-                                    className={`flex items-center space-x-2 ${
-                                        irrigationElements.some((el) => el.type === 'sub-pipe')
-                                            ? 'text-green-400'
-                                            : 'text-red-400'
-                                    }`}
-                                >
-                                    <span>
-                                        {irrigationElements.some((el) => el.type === 'sub-pipe')
-                                            ? '✓'
-                                            : '✗'}
-                                    </span>
-                                    <span>Sub Pipe</span>
+                {/* Main Content */}
+                <div className="flex flex-1 overflow-hidden">
+                    {/* Toolbar */}
+                    <div className="flex w-80 flex-col border-r border-gray-700 bg-gray-800">
+                        <div className="flex-1 overflow-y-auto p-4">
+                            {/* Selected Crops */}
+                            <div className="mb-4">
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">Selected Crops</h3>
+                                <div className="flex flex-wrap gap-1">
+                                    {selectedCrops.map((cropValue, index) => {
+                                        const crop = getCropByValue(cropValue);
+                                        return (
+                                            <span
+                                                key={index}
+                                                className="flex items-center rounded bg-green-600 px-2 py-1 text-xs text-white"
+                                            >
+                                                {crop?.icon} {crop?.name || cropValue}
+                                            </span>
+                                        );
+                                    })}
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Crop Assignment Status */}
-                        {shapes.filter((s) => s.type === 'plot').length > 0 && (
+                            {/* Irrigation Method */}
                             <div className="mb-4">
                                 <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                    Crop Assignment Status
+                                    Selected Irrigation Method
+                                </h3>
+                                <div className="rounded border border-blue-500 bg-blue-600 px-3 py-2 text-sm text-white">
+                                    {
+                                        irrigationMethods[
+                                            selectedIrrigationMethod as keyof typeof irrigationMethods
+                                        ]?.name
+                                    }
+                                </div>
+                            </div>
+
+                            {/* Tools */}
+                            <div className="mb-4">
+                                <h3 className="mb-3 text-sm font-medium text-gray-300">Tools</h3>
+                                <div className="space-y-1">
+                                    {tools.map((tool) => (
+                                        <button
+                                            key={tool.id}
+                                            onClick={() => setSelectedTool(tool.id)}
+                                            className={`w-full rounded p-2 text-left transition-colors ${
+                                                selectedTool === tool.id
+                                                    ? 'bg-blue-600 text-white'
+                                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                            }`}
+                                            title={tool.description}
+                                        >
+                                            <div className="flex items-center space-x-2">
+                                                <span className="text-sm">{tool.icon}</span>
+                                                <span className="text-xs">{tool.name}</span>
+                                            </div>
+                                            {tool.id === 'select' && (
+                                                <div className="mt-1 text-xs text-gray-400">
+                                                    Ctrl+Click = Pan view
+                                                </div>
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Prerequisites Check */}
+                            <div className="mb-4">
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">
+                                    Prerequisites
                                 </h3>
                                 <div className="space-y-1 text-xs">
                                     <div
                                         className={`flex items-center space-x-2 ${
-                                            plotsWithoutCrops.length === 0
+                                            irrigationElements.some((el) => el.type === 'main-pipe')
                                                 ? 'text-green-400'
-                                                : 'text-yellow-400'
+                                                : 'text-red-400'
                                         }`}
                                     >
-                                        <span>{plotsWithoutCrops.length === 0 ? '✓' : '⚠️'}</span>
                                         <span>
-                                            เลือกพืชครบทุกแปลง (
-                                            {
-                                                shapes.filter(
-                                                    (s) => s.type === 'plot' && s.cropType
-                                                ).length
-                                            }
-                                            /{shapes.filter((s) => s.type === 'plot').length})
+                                            {irrigationElements.some((el) => el.type === 'main-pipe')
+                                                ? '✓'
+                                                : '✗'}
                                         </span>
+                                        <span>Main Pipe</span>
                                     </div>
                                     <div
                                         className={`flex items-center space-x-2 ${
-                                            canGoToSummary ? 'text-green-400' : 'text-red-400'
+                                            irrigationElements.some((el) => el.type === 'sub-pipe')
+                                                ? 'text-green-400'
+                                                : 'text-red-400'
                                         }`}
                                     >
-                                        <span>{canGoToSummary ? '✓' : '✗'}</span>
-                                        <span>Ready for summary</span>
+                                        <span>
+                                            {irrigationElements.some((el) => el.type === 'sub-pipe')
+                                                ? '✓'
+                                                : '✗'}
+                                        </span>
+                                        <span>Sub Pipe</span>
                                     </div>
                                 </div>
-                                {plotsWithoutCrops.length > 0 && (
-                                    <div className="mt-2 text-xs text-yellow-400">
-                                        แปลงที่ยังไม่เลือก:{' '}
-                                        {plotsWithoutCrops.map((plot) => plot.name).join(', ')}
-                                    </div>
-                                )}
                             </div>
-                        )}
 
-                        {/* Canvas Info */}
-                        <div className="mb-4">
-                            <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                Canvas Info
-                            </h3>
-                            <div className="space-y-1 text-xs text-gray-400">
-                                <p>
-                                    📏 Size: {CANVAS_SIZE.width} × {CANVAS_SIZE.height} px
-                                </p>
-                                <p>📐 Grid: {GRID_SIZE} px</p>
-                                <p>🔍 Zoom: {(zoom * 100).toFixed(0)}%</p>
-                                <p>
-                                    📍 Pan: ({pan.x.toFixed(0)}, {pan.y.toFixed(0)})
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Irrigation Settings */}
-                        {selectedIrrigationMethod === 'mini-sprinkler' && (
-                            <div className="mb-4">
-                                <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                    Mini Sprinkler Settings
-                                </h3>
-                                <div className="space-y-3">
-                                    <div>
-                                        <label className="mb-1 block text-xs text-gray-400">
-                                            Global Radius:
-                                        </label>
-                                        <div className="flex items-center space-x-2">
-                                            <input
-                                                type="range"
-                                                min="0.5"
-                                                max="3"
-                                                step="0.1"
-                                                value={globalRadius}
-                                                onChange={(e) =>
-                                                    updateAllSprinklerRadius(
-                                                        parseFloat(e.target.value)
-                                                    )
+                            {/* Crop Assignment Status */}
+                            {shapes.filter((s) => s.type === 'plot').length > 0 && (
+                                <div className="mb-4">
+                                    <h3 className="mb-2 text-sm font-medium text-gray-300">
+                                        Crop Assignment Status
+                                    </h3>
+                                    <div className="space-y-1 text-xs">
+                                        <div
+                                            className={`flex items-center space-x-2 ${
+                                                plotsWithoutCrops.length === 0
+                                                    ? 'text-green-400'
+                                                    : 'text-yellow-400'
+                                            }`}
+                                        >
+                                            <span>{plotsWithoutCrops.length === 0 ? '✓' : '⚠️'}</span>
+                                            <span>
+                                                เลือกพืชครบทุกแปลง (
+                                                {
+                                                    shapes.filter(
+                                                        (s) => s.type === 'plot' && s.cropType
+                                                    ).length
                                                 }
-                                                className="flex-1"
-                                            />
-                                            <span className="min-w-[2rem] text-xs text-white">
-                                                {globalRadius}m
+                                                /{shapes.filter((s) => s.type === 'plot').length})
                                             </span>
                                         </div>
+                                        <div
+                                            className={`flex items-center space-x-2 ${
+                                                canGoToSummary ? 'text-green-400' : 'text-red-400'
+                                            }`}
+                                        >
+                                            <span>{canGoToSummary ? '✓' : '✗'}</span>
+                                            <span>Ready for summary</span>
+                                        </div>
                                     </div>
+                                    {plotsWithoutCrops.length > 0 && (
+                                        <div className="mt-2 text-xs text-yellow-400">
+                                            แปลงที่ยังไม่เลือก:{' '}
+                                            {plotsWithoutCrops.map((plot) => plot.name).join(', ')}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
-                                    {selectedElement &&
-                                        irrigationElements.find(
-                                            (el) =>
-                                                el.id === selectedElement && el.type === 'sprinkler'
-                                        ) && (
-                                            <div className="mt-3 rounded bg-gray-700 p-2">
-                                                <div className="mb-2 text-xs text-yellow-300">
-                                                    Adjust Selected:
-                                                </div>
+                            {/* Canvas Info */}
+                            <div className="mb-4">
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">
+                                    Canvas Info
+                                </h3>
+                                <div className="space-y-1 text-xs text-gray-400">
+                                    <p>
+                                        📏 Size: {CANVAS_SIZE.width} × {CANVAS_SIZE.height} px
+                                    </p>
+                                    <p>📐 Grid: {GRID_SIZE} px</p>
+                                    <p>🔍 Zoom: {(zoom * 100).toFixed(0)}%</p>
+                                    <p>
+                                        📍 Pan: ({pan.x.toFixed(0)}, {pan.y.toFixed(0)})
+                                    </p>
+                                </div>
+                            </div>
 
-                                                <div className="space-y-2">
-                                                    <div>
-                                                        <label className="mb-1 block text-xs text-gray-400">
-                                                            Radius:
-                                                        </label>
-                                                        <div className="flex items-center space-x-2">
-                                                            <input
-                                                                type="range"
-                                                                min="0.5"
-                                                                max="3"
-                                                                step="0.1"
-                                                                value={
-                                                                    (irrigationElements.find(
-                                                                        (el) =>
-                                                                            el.id ===
-                                                                            selectedElement
-                                                                    )?.radius || 30) / 20
-                                                                }
-                                                                onChange={(e) =>
-                                                                    updateSelectedSprinklerRadius(
-                                                                        parseFloat(e.target.value)
-                                                                    )
-                                                                }
-                                                                className="flex-1"
-                                                            />
-                                                            <span className="min-w-[2rem] text-xs text-white">
-                                                                {(
-                                                                    (irrigationElements.find(
-                                                                        (el) =>
-                                                                            el.id ===
-                                                                            selectedElement
-                                                                    )?.radius || 30) / 20
-                                                                ).toFixed(1)}
-                                                                m
-                                                            </span>
+                            {/* Irrigation Settings */}
+                            {selectedIrrigationMethod === 'mini-sprinkler' && (
+                                <div className="mb-4">
+                                    <h3 className="mb-2 text-sm font-medium text-gray-300">
+                                        Mini Sprinkler Settings
+                                    </h3>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="mb-1 block text-xs text-gray-400">
+                                                Global Radius:
+                                            </label>
+                                            <div className="flex items-center space-x-2">
+                                                <input
+                                                    type="range"
+                                                    min="0.5"
+                                                    max="3"
+                                                    step="0.1"
+                                                    value={globalRadius}
+                                                    onChange={(e) =>
+                                                        updateAllSprinklerRadius(
+                                                            parseFloat(e.target.value)
+                                                        )
+                                                    }
+                                                    className="flex-1"
+                                                />
+                                                <span className="min-w-[2rem] text-xs text-white">
+                                                    {globalRadius}m
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {selectedElement &&
+                                            irrigationElements.find(
+                                                (el) =>
+                                                    el.id === selectedElement && el.type === 'sprinkler'
+                                            ) && (
+                                                <div className="mt-3 rounded bg-gray-700 p-2">
+                                                    <div className="mb-2 text-xs text-yellow-300">
+                                                        Adjust Selected:
+                                                    </div>
+
+                                                    <div className="space-y-2">
+                                                        <div>
+                                                            <label className="mb-1 block text-xs text-gray-400">
+                                                                Radius:
+                                                            </label>
+                                                            <div className="flex items-center space-x-2">
+                                                                <input
+                                                                    type="range"
+                                                                    min="0.5"
+                                                                    max="3"
+                                                                    step="0.1"
+                                                                    value={
+                                                                        (irrigationElements.find(
+                                                                            (el) =>
+                                                                                el.id ===
+                                                                                selectedElement
+                                                                        )?.radius || 30) / 20
+                                                                    }
+                                                                    onChange={(e) =>
+                                                                        updateSelectedSprinklerRadius(
+                                                                            parseFloat(e.target.value)
+                                                                        )
+                                                                    }
+                                                                    className="flex-1"
+                                                                />
+                                                                <span className="min-w-[2rem] text-xs text-white">
+                                                                    {(
+                                                                        (irrigationElements.find(
+                                                                            (el) =>
+                                                                                el.id ===
+                                                                                selectedElement
+                                                                        )?.radius || 30) / 20
+                                                                    ).toFixed(1)}
+                                                                    m
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        )}
+                                            )}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                        {/* Drip Irrigation Settings */}
-                        {selectedIrrigationMethod === 'drip' && (
+                            {/* Drip Irrigation Settings */}
+                            {selectedIrrigationMethod === 'drip' && (
+                                <div className="mb-4">
+                                    <h3 className="mb-2 text-sm font-medium text-gray-300">
+                                        Drip Irrigation Settings
+                                    </h3>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="mb-1 block text-xs text-gray-400">
+                                                Global Drip Point Spacing:
+                                            </label>
+                                            <div className="flex items-center space-x-2">
+                                                <input
+                                                    type="range"
+                                                    min="0.1"
+                                                    max="1"
+                                                    step="0.05"
+                                                    value={globalDripSpacing}
+                                                    onChange={(e) =>
+                                                        updateGlobalDripSpacing(
+                                                            parseFloat(e.target.value)
+                                                        )
+                                                    }
+                                                    className="flex-1"
+                                                />
+                                                <span className="min-w-[2rem] text-xs text-white">
+                                                    {globalDripSpacing}m
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {selectedElement &&
+                                            irrigationElements.find(
+                                                (el) =>
+                                                    el.id === selectedElement && el.type === 'drip-line'
+                                            ) && (
+                                                <div className="mt-2 rounded bg-gray-700 p-2">
+                                                    <div className="mb-1 text-xs text-yellow-300">
+                                                        Adjust Selected Line:
+                                                    </div>
+                                                    <div className="flex items-center space-x-2">
+                                                        <input
+                                                            type="range"
+                                                            min="0.1"
+                                                            max="1"
+                                                            step="0.05"
+                                                            value={
+                                                                irrigationElements.find(
+                                                                    (el) => el.id === selectedElement
+                                                                )?.spacing || globalDripSpacing
+                                                            }
+                                                            onChange={(e) =>
+                                                                updateSelectedDripSpacing(
+                                                                    parseFloat(e.target.value)
+                                                                )
+                                                            }
+                                                            className="flex-1"
+                                                        />
+                                                        <span className="min-w-[2rem] text-xs text-white">
+                                                            {(
+                                                                irrigationElements.find(
+                                                                    (el) => el.id === selectedElement
+                                                                )?.spacing || globalDripSpacing
+                                                            ).toFixed(2)}
+                                                            m
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Auto Generation */}
                             <div className="mb-4">
                                 <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                    Drip Irrigation Settings
+                                    Auto Generate
                                 </h3>
-                                <div className="space-y-3">
-                                    <div>
-                                        <label className="mb-1 block text-xs text-gray-400">
-                                            Global Drip Point Spacing:
-                                        </label>
-                                        <div className="flex items-center space-x-2">
-                                            <input
-                                                type="range"
-                                                min="0.1"
-                                                max="1"
-                                                step="0.05"
-                                                value={globalDripSpacing}
-                                                onChange={(e) =>
-                                                    updateGlobalDripSpacing(
-                                                        parseFloat(e.target.value)
-                                                    )
-                                                }
-                                                className="flex-1"
-                                            />
-                                            <span className="min-w-[2rem] text-xs text-white">
-                                                {globalDripSpacing}m
-                                            </span>
+                                <div className="space-y-2">
+                                    {selectedIrrigationMethod === 'mini-sprinkler' && (
+                                        <div className="space-y-2">
+                                            <button
+                                                onClick={autoGenerateSprinklers}
+                                                disabled={!canAutoGenerate}
+                                                className={`w-full rounded px-3 py-2 text-xs transition-colors ${
+                                                    canAutoGenerate
+                                                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                                        : 'cursor-not-allowed bg-gray-600 text-gray-400'
+                                                }`}
+                                            >
+                                                💦 Generate Mini Sprinklers (Straight Line)
+                                            </button>
                                         </div>
-                                    </div>
+                                    )}
 
-                                    {selectedElement &&
-                                        irrigationElements.find(
-                                            (el) =>
-                                                el.id === selectedElement && el.type === 'drip-line'
-                                        ) && (
-                                            <div className="mt-2 rounded bg-gray-700 p-2">
-                                                <div className="mb-1 text-xs text-yellow-300">
-                                                    Adjust Selected Line:
-                                                </div>
-                                                <div className="flex items-center space-x-2">
-                                                    <input
-                                                        type="range"
-                                                        min="0.1"
-                                                        max="1"
-                                                        step="0.05"
-                                                        value={
-                                                            irrigationElements.find(
-                                                                (el) => el.id === selectedElement
-                                                            )?.spacing || globalDripSpacing
-                                                        }
-                                                        onChange={(e) =>
-                                                            updateSelectedDripSpacing(
-                                                                parseFloat(e.target.value)
-                                                            )
-                                                        }
-                                                        className="flex-1"
-                                                    />
-                                                    <span className="min-w-[2rem] text-xs text-white">
-                                                        {(
-                                                            irrigationElements.find(
-                                                                (el) => el.id === selectedElement
-                                                            )?.spacing || globalDripSpacing
-                                                        ).toFixed(2)}
-                                                        m
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Auto Generation */}
-                        <div className="mb-4">
-                            <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                Auto Generate
-                            </h3>
-                            <div className="space-y-2">
-                                {selectedIrrigationMethod === 'mini-sprinkler' && (
-                                    <div className="space-y-2">
+                                    {selectedIrrigationMethod === 'drip' && (
                                         <button
-                                            onClick={autoGenerateSprinklers}
+                                            onClick={autoGenerateDripLines}
                                             disabled={!canAutoGenerate}
                                             className={`w-full rounded px-3 py-2 text-xs transition-colors ${
                                                 canAutoGenerate
-                                                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                                    ? 'bg-cyan-600 text-white hover:bg-cyan-700'
                                                     : 'cursor-not-allowed bg-gray-600 text-gray-400'
                                             }`}
                                         >
-                                            💦 Generate Mini Sprinklers (Straight Line)
+                                            💧 Generate Drip Lines
                                         </button>
-                                    </div>
-                                )}
+                                    )}
 
-                                {selectedIrrigationMethod === 'drip' && (
+                                    {!canAutoGenerate && (
+                                        <div className="mt-1 text-xs text-yellow-400">
+                                            ⚠️ Main pipe and sub-pipe required first
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* View Controls */}
+                            <div className="mb-4">
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">View Controls</h3>
+                                <div className="space-y-2">
                                     <button
-                                        onClick={autoGenerateDripLines}
-                                        disabled={!canAutoGenerate}
+                                        onClick={() => setShowGrid(!showGrid)}
                                         className={`w-full rounded px-3 py-2 text-xs transition-colors ${
-                                            canAutoGenerate
-                                                ? 'bg-cyan-600 text-white hover:bg-cyan-700'
-                                                : 'cursor-not-allowed bg-gray-600 text-gray-400'
+                                            showGrid
+                                                ? 'bg-blue-600 text-white'
+                                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                         }`}
                                     >
-                                        💧 Generate Drip Lines
+                                        📐 Show Grid ({GRID_SIZE}px)
                                     </button>
-                                )}
+                                    <button
+                                        onClick={() => {
+                                            setZoom(1);
+                                            setPan({ x: 0, y: 0 });
+                                        }}
+                                        className="w-full rounded bg-gray-700 px-3 py-2 text-xs text-gray-300 transition-colors hover:bg-gray-600"
+                                    >
+                                        🔄 Reset View
+                                    </button>
+                                </div>
+                            </div>
 
-                                {!canAutoGenerate && (
-                                    <div className="mt-1 text-xs text-yellow-400">
-                                        ⚠️ Main pipe and sub-pipe required first
+                            {/* Statistics */}
+                            <div className="mb-4">
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">
+                                    Structure Statistics
+                                </h3>
+                                <div className="mb-3 space-y-1 text-xs text-gray-400">
+                                    <div className="flex justify-between">
+                                        <span>🏠 Greenhouses:</span>
+                                        <span>
+                                            {shapes.filter((s) => s.type === 'greenhouse').length}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>🌱 Plots:</span>
+                                        <span>{shapes.filter((s) => s.type === 'plot').length}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>🚶 Walkways:</span>
+                                        <span>{shapes.filter((s) => s.type === 'walkway').length}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>💧 Water Sources:</span>
+                                        <span>
+                                            {shapes.filter((s) => s.type === 'water-source').length}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">Irrigation Statistics</h3>
+                                <div className="space-y-1 text-xs text-gray-400">
+                                    <div className="flex justify-between">
+                                        <span>Main Pipe:</span>
+                                        <span>{calculateStats.mainPipeLength} px</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Sub Pipe:</span>
+                                        <span>{calculateStats.subPipeLength} px</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Drip Lines:</span>
+                                        <span>{calculateStats.dripLineLength} px</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Mini Sprinklers:</span>
+                                        <span>{calculateStats.sprinklerCount} units</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Pumps:</span>
+                                        <span>{calculateStats.pumpCount} units</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Valves:</span>
+                                        <span>{calculateStats.valveCount} units</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Canvas Area */}
+                    <div className="relative flex-1 overflow-hidden">
+                        <canvas
+                            ref={canvasRef}
+                            width={CANVAS_SIZE.width}
+                            height={CANVAS_SIZE.height}
+                            onMouseDown={handleMouseDown}
+                            onMouseUp={handleMouseUp}
+                            onMouseMove={handleMouseMove}
+                            onMouseEnter={handleMouseEnter}
+                            onMouseLeave={handleMouseLeave}
+                            onDoubleClick={finishDrawing}
+                            onContextMenu={(e) => e.preventDefault()}
+                            className="block select-none bg-gray-900"
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                cursor: isDragging
+                                    ? 'grabbing'
+                                    : isPanning
+                                      ? 'grabbing'
+                                      : selectedTool === 'select' && hoveredElement
+                                        ? 'grab'
+                                        : selectedTool === 'select'
+                                          ? 'default'
+                                          : 'crosshair',
+                            }}
+                        />
+
+                        {/* Coordinates Display */}
+                        <div className="absolute bottom-4 left-4 rounded bg-black/50 px-3 py-1 text-sm text-white">
+                            X: {mousePos.x.toFixed(0)}, Y: {mousePos.y.toFixed(0)} | Zoom:{' '}
+                            {(zoom * 100).toFixed(0)}%
+                        </div>
+
+                        {/* Status Messages */}
+                        {isDrawing && (
+                            <div className="absolute left-4 top-4 rounded bg-blue-600 px-3 py-1 text-sm text-white">
+                                Drawing {selectedTool}... (Press Enter to finish, Escape to cancel)
+                            </div>
+                        )}
+
+                        {isDragging && (
+                            <div className="absolute left-4 top-4 rounded bg-yellow-600 px-3 py-1 text-sm text-white">
+                                🤏 Moving element... (Not holding Ctrl)
+                            </div>
+                        )}
+
+                        {isPanning && (
+                            <div className="absolute left-4 top-4 rounded bg-purple-600 px-3 py-1 text-sm text-white">
+                                🤏 Panning view... (Ctrl+Drag or click empty space)
+                            </div>
+                        )}
+
+                        {/* Action Buttons */}
+                        <div className="absolute right-4 top-4 flex space-x-2">
+                            {selectedElement && selectedTool === 'select' && (
+                                <button
+                                    onClick={deleteElement}
+                                    className="rounded bg-red-600 px-4 py-2 text-sm text-white shadow-lg transition-colors hover:bg-red-700"
+                                >
+                                    🗑️ Delete Element
+                                </button>
+                            )}
+
+                            <button
+                                onClick={() => {
+                                    setIrrigationElements([]);
+                                    setSelectedElement(null);
+                                }}
+                                className="rounded bg-orange-600 px-4 py-2 text-sm text-white shadow-lg transition-colors hover:bg-orange-700"
+                            >
+                                🧹 Clear Irrigation System
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Properties Panel */}
+                    <div className="flex w-64 flex-col border-l border-gray-700 bg-gray-800">
+                        <div className="flex-1 overflow-y-auto p-4">
+                            <h3 className="mb-3 text-sm font-medium text-gray-300">
+                                Greenhouse Structure
+                            </h3>
+
+                            {shapes.length === 0 ? (
+                                <p className="text-sm text-gray-500">No structures</p>
+                            ) : (
+                                <div className="mb-4 space-y-3">
+                                    {shapes.filter((s) => s.type === 'plot').length > 0 && (
+                                        <div>
+                                            <h4 className="mb-2 text-xs font-medium text-green-400">
+                                                🌱 Plots
+                                            </h4>
+                                            <div className="space-y-1">
+                                                {shapes
+                                                    .filter((s) => s.type === 'plot')
+                                                    .map((plot) => {
+                                                        const crop = plot.cropType
+                                                            ? getCropByValue(plot.cropType)
+                                                            : null;
+                                                        return (
+                                                            <div
+                                                                key={plot.id}
+                                                                onClick={() => {
+                                                                    if (selectedCrops.length === 0) {
+                                                                        alert(
+                                                                            'No crops selected. Please go back to select crops first.'
+                                                                        );
+                                                                        return;
+                                                                    }
+                                                                    setSelectedPlot(plot.id);
+                                                                    setShowCropSelector(true);
+                                                                }}
+                                                                className={`cursor-pointer rounded p-2 text-sm transition-colors ${
+                                                                    selectedCrops.length === 0
+                                                                        ? 'cursor-not-allowed bg-gray-700 text-gray-500'
+                                                                        : plot.cropType
+                                                                          ? 'bg-green-700 text-gray-300 hover:bg-green-600'
+                                                                          : 'bg-yellow-700 text-gray-300 hover:bg-yellow-600'
+                                                                }`}
+                                                                title={
+                                                                    selectedCrops.length === 0
+                                                                        ? 'Please select crops first'
+                                                                        : plot.cropType
+                                                                          ? 'คลิกเพื่อเปลี่ยนพืช'
+                                                                          : 'คลิกเพื่อเลือกพืช (จำเป็น)'
+                                                                }
+                                                            >
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="truncate">
+                                                                        {plot.name}
+                                                                        {!plot.cropType && (
+                                                                            <span className="ml-1 text-yellow-400">
+                                                                                ⚠️
+                                                                            </span>
+                                                                        )}
+                                                                    </span>
+                                                                    <div className="flex items-center space-x-2">
+                                                                        {crop ? (
+                                                                            <span className="text-lg">
+                                                                                {crop.icon}
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className="text-xs text-yellow-400">
+                                                                                {selectedCrops.length ===
+                                                                                0
+                                                                                    ? 'No crops available'
+                                                                                    : 'Not selected'}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                                {crop && (
+                                                                    <div className="mt-1 text-xs text-gray-400">
+                                                                        {crop.name}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {shapes.filter((s) => s.type === 'greenhouse').length > 0 && (
+                                        <div>
+                                            <h4 className="mb-2 text-xs font-medium text-green-400">
+                                                🏠 Greenhouses
+                                            </h4>
+                                            <div className="space-y-1">
+                                                {shapes
+                                                    .filter((s) => s.type === 'greenhouse')
+                                                    .map((greenhouse) => (
+                                                        <div
+                                                            key={greenhouse.id}
+                                                            className="rounded bg-gray-700 p-2 text-sm text-gray-300"
+                                                        >
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="truncate">
+                                                                    {greenhouse.name}
+                                                                </span>
+                                                                <span className="text-xs text-gray-400">
+                                                                    {greenhouse.points.length} points
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {shapes.filter((s) => s.type === 'walkway').length > 0 && (
+                                        <div>
+                                            <h4 className="mb-2 text-xs font-medium text-gray-400">
+                                                🚶 Walkways
+                                            </h4>
+                                            <div className="space-y-1">
+                                                {shapes
+                                                    .filter((s) => s.type === 'walkway')
+                                                    .map((walkway) => (
+                                                        <div
+                                                            key={walkway.id}
+                                                            className="rounded bg-gray-700 p-2 text-sm text-gray-300"
+                                                        >
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="truncate">
+                                                                    {walkway.name}
+                                                                </span>
+                                                                <span className="text-xs text-gray-400">
+                                                                    {walkway.points.length} points
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {shapes.filter((s) => s.type === 'water-source').length > 0 && (
+                                        <div>
+                                            <h4 className="mb-2 text-xs font-medium text-blue-400">
+                                                💧 Water Sources
+                                            </h4>
+                                            <div className="space-y-1">
+                                                {shapes
+                                                    .filter((s) => s.type === 'water-source')
+                                                    .map((water) => (
+                                                        <div
+                                                            key={water.id}
+                                                            className="rounded bg-gray-700 p-2 text-sm text-gray-300"
+                                                        >
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="truncate">
+                                                                    {water.name}
+                                                                </span>
+                                                                <span className="text-xs text-gray-400">
+                                                                    {water.points.length === 1
+                                                                        ? 'Single point'
+                                                                        : `${water.points.length} points`}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Irrigation Elements List */}
+                            <div className="border-t border-gray-700 pt-4">
+                                <h3 className="mb-3 text-sm font-medium text-gray-300">
+                                    Irrigation Components
+                                </h3>
+
+                                {irrigationElements.length === 0 ? (
+                                    <p className="text-sm text-gray-500">No components yet</p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {irrigationElements.map((element) => {
+                                            const typeNames = {
+                                                'main-pipe': '🔵 Main Pipe',
+                                                'sub-pipe': '🟢 Sub Pipe',
+                                                pump: '⚙️ Pump',
+                                                'solenoid-valve': '🔧 Solenoid Valve',
+                                                'ball-valve': '🟡 Ball Valve',
+                                                sprinkler: '💦 Mini Sprinkler',
+                                                'drip-line': '💧 Drip Line',
+                                            };
+
+                                            return (
+                                                <div
+                                                    key={element.id}
+                                                    onClick={() => setSelectedElement(element.id)}
+                                                    className={`cursor-pointer rounded p-2 text-sm transition-colors ${
+                                                        selectedElement === element.id
+                                                            ? 'bg-yellow-600 text-white'
+                                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="truncate">
+                                                            {typeNames[element.type] || element.type}
+                                                        </span>
+                                                        {selectedElement === element.id && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    deleteElement();
+                                                                }}
+                                                                className="text-red-400 transition-colors hover:text-red-300"
+                                                                title="Delete component"
+                                                            >
+                                                                🗑️
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    <div className="mt-1 text-xs text-gray-400">
+                                                        {element.points.length} points
+                                                        {element.radius &&
+                                                            ` | Radius: ${(element.radius / 20).toFixed(1)}m`}
+                                                        {element.spacing &&
+                                                            ` | Spacing: ${element.spacing.toFixed(2)}m`}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 )}
-                            </div>
-                        </div>
-
-                        {/* View Controls */}
-                        <div className="mb-4">
-                            <h3 className="mb-2 text-sm font-medium text-gray-300">View Controls</h3>
-                            <div className="space-y-2">
-                                <button
-                                    onClick={() => setShowGrid(!showGrid)}
-                                    className={`w-full rounded px-3 py-2 text-xs transition-colors ${
-                                        showGrid
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                    }`}
-                                >
-                                    📐 Show Grid ({GRID_SIZE}px)
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setZoom(1);
-                                        setPan({ x: 0, y: 0 });
-                                    }}
-                                    className="w-full rounded bg-gray-700 px-3 py-2 text-xs text-gray-300 transition-colors hover:bg-gray-600"
-                                >
-                                    🔄 Reset View
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Statistics */}
-                        <div className="mb-4">
-                            <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                Structure Statistics
-                            </h3>
-                            <div className="mb-3 space-y-1 text-xs text-gray-400">
-                                <div className="flex justify-between">
-                                    <span>🏠 Greenhouses:</span>
-                                    <span>
-                                        {shapes.filter((s) => s.type === 'greenhouse').length}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>🌱 Plots:</span>
-                                    <span>{shapes.filter((s) => s.type === 'plot').length}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>🚶 Walkways:</span>
-                                    <span>{shapes.filter((s) => s.type === 'walkway').length}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>💧 Water Sources:</span>
-                                    <span>
-                                        {shapes.filter((s) => s.type === 'water-source').length}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <h3 className="mb-2 text-sm font-medium text-gray-300">Irrigation Statistics</h3>
-                            <div className="space-y-1 text-xs text-gray-400">
-                                <div className="flex justify-between">
-                                    <span>Main Pipe:</span>
-                                    <span>{calculateStats.mainPipeLength} px</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Sub Pipe:</span>
-                                    <span>{calculateStats.subPipeLength} px</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Drip Lines:</span>
-                                    <span>{calculateStats.dripLineLength} px</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Mini Sprinklers:</span>
-                                    <span>{calculateStats.sprinklerCount} units</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Pumps:</span>
-                                    <span>{calculateStats.pumpCount} units</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Valves:</span>
-                                    <span>{calculateStats.valveCount} units</span>
-                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Canvas Area */}
-                <div className="relative flex-1 overflow-hidden">
-                    <canvas
-                        ref={canvasRef}
-                        width={CANVAS_SIZE.width}
-                        height={CANVAS_SIZE.height}
-                        onMouseDown={handleMouseDown}
-                        onMouseUp={handleMouseUp}
-                        onMouseMove={handleMouseMove}
-                        onMouseEnter={handleMouseEnter}
-                        onMouseLeave={handleMouseLeave}
-                        onDoubleClick={finishDrawing}
-                        onContextMenu={(e) => e.preventDefault()}
-                        className="block select-none bg-gray-900"
-                        style={{
-                            width: '100%',
-                            height: '100%',
-                            cursor: isDragging
-                                ? 'grabbing'
-                                : isPanning
-                                  ? 'grabbing'
-                                  : selectedTool === 'select' && hoveredElement
-                                    ? 'grab'
-                                    : selectedTool === 'select'
-                                      ? 'default'
-                                      : 'crosshair',
-                        }}
-                    />
-
-                    {/* Coordinates Display */}
-                    <div className="absolute bottom-4 left-4 rounded bg-black/50 px-3 py-1 text-sm text-white">
-                        X: {mousePos.x.toFixed(0)}, Y: {mousePos.y.toFixed(0)} | Zoom:{' '}
-                        {(zoom * 100).toFixed(0)}%
-                    </div>
-
-                    {/* Status Messages */}
-                    {isDrawing && (
-                        <div className="absolute left-4 top-4 rounded bg-blue-600 px-3 py-1 text-sm text-white">
-                            Drawing {selectedTool}... (Press Enter to finish, Escape to cancel)
+                {/* Bottom Bar */}
+                <div className="flex-shrink-0 border-t border-gray-700 bg-gray-800 px-6 py-3">
+                    {/* Warning Message */}
+                    {plotsWithoutCrops.length > 0 && (
+                        <div className="mb-3 rounded-lg border border-yellow-600 bg-yellow-900/30 p-3">
+                            <div className="text-sm text-yellow-300">
+                                ⚠️ Please select crops for all plots before viewing summary
+                            </div>
+                            <div className="mt-1 text-xs text-yellow-400">
+                                แปลงที่ยังไม่เลือกพืช:{' '}
+                                {plotsWithoutCrops.map((plot) => plot.name).join(', ')}
+                            </div>
                         </div>
                     )}
 
-                    {isDragging && (
-                        <div className="absolute left-4 top-4 rounded bg-yellow-600 px-3 py-1 text-sm text-white">
-                            🤏 Moving element... (Not holding Ctrl)
-                        </div>
-                    )}
+                    <div className="flex justify-between">
+                        <button
+                            onClick={() => {
+                                // Save irrigation system data
+                                const summaryData = {
+                                    selectedCrops: selectedCrops,
+                                    planningMethod: 'draw',
+                                    shapes: shapes,
+                                    irrigationElements: irrigationElements, // Added this line
+                                    irrigationMethod: selectedIrrigationMethod,
+                                    updatedAt: new Date().toISOString(),
+                                };
 
-                    {isPanning && (
-                        <div className="absolute left-4 top-4 rounded bg-purple-600 px-3 py-1 text-sm text-white">
-                            🤏 Panning view... (Ctrl+Drag or click empty space)
-                        </div>
-                    )}
+                                const queryParams = new URLSearchParams();
+                                if (selectedCrops && selectedCrops.length > 0) {
+                                    queryParams.set('crops', selectedCrops.join(','));
+                                }
+                                if (shapes && shapes.length > 0) {
+                                    queryParams.set(
+                                        'shapes',
+                                        encodeURIComponent(JSON.stringify(shapes))
+                                    );
+                                }
+                                if (selectedIrrigationMethod) {
+                                    queryParams.set('irrigation', selectedIrrigationMethod); // Added this line
+                                }
 
-                    {/* Action Buttons */}
-                    <div className="absolute right-4 top-4 flex space-x-2">
-                        {selectedElement && selectedTool === 'select' && (
-                            <button
-                                onClick={deleteElement}
-                                className="rounded bg-red-600 px-4 py-2 text-sm text-white shadow-lg transition-colors hover:bg-red-700"
+                                window.location.href = `/choose-irrigation?${queryParams.toString()}`;
+                            }}
+                            className="flex items-center rounded bg-gray-600 px-4 py-2 text-white transition-colors hover:bg-gray-700"
+                        >
+                            <svg
+                                className="mr-2 h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
                             >
-                                🗑️ Delete Element
-                            </button>
-                        )}
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                                />
+                            </svg>
+                            Back
+                        </button>
 
                         <button
                             onClick={() => {
-                                setIrrigationElements([]);
-                                setSelectedElement(null);
+                                if (!canGoToSummary) {
+                                    alert('Please select crops for all plots before viewing summary');
+                                    return;
+                                }
+
+                                const summaryData = {
+                                    selectedCrops: selectedCrops,
+                                    planningMethod: 'draw',
+                                    shapes: shapes,
+                                    irrigationElements: irrigationElements,
+                                    irrigationMethod: selectedIrrigationMethod,
+                                    createdAt: new Date().toISOString(),
+                                    updatedAt: new Date().toISOString(),
+                                };
+
+                                localStorage.setItem(
+                                    'greenhousePlanningData',
+                                    JSON.stringify(summaryData)
+                                );
+
+                                window.location.href = '/green-house-summary';
                             }}
-                            className="rounded bg-orange-600 px-4 py-2 text-sm text-white shadow-lg transition-colors hover:bg-orange-700"
+                            disabled={!canGoToSummary}
+                            className={`flex items-center rounded px-6 py-2 transition-colors ${
+                                canGoToSummary
+                                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                    : 'cursor-not-allowed bg-gray-600 text-gray-400'
+                            }`}
+                            title={!canGoToSummary ? 'Please select crops for all plots first' : ''}
                         >
-                            🧹 Clear Irrigation System
+                            📊 View Summary
+                            <svg
+                                className="ml-2 h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                />
+                            </svg>
                         </button>
                     </div>
                 </div>
 
-                {/* Properties Panel */}
-                <div className="flex w-64 flex-col border-l border-gray-700 bg-gray-800">
-                    <div className="flex-1 overflow-y-auto p-4">
-                        <h3 className="mb-3 text-sm font-medium text-gray-300">
-                            Greenhouse Structure
-                        </h3>
-
-                        {shapes.length === 0 ? (
-                            <p className="text-sm text-gray-500">No structures</p>
-                        ) : (
-                            <div className="mb-4 space-y-3">
-                                {shapes.filter((s) => s.type === 'plot').length > 0 && (
-                                    <div>
-                                        <h4 className="mb-2 text-xs font-medium text-green-400">
-                                            🌱 Plots
-                                        </h4>
-                                        <div className="space-y-1">
-                                            {shapes
-                                                .filter((s) => s.type === 'plot')
-                                                .map((plot) => {
-                                                    const crop = plot.cropType
-                                                        ? getCropByValue(plot.cropType)
-                                                        : null;
-                                                    return (
-                                                        <div
-                                                            key={plot.id}
-                                                            onClick={() => {
-                                                                if (selectedCrops.length === 0) {
-                                                                    alert(
-                                                                        'No crops selected. Please go back to select crops first.'
-                                                                    );
-                                                                    return;
-                                                                }
-                                                                setSelectedPlot(plot.id);
-                                                                setShowCropSelector(true);
-                                                            }}
-                                                            className={`cursor-pointer rounded p-2 text-sm transition-colors ${
-                                                                selectedCrops.length === 0
-                                                                    ? 'cursor-not-allowed bg-gray-700 text-gray-500'
-                                                                    : plot.cropType
-                                                                      ? 'bg-green-700 text-gray-300 hover:bg-green-600'
-                                                                      : 'bg-yellow-700 text-gray-300 hover:bg-yellow-600'
-                                                            }`}
-                                                            title={
-                                                                selectedCrops.length === 0
-                                                                    ? 'Please select crops first'
-                                                                    : plot.cropType
-                                                                      ? 'คลิกเพื่อเปลี่ยนพืช'
-                                                                      : 'คลิกเพื่อเลือกพืช (จำเป็น)'
-                                                            }
-                                                        >
-                                                            <div className="flex items-center justify-between">
-                                                                <span className="truncate">
-                                                                    {plot.name}
-                                                                    {!plot.cropType && (
-                                                                        <span className="ml-1 text-yellow-400">
-                                                                            ⚠️
-                                                                        </span>
-                                                                    )}
-                                                                </span>
-                                                                <div className="flex items-center space-x-2">
-                                                                    {crop ? (
-                                                                        <span className="text-lg">
-                                                                            {crop.icon}
-                                                                        </span>
-                                                                    ) : (
-                                                                        <span className="text-xs text-yellow-400">
-                                                                            {selectedCrops.length ===
-                                                                            0
-                                                                                ? 'No crops available'
-                                                                                : 'Not selected'}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                            {crop && (
-                                                                <div className="mt-1 text-xs text-gray-400">
-                                                                    {crop.name}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {shapes.filter((s) => s.type === 'greenhouse').length > 0 && (
-                                    <div>
-                                        <h4 className="mb-2 text-xs font-medium text-green-400">
-                                            🏠 Greenhouses
-                                        </h4>
-                                        <div className="space-y-1">
-                                            {shapes
-                                                .filter((s) => s.type === 'greenhouse')
-                                                .map((greenhouse) => (
-                                                    <div
-                                                        key={greenhouse.id}
-                                                        className="rounded bg-gray-700 p-2 text-sm text-gray-300"
-                                                    >
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="truncate">
-                                                                {greenhouse.name}
-                                                            </span>
-                                                            <span className="text-xs text-gray-400">
-                                                                {greenhouse.points.length} points
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {shapes.filter((s) => s.type === 'walkway').length > 0 && (
-                                    <div>
-                                        <h4 className="mb-2 text-xs font-medium text-gray-400">
-                                            🚶 Walkways
-                                        </h4>
-                                        <div className="space-y-1">
-                                            {shapes
-                                                .filter((s) => s.type === 'walkway')
-                                                .map((walkway) => (
-                                                    <div
-                                                        key={walkway.id}
-                                                        className="rounded bg-gray-700 p-2 text-sm text-gray-300"
-                                                    >
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="truncate">
-                                                                {walkway.name}
-                                                            </span>
-                                                            <span className="text-xs text-gray-400">
-                                                                {walkway.points.length} points
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {shapes.filter((s) => s.type === 'water-source').length > 0 && (
-                                    <div>
-                                        <h4 className="mb-2 text-xs font-medium text-blue-400">
-                                            💧 Water Sources
-                                        </h4>
-                                        <div className="space-y-1">
-                                            {shapes
-                                                .filter((s) => s.type === 'water-source')
-                                                .map((water) => (
-                                                    <div
-                                                        key={water.id}
-                                                        className="rounded bg-gray-700 p-2 text-sm text-gray-300"
-                                                    >
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="truncate">
-                                                                {water.name}
-                                                            </span>
-                                                            <span className="text-xs text-gray-400">
-                                                                {water.points.length === 1
-                                                                    ? 'Single point'
-                                                                    : `${water.points.length} points`}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                        </div>
-                                    </div>
-                                )}
+                {/* Crop Selector Modal */}
+                {showCropSelector && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                        <div className="mx-4 w-full max-w-md rounded-lg border border-gray-600 bg-gray-800 p-6">
+                            <div className="mb-4 flex items-center justify-between">
+                                <h3 className="text-lg font-medium text-white">
+                                    Select Crop for This Plot
+                                </h3>
+                                <button
+                                    onClick={() => {
+                                        setShowCropSelector(false);
+                                        setSelectedPlot(null);
+                                    }}
+                                    className="text-gray-400 hover:text-white"
+                                >
+                                    ✕
+                                </button>
                             </div>
-                        )}
 
-                        {/* Irrigation Elements List */}
-                        <div className="border-t border-gray-700 pt-4">
-                            <h3 className="mb-3 text-sm font-medium text-gray-300">
-                                Irrigation Components
-                            </h3>
-
-                            {irrigationElements.length === 0 ? (
-                                <p className="text-sm text-gray-500">No components yet</p>
-                            ) : (
-                                <div className="space-y-2">
-                                    {irrigationElements.map((element) => {
-                                        const typeNames = {
-                                            'main-pipe': '🔵 Main Pipe',
-                                            'sub-pipe': '🟢 Sub Pipe',
-                                            pump: '⚙️ Pump',
-                                            'solenoid-valve': '🔧 Solenoid Valve',
-                                            'ball-valve': '🟡 Ball Valve',
-                                            sprinkler: '💦 Mini Sprinkler',
-                                            'drip-line': '💧 Drip Line',
-                                        };
-
-                                        return (
-                                            <div
-                                                key={element.id}
-                                                onClick={() => setSelectedElement(element.id)}
-                                                className={`cursor-pointer rounded p-2 text-sm transition-colors ${
-                                                    selectedElement === element.id
-                                                        ? 'bg-yellow-600 text-white'
-                                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                                }`}
-                                            >
-                                                <div className="flex items-center justify-between">
-                                                    <span className="truncate">
-                                                        {typeNames[element.type] || element.type}
-                                                    </span>
-                                                    {selectedElement === element.id && (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                deleteElement();
-                                                            }}
-                                                            className="text-red-400 transition-colors hover:text-red-300"
-                                                            title="Delete component"
-                                                        >
-                                                            🗑️
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                <div className="mt-1 text-xs text-gray-400">
-                                                    {element.points.length} points
-                                                    {element.radius &&
-                                                        ` | Radius: ${(element.radius / 20).toFixed(1)}m`}
-                                                    {element.spacing &&
-                                                        ` | Spacing: ${element.spacing.toFixed(2)}m`}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+                            {selectedCrops.length === 0 && (
+                                <div className="mb-4 rounded-lg border border-yellow-600 bg-yellow-900/30 p-3">
+                                    <div className="text-sm text-yellow-300">
+                                        ⚠️ No crops selected. Please go back to select crops first.
+                                    </div>
                                 </div>
                             )}
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            {/* Bottom Bar */}
-            <div className="flex-shrink-0 border-t border-gray-700 bg-gray-800 px-6 py-3">
-                {/* Warning Message */}
-                {plotsWithoutCrops.length > 0 && (
-                    <div className="mb-3 rounded-lg border border-yellow-600 bg-yellow-900/30 p-3">
-                        <div className="text-sm text-yellow-300">
-                            ⚠️ Please select crops for all plots before viewing summary
-                        </div>
-                        <div className="mt-1 text-xs text-yellow-400">
-                            แปลงที่ยังไม่เลือกพืช:{' '}
-                            {plotsWithoutCrops.map((plot) => plot.name).join(', ')}
+                            <div className="grid max-h-64 grid-cols-2 gap-3 overflow-y-auto">
+                                {selectedCrops.length === 0 ? (
+                                    <div className="col-span-2 py-4 text-center text-gray-400">
+                                        No crops selected
+                                    </div>
+                                ) : (
+                                    selectedCrops.map((cropValue) => {
+                                        const crop = getCropByValue(cropValue);
+                                        if (!crop) return null;
+                                        return (
+                                            <button
+                                                key={crop.value}
+                                                onClick={() => assignCropToPlot(crop.value)}
+                                                className="rounded-lg border border-gray-600 bg-gray-700 p-3 text-center transition-colors hover:bg-gray-600"
+                                            >
+                                                <div className="mb-1 text-2xl">{crop.icon}</div>
+                                                <div className="text-sm text-white">{crop.name}</div>
+                                                <div className="text-xs text-gray-400">
+                                                    {crop.nameEn}
+                                                </div>
+                                            </button>
+                                        );
+                                    })
+                                )}
+                            </div>
+
+                            <div className="mt-4 border-t border-gray-600 pt-4">
+                                <button
+                                    onClick={() => {
+                                        if (selectedPlot) {
+                                            setShapes((prev) =>
+                                                prev.map((shape) => {
+                                                    if (shape.id === selectedPlot) {
+                                                        const { cropType, ...shapeWithoutCrop } = shape;
+                                                        return shapeWithoutCrop;
+                                                    }
+                                                    return shape;
+                                                })
+                                            );
+                                        }
+                                        setShowCropSelector(false);
+                                        setSelectedPlot(null);
+                                    }}
+                                    className="w-full rounded bg-red-600 py-2 text-sm text-white transition-colors hover:bg-red-700"
+                                >
+                                    Remove Crop from Plot
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
-
-                <div className="flex justify-between">
-                    <button
-                        onClick={() => {
-                            // Save irrigation system data
-                            const summaryData = {
-                                selectedCrops: selectedCrops,
-                                planningMethod: 'draw',
-                                shapes: shapes,
-                                irrigationElements: irrigationElements, // Added this line
-                                irrigationMethod: selectedIrrigationMethod,
-                                updatedAt: new Date().toISOString(),
-                            };
-
-                            const queryParams = new URLSearchParams();
-                            if (selectedCrops && selectedCrops.length > 0) {
-                                queryParams.set('crops', selectedCrops.join(','));
-                            }
-                            if (shapes && shapes.length > 0) {
-                                queryParams.set(
-                                    'shapes',
-                                    encodeURIComponent(JSON.stringify(shapes))
-                                );
-                            }
-                            if (selectedIrrigationMethod) {
-                                queryParams.set('irrigation', selectedIrrigationMethod); // Added this line
-                            }
-
-                            window.location.href = `/choose-irrigation?${queryParams.toString()}`;
-                        }}
-                        className="flex items-center rounded bg-gray-600 px-4 py-2 text-white transition-colors hover:bg-gray-700"
-                    >
-                        <svg
-                            className="mr-2 h-4 w-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                            />
-                        </svg>
-                        Back
-                    </button>
-
-                    <button
-                        onClick={() => {
-                            if (!canGoToSummary) {
-                                alert('Please select crops for all plots before viewing summary');
-                                return;
-                            }
-
-                            const summaryData = {
-                                selectedCrops: selectedCrops,
-                                planningMethod: 'draw',
-                                shapes: shapes,
-                                irrigationElements: irrigationElements,
-                                irrigationMethod: selectedIrrigationMethod,
-                                createdAt: new Date().toISOString(),
-                                updatedAt: new Date().toISOString(),
-                            };
-
-                            localStorage.setItem(
-                                'greenhousePlanningData',
-                                JSON.stringify(summaryData)
-                            );
-
-                            window.location.href = '/green-house-summary';
-                        }}
-                        disabled={!canGoToSummary}
-                        className={`flex items-center rounded px-6 py-2 transition-colors ${
-                            canGoToSummary
-                                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                : 'cursor-not-allowed bg-gray-600 text-gray-400'
-                        }`}
-                        title={!canGoToSummary ? 'Please select crops for all plots first' : ''}
-                    >
-                        📊 View Summary
-                        <svg
-                            className="ml-2 h-4 w-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                            />
-                        </svg>
-                    </button>
-                </div>
             </div>
-
-            {/* Crop Selector Modal */}
-            {showCropSelector && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                    <div className="mx-4 w-full max-w-md rounded-lg border border-gray-600 bg-gray-800 p-6">
-                        <div className="mb-4 flex items-center justify-between">
-                            <h3 className="text-lg font-medium text-white">
-                                Select Crop for This Plot
-                            </h3>
-                            <button
-                                onClick={() => {
-                                    setShowCropSelector(false);
-                                    setSelectedPlot(null);
-                                }}
-                                className="text-gray-400 hover:text-white"
-                            >
-                                ✕
-                            </button>
-                        </div>
-
-                        {selectedCrops.length === 0 && (
-                            <div className="mb-4 rounded-lg border border-yellow-600 bg-yellow-900/30 p-3">
-                                <div className="text-sm text-yellow-300">
-                                    ⚠️ No crops selected. Please go back to select crops first.
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="grid max-h-64 grid-cols-2 gap-3 overflow-y-auto">
-                            {selectedCrops.length === 0 ? (
-                                <div className="col-span-2 py-4 text-center text-gray-400">
-                                    No crops selected
-                                </div>
-                            ) : (
-                                selectedCrops.map((cropValue) => {
-                                    const crop = getCropByValue(cropValue);
-                                    if (!crop) return null;
-                                    return (
-                                        <button
-                                            key={crop.value}
-                                            onClick={() => assignCropToPlot(crop.value)}
-                                            className="rounded-lg border border-gray-600 bg-gray-700 p-3 text-center transition-colors hover:bg-gray-600"
-                                        >
-                                            <div className="mb-1 text-2xl">{crop.icon}</div>
-                                            <div className="text-sm text-white">{crop.name}</div>
-                                            <div className="text-xs text-gray-400">
-                                                {crop.nameEn}
-                                            </div>
-                                        </button>
-                                    );
-                                })
-                            )}
-                        </div>
-
-                        <div className="mt-4 border-t border-gray-600 pt-4">
-                            <button
-                                onClick={() => {
-                                    if (selectedPlot) {
-                                        setShapes((prev) =>
-                                            prev.map((shape) => {
-                                                if (shape.id === selectedPlot) {
-                                                    const { cropType, ...shapeWithoutCrop } = shape;
-                                                    return shapeWithoutCrop;
-                                                }
-                                                return shape;
-                                            })
-                                        );
-                                    }
-                                    setShowCropSelector(false);
-                                    setSelectedPlot(null);
-                                }}
-                                className="w-full rounded bg-red-600 py-2 text-sm text-white transition-colors hover:bg-red-700"
-                            >
-                                Remove Crop from Plot
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            </div>
-            <Footer />
         </div>
     );
 }
