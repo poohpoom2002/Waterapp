@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // resources\js\pages\components\InputForm.tsx
 import React, { useEffect, useState } from 'react';
 import { IrrigationInput } from '../types/interfaces';

@@ -252,7 +252,7 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
             setDrawingManager(drawingMgr);
             onLoad(newMap);
         }
-    }, [ref.current]);
+    }, [center, map, mapType, onCenterChanged, onDrawCreated, onLoad, onZoomChanged, zoom]);
     
     useEffect(() => {
         if (map && onMapClick) {
@@ -287,7 +287,7 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                 isInternalChange.current = false;
             }, 100);
         }
-    }, [map, center.lat, center.lng, zoom]);
+    }, [map, center.lat, center.lng, zoom, center]);
 
     // Get current drawing options
     const getCurrentDrawingOptions = useCallback(() => {
@@ -412,7 +412,7 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
         if (drawingManager && currentDrawingMode) {
             stopDrawing();
         }
-    }, [drawingMode, drawingStage]);
+    }, [currentDrawingMode, drawingManager, drawingMode, drawingStage, stopDrawing]);
 
     // Update cursor for equipment placement
     useEffect(() => {

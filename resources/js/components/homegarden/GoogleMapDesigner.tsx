@@ -1005,29 +1005,7 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
             clearTimeout(timer);
             clearOverlays();
         };
-    }, [
-        props.map,
-        props.gardenZones,
-        props.sprinklers,
-        props.waterSource,
-        props.pipes,
-        props.mainPipeDrawing,
-        props.selectedSprinkler,
-        props.selectedSprinklersForPipe,
-        props.selectedPipes,
-        props.editMode,
-        props.pipeEditMode,
-        clearOverlays,
-        createSprinklerIcon,
-        createWaterSourceIcon,
-        props.onSprinklerClick,
-        props.onSprinklerDelete,
-        props.onSprinklerDragged,
-        props.onWaterSourceDelete,
-        props.onPipeClick,
-        isDragging,
-        isMapStable,
-    ]);
+    }, [props.map, props.gardenZones, props.sprinklers, props.waterSource, props.pipes, props.mainPipeDrawing, props.selectedSprinkler, props.selectedSprinklersForPipe, props.selectedPipes, props.editMode, props.pipeEditMode, clearOverlays, createSprinklerIcon, createWaterSourceIcon, props.onSprinklerClick, props.onSprinklerDelete, props.onSprinklerDragged, props.onWaterSourceDelete, props.onPipeClick, isDragging, isMapStable, props]);
 
     return (
         <>
