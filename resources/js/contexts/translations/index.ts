@@ -6,6 +6,7 @@ import { productTranslations } from './product';
 import { footnavTranslations } from './footnav';
 import { homepageTranslations } from './homepage';
 import { equipmentTranslations } from './equipment';
+import { aiTranslations } from './ai';
 export const translations = {
     en: {
         ...horticultureTranslations.en,
@@ -16,6 +17,7 @@ export const translations = {
         ...footnavTranslations.en,
         ...homepageTranslations.en,
         ...equipmentTranslations.en,
+        ...aiTranslations.en,
     },
     th: {
         ...horticultureTranslations.th,
@@ -26,5 +28,6 @@ export const translations = {
         ...footnavTranslations.th,
         ...homepageTranslations.th,
         ...equipmentTranslations.th,
+        ...aiTranslations.th,
     },
 };
