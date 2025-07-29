@@ -3,6 +3,8 @@ return [
     'paths' => ['api/*', 'sanctum/csrf-cookie'],
     'allowed_methods' => ['*'],
     'allowed_origins' => [
+	'http://34.126.111.147',
+	'https://chaiyopipeandfitting.com',
         'http://localhost:3000',
         'http://localhost:5173',
         'http://127.0.0.1:3000',
@@ -12,6 +14,8 @@ return [
         // เพิ่ม domain ที่ต้องการ
     ],
     'allowed_origins_patterns' => [
+	'http://34.126.111.147',
+	'https://chaiyopipeandfitting.com',
         'http://localhost:*',
         'http://127.0.0.1:*',
     ],
