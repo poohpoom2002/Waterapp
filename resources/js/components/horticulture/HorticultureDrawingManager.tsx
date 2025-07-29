@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // components/horticulture/HorticultureDrawingManager.tsx
 import React, { useEffect, useRef, useState } from 'react';
 

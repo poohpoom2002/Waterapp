@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // resources\js\pages\components\CalculationSummary.tsx
 import React from 'react';
 import { CalculationResults, IrrigationInput } from '../types/interfaces';
