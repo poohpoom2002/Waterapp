@@ -131,6 +131,39 @@ export default function Product() {
         };
     }, [projectImage]);
 
+    // Load project mode from URL parameters
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const mode = urlParams.get('mode') as ProjectMode;
+        if (mode) {
+            setProjectMode(mode);
+        }
+    }, []);
+
+    // Fanggy005 EDIT: Updated image loading logic to be more robust.
+    // This now consistently checks for the 'projectMapImage' key set by summary pages.
+    useEffect(() => {
+        // This key is now the standard for all project types coming from a summary page.
+        const standardImage = localStorage.getItem('projectMapImage');
+        if (standardImage) {
+            console.log("✅ Found standard 'projectMapImage' in localStorage. Using it.");
+            setProjectImage(standardImage);
+            return; // Exit if the standard image is found
+        }
+
+        // Fallback for older versions or different flows for backward compatibility
+        if (projectMode === 'field-crop') {
+            const fieldCropImage = localStorage.getItem('fieldCropPlanImage');
+            if (fieldCropImage) {
+                console.log("⚠️ Found fallback 'fieldCropPlanImage' for field-crop mode.");
+                setProjectImage(fieldCropImage);
+            }
+        }
+        
+        console.log("ℹ️ No project map image found in localStorage.");
+
+    }, [projectMode]); // Rerun when projectMode is determined
+
     const getZoneName = (zoneId: string): string => {
         if (projectMode === 'garden' && gardenStats) {
             const zone = gardenStats.zones.find((z) => z.zoneId === zoneId);
@@ -720,12 +753,7 @@ export default function Product() {
         } else if (!mode && storedType === 'home-garden') {
             mode = 'garden';
         }
-
-        const mapImage = localStorage.getItem('projectMapImage');
-        if (mapImage) {
-            setProjectImage(mapImage);
-        }
-
+        
         // ADD: Handle greenhouse mode
         if (mode === 'greenhouse') {
             setProjectMode('greenhouse');
@@ -1360,7 +1388,7 @@ export default function Product() {
                                                 projectMode === 'garden' ? 'สวนบ้าน' : 
                                                 projectMode === 'field-crop' ? 'พืชไร่' : 
                                                 projectMode === 'greenhouse' ? 'โรงเรือน' : 'พืชสวน'
-                                            } Project`}
+                                            } Project Plan`}
                                             className="aspect-video max-h-[500px] w-full cursor-pointer rounded-lg object-contain transition-transform hover:scale-105"
                                             style={{ maxHeight: '500px', minHeight: '300px' }}
                                             onClick={() => setShowImageModal(true)}
@@ -1399,7 +1427,7 @@ export default function Product() {
                                             {projectMode === 'garden'
                                                 ? 'หรือส่งออกจากหน้าสรุปผลสวนบ้าน'
                                                 : projectMode === 'field-crop'
-                                                ? 'หรือส่งออกจากหน้าสรุปผลพืชไร่'
+                                                ? 'หรือส่งออกจากหน้าสรุปผลพืชไร่ (หรือใช้ปุ่ม Capture Plan)'
                                                 : projectMode === 'greenhouse'
                                                 ? 'หรือส่งออกจากหน้าสรุปผลโรงเรือน'
                                                 : 'หรือส่งออกจากหน้าสรุปผลพืชสวน'}

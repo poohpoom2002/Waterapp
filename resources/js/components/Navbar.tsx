@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import { useLanguage } from '../contexts/LanguageContext';

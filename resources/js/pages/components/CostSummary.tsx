@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // resources\js\pages\components\CostSummary.tsx
 import React from 'react';
 import { AnalyzedPipe, CalculationResults, IrrigationInput } from '../types/interfaces';
@@ -615,7 +617,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                         {item.totalCost?.toLocaleString()} บาท
                                     </p>
                                     <p className="text-xs text-green-300">
-                                        ({(item.totalCost / item.quantity).toFixed(0)} บาท/หัว)
+                                        ({(Number(item.totalCost) / Number(item.quantity)).toFixed(0)} บาท/หัว)
                                     </p>
                                 </div>
                             </div>
@@ -658,7 +660,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                 </p>
                                                 <p className="text-xs text-purple-200">
                                                     {item.zones.join(', ')} |{' '}
-                                                    {item.pipe.price?.toLocaleString()} บาท/ม้วน (
+                                                    {(Number(item.pipe.price) || 0)?.toLocaleString()} บาท/ม้วน (
                                                     {item.pipe.lengthM}ม./ม้วน) | คะแนน:{' '}
                                                     {item.pipe.score || 'N/A'}
                                                 </p>
@@ -982,7 +984,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                     <div className="mt-2 grid grid-cols-2 gap-4">
                         <div>
                             <p className="text-2xl font-bold text-white">
-                                {costs.totalCost?.toLocaleString()} บาท
+                                {(Number(costs.totalCost) || 0)?.toLocaleString()} บาท
                             </p>
                             <p className="mt-1 text-xs text-green-200">
                                 * รวมอุปกรณ์ที่เลือกอัตโนมัติและปรับแต่ง

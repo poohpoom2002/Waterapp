@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\EquipmentCategoryController;
 use App\Http\Controllers\Api\EquipmentController;
 use App\Http\Controllers\Api\PumpAccessoryController;
 use App\Http\Controllers\Api\ImageUploadController;
+use App\Http\Controllers\ProfilePhotoController; // เพิ่มเข้ามา
 
 /*
 |--------------------------------------------------------------------------
@@ -69,29 +70,29 @@ Route::apiResource('pump-accessories', PumpAccessoryController::class);
 Route::get('/sprinklers', [SprinklerController::class, 'index']); 
 Route::post('/calculate-pipe-layout', [SprinklerController::class, 'calculatePipeLayout']);
 
-// Quick equipment access routes
-Route::get('/api/sprinklers', fn() => app(EquipmentController::class)->getByCategory('sprinkler'));
-Route::get('/api/pumps', fn() => app(EquipmentController::class)->getByCategory('pump'));
-Route::get('/api/pipes', fn() => app(EquipmentController::class)->getByCategory('pipe'));
+// Quick equipment access routes - เปลี่ยนจาก /api/sprinklers เป็น /sprinklers
+Route::get('/sprinklers', fn() => app(EquipmentController::class)->getByCategory('sprinkler'));
+Route::get('/pumps', fn() => app(EquipmentController::class)->getByCategory('pump'));
+Route::get('/pipes', fn() => app(EquipmentController::class)->getByCategory('pipe'));
 
 // ==================================================
 // 🌱 FARM PLANNING & MANAGEMENT ROUTES
+// (ย้ายมาจาก web.php และปรับ Path)
 // ==================================================
 
 // General Farm & Planner API Routes
 Route::post('/generate-planting-points', [FarmController::class, 'generatePlantingPoints']);
-Route::post('/generate-pipe-layout', [FarmController::class, 'generatePipeLayout']); // For main farm planner
-Route::post('/calculate-pipe-layout', [SprinklerController::class, 'calculatePipeLayout']); // Legacy or specific use
+Route::post('/generate-pipe-layout', [FarmController::class, 'generatePipeLayout']); 
 
 // Field Management API Routes
-Route::get('/fields', [FarmController::class, 'getFields']);
+Route::get('/fields', [FarmController::class, 'getFields']); // แก้ name() ถ้ามันซ้ำ
 Route::get('/fields/{fieldId}', [FarmController::class, 'getField']);
 Route::post('/save-field', [FarmController::class, 'saveField']);
 Route::put('/fields/{fieldId}', [FarmController::class, 'updateField']);
 Route::delete('/fields/{fieldId}', [FarmController::class, 'deleteField']);
 
 // Folder Management API Routes
-Route::get('/folders', [FarmController::class, 'getFolders']);
+Route::get('/folders', [FarmController::class, 'getFolders']); // แก้ name() ถ้ามันซ้ำ
 Route::post('/folders', [FarmController::class, 'createFolder']);
 Route::put('/folders/{folderId}', [FarmController::class, 'updateFolder']);
 Route::delete('/folders/{folderId}', [FarmController::class, 'deleteFolder']);
@@ -99,12 +100,15 @@ Route::delete('/folders/{folderId}', [FarmController::class, 'deleteFolder']);
 // Field Status Management
 Route::put('/fields/{fieldId}/status', [FarmController::class, 'updateFieldStatus']);
 
-// Plant management
-Route::get('/api/plant-types', [FarmController::class, 'getPlantTypes']);
-Route::post('/api/get-elevation', [FarmController::class, 'getElevation']);
-Route::post('/api/plant-points/add', [FarmController::class, 'addPlantPoint'])->name('plant-points.add');
-Route::post('/api/plant-points/delete', [FarmController::class, 'deletePlantPoint'])->name('plant-points.delete');
-Route::post('/api/plant-points/move', [FarmController::class, 'movePlantPoint'])->name('plant-points.move');
+// Plant management (ย้ายมาจาก web.php และปรับ Path)
+Route::get('/plant-types', [FarmController::class, 'getPlantTypes']); // แก้ name() ถ้ามันซ้ำ
+Route::post('/get-elevation', [FarmController::class, 'getElevation']);
+// THESE ARE THE ONES WITH DUPLICATE NAMES WE KEPT ON WEB.PHP ORIGINALLY
+// Adjust names if needed, or remove if not used elsewhere
+Route::post('/plant-points/add', [FarmController::class, 'addPlantPoint'])->name('plant-points.add');
+Route::post('/plant-points/delete', [FarmController::class, 'deletePlantPoint'])->name('plant-points.delete');
+Route::post('/plant-points/move', [FarmController::class, 'movePlantPoint'])->name('plant-points.move');
+
 
 // ==================================================
 // 🏡 HOME GARDEN ROUTES
@@ -117,7 +121,12 @@ Route::prefix('home-garden')->group(function () {
 
 // ==================================================
 // 📸 IMAGE MANAGEMENT ROUTES
+// (ย้ายมาจาก web.php และปรับ Path)
 // ==================================================
+
+// Profile Photo Routes (ย้ายมาจาก web.php)
+Route::post('/profile-photo/upload', [ProfilePhotoController::class, 'upload'])->name('profile-photo.upload');
+Route::delete('/profile-photo/delete', [ProfilePhotoController::class, 'delete'])->name('profile-photo.delete');
 
 Route::prefix('images')->group(function () {
     Route::post('upload', [ImageUploadController::class, 'store']);
