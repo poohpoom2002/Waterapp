@@ -54,9 +54,10 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
     };
 
     return (
-        <div className="min-h-screen flex flex-col bg-gray-900 text-white">
-            <Navbar />
-            <div className="flex-1 mx-auto max-w-6xl p-6">
+        <>
+            <div className="min-h-screen flex flex-col bg-gray-900 text-white">
+                <Navbar />
+                <div className="flex-1 mx-auto max-w-6xl p-6">
                 {/* Header */}
                 <div className="mb-8">
                     <div className="mb-4 flex items-center justify-between">
@@ -216,9 +217,10 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                             <div className="mb-4 text-6xl">📁</div>
                             <h3 className="mb-3 text-xl font-bold text-white">Import Blueprint File</h3>
                             <p className="mb-4 text-gray-400">
-
+                                Import your existing blueprint files to define the greenhouse area
+                            </p>
                             <div className="space-y-2 text-left">
-                            </p>                                <div className="flex items-center text-sm text-gray-300">
+                                <div className="flex items-center text-sm text-gray-300">
                                     <svg
                                         className="mr-2 h-4 w-4 text-green-400"
                                         fill="currentColor"
@@ -394,5 +396,6 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
             </div>
             <Footer />
         </div>
+        </>
     );
 }
