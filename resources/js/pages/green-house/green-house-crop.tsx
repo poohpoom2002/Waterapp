@@ -27,7 +27,7 @@ export default function GreenhouseCrop({ cropType, crops }) {
             const cropArray = crops.split(',').filter(Boolean);
             setSelectedCrops(cropArray);
         }
-    }, [cropType, crops]);
+    }, [cropType, crops, selectedCrops]);
 
     // Update filtered crops when search or category changes
     useEffect(() => {
