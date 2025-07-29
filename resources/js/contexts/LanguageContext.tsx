@@ -49,55 +49,6 @@ export const useLanguage = (): LanguageContextType => {
     return context;
 };
 
-// import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-
-// type Language = 'en' | 'th';
-
-// interface LanguageContextType {
-//     language: Language;
-//     setLanguage: (lang: Language) => void;
-//     t: (key: string) => string;
-// }
-
-// const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
-
-// // Translation dictionary
-// const translations = {
-//     en: {
-//         // Home page
-//         water_management_system: 'Water Management System',
-//         manage_irrigation_fields: 'Manage your irrigation fields and pipe networks',
-//         add_field: 'Add Field',
-//         no_fields_yet: 'No Fields Yet',
-//         start_first_field: 'Start by creating your first irrigation field',
-//         create_first_field: 'Create Your First Field',
-//         your_fields: 'Your Fields',
-//         click_field_manage: 'Click on a field to view and manage its pipe network',
-//         delete_field: 'Delete Field',
-//         delete_confirm: 'Are you sure you want to delete',
-//         delete_warning:
-//             'This action cannot be undone. All field data, planting points, pipes, and zones will be permanently deleted.',
-//         cancel: 'Cancel',
-//         deleting: 'Deleting...',
-//         plant_type: 'Plant Type',
-//         area: 'Area',
-//         plants: 'Plants',
-//         water_need: 'Water Need',
-
-//         // Category modal
-//         choose_irrigation_category: 'Choose Your Irrigation Planning Category',
-//         select_irrigation_type:
-//             'Select the type of irrigation system that best fits your agricultural needs',
-//         click_start_planning: 'Click to start planning',
-//         why_choose_system: 'Why Choose Our Irrigation Planning System?',
-//         precision_planning: 'Precision Planning',
-//         precision_desc: 'Advanced algorithms optimize water distribution for maximum efficiency',
-//         water_conservation: 'Water Conservation',
-//         water_conservation_desc:
-//             'Smart systems reduce water waste while maintaining optimal plant health',
-//         data_driven: 'Data-Driven',
-//         data_driven_desc: 'Comprehensive analytics and reporting for informed decision making',
-
 //         // Categories
 //         horticulture: 'Horticulture',
 //         horticulture_desc: 'Advanced irrigation system for fruit trees and orchards',

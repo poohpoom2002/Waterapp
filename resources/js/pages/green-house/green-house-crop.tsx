@@ -8,8 +8,10 @@ import {
     categories,
     type Crop,
 } from '../components/Greenhouse/CropData';
+import Footer from '../../components/Footer';
 
 export default function GreenhouseCrop({ cropType, crops }) {
+    const { t } = useLanguage();
     const [selectedCrops, setSelectedCrops] = useState<string[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
@@ -346,6 +348,7 @@ export default function GreenhouseCrop({ cropType, crops }) {
                     </div>
                 </div>
             </div>
+            <Footer />
         </div>
     );
 }

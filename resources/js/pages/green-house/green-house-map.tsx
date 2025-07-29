@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import Navbar from '../../components/Navbar';
+import Footer from '../../components/Footer';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 // Types
 interface Point {
@@ -104,6 +107,7 @@ const GRID_SIZE = 25;
 const CANVAS_SIZE = { width: 2400, height: 1600 };
 
 export default function GreenhouseMap() {
+    const { t } = useLanguage();
     // Canvas and interaction states
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [selectedTool, setSelectedTool] = useState('select');
@@ -1686,20 +1690,24 @@ export default function GreenhouseMap() {
     }, [irrigationElements]);
 
     return (
-        <div className="flex h-screen flex-col overflow-hidden bg-gray-900 text-white">
-            {/* Header */}
-            <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-3">
+        <div className="min-h-screen flex flex-col bg-gray-900 text-white">
+            <Navbar />
+            <div className="flex flex-1 flex-col overflow-hidden">
+                {/* Header */}
+                <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-3">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-xl font-bold">💧 Greenhouse Irrigation System Design (Large)</h1>
                         <p className="text-sm text-gray-400">
                             Irrigation system design:{' '}
+>>>>>>> 0295538755fa4f41c4e2f5f543e0e7d77c907e5c
                             {
                                 irrigationMethods[
                                     selectedIrrigationMethod as keyof typeof irrigationMethods
                                 ]?.name
                             }{' '}
                             - Area 2400x1600 pixels
+>>>>>>> 0295538755fa4f41c4e2f5f543e0e7d77c907e5c
                         </p>
                     </div>
                     <div className="flex items-center space-x-2 text-sm text-gray-400">
@@ -1743,6 +1751,7 @@ export default function GreenhouseMap() {
                         <div className="mb-4">
                             <h3 className="mb-2 text-sm font-medium text-gray-300">
                                 Selected Irrigation Method
+>>>>>>> 0295538755fa4f41c4e2f5f543e0e7d77c907e5c
                             </h3>
                             <div className="rounded border border-blue-500 bg-blue-600 px-3 py-2 text-sm text-white">
                                 {
@@ -2670,6 +2679,8 @@ export default function GreenhouseMap() {
                     </div>
                 </div>
             )}
+            </div>
+            <Footer />
         </div>
     );
 }

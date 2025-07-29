@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
+import Navbar from '../../components/Navbar';
+import Footer from '../../components/Footer';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface AreaInputMethodProps {
     crops?: string;
 }
 
 export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
+    const { t } = useLanguage();
     const [selectedCrops, setSelectedCrops] = useState<string[]>([]);
     const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
 
@@ -50,8 +54,9 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
     };
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white">
-            <div className="mx-auto max-w-6xl p-6">
+        <div className="min-h-screen flex flex-col bg-gray-900 text-white">
+            <Navbar />
+            <div className="flex-1 mx-auto max-w-6xl p-6">
                 {/* Header */}
                 <div className="mb-8">
                     <div className="mb-4 flex items-center justify-between">
@@ -128,9 +133,8 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                             <h3 className="mb-3 text-xl font-bold text-white">Draw Area Yourself</h3>
                             <p className="mb-4 text-gray-400">
                                 Use the drawing tools in the system to define the shape and size of your greenhouse
-                            </p>
 
-                            <div className="space-y-2 text-left">
+                            </p>                            <div className="space-y-2 text-left">
                                 <div className="flex items-center text-sm text-gray-300">
                                     <svg
                                         className="mr-2 h-4 w-4 text-green-400"
@@ -212,11 +216,9 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                             <div className="mb-4 text-6xl">📁</div>
                             <h3 className="mb-3 text-xl font-bold text-white">Import Blueprint File</h3>
                             <p className="mb-4 text-gray-400">
-                                Upload an existing blueprint file to trace and customize
-                            </p>
 
                             <div className="space-y-2 text-left">
-                                <div className="flex items-center text-sm text-gray-300">
+                            </p>                                <div className="flex items-center text-sm text-gray-300">
                                     <svg
                                         className="mr-2 h-4 w-4 text-green-400"
                                         fill="currentColor"
@@ -390,6 +392,7 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                     </div>
                 )}
             </div>
+            <Footer />
         </div>
     );
 }
