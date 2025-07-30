@@ -1227,7 +1227,7 @@ export default function GreenhouseSummary() {
                                 </button>
 
                                 <h1 className="mb-1 text-3xl font-bold">
-                                    🏠 Greenhouse Planning Summary
+                                    🏠 Greenhouse Planning Summar
                                 </h1>
                                 <p className="mb-4 text-gray-400">
                                     Overview of the greenhouse and irrigation system design.

@@ -624,7 +624,9 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                     {(
                                                         Number(item.pipe.price) || 0
                                                     )?.toLocaleString()}{' '}
+
                                                     {t('บาท/ม้วน')} ({item.pipe.lengthM} {t('ม./ม้วน')}) | {t('คะแนน:')} {' '}
+                                                   
                                                     {item.pipe.score || 'N/A'}
                                                 </p>
                                                 <p className="text-xs text-purple-300">

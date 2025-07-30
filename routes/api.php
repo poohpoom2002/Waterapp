@@ -110,6 +110,10 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::put('/fields/{fieldId}/folder', [FarmController::class, 'updateFieldFolder']);
 });
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> bae165d6cbecdc86ea22829f8d585168a8f276af
 // ==================================================
 // 🏡 HOME GARDEN ROUTES
 // ==================================================

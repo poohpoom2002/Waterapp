@@ -366,10 +366,13 @@ export const formatRadius = (radius: any) => {
 };
 
 export const parseRangeValue = (value: any): [number, number] | number => {
-    if (value === null || value === undefined || value === '') return 0;
+    // บรรทัดที่ 1: เพิ่มการตรวจสอบสำหรับ boolean ด้วย
+    if (value === null || value === undefined || value === '' || typeof value === 'boolean') {
+        return 0;
+    }
 
     if (Array.isArray(value)) {
-        if (value.length === 2 && value.every((v) => typeof v === 'number' || !isNaN(Number(v)))) {
+        if (value.length === 2 && value.every((v: any) => typeof v === 'number' || (typeof v === 'string' && !isNaN(Number(v))))) {
             return [Number(value[0]), Number(value[1])];
         }
         if (value.length === 1) return Number(value[0]) || 0;
@@ -379,19 +382,21 @@ export const parseRangeValue = (value: any): [number, number] | number => {
 
     if (typeof value === 'string') {
         const separators = ['-', ',', '~', '–', '—'];
+        // บรรทัดที่ 2: เพิ่มการตรวจสอบว่า 'value' มีเมธอด 'includes' และเป็นฟังก์ชัน
+        if (value.includes && typeof value.includes === 'function') { // <--- เพิ่มบรรทัดนี้
+            for (const separator of separators) {
+                if (value.includes(separator) && !value.startsWith('-')) {
+                    const parts = value
+                        .split(separator)
+                        .map((v: string) => { // ระบุ Type v เป็น string ชัดเจน
+                            const cleaned = v.trim().replace(/[^\d.]/g, '');
+                            return parseFloat(cleaned);
+                        })
+                        .filter((v: number) => !isNaN(v)); // ระบุ Type v เป็น number ชัดเจน
 
-        for (const separator of separators) {
-            if (value.includes(separator) && !value.startsWith('-')) {
-                const parts = value
-                    .split(separator)
-                    .map((v) => {
-                        const cleaned = v.trim().replace(/[^\d.]/g, '');
-                        return parseFloat(cleaned);
-                    })
-                    .filter((v) => !isNaN(v));
-
-                if (parts.length >= 2) return [parts[0], parts[parts.length - 1]];
-                if (parts.length === 1) return parts[0];
+                    if (parts.length >= 2) return [parts[0], parts[parts.length - 1]];
+                    if (parts.length === 1) return parts[0];
+                }
             }
         }
 
@@ -402,7 +407,8 @@ export const parseRangeValue = (value: any): [number, number] | number => {
 
     if (typeof value === 'number') return isNaN(value) ? 0 : value;
 
-    const numValue = parseFloat(String(value));
+    // Last resort: พยายามแปลงเป็น string แล้ว parse
+    const numValue = parseFloat(String(value)); 
     return isNaN(numValue) ? 0 : numValue;
 };
 

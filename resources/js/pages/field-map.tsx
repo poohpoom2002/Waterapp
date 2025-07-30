@@ -271,7 +271,6 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
             onLoad(newMap);
         }
     }, [center, map, mapType, onCenterChanged, onDrawCreated, onLoad, onZoomChanged, zoom, ref]);
-    
     useEffect(() => {
         if (map && onMapClick) {
             const clickListener = google.maps.event.addListener(
@@ -3329,7 +3328,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
 
                                 <div
                                     className="rounded border border-white p-2"
-                                    style={{ backgroundColor: '#000005' }}
+                                    style={{ backgroundColor: '#000005' }}                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
                                 >
                                     <FieldMapToolsPanel
                                         currentStep={currentStep}
