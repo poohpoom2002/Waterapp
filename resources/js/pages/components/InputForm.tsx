@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// resources\js\pages\components\InputForm.tsx - Optimized Layout
+// resources\js\pages\components\InputForm.tsx - Enhanced with Field-Crop and Greenhouse Support
 import React, { useEffect, useState } from 'react';
-import { IrrigationInput } from '../types/interfaces';
+import { IrrigationInput, ProjectMode } from '../types/interfaces';
 import { formatNumber } from '../utils/calculations';
-import { Zone } from '../../utils/horticultureUtils';
+import { Zone, PlantData } from '../../utils/horticultureUtils';
 import {
     getLongestBranchPipeStats,
     getSubMainPipeBranchCount,
@@ -12,12 +12,13 @@ import {
 } from '../../utils/horticultureProjectStats';
 import { useCalculations } from '../hooks/useCalculations';
 import { useLanguage } from '@/contexts/LanguageContext';
+
 interface InputFormProps {
     input: IrrigationInput;
     onInputChange: (input: IrrigationInput) => void;
     selectedSprinkler?: any;
     activeZone?: Zone;
-    projectMode?: 'horticulture' | 'garden' | 'field-crop';
+    projectMode?: ProjectMode;
     maxZones?: number;
 }
 
@@ -36,6 +37,16 @@ interface SprinklerPressureInfo {
     sprinklerName: string;
 }
 
+// Add type guard for PlantData with category
+interface PlantDataWithCategory extends PlantData {
+    category?: string;
+}
+
+// Type guard function
+const hasCategory = (plantData: PlantData): plantData is PlantDataWithCategory => {
+    return 'category' in plantData;
+};
+
 const InputForm: React.FC<InputFormProps> = ({
     input,
     onInputChange,
@@ -47,6 +58,7 @@ const InputForm: React.FC<InputFormProps> = ({
     const [validationMessages, setValidationMessages] = useState<string[]>([]);
     const [pipeData, setPipeData] = useState<any[]>([]);
     const { t } = useLanguage();
+    
     useEffect(() => {
         const fetchPipeData = async () => {
             try {
@@ -152,9 +164,10 @@ const InputForm: React.FC<InputFormProps> = ({
         const messages: string[] = [];
 
         if (input.totalTrees < 1) {
-            messages.push(
-                projectMode === 'garden' ? t('จำนวนหัวฉีดต้องมากกว่า 0') : t('จำนวนต้นไม้ต้องมากกว่า 0')
-            );
+            const itemName = projectMode === 'garden' ? t('จำนวนหัวฉีด') : 
+                           projectMode === 'field-crop' ? t('จำนวนต้นไม้') :
+                           projectMode === 'greenhouse' ? t('จำนวนต้นไม้') : t('จำนวนต้นไม้');
+            messages.push(`${itemName}${t('ต้องมากกว่า 0')}`);
         }
 
         const estimatedVelocity = calculateEstimatedVelocity(input);
@@ -221,7 +234,7 @@ const InputForm: React.FC<InputFormProps> = ({
     };
 
     const calculateBranchPipeStats = (): BranchPipeStats | null => {
-        if (projectMode === 'garden') {
+        if (projectMode === 'garden' || projectMode === 'field-crop' || projectMode === 'greenhouse') {
             return null;
         }
 
@@ -283,16 +296,76 @@ const InputForm: React.FC<InputFormProps> = ({
     const branchStats = calculateBranchPipeStats();
     const sprinklerPressure = getSprinklerPressureInfo();
 
+    const getProjectIcon = () => {
+        switch (projectMode) {
+            case 'garden':
+                return '🏡';
+            case 'field-crop':
+                return '🌾';
+            case 'greenhouse':
+                return '🏠';
+            default:
+                return '🌱';
+        }
+    };
+
+    const getItemName = () => {
+        switch (projectMode) {
+            case 'garden':
+                return t('หัวฉีด');
+            case 'field-crop':
+                return t('ต้นไม้');
+            case 'greenhouse':
+                return t('ต้นไม้');
+            default:
+                return t('ต้นไม้');
+        }
+    };
+
+    const getAreaUnit = () => {
+        switch (projectMode) {
+            case 'garden':
+                return t('ตร.ม.');
+            case 'greenhouse':
+                return t('ตร.ม.');
+            default:
+                return t('ไร่');
+        }
+    };
+
+    const getAreaConversionFactor = () => {
+        switch (projectMode) {
+            case 'garden':
+                return 1600;
+            case 'greenhouse':
+                return 1600;
+            default:
+                return 1;
+        }
+    };
+
+    const getWaterSourceLabel = () => {
+        switch (projectMode) {
+            case 'garden':
+                return t('แหล่งน้ำ');
+            case 'field-crop':
+                return t('ปั๊ม');
+            case 'greenhouse':
+                return t('แหล่งน้ำ');
+            default:
+                return t('ปั๊ม');
+        }
+    };
+
     return (
         <div className="mb-6 rounded-lg bg-gray-800 p-4">
-            {/* Zone & Multi-Zone Info - Combined Header */}
             {(activeZone || isMultiZone) && (
                 <div className="mb-4 space-y-2">
                     {activeZone && (
                         <div className="rounded bg-blue-900 p-3">
                             <div className="flex items-center justify-between">
                                 <h3 className="text-lg font-semibold text-blue-300">
-                                        {projectMode === 'garden' ? t('🏡') : t('🌱')} {activeZone.name}
+                                    {getProjectIcon()} {activeZone.name}
                                     {isMultiZone && (
                                         <span className="ml-2 text-sm font-normal text-blue-200">
                                             ({t('โซน')} {activeZone.id}/{input.numberOfZones})
@@ -313,25 +386,31 @@ const InputForm: React.FC<InputFormProps> = ({
                                 <div>
                                     <p className="text-blue-200">{t('พื้นที่:')}</p>
                                     <p className="font-medium text-white">
-                                        {activeZone.area >= 1600 
-                                            ? `${(activeZone.area / 1600).toFixed(1)} ไร่`
-                                            : `${activeZone.area.toFixed(2)} ตร.ม.`}
+                                        {projectMode === 'garden' || projectMode === 'greenhouse'
+                                            ? activeZone.area >= 1600 
+                                                ? `${(activeZone.area / 1600).toFixed(1)} ไร่`
+                                                : `${activeZone.area.toFixed(2)} ตร.ม.`
+                                            : activeZone.area >= 1600 
+                                                ? `${(activeZone.area / 1600).toFixed(1)} ไร่`
+                                                : `${activeZone.area.toFixed(2)} ตร.ม.`}
                                     </p>
                                 </div>
                                 <div>
                                     <p className="text-blue-200">
-                                        {projectMode === 'garden' ? t('จำนวนหัวฉีด:') : t('จำนวนต้น:')}
+                                        {t('จำนวน')}{getItemName()}:
                                     </p>
                                     <p className="font-medium text-white">
-                                        {activeZone.plantCount} {projectMode === 'garden' ? 'หัว' : 'ต้น'}
+                                        {activeZone.plantCount} {getItemName()}
                                     </p>
                                 </div>
-                                {projectMode === 'horticulture' && activeZone.plantData && (
+                                {((projectMode === 'horticulture' && activeZone.plantData) ||
+                                  (projectMode === 'field-crop' && activeZone.plantData) ||
+                                  (projectMode === 'greenhouse' && activeZone.plantData)) && (
                                     <>
                                         <div>
                                             <p className="text-blue-200">{t('พืชที่ปลูก:')}</p>
                                             <p className="font-medium text-white">
-                                                {activeZone.plantData?.name || 'ไม่ระบุ'}
+                                                {activeZone.plantData?.name || t('ไม่ระบุ')}
                                             </p>
                                         </div>
                                         <div>
@@ -349,22 +428,21 @@ const InputForm: React.FC<InputFormProps> = ({
             )}
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {/* Left Column - Basic Info */}
                 <div className="space-y-4">
                     <h2 className="text-lg font-semibold text-green-400">📋 {t('ข้อมูลพื้นฐาน')}</h2>
                     
                     <div className="grid grid-cols-2 gap-3 bg-gray-700 p-2 rounded-lg">
                         <div>
                             <label className="mb-2 block text-sm font-medium">
-                                {projectMode === 'garden' ? t('ขนาดพื้นที่ (ตร.ม.)') : t('ขนาดพื้นที่ (ไร่)')}
+                                {t('ขนาดพื้นที่')} ({getAreaUnit()})
                             </label>
                             <input
                                 type="number"
-                                value={(input.farmSizeRai * (projectMode === 'garden' ? 1600 : 1)).toFixed(2)}
+                                value={(input.farmSizeRai * getAreaConversionFactor()).toFixed(2)}
                                 onChange={(e) =>
                                     updateInput(
                                         'farmSizeRai',
-                                        parseFloat(e.target.value) / (projectMode === 'garden' ? 1600 : 1) || 0
+                                        parseFloat(e.target.value) / getAreaConversionFactor() || 0
                                     )
                                 }
                                 step="0.1"
@@ -375,7 +453,7 @@ const InputForm: React.FC<InputFormProps> = ({
 
                         <div>
                             <label className="mb-2 block text-sm font-medium">
-                                {projectMode === 'garden' ? t('จำนวนหัวฉีด (หัว)') : t('จำนวนต้นไม้ (ต้น)')}
+                                {t('จำนวน')}{getItemName()} ({getItemName()})
                             </label>
                             <input
                                 type="number"
@@ -389,7 +467,7 @@ const InputForm: React.FC<InputFormProps> = ({
 
                         <div>
                             <label className="mb-2 block text-sm font-medium">
-                                {projectMode === 'garden' ? t('น้ำต่อหัวฉีด (ลิตร/วัน)') : t('น้ำต่อต้น (ลิตร/วัน)')}
+                                {t('น้ำต่อ')}{getItemName()} ({t('ลิตร/วัน')})
                             </label>
                             <input
                                 type="number"
@@ -413,13 +491,14 @@ const InputForm: React.FC<InputFormProps> = ({
                         </div>
                     </div>
 
-                    {/* System Settings */}
                     <div className="bg-gray-700 p-2 rounded-lg">
                         <h3 className="mb-3 text-base font-semibold text-orange-400">⚙️ {t('การตั้งค่าระบบ')}</h3>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <label className="mb-2 block text-sm font-medium">
-                                    {projectMode === 'garden' ? t('อัตราส่วนหัวฉีด') : t('สปริงเกอร์ต่อต้น')}
+                                    {projectMode === 'garden' ? t('อัตราส่วนหัวฉีด') : 
+                                     projectMode === 'field-crop' ? t('สปริงเกอร์ต่อต้น') :
+                                     projectMode === 'greenhouse' ? t('สปริงเกอร์ต่อต้น') : t('สปริงเกอร์ต่อต้น')}
                                 </label>
                                 <input
                                     type="number"
@@ -434,7 +513,7 @@ const InputForm: React.FC<InputFormProps> = ({
 
                             <div>
                                 <label className="mb-2 block text-sm font-medium">
-                                    {t('ความสูงจาก')} {projectMode === 'garden' ? t('แหล่งน้ำ') : t('ปั๊ม')} {t('ไปจุดสูงสุด (ม.)')}
+                                    {t('ความสูงจาก')}{getWaterSourceLabel()}{t('ไปจุดสูงสุด (ม.)')}
                                 </label>
                                 <input
                                     type="number"
@@ -475,11 +554,9 @@ const InputForm: React.FC<InputFormProps> = ({
                     </div>
                 </div>
 
-                {/* Right Column - Pipe Info */}
                 <div className="space-y-4">
                     <h3 className="text-base font-semibold text-blue-400">🔧 {t('ข้อมูลท่อ')}</h3>
                     
-                    {/* Branch Pipe */}
                     <div className="rounded-lg bg-gray-700 p-3">
                         <h4 className="mb-2 text-sm font-medium text-purple-300">🔹 {t('ท่อย่อย (Branch Pipe)')}</h4>
                         <div className="grid grid-cols-2 gap-3">
@@ -513,7 +590,6 @@ const InputForm: React.FC<InputFormProps> = ({
                         )}
                     </div>
 
-                    {/* Secondary Pipe */}
                     <div className="rounded-lg bg-gray-700 p-3">
                         {input.longestSecondaryPipeM > 0 ? (
                             <>
@@ -561,7 +637,6 @@ const InputForm: React.FC<InputFormProps> = ({
                         )}
                     </div>
 
-                    {/* Main Pipe */}
                     <div className="rounded-lg bg-gray-700 p-3">
                         {input.longestMainPipeM > 0 ? (
                             <>
@@ -611,7 +686,6 @@ const InputForm: React.FC<InputFormProps> = ({
                 </div>
             </div>
 
-            {/* Advanced Settings */}
             <div className="mt-4">
                 <button
                     type="button"
@@ -628,7 +702,7 @@ const InputForm: React.FC<InputFormProps> = ({
                             <div className="space-y-3">
                                 <div>
                                     <label className="mb-2 block text-sm font-medium">
-                                        {projectMode === 'garden' ? t('หัวฉีด') : t('ต้นไม้')} {t('ต่อท่อย่อย 1 เส้น (เส้นที่ยาวที่สุด)')}
+                                        {getItemName()}{t('ต่อท่อย่อย 1 เส้น (เส้นที่ยาวที่สุด)')}
                                     </label>
                                     <input
                                         type="number"
@@ -638,7 +712,6 @@ const InputForm: React.FC<InputFormProps> = ({
                                         step="1"
                                         className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                                     />
-                                   
                                 </div>
 
                                 {projectMode === 'horticulture' && (
@@ -714,9 +787,7 @@ const InputForm: React.FC<InputFormProps> = ({
                 )}
             </div>
 
-            {/* Plant Information & Validation Messages - Bottom */}
             <div className="mt-4 space-y-3">
-                {/* Validation Messages */}
                 {validationMessages.length > 0 && (
                     <div className="rounded bg-yellow-900 p-3">
                         <div className="space-y-1">
@@ -729,8 +800,7 @@ const InputForm: React.FC<InputFormProps> = ({
                     </div>
                 )}
 
-                {/* Plant Information */}
-                {activeZone && activeZone.plantData && projectMode === 'horticulture' && (
+                {activeZone && activeZone.plantData && (projectMode === 'horticulture' || projectMode === 'field-crop' || projectMode === 'greenhouse') && (
                     <div className="rounded bg-green-900 p-3">
                         <h4 className="mb-2 text-sm font-semibold text-green-300">🌿 {t('ข้อมูลการปลูกพืชในโซน')}</h4>
                         <div className="grid grid-cols-2 gap-4 text-sm text-gray-300 md:grid-cols-4">
@@ -738,14 +808,18 @@ const InputForm: React.FC<InputFormProps> = ({
                                 <p className="text-green-200">{t('ชนิดพืช:')}</p>
                                 <p className="font-bold text-white">{activeZone.plantData.name}</p>
                             </div>
-                            <div>
-                                <p className="text-green-200">{t('ระยะปลูก:')}</p>
-                                <p className="font-bold text-white">{activeZone.plantData.plantSpacing} {t('ม.')}</p>
-                            </div>
-                            <div>
-                                <p className="text-green-200">{t('ระยะแถว:')}</p>
-                                <p className="font-bold text-white">{activeZone.plantData.rowSpacing} {t('ม.')}</p>
-                            </div>
+                            {activeZone.plantData.plantSpacing && (
+                                <div>
+                                    <p className="text-green-200">{t('ระยะปลูก:')}</p>
+                                    <p className="font-bold text-white">{activeZone.plantData.plantSpacing} {t('ม.')}</p>
+                                </div>
+                            )}
+                            {activeZone.plantData.rowSpacing && (
+                                <div>
+                                    <p className="text-green-200">{t('ระยะแถว:')}</p>
+                                    <p className="font-bold text-white">{activeZone.plantData.rowSpacing} {t('ม.')}</p>
+                                </div>
+                            )}
                             <div>
                                 <p className="text-green-200">{t('น้ำ/ต้น/วัน:')}</p>
                                 <p className="font-bold text-white">{activeZone.plantData.waterNeed} {t('ลิตร')}</p>
@@ -753,9 +827,87 @@ const InputForm: React.FC<InputFormProps> = ({
                         </div>
                         <div className="mt-2 text-xs text-green-200">
                             <p>
+                                💡 {t('ความหนาแน่น:')} {(() => {
+                                    const isGardenOrGreenhouse = (projectMode as string) === 'garden' || (projectMode as string) === 'greenhouse';
+                                    return isGardenOrGreenhouse
+                                        ? activeZone.area >= 1600 
+                                            ? `${(activeZone.plantCount / (activeZone.area / 1600)).toFixed(0)} ${t('ต้น/ไร่')}`
+                                            : `${(activeZone.plantCount / activeZone.area).toFixed(0)} ${t('ต้น/ตร.ม.')}`
+                                        : activeZone.area >= 1600 
+                                            ? `${(activeZone.plantCount / (activeZone.area / 1600)).toFixed(0)} ${t('ต้น/ไร่')}`
+                                            : `${(activeZone.plantCount / activeZone.area).toFixed(0)} ${t('ต้น/ตร.ม.')}`;
+                                })()}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {activeZone && activeZone.plantData && projectMode === 'field-crop' && (
+                    <div className="rounded bg-blue-900 p-3">
+                        <h4 className="mb-2 text-sm font-semibold text-blue-300">🌾 {t('ข้อมูลการปลูกพืชไร่ในโซน')}</h4>
+                        <div className="grid grid-cols-2 gap-4 text-sm text-gray-300 md:grid-cols-4">
+                            <div>
+                                <p className="text-blue-200">{t('ชนิดพืช:')}</p>
+                                <p className="font-bold text-white">{activeZone.plantData.name}</p>
+                            </div>
+                            <div>
+                                <p className="text-blue-200">{t('หมวดหมู่:')}</p>
+                                <p className="font-bold text-white">
+                                    {activeZone.plantData && hasCategory(activeZone.plantData) 
+                                        ? activeZone.plantData.category || t('ไม่ระบุ')
+                                        : t('ไม่ระบุ')}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-blue-200">{t('น้ำ/ต้น/วัน:')}</p>
+                                <p className="font-bold text-white">{activeZone.plantData.waterNeed} {t('ลิตร')}</p>
+                            </div>
+                            <div>
+                                <p className="text-blue-200">{t('พื้นที่โซน:')}</p>
+                                <p className="font-bold text-white">{activeZone.area >= 1600 
+                                    ? `${(activeZone.area / 1600).toFixed(1)} ไร่`
+                                    : `${activeZone.area.toFixed(2)} ตร.ม.`}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="mt-2 text-xs text-blue-200">
+                            <p>
                                 💡 {t('ความหนาแน่น:')} {activeZone.area >= 1600 
                                     ? `${(activeZone.plantCount / (activeZone.area / 1600)).toFixed(0)} ${t('ต้น/ไร่')}`
                                     : `${(activeZone.plantCount / activeZone.area).toFixed(0)} ${t('ต้น/ตร.ม.')}`}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {activeZone && activeZone.plantData && projectMode === 'greenhouse' && (
+                    <div className="rounded bg-purple-900 p-3">
+                        <h4 className="mb-2 text-sm font-semibold text-purple-300">🏠 {t('ข้อมูลการปลูกในโรงเรือน')}</h4>
+                        <div className="grid grid-cols-2 gap-4 text-sm text-gray-300 md:grid-cols-4">
+                            <div>
+                                <p className="text-purple-200">{t('ชนิดพืช:')}</p>
+                                <p className="font-bold text-white">{activeZone.plantData.name}</p>
+                            </div>
+                            <div>
+                                <p className="text-purple-200">{t('หมวดหมู่:')}</p>
+                                <p className="font-bold text-white">
+                                    {activeZone.plantData && hasCategory(activeZone.plantData) 
+                                        ? activeZone.plantData.category || t('ไม่ระบุ')
+                                        : t('ไม่ระบุ')}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-purple-200">{t('น้ำ/ต้น/วัน:')}</p>
+                                <p className="font-bold text-white">{activeZone.plantData.waterNeed} {t('ลิตร')}</p>
+                            </div>
+                            <div>
+                                <p className="text-purple-200">{t('พื้นที่แปลง:')}</p>
+                                <p className="font-bold text-white">{activeZone.area.toFixed(2)} {t('ตร.ม.')}</p>
+                            </div>
+                        </div>
+                        <div className="mt-2 text-xs text-purple-200">
+                            <p>
+                                💡 {t('ความหนาแน่น:')} {(activeZone.plantCount / activeZone.area).toFixed(0)} {t('ต้น/ตร.ม.')}
                             </p>
                         </div>
                     </div>

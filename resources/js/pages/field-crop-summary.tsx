@@ -1,24 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Head, Link, router } from '@inertiajs/react'; // Fanggy005 EDIT: Import router
+import { Head, Link, router } from '@inertiajs/react';
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
 import { useState, useEffect, useRef } from 'react';
-import {
-    MapContainer,
-    TileLayer,
-    FeatureGroup,
-    Polygon,
-    Polyline,
-    Marker,
-    CircleMarker,
-    Circle,
-} from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
 import * as turf from '@turf/turf';
 import { getCropByValue } from '@/pages/utils/cropData';
-// FIXED: Import helpers from fieldCropData with correct path
-import { calculateAllFieldStats, saveFieldCropData, FieldCropData } from '@/utils/fieldCropData';
+import { calculateEnhancedFieldStats, saveEnhancedFieldCropData, FieldCropData } from '@/utils/fieldCropData';
 import {
     ZONE_COLORS,
     OBSTACLE_TYPES,
@@ -32,61 +19,394 @@ import {
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
-// Fix leaflet icon issue
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
+// Enhanced Google Maps component for better image capture
+const GoogleMapsDisplay = ({ 
+    center, 
+    zoom, 
+    mainField, 
+    zones, 
+    pipes, 
+    equipment, 
+    irrigationPoints, 
+    irrigationLines,
+    onMapReady 
+}: {
+    center: [number, number];
+    zoom: number;
+    mainField: any;
+    zones: any[];
+    pipes: any[];
+    equipment: any[];
+    irrigationPoints: any[];
+    irrigationLines: any[];
+    onMapReady?: (map: google.maps.Map) => void;
+}) => {
+    const mapRef = useRef<HTMLDivElement>(null);
+    const googleMapRef = useRef<google.maps.Map | null>(null);
+    const [isLoaded, setIsLoaded] = useState(false);
+    const [mapFullyLoaded, setMapFullyLoaded] = useState(false);
+
+    useEffect(() => {
+        // Load Google Maps API if not already loaded
+        if (!window.google?.maps) {
+            const loadGoogleMaps = () => {
+                const script = document.createElement('script');
+                script.src = `https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=geometry,drawing`;
+                script.async = true;
+                script.defer = true;
+                script.onload = () => {
+                    setIsLoaded(true);
+                };
+                document.head.appendChild(script);
+            };
+            loadGoogleMaps();
+        } else {
+            setIsLoaded(true);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (isLoaded && mapRef.current && !googleMapRef.current) {
+            // Initialize Google Map
+            const map = new google.maps.Map(mapRef.current, {
+                center: { lat: center[0], lng: center[1] },
+                zoom: zoom,
+                mapTypeId: google.maps.MapTypeId.SATELLITE,
+                streetViewControl: false,
+                fullscreenControl: true,
+                mapTypeControl: true,
+                zoomControl: true,
+            });
+
+            googleMapRef.current = map;
+
+            // Wait for map to fully load before marking as ready
+            const mapLoadListener = google.maps.event.addListener(map, 'tilesloaded', () => {
+                setTimeout(() => {
+                    setMapFullyLoaded(true);
+                    google.maps.event.removeListener(mapLoadListener);
+                }, 1000); // Additional delay to ensure all tiles are rendered
+            });
+
+            // Draw main field boundary
+            if (mainField && mainField.coordinates && Array.isArray(mainField.coordinates)) {
+                const fieldPath = mainField.coordinates.map((coord: any) => {
+                    if (Array.isArray(coord)) {
+                        return { lat: coord[0], lng: coord[1] };
+                    }
+                    return { lat: coord.lat, lng: coord.lng };
+                });
+
+                new google.maps.Polygon({
+                    paths: fieldPath,
+                    strokeColor: '#22C55E',
+                    strokeOpacity: 0.8,
+                    strokeWeight: 2,
+                    fillColor: '#22C55E',
+                    fillOpacity: 0.2,
+                    map: map,
+                });
+            }
+
+            // Draw zones
+            zones.forEach((zone) => {
+                if (zone.coordinates && Array.isArray(zone.coordinates)) {
+                    const zonePath = zone.coordinates.map((coord: any) => {
+                        if (Array.isArray(coord)) {
+                            return { lat: coord[0], lng: coord[1] };
+                        }
+                        return { lat: coord.lat, lng: coord.lng };
+                    });
+
+                    new google.maps.Polygon({
+                        paths: zonePath,
+                        strokeColor: zone.color || '#3B82F6',
+                        strokeOpacity: 0.8,
+                        strokeWeight: 2,
+                        fillColor: zone.color || '#3B82F6',
+                        fillOpacity: 0.3,
+                        map: map,
+                    });
+                }
+            });
+
+            // Draw pipes
+            pipes.forEach((pipe) => {
+                if (pipe.coordinates && Array.isArray(pipe.coordinates)) {
+                    const pipeConfig = PIPE_TYPES[pipe.type as PipeType] || { color: '#888888', weight: 3 };
+                    
+                    const pipePath = pipe.coordinates.map((coord: any) => {
+                        if (Array.isArray(coord)) {
+                            return { lat: coord[0], lng: coord[1] };
+                        }
+                        return { lat: coord.lat, lng: coord.lng };
+                    });
+
+                    new google.maps.Polyline({
+                        path: pipePath,
+                        geodesic: true,
+                        strokeColor: pipeConfig.color,
+                        strokeOpacity: 0.9,
+                        strokeWeight: pipeConfig.weight,
+                        map: map,
+                    });
+                }
+            });
+
+            // Draw equipment
+            equipment.forEach((equip) => {
+                if (equip.lat && equip.lng) {
+                    const equipmentConfig = EQUIPMENT_TYPES[equip.type as EquipmentType];
+                    if (equipmentConfig) {
+                        new google.maps.Marker({
+                            position: { lat: equip.lat, lng: equip.lng },
+                            map: map,
+                            title: equipmentConfig.name,
+                            icon: {
+                                url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                                    <svg width="28" height="28" xmlns="http://www.w3.org/2000/svg">
+                                        <circle cx="14" cy="14" r="12" fill="white" stroke="${equipmentConfig.color}" stroke-width="2"/>
+                                        <text x="14" y="18" text-anchor="middle" font-size="12" fill="${equipmentConfig.color}">${equipmentConfig.icon}</text>
+                                    </svg>
+                                `)}`,
+                                scaledSize: new google.maps.Size(28, 28),
+                                anchor: new google.maps.Point(14, 14),
+                            },
+                        });
+                    }
+                }
+            });
+
+            // Draw irrigation points
+            irrigationPoints.forEach((point, index) => {
+                let lat, lng;
+                if (point.lat && point.lng) {
+                    [lat, lng] = [point.lat, point.lng];
+                } else if (Array.isArray(point.position)) {
+                    [lat, lng] = point.position;
+                }
+                
+                if (lat && lng) {
+                    const normalizedType = normalizeIrrigationType(point.type);
+                    let color = '#06b6d4'; // Default (cyan)
+                    if (normalizedType === 'sprinkler') color = '#22c55e'; // Green
+                    else if (normalizedType === 'mini_sprinkler') color = '#3b82f6'; // Blue
+                    else if (normalizedType === 'micro_spray') color = '#f97316'; // Orange
+
+                    new google.maps.Marker({
+                        position: { lat, lng },
+                        map: map,
+                        icon: {
+                            url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                                <svg width="8" height="8" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="4" cy="4" r="3" fill="${color}" stroke="white" stroke-width="1"/>
+                                </svg>
+                            `)}`,
+                            scaledSize: new google.maps.Size(8, 8),
+                            anchor: new google.maps.Point(4, 4),
+                        },
+                    });
+
+                    // Draw coverage circles for sprinklers (if they have radius)
+                    if (point.radius && normalizedType !== 'drip_tape') {
+                        new google.maps.Circle({
+                            strokeColor: color,
+                            strokeOpacity: 0.6,
+                            strokeWeight: 1,
+                            fillColor: color,
+                            fillOpacity: 0.1,
+                            map: map,
+                            center: { lat, lng },
+                            radius: point.radius,
+                        });
+                    }
+                }
+            });
+
+            // Draw irrigation lines
+            irrigationLines.forEach((line) => {
+                if (line.coordinates && Array.isArray(line.coordinates)) {
+                    const linePath = line.coordinates.map((coord: any) => {
+                        if (Array.isArray(coord)) {
+                            return { lat: coord[0], lng: coord[1] };
+                        }
+                        return { lat: coord.lat, lng: coord.lng };
+                    });
+
+                    new google.maps.Polyline({
+                        path: linePath,
+                        geodesic: true,
+                        strokeColor: '#06B6D4',
+                        strokeOpacity: 0.8,
+                        strokeWeight: 3,
+                        map: map,
+                    });
+                }
+            });
+
+            // Callback when map is ready
+            if (onMapReady) {
+                onMapReady(map);
+            }
+        }
+    }, [isLoaded, center, zoom, mainField, zones, pipes, equipment, irrigationPoints, irrigationLines]);
+
+    if (!isLoaded) {
+        return (
+            <div className="flex h-full items-center justify-center bg-gray-700">
+                <div className="text-center">
+                    <div className="mb-2 text-2xl">🗺️</div>
+                    <p className="text-sm text-gray-400">กำลังโหลด Google Maps...</p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="relative h-full w-full">
+            <div ref={mapRef} className="h-full w-full rounded-lg" />
+            {!mapFullyLoaded && (
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-700/75 rounded-lg">
+                    <div className="text-center">
+                        <div className="mb-2 inline-block h-6 w-6 animate-spin rounded-full border-b-2 border-blue-400"></div>
+                        <p className="text-sm text-gray-300">กำลังโหลดแผนที่...</p>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Enhanced function to capture map as image with better error handling and multiple save formats
+const captureMapImage = async (mapElement: HTMLElement, projectType: string = 'field-crop'): Promise<string | null> => {
+    try {
+        console.log('🖼️ Starting map image capture...');
+        
+        // Check for html2canvas availability
+        let html2canvas;
+        try {
+            html2canvas = (await import('html2canvas')).default;
+        } catch (error) {
+            console.error('❌ html2canvas not available:', error);
+            return null;
+        }
+
+        // Wait a bit more to ensure Google Maps is fully rendered
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        const canvas = await html2canvas(mapElement, {
+            useCORS: true,
+            allowTaint: true,
+            scale: 1,
+            width: mapElement.offsetWidth,
+            height: mapElement.offsetHeight,
+            backgroundColor: '#1f2937',
+            logging: false, // Reduce console noise
+            ignoreElements: (element) => {
+                // Ignore certain elements that might cause issues
+                return element.classList?.contains('gm-style-cc') || 
+                       element.classList?.contains('gmnoprint');
+            }
+        });
+
+        const imageDataUrl = canvas.toDataURL('image/png', 0.9);
+        
+        // Enhanced saving with multiple keys and validation
+        const saveKeys = [
+            'projectMapImage', // Primary key used by product page
+            `${projectType}PlanImage`, // Project-specific key
+            'fieldCropPlanImage', // Legacy key for field-crop
+            'mapCaptureImage', // Additional backup key
+        ];
+
+        let saveSuccess = false;
+        for (const key of saveKeys) {
+            try {
+                localStorage.setItem(key, imageDataUrl);
+                console.log(`✅ Image saved with key: ${key}`);
+                saveSuccess = true;
+            } catch (error) {
+                console.warn(`⚠️ Failed to save image with key ${key}:`, error);
+            }
+        }
+
+        if (saveSuccess) {
+            // Additional metadata save
+            const metadata = {
+                timestamp: new Date().toISOString(),
+                projectType: projectType,
+                imageSize: imageDataUrl.length,
+                captureInfo: {
+                    width: mapElement.offsetWidth,
+                    height: mapElement.offsetHeight,
+                    source: 'google-maps'
+                }
+            };
+            
+            try {
+                localStorage.setItem('projectMapMetadata', JSON.stringify(metadata));
+            } catch (error) {
+                console.warn('⚠️ Failed to save metadata:', error);
+            }
+
+            console.log('✅ Map image captured and saved successfully');
+            console.log(`📊 Image size: ${Math.round(imageDataUrl.length / 1024)} KB`);
+            return imageDataUrl;
+        } else {
+            console.error('❌ Failed to save image to localStorage');
+            return null;
+        }
+    } catch (error) {
+        console.error('❌ Error capturing map image:', error);
+        return null;
+    }
+};
+
+// Enhanced function to verify image was saved correctly
+const verifyImageSave = (): boolean => {
+    const keys = ['projectMapImage', 'fieldCropPlanImage', 'mapCaptureImage'];
+    for (const key of keys) {
+        const image = localStorage.getItem(key);
+        if (image && image.startsWith('data:image/')) {
+            console.log(`✅ Verified image exists with key: ${key}`);
+            return true;
+        }
+    }
+    console.warn('⚠️ No valid image found in localStorage');
+    return false;
+};
 
 interface FieldCropSummaryProps {
-    // Field data
     mainField?: any;
     fieldAreaSize?: number;
     selectedCrops?: string[];
-
-    // Zones and crops
     zones?: any[];
     zoneAssignments?: any;
     zoneSummaries?: any;
-
-    // Pipes
     pipes?: any[];
-
-    // Equipment
     equipmentIcons?: any[];
-
-    // Irrigation
     irrigationPoints?: any[];
     irrigationLines?: any[];
     irrigationAssignments?: any;
     irrigationSettings?: any;
-
-    // Spacing
     rowSpacing?: any;
     plantSpacing?: any;
-
-    // Map state
     mapCenter?: [number, number];
     mapZoom?: number;
     mapType?: string;
-
-    // Summary data passed from field-map
     summary?: any;
     equipment?: any[];
 }
 
-// ฟังก์ชันคำนวณพื้นที่โซนจากพิกัด
+// Existing functions remain unchanged (copied from original)
 const calculateZoneArea = (coordinates: any[]): number => {
     if (!coordinates || coordinates.length < 3) return 0;
 
     try {
-        // แปลงพิกัดเป็นรูปแบบที่ turf.js ใช้ได้ [lng, lat]
         const turfCoords = coordinates
             .map((coord: any) => {
                 if (Array.isArray(coord) && coord.length === 2) {
-                    return [coord[1], coord[0]]; // [lat, lng] -> [lng, lat]
+                    return [coord[1], coord[0]];
                 }
                 if (coord && typeof coord.lat === 'number' && typeof coord.lng === 'number') {
                     return [coord.lng, coord.lat];
@@ -97,7 +417,6 @@ const calculateZoneArea = (coordinates: any[]): number => {
 
         if (turfCoords.length < 3) return 0;
 
-        // ปิด polygon ถ้ายังไม่ปิด
         const firstPoint = turfCoords[0];
         const lastPoint = turfCoords[turfCoords.length - 1];
         if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
@@ -105,77 +424,60 @@ const calculateZoneArea = (coordinates: any[]): number => {
         }
 
         const polygon = turf.polygon([turfCoords]);
-        return turf.area(polygon); // ผลลัพธ์เป็นตารางเมตร
+        return turf.area(polygon);
     } catch (error) {
         console.error('Error calculating zone area:', error);
         return 0;
     }
 };
 
-// ฟังก์ชันคำนวณจำนวนจุดปลูกในโซน - ใช้ข้อมูลจาก cropData
 const calculatePlantingPoints = (
-    zoneArea: number, // ตารางเมตร
-    crop: any, // crop object จาก cropData
-    customRowSpacing?: number, // custom spacing ถ้ามี (เมตร)
-    customPlantSpacing?: number // custom spacing ถ้ามี (เมตร)
+    zoneArea: number,
+    crop: any,
+    customRowSpacing?: number,
+    customPlantSpacing?: number
 ): number => {
     if (!zoneArea || !crop) return 0;
 
-    // ใช้ custom spacing ถ้ามี หรือใช้ค่าจาก cropData (แปลง cm เป็น m)
-    const rowSpacing = customRowSpacing || crop.rowSpacing / 100; // cm -> m
-    const plantSpacing = customPlantSpacing || crop.plantSpacing / 100; // cm -> m
+    const rowSpacing = customRowSpacing || crop.rowSpacing / 100;
+    const plantSpacing = customPlantSpacing || crop.plantSpacing / 100;
 
     if (!rowSpacing || !plantSpacing) return 0;
 
-    // คำนวณจำนวนแถวต่อตารางเมตร
     const rowsPerSquareMeter = 1 / rowSpacing;
-    // คำนวณจำนวนต้นต่อแถวต่อเมตร
     const plantsPerRowPerMeter = 1 / plantSpacing;
-    // คำนวณจำนวนต้นต่อตารางเมตร
     const plantsPerSquareMeter = rowsPerSquareMeter * plantsPerRowPerMeter;
-    // คำนวณจำนวนต้นทั้งหมดในโซน
     const totalPlants = Math.floor(zoneArea * plantsPerSquareMeter);
 
     return totalPlants;
 };
 
-// ฟังก์ชันคำนวณผลผลิตและราคา - ใช้ข้อมูลจาก cropData
 const calculateYieldAndPrice = (
-    zoneArea: number, // ตารางเมตร
+    zoneArea: number,
     crop: any
 ): { estimatedYield: number; estimatedPrice: number } => {
     if (!zoneArea || !crop) {
         return { estimatedYield: 0, estimatedPrice: 0 };
     }
 
-    // แปลงพื้นที่จากตารางเมตรเป็นไร่ (1 ไร่ = 1600 ตารางเมตร)
     const areaInRai = zoneArea / 1600;
-
-    // คำนวณผลผลิตรวม (กิโลกรัม) จากข้อมูล yield ใน cropData (กก./ไร่)
     const estimatedYield = Math.round(areaInRai * crop.yield);
-
-    // คำนวณราคารวม (บาท) จากข้อมูล price ใน cropData (บาท/กก.)
     const estimatedPrice = Math.round(estimatedYield * crop.price);
 
     return { estimatedYield, estimatedPrice };
 };
 
-// ฟังก์ชันคำนวณความต้องการน้ำรวม - เปลี่ยนเป็นลิตรต่อครั้ง (ไม่หาร)
 const calculateWaterRequirement = (plantingPoints: number, crop: any): number => {
     if (!plantingPoints || !crop || !crop.waterRequirement) {
         return 0;
     }
 
-    // ใช้ค่าจาก cropData เป็นลิตร/ต้น/ครั้ง โดยตรง (ไม่หาร)
     const waterPerPlantPerIrrigation = crop.waterRequirement;
-
-    // คำนวณความต้องการน้ำรวมต่อครั้ง (ลิตร/ครั้ง)
     const totalWaterRequirement = plantingPoints * waterPerPlantPerIrrigation;
 
     return Math.round(totalWaterRequirement);
 };
 
-// ฟังก์ชันคำนวณความยาวท่อจากพิกัด
 const calculatePipeLength = (coordinates: any[]): number => {
     if (!coordinates || coordinates.length < 2) return 0;
 
@@ -185,7 +487,6 @@ const calculatePipeLength = (coordinates: any[]): number => {
             const point1 = coordinates[i];
             const point2 = coordinates[i + 1];
 
-            // Handle different coordinate formats
             let lat1, lng1, lat2, lng2;
 
             if (Array.isArray(point1) && Array.isArray(point2)) {
@@ -200,7 +501,6 @@ const calculatePipeLength = (coordinates: any[]): number => {
                 continue;
             }
 
-            // Create turf points and calculate distance
             const from = turf.point([lng1, lat1]);
             const to = turf.point([lng2, lat2]);
             const distance = turf.distance(from, to, 'kilometers') * 1000;
@@ -214,9 +514,7 @@ const calculatePipeLength = (coordinates: any[]): number => {
     }
 };
 
-// ฟังก์ชันคำนวณสถิติท่อแต่ละประเภท - นับเฉพาะท่อที่วาดเสร็จแล้ว
 const calculatePipeStats = (pipes: any[], pipeType: string) => {
-    // กรองเฉพาะท่อที่มีพิกัดและวาดเสร็จแล้ว
     const typePipes = pipes.filter(
         (pipe) =>
             pipe.type === pipeType &&
@@ -244,7 +542,6 @@ const calculatePipeStats = (pipes: any[], pipeType: string) => {
     };
 };
 
-// ฟังก์ชันตรวจสอบว่าท่อผ่านหรืออยู่ในโซนหรือไม่
 const isPipeInZone = (pipe: any, zone: any): boolean => {
     if (!pipe.coordinates || !Array.isArray(pipe.coordinates) || pipe.coordinates.length < 2) {
         return false;
@@ -255,11 +552,10 @@ const isPipeInZone = (pipe: any, zone: any): boolean => {
     }
 
     try {
-        // สร้าง polygon ของโซน
         const zoneCoords = zone.coordinates
             .map((coord: any) => {
                 if (Array.isArray(coord) && coord.length === 2) {
-                    return [coord[1], coord[0]]; // [lat, lng] -> [lng, lat] for turf
+                    return [coord[1], coord[0]];
                 }
                 if (coord && typeof coord.lat === 'number' && typeof coord.lng === 'number') {
                     return [coord.lng, coord.lat];
@@ -270,7 +566,6 @@ const isPipeInZone = (pipe: any, zone: any): boolean => {
 
         if (zoneCoords.length < 3) return false;
 
-        // ปิด polygon ถ้ายังไม่ปิด
         const firstPoint = zoneCoords[0];
         const lastPoint = zoneCoords[zoneCoords.length - 1];
         if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
@@ -279,7 +574,6 @@ const isPipeInZone = (pipe: any, zone: any): boolean => {
 
         const zonePolygon = turf.polygon([zoneCoords]);
 
-        // ตรวจสอบทุกจุดของท่อ
         for (const coord of pipe.coordinates) {
             let lat, lng;
             if (Array.isArray(coord) && coord.length === 2) {
@@ -293,7 +587,6 @@ const isPipeInZone = (pipe: any, zone: any): boolean => {
 
             const point = turf.point([lng, lat]);
 
-            // ถ้าจุดใดจุดหนึ่งของท่ออยู่ในโซน ถือว่าท่อนี้อยู่ในโซน
             if (booleanPointInPolygon(point, zonePolygon)) {
                 return true;
             }
@@ -306,21 +599,13 @@ const isPipeInZone = (pipe: any, zone: any): boolean => {
     }
 };
 
-// ฟังก์ชันจำแนกประเภทท่อจากสีหรือคุณสมบัติ
 const identifyPipeType = (pipe: any): string => {
-    // วิธีที่ 1: ใช้ type ที่มีอยู่แล้ว
     if (pipe.type) {
         return pipe.type;
     }
 
-    // วิธีที่ 2: ใช้สีเพื่อจำแนกประเภท (ถ้าไม่มี type)
     if (pipe.color) {
         const color = pipe.color.toLowerCase();
-        // ตาม PIPE_TYPES constants:
-        // main: blue (#2563EB)
-        // submain: green (#16A34A)
-        // lateral: orange/purple (#EA580C)
-
         if (color.includes('blue') || color.includes('#2563eb') || color.includes('2563eb')) {
             return 'main';
         } else if (
@@ -339,7 +624,6 @@ const identifyPipeType = (pipe: any): string => {
         }
     }
 
-    // วิธีที่ 3: ใช้ pathOptions.color (สำหรับ Leaflet Polyline)
     if (pipe.pathOptions && pipe.pathOptions.color) {
         const color = pipe.pathOptions.color.toLowerCase();
         if (color.includes('blue') || color === '#2563eb') {
@@ -351,13 +635,10 @@ const identifyPipeType = (pipe: any): string => {
         }
     }
 
-    // ค่าเริ่มต้น
     return 'lateral';
 };
 
-// ฟังก์ชันคำนวณข้อมูล pipe system ในแต่ละโซน - ปรับปรุงใหม่
 const calculateZonePipeStats = (pipes: any[], zoneId: string, zones: any[]) => {
-    // หาโซนที่ต้องการ
     const currentZone = zones.find((zone) => zone.id.toString() === zoneId);
     if (!currentZone) {
         return {
@@ -373,16 +654,12 @@ const calculateZonePipeStats = (pipes: any[], zoneId: string, zones: any[]) => {
     console.log(`🔍 Checking pipes for zone ${zoneId} (${currentZone.name})...`);
     console.log(`📏 Total pipes to check: ${pipes.length}`);
 
-    // กรองท่อที่อยู่ในโซน - ใช้ทั้ง zoneId และการตรวจสอบทางกายภาพ
     const zonePipes = pipes.filter((pipe) => {
         if (!pipe.coordinates || !Array.isArray(pipe.coordinates) || pipe.coordinates.length < 2) {
             return false;
         }
 
-        // วิธีที่ 1: ตรวจสอบจาก zoneId (ถ้ามี)
         const hasZoneId = pipe.zoneId && pipe.zoneId.toString() === zoneId;
-
-        // วิธีที่ 2: ตรวจสอบว่าท่อผ่านหรืออยู่ในโซนจริงๆ หรือไม่
         const isInZone = isPipeInZone(pipe, currentZone);
 
         const isZonePipe = hasZoneId || isInZone;
@@ -407,7 +684,6 @@ const calculateZonePipeStats = (pipes: any[], zoneId: string, zones: any[]) => {
 
     console.log(`📊 Found ${zonePipes.length} pipes in zone ${zoneId}`);
 
-    // แยกประเภทท่อโดยใช้ฟังก์ชันจำแนกประเภทใหม่
     const mainPipes = zonePipes.filter((pipe) => identifyPipeType(pipe) === 'main');
     const submainPipes = zonePipes.filter((pipe) => identifyPipeType(pipe) === 'submain');
     const lateralPipes = zonePipes.filter((pipe) => identifyPipeType(pipe) === 'lateral');
@@ -430,7 +706,6 @@ const calculateZonePipeStats = (pipes: any[], zoneId: string, zones: any[]) => {
     const submainStats = calculateTypeStats(submainPipes);
     const lateralStats = calculateTypeStats(lateralPipes);
 
-    // คำนวณความยาวรวม
     const totalLongestLength =
         mainStats.longestLength + submainStats.longestLength + lateralStats.longestLength;
     const totalAllLength =
@@ -450,7 +725,6 @@ const calculateZonePipeStats = (pipes: any[], zoneId: string, zones: any[]) => {
     return result;
 };
 
-// Helper function to standardize irrigation types for consistent coloring
 const normalizeIrrigationType = (type: string): string => {
     if (!type) return 'unknown';
     const normalizedType = type.toLowerCase().trim();
@@ -474,18 +748,22 @@ const normalizeIrrigationType = (type: string): string => {
 };
 
 export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
-    // Get data from props (from route), localStorage, or default values
     const [summaryData, setSummaryData] = useState<any>(null);
     const [dataSource, setDataSource] = useState<string>('');
     const [calculatedZoneSummaries, setCalculatedZoneSummaries] = useState<Record<string, any>>({});
+    
+    // Enhanced state for Google Maps and image capture
+    const [mapImageCaptured, setMapImageCaptured] = useState<boolean>(false);
+    const [isCapturingImage, setIsCapturingImage] = useState<boolean>(false);
+    const [captureStatus, setCaptureStatus] = useState<string>('');
+    const googleMapRef = useRef<google.maps.Map | null>(null);
+    const mapContainerRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
-        // Always load data from localStorage as the single source of truth
         const savedData = localStorage.getItem('fieldMapData');
         if (savedData) {
             try {
                 const parsedData = JSON.parse(savedData);
-                // Basic validation
                 if (
                     parsedData &&
                     typeof parsedData === 'object' &&
@@ -510,9 +788,88 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
             setDataSource('none');
             setSummaryData(null);
         }
-    }, []); // Empty dependency array to run only once on mount
+    }, []);
 
-    // Default values if no data is available
+    // Enhanced auto-capture with better timing and error handling
+    useEffect(() => {
+        if (summaryData && !mapImageCaptured && !isCapturingImage) {
+            // Delay to ensure map is fully rendered and tiles are loaded
+            const timer = setTimeout(() => {
+                handleCaptureMapImage();
+            }, 5000); // Increased delay for better reliability
+
+            return () => clearTimeout(timer);
+        }
+    }, [summaryData, mapImageCaptured, isCapturingImage]);
+
+    // Enhanced function to handle map image capture with better feedback
+    const handleCaptureMapImage = async () => {
+        if (mapImageCaptured || isCapturingImage) return;
+
+        setIsCapturingImage(true);
+        setCaptureStatus('กำลังจับภาพแผนที่...');
+
+        try {
+            let mapElement: HTMLElement | null = null;
+            
+            // Try different methods to get the map element
+            if (googleMapRef.current) {
+                mapElement = googleMapRef.current.getDiv();
+            } else if (mapContainerRef.current) {
+                mapElement = mapContainerRef.current;
+            } else {
+                // Fallback: try to find map element by class or ID
+                mapElement = document.querySelector('.google-maps-container') as HTMLElement ||
+                           document.querySelector('[id*="map"]') as HTMLElement ||
+                           document.querySelector('[class*="map"]') as HTMLElement;
+            }
+
+            if (mapElement) {
+                setCaptureStatus('กำลังประมวลผลภาพ...');
+                const imageUrl = await captureMapImage(mapElement, 'field-crop');
+                
+                if (imageUrl) {
+                    const isVerified = verifyImageSave();
+                    if (isVerified) {
+                        setMapImageCaptured(true);
+                        setCaptureStatus('บันทึกภาพแผนที่สำเร็จ!');
+                        console.log('✅ Map image captured and verified for product page');
+                        
+                        // Clear status after delay
+                        setTimeout(() => setCaptureStatus(''), 3000);
+                    } else {
+                        setCaptureStatus('เกิดข้อผิดพลาดในการบันทึก');
+                        setTimeout(() => setCaptureStatus(''), 3000);
+                    }
+                } else {
+                    setCaptureStatus('ไม่สามารถจับภาพได้');
+                    setTimeout(() => setCaptureStatus(''), 3000);
+                }
+            } else {
+                setCaptureStatus('ไม่พบแผนที่');
+                setTimeout(() => setCaptureStatus(''), 3000);
+            }
+        } catch (error) {
+            console.error('❌ Error in handleCaptureMapImage:', error);
+            setCaptureStatus('เกิดข้อผิดพลาด');
+            setTimeout(() => setCaptureStatus(''), 3000);
+        } finally {
+            setIsCapturingImage(false);
+        }
+    };
+
+    // Enhanced manual capture function with user feedback
+    const handleManualCapture = async () => {
+        setMapImageCaptured(false); // Reset to allow manual capture
+        await handleCaptureMapImage();
+        
+        if (captureStatus.includes('สำเร็จ')) {
+            alert('ภาพแผนที่ถูกบันทึกแล้ว! สามารถดูได้ในหน้าคำนวณอุปกรณ์');
+        } else if (captureStatus.includes('ข้อผิดพลาด') || captureStatus.includes('ไม่สามารถ')) {
+            alert('เกิดข้อผิดพลาดในการบันทึกภาพ โปรดลองอีกครั้ง');
+        }
+    };
+
     const {
         mainField,
         fieldAreaSize = 0,
@@ -533,7 +890,6 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
         mapType = 'satellite',
     } = summaryData || {};
 
-    // คำนวณข้อมูลโซนเมื่อข้อมูลพร้อม - ใช้ข้อมูลจาก cropData และเปลี่ยนเป็นลิตรต่อครั้ง
     useEffect(() => {
         if (summaryData && zones.length > 0) {
             console.log('🧮 Starting zone calculations with cropData (per irrigation)...');
@@ -549,19 +905,16 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                 if (assignedCropValue && zone.coordinates) {
                     const crop = getCropByValue(assignedCropValue);
                     if (crop) {
-                        // คำนวณพื้นที่โซน
                         const zoneArea = calculateZoneArea(zone.coordinates);
 
-                        // ใช้ spacing ที่ตั้งค่าไว้ หรือใช้ค่าเริ่มต้นจากข้อมูลพืชใน cropData
                         const effectiveRowSpacing = rowSpacing[assignedCropValue]
                             ? rowSpacing[assignedCropValue]
-                            : crop.rowSpacing / 100; // แปลง cm เป็น m
+                            : crop.rowSpacing / 100;
 
                         const effectivePlantSpacing = plantSpacing[assignedCropValue]
                             ? plantSpacing[assignedCropValue]
-                            : crop.plantSpacing / 100; // แปลง cm เป็น m
+                            : crop.plantSpacing / 100;
 
-                        // คำนวณจำนวนจุดปลูก
                         const totalPlantingPoints = calculatePlantingPoints(
                             zoneArea,
                             crop,
@@ -569,13 +922,11 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                             effectivePlantSpacing
                         );
 
-                        // คำนวณผลผลิตและราคาจาก cropData
                         const { estimatedYield, estimatedPrice } = calculateYieldAndPrice(
                             zoneArea,
                             crop
                         );
 
-                        // คำนวณความต้องการน้ำต่อครั้ง (ไม่หาร)
                         const waterRequirementPerIrrigation = calculateWaterRequirement(
                             totalPlantingPoints,
                             crop
@@ -588,21 +939,21 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                             cropValue: assignedCropValue,
                             cropIcon: crop.icon,
                             cropCategory: crop.category,
-                            zoneArea: Math.round(zoneArea), // ตารางเมตร
-                            zoneAreaRai: Math.round((zoneArea / 1600) * 100) / 100, // ไร่
+                            zoneArea: Math.round(zoneArea),
+                            zoneAreaRai: Math.round((zoneArea / 1600) * 100) / 100,
                             rowSpacing: effectiveRowSpacing,
                             plantSpacing: effectivePlantSpacing,
                             totalPlantingPoints: totalPlantingPoints,
-                            estimatedYield: estimatedYield, // กิโลกรัม
-                            estimatedPrice: estimatedPrice, // บาท
-                            waterRequirementPerIrrigation: waterRequirementPerIrrigation, // ลิตร/ครั้ง
-                            waterRequirementPerDay: waterRequirementPerIrrigation, // ลิตร/วัน (เท่ากับ per irrigation)
-                            cropYieldPerRai: crop.yield, // กก./ไร่ จาก cropData
-                            cropPricePerKg: crop.price, // บาท/กก. จาก cropData
-                            cropWaterPerPlant: crop.waterRequirement, // ลิตร/ต้น/ครั้ง จาก cropData
-                            cropWaterPerPlantPerIrrigation: crop.waterRequirement, // ลิตร/ต้น/ครั้ง (เท่ากันกับด้านบน)
-                            growthPeriod: crop.growthPeriod, // วัน
-                            irrigationNeeds: crop.irrigationNeeds, // low/medium/high
+                            estimatedYield: estimatedYield,
+                            estimatedPrice: estimatedPrice,
+                            waterRequirementPerIrrigation: waterRequirementPerIrrigation,
+                            waterRequirementPerDay: waterRequirementPerIrrigation,
+                            cropYieldPerRai: crop.yield,
+                            cropPricePerKg: crop.price,
+                            cropWaterPerPlant: crop.waterRequirement,
+                            cropWaterPerPlantPerIrrigation: crop.waterRequirement,
+                            growthPeriod: crop.growthPeriod,
+                            irrigationNeeds: crop.irrigationNeeds,
                             irrigationType: irrigationAssignments[zoneId] || 'ไม่ได้กำหนด',
                         };
 
@@ -625,7 +976,6 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                         );
                     }
                 } else {
-                    // โซนที่ไม่ได้มอบหมายพืช
                     newZoneSummaries[zoneId] = {
                         zoneId: zoneId,
                         zoneName: zone.name,
@@ -645,7 +995,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                         estimatedYield: 0,
                         estimatedPrice: 0,
                         waterRequirementPerIrrigation: 0,
-                        waterRequirementPerDay: 0, // เก็บไว้เผื่อใช้ในอนาคต
+                        waterRequirementPerDay: 0,
                         cropYieldPerRai: 0,
                         cropPricePerKg: 0,
                         cropWaterPerPlant: 0,
@@ -673,7 +1023,6 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
         pipes,
     ]);
 
-    // Fanggy005 EDIT: Add handler for the calculation button
     const handleCalculateEquipment = () => {
         if (!summaryData) {
             alert('ไม่พบข้อมูลโปรเจกต์สำหรับคำนวณ');
@@ -682,33 +1031,31 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
 
         console.log('🚀 Preparing data for product page...');
 
-        // ใช้ฟังก์ชัน calculateAllFieldStats เพื่อสร้างออบเจกต์ FieldCropData ที่สมบูรณ์
-        const fieldData: FieldCropData = calculateAllFieldStats(summaryData);
-
-        // บันทึกข้อมูลที่จัดโครงสร้างแล้วลง localStorage
-        saveFieldCropData(fieldData);
-
-        // ตั้งค่าประเภทโปรเจกต์เพื่อให้หน้า product รู้ว่าต้องโหลดข้อมูลอะไร
+        const fieldData: FieldCropData = calculateEnhancedFieldStats(summaryData);
+        saveEnhancedFieldCropData(fieldData);
         localStorage.setItem('projectType', 'field-crop');
 
-        // นำทางไปยังหน้า product
-        console.log('Navigating to /product?mode=field-crop');
-        router.visit('/product?mode=field-crop');
+        // Ensure image is saved before navigating
+        if (!mapImageCaptured && !isCapturingImage) {
+            handleCaptureMapImage().then(() => {
+                console.log('Navigating to /product?mode=field-crop');
+                router.visit('/product?mode=field-crop');
+            });
+        } else {
+            console.log('Navigating to /product?mode=field-crop');
+            router.visit('/product?mode=field-crop');
+        }
     };
 
-    // Handle case where zones might be just a number (from minimal data)
     const actualZones = Array.isArray(zones) ? zones : [];
     const actualPipes = Array.isArray(pipes) ? pipes : [];
     const actualEquipmentIcons = Array.isArray(equipmentIcons) ? equipmentIcons : [];
     const actualIrrigationPoints = Array.isArray(irrigationPoints) ? irrigationPoints : [];
     const actualIrrigationLines = Array.isArray(irrigationLines) ? irrigationLines : [];
 
-    // *** FIXED: This function is now more robust to prevent crashes ***
     const calculateMapBounds = () => {
-        // First try to use mainField coordinates
         if (mainField && mainField.coordinates && mainField.coordinates.length > 0) {
             try {
-                // Handle multiple coordinate formats for robustness
                 const coords = mainField.coordinates
                     .map((c: any) => {
                         if (
@@ -716,11 +1063,9 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                             typeof c[0] === 'number' &&
                             typeof c[1] === 'number'
                         ) {
-                            // It's [lat, lng], convert to [lng, lat] for turf
                             return [c[1], c[0]];
                         }
                         if (c && typeof c.lat === 'number' && typeof c.lng === 'number') {
-                            // It's {lat, lng}, convert to [lng, lat] for turf
                             return [c.lng, c.lat];
                         }
                         return null;
@@ -743,7 +1088,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                 const centroid = turf.centroid(polygon);
                 const [centerLng, centerLat] = centroid.geometry.coordinates;
 
-                let optimalZoom = 19; // เพิ่ม zoom level เริ่มต้น
+                let optimalZoom = 19;
                 if (fieldAreaSize > 50000) optimalZoom = 16;
                 else if (fieldAreaSize > 20000) optimalZoom = 17;
                 else if (fieldAreaSize > 10000) optimalZoom = 18;
@@ -752,19 +1097,15 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                 return { center: [centerLat, centerLng], zoom: optimalZoom };
             } catch (error) {
                 console.error('Error calculating bounds from mainField:', error);
-                // Don't return here, let it fall through to the next check
             }
         }
 
-        // Fallback: Try to use zones if mainField is not available or failed
         if (actualZones.length > 0) {
             try {
-                // *** FIXED: Safer way to collect and validate all zone coordinates ***
                 const allCoords = actualZones.flatMap((zone) => {
                     if (!zone.coordinates || !Array.isArray(zone.coordinates)) {
-                        return []; // Return empty array if coordinates are missing or not an array
+                        return [];
                     }
-                    // Map over coordinates, validate format, and filter out invalid ones
                     return zone.coordinates
                         .map((c: any) => {
                             if (
@@ -772,14 +1113,14 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                 typeof c[0] === 'number' &&
                                 typeof c[1] === 'number'
                             ) {
-                                return c as [number, number]; // Format is [lat, lng]
+                                return c as [number, number];
                             }
                             if (c && typeof c.lat === 'number' && typeof c.lng === 'number') {
-                                return [c.lat, c.lng] as [number, number]; // Format is {lat, lng}
+                                return [c.lat, c.lng] as [number, number];
                             }
-                            return null; // Invalid format
+                            return null;
                         })
-                        .filter((c): c is [number, number] => c !== null); // Filter out nulls
+                        .filter((c): c is [number, number] => c !== null);
                 });
 
                 if (allCoords.length > 0) {
@@ -795,20 +1136,17 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
             }
         }
 
-        // Final fallback: Use provided mapCenter or default
         return { center: mapCenter || [14.5995, 120.9842], zoom: mapZoom || 15 };
     };
 
     const { center: optimalCenter, zoom: optimalZoom } = calculateMapBounds();
 
-    // Remove duplicate irrigation points by unique ID
     const uniqueIrrigationPoints = actualIrrigationPoints.filter((point, index, array) => {
         if (!point || !point.id) return false;
         const firstIndex = array.findIndex((p) => p && p.id === point.id);
         return firstIndex === index;
     });
 
-    // Show a subset of irrigation points for performance if there are too many
     let filteredIrrigationPoints = uniqueIrrigationPoints;
     if (uniqueIrrigationPoints.length > 200) {
         filteredIrrigationPoints = uniqueIrrigationPoints.filter((_, index) => index % 3 === 0);
@@ -838,12 +1176,10 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
         (l) => normalizeIrrigationType(l.type) === 'drip_tape'
     ).length;
 
-    // Calculate totals
     const totalZones = actualZones.length;
 
-    // Calculate pipe statistics - นับเฉพาะท่อที่วาดเสร็จแล้ว
     const mainPipeStats = calculatePipeStats(actualPipes, 'main');
-    const submainPipeStats = calculatePipeStats(actualPipes, 'submain');
+    const submainPipeStats = calculatePipeStats(actualPipes, 'submain');  
     const lateralPipeStats = calculatePipeStats(actualPipes, 'lateral');
 
     const uniqueEquipment = actualEquipmentIcons.filter(
@@ -853,7 +1189,6 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
     const valveCount = uniqueEquipment.filter((e) => e.type === 'ballvalve').length;
     const solenoidCount = uniqueEquipment.filter((e) => e.type === 'solenoid').length;
 
-    // *** การคำนวณรวมใช้ข้อมูลที่คำนวณแล้วจาก cropData - เปลี่ยนเป็นลิตรต่อครั้ง ***
     const totalEstimatedYield = Object.values(calculatedZoneSummaries).reduce(
         (sum: number, summary: any) => sum + (summary.estimatedYield || 0),
         0
@@ -871,41 +1206,12 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
         0
     );
 
-    // Format area
     const areaInRai = fieldAreaSize / 1600;
 
-    // Selected crop objects
     const selectedCropObjects = (selectedCrops || [])
         .map((cropValue) => getCropByValue(cropValue))
         .filter(Boolean);
 
-    // Create custom equipment icons for map display
-    const createEquipmentIcon = (equipment: any) => {
-        const equipmentConfig = EQUIPMENT_TYPES[equipment.type as EquipmentType];
-        if (!equipmentConfig) return null;
-        let iconHtml = '';
-        if (
-            equipment.type === 'pump' ||
-            equipment.type === 'ballvalve' ||
-            equipment.type === 'solenoid'
-        ) {
-            let imgSrc = '';
-            if (equipment.type === 'pump') imgSrc = './generateTree/wtpump.png';
-            if (equipment.type === 'ballvalve') imgSrc = './generateTree/ballv.png';
-            if (equipment.type === 'solenoid') imgSrc = './generateTree/solv.png';
-            iconHtml = `<img src="${imgSrc}" alt="${equipmentConfig.name}" style="width:20px;height:20px;object-fit:contain;display:block;margin:auto;" />`;
-        } else {
-            iconHtml = `<span style="font-size: 12px;">${equipmentConfig.icon}</span>`;
-        }
-        return L.divIcon({
-            html: `<div style="background: white; border: 2px solid ${equipmentConfig.color}; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">${iconHtml}</div>`,
-            iconSize: [28, 28],
-            iconAnchor: [14, 14],
-            className: 'equipment-marker-icon',
-        });
-    };
-
-    // Show loading or no data message
     if (!summaryData) {
         return (
             <div className="flex h-screen flex-col overflow-hidden bg-gray-900 text-white">
@@ -939,16 +1245,12 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
         <div className="flex h-screen flex-col overflow-hidden bg-gray-900 text-white print:bg-white print:text-black">
             <Head title="Field Crop Summary - Irrigation Planning" />
 
-            {/* Navbar - Fixed at top */}
             <Navbar />
 
-            {/* Header - Hidden on print */}
             <div className="border-b border-gray-700 bg-gray-800 print:hidden">
                 <div className="container mx-auto px-4 py-4">
                     <div className="mx-auto max-w-7xl">
-                        {/* Enhanced Header with Equipment Calculator Button */}
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                            {/* Left side: Back button and title */}
                             <div className="flex-1">
                                 <Link
                                     href="/field-map?edit=true&step=4"
@@ -975,9 +1277,50 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                 </p>
                             </div>
 
-                            {/* Right side: Equipment Calculator Button */}
-                            <div className="flex-shrink-0">
-                                {/* Fanggy005 EDIT: Changed Link to button with onClick handler */}
+                            <div className="flex-shrink-0 space-x-3">
+                                {/* Enhanced Map capture button */}
+                                <button
+                                    onClick={handleManualCapture}
+                                    disabled={isCapturingImage}
+                                    className={`inline-flex transform items-center rounded-lg px-6 py-3 font-semibold text-white transition-all duration-200 hover:scale-105 hover:shadow-lg ${
+                                        isCapturingImage
+                                            ? 'bg-gray-600 cursor-not-allowed'
+                                            : mapImageCaptured
+                                            ? 'bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700'
+                                            : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700'
+                                    }`}
+                                >
+                                    {isCapturingImage ? (
+                                        <>
+                                            <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
+                                            กำลังจับภาพ...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg
+                                                className="mr-2 h-5 w-5"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                                                />
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                                                />
+                                            </svg>
+                                            {mapImageCaptured ? '✅ บันทึกภาพแล้ว' : '📷 บันทึกภาพแผนที่'}
+                                        </>
+                                    )}
+                                </button>
+
                                 <button
                                     onClick={handleCalculateEquipment}
                                     className="inline-flex transform items-center rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 font-semibold text-white transition-all duration-200 hover:scale-105 hover:from-purple-700 hover:to-blue-700 hover:shadow-lg"
@@ -999,236 +1342,76 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                 </button>
                             </div>
                         </div>
+                        
+                        {/* Enhanced capture status display */}
+                        {captureStatus && (
+                            <div className={`mt-3 rounded-lg p-3 text-sm ${
+                                captureStatus.includes('สำเร็จ') || captureStatus.includes('บันทึก')
+                                    ? 'bg-green-800/50 text-green-200 border border-green-600'
+                                    : captureStatus.includes('ข้อผิดพลาด') || captureStatus.includes('ไม่สามารถ')
+                                    ? 'bg-red-800/50 text-red-200 border border-red-600'
+                                    : 'bg-blue-800/50 text-blue-200 border border-blue-600'
+                            }`}>
+                                <div className="flex items-center gap-2">
+                                    {captureStatus.includes('กำลัง') && (
+                                        <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current"></div>
+                                    )}
+                                    <span>{captureStatus}</span>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
 
-            {/* Print Header */}
             <div className="hidden print:mb-4 print:block">
                 <h1 className="text-2xl font-bold text-black">📊 Field Crop Summary</h1>
                 <p className="text-gray-600">Generated on {new Date().toLocaleDateString()}</p>
                 <hr className="my-2 border-gray-300" />
             </div>
 
-            {/* Main Content - Scrollable */}
             <div className="print:print-layout flex-1 overflow-y-auto">
                 <div className="container mx-auto px-4 py-4">
                     <div className="mx-auto max-w-7xl print:max-w-none">
                         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 print:grid-cols-2 print:gap-6">
-                            {/* Left Column: Project Overview & Details */}
                             <div className="print:print-summary-section space-y-4">
-                                {/* Map Visualization - ย้ายมาด้านบนสุด */}
+                                {/* Enhanced Map Visualization with better capture capabilities */}
                                 <div className="print:print-map-container overflow-hidden rounded-lg bg-gray-800 print:border">
                                     <div className="flex h-full flex-col">
                                         <div className="print:print-map-header border-b border-gray-600 bg-gray-700 p-2">
                                             <h3 className="text-sm font-semibold text-white print:text-black">
                                                 🗺️ Project Map Overview
+                                                {mapImageCaptured && (
+                                                    <span className="ml-2 text-xs text-green-400 print:text-green-600">
+                                                        ✅ บันทึกแล้ว
+                                                    </span>
+                                                )}
                                             </h3>
                                         </div>
                                         <div
-                                            className="print:print-map-container relative"
+                                            ref={mapContainerRef}
+                                            className="print:print-map-container relative google-maps-container"
                                             style={{ minHeight: 300, height: '400px' }}
                                         >
-                                            <MapContainer
+                                            <GoogleMapsDisplay
                                                 center={optimalCenter}
                                                 zoom={optimalZoom}
-                                                maxZoom={20}
-                                                style={{ height: '100%', width: '100%' }}
-                                                scrollWheelZoom={true}
-                                            >
-                                                <TileLayer
-                                                    url={
-                                                        MAP_TILES[mapType]?.url ||
-                                                        MAP_TILES.satellite.url
-                                                    }
-                                                    attribution={
-                                                        MAP_TILES[mapType]?.attribution ||
-                                                        MAP_TILES.satellite.attribution
-                                                    }
-                                                    maxZoom={20}
-                                                />
-                                                <FeatureGroup>
-                                                    {mainField &&
-                                                        mainField.coordinates &&
-                                                        Array.isArray(mainField.coordinates) && (
-                                                            <Polygon
-                                                                positions={mainField.coordinates}
-                                                                pathOptions={{
-                                                                    color: '#22C55E',
-                                                                    fillColor: '#22C55E',
-                                                                    fillOpacity: 0.2,
-                                                                    weight: 2,
-                                                                }}
-                                                            />
-                                                        )}
-                                                    {actualZones.map((zone) =>
-                                                        zone.coordinates &&
-                                                        Array.isArray(zone.coordinates) ? (
-                                                            <Polygon
-                                                                key={zone.id}
-                                                                positions={zone.coordinates}
-                                                                pathOptions={{
-                                                                    color: zone.color || '#3B82F6',
-                                                                    fillColor:
-                                                                        zone.color || '#3B82F6',
-                                                                    fillOpacity: 0.3,
-                                                                    weight: 2,
-                                                                }}
-                                                            />
-                                                        ) : null
-                                                    )}
-                                                    {actualPipes.map((pipe) => {
-                                                        // **IMPROVED LOGIC**
-                                                        const pipeConfig = PIPE_TYPES[
-                                                            pipe.type as PipeType
-                                                        ] || { color: '#888888', weight: 3 };
-
-                                                        return pipe.coordinates &&
-                                                            Array.isArray(pipe.coordinates) ? (
-                                                            <Polyline
-                                                                key={pipe.id}
-                                                                positions={pipe.coordinates}
-                                                                pathOptions={{
-                                                                    color: pipeConfig.color,
-                                                                    weight: pipeConfig.weight,
-                                                                    opacity: 0.9,
-                                                                }}
-                                                            />
-                                                        ) : null;
-                                                    })}
-                                                    {uniqueEquipment.map((equipment) => {
-                                                        const customIcon =
-                                                            createEquipmentIcon(equipment);
-                                                        return customIcon &&
-                                                            equipment.lat &&
-                                                            equipment.lng ? (
-                                                            <Marker
-                                                                key={equipment.id}
-                                                                position={[
-                                                                    equipment.lat,
-                                                                    equipment.lng,
-                                                                ]}
-                                                                icon={customIcon}
-                                                            />
-                                                        ) : null;
-                                                    })}
-                                                    {filteredIrrigationPoints.map(
-                                                        (point, index) => {
-                                                            let lat, lng;
-                                                            if (point.lat && point.lng) {
-                                                                [lat, lng] = [point.lat, point.lng];
-                                                            } else if (
-                                                                Array.isArray(point.position)
-                                                            ) {
-                                                                [lat, lng] = point.position;
-                                                            }
-                                                            if (!lat || !lng) return null;
-
-                                                            // **IMPROVED LOGIC**
-                                                            const normalizedType =
-                                                                normalizeIrrigationType(point.type);
-                                                            let color = '#06b6d4'; // Default (cyan)
-                                                            if (normalizedType === 'sprinkler')
-                                                                color = '#22c55e'; // Green
-                                                            else if (
-                                                                normalizedType === 'mini_sprinkler'
-                                                            )
-                                                                color = '#3b82f6'; // Blue
-                                                            else if (
-                                                                normalizedType === 'micro_spray'
-                                                            )
-                                                                color = '#f97316'; // Orange
-
-                                                            return (
-                                                                <CircleMarker
-                                                                    key={
-                                                                        point.id ||
-                                                                        `irrigation-${index}`
-                                                                    }
-                                                                    center={[lat, lng]}
-                                                                    radius={4}
-                                                                    pathOptions={{
-                                                                        color: color,
-                                                                        fillColor: color,
-                                                                        fillOpacity: 0.9,
-                                                                        weight: 2,
-                                                                    }}
-                                                                />
-                                                            );
-                                                        }
-                                                    )}
-                                                    {uniqueIrrigationLines.map((line) =>
-                                                        line.coordinates &&
-                                                        Array.isArray(line.coordinates) ? (
-                                                            <Polyline
-                                                                key={line.id}
-                                                                positions={line.coordinates}
-                                                                pathOptions={{
-                                                                    color: '#06B6D4',
-                                                                    weight: 3,
-                                                                    opacity: 0.8,
-                                                                }}
-                                                            />
-                                                        ) : null
-                                                    )}
-                                                    {filteredIrrigationPoints.map(
-                                                        (point, index) => {
-                                                            let lat, lng;
-                                                            if (point.lat && point.lng) {
-                                                                [lat, lng] = [point.lat, point.lng];
-                                                            } else if (
-                                                                Array.isArray(point.position)
-                                                            ) {
-                                                                [lat, lng] = point.position;
-                                                            }
-                                                            if (
-                                                                !lat ||
-                                                                !lng ||
-                                                                !point.radius ||
-                                                                normalizeIrrigationType(
-                                                                    point.type
-                                                                ) === 'drip_tape'
-                                                            )
-                                                                return null;
-
-                                                            // **IMPROVED LOGIC**
-                                                            const normalizedType =
-                                                                normalizeIrrigationType(point.type);
-                                                            let color = '#06b6d4'; // Default (cyan)
-                                                            if (normalizedType === 'sprinkler')
-                                                                color = '#22c55e'; // Green
-                                                            else if (
-                                                                normalizedType === 'mini_sprinkler'
-                                                            )
-                                                                color = '#3b82f6'; // Blue
-                                                            else if (
-                                                                normalizedType === 'micro_spray'
-                                                            )
-                                                                color = '#f97316'; // Orange
-
-                                                            return (
-                                                                <Circle
-                                                                    key={`${point.id || index}-coverage`}
-                                                                    center={[lat, lng]}
-                                                                    radius={point.radius}
-                                                                    pathOptions={{
-                                                                        color: color,
-                                                                        fillColor: color,
-                                                                        fillOpacity: 0.1,
-                                                                        weight: 1,
-                                                                        opacity: 0.6,
-                                                                    }}
-                                                                />
-                                                            );
-                                                        }
-                                                    )}
-                                                </FeatureGroup>
-                                            </MapContainer>
+                                                mainField={mainField}
+                                                zones={actualZones}
+                                                pipes={actualPipes}
+                                                equipment={uniqueEquipment}
+                                                irrigationPoints={filteredIrrigationPoints}
+                                                irrigationLines={uniqueIrrigationLines}
+                                                onMapReady={(map) => {
+                                                    googleMapRef.current = map;
+                                                    console.log('✅ Google Map ready for capture');
+                                                }}
+                                            />
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Project Overview */}
+                                {/* Rest of the component remains the same... */}
                                 <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
                                     <h2 className="mb-3 text-lg font-bold text-green-400 print:text-base print:text-black">
                                         🏡 Project Overview
@@ -1269,77 +1452,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                     </div>
                                 </div>
 
-                                {/* Crop Information - ซ่อนการแสดงผลแต่เก็บโครงสร้างข้อมูลไว้ */}
-                                <div
-                                    style={{ display: 'none' }}
-                                    className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3"
-                                >
-                                    <h2 className="mb-3 text-lg font-bold text-green-400 print:text-base print:text-black">
-                                        🌱 Crop Information (from cropData)
-                                    </h2>
-                                    <div className="space-y-2 print:space-y-1">
-                                        {selectedCropObjects.map(
-                                            (crop) =>
-                                                crop && (
-                                                    <div
-                                                        key={crop.value}
-                                                        className="rounded-lg bg-gray-700 p-2 print:border print:border-gray-200 print:bg-gray-50 print:p-1"
-                                                    >
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="flex items-center space-x-2">
-                                                                <span className="text-lg print:text-sm">
-                                                                    {crop.icon}
-                                                                </span>
-                                                                <div>
-                                                                    <h3 className="text-sm font-semibold text-white print:text-xs print:text-black">
-                                                                        {crop.name}
-                                                                    </h3>
-                                                                    <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                        {crop.category} •{' '}
-                                                                        {crop.irrigationNeeds} water
-                                                                        needs
-                                                                    </div>
-                                                                    <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                        Growth: {crop.growthPeriod}{' '}
-                                                                        days
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div className="text-right">
-                                                                <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                    <strong>Spacing:</strong>
-                                                                </div>
-                                                                <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                    แถว: {crop.rowSpacing} ซม.
-                                                                </div>
-                                                                <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                    ต้น: {crop.plantSpacing} ซม.
-                                                                </div>
-                                                                <div className="mt-1 text-xs text-gray-400 print:text-gray-600">
-                                                                    <strong>Production:</strong>
-                                                                </div>
-                                                                <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                    {crop.yield} กก./ไร่
-                                                                </div>
-                                                                <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                    {crop.price} บาท/กก.
-                                                                </div>
-                                                                <div className="mt-1 text-xs text-gray-400 print:text-gray-600">
-                                                                    <strong>Water:</strong>
-                                                                </div>
-                                                                <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                    {crop.waterRequirement}{' '}
-                                                                    ล./ต้น/ครั้ง
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Infrastructure Summary */}
+                                {/* Infrastructure Summary - keeping existing code */}
                                 <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
                                     <h2 className="mb-3 text-lg font-bold text-purple-400 print:text-base print:text-black">
                                         🔧 Infrastructure Summary
@@ -1349,7 +1462,6 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                             📏 Pipe System (วาดเสร็จแล้วเท่านั้น)
                                         </h3>
                                         <div className="space-y-2">
-                                            {/* Main Pipes */}
                                             <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
                                                 <div className="mb-1 flex items-center justify-between">
                                                     <span className="text-xs font-medium text-blue-300 print:text-black">
@@ -1381,7 +1493,6 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                 </div>
                                             </div>
 
-                                            {/* Submain Pipes */}
                                             <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
                                                 <div className="mb-1 flex items-center justify-between">
                                                     <span className="text-xs font-medium text-green-300 print:text-black">
@@ -1413,7 +1524,6 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                 </div>
                                             </div>
 
-                                            {/* Lateral Pipes */}
                                             <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
                                                 <div className="mb-1 flex items-center justify-between">
                                                     <span className="text-xs font-medium text-purple-300 print:text-black">
@@ -1445,7 +1555,6 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                 </div>
                                             </div>
 
-                                            {/* Total Summary */}
                                             <div className="rounded bg-blue-900/30 p-2 print:border print:bg-blue-50">
                                                 <div className="text-center">
                                                     <span className="text-xs font-medium text-blue-300 print:text-blue-800">
@@ -1544,13 +1653,12 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                     </div>
                                 </div>
 
-                                {/* Financial & Water Summary */}
+                                {/* Financial & Water Summary - keeping existing code */}
                                 <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
                                     <h2 className="mb-3 text-lg font-bold text-green-400 print:text-base print:text-black">
                                         💰 Financial & Water Summary
                                     </h2>
                                     <div className="space-y-3 print:space-y-2">
-                                        {/* Financial Summary */}
                                         <div className="space-y-2">
                                             <div className="rounded-lg bg-gray-700 p-2 print:border print:bg-gray-50">
                                                 <div className="flex items-center justify-between">
@@ -1574,7 +1682,6 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                             </div>
                                         </div>
 
-                                        {/* Water Requirements Summary - เปลี่ยนเป็นลิตรต่อครั้ง */}
                                         <div className="rounded-lg bg-cyan-900/30 p-3 print:border-2 print:border-cyan-200 print:bg-cyan-50">
                                             <h3 className="mb-2 text-sm font-semibold text-cyan-300 print:text-cyan-800">
                                                 💧 Total Water Requirements (ลิตรต่อครั้ง - from
@@ -1624,7 +1731,6 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                 </div>
                                             </div>
 
-                                            {/* Water breakdown by zone */}
                                             <div className="mt-3 border-t border-cyan-700 pt-2 print:border-cyan-300">
                                                 <div className="mb-2 text-xs font-medium text-cyan-200 print:text-cyan-700">
                                                     Water Requirements by Zone (per irrigation):
@@ -1650,7 +1756,6 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                 </div>
                                             </div>
 
-                                            {/* Monthly and yearly projections - อัปเดตให้ใช้ข้อมูลใหม่ */}
                                             <div className="mt-3 border-t border-cyan-700 pt-2 print:border-cyan-300">
                                                 <div className="grid grid-cols-2 gap-2 text-xs">
                                                     <div className="rounded bg-cyan-800/50 p-2 text-center print:bg-cyan-100">
@@ -1711,9 +1816,8 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                 </div>
                             </div>
 
-                            {/* Right Column: Zone Details */}
+                            {/* Right Column: Zone Details - keeping existing code structure */}
                             <div className="space-y-4 print:contents">
-                                {/* Zone Details */}
                                 <div className="print:print-other-content rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
                                     <h2 className="mb-3 text-lg font-bold text-blue-400 print:text-base print:text-black">
                                         🎯 Zone Details & Irrigation Systems (ลิตรต่อครั้ง)
@@ -1755,7 +1859,6 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                     </div>
                                                     {summary ? (
                                                         <div className="space-y-3">
-                                                            {/* Zone Basic Info */}
                                                             <div className="grid grid-cols-3 gap-2 text-xs">
                                                                 <div className="rounded bg-gray-600 p-2 text-center print:bg-gray-100">
                                                                     <div className="text-gray-400 print:text-gray-600">
@@ -1792,7 +1895,6 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                                 </div>
                                                             </div>
 
-                                                            {/* Water Requirements Section - เปลี่ยนเป็นลิตรต่อครั้ง */}
                                                             <div className="rounded-lg bg-cyan-900/30 p-3 print:border print:bg-cyan-50">
                                                                 <h4 className="mb-2 text-sm font-semibold text-cyan-300 print:text-cyan-800">
                                                                     💧 Water Requirements
@@ -1859,14 +1961,12 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                                 </div>
                                                             </div>
 
-                                                            {/* Irrigation System Section - เพิ่มข้อมูล pipe system */}
                                                             <div className="rounded-lg bg-blue-900/30 p-3 print:border print:bg-blue-50">
                                                                 <h4 className="mb-2 text-sm font-semibold text-blue-300 print:text-blue-800">
                                                                     🔧 Irrigation System & Pipe
                                                                     Network
                                                                 </h4>
 
-                                                                {/* Irrigation Type */}
                                                                 <div className="mb-3">
                                                                     <div className="mb-1 text-xs font-medium text-blue-200 print:text-blue-700">
                                                                         Irrigation Type:
@@ -1877,13 +1977,11 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                                     </div>
                                                                 </div>
 
-                                                                {/* Pipe System Details */}
                                                                 <div className="space-y-3">
                                                                     <div className="border-b border-blue-700 pb-1 text-xs font-medium text-blue-200 print:border-blue-300 print:text-blue-700">
                                                                         Pipe System Details in Zone:
                                                                     </div>
 
-                                                                    {/* Zone Pipe Summary Table - แสดงเฉพาะตารางเท่านั้น */}
                                                                     <div className="rounded border border-cyan-600 bg-cyan-800/40 p-3 print:border-cyan-300 print:bg-cyan-100">
                                                                         <div className="mb-3 text-center">
                                                                             <div className="text-sm font-bold text-cyan-200 print:text-cyan-800">
@@ -1891,7 +1989,6 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                                             </div>
                                                                         </div>
 
-                                                                        {/* Summary table แสดงแต่ละประเภทท่อ */}
                                                                         <div className="mb-3">
                                                                             <div className="mb-2 grid grid-cols-4 gap-1 text-xs">
                                                                                 <div className="font-medium text-cyan-200 print:text-cyan-700">
@@ -1968,7 +2065,6 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                                             </div>
                                                                         </div>
 
-                                                                        {/* Overall totals */}
                                                                         <div className="grid grid-cols-2 gap-2 border-t border-cyan-600 pt-2 text-xs print:border-cyan-300">
                                                                             <div className="rounded bg-cyan-700/30 p-2 text-center print:bg-cyan-50">
                                                                                 <div className="mb-1 text-xs text-cyan-200 print:text-cyan-700">
@@ -2042,79 +2138,6 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                                                     ท่อ
                                                                                 </span>
                                                                             </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Hidden sections - เก็บโค้ดโครงสร้างไว้แต่ไม่แสดงผล */}
-                                                            <div style={{ display: 'none' }}>
-                                                                {/* Production & Income - ซ่อนการแสดงผล */}
-                                                                <div className="grid grid-cols-2 gap-2 text-xs">
-                                                                    <div className="rounded bg-yellow-900/30 p-2 print:bg-yellow-50">
-                                                                        <div className="mb-1 text-yellow-300 print:text-yellow-800">
-                                                                            Expected Yield
-                                                                        </div>
-                                                                        <div className="font-semibold text-yellow-100 print:text-yellow-900">
-                                                                            {summary.estimatedYield.toLocaleString()}{' '}
-                                                                            กก.
-                                                                        </div>
-                                                                        <div className="text-xs text-yellow-300 print:text-yellow-700">
-                                                                            @{' '}
-                                                                            {
-                                                                                summary.cropYieldPerRai
-                                                                            }{' '}
-                                                                            กก./ไร่
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="rounded bg-green-900/30 p-2 print:bg-green-50">
-                                                                        <div className="mb-1 text-green-300 print:text-green-800">
-                                                                            Expected Income
-                                                                        </div>
-                                                                        <div className="font-semibold text-green-100 print:text-green-900">
-                                                                            ฿
-                                                                            {summary.estimatedPrice.toLocaleString()}
-                                                                        </div>
-                                                                        <div className="text-xs text-green-300 print:text-green-700">
-                                                                            @{' '}
-                                                                            {summary.cropPricePerKg}{' '}
-                                                                            บาท/กก.
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-
-                                                                {/* Additional Info - ซ่อนการแสดงผล */}
-                                                                <div className="grid grid-cols-2 gap-2 border-t border-gray-600 pt-2 text-xs print:border-gray-300">
-                                                                    <div>
-                                                                        <div className="text-gray-400 print:text-gray-600">
-                                                                            Plant Spacing
-                                                                        </div>
-                                                                        <div className="font-semibold text-blue-400 print:text-black">
-                                                                            แถว:{' '}
-                                                                            {summary.rowSpacing *
-                                                                                100}{' '}
-                                                                            ซม.
-                                                                        </div>
-                                                                        <div className="font-semibold text-blue-400 print:text-black">
-                                                                            ต้น:{' '}
-                                                                            {summary.plantSpacing *
-                                                                                100}{' '}
-                                                                            ซม.
-                                                                        </div>
-                                                                    </div>
-                                                                    <div>
-                                                                        <div className="text-gray-400 print:text-gray-600">
-                                                                            Growth Info
-                                                                        </div>
-                                                                        <div className="font-semibold text-purple-400 print:text-black">
-                                                                            {summary.growthPeriod}{' '}
-                                                                            วัน
-                                                                        </div>
-                                                                        <div className="font-semibold text-purple-400 print:text-black">
-                                                                            น้ำ:{' '}
-                                                                            {
-                                                                                summary.irrigationNeeds
-                                                                            }
                                                                         </div>
                                                                     </div>
                                                                 </div>
