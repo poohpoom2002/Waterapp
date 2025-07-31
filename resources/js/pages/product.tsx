@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// resources/js/pages/product.tsx - Updated to support greenhouse mode
+// resources/js/pages/product.tsx - Enhanced Image Loading
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useMemo } from 'react';
@@ -30,10 +30,10 @@ import { calculateGardenStatistics, GardenStatistics } from '../utils/gardenStat
 
 // ADD: Import field crop data utilities
 import {
-    getFieldCropData,
-    migrateFromFieldMapData,
+    getEnhancedFieldCropData,
+    migrateToEnhancedFieldCropData,
     FieldCropData,
-    ZoneInfo as FieldZoneInfo,
+    calculateEnhancedFieldStats,
 } from '../utils/fieldCropData';
 
 // ADD: Import greenhouse data utilities
@@ -67,6 +67,93 @@ interface ZoneOperationGroup {
     order: number;
     label: string;
 }
+
+// Enhanced image loading and management functions
+const getStoredProjectImage = (projectMode: ProjectMode): string | null => {
+    // Priority order for image keys
+    const imageKeys = [
+        'projectMapImage', // Primary key - universal
+        `${projectMode}PlanImage`, // Project-specific key
+        'mapCaptureImage', // Backup key
+    ];
+
+    // Add mode-specific fallback keys
+    if (projectMode === 'field-crop') {
+        imageKeys.push('fieldCropPlanImage');
+    } else if (projectMode === 'garden') {
+        imageKeys.push('gardenPlanImage', 'homeGardenPlanImage');
+    } else if (projectMode === 'greenhouse') {
+        imageKeys.push('greenhousePlanImage');
+    } else if (projectMode === 'horticulture') {
+        imageKeys.push('horticulturePlanImage');
+    }
+
+    // Try each key in order
+    for (const key of imageKeys) {
+        const image = localStorage.getItem(key);
+        if (image && image.startsWith('data:image/')) {
+            console.log(`✅ Found project image with key: ${key}`);
+            
+            // Verify image metadata if available
+            try {
+                const metadata = localStorage.getItem('projectMapMetadata');
+                if (metadata) {
+                    const parsedMetadata = JSON.parse(metadata);
+                    console.log(`📊 Image metadata:`, parsedMetadata);
+                }
+            } catch (error) {
+                console.warn('⚠️ Could not parse image metadata:', error);
+            }
+            
+            return image;
+        }
+    }
+
+    console.warn(`⚠️ No project image found for mode: ${projectMode}`);
+    return null;
+};
+
+const validateImageData = (imageData: string): boolean => {
+    if (!imageData || !imageData.startsWith('data:image/')) {
+        return false;
+    }
+    
+    // Check if image data is not corrupted (minimum size check)
+    if (imageData.length < 1000) {
+        console.warn('⚠️ Image data appears to be too small');
+        return false;
+    }
+    
+    return true;
+};
+
+// Enhanced image cleanup function
+const cleanupOldImages = (): void => {
+    const imageKeys = [
+        'projectMapImage',
+        'fieldCropPlanImage', 
+        'gardenPlanImage',
+        'homeGardenPlanImage',
+        'greenhousePlanImage',
+        'horticulturePlanImage',
+        'mapCaptureImage'
+    ];
+    
+    let cleanedCount = 0;
+    imageKeys.forEach(key => {
+        const image = localStorage.getItem(key);
+        if (image && image.startsWith('blob:')) {
+            // Clean up old blob URLs
+            URL.revokeObjectURL(image);
+            localStorage.removeItem(key);
+            cleanedCount++;
+        }
+    });
+    
+    if (cleanedCount > 0) {
+        console.log(`🧹 Cleaned up ${cleanedCount} old image references`);
+    }
+};
 
 export default function Product() {
     const [projectMode, setProjectMode] = useState<ProjectMode>('horticulture');
@@ -102,14 +189,52 @@ export default function Product() {
     const [selectedPump, setSelectedPump] = useState<any>(null);
     const [showPumpOption, setShowPumpOption] = useState(true);
 
+    // Enhanced project image state with loading status
     const [projectImage, setProjectImage] = useState<string | null>(null);
+    const [imageLoading, setImageLoading] = useState<boolean>(false);
+    const [imageLoadError, setImageLoadError] = useState<string | null>(null);
     const [showImageModal, setShowImageModal] = useState(false);
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            const url = URL.createObjectURL(file);
-            setProjectImage(url);
+            setImageLoading(true);
+            setImageLoadError(null);
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const imageData = event.target?.result as string;
+                if (validateImageData(imageData)) {
+                    setProjectImage(imageData);
+                    
+                    // Save the uploaded image to localStorage with multiple keys
+                    const saveKeys = [
+                        'projectMapImage',
+                        `${projectMode}PlanImage`,
+                        'userUploadedImage'
+                    ];
+                    
+                    saveKeys.forEach(key => {
+                        try {
+                            localStorage.setItem(key, imageData);
+                        } catch (error) {
+                            console.warn(`Failed to save uploaded image with key ${key}:`, error);
+                        }
+                    });
+                    
+                    console.log('✅ User uploaded image saved successfully');
+                } else {
+                    setImageLoadError('Invalid image format');
+                }
+                setImageLoading(false);
+            };
+            
+            reader.onerror = () => {
+                setImageLoadError('Failed to read image file');
+                setImageLoading(false);
+            };
+            
+            reader.readAsDataURL(file);
         }
     };
 
@@ -117,14 +242,31 @@ export default function Product() {
         if (projectImage && projectImage.startsWith('blob:')) {
             URL.revokeObjectURL(projectImage);
         }
+        
+        // Clear from localStorage
+        const keysToRemove = [
+            'projectMapImage',
+            `${projectMode}PlanImage`,
+            'userUploadedImage',
+            'mapCaptureImage'
+        ];
+        
+        keysToRemove.forEach(key => {
+            localStorage.removeItem(key);
+        });
+        
         setProjectImage(null);
+        setImageLoadError(null);
+        console.log('🗑️ Project image deleted');
     };
 
+    // Enhanced cleanup on unmount
     useEffect(() => {
         return () => {
             if (projectImage && projectImage.startsWith('blob:')) {
                 URL.revokeObjectURL(projectImage);
             }
+            cleanupOldImages();
         };
     }, [projectImage]);
 
@@ -137,29 +279,59 @@ export default function Product() {
         }
     }, []);
 
-    // Fanggy005 EDIT: Updated image loading logic to be more robust.
-    // This now consistently checks for the 'projectMapImage' key set by summary pages.
+    // Enhanced project image loading with better error handling and validation
     useEffect(() => {
-        // This key is now the standard for all project types coming from a summary page.
-        const standardImage = localStorage.getItem('projectMapImage');
-        if (standardImage) {
-            console.log("✅ Found standard 'projectMapImage' in localStorage. Using it.");
-            setProjectImage(standardImage);
-            return; // Exit if the standard image is found
-        }
-
-        // Fallback for older versions or different flows for backward compatibility
-        if (projectMode === 'field-crop') {
-            const fieldCropImage = localStorage.getItem('fieldCropPlanImage');
-            if (fieldCropImage) {
-                console.log("⚠️ Found fallback 'fieldCropPlanImage' for field-crop mode.");
-                setProjectImage(fieldCropImage);
-            }
+        if (!projectMode) return;
+        
+        setImageLoading(true);
+        setImageLoadError(null);
+        
+        // Clean up old images first
+        cleanupOldImages();
+        
+        // Try to load image for current project mode
+        const image = getStoredProjectImage(projectMode);
+        
+        if (image && validateImageData(image)) {
+            setProjectImage(image);
+            console.log(`✅ Successfully loaded project image for ${projectMode} mode`);
+        } else {
+            console.log(`ℹ️ No valid project image found for ${projectMode} mode`);
+            setProjectImage(null);
+            
+            // Set appropriate message based on project mode
+            const modeNames = {
+                'field-crop': 'Field Crop Summary',
+                'garden': 'Garden Planner',
+                'greenhouse': 'Greenhouse Planner', 
+                'horticulture': 'Horticulture Planner'
+            };
+            
+            setImageLoadError(`No map image found. Please capture one from ${modeNames[projectMode]} page.`);
         }
         
-        console.log("ℹ️ No project map image found in localStorage.");
+        setImageLoading(false);
+    }, [projectMode]);
 
-    }, [projectMode]); // Rerun when projectMode is determined
+    // Enhanced image verification on mode change
+    useEffect(() => {
+        if (projectImage && projectMode) {
+            const isValid = validateImageData(projectImage);
+            if (!isValid) {
+                console.warn('⚠️ Current project image is invalid, attempting to reload...');
+                setProjectImage(null);
+                
+                // Try to reload valid image
+                const validImage = getStoredProjectImage(projectMode);
+                if (validImage && validateImageData(validImage)) {
+                    setProjectImage(validImage);
+                    setImageLoadError(null);
+                } else {
+                    setImageLoadError('Invalid or corrupted image data');
+                }
+            }
+        }
+    }, [projectImage, projectMode]);
 
     const getZoneName = (zoneId: string): string => {
         if (projectMode === 'garden' && gardenStats) {
@@ -178,7 +350,7 @@ export default function Product() {
         return zone?.name || zoneId;
     };
 
-    // ADD: Create greenhouse zone input
+    // UPDATED: Create greenhouse zone input using enhanced data
     const createGreenhouseZoneInput = (
         plot: PlotStats,
         greenhouseData: GreenhousePlanningData,
@@ -189,18 +361,15 @@ export default function Product() {
         // Get crop data for this plot
         const crop = getCropByValue(plot.cropType || '');
 
-        // Calculate planting points for this plot
-        const totalTrees = plot.production.totalPlants || 100;
-        const waterPerTree =
-            plot.production.waterRequirementPerIrrigation / Math.max(totalTrees, 1) || 50;
+        // Use enhanced production data from plot
+        const totalTrees = plot.production.totalPlants;
+        const waterPerTree = plot.production.waterRequirementPerIrrigation / Math.max(totalTrees, 1);
 
-        // Use pipe stats from the plot
-        const longestBranch = plot.pipeStats.sub.longest || 30;
-        const totalBranchLength = plot.pipeStats.sub.totalLength || 100;
+        // Use enhanced pipe stats from the plot
+        const longestBranch = plot.pipeStats.drip.longest || plot.pipeStats.sub.longest || 30;
+        const totalBranchLength = plot.pipeStats.drip.totalLength || plot.pipeStats.sub.totalLength || 100;
         const longestSubmain = plot.pipeStats.main.longest || 0;
         const totalSubmainLength = plot.pipeStats.main.totalLength || 0;
-        const longestMain = plot.pipeStats.main.longest || 0;
-        const totalMainLength = plot.pipeStats.main.totalLength || 0;
 
         return {
             farmSizeRai: formatNumber(areaInRai, 3),
@@ -225,20 +394,18 @@ export default function Product() {
             totalBranchPipeM: formatNumber(totalBranchLength, 3),
             longestSecondaryPipeM: formatNumber(longestSubmain, 3),
             totalSecondaryPipeM: formatNumber(totalSubmainLength, 3),
-            longestMainPipeM: formatNumber(longestMain, 3),
-            totalMainPipeM: formatNumber(totalMainLength, 3),
+            longestMainPipeM: 0,
+            totalMainPipeM: 0,
         };
     };
 
-    // ADD: Create single greenhouse input (when there's only one plot)
+    // UPDATED: Create single greenhouse input using enhanced data
     const createSingleGreenhouseInput = (
         greenhouseData: GreenhousePlanningData
     ): IrrigationInput => {
         const areaInRai = greenhouseData.summary.totalPlotArea / 1600;
         const totalTrees = greenhouseData.summary.overallProduction.totalPlants;
-        const waterPerTree =
-            greenhouseData.summary.overallProduction.waterRequirementPerIrrigation /
-            Math.max(totalTrees, 1);
+        const waterPerTree = greenhouseData.summary.overallProduction.waterRequirementPerIrrigation / Math.max(totalTrees, 1);
 
         return {
             farmSizeRai: formatNumber(areaInRai, 3),
@@ -260,10 +427,12 @@ export default function Product() {
             secondariesPerLongestMain: 1,
 
             longestBranchPipeM: formatNumber(
+                greenhouseData.summary.overallPipeStats.drip.longest || 
                 greenhouseData.summary.overallPipeStats.sub.longest || 30,
                 3
             ),
             totalBranchPipeM: formatNumber(
+                greenhouseData.summary.overallPipeStats.drip.totalLength || 
                 greenhouseData.summary.overallPipeStats.sub.totalLength || 100,
                 3
             ),
@@ -275,20 +444,14 @@ export default function Product() {
                 greenhouseData.summary.overallPipeStats.main.totalLength || 0,
                 3
             ),
-            longestMainPipeM: formatNumber(
-                greenhouseData.summary.overallPipeStats.main.longest || 0,
-                3
-            ),
-            totalMainPipeM: formatNumber(
-                greenhouseData.summary.overallPipeStats.main.totalLength || 0,
-                3
-            ),
+            longestMainPipeM: 0,
+            totalMainPipeM: 0,
         };
     };
 
-    // ADD: Create field crop zone input
+    // UPDATED: Create field crop zone input using enhanced data
     const createFieldCropZoneInput = (
-        zone: FieldZoneInfo,
+        zone: FieldCropData['zones']['info'][0],
         fieldData: FieldCropData,
         totalZones: number
     ): IrrigationInput => {
@@ -298,40 +461,18 @@ export default function Product() {
         const assignedCropValue = fieldData.crops.zoneAssignments[zone.id];
         const crop = assignedCropValue ? getCropByValue(assignedCropValue) : null;
 
-        // Calculate planting points for this zone
-        let totalTrees = 100; // default
-        let waterPerTree = 50; // default liters per tree
+        // Use enhanced zone data
+        const totalTrees = zone.totalPlantingPoints;
+        const waterPerTree = zone.totalWaterRequirementPerDay / Math.max(totalTrees, 1);
 
-        if (crop) {
-            const rowSpacing =
-                fieldData.crops.spacing.rowSpacing[assignedCropValue] || crop.rowSpacing / 100;
-            const plantSpacing =
-                fieldData.crops.spacing.plantSpacing[assignedCropValue] || crop.plantSpacing / 100;
-
-            if (rowSpacing > 0 && plantSpacing > 0) {
-                const plantsPerSqm = (1 / rowSpacing) * (1 / plantSpacing);
-                totalTrees = Math.floor(zone.area * plantsPerSqm);
-            }
-
-            if (crop.waterRequirement) {
-                waterPerTree = crop.waterRequirement;
-            }
-        }
-
-        // Get pipe data for this zone
-        const zonePipes = fieldData.pipes.connections.filter((p) => p.zoneId === zone.id);
-        const branchPipes = zonePipes.filter((p) => p.type === 'lateral');
-        const submainPipes = zonePipes.filter((p) => p.type === 'submain');
-        const mainPipes = zonePipes.filter((p) => p.type === 'main');
-
-        const longestBranch =
-            branchPipes.length > 0 ? Math.max(...branchPipes.map((p) => p.length)) : 30;
-        const totalBranchLength = branchPipes.reduce((sum, p) => sum + p.length, 0) || 100;
-        const longestSubmain =
-            submainPipes.length > 0 ? Math.max(...submainPipes.map((p) => p.length)) : 0;
-        const totalSubmainLength = submainPipes.reduce((sum, p) => sum + p.length, 0) || 0;
-        const longestMain = mainPipes.length > 0 ? Math.max(...mainPipes.map((p) => p.length)) : 0;
-        const totalMainLength = mainPipes.reduce((sum, p) => sum + p.length, 0) || 0;
+        // Use enhanced pipe stats from zone
+        const zonePipeStats = zone.pipeStats;
+        const longestBranch = zonePipeStats.lateral.longest || 30;
+        const totalBranchLength = zonePipeStats.lateral.totalLength || 100;
+        const longestSubmain = zonePipeStats.submain.longest || 0;
+        const totalSubmainLength = zonePipeStats.submain.totalLength || 0;
+        const longestMain = zonePipeStats.main.longest || 0;
+        const totalMainLength = zonePipeStats.main.totalLength || 0;
 
         return {
             farmSizeRai: formatNumber(areaInRai, 3),
@@ -344,28 +485,13 @@ export default function Product() {
             pressureHeadM: 20,
             pipeAgeYears: 0,
 
-            sprinklersPerBranch: Math.max(
-                1,
-                Math.ceil(totalTrees / Math.max(branchPipes.length, 1))
-            ),
-            branchesPerSecondary: Math.max(
-                1,
-                Math.ceil(branchPipes.length / Math.max(submainPipes.length, 1))
-            ),
+            sprinklersPerBranch: Math.max(1, Math.ceil(totalTrees / 5)),
+            branchesPerSecondary: 1,
             simultaneousZones: 1,
 
-            sprinklersPerLongestBranch: Math.max(
-                1,
-                Math.ceil(totalTrees / Math.max(branchPipes.length, 1))
-            ),
-            branchesPerLongestSecondary: Math.max(
-                1,
-                Math.ceil(branchPipes.length / Math.max(submainPipes.length, 1))
-            ),
-            secondariesPerLongestMain: Math.max(
-                1,
-                Math.ceil(submainPipes.length / Math.max(mainPipes.length, 1))
-            ),
+            sprinklersPerLongestBranch: Math.max(1, Math.ceil(totalTrees / 5)),
+            branchesPerLongestSecondary: 1,
+            secondariesPerLongestMain: 1,
 
             longestBranchPipeM: formatNumber(longestBranch, 3),
             totalBranchPipeM: formatNumber(totalBranchLength, 3),
@@ -376,12 +502,11 @@ export default function Product() {
         };
     };
 
-    // ADD: Create single field crop input (when there's only one area)
+    // UPDATED: Create single field crop input using enhanced data
     const createSingleFieldCropInput = (fieldData: FieldCropData): IrrigationInput => {
         const areaInRai = fieldData.area.size / 1600;
         const totalTrees = fieldData.summary.totalPlantingPoints;
-        const waterPerTree =
-            fieldData.summary.totalWaterRequirementPerIrrigation / Math.max(totalTrees, 1);
+        const waterPerTree = fieldData.summary.totalWaterRequirementPerDay / Math.max(totalTrees, 1);
 
         return {
             farmSizeRai: formatNumber(areaInRai, 3),
@@ -789,7 +914,6 @@ export default function Product() {
         let mode = urlParams.get('mode') as ProjectMode;
         const storedType = localStorage.getItem('projectType');
 
-        // UPDATE: Handle greenhouse mode
         if (!mode && storedType === 'greenhouse') {
             mode = 'greenhouse';
         } else if (!mode && storedType === 'field-crop') {
@@ -798,14 +922,12 @@ export default function Product() {
             mode = 'garden';
         }
         
-        // ADD: Handle greenhouse mode
+        // UPDATED: Handle greenhouse mode with enhanced data
         if (mode === 'greenhouse') {
             setProjectMode('greenhouse');
 
-            // Try to load existing greenhouse data
             let data = getGreenhouseData();
 
-            // If no data exists, try to migrate from old format
             if (!data) {
                 data = migrateLegacyGreenhouseData();
             }
@@ -857,18 +979,17 @@ export default function Product() {
                 }
             } else {
                 console.warn('⚠️ No greenhouse data found');
-                // Redirect back to greenhouse-summary or greenhouse-crop
                 router.visit('/greenhouse-crop');
             }
-        } else if (mode === 'field-crop') {
+        } 
+        // UPDATED: Handle field-crop mode with enhanced data
+        else if (mode === 'field-crop') {
             setProjectMode('field-crop');
 
-            // Try to load existing field crop data
-            let fieldData = getFieldCropData();
+            let fieldData = getEnhancedFieldCropData();
 
-            // If no data exists, try to migrate from old format
             if (!fieldData) {
-                fieldData = migrateFromFieldMapData();
+                fieldData = migrateToEnhancedFieldCropData();
             }
 
             if (fieldData) {
@@ -918,7 +1039,6 @@ export default function Product() {
                 }
             } else {
                 console.warn('⚠️ No field crop data found');
-                // Redirect back to field-crop-summary or field-map
                 router.visit('/field-map');
             }
         } else if (mode === 'garden') {
@@ -1100,6 +1220,7 @@ export default function Product() {
         };
     };
 
+    // UPDATED: Get zones data for different project modes
     const getZonesData = () => {
         if (projectMode === 'garden' && gardenStats) {
             return gardenStats.zones.map((z) => ({
@@ -1113,37 +1234,15 @@ export default function Product() {
         }
         if (projectMode === 'field-crop' && fieldCropData) {
             return fieldCropData.zones.info.map((z) => {
-                // Calculate planting points for this zone
                 const assignedCropValue = fieldCropData.crops.zoneAssignments[z.id];
                 const crop = assignedCropValue ? getCropByValue(assignedCropValue) : null;
-
-                let plantCount = 100; // default
-                let totalWaterNeed = 5000; // default
-
-                if (crop) {
-                    const rowSpacing =
-                        fieldCropData.crops.spacing.rowSpacing[assignedCropValue] ||
-                        crop.rowSpacing / 100;
-                    const plantSpacing =
-                        fieldCropData.crops.spacing.plantSpacing[assignedCropValue] ||
-                        crop.plantSpacing / 100;
-
-                    if (rowSpacing > 0 && plantSpacing > 0) {
-                        const plantsPerSqm = (1 / rowSpacing) * (1 / plantSpacing);
-                        plantCount = Math.floor(z.area * plantsPerSqm);
-                    }
-
-                    if (crop.waterRequirement) {
-                        totalWaterNeed = plantCount * crop.waterRequirement;
-                    }
-                }
 
                 return {
                     id: z.id,
                     name: z.name,
                     area: z.area,
-                    plantCount: plantCount,
-                    totalWaterNeed: totalWaterNeed,
+                    plantCount: z.totalPlantingPoints,
+                    totalWaterNeed: z.totalWaterRequirementPerDay,
                     plantData: crop
                         ? {
                               name: crop.name,
@@ -1156,7 +1255,6 @@ export default function Product() {
         }
         if (projectMode === 'greenhouse' && greenhouseData) {
             return greenhouseData.summary.plotStats.map((p) => {
-                // Get crop data for this plot
                 const crop = getCropByValue(p.cropType || '');
 
                 return {
@@ -1195,6 +1293,7 @@ export default function Product() {
         return zone?.name || zoneId;
     };
 
+    // UPDATED: Get active zone for different project modes
     const getActiveZone = () => {
         if (projectMode === 'garden' && gardenStats) {
             const zone = gardenStats.zones.find((z) => z.zoneId === activeZoneId);
@@ -1212,37 +1311,15 @@ export default function Product() {
         if (projectMode === 'field-crop' && fieldCropData) {
             const zone = fieldCropData.zones.info.find((z) => z.id === activeZoneId);
             if (zone) {
-                // Calculate planting points for this zone
                 const assignedCropValue = fieldCropData.crops.zoneAssignments[zone.id];
                 const crop = assignedCropValue ? getCropByValue(assignedCropValue) : null;
-
-                let plantCount = 100; // default
-                let totalWaterNeed = 5000; // default
-
-                if (crop) {
-                    const rowSpacing =
-                        fieldCropData.crops.spacing.rowSpacing[assignedCropValue] ||
-                        crop.rowSpacing / 100;
-                    const plantSpacing =
-                        fieldCropData.crops.spacing.plantSpacing[assignedCropValue] ||
-                        crop.plantSpacing / 100;
-
-                    if (rowSpacing > 0 && plantSpacing > 0) {
-                        const plantsPerSqm = (1 / rowSpacing) * (1 / plantSpacing);
-                        plantCount = Math.floor(zone.area * plantsPerSqm);
-                    }
-
-                    if (crop.waterRequirement) {
-                        totalWaterNeed = plantCount * crop.waterRequirement;
-                    }
-                }
 
                 return {
                     id: zone.id,
                     name: zone.name,
                     area: zone.area,
-                    plantCount: plantCount,
-                    totalWaterNeed: totalWaterNeed,
+                    plantCount: zone.totalPlantingPoints,
+                    totalWaterNeed: zone.totalWaterRequirementPerDay,
                     plantData: crop
                         ? {
                               name: crop.name,
@@ -1256,7 +1333,6 @@ export default function Product() {
         if (projectMode === 'greenhouse' && greenhouseData) {
             const plot = greenhouseData.summary.plotStats.find((p) => p.plotId === activeZoneId);
             if (plot) {
-                // Get crop data for this plot
                 const crop = getCropByValue(plot.cropType || '');
 
                 return {
@@ -1400,9 +1476,23 @@ export default function Product() {
                                     <h2 className="text-lg font-semibold text-blue-400">
                                         📐 {t('แผนผัง')}
                                     </h2>
+                                    {/* Enhanced image status indicator */}
+                                    {imageLoading && (
+                                        <div className="flex items-center gap-2">
+                                            <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-blue-400"></div>
+                                            <span className="text-xs text-blue-400">Loading...</span>
+                                        </div>
+                                    )}
                                 </div>
 
-                                {projectImage ? (
+                                {imageLoading ? (
+                                    <div className="flex h-[280px] items-center justify-center rounded-lg bg-gray-700">
+                                        <div className="text-center">
+                                            <div className="mb-2 inline-block h-8 w-8 animate-spin rounded-full border-b-2 border-blue-400"></div>
+                                            <p className="text-sm text-gray-400">กำลังโหลดภาพ...</p>
+                                        </div>
+                                    </div>
+                                ) : projectImage ? (
                                     <div
                                         className="group relative flex items-center justify-center"
                                         style={{ minHeight: 0 }}
@@ -1421,6 +1511,11 @@ export default function Product() {
                                             className="aspect-video max-h-[500px] w-full cursor-pointer rounded-lg object-contain transition-transform hover:scale-105"
                                             style={{ maxHeight: '500px', minHeight: '300px' }}
                                             onClick={() => setShowImageModal(true)}
+                                            onError={() => {
+                                                console.warn('Failed to load project image');
+                                                setImageLoadError('Failed to load image');
+                                                setProjectImage(null);
+                                            }}
                                         />
                                         <div className="absolute right-2 top-2 flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
                                             <label className="cursor-pointer rounded-full bg-blue-600 p-2 text-sm hover:bg-blue-700">
@@ -1435,39 +1530,69 @@ export default function Product() {
                                             <button
                                                 onClick={handleImageDelete}
                                                 className="rounded-full bg-red-600 p-2 text-sm hover:bg-red-700"
+                                                title="Delete image"
                                             >
                                                 ×
                                             </button>
                                         </div>
+                                        {/* Enhanced project mode indicator */}
+                                        <div className="absolute left-2 top-2">
+                                            <div
+                                                className={`rounded-lg px-2 py-1 text-xs font-medium ${
+                                                    projectMode === 'garden'
+                                                        ? 'bg-green-600 text-white'
+                                                        : projectMode === 'field-crop'
+                                                          ? 'bg-yellow-600 text-white'
+                                                          : projectMode === 'greenhouse'
+                                                            ? 'bg-purple-600 text-white'
+                                                            : 'bg-orange-600 text-white'
+                                                }`}
+                                            >
+                                                {projectMode === 'garden'
+                                                    ? '🏡 สวนบ้าน'
+                                                    : projectMode === 'field-crop'
+                                                      ? '🌾 พืชไร่'
+                                                      : projectMode === 'greenhouse'
+                                                        ? '🏠 โรงเรือน'
+                                                        : '🌱 พืชสวน'}
+                                            </div>
+                                        </div>
                                     </div>
                                 ) : (
-                                    <label className="flex h-[280px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-600 hover:border-blue-500">
-                                        <div className="text-4xl text-gray-500">📷</div>
-                                        <p className="mt-2 text-sm text-gray-400">
-                                            {projectMode === 'garden'
-                                                ? t('เพิ่มรูปแผนผังสวนบ้าน')
-                                                : projectMode === 'field-crop'
-                                                  ? t('เพิ่มรูปแผนผังพืชไร่')
-                                                  : projectMode === 'greenhouse'
-                                                    ? t('เพิ่มรูปแผนผังโรงเรือน')
-                                                    : t('เพิ่มรูปแผนผังพืชสวน')}
-                                        </p>
-                                        <p className="mt-1 text-xs text-gray-500">
-                                            {projectMode === 'garden'
-                                                ? t('หรือส่งออกจากหน้าสรุปผลสวนบ้าน')
-                                                : projectMode === 'field-crop'
-                                                  ? t('หรือส่งออกจากหน้าสรุปผลพืชไร่')
-                                                  : projectMode === 'greenhouse'
-                                                    ? t('หรือส่งออกจากหน้าสรุปผลโรงเรือน')
-                                                    : t('หรือส่งออกจากหน้าสรุปผลพืชสวน')}
-                                        </p>
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={handleImageUpload}
-                                            className="hidden"
-                                        />
-                                    </label>
+                                    <div className="rounded-lg border-2 border-dashed border-gray-600">
+                                        <label className="flex h-[280px] cursor-pointer flex-col items-center justify-center hover:border-blue-500">
+                                            <div className="text-4xl text-gray-500">📷</div>
+                                            <p className="mt-2 text-sm text-gray-400">
+                                                {projectMode === 'garden'
+                                                    ? t('เพิ่มรูปแผนผังสวนบ้าน')
+                                                    : projectMode === 'field-crop'
+                                                      ? t('เพิ่มรูปแผนผังพืชไร่')
+                                                      : projectMode === 'greenhouse'
+                                                        ? t('เพิ่มรูปแผนผังโรงเรือน')
+                                                        : t('เพิ่มรูปแผนผังพืชสวน')}
+                                            </p>
+                                            <p className="mt-1 text-xs text-gray-500">
+                                                {projectMode === 'garden'
+                                                    ? t('หรือส่งออกจากหน้าสรุปผลสวนบ้าน')
+                                                    : projectMode === 'field-crop'
+                                                      ? t('หรือส่งออกจากหน้าสรุปผลพืชไร่')
+                                                      : projectMode === 'greenhouse'
+                                                        ? t('หรือส่งออกจากหน้าสรุปผลโรงเรือน')
+                                                        : t('หรือส่งออกจากหน้าสรุปผลพืชสวน')}
+                                            </p>
+                                            {imageLoadError && (
+                                                <p className="mt-2 text-xs text-red-400">
+                                                    {imageLoadError}
+                                                </p>
+                                            )}
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handleImageUpload}
+                                                className="hidden"
+                                            />
+                                        </label>
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -1802,6 +1927,8 @@ export default function Product() {
                                     }
                                     zoneOperationGroups={zoneOperationGroups}
                                     getZoneName={getZoneNameForSummary}
+                                    fieldCropData={fieldCropData}
+                                    greenhouseData={greenhouseData}
                                 />
 
                                 <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -1832,7 +1959,6 @@ export default function Product() {
                                         </div>
                                     )}
 
-                                    {/* แถวใหม่สำหรับท่อหลักกับปั๊มน้ำ */}
                                     {hasValidMainPipeData && (
                                         <PipeSelector
                                             pipeType="main"
@@ -1879,6 +2005,8 @@ export default function Product() {
                                     onQuotationClick={handleOpenQuotationModal}
                                     projectMode={projectMode}
                                     showPump={projectMode === 'horticulture' || showPumpOption}
+                                    fieldCropData={fieldCropData}
+                                    greenhouseData={greenhouseData}
                                 />
                             </>
                         )}
@@ -1915,7 +2043,6 @@ export default function Product() {
                                 } Project`}
                                 className="max-h-full max-w-full rounded-lg"
                             />
-                            {/* แสดงข้อมูลประเภทของโปรเจคใน Modal */}
                             <div className="absolute left-4 top-4">
                                 <div
                                     className={`rounded-lg px-3 py-1 text-sm font-medium ${
