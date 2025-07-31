@@ -814,3 +814,62 @@ export const normalizeEquipmentData = (
 
     return normalized;
 };
+
+// Field-crop and greenhouse specific utility functions
+export const convertAreaUnits = {
+    sqmToRai: (sqm: number): number => formatNumber(sqm / 1600, 3),
+    raiToSqm: (rai: number): number => formatNumber(rai * 1600, 1),
+    formatArea: (sqm: number): string => {
+        const rai = sqm / 1600;
+        if (rai >= 1) {
+            return `${formatNumber(rai, 2)} ไร่`;
+        }
+        return `${formatNumber(sqm, 0)} ตร.ม.`;
+    }
+};
+
+export const calculatePlantingDensity = (
+    areaSqm: number,
+    rowSpacingM: number,
+    plantSpacingM: number
+): number => {
+    if (!areaSqm || !rowSpacingM || !plantSpacingM) return 0;
+    const plantsPerSqm = (1 / rowSpacingM) * (1 / plantSpacingM);
+    return Math.floor(areaSqm * plantsPerSqm);
+};
+
+export const calculateWaterRequirementPerArea = (
+    plantCount: number,
+    waterPerPlantLiters: number
+): number => {
+    return formatNumber(plantCount * waterPerPlantLiters, 1);
+};
+
+export const calculateProductionEstimate = (
+    areaSqm: number,
+    yieldPerRai: number,
+    pricePerKg: number
+): { yield: number; income: number } => {
+    const areaRai = areaSqm / 1600;
+    const totalYield = Math.round(areaRai * yieldPerRai);
+    const totalIncome = Math.round(totalYield * pricePerKg);
+    return { yield: totalYield, income: totalIncome };
+};
+
+export const validateFieldCropInput = (input: any): boolean => {
+    return !!(
+        input &&
+        input.area > 0 &&
+        input.totalPlantingPoints > 0 &&
+        input.waterRequirement >= 0
+    );
+};
+
+export const validateGreenhouseInput = (input: any): boolean => {
+    return !!(
+        input &&
+        input.area > 0 &&
+        input.totalPlants > 0 &&
+        input.waterRequirement >= 0
+    );
+};
