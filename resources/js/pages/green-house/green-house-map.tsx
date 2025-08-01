@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Navbar from '../../components/Navbar';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 // Types
 interface Point {
@@ -55,58 +56,60 @@ interface Crop {
     description: string;
 }
 
-// Tools configuration
-const tools: Tool[] = [
-    {
-        id: 'select',
-        name: 'Select',
-        icon: '↖️',
-        description: 'Select and edit components',
-        category: 'select',
-    },
-    { id: 'main-pipe', name: 'Main Pipe', icon: '🔵', description: 'Draw main pipe', category: 'pipe' },
-    { id: 'sub-pipe', name: 'Sub Pipe', icon: '🟢', description: 'Draw sub pipe', category: 'pipe' },
-    { id: 'pump', name: 'Pump', icon: '⚙️', description: 'Place water pump', category: 'component' },
-    {
-        id: 'solenoid-valve',
-        name: 'Solenoid Valve',
-        icon: '🔧',
-        description: 'Place solenoid valve',
-        category: 'component',
-    },
-    {
-        id: 'ball-valve',
-        name: 'Ball Valve',
-        icon: '🟡',
-        description: 'Place ball valve',
-        category: 'component',
-    },
-    {
-        id: 'sprinkler',
-        name: 'Mini Sprinkler',
-        icon: '💦',
-        description: 'Place mini sprinkler',
-        category: 'irrigation',
-    },
-    {
-        id: 'drip-line',
-        name: 'Drip Line',
-        icon: '💧',
-        description: 'Place drip line',
-        category: 'irrigation',
-    },
-];
-
-// Irrigation methods
-const irrigationMethods = {
-    'mini-sprinkler': { name: 'Mini Sprinkler', radius: 30, spacing: 50 },
-    drip: { name: 'Drip Irrigation', radius: 0, spacing: 20 },
-};
-
-const GRID_SIZE = 25;
-const CANVAS_SIZE = { width: 2400, height: 1600 };
-
 export default function GreenhouseMap() {
+    const { t } = useLanguage();
+    
+    // Tools configuration
+    const tools: Tool[] = [
+        {
+            id: 'select',
+            name: t('เลือก'),
+            icon: '↖️',
+            description: t('เลือกและแก้ไขอุปกรณ์'),
+            category: 'select',
+        },
+        { id: 'main-pipe', name: t('ท่อเมน'), icon: '🔵', description: t('วาดท่อเมน'), category: 'pipe' },
+        { id: 'sub-pipe', name: t('ท่อย่อย'), icon: '🟢', description: t('วาดท่อย่อย'), category: 'pipe' },
+        { id: 'pump', name: t('ปั๊ม'), icon: '⚙️', description: t('วางปั๊มน้ำ'), category: 'component' },
+        {
+            id: 'solenoid-valve',
+            name: t('โซลินอยด์วาล์ว'),
+            icon: '🔧',
+            description: t('วางโซลินอยด์วาล์ว'),
+            category: 'component',
+        },
+        {
+            id: 'ball-valve',
+            name: t('บอลวาล์ว'),
+            icon: '🟡',
+            description: t('วางบอลวาล์ว'),
+            category: 'component',
+        },
+        {
+            id: 'sprinkler',
+            name: t('มินิสปริงเกลอร์'),
+            icon: '💦',
+            description: t('วางมินิสปริงเกลอร์'),
+            category: 'irrigation',
+        },
+        {
+            id: 'drip-line',
+            name: t('สายน้ำหยด'),
+            icon: '💧',
+            description: t('วางสายน้ำหยด'),
+            category: 'irrigation',
+        },
+    ];
+
+    // Irrigation methods
+    const irrigationMethods = {
+        'mini-sprinkler': { name: t('มินิสปริงเกลอร์'), radius: 30, spacing: 50 },
+        drip: { name: t('น้ำหยด'), radius: 0, spacing: 20 },
+    };
+
+    const GRID_SIZE = 25;
+    const CANVAS_SIZE = { width: 2400, height: 1600 };
+
     // Canvas and interaction states
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [selectedTool, setSelectedTool] = useState('select');
@@ -178,7 +181,7 @@ export default function GreenhouseMap() {
         const cropsParam = urlParams.get('crops');
         const shapesParam = urlParams.get('shapes');
         const irrigationParam = urlParams.get('irrigation');
-        const loadIrrigationParam = urlParams.get('loadIrrigation'); // Added this
+        const loadIrrigationParam = urlParams.get('loadIrrigation');
 
         console.log('Map received:', {
             crops: cropsParam,
@@ -237,43 +240,43 @@ export default function GreenhouseMap() {
         const basicCrops: Record<string, Crop> = {
             tomato: {
                 value: 'tomato',
-                name: 'Tomato',
+                name: t('มะเขือเทศ'),
                 nameEn: 'Tomato',
                 icon: '🍅',
                 category: 'vegetables',
-                description: 'Tomato',
+                description: t('มะเขือเทศ'),
             },
             'bell-pepper': {
                 value: 'bell-pepper',
-                name: 'Bell Pepper',
+                name: t('พริกหวาน'),
                 nameEn: 'Bell Pepper',
                 icon: '🫑',
                 category: 'vegetables',
-                description: 'Bell Pepper',
+                description: t('พริกหวาน'),
             },
             cucumber: {
                 value: 'cucumber',
-                name: 'Cucumber',
+                name: t('แตงกวา'),
                 nameEn: 'Cucumber',
                 icon: '🥒',
                 category: 'vegetables',
-                description: 'Cucumber',
+                description: t('แตงกวา'),
             },
             lettuce: {
                 value: 'lettuce',
-                name: 'Lettuce',
+                name: t('ผักกาดหอม'),
                 nameEn: 'Lettuce',
                 icon: '🥬',
                 category: 'vegetables',
-                description: 'Lettuce',
+                description: t('ผักกาดหอม'),
             },
             strawberry: {
                 value: 'strawberry',
-                name: 'Strawberry',
+                name: t('สตรอเบอร์รี่'),
                 nameEn: 'Strawberry',
                 icon: '🍓',
                 category: 'fruits',
-                description: 'Strawberry',
+                description: t('สตรอเบอร์รี่'),
             },
         };
 
@@ -287,7 +290,7 @@ export default function GreenhouseMap() {
                 description: value,
             }
         );
-    }, []);
+    }, [t]);
 
     // Check if prerequisites are met for auto generation
     const canAutoGenerate = useMemo(() => {
@@ -986,7 +989,7 @@ export default function GreenhouseMap() {
                     // Select and start dragging (only when not holding Ctrl)
                     if (clickedElement.type === 'shape' && clickedElement.element.type === 'plot') {
                         if (selectedCrops.length === 0) {
-                            alert('No crops selected. Please go back to select crops first.');
+                            alert(t('ไม่มีพืชที่เลือกไว้ กรุณากลับไปเลือกพืชในขั้นตอนแรก'));
                             return;
                         }
                         setSelectedPlot(clickedElement.element.id);
@@ -1069,6 +1072,7 @@ export default function GreenhouseMap() {
             getRawMousePos,
             isDrawing,
             globalRadius,
+            t,
         ]
     );
 
@@ -1367,7 +1371,7 @@ export default function GreenhouseMap() {
                 // แสดงข้อความแจ้งเตือน
                 if (relatedSprinklers.length > 0) {
                     alert(
-                        `ลบท่อย่อยและสปริงเกลอร์ ${relatedSprinklers.length} ตัวที่เกี่ยวข้องเรียบร้อยแล้ว`
+                        t('ลบท่อย่อยและสปริงเกลอร์ {count} ตัวที่เกี่ยวข้องเรียบร้อยแล้ว').replace('{count}', relatedSprinklers.length.toString())
                     );
                 }
             } else if (elementToDelete && elementToDelete.type === 'drip-line') {
@@ -1381,16 +1385,16 @@ export default function GreenhouseMap() {
 
             setSelectedElement(null);
         }
-    }, [selectedElement, irrigationElements]);
+    }, [selectedElement, irrigationElements, t]);
 
     const autoGenerateSprinklers = useCallback(() => {
         if (!canAutoGenerate) {
-            alert('Please draw main pipe and sub-pipe before auto generation');
+            alert(t('กรุณาวาดท่อเมนและท่อย่อยก่อนการสร้างอัตโนมัติ'));
             return;
         }
 
         if (selectedIrrigationMethod !== 'mini-sprinkler') {
-            alert('This function is only available for mini sprinkler system');
+            alert(t('ฟังก์ชันนี้ใช้ได้เฉพาะระบบสปริงเกลอร์เท่านั้น'));
             return;
         }
 
@@ -1484,20 +1488,20 @@ export default function GreenhouseMap() {
 
         if (newSprinklers.length > 0) {
             setIrrigationElements((prev) => [...prev, ...newSprinklers]);
-            alert(`Created ${newSprinklers.length} mini sprinklers along new sub-pipes successfully`);
+            alert(t('สร้างมินิสปริงเกลอร์ {count} ตัวตามแนวท่อย่อยใหม่เรียบร้อยแล้ว').replace('{count}', newSprinklers.length.toString()));
         } else {
-            alert('All sub-pipes already have mini sprinklers');
+            alert(t('ท่อย่อยทั้งหมดมีมินิสปริงเกลอร์อยู่แล้ว'));
         }
-    }, [canAutoGenerate, selectedIrrigationMethod, irrigationElements, globalRadius]);
+    }, [canAutoGenerate, selectedIrrigationMethod, irrigationElements, globalRadius, t]);
 
     const autoGenerateDripLines = useCallback(() => {
         if (!canAutoGenerate) {
-            alert('Please draw main pipe and sub-pipe before auto generation');
+            alert(t('กรุณาวาดท่อเมนและท่อย่อยก่อนการสร้างอัตโนมัติ'));
             return;
         }
 
         if (selectedIrrigationMethod !== 'drip') {
-            alert('This function is only available for drip irrigation system');
+            alert(t('ฟังก์ชันนี้ใช้ได้เฉพาะระบบน้ำหยดเท่านั้น'));
             return;
         }
 
@@ -1549,11 +1553,11 @@ export default function GreenhouseMap() {
 
         if (newDripLines.length > 0) {
             setIrrigationElements((prev) => [...prev, ...newDripLines]);
-            alert(`Created ${newDripLines.length} drip lines along new sub-pipes successfully`);
+            alert(t('สร้างสายน้ำหยด {count} เส้นตามแนวท่อย่อยใหม่เรียบร้อยแล้ว').replace('{count}', newDripLines.length.toString()));
         } else {
-            alert('All sub-pipes already have drip lines');
+            alert(t('ท่อย่อยทั้งหมดมีสายน้ำหยดอยู่แล้ว'));
         }
-    }, [canAutoGenerate, selectedIrrigationMethod, irrigationElements, globalDripSpacing]);
+    }, [canAutoGenerate, selectedIrrigationMethod, irrigationElements, globalDripSpacing, t]);
 
     const assignCropToPlot = useCallback(
         (cropValue: string) => {
@@ -1695,27 +1699,27 @@ export default function GreenhouseMap() {
                 <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-3">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h1 className="text-xl font-bold">💧 Greenhouse Irrigation System Design (Large)</h1>
+                            <h1 className="text-xl font-bold">💧 {t('ออกแบบระบบน้ำในโรงเรือน (ขนาดใหญ่)')}</h1>
                             <p className="text-sm text-gray-400">
-                                Irrigation system design:{' '}
+                                {t('ออกแบบระบบการให้น้ำแบบ')}:{' '}
                                 {
                                     irrigationMethods[
                                         selectedIrrigationMethod as keyof typeof irrigationMethods
                                     ]?.name
                                 }{' '}
-                                - Area 2400x1600 pixels
+                                - {t('พื้นที่')} 2400x1600 pixels
                             </p>
                         </div>
                         <div className="flex items-center space-x-2 text-sm text-gray-400">
-                            <span className="text-green-400">✓ Select Crops</span>
+                            <span className="text-green-400">✓ {t('เลือกพืช')}</span>
                             <span>→</span>
-                            <span className="text-green-400">✓ Planning</span>
+                            <span className="text-green-400">✓ {t('วางแผน')}</span>
                             <span>→</span>
-                            <span className="text-green-400">✓ Design Area</span>
+                            <span className="text-green-400">✓ {t('ออกแบบพื้นที่')}</span>
                             <span>→</span>
-                            <span className="text-green-400">✓ Choose Irrigation</span>
+                            <span className="text-green-400">✓ {t('เลือกระบบน้ำ')}</span>
                             <span>→</span>
-                            <span className="font-medium text-blue-400">Design Irrigation System</span>
+                            <span className="font-medium text-blue-400">{t('ออกแบบระบบน้ำ')}</span>
                         </div>
                     </div>
                 </div>
@@ -1727,7 +1731,7 @@ export default function GreenhouseMap() {
                         <div className="flex-1 overflow-y-auto p-4">
                             {/* Selected Crops */}
                             <div className="mb-4">
-                                <h3 className="mb-2 text-sm font-medium text-gray-300">Selected Crops</h3>
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">{t('พืชที่เลือก')}</h3>
                                 <div className="flex flex-wrap gap-1">
                                     {selectedCrops.map((cropValue, index) => {
                                         const crop = getCropByValue(cropValue);
@@ -1746,7 +1750,7 @@ export default function GreenhouseMap() {
                             {/* Irrigation Method */}
                             <div className="mb-4">
                                 <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                    Selected Irrigation Method
+                                    {t('วิธีการให้น้ำที่เลือก')}
                                 </h3>
                                 <div className="rounded border border-blue-500 bg-blue-600 px-3 py-2 text-sm text-white">
                                     {
@@ -1759,7 +1763,7 @@ export default function GreenhouseMap() {
 
                             {/* Tools */}
                             <div className="mb-4">
-                                <h3 className="mb-3 text-sm font-medium text-gray-300">Tools</h3>
+                                <h3 className="mb-3 text-sm font-medium text-gray-300">{t('เครื่องมือ')}</h3>
                                 <div className="space-y-1">
                                     {tools.map((tool) => (
                                         <button
@@ -1778,7 +1782,7 @@ export default function GreenhouseMap() {
                                             </div>
                                             {tool.id === 'select' && (
                                                 <div className="mt-1 text-xs text-gray-400">
-                                                    Ctrl+Click = Pan view
+                                                    {t('คลิกเลือก + Ctrl = แพนมุมมอง')}
                                                 </div>
                                             )}
                                         </button>
@@ -1789,7 +1793,7 @@ export default function GreenhouseMap() {
                             {/* Prerequisites Check */}
                             <div className="mb-4">
                                 <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                    Prerequisites
+                                    {t('ข้อกำหนดเบื้องต้น')}
                                 </h3>
                                 <div className="space-y-1 text-xs">
                                     <div
@@ -1804,7 +1808,7 @@ export default function GreenhouseMap() {
                                                 ? '✓'
                                                 : '✗'}
                                         </span>
-                                        <span>Main Pipe</span>
+                                        <span>{t('ท่อเมนแมพ')}</span>
                                     </div>
                                     <div
                                         className={`flex items-center space-x-2 ${
@@ -1818,7 +1822,7 @@ export default function GreenhouseMap() {
                                                 ? '✓'
                                                 : '✗'}
                                         </span>
-                                        <span>Sub Pipe</span>
+                                        <span>{t('ท่อเมนย่อยแมพ')}</span>
                                     </div>
                                 </div>
                             </div>
@@ -1827,7 +1831,7 @@ export default function GreenhouseMap() {
                             {shapes.filter((s) => s.type === 'plot').length > 0 && (
                                 <div className="mb-4">
                                     <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                        Crop Assignment Status
+                                        {t('สถานะการเลือกพืช')}
                                     </h3>
                                     <div className="space-y-1 text-xs">
                                         <div
@@ -1839,13 +1843,9 @@ export default function GreenhouseMap() {
                                         >
                                             <span>{plotsWithoutCrops.length === 0 ? '✓' : '⚠️'}</span>
                                             <span>
-                                                เลือกพืชครบทุกแปลง (
-                                                {
-                                                    shapes.filter(
-                                                        (s) => s.type === 'plot' && s.cropType
-                                                    ).length
-                                                }
-                                                /{shapes.filter((s) => s.type === 'plot').length})
+                                                {t('เลือกพืชครบทุกแปลง ({assigned}/{total})')
+                                                    .replace('{assigned}', shapes.filter((s) => s.type === 'plot' && s.cropType).length.toString())
+                                                    .replace('{total}', shapes.filter((s) => s.type === 'plot').length.toString())}
                                             </span>
                                         </div>
                                         <div
@@ -1854,12 +1854,12 @@ export default function GreenhouseMap() {
                                             }`}
                                         >
                                             <span>{canGoToSummary ? '✓' : '✗'}</span>
-                                            <span>Ready for summary</span>
+                                            <span>{t('พร้อมไปดูสรุป')}</span>
                                         </div>
                                     </div>
                                     {plotsWithoutCrops.length > 0 && (
                                         <div className="mt-2 text-xs text-yellow-400">
-                                            แปลงที่ยังไม่เลือก:{' '}
+                                            {t('แปลงที่ยังไม่เลือก')}:{' '}
                                             {plotsWithoutCrops.map((plot) => plot.name).join(', ')}
                                         </div>
                                     )}
@@ -1869,16 +1869,16 @@ export default function GreenhouseMap() {
                             {/* Canvas Info */}
                             <div className="mb-4">
                                 <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                    Canvas Info
+                                    {t('ข้อมูล Canvas')}
                                 </h3>
                                 <div className="space-y-1 text-xs text-gray-400">
                                     <p>
-                                        📏 Size: {CANVAS_SIZE.width} × {CANVAS_SIZE.height} px
+                                        📏 {t('ขนาด')}: {CANVAS_SIZE.width} × {CANVAS_SIZE.height} px
                                     </p>
-                                    <p>📐 Grid: {GRID_SIZE} px</p>
-                                    <p>🔍 Zoom: {(zoom * 100).toFixed(0)}%</p>
+                                    <p>📐 {t('กริด')}: {GRID_SIZE} px</p>
+                                    <p>🔍 {t('ซูม')}: {(zoom * 100).toFixed(0)}%</p>
                                     <p>
-                                        📍 Pan: ({pan.x.toFixed(0)}, {pan.y.toFixed(0)})
+                                        📍 {t('แพน')}: ({pan.x.toFixed(0)}, {pan.y.toFixed(0)})
                                     </p>
                                 </div>
                             </div>
@@ -1887,12 +1887,12 @@ export default function GreenhouseMap() {
                             {selectedIrrigationMethod === 'mini-sprinkler' && (
                                 <div className="mb-4">
                                     <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                        Mini Sprinkler Settings
+                                        {t('ตั้งค่ามินิสปริงเกลอร์')}
                                     </h3>
                                     <div className="space-y-3">
                                         <div>
                                             <label className="mb-1 block text-xs text-gray-400">
-                                                Global Radius:
+                                                {t('รัศมีทั้งหมด')}:
                                             </label>
                                             <div className="flex items-center space-x-2">
                                                 <input
@@ -1921,13 +1921,13 @@ export default function GreenhouseMap() {
                                             ) && (
                                                 <div className="mt-3 rounded bg-gray-700 p-2">
                                                     <div className="mb-2 text-xs text-yellow-300">
-                                                        Adjust Selected:
+                                                        {t('ปรับตัวที่เลือก')}:
                                                     </div>
 
                                                     <div className="space-y-2">
                                                         <div>
                                                             <label className="mb-1 block text-xs text-gray-400">
-                                                                Radius:
+                                                                {t('รัศมี')}:
                                                             </label>
                                                             <div className="flex items-center space-x-2">
                                                                 <input
@@ -1972,12 +1972,12 @@ export default function GreenhouseMap() {
                             {selectedIrrigationMethod === 'drip' && (
                                 <div className="mb-4">
                                     <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                        Drip Irrigation Settings
+                                        {t('ตั้งค่าน้ำหยด')}
                                     </h3>
                                     <div className="space-y-3">
                                         <div>
                                             <label className="mb-1 block text-xs text-gray-400">
-                                                Global Drip Point Spacing:
+                                                {t('ระยะห่างจุดน้ำหยดทั้งหมด')}:
                                             </label>
                                             <div className="flex items-center space-x-2">
                                                 <input
@@ -2006,7 +2006,7 @@ export default function GreenhouseMap() {
                                             ) && (
                                                 <div className="mt-2 rounded bg-gray-700 p-2">
                                                     <div className="mb-1 text-xs text-yellow-300">
-                                                        Adjust Selected Line:
+                                                        {t('ปรับเส้นที่เลือก')}:
                                                     </div>
                                                     <div className="flex items-center space-x-2">
                                                         <input
@@ -2044,7 +2044,7 @@ export default function GreenhouseMap() {
                             {/* Auto Generation */}
                             <div className="mb-4">
                                 <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                    Auto Generate
+                                    {t('สร้างอัตโนมัติ')}
                                 </h3>
                                 <div className="space-y-2">
                                     {selectedIrrigationMethod === 'mini-sprinkler' && (
@@ -2058,7 +2058,7 @@ export default function GreenhouseMap() {
                                                         : 'cursor-not-allowed bg-gray-600 text-gray-400'
                                                 }`}
                                             >
-                                                💦 Generate Mini Sprinklers (Straight Line)
+                                                💦 {t('สร้างมินิสปริงเกลอร์ (แถวตรง)')}
                                             </button>
                                         </div>
                                     )}
@@ -2073,13 +2073,13 @@ export default function GreenhouseMap() {
                                                     : 'cursor-not-allowed bg-gray-600 text-gray-400'
                                             }`}
                                         >
-                                            💧 Generate Drip Lines
+                                            💧 {t('สร้างสายน้ำหยด')}
                                         </button>
                                     )}
 
                                     {!canAutoGenerate && (
                                         <div className="mt-1 text-xs text-yellow-400">
-                                            ⚠️ Main pipe and sub-pipe required first
+                                            ⚠️ {t('ต้องมีท่อเมนและท่อย่อยก่อนสร้าง')}
                                         </div>
                                     )}
                                 </div>
@@ -2087,7 +2087,7 @@ export default function GreenhouseMap() {
 
                             {/* View Controls */}
                             <div className="mb-4">
-                                <h3 className="mb-2 text-sm font-medium text-gray-300">View Controls</h3>
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">{t('การแสดงผล')}</h3>
                                 <div className="space-y-2">
                                     <button
                                         onClick={() => setShowGrid(!showGrid)}
@@ -2097,7 +2097,7 @@ export default function GreenhouseMap() {
                                                 : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                         }`}
                                     >
-                                        📐 Show Grid ({GRID_SIZE}px)
+                                        📐 {t('แสดงกริด')} ({GRID_SIZE}px)
                                     </button>
                                     <button
                                         onClick={() => {
@@ -2106,7 +2106,7 @@ export default function GreenhouseMap() {
                                         }}
                                         className="w-full rounded bg-gray-700 px-3 py-2 text-xs text-gray-300 transition-colors hover:bg-gray-600"
                                     >
-                                        🔄 Reset View
+                                        🔄 {t('รีเซ็ตมุมมอง')}
                                     </button>
                                 </div>
                             </div>
@@ -2114,56 +2114,56 @@ export default function GreenhouseMap() {
                             {/* Statistics */}
                             <div className="mb-4">
                                 <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                    Structure Statistics
+                                    {t('สถิติโครงสร้าง')}
                                 </h3>
                                 <div className="mb-3 space-y-1 text-xs text-gray-400">
                                     <div className="flex justify-between">
-                                        <span>🏠 Greenhouses:</span>
+                                        <span>🏠 {t('โรงเรือน')}:</span>
                                         <span>
                                             {shapes.filter((s) => s.type === 'greenhouse').length}
                                         </span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>🌱 Plots:</span>
+                                        <span>🌱 {t('แปลงปลูก')}:</span>
                                         <span>{shapes.filter((s) => s.type === 'plot').length}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>🚶 Walkways:</span>
+                                        <span>🚶 {t('ทางเดิน')}:</span>
                                         <span>{shapes.filter((s) => s.type === 'walkway').length}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>💧 Water Sources:</span>
+                                        <span>💧 {t('แหล่งน้ำ')}:</span>
                                         <span>
                                             {shapes.filter((s) => s.type === 'water-source').length}
                                         </span>
                                     </div>
                                 </div>
 
-                                <h3 className="mb-2 text-sm font-medium text-gray-300">Irrigation Statistics</h3>
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">{t('สถิติระบบน้ำ')}</h3>
                                 <div className="space-y-1 text-xs text-gray-400">
                                     <div className="flex justify-between">
-                                        <span>Main Pipe:</span>
+                                        <span>{t('ท่อเมนแมพ')}:</span>
                                         <span>{calculateStats.mainPipeLength} px</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>Sub Pipe:</span>
+                                        <span>{t('ท่อเมนย่อยแมพ')}:</span>
                                         <span>{calculateStats.subPipeLength} px</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>Drip Lines:</span>
+                                        <span>{t('สายน้ำหยด')}:</span>
                                         <span>{calculateStats.dripLineLength} px</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>Mini Sprinklers:</span>
-                                        <span>{calculateStats.sprinklerCount} units</span>
+                                        <span>{t('มินิสปริงเกลอร์')}:</span>
+                                        <span>{calculateStats.sprinklerCount} {t('หน่วย')}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>Pumps:</span>
-                                        <span>{calculateStats.pumpCount} units</span>
+                                        <span>{t('ปั๊ม')}:</span>
+                                        <span>{calculateStats.pumpCount} {t('หน่วย')}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>Valves:</span>
-                                        <span>{calculateStats.valveCount} units</span>
+                                        <span>{t('วาล์ว')}:</span>
+                                        <span>{calculateStats.valveCount} {t('หน่วย')}</span>
                                     </div>
                                 </div>
                             </div>
@@ -2201,26 +2201,26 @@ export default function GreenhouseMap() {
 
                         {/* Coordinates Display */}
                         <div className="absolute bottom-4 left-4 rounded bg-black/50 px-3 py-1 text-sm text-white">
-                            X: {mousePos.x.toFixed(0)}, Y: {mousePos.y.toFixed(0)} | Zoom:{' '}
+                            X: {mousePos.x.toFixed(0)}, Y: {mousePos.y.toFixed(0)} | {t('ซูม')}:{' '}
                             {(zoom * 100).toFixed(0)}%
                         </div>
 
                         {/* Status Messages */}
                         {isDrawing && (
                             <div className="absolute left-4 top-4 rounded bg-blue-600 px-3 py-1 text-sm text-white">
-                                Drawing {selectedTool}... (Press Enter to finish, Escape to cancel)
+                                {t('กำลังวาด {tool}... (กด Enter เพื่อจบ, Escape เพื่อยกเลิก)').replace('{tool}', selectedTool)}
                             </div>
                         )}
 
                         {isDragging && (
                             <div className="absolute left-4 top-4 rounded bg-yellow-600 px-3 py-1 text-sm text-white">
-                                🤏 Moving element... (Not holding Ctrl)
+                                🤏 {t('กำลังขยับองค์ประกอบ... (ไม่กด Ctrl)')}
                             </div>
                         )}
 
                         {isPanning && (
                             <div className="absolute left-4 top-4 rounded bg-purple-600 px-3 py-1 text-sm text-white">
-                                🤏 Panning view... (Ctrl+Drag or click empty space)
+                                🤏 {t('กำลังเลื่อนมุมมอง... (Ctrl+Drag หรือ คลิกพื้นที่ว่าง)')}
                             </div>
                         )}
 
@@ -2231,7 +2231,7 @@ export default function GreenhouseMap() {
                                     onClick={deleteElement}
                                     className="rounded bg-red-600 px-4 py-2 text-sm text-white shadow-lg transition-colors hover:bg-red-700"
                                 >
-                                    🗑️ Delete Element
+                                    🗑️ {t('ลบองค์ประกอบ')}
                                 </button>
                             )}
 
@@ -2242,7 +2242,7 @@ export default function GreenhouseMap() {
                                 }}
                                 className="rounded bg-orange-600 px-4 py-2 text-sm text-white shadow-lg transition-colors hover:bg-orange-700"
                             >
-                                🧹 Clear Irrigation System
+                                🧹 {t('ล้างระบบน้ำ')}
                             </button>
                         </div>
                     </div>
@@ -2251,17 +2251,17 @@ export default function GreenhouseMap() {
                     <div className="flex w-64 flex-col border-l border-gray-700 bg-gray-800">
                         <div className="flex-1 overflow-y-auto p-4">
                             <h3 className="mb-3 text-sm font-medium text-gray-300">
-                                Greenhouse Structure
+                                {t('โครงสร้างโรงเรือน')}
                             </h3>
 
                             {shapes.length === 0 ? (
-                                <p className="text-sm text-gray-500">No structures</p>
+                                <p className="text-sm text-gray-500">{t('ไม่มีโครงสร้าง')}</p>
                             ) : (
                                 <div className="mb-4 space-y-3">
                                     {shapes.filter((s) => s.type === 'plot').length > 0 && (
                                         <div>
                                             <h4 className="mb-2 text-xs font-medium text-green-400">
-                                                🌱 Plots
+                                                🌱 {t('แปลงปลูก')}
                                             </h4>
                                             <div className="space-y-1">
                                                 {shapes
@@ -2276,7 +2276,7 @@ export default function GreenhouseMap() {
                                                                 onClick={() => {
                                                                     if (selectedCrops.length === 0) {
                                                                         alert(
-                                                                            'No crops selected. Please go back to select crops first.'
+                                                                            t('ไม่มีพืชที่เลือกไว้ กรุณากลับไปเลือกพืชในขั้นตอนแรก')
                                                                         );
                                                                         return;
                                                                     }
@@ -2292,10 +2292,10 @@ export default function GreenhouseMap() {
                                                                 }`}
                                                                 title={
                                                                     selectedCrops.length === 0
-                                                                        ? 'Please select crops first'
+                                                                        ? t('กรุณาเลือกพืชก่อน')
                                                                         : plot.cropType
-                                                                          ? 'คลิกเพื่อเปลี่ยนพืช'
-                                                                          : 'คลิกเพื่อเลือกพืช (จำเป็น)'
+                                                                          ? t('คลิกเพื่อเปลี่ยนพืช')
+                                                                          : t('คลิกเพื่อเลือกพืช (จำเป็น)')
                                                                 }
                                                             >
                                                                 <div className="flex items-center justify-between">
@@ -2316,8 +2316,8 @@ export default function GreenhouseMap() {
                                                                             <span className="text-xs text-yellow-400">
                                                                                 {selectedCrops.length ===
                                                                                 0
-                                                                                    ? 'No crops available'
-                                                                                    : 'Not selected'}
+                                                                                    ? t('ไม่มีพืชให้เลือก')
+                                                                                    : t('ยังไม่เลือกพืช')}
                                                                             </span>
                                                                         )}
                                                                     </div>
@@ -2337,7 +2337,7 @@ export default function GreenhouseMap() {
                                     {shapes.filter((s) => s.type === 'greenhouse').length > 0 && (
                                         <div>
                                             <h4 className="mb-2 text-xs font-medium text-green-400">
-                                                🏠 Greenhouses
+                                                🏠 {t('โรงเรือน')}
                                             </h4>
                                             <div className="space-y-1">
                                                 {shapes
@@ -2352,7 +2352,7 @@ export default function GreenhouseMap() {
                                                                     {greenhouse.name}
                                                                 </span>
                                                                 <span className="text-xs text-gray-400">
-                                                                    {greenhouse.points.length} points
+                                                                    {greenhouse.points.length} {t('จุด')}
                                                                 </span>
                                                             </div>
                                                         </div>
@@ -2364,7 +2364,7 @@ export default function GreenhouseMap() {
                                     {shapes.filter((s) => s.type === 'walkway').length > 0 && (
                                         <div>
                                             <h4 className="mb-2 text-xs font-medium text-gray-400">
-                                                🚶 Walkways
+                                                🚶 {t('ทางเดิน')}
                                             </h4>
                                             <div className="space-y-1">
                                                 {shapes
@@ -2379,7 +2379,7 @@ export default function GreenhouseMap() {
                                                                     {walkway.name}
                                                                 </span>
                                                                 <span className="text-xs text-gray-400">
-                                                                    {walkway.points.length} points
+                                                                    {walkway.points.length} {t('จุด')}
                                                                 </span>
                                                             </div>
                                                         </div>
@@ -2391,7 +2391,7 @@ export default function GreenhouseMap() {
                                     {shapes.filter((s) => s.type === 'water-source').length > 0 && (
                                         <div>
                                             <h4 className="mb-2 text-xs font-medium text-blue-400">
-                                                💧 Water Sources
+                                                💧 {t('แหล่งน้ำ')}
                                             </h4>
                                             <div className="space-y-1">
                                                 {shapes
@@ -2407,8 +2407,8 @@ export default function GreenhouseMap() {
                                                                 </span>
                                                                 <span className="text-xs text-gray-400">
                                                                     {water.points.length === 1
-                                                                        ? 'Single point'
-                                                                        : `${water.points.length} points`}
+                                                                        ? t('จุดเดียว')
+                                                                        : `${water.points.length} ${t('จุด')}`}
                                                                 </span>
                                                             </div>
                                                         </div>
@@ -2422,22 +2422,22 @@ export default function GreenhouseMap() {
                             {/* Irrigation Elements List */}
                             <div className="border-t border-gray-700 pt-4">
                                 <h3 className="mb-3 text-sm font-medium text-gray-300">
-                                    Irrigation Components
+                                    {t('องค์ประกอบระบบน้ำ')}
                                 </h3>
 
                                 {irrigationElements.length === 0 ? (
-                                    <p className="text-sm text-gray-500">No components yet</p>
+                                    <p className="text-sm text-gray-500">{t('ยังไม่มีองค์ประกอบ')}</p>
                                 ) : (
                                     <div className="space-y-2">
                                         {irrigationElements.map((element) => {
                                             const typeNames = {
-                                                'main-pipe': '🔵 Main Pipe',
-                                                'sub-pipe': '🟢 Sub Pipe',
-                                                pump: '⚙️ Pump',
-                                                'solenoid-valve': '🔧 Solenoid Valve',
-                                                'ball-valve': '🟡 Ball Valve',
-                                                sprinkler: '💦 Mini Sprinkler',
-                                                'drip-line': '💧 Drip Line',
+                                                'main-pipe': '🔵 ' + t('ท่อเมนแมพ'),
+                                                'sub-pipe': '🟢 ' + t('ท่อเมนย่อยแมพ'),
+                                                pump: '⚙️ ' + t('ปั๊ม'),
+                                                'solenoid-valve': '🔧 ' + t('โซลินอยด์วาล์ว'),
+                                                'ball-valve': '🟡 ' + t('บอลวาล์ว'),
+                                                sprinkler: '💦 ' + t('มินิสปริงเกลอร์'),
+                                                'drip-line': '💧 ' + t('สายน้ำหยด'),
                                             };
 
                                             return (
@@ -2461,18 +2461,18 @@ export default function GreenhouseMap() {
                                                                     deleteElement();
                                                                 }}
                                                                 className="text-red-400 transition-colors hover:text-red-300"
-                                                                title="Delete component"
+                                                                title={t('ลบอุปกรณ์')}
                                                             >
                                                                 🗑️
                                                             </button>
                                                         )}
                                                     </div>
                                                     <div className="mt-1 text-xs text-gray-400">
-                                                        {element.points.length} points
+                                                        {element.points.length} {t('จุด')}
                                                         {element.radius &&
-                                                            ` | Radius: ${(element.radius / 20).toFixed(1)}m`}
+                                                            ` | ${t('รัศมี')}: ${(element.radius / 20).toFixed(1)}m`}
                                                         {element.spacing &&
-                                                            ` | Spacing: ${element.spacing.toFixed(2)}m`}
+                                                            ` | ${t('ระยะห่าง')}: ${element.spacing.toFixed(2)}m`}
                                                     </div>
                                                 </div>
                                             );
@@ -2490,10 +2490,10 @@ export default function GreenhouseMap() {
                     {plotsWithoutCrops.length > 0 && (
                         <div className="mb-3 rounded-lg border border-yellow-600 bg-yellow-900/30 p-3">
                             <div className="text-sm text-yellow-300">
-                                ⚠️ Please select crops for all plots before viewing summary
+                                ⚠️ {t('กรุณาเลือกพืชให้ครบทุกแปลงปลูกก่อนไปดูสรุป')}
                             </div>
                             <div className="mt-1 text-xs text-yellow-400">
-                                แปลงที่ยังไม่เลือกพืช:{' '}
+                                {t('แปลงที่ยังไม่เลือก')}:{' '}
                                 {plotsWithoutCrops.map((plot) => plot.name).join(', ')}
                             </div>
                         </div>
@@ -2543,13 +2543,13 @@ export default function GreenhouseMap() {
                                     d="M10 19l-7-7m0 0l7-7m-7 7h18"
                                 />
                             </svg>
-                            Back
+                            {t('กลับ')}
                         </button>
 
                         <button
                             onClick={() => {
                                 if (!canGoToSummary) {
-                                    alert('Please select crops for all plots before viewing summary');
+                                    alert(t('กรุณาเลือกพืชให้ครบทุกแปลงปลูกก่อนไปดูสรุป'));
                                     return;
                                 }
 
@@ -2576,9 +2576,9 @@ export default function GreenhouseMap() {
                                     ? 'bg-blue-600 text-white hover:bg-blue-700'
                                     : 'cursor-not-allowed bg-gray-600 text-gray-400'
                             }`}
-                            title={!canGoToSummary ? 'Please select crops for all plots first' : ''}
+                            title={!canGoToSummary ? t('กรุณาเลือกพืชให้ครบทุกแปลงปลูกก่อน') : ''}
                         >
-                            📊 View Summary
+                            📊 {t('ดูสรุป')}
                             <svg
                                 className="ml-2 h-4 w-4"
                                 fill="none"
@@ -2602,7 +2602,7 @@ export default function GreenhouseMap() {
                         <div className="mx-4 w-full max-w-md rounded-lg border border-gray-600 bg-gray-800 p-6">
                             <div className="mb-4 flex items-center justify-between">
                                 <h3 className="text-lg font-medium text-white">
-                                    Select Crop for This Plot
+                                    {t('เลือกพืชสำหรับแปลงนี้')}
                                 </h3>
                                 <button
                                     onClick={() => {
@@ -2618,7 +2618,7 @@ export default function GreenhouseMap() {
                             {selectedCrops.length === 0 && (
                                 <div className="mb-4 rounded-lg border border-yellow-600 bg-yellow-900/30 p-3">
                                     <div className="text-sm text-yellow-300">
-                                        ⚠️ No crops selected. Please go back to select crops first.
+                                        ⚠️ {t('ไม่มีพืชที่เลือกไว้ กรุณากลับไปเลือกพืชในขั้นตอนแรก')}
                                     </div>
                                 </div>
                             )}
@@ -2626,7 +2626,7 @@ export default function GreenhouseMap() {
                             <div className="grid max-h-64 grid-cols-2 gap-3 overflow-y-auto">
                                 {selectedCrops.length === 0 ? (
                                     <div className="col-span-2 py-4 text-center text-gray-400">
-                                        No crops selected
+                                        {t('ไม่มีพืชที่เลือกไว้')}
                                     </div>
                                 ) : (
                                     selectedCrops.map((cropValue) => {
@@ -2668,7 +2668,7 @@ export default function GreenhouseMap() {
                                     }}
                                     className="w-full rounded bg-red-600 py-2 text-sm text-white transition-colors hover:bg-red-700"
                                 >
-                                    Remove Crop from Plot
+                                    {t('ลบพืชออกจากแปลง')}
                                 </button>
                             </div>
                         </div>

@@ -7,6 +7,7 @@ import { Wrapper, Status } from '@googlemaps/react-wrapper';
 import * as turf from '@turf/turf';
 import lineIntersect from '@turf/line-intersect';
 import { getCropByValue } from '@/pages/utils/cropData';
+import { useLanguage } from '../contexts/LanguageContext';
 import {
     ZONE_COLORS,
     OBSTACLE_TYPES,
@@ -116,10 +117,10 @@ const DEFAULT_IRRIGATION_SETTINGS = {
 } as const;
 
 const getGoogleMapsConfig = () => {
-    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+    const apiKey = import.meta.env.VITE_Maps_API_KEY || '';
     
     if (!apiKey) {
-        console.error('❌ Google Maps API Key not found! Please set VITE_GOOGLE_MAPS_API_KEY in .env file');
+        console.error('❌ Google Maps API Key not found! Please set VITE_Maps_API_KEY in .env file');
         console.log('Environment variables:', {
             NODE_ENV: import.meta.env.MODE,
             Available_VITE_vars: Object.keys(import.meta.env).filter(key => key.startsWith('VITE_'))
@@ -162,6 +163,7 @@ interface GoogleMapComponentProps {
     mapType: string;
     onCenterChanged?: (center: google.maps.LatLngLiteral) => void;
     onZoomChanged?: (zoom: number) => void;
+    t: (key: string) => string;
 }
 
 const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
@@ -182,6 +184,7 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
     mapType,
     onCenterChanged,
     onZoomChanged,
+    t,
 }) => {
     const ref = useRef<HTMLDivElement>(null);
     const [map, setMap] = useState<google.maps.Map>();
@@ -201,9 +204,9 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                 zoom,
                 mapTypeId: mapType as google.maps.MapTypeId,
                 mapTypeControl: false,
-                streetViewControl: false,
-                fullscreenControl: false,
-                zoomControl: false,
+                streetViewControl: true, // Enabled
+                fullscreenControl: true, // Enabled
+                zoomControl: true, // Enabled
                 gestureHandling: 'greedy',
                 disableDoubleClickZoom: false,
                 clickableIcons: true,
@@ -453,15 +456,15 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
         <>
             <div ref={ref} style={{ width: '100%', height: '100%' }} />
 
-            {/* Drawing Controls Overlay */}
+            {/* Drawing Controls Overlay - MOVED under search bar via CSS */}
             <div
-                className="absolute left-2 top-2 z-10 max-w-xs rounded-md border border-white p-2 shadow-md"
+                className="absolute left-2 top-20 z-10 max-w-xs rounded-md border border-white p-2 shadow-md"
                 style={{ backgroundColor: '#000005' }}
             >
                 {/* Step 1: Field Drawing */}
                 {drawingStage === 'field' && (
                     <div className="flex flex-col space-y-1">
-                        <div className="text-xs font-semibold text-white">Step 1: Draw Field</div>
+                        <div className="text-xs font-semibold text-white">{t('Step 1: Draw Field')}</div>
                         <button
                             onClick={() => startDrawing('polygon')}
                             disabled={currentDrawingMode !== null}
@@ -473,15 +476,15 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                         >
                             🏔️{' '}
                             {currentDrawingMode === google.maps.drawing.OverlayType.POLYGON
-                                ? 'Drawing...'
-                                : 'Draw Field'}
+                                ? t('Drawing...')
+                                : t('Draw Field')}
                         </button>
                         {currentDrawingMode && (
                             <button
                                 onClick={stopDrawing}
                                 className="rounded border border-white bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
                             >
-                                ❌ Cancel
+                                ❌ {t('Cancel')}
                             </button>
                         )}
                     </div>
@@ -491,7 +494,7 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                 {drawingStage === 'zones' && (
                     <div className="flex flex-col space-y-1">
                         <div className="text-xs font-semibold text-white">
-                            Step 2: Zones & Obstacles
+                            {t('Step 2: Zones & Obstacles')}
                         </div>
 
                         {drawingMode === 'zone' && canDrawZone && (
@@ -506,8 +509,8 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                             >
                                 🎨{' '}
                                 {currentDrawingMode === google.maps.drawing.OverlayType.POLYGON
-                                    ? 'Drawing...'
-                                    : 'Draw Zone'}
+                                    ? t('Drawing...')
+                                    : t('Draw Zone')}
                             </button>
                         )}
 
@@ -523,8 +526,8 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                             >
                                 🚫{' '}
                                 {currentDrawingMode === google.maps.drawing.OverlayType.POLYGON
-                                    ? 'Drawing...'
-                                    : 'Draw Obstacle'}
+                                    ? t('Drawing...')
+                                    : t('Draw Obstacle')}
                             </button>
                         )}
 
@@ -533,7 +536,7 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                                 onClick={stopDrawing}
                                 className="rounded border border-white bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
                             >
-                                ❌ Cancel
+                                ❌ {t('Cancel')}
                             </button>
                         )}
                     </div>
@@ -542,7 +545,7 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                 {/* Step 3: Pipes */}
                 {drawingStage === 'pipes' && canDrawPipe && (
                     <div className="flex flex-col space-y-1">
-                        <div className="text-xs font-semibold text-white">Step 3: Pipe System</div>
+                        <div className="text-xs font-semibold text-white">{t('Step 3: Pipe System')}</div>
                         <button
                             onClick={() => startDrawing('polyline')}
                             disabled={currentDrawingMode !== null}
@@ -554,15 +557,15 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                         >
                             🔧{' '}
                             {currentDrawingMode === google.maps.drawing.OverlayType.POLYLINE
-                                ? 'Drawing...'
-                                : `Draw ${PIPE_TYPES[currentPipeType as keyof typeof PIPE_TYPES]?.name || 'Pipe'}`}
+                                ? t('Drawing...')
+                                : t('Draw {pipeName}').replace('{pipeName}', PIPE_TYPES[currentPipeType as keyof typeof PIPE_TYPES]?.name || 'Pipe')}
                         </button>
                         {currentDrawingMode && (
                             <button
                                 onClick={stopDrawing}
                                 className="rounded border border-white bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
                             >
-                                ❌ Cancel
+                                ❌ {t('Cancel')}
                             </button>
                         )}
                     </div>
@@ -571,10 +574,9 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                 {/* Equipment Placement Mode */}
                 {isPlacingEquipment && selectedEquipmentType && (
                     <div className="flex flex-col space-y-1">
-                        <div className="text-xs font-semibold text-white">Equipment Placement</div>
+                        <div className="text-xs font-semibold text-white">{t('Equipment Placement')}</div>
                         <div className="rounded border border-white bg-yellow-100 px-2 py-1 text-xs text-yellow-800">
-                            {EQUIPMENT_TYPES[selectedEquipmentType].icon} Click to place{' '}
-                            {EQUIPMENT_TYPES[selectedEquipmentType].name}
+                            {EQUIPMENT_TYPES[selectedEquipmentType].icon} {t('Click to place {equipmentName}').replace('{equipmentName}', EQUIPMENT_TYPES[selectedEquipmentType].name)}
                         </div>
                     </div>
                 )}
@@ -589,6 +591,8 @@ interface FieldMapProps {
 }
 
 export default function FieldMap({ crops, irrigation }: FieldMapProps) {
+    const { t } = useLanguage();
+    
     // Custom hooks for state management
     const urlParams = new URLSearchParams(window.location.search);
     const isEditMode = urlParams.get('edit') === 'true';
@@ -821,11 +825,11 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     console.log(`✅ Edit mode: Set to step ${targetStep}`);
                 } catch (error) {
                     console.error('Error loading saved data for editing:', error);
-                    handleError('Failed to load saved project data');
+                    handleError(t('Failed to load saved project data'));
                 }
             } else {
                 console.warn('No saved data found for editing');
-                handleError('No saved project data found');
+                handleError(t('No saved project data found'));
             }
         } else {
             if (crops) {
@@ -898,7 +902,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             if (step > currentStep) {
                 for (let i = 1; i < step; i++) {
                     if (!validateStep(i)) {
-                        handleError(`Please complete step ${i} first`);
+                        handleError(t('Please complete step {step} first').replace('{step}', i.toString()));
                         return;
                     }
                 }
@@ -938,6 +942,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             setIsPlacingEquipment,
             setSelectedEquipmentType,
             map,
+            t,
         ]
     );
 
@@ -948,9 +953,9 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 goToStep(currentStep + 1);
             }
         } else {
-            handleError(`Please complete step ${currentStep} requirements first`);
+            handleError(t('Please complete step {step} requirements first').replace('{step}', currentStep.toString()));
         }
-    }, [validateStep, currentStep, setStepCompleted, goToStep, handleError]);
+    }, [validateStep, currentStep, setStepCompleted, goToStep, handleError, t]);
 
     const previousStep = useCallback(() => {
         if (currentStep > 1) {
@@ -1015,10 +1020,10 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     content: `
                     <div style="text-align: center; min-width: 150px;">
                         <h3 style="margin: 0 0 8px 0; color: #333;">${equipmentConfig.name}</h3>
-                        <p style="margin: 0 0 8px 0; color: #666; font-size: 12px;">${equipmentConfig.description || 'Equipment'}</p>
+                        <p style="margin: 0 0 8px 0; color: #666; font-size: 12px;">${equipmentConfig.description || t('Equipment')}</p>
                         <button onclick="window.removeEquipment('${equipmentId}')" 
                                 style="background: #dc2626; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                            Remove Equipment
+                            ${t('Remove {equipmentName}').replace('{equipmentName}', '')}
                         </button>
                     </div>
                 `,
@@ -1053,7 +1058,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             } catch (error) {
                 console.error('Error placing equipment:', error);
                 const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                handleError('Error placing equipment: ' + errorMessage);
+                handleError(t('Error placing equipment:') + ' ' + errorMessage);
             }
         },
         [
@@ -1068,6 +1073,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             equipmentHistoryIndex,
             handleError,
             createEquipmentMarkerIcon,
+            t,
         ]
     );
 
@@ -1126,7 +1132,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                             setMapObjects((prev) => ({ ...prev, zones: [...prev.zones, polygon] }));
                         } catch (error) {
                             console.error('Field creation error:', error);
-                            handleError('Error calculating field area');
+                            handleError(t('Error calculating field area'));
                             polygon.setMap(null);
                             return;
                         }
@@ -1137,7 +1143,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                 polygon: polygon,
                                 coordinates: coordinates,
                                 color: currentZoneColor,
-                                name: `Zone ${zones.length + 1}`,
+                                name: `${t('Zone')} ${zones.length + 1}`,
                             };
 
                             polygon.setOptions({
@@ -1180,7 +1186,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                             const obstacleConfig =
                                 OBSTACLE_TYPES[currentObstacleType as keyof typeof OBSTACLE_TYPES];
                             if (!obstacleConfig) {
-                                handleError('Invalid obstacle type');
+                                handleError(t('Invalid obstacle type'));
                                 polygon.setMap(null);
                                 return;
                             }
@@ -1218,7 +1224,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     if (drawingStage === 'pipes' && canDrawPipe) {
                         const pipeConfig = PIPE_TYPES[currentPipeType as keyof typeof PIPE_TYPES];
                         if (!pipeConfig) {
-                            handleError('Invalid pipe type');
+                            handleError(t('Invalid pipe type'));
                             polyline.setMap(null);
                             return;
                         }
@@ -1247,7 +1253,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 }
             } catch (error) {
                 console.error('Error in handleDrawCreated:', error);
-                handleError('Drawing error. Please try again.');
+                handleError(t('Drawing error. Please try again.'));
 
                 if (overlay && 'setMap' in overlay && typeof overlay.setMap === 'function') {
                     overlay.setMap(null);
@@ -1282,6 +1288,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             isPlacingEquipment,
             selectedEquipmentType,
             placeEquipmentAtPosition,
+            t,
         ]
     );
 
@@ -1322,7 +1329,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
     }, [clearAllZoneLabels]);
 
     const resetAll = useCallback(() => {
-        if (confirm('⚠️ Reset all data? All drawn elements will be lost.')) {
+        if (confirm(t('⚠️ Reset all data? All drawn elements will be lost.'))) {
             localStorage.removeItem('fieldMapData');
 
             if (mainField && mainField.polygon) {
@@ -1403,12 +1410,13 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         setDripSpacing,
         setZoneSummaries,
         setPlantingPoints,
+        t,
     ]);
 
     const clearAllEquipment = useCallback(() => {
         if (equipmentIcons.length === 0) return;
 
-        if (confirm('Remove all equipment?')) {
+        if (confirm(t('Remove all equipment?'))) {
             mapObjects.equipment.forEach((marker) => {
                 if ((marker as any).infoWindow) {
                     (marker as any).infoWindow.close();
@@ -1419,7 +1427,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             setEquipmentIcons([]);
             setMapObjects((prev) => ({ ...prev, equipment: [] }));
         }
-    }, [equipmentIcons, mapObjects.equipment, setEquipmentIcons, setMapObjects]);
+    }, [equipmentIcons, mapObjects.equipment, setEquipmentIcons, setMapObjects, t]);
 
     const undoEquipment = useCallback(() => {
         if (equipmentHistoryIndex > 0) {
@@ -1526,7 +1534,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
 
             const equipmentConfig = EQUIPMENT_TYPES[equipmentToRemove.type as EquipmentType];
 
-            if (confirm(`Remove ${equipmentConfig.name}?`)) {
+            if (confirm(t('Remove {equipmentName}?').replace('{equipmentName}', equipmentConfig.name))) {
                 const newEquipmentState = equipmentIcons.filter((e) => e.id !== equipmentId);
                 setEquipmentIcons(newEquipmentState);
 
@@ -1562,6 +1570,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         setEquipmentHistory,
         setEquipmentHistoryIndex,
         equipmentHistoryIndex,
+        t,
     ]);
 
     const handleSearch = useCallback(
@@ -1655,11 +1664,11 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     setSearchResults([]);
                     setShowDropdown(false);
                     setIsSearching(false);
-                    handleError('Unable to search places');
+                    handleError(t('Unable to search places'));
                 }
             }
         },
-        [map, setSearchResults, setShowDropdown, setIsSearching, handleError]
+        [map, setSearchResults, setShowDropdown, setIsSearching, handleError, t]
     );
 
     useEffect(() => {
@@ -1740,15 +1749,15 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     setMapZoom(15);
                 },
                 () => {
-                    handleError('Unable to get current location');
+                    handleError(t('Unable to get current location'));
                 }
             );
         }
-    }, [setMapCenter, setMapZoom, handleError]);
+    }, [setMapCenter, setMapZoom, handleError, t]);
 
     const addNewZone = useCallback(() => {
         if (zones.length >= ZONE_COLORS.length) {
-            handleError('Maximum number of zones reached');
+            handleError(t('Maximum number of zones reached'));
             return;
         }
 
@@ -1765,6 +1774,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         setCanDrawZone,
         setDrawingMode,
         handleError,
+        t,
     ]);
 
     const zoneLabelsRef = useRef<google.maps.Marker[]>([]);
@@ -1925,7 +1935,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             const zoneToDelete = zones.find((zone) => zone.id.toString() === zoneId);
             if (!zoneToDelete) return;
 
-            if (confirm(`Delete ${zoneToDelete.name}?`)) {
+            if (confirm(t('Delete {zoneName}?').replace('{zoneName}', zoneToDelete.name))) {
                 if (zoneToDelete.polygon) {
                     zoneToDelete.polygon.setMap(null);
                 }
@@ -1956,7 +1966,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 }));
             }
         },
-        [zones, setZones, setZoneAssignments, setUsedColors]
+        [zones, setZones, setZoneAssignments, setUsedColors, t]
     );
 
     const generateLateralPipesForZone = useCallback(
@@ -2094,7 +2104,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                         id: pipeId,
                                         coordinates: coordinates,
                                         type: 'lateral',
-                                        name: `Lateral ${lateralPipes.length + 1}`,
+                                        name: `${t('Lateral Pipe')} ${lateralPipes.length + 1}`,
                                         color: PIPE_TYPES.lateral?.color || '#00ff00',
                                         zoneId: zone.id,
                                     };
@@ -2145,7 +2155,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                 id: pipeId,
                                 coordinates: coordinates,
                                 type: 'lateral',
-                                name: `Grid Lateral ${lateralPipes.length + 1}`,
+                                name: `Grid ${t('Lateral Pipe')} ${lateralPipes.length + 1}`,
                                 color: PIPE_TYPES.lateral?.color || '#00ff00',
                                 zoneId: zone.id,
                             };
@@ -2180,16 +2190,18 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             } catch (error) {
                 console.error('Error generating lateral pipes for zone:', error);
                 handleError(
-                    `Error generating pipes for ${zone.name}: ${error instanceof Error ? error.message : 'Unknown error'}`
+                    t('Error generating pipes for {zoneName}: {error}')
+                        .replace('{zoneName}', zone.name)
+                        .replace('{error}', error instanceof Error ? error.message : 'Unknown error')
                 );
             }
         },
-        [map, pipes, setPipes, setMapObjects, handleError]
+        [map, pipes, setPipes, setMapObjects, handleError, t]
     );
 
     const generateLateralPipes = useCallback(() => {
         if (zones.length === 0) {
-            handleError('No zones found to generate pipes for');
+            handleError(t('No zones found to generate pipes for'));
             return;
         }
 
@@ -2201,11 +2213,11 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             });
         } catch (error) {
             console.error('Error generating lateral pipes:', error);
-            handleError('Error generating lateral pipes');
+            handleError(t('Error generating lateral pipes'));
         } finally {
             setIsGeneratingPipes(false);
         }
-    }, [zones, setIsGeneratingPipes, handleError, generateLateralPipesForZone]);
+    }, [zones, setIsGeneratingPipes, handleError, generateLateralPipesForZone, t]);
 
     const generateIrrigationForZone = useCallback(
         (zone: Zone, irrigationType: string) => {
@@ -2328,7 +2340,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                         ] || DEFAULT_IRRIGATION_SETTINGS.default;
                     if (!('defaultRadius' in defaultSettings)) {
                         handleError(
-                            `Irrigation type ${irrigationType} is not configured for radius.`
+                            t('Invalid irrigation type').replace('{irrigationType}', irrigationType)
                         );
                         return;
                     }
@@ -2494,7 +2506,10 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             } catch (error) {
                 console.error('Error generating irrigation for zone:', error);
                 const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                handleError(`Error generating ${irrigationType} for ${zone.name}: ${errorMessage}`);
+                handleError(t('Error generating {irrigationType} for {zoneName}: {error}')
+                    .replace('{irrigationType}', irrigationType)
+                    .replace('{zoneName}', zone.name)
+                    .replace('{error}', errorMessage));
             }
         },
         [
@@ -2512,6 +2527,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             setIrrigationAssignments,
             setZoneSummaries,
             handleError,
+            t,
         ]
     );
 
@@ -2525,16 +2541,18 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             );
 
             if (zoneIrrigationPoints.length === 0 && zoneIrrigationLines.length === 0) {
-                handleError('No irrigation points found for this zone');
+                handleError(t('No irrigation points found for this zone'));
                 return;
             }
 
             const zone = zones.find((z) => z.id.toString() === zoneId);
-            const zoneName = zone?.name || `Zone ${zoneId}`;
+            const zoneName = zone?.name || `${t('Zone')} ${zoneId}`;
 
             if (
                 confirm(
-                    `Remove all irrigation from ${zoneName} (${zoneIrrigationPoints.length} points)?`
+                    `${t('Remove all irrigation from {zoneName} ({count} points)?')
+                        .replace('{zoneName}', zoneName)
+                        .replace('{count}', zoneIrrigationPoints.length.toString())}`
                 )
             ) {
                 zoneIrrigationPoints.forEach((point) => {
@@ -2588,6 +2606,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             setIrrigationAssignments,
             setZoneSummaries,
             handleError,
+            t,
         ]
     );
 
@@ -2606,10 +2625,10 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     return updated;
                 });
             } else {
-                handleError('Please enter a valid row spacing value');
+                handleError(t('Please enter a valid row spacing value'));
             }
         },
-        [tempRowSpacing, setRowSpacing, setEditingRowSpacingForCrop, setTempRowSpacing, handleError]
+        [tempRowSpacing, setRowSpacing, setEditingRowSpacingForCrop, setTempRowSpacing, handleError, t]
     );
 
     const handleRowSpacingCancel = useCallback(
@@ -2639,7 +2658,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     return updated;
                 });
             } else {
-                handleError('Please enter a valid plant spacing value');
+                handleError(t('Please enter a valid plant spacing value'));
             }
         },
         [
@@ -2648,6 +2667,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             setEditingPlantSpacingForCrop,
             setTempPlantSpacing,
             handleError,
+            t,
         ]
     );
 
@@ -2665,7 +2685,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
 
     const handleCaptureMapAndSummary = () => {
         if (!map) {
-            handleError('Map is not ready for capture');
+            handleError(t('Map is not ready for capture'));
             return;
         }
 
@@ -2912,10 +2932,10 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                         const infoWindow = new google.maps.InfoWindow({
                                             content: `<div style="text-align: center; min-width: 150px;">
                                                 <h3 style="margin: 0 0 8px 0; color: #333;">${equipmentConfig.name}</h3>
-                                                <p style="margin: 0 0 8px 0; color: #666; font-size: 12px;">${equipmentConfig.description || 'Equipment'}</p>
+                                                <p style="margin: 0 0 8px 0; color: #666; font-size: 12px;">${equipmentConfig.description || t('Equipment')}</p>
                                                 <button onclick="window.removeEquipment('${equipmentData.id}')" 
                                                         style="background: #dc2626; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                                                    Remove Equipment
+                                                    ${t('Remove {equipmentName}').replace('{equipmentName}', '')}
                                                 </button>
                                             </div>`,
                                         });
@@ -2962,7 +2982,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                         const marker = new google.maps.Marker({
                                             position: { lat: pointData.lat, lng: pointData.lng },
                                             map: map,
-                                            title: `${pointData.type} - Zone ${pointData.zoneId}`,
+                                            title: `${pointData.type} - ${t('Zone')} ${pointData.zoneId}`,
                                             icon: {
                                                 path: google.maps.SymbolPath.CIRCLE,
                                                 scale: 4,
@@ -3046,7 +3066,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                         console.log('✅ Successfully restored all map objects for editing');
                     } catch (error) {
                         console.error('Error restoring map objects:', error);
-                        handleError('Failed to restore map data');
+                        handleError(t('Failed to load saved project data'));
                     } finally {
                         setIsRestoring(false);
                     }
@@ -3081,6 +3101,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         setZones,
         createEquipmentMarkerIcon,
         restoreZoneLabels,
+        t,
     ]);
 
     useEffect(() => {
@@ -3159,11 +3180,11 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         const lateralPipes = pipes.filter((pipe) => pipe.type === 'lateral');
 
         if (lateralPipes.length === 0) {
-            handleError('No lateral pipes to clear');
+            handleError(t('No lateral pipes to clear'));
             return;
         }
 
-        if (confirm(`Remove all ${lateralPipes.length} lateral pipes?`)) {
+        if (confirm(t('Remove all {count} lateral pipes?').replace('{count}', lateralPipes.length.toString()))) {
             lateralPipes.forEach((pipe) => {
                 if ('polyline' in pipe && pipe.polyline) {
                     pipe.polyline.setMap(null);
@@ -3180,7 +3201,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 }),
             }));
         }
-    }, [pipes, setPipes, setMapObjects, handleError]);
+    }, [pipes, setPipes, setMapObjects, handleError, t]);
 
     return (
         <ErrorBoundary>
@@ -3188,14 +3209,14 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 className="flex h-screen flex-col overflow-hidden text-white"
                 style={{ backgroundColor: '#000005' }}
             >
-                <Head title="Field Map - Irrigation Planning" />
+                <Head title={t('Field Map - Irrigation Planning')} />
 
                 <Navbar />
 
                 {error && (
                     <div className="fixed right-4 top-20 z-[9999] max-w-md">
                         <ErrorMessage
-                            title="Error"
+                            title={t('Error')}
                             message={error}
                             type="error"
                             onDismiss={clearError}
@@ -3204,7 +3225,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 )}
 
                 {isLoading && (
-                    <LoadingSpinner size="lg" color="blue" text="Processing..." fullScreen={true} />
+                    <LoadingSpinner size="lg" color="blue" text={t('Processing...')} fullScreen={true} />
                 )}
 
                 <div className="flex flex-1 overflow-hidden">
@@ -3235,11 +3256,11 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                                 d="M10 19l-7-7m0 0l7-7m-7 7h18"
                                             />
                                         </svg>
-                                        Back to Crop Selection
+                                        {t('Back to Crop Selection')}
                                     </Link>
                                 </div>
                                 <h3 className="text-lg font-semibold text-white">
-                                    🛠️ Tools & Settings
+                                    🛠️ {t('Tools & Settings')}
                                 </h3>
                             </div>
 
@@ -3249,31 +3270,31 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                     style={{ backgroundColor: '#000005' }}
                                 >
                                     <div className="mb-2 text-xs font-semibold text-white">
-                                        Planning Steps
+                                        {t('Planning Steps')}
                                     </div>
                                     <div className="grid grid-cols-4 gap-1">
                                         {[
                                             {
                                                 step: 1,
-                                                title: 'Field',
+                                                title: t('Field'),
                                                 icon: '1️⃣',
                                                 color: 'green',
                                             },
                                             {
                                                 step: 2,
-                                                title: 'Zones',
+                                                title: t('Zones'),
                                                 icon: '2️⃣',
                                                 color: 'blue',
                                             },
                                             {
                                                 step: 3,
-                                                title: 'Pipes',
+                                                title: t('Pipes'),
                                                 icon: '3️⃣',
                                                 color: 'purple',
                                             },
                                             {
                                                 step: 4,
-                                                title: 'Irrigation',
+                                                title: t('Irrigation'),
                                                 icon: '4️⃣',
                                                 color: 'cyan',
                                             },
@@ -3323,6 +3344,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                             pipeSnapEnabled={pipeSnapEnabled}
                                             setPipeSnapEnabled={setPipeSnapEnabled}
                                             drawingStage={drawingStage}
+                                            t={t}
                                         />
                                     </div>
                                 )}
@@ -3416,6 +3438,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                         setIrrigationSettings={setIrrigationSettings}
                                         dripSpacing={dripSpacing}
                                         setDripSpacing={setDripSpacing}
+                                        t={t}
                                     />
                                 </div>
                             </div>
@@ -3429,14 +3452,14 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                         >
                             <div className="flex items-center justify-between">
                                 <h3 className="text-lg font-semibold text-white">
-                                    📍 Interactive Map
+                                    📍 {t('Interactive Map')}
                                 </h3>
 
                                 <div className="flex space-x-2">
                                     {[
-                                        { id: 'street', name: '🗺️' },
-                                        { id: 'satellite', name: '🛰️' },
-                                        { id: 'hybrid', name: '🔄' },
+                                        { id: 'street', name: `🗺️ ${t('Street')}` },
+                                        { id: 'satellite', name: `🛰️ ${t('Satellite')}` },
+                                        { id: 'hybrid', name: `🔄 ${t('Hybrid')}` },
                                     ].map((type) => (
                                         <button
                                             key={type.id}
@@ -3472,7 +3495,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                                 <LoadingSpinner
                                                     size="lg"
                                                     color="blue"
-                                                    text="Loading Map..."
+                                                    text={t('Loading Map...')}
                                                 />
                                             </div>
                                         );
@@ -3481,9 +3504,9 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                         return (
                                             <div className="flex h-full items-center justify-center">
                                                 <div className="text-center text-red-400">
-                                                    <p>Error loading Google Maps</p>
+                                                    <p>{t('Error loading Google Maps')}</p>
                                                     <p className="text-sm">
-                                                        Please check your API key
+                                                        {t('Please check your API key')}
                                                     </p>
                                                 </div>
                                             </div>
@@ -3511,15 +3534,17 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                     mapType={mapType}
                                     onCenterChanged={handleCenterChanged}
                                     onZoomChanged={handleZoomChanged}
+                                    t={t}
                                 />
                             </Wrapper>
-
-                            <div className="absolute right-2 top-2 z-10 w-80">
+                            
+                            {/* Search bar moved to top-left */}
+                            <div className="absolute left-2 top-2 z-10 w-80">
                                 <div className="relative">
                                     <div className="relative">
                                         <input
                                             type="text"
-                                            placeholder="🔍 Search places..."
+                                            placeholder={`🔍 ${t('Search places...')}`}
                                             value={searchQuery}
                                             onChange={(e) => setSearchQuery(e.target.value)}
                                             onFocus={() => {
@@ -3538,6 +3563,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                             <button
                                                 onClick={clearSearch}
                                                 className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                title={t('Clear search')}
                                             >
                                                 <svg
                                                     className="h-4 w-4"
@@ -3616,7 +3642,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                         !isSearching &&
                                         searchQuery.trim() && (
                                             <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-md border border-gray-200 bg-white p-3 text-center text-xs text-gray-500 shadow-lg">
-                                                No places found for "{searchQuery}"
+                                                {t('No places found for "{query}"').replace('{query}', searchQuery)}
                                             </div>
                                         )}
                                 </div>
@@ -3632,15 +3658,14 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                             {EQUIPMENT_TYPES[selectedEquipmentType].icon}
                                         </span>
                                         <span>
-                                            Click map to place{' '}
-                                            {EQUIPMENT_TYPES[selectedEquipmentType].name}
+                                            {t('Click to place {equipmentName}').replace('{equipmentName}', EQUIPMENT_TYPES[selectedEquipmentType].name)}
                                         </span>
                                     </div>
                                 </div>
                             )}
 
                             <div className="absolute bottom-3 left-20 z-10 flex space-x-2">
-                                <Tooltip content="Center map view">
+                                <Tooltip content={t('Center map view')}>
                                     <button
                                         onClick={() => {
                                             setMapCenter([14.5995, 120.9842]);
@@ -3652,7 +3677,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                         📍
                                     </button>
                                 </Tooltip>
-                                <Tooltip content="Get your current location">
+                                <Tooltip content={t('Get your current location')}>
                                     <button
                                         onClick={getCurrentLocation}
                                         className="flex h-12 w-12 items-center justify-center rounded border border-white text-gray-700 shadow-md transition-colors hover:bg-gray-50"
@@ -3664,7 +3689,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
 
                                 {currentStep === 3 && (
                                     <>
-                                        <Tooltip content="Place Water Pump">
+                                        <Tooltip content={t('Place Water Pump')}>
                                             <button
                                                 onClick={() => startPlacingEquipment('pump')}
                                                 className={`flex h-12 w-12 items-center justify-center rounded border border-white text-gray-700 shadow-md transition-colors hover:bg-gray-50 ${
@@ -3677,12 +3702,12 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                             >
                                                 <img
                                                     src="./generateTree/wtpump.png"
-                                                    alt="Pump"
+                                                    alt={t('Water Pump')}
                                                     className="h-8 w-8 object-contain"
                                                 />
                                             </button>
                                         </Tooltip>
-                                        <Tooltip content="Place Solenoid Valve">
+                                        <Tooltip content={t('Place Solenoid Valve')}>
                                             <button
                                                 onClick={() => startPlacingEquipment('solenoid')}
                                                 className={`flex h-12 w-12 items-center justify-center rounded border border-white text-gray-700 shadow-md transition-colors hover:bg-gray-50 ${
@@ -3695,12 +3720,12 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                             >
                                                 <img
                                                     src="./generateTree/solv.png"
-                                                    alt="Solenoid Valve"
+                                                    alt={t('Solenoid Valve')}
                                                     className="h-8 w-8 object-contain"
                                                 />
                                             </button>
                                         </Tooltip>
-                                        <Tooltip content="Place Ball Valve">
+                                        <Tooltip content={t('Place Ball Valve')}>
                                             <button
                                                 onClick={() => startPlacingEquipment('ballvalve')}
                                                 className={`flex h-12 w-12 items-center justify-center rounded border border-white text-gray-700 shadow-md transition-colors hover:bg-gray-50 ${
@@ -3713,14 +3738,14 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                             >
                                                 <img
                                                     src="./generateTree/ballv.png"
-                                                    alt="Ball Valve"
+                                                    alt={t('Ball Valve')}
                                                     className="h-8 w-8 object-contain"
                                                 />
                                             </button>
                                         </Tooltip>
 
                                         {isPlacingEquipment && (
-                                            <Tooltip content="Cancel Equipment Placement">
+                                            <Tooltip content={t('Cancel Equipment Placement')}>
                                                 <button
                                                     onClick={cancelPlacingEquipment}
                                                     className="flex h-12 w-12 items-center justify-center rounded border border-white bg-red-500 text-white shadow-md transition-colors hover:bg-red-600"
@@ -3744,8 +3769,8 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                         >
                             <div className="mb-4 flex items-center justify-between">
                                 <h3 className="text-xl font-semibold text-white">
-                                    🌱 Assign Plant to{' '}
-                                    {typeof selectedZone === 'object' && selectedZone.name}
+                                    🌱 {t('Assign Plant to {zoneName}').replace('{zoneName}', 
+                                        typeof selectedZone === 'object' && selectedZone.name)}
                                 </h3>
                                 <button
                                     onClick={() => {
@@ -3781,10 +3806,10 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                                     : '',
                                         }}
                                     ></span>
-                                    <span className="text-gray-300">Zone Color</span>
+                                    <span className="text-gray-300">{t('Zone Color')}</span>
                                 </div>
                                 <p className="text-sm text-gray-400">
-                                    Select a plant from your chosen crops to assign to this zone.
+                                    {t('Select a plant from your chosen crops to assign to this zone.')}
                                 </p>
                             </div>
 
@@ -3836,8 +3861,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                             {selectedCropObjects.length === 0 && (
                                 <div className="py-8 text-center text-gray-400">
                                     <p>
-                                        No crops selected. Please go back to the crop selection page
-                                        to choose crops.
+                                        {t('No crops selected. Please go back to the crop selection page to choose crops.')}
                                     </p>
                                 </div>
                             )}
@@ -3854,7 +3878,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                         }}
                                         className="rounded-lg border border-white bg-red-600 px-4 py-2 text-white transition-colors hover:bg-red-700"
                                     >
-                                        Remove Plant
+                                        {t('Remove Plant')}
                                     </button>
                                 )}
                                 <button
@@ -3865,7 +3889,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                     className="rounded-lg border border-white px-4 py-2 text-white transition-colors hover:bg-gray-700"
                                     style={{ backgroundColor: '#000005' }}
                                 >
-                                    Cancel
+                                    {t('Cancel')}
                                 </button>
                             </div>
                         </div>
