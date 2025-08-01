@@ -17,6 +17,7 @@ interface FieldMapCropSpacingProps {
     setEditingPlantSpacingForCrop: (crop: string | null) => void;
     handlePlantSpacingConfirm: (cropValue: string) => void;
     handlePlantSpacingCancel: (cropValue: string) => void;
+    t: (key: string) => string;
 }
 
 const FieldMapCropSpacing: React.FC<FieldMapCropSpacingProps> = ({
@@ -35,13 +36,14 @@ const FieldMapCropSpacing: React.FC<FieldMapCropSpacingProps> = ({
     setEditingPlantSpacingForCrop,
     handlePlantSpacingConfirm,
     handlePlantSpacingCancel,
+    t,
 }) => {
     if (selectedCropObjects.length === 0) return null;
 
     return (
         <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-3">
             <div className="mb-3 flex items-center justify-between">
-                <span className="text-sm font-medium text-blue-300">📏 Crop Spacing Settings</span>
+                <span className="text-sm font-medium text-blue-300">📏 {t('Crop Spacing Settings')}</span>
             </div>
 
             <div className="space-y-3">
@@ -60,7 +62,7 @@ const FieldMapCropSpacing: React.FC<FieldMapCropSpacingProps> = ({
                                 <div className="mb-2">
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs text-gray-300">
-                                            Row Spacing (m)
+                                            {t('Row Spacing')} (m)
                                         </span>
                                         {editingRowSpacingForCrop !== crop.value ? (
                                             <div className="flex items-center space-x-2">
@@ -132,7 +134,7 @@ const FieldMapCropSpacing: React.FC<FieldMapCropSpacingProps> = ({
                                 <div>
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs text-gray-300">
-                                            Plant Spacing (m)
+                                            {t('Plant Spacing')} (m)
                                         </span>
                                         {editingPlantSpacingForCrop !== crop.value ? (
                                             <div className="flex items-center space-x-2">

@@ -12,7 +12,7 @@ export const ZONE_COLORS = [
 
 export const OBSTACLE_TYPES = {
     river: {
-        name: 'River/Stream',
+        name: 'Water Source', // Translation key - ใช้ใน fieldcrop.ts
         icon: '🌊',
         color: '#3B82F6',
         fillColor: '#3B82F6',
@@ -20,7 +20,7 @@ export const OBSTACLE_TYPES = {
         description: 'Natural water source, pipes cannot be placed through',
     },
     building: {
-        name: 'Building/Structure',
+        name: 'Building', // Translation key - ใช้ใน fieldcrop.ts
         icon: '🏠',
         color: '#6B7280',
         fillColor: '#6B7280',
@@ -28,7 +28,7 @@ export const OBSTACLE_TYPES = {
         description: 'Building or structure, pipes cannot be placed through',
     },
     rock: {
-        name: 'Rock/Mountain',
+        name: 'Rock', // Translation key - ใช้ใน fieldcrop.ts
         icon: '⛰️',
         color: '#8B5CF6',
         fillColor: '#8B5CF6',
@@ -39,7 +39,7 @@ export const OBSTACLE_TYPES = {
 
 export const PIPE_TYPES = {
     main: {
-        name: 'Main Pipe',
+        name: 'Main Pipe', // Translation key - ใช้ใน fieldcrop.ts
         icon: '🔵',
         color: '#2563eb',
         weight: 8,
@@ -48,7 +48,7 @@ export const PIPE_TYPES = {
         manual: true,
     },
     submain: {
-        name: 'Submain Pipe',
+        name: 'Sub Main Pipe', // Translation key - ใช้ใน fieldcrop.ts
         icon: '🟢',
         color: '#16a34a',
         weight: 5,
@@ -57,7 +57,7 @@ export const PIPE_TYPES = {
         manual: true,
     },
     lateral: {
-        name: 'Lateral Pipe',
+        name: 'Lateral Pipe', // Translation key - ใช้ใน fieldcrop.ts
         icon: '🟡',
         color: '#ca8a04',
         weight: 2,
@@ -72,42 +72,42 @@ export const MAP_TILES = {
         url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
         attribution:
             '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        name: 'Street Map',
+        name: 'Street', // Translation key - ใช้ใน fieldcrop.ts
         icon: '🛣️',
     },
     satellite: {
         url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         attribution:
             '&copy; <a href="https://www.esri.com/">Esri</a> &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
-        name: 'Satellite',
+        name: 'Satellite', // Translation key - ใช้ใน fieldcrop.ts
         icon: '🛰️',
     },
     hybrid: {
         url: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
         attribution:
             '&copy; <a href="https://www.google.com/maps/">Google</a> &mdash; Hybrid satellite with roads',
-        name: 'Hybrid',
+        name: 'Hybrid', // Translation key - ใช้ใน fieldcrop.ts
         icon: '🗺️',
     },
 } as const;
 
 export const EQUIPMENT_TYPES = {
     pump: {
-        name: 'Pump',
+        name: 'Water Pump', // Translation key - ใช้ใน fieldcrop.ts
         icon: '⚡',
         imageUrl: '/generateTree/wtpump.png',
         description: 'Water pump for suction and delivery',
         color: '#DC2626',
     },
     ballvalve: {
-        name: 'Ball Valve',
+        name: 'Ball Valve', // Translation key - ใช้ใน fieldcrop.ts
         icon: '🔘',
         imageUrl: '/generateTree/ballv.png',
         description: 'Valve for controlling water flow',
         color: '#2563EB',
     },
     solenoid: {
-        name: 'Solenoid Valve',
+        name: 'Solenoid Valve', // Translation key - ใช้ใน fieldcrop.ts
         icon: '🔌',
         imageUrl: '/generateTree/solv.png',
         description: 'Automatic valve controlled by electricity',
@@ -128,3 +128,19 @@ export type EquipmentType = keyof typeof EQUIPMENT_TYPES;
 export type ObstacleType = keyof typeof OBSTACLE_TYPES;
 export type DrawingStage = 'field' | 'zones' | 'pipes' | 'irrigation';
 export type DrawingMode = 'zone' | 'obstacle';
+
+// Translation Helper Function
+export const getTranslatedName = (t: (key: string) => string, type: 'obstacle' | 'pipe' | 'equipment' | 'map', key: string): string => {
+    switch (type) {
+        case 'obstacle':
+            return t((OBSTACLE_TYPES as any)[key]?.name || key);
+        case 'pipe':
+            return t((PIPE_TYPES as any)[key]?.name || key);
+        case 'equipment':
+            return t((EQUIPMENT_TYPES as any)[key]?.name || key);
+        case 'map':
+            return t((MAP_TILES as any)[key]?.name || key);
+        default:
+            return key;
+    }
+};

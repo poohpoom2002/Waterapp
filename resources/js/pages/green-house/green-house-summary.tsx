@@ -10,6 +10,7 @@ import { router } from '@inertiajs/react';
 import { greenhouseCrops, getCropByValue } from '../components/Greenhouse/CropData';
 import { saveGreenhouseData, GreenhousePlanningData, calculateAllGreenhouseStats } from '@/utils/greenHouseData';
 import Navbar from '../../components/Navbar';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface Point {
     x: number;
@@ -74,6 +75,7 @@ interface GreenhouseSummaryData {
 }
 
 export default function GreenhouseSummary() {
+    const { t } = useLanguage();
     const [summaryData, setSummaryData] = useState<GreenhouseSummaryData | null>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -130,7 +132,7 @@ export default function GreenhouseSummary() {
                     console.log('✅ Image saved to localStorage successfully.');
                 } catch (error) {
                     console.error('Error capturing canvas image:', error);
-                    alert('เกิดข้อผิดพลาดในการสร้างภาพแผนผัง');
+                    alert(t('เกิดข้อผิดพลาดในการสร้างภาพแผนผัง'));
                 }
             }
             // --- จบส่วนที่เพิ่มเข้ามา ---
@@ -155,7 +157,7 @@ export default function GreenhouseSummary() {
             // Navigate to product page with greenhouse mode
             router.visit('/product?mode=greenhouse');
         } else {
-            alert('Greenhouse data not found. Please create a new greenhouse design.');
+            alert(t('ไม่พบข้อมูลโรงเรือน กรุณาสร้างการออกแบบโรงเรือนใหม่'));
         }
     };
 
@@ -388,11 +390,11 @@ export default function GreenhouseSummary() {
 
         return sortedPlots.map((plot, sortedIndex) => {
             const plotPipeData = {
-                plotName: plot.name || `แปลงปลูกที่ ${sortedIndex + 1}`,
+                plotName: plot.name || `${t('แปลงปลูกที่')} ${sortedIndex + 1}`,
                 cropType:
                     plot.cropType ||
                     (summaryData.selectedCrops && summaryData.selectedCrops[plot.originalIndex]) ||
-                    'ยังไม่ได้เลือกพืช',
+                    t('ยังไม่ได้เลือกพืช'),
                 maxMainPipeLength: 0,
                 maxSubPipeLength: 0,
                 maxTotalPipeLength: 0,
@@ -904,7 +906,7 @@ export default function GreenhouseSummary() {
     // Temporarily disable the save data button
     const handleSaveData = () => {
         alert(
-            'The save feature is still under development. Please wait for the next version update.'
+            t('ฟีเจอร์การบันทึกข้อมูลยังอยู่ระหว่างการพัฒนา กรุณารอการอัพเดทในเวอร์ชันถัดไป')
         );
     };
 
@@ -1078,7 +1080,7 @@ export default function GreenhouseSummary() {
     if (!summaryData) {
         return (
             <div className="min-h-screen bg-gray-900 text-white">
-                <Head title="Greenhouse Summary - Growing System Planning" />
+                <Head title={t('Greenhouse Summary - Growing System Planning')} />
                 
                 {/* Add Navbar at the top - fixed position */}
                 <div className="fixed top-0 left-0 right-0 z-50">
@@ -1110,13 +1112,13 @@ export default function GreenhouseSummary() {
                                                 d="M10 19l-7-7m0 0l7-7m-7 7h18"
                                             />
                                         </svg>
-                                        Back to Greenhouse Map
+                                        {t('Back to Greenhouse Map')}
                                     </button>
                                     <h1 className="mb-2 text-4xl font-bold">
-                                        🏠 Greenhouse Summary
+                                        🏠 {t('Greenhouse Summary')}
                                     </h1>
                                     <p className="mb-6 text-gray-400">
-                                        Complete overview of your greenhouse system planning project
+                                        {t('Complete overview of your greenhouse system planning project')}
                                     </p>
                                 </div>
 
@@ -1138,7 +1140,7 @@ export default function GreenhouseSummary() {
                                                 d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
                                             />
                                         </svg>
-                                        🧮 Calculate Equipment
+                                        🧮 {t('คำนวณอุปกรณ์')}
                                     </button>
                                 </div>
                             </div>
@@ -1151,26 +1153,25 @@ export default function GreenhouseSummary() {
                         <div className="rounded-lg bg-gray-800 p-8 text-center">
                             <div className="mb-4 text-6xl">🏠</div>
                             <h2 className="mb-4 text-2xl font-bold text-yellow-400">
-                                No Greenhouse Data Found
+                                {t('No Greenhouse Data Found')}
                             </h2>
                             <p className="mb-6 text-gray-400">
-                                It looks like you haven't completed a greenhouse planning project
-                                yet, or the data has been cleared.
+                                {t("It looks like you haven't completed a greenhouse planning project yet, or the data has been cleared.")}
                             </p>
                             <div className="space-y-4">
-                                <p className="text-gray-300">To view a summary, please:</p>
+                                <p className="text-gray-300">{t('To view a summary, please:')}</p>
                                 <ol className="mx-auto max-w-md space-y-2 text-left text-gray-300">
                                     <li className="flex items-start">
                                         <span className="mr-2 text-blue-400">1.</span>
-                                        Go to the Greenhouse planning page
+                                        {t('Go to the Greenhouse planning page')}
                                     </li>
                                     <li className="flex items-start">
                                         <span className="mr-2 text-blue-400">2.</span>
-                                        Complete the greenhouse design process
+                                        {t('Complete the greenhouse design process')}
                                     </li>
                                     <li className="flex items-start">
                                         <span className="mr-2 text-blue-400">3.</span>
-                                        Click the "View Summary" button that appears
+                                        {t('Click the "View Summary" button that appears')}
                                     </li>
                                 </ol>
                             </div>
@@ -1179,7 +1180,7 @@ export default function GreenhouseSummary() {
                                     onClick={() => (window.location.href = '/greenhouse-crop')}
                                     className="inline-flex items-center rounded-lg bg-blue-600 px-6 py-3 text-white transition-colors hover:bg-blue-700"
                                 >
-                                    🏠 Start New Plan
+                                    🏠 {t('เริ่มโครงการใหม่')}
                                 </button>
                             </div>
                         </div>
@@ -1191,7 +1192,7 @@ export default function GreenhouseSummary() {
 
     return (
         <div className="min-h-screen bg-gray-900 text-white print:bg-white print:text-black">
-            <Head title="Greenhouse Summary - Growing System Planning" />
+            <Head title={t('Greenhouse Summary - Growing System Planning')} />
             
             {/* Add Navbar at the top - fixed position, hidden in print */}
             <div className="fixed top-0 left-0 right-0 z-50 print:hidden">
@@ -1223,14 +1224,14 @@ export default function GreenhouseSummary() {
                                             d="M10 19l-7-7m0 0l7-7m-7 7h18"
                                         />
                                     </svg>
-                                    Back to Greenhouse Map
+                                    {t('Back to Greenhouse Map')}
                                 </button>
 
                                 <h1 className="mb-1 text-3xl font-bold">
-                                    🏠 Greenhouse Planning Summary
+                                    🏠 {t('สรุปการวางแผนโรงเรือน')}
                                 </h1>
                                 <p className="mb-4 text-gray-400">
-                                    Overview of the greenhouse and irrigation system design.
+                                    {t('ภาพรวมการออกแบบโรงเรือนและระบบการให้น้ำ')}
                                 </p>
                             </div>
 
@@ -1252,7 +1253,7 @@ export default function GreenhouseSummary() {
                                             d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
                                         />
                                     </svg>
-                                    🧮 Calculate Equipment
+                                    🧮 {t('คำนวณอุปกรณ์')}
                                 </button>
                             </div>
                         </div>
@@ -1261,13 +1262,13 @@ export default function GreenhouseSummary() {
             </div>
 
             <div className="hidden print:mb-6 print:block">
-                <h1 className="text-2xl font-bold text-black">🏠 Greenhouse Planning Summary</h1>
+                <h1 className="text-2xl font-bold text-black">🏠 {t('สรุปการวางแผนโรงเรือน')}</h1>
                 <p className="text-gray-600">
-                    Overview of the greenhouse and irrigation system design.
+                    {t('ภาพรวมการออกแบบโรงเรือนและระบบการให้น้ำ')}
                 </p>
                 <hr className="my-2 border-gray-300" />
                 <p className="text-sm text-gray-500">
-                    Date: {new Date().toLocaleDateString('en-US')}
+                    {t('วันที่')}: {new Date().toLocaleDateString('th-TH')}
                 </p>
             </div>
 
@@ -1277,7 +1278,7 @@ export default function GreenhouseSummary() {
                         <div className="print:page-break-after-avoid space-y-4 print:space-y-4">
                             <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-4">
                                 <h2 className="mb-3 text-lg font-bold text-green-400 print:text-lg print:text-black">
-                                    🏠 Project Overview
+                                    🏠 {t('ภาพรวมโครงการ')}
                                 </h2>
                                 <div className="grid grid-cols-3 gap-2 print:grid-cols-3 print:gap-3">
                                     <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
@@ -1285,7 +1286,7 @@ export default function GreenhouseSummary() {
                                             {metrics.shapeTypeCount}
                                         </div>
                                         <div className="text-xs text-gray-400 print:text-sm print:text-gray-600">
-                                            Area Types
+                                            {t('ชนิดพื้นที่')}
                                         </div>
                                     </div>
                                     <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
@@ -1293,7 +1294,7 @@ export default function GreenhouseSummary() {
                                             {metrics.greenhouseArea.toFixed(1)}
                                         </div>
                                         <div className="text-xs text-gray-400 print:text-sm print:text-gray-600">
-                                            Greenhouse Area (m²)
+                                            {t('พื้นที่โรงเรือน (ตร.ม.)')}
                                         </div>
                                     </div>
                                     <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
@@ -1301,7 +1302,7 @@ export default function GreenhouseSummary() {
                                             {metrics.plotArea.toFixed(1)}
                                         </div>
                                         <div className="text-xs text-gray-400 print:text-sm print:text-gray-600">
-                                            Plot Area (m²)
+                                            {t('พื้นที่แปลงปลูก (ตร.ม.)')}
                                         </div>
                                     </div>
                                 </div>
@@ -1312,7 +1313,7 @@ export default function GreenhouseSummary() {
                                             {metrics.plotCount}
                                         </div>
                                         <div className="text-xs text-gray-400 print:text-sm print:text-gray-600">
-                                            Number of Plots
+                                            {t('จำนวนแปลงปลูก')}
                                         </div>
                                     </div>
                                     <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
@@ -1320,7 +1321,7 @@ export default function GreenhouseSummary() {
                                             {metrics.waterSourceCount}
                                         </div>
                                         <div className="text-xs text-gray-400 print:text-sm print:text-gray-600">
-                                            Water Sources
+                                            {t('จำนวนแหล่งน้ำ')}
                                         </div>
                                     </div>
                                     <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
@@ -1328,7 +1329,7 @@ export default function GreenhouseSummary() {
                                             {metrics.walkwayArea.toFixed(1)}
                                         </div>
                                         <div className="text-xs text-gray-400 print:text-sm print:text-gray-600">
-                                            Walkway Area (m²)
+                                            {t('พื้นที่ทางเดิน (ตร.ม.)')}
                                         </div>
                                     </div>
                                 </div>
@@ -1336,46 +1337,46 @@ export default function GreenhouseSummary() {
 
                             <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-4">
                                 <h2 className="mb-3 text-lg font-bold text-blue-400 print:text-lg print:text-black">
-                                    📋 Planning Method
+                                    📋 {t('วิธีการวางแผน')}
                                 </h2>
                                 <div className="space-y-2 print:space-y-3">
                                     <div className="rounded-lg bg-gray-700 p-2 print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-gray-400 print:text-sm print:text-gray-600">
-                                                Design Method
+                                                {t('วิธีการออกแบบ')}
                                             </span>
                                             <span className="text-sm font-bold text-orange-400 print:text-sm print:text-black">
                                                 {summaryData?.planningMethod === 'draw'
-                                                    ? '✏️ Manual Drawing'
-                                                    : '📁 File Import'}
+                                                    ? `✏️ ${t('วาดพื้นที่เอง')}`
+                                                    : `📁 ${t('นำเข้าไฟล์แบบแปลน')}`}
                                             </span>
                                         </div>
                                     </div>
                                     <div className="rounded-lg bg-gray-700 p-2 print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-gray-400 print:text-sm print:text-gray-600">
-                                                Irrigation System
+                                                {t('ระบบการให้น้ำ')}
                                             </span>
                                             <span className="text-sm font-bold text-cyan-400 print:text-sm print:text-black">
                                                 {summaryData?.irrigationMethod === 'mini-sprinkler'
-                                                    ? '💧 Mini-Sprinkler'
+                                                    ? `💧 ${t('มินิสปริงเกลอร์')}`
                                                     : summaryData?.irrigationMethod === 'drip'
-                                                      ? '💧🌱 Drip System'
-                                                      : '🔄 Mixed System'}
+                                                      ? `💧🌱 ${t('น้ำหยด')}`
+                                                      : `🔄 ${t('แบบผสม')}`}
                                             </span>
                                         </div>
                                     </div>
                                     <div className="rounded-lg bg-gray-700 p-2 print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-gray-400 print:text-sm print:text-gray-600">
-                                                Date Created
+                                                {t('วันที่สร้าง')}
                                             </span>
                                             <span className="text-sm font-bold text-purple-400 print:text-sm print:text-black">
                                                 {summaryData?.createdAt
                                                     ? new Date(
                                                           summaryData.createdAt
-                                                      ).toLocaleDateString('en-US')
-                                                    : 'Today'}
+                                                      ).toLocaleDateString('th-TH')
+                                                    : t('วันนี้')}
                                             </span>
                                         </div>
                                     </div>
@@ -1384,64 +1385,63 @@ export default function GreenhouseSummary() {
 
                             <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-4">
                                 <h2 className="mb-3 text-lg font-bold text-purple-400 print:text-lg print:text-black">
-                                    ⚙️ Irrigation Equipment Summary
+                                    ⚙️ {t('สรุปอุปกรณ์การให้น้ำ')}
                                 </h2>
 
                                 <div className="mb-3">
                                     <h3 className="mb-2 text-sm font-semibold text-orange-400 print:text-sm print:text-black">
-                                        🔵 Pipe System
+                                        🔵 {t('ระบบท่อ')}
                                     </h3>
                                     {/* First row: Max pipe lengths */}
                                     <div className="mb-2 grid grid-cols-3 gap-1 print:gap-2">
                                         <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                             <div className="text-sm font-bold text-blue-400 print:text-sm print:text-black">
-                                                {irrigationMetrics.maxMainPipeLength.toFixed(1)} m
+                                                {irrigationMetrics.maxMainPipeLength.toFixed(1)} {t('เมตร')}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                Max Main Pipe
+                                                {t('ท่อเมนสูงสุด')}
                                             </div>
                                         </div>
                                         <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                             <div className="text-sm font-bold text-green-400 print:text-sm print:text-black">
-                                                {irrigationMetrics.maxSubPipeLength.toFixed(1)} m
+                                                {irrigationMetrics.maxSubPipeLength.toFixed(1)} {t('เมตร')}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                Max Sub-Pipe
+                                                {t('ท่อย่อยสูงสุด')}
                                             </div>
                                         </div>
                                         <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                             <div className="text-sm font-bold text-purple-400 print:text-sm print:text-black">
-                                                {irrigationMetrics.maxTotalPipeLength.toFixed(1)} m
+                                                {irrigationMetrics.maxTotalPipeLength.toFixed(1)} {t('เมตร')}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                Max Total Length
+                                                {t('ความยาวสูงสุดรวม')}
                                             </div>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-3 gap-1 print:gap-2">
                                         <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                             <div className="text-sm font-bold text-cyan-400 print:text-sm print:text-black">
-                                                {irrigationMetrics.totalMainPipeLength.toFixed(1)}{' '}
-                                                ม.
+                                                {irrigationMetrics.totalMainPipeLength.toFixed(1)} {t('เมตร')}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                Total Main Pipe
+                                                {t('ท่อเมนทั้งหมด')}
                                             </div>
                                         </div>
                                         <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                             <div className="text-sm font-bold text-yellow-400 print:text-sm print:text-black">
-                                                {irrigationMetrics.totalSubPipeLength.toFixed(1)} m
+                                                {irrigationMetrics.totalSubPipeLength.toFixed(1)} {t('เมตร')}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                Total Sub-Pipe
+                                                {t('ท่อย่อยทั้งหมด')}
                                             </div>
                                         </div>
                                         <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                             <div className="text-sm font-bold text-pink-400 print:text-sm print:text-black">
-                                                {irrigationMetrics.totalPipeLength.toFixed(1)} m
+                                                {irrigationMetrics.totalPipeLength.toFixed(1)} {t('เมตร')}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                Total Length
+                                                {t('ความยาวรวมทั้งหมด')}
                                             </div>
                                         </div>
                                     </div>
@@ -1449,7 +1449,7 @@ export default function GreenhouseSummary() {
 
                                 <div className="mb-3">
                                     <h3 className="mb-2 text-sm font-semibold text-red-400 print:text-sm print:text-black">
-                                        🔧 Control Equipment
+                                        🔧 {t('อุปกรณ์ควบคุม')}
                                     </h3>
                                     <div className="grid grid-cols-3 gap-1 print:gap-2">
                                         <div className="rounded bg-gray-700 p-1 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-2">
@@ -1457,7 +1457,7 @@ export default function GreenhouseSummary() {
                                                 {irrigationMetrics.pumps}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                Pumps
+                                                {t('ปั๊ม')}
                                             </div>
                                         </div>
                                         <div className="rounded bg-gray-700 p-1 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-2">
@@ -1465,7 +1465,7 @@ export default function GreenhouseSummary() {
                                                 {irrigationMetrics.solenoidValves}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                Solenoid Valves
+                                                {t('โซลินอยด์วาล์ว')}
                                             </div>
                                         </div>
                                         <div className="rounded bg-gray-700 p-1 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-2">
@@ -1473,7 +1473,7 @@ export default function GreenhouseSummary() {
                                                 {irrigationMetrics.ballValves}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                Ball Valves
+                                                {t('บอลวาล์ว')}
                                             </div>
                                         </div>
                                     </div>
@@ -1481,7 +1481,7 @@ export default function GreenhouseSummary() {
 
                                 <div>
                                     <h3 className="mb-2 text-sm font-semibold text-cyan-400 print:text-sm print:text-black">
-                                        💧 Irrigation Emitters
+                                        💧 {t('อุปกรณ์การให้น้ำ')}
                                     </h3>
                                     <div className="grid grid-cols-2 gap-1 print:gap-2">
                                         <div className="rounded bg-gray-700 p-1 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-2">
@@ -1489,7 +1489,7 @@ export default function GreenhouseSummary() {
                                                 {irrigationMetrics.sprinklers}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                Sprinklers
+                                                {t('มินิสปริงเกลอร์')}
                                             </div>
                                         </div>
                                         <div className="rounded bg-gray-700 p-1 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-2">
@@ -1497,7 +1497,7 @@ export default function GreenhouseSummary() {
                                                 {irrigationMetrics.dripLines}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                Drip Lines
+                                                {t('สายน้ำหยด')}
                                             </div>
                                         </div>
                                     </div>
@@ -1506,26 +1506,26 @@ export default function GreenhouseSummary() {
 
                             <div className="rounded-lg bg-gray-800 p-4 print:hidden">
                                 <h2 className="mb-3 text-lg font-bold text-purple-400">
-                                    📋 Actions
+                                    📋 {t('การจัดการ')}
                                 </h2>
                                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                                     <button
                                         onClick={handleBackNavigation}
                                         className="rounded-lg bg-blue-600 px-4 py-2 text-center font-semibold text-white transition-colors hover:bg-blue-700"
                                     >
-                                        🔄 Edit Project
+                                        🔄 {t('แก้ไขโครงการ')}
                                     </button>
                                     <button
                                         onClick={handleCalculateEquipment}
                                         className="rounded-lg bg-purple-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-purple-700"
                                     >
-                                        🧮 Calculate Equipment
+                                        🧮 {t('คำนวณอุปกรณ์')}
                                     </button>
                                     <button
                                         onClick={handlePrint}
                                         className="rounded-lg bg-green-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-green-700"
                                     >
-                                        🖨️ Print Plan
+                                        🖨️ {t('พิมพ์แบบแปลน')}
                                     </button>
                                 </div>
                             </div>
@@ -1534,17 +1534,17 @@ export default function GreenhouseSummary() {
                         <div className="print:page-break-before-always space-y-4 print:space-y-0">
                             <div className="hidden print:mb-6 print:block">
                                 <h1 className="text-xl font-bold text-black">
-                                    📐 Greenhouse Plan with Irrigation System
+                                    📐 {t('แบบแปลนโรงเรือนพร้อมระบบการให้น้ำ')}
                                 </h1>
                                 <p className="text-gray-600">
-                                    Details of greenhouse structure and equipment installation.
+                                    {t('รายละเอียดโครงสร้างโรงเรือนและการติดตั้งอุปกรณ์')}
                                 </p>
                                 <hr className="my-2 border-gray-300" />
                             </div>
 
                             <div className="rounded-lg bg-gray-800 p-4 print:border-0 print:bg-white print:p-0">
                                 <h2 className="mb-3 text-lg font-bold text-green-400 print:hidden">
-                                    🏠 Greenhouse Layout (with Irrigation)
+                                    🏠 {t('แบบแปลนโรงเรือน (พร้อมระบบน้ำ)')}
                                 </h2>
                                 <div className="overflow-hidden rounded-lg bg-white print:h-96">
                                     <canvas
@@ -1554,33 +1554,28 @@ export default function GreenhouseSummary() {
                                     />
                                 </div>
                                 <div className="mt-2 text-center text-xs text-gray-400 print:hidden">
-                                    Greenhouse layout with all irrigation systems and equipment
-                                    (centered).
+                                    {t('แบบแปลนโรงเรือนพร้อมระบบการให้น้ำและอุปกรณ์ทั้งหมด (อยู่ตรงกลาง)')}
                                 </div>
                             </div>
 
                             <div className="hidden print:mt-8 print:block">
                                 <div className="border border-gray-300 bg-gray-50 p-4">
                                     <h3 className="mb-3 text-sm font-bold text-black">
-                                        📝 Usage Notes
+                                        📝 {t('หมายเหตุการใช้งาน')}
                                     </h3>
                                     <div className="space-y-1 text-xs text-gray-700">
                                         <p>
-                                            • This plan shows the positions of all greenhouse
-                                            structures and irrigation systems.
+                                            • {t('แผนนี้แสดงตำแหน่งของโครงสร้างโรงเรือนและระบบการให้น้ำทั้งหมด')}
                                         </p>
                                         <p>
-                                            • Blue: Main and sub-pipes | Green: Plot areas | Brown:
-                                            Greenhouse structure.
+                                            • {t('สีน้ำเงิน: ท่อเมนและท่อย่อย | สีเขียว: พื้นที่แปลงปลูก | สีน้ำตาล: โครงสร้างโรงเรือน')}
                                         </p>
                                         <p>
-                                            • Symbols indicate the positions of irrigation equipment
-                                            such as pumps, valves, and sprinklers.
+                                            • {t('สัญลักษณ์แสดงตำแหน่งของอุปกรณ์การให้น้ำ เช่น ปั๊ม วาล์ว และสปริงเกลอร์')}
                                         </p>
-                                        <p>• ขนาดและตำแหน่งอาจต้องปรับตามสภาพพื้นที่จริง</p>
+                                        <p>• {t('ขนาดและตำแหน่งอาจต้องปรับตามสภาพพื้นที่จริง')}</p>
                                         <p>
-                                            • ความยาวท่อทั้งหมด:{' '}
-                                            {irrigationMetrics.totalPipeLength.toFixed(1)} เมตร
+                                            • {t('ความยาวท่อทั้งหมด')}: {irrigationMetrics.totalPipeLength.toFixed(1)} {t('เมตร')}
                                         </p>
                                     </div>
                                 </div>
@@ -1589,7 +1584,7 @@ export default function GreenhouseSummary() {
                             <div className="hidden print:mt-6 print:block">
                                 <div className="border border-gray-300 bg-white p-4">
                                     <h3 className="mb-3 text-sm font-bold text-black">
-                                        🌱 Crop Information
+                                        🌱 {t('ข้อมูลการปลูก')}
                                     </h3>
                                     <div className="space-y-3">
                                         {plotPipeData.length > 0 ? (
@@ -1604,11 +1599,11 @@ export default function GreenhouseSummary() {
                                                             {plot.plotName}
                                                         </span>
                                                         <span className="text-xs text-gray-500">
-                                                            Controlled Environment
+                                                            {t('สภาพแวดล้อมควบคุม')}
                                                         </span>
                                                     </div>
                                                     <p className="mb-2 text-xs text-gray-600">
-                                                        พืชที่ปลูก: {plot.cropType}
+                                                        {t('พืชที่ปลูก')}: {plot.cropType}
                                                     </p>
 
                                                     {plot.hasPipes ? (
@@ -1616,70 +1611,52 @@ export default function GreenhouseSummary() {
                                                             <div className="grid grid-cols-3 gap-2">
                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
                                                                     <div className="text-xs font-bold text-black">
-                                                                        {plot.maxMainPipeLength.toFixed(
-                                                                            1
-                                                                        )}{' '}
-                                                                        ม.
+                                                                        {plot.maxMainPipeLength.toFixed(1)} {t('เมตร')}
                                                                     </div>
                                                                     <div className="text-xs text-gray-600">
-                                                                        Max Main Pipe
+                                                                        {t('ท่อเมนสูงสุด')}
                                                                     </div>
                                                                 </div>
                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
                                                                     <div className="text-xs font-bold text-black">
-                                                                        {plot.maxSubPipeLength.toFixed(
-                                                                            1
-                                                                        )}{' '}
-                                                                        ม.
+                                                                        {plot.maxSubPipeLength.toFixed(1)} {t('เมตร')}
                                                                     </div>
                                                                     <div className="text-xs text-gray-600">
-                                                                        Max Sub-Pipe
+                                                                        {t('ท่อย่อยสูงสุด')}
                                                                     </div>
                                                                 </div>
                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
                                                                     <div className="text-xs font-bold text-black">
-                                                                        {plot.maxTotalPipeLength.toFixed(
-                                                                            1
-                                                                        )}{' '}
-                                                                        ม.
+                                                                        {plot.maxTotalPipeLength.toFixed(1)} {t('เมตร')}
                                                                     </div>
                                                                     <div className="text-xs text-gray-600">
-                                                                        Max Total
+                                                                        {t('ความยาวสูงสุดรวม')}
                                                                     </div>
                                                                 </div>
                                                             </div>
                                                             <div className="grid grid-cols-3 gap-2">
                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
                                                                     <div className="text-xs font-bold text-black">
-                                                                        {plot.totalMainPipeLength.toFixed(
-                                                                            1
-                                                                        )}{' '}
-                                                                        ม.
+                                                                        {plot.totalMainPipeLength.toFixed(1)} {t('เมตร')}
                                                                     </div>
                                                                     <div className="text-xs text-gray-600">
-                                                                        Total Main Pipe
+                                                                        {t('ท่อเมนทั้งหมด')}
                                                                     </div>
                                                                 </div>
                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
                                                                     <div className="text-xs font-bold text-black">
-                                                                        {plot.totalSubPipeLength.toFixed(
-                                                                            1
-                                                                        )}{' '}
-                                                                        ม.
+                                                                        {plot.totalSubPipeLength.toFixed(1)} {t('เมตร')}
                                                                     </div>
                                                                     <div className="text-xs text-gray-600">
-                                                                        Total Sub-Pipe
+                                                                        {t('ท่อย่อยทั้งหมด')}
                                                                     </div>
                                                                 </div>
                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
                                                                     <div className="text-xs font-bold text-black">
-                                                                        {plot.totalPipeLength.toFixed(
-                                                                            1
-                                                                        )}{' '}
-                                                                        ม.
+                                                                        {plot.totalPipeLength.toFixed(1)} {t('เมตร')}
                                                                     </div>
                                                                     <div className="text-xs text-gray-600">
-                                                                        Total
+                                                                        {t('ความยาวรวมทั้งหมด')}
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -1687,7 +1664,7 @@ export default function GreenhouseSummary() {
                                                     ) : (
                                                         <div className="border border-gray-200 bg-gray-50 p-2 text-center">
                                                             <span className="text-xs text-gray-600">
-                                                                No pipe system in this plot.
+                                                                {t('ไม่มีระบบท่อในแปลงนี้')}
                                                             </span>
                                                         </div>
                                                     )}
@@ -1704,12 +1681,12 @@ export default function GreenhouseSummary() {
                                                             {getCropIcon(crop)} {crop}
                                                         </span>
                                                         <span className="text-xs text-gray-500">
-                                                            Controlled Environment
+                                                            {t('สภาพแวดล้อมควบคุม')}
                                                         </span>
                                                     </div>
                                                 )) || (
                                                     <p className="text-sm text-gray-500">
-                                                        No crops selected.
+                                                        {t('ไม่มีพืชที่เลือกไว้')}
                                                     </p>
                                                 )}
                                             </>
@@ -1720,7 +1697,7 @@ export default function GreenhouseSummary() {
 
                             <div className="rounded-lg bg-gray-800 p-4 print:hidden">
                                 <h2 className="mb-3 text-lg font-bold text-yellow-400">
-                                    🌱 Crop Information
+                                    🌱 {t('ข้อมูลการปลูก')}
                                 </h2>
                                 <div className="space-y-3">
                                     {plotPipeData.length > 0 ? (
@@ -1736,13 +1713,13 @@ export default function GreenhouseSummary() {
                                                                 {plot.plotName}
                                                             </h3>
                                                             <p className="text-xs text-gray-400">
-                                                                Crop: {plot.cropType}
+                                                                {t('พืชที่ปลูก')}: {plot.cropType}
                                                             </p>
                                                         </div>
                                                     </div>
                                                     <div className="text-right">
                                                         <div className="text-xs text-gray-400">
-                                                            Controlled Environment
+                                                            {t('สภาพแวดล้อมควบคุม')}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1752,70 +1729,52 @@ export default function GreenhouseSummary() {
                                                         <div className="grid grid-cols-3 gap-2">
                                                             <div className="rounded bg-gray-600 p-2 text-center">
                                                                 <div className="text-xs font-bold text-blue-400">
-                                                                    {plot.maxMainPipeLength.toFixed(
-                                                                        1
-                                                                    )}{' '}
-                                                                    ม.
+                                                                    {plot.maxMainPipeLength.toFixed(1)} {t('เมตร')}
                                                                 </div>
                                                                 <div className="text-xs text-gray-400">
-                                                                    Max Main Pipe
+                                                                    {t('ท่อเมนสูงสุด')}
                                                                 </div>
                                                             </div>
                                                             <div className="rounded bg-gray-600 p-2 text-center">
                                                                 <div className="text-xs font-bold text-green-400">
-                                                                    {plot.maxSubPipeLength.toFixed(
-                                                                        1
-                                                                    )}{' '}
-                                                                    ม.
+                                                                    {plot.maxSubPipeLength.toFixed(1)} {t('เมตร')}
                                                                 </div>
                                                                 <div className="text-xs text-gray-400">
-                                                                    Max Sub-Pipe
+                                                                    {t('ท่อย่อยสูงสุด')}
                                                                 </div>
                                                             </div>
                                                             <div className="rounded bg-gray-600 p-2 text-center">
                                                                 <div className="text-xs font-bold text-purple-400">
-                                                                    {plot.maxTotalPipeLength.toFixed(
-                                                                        1
-                                                                    )}{' '}
-                                                                    ม.
+                                                                    {plot.maxTotalPipeLength.toFixed(1)} {t('เมตร')}
                                                                 </div>
                                                                 <div className="text-xs text-gray-400">
-                                                                    Max Total
+                                                                    {t('ความยาวสูงสุดรวม')}
                                                                 </div>
                                                             </div>
                                                         </div>
                                                         <div className="grid grid-cols-3 gap-2">
                                                             <div className="rounded bg-gray-600 p-2 text-center">
                                                                 <div className="text-xs font-bold text-cyan-400">
-                                                                    {plot.totalMainPipeLength.toFixed(
-                                                                        1
-                                                                    )}{' '}
-                                                                    ม.
+                                                                    {plot.totalMainPipeLength.toFixed(1)} {t('เมตร')}
                                                                 </div>
                                                                 <div className="text-xs text-gray-400">
-                                                                    Total Main Pipe
+                                                                    {t('ท่อเมนทั้งหมด')}
                                                                 </div>
                                                             </div>
                                                             <div className="rounded bg-gray-600 p-2 text-center">
                                                                 <div className="text-xs font-bold text-yellow-400">
-                                                                    {plot.totalSubPipeLength.toFixed(
-                                                                        1
-                                                                    )}{' '}
-                                                                    ม.
+                                                                    {plot.totalSubPipeLength.toFixed(1)} {t('เมตร')}
                                                                 </div>
                                                                 <div className="text-xs text-gray-400">
-                                                                    Total Sub-Pipe
+                                                                    {t('ท่อย่อยทั้งหมด')}
                                                                 </div>
                                                             </div>
                                                             <div className="rounded bg-gray-600 p-2 text-center">
                                                                 <div className="text-xs font-bold text-pink-400">
-                                                                    {plot.totalPipeLength.toFixed(
-                                                                        1
-                                                                    )}{' '}
-                                                                    ม.
+                                                                    {plot.totalPipeLength.toFixed(1)} {t('เมตร')}
                                                                 </div>
                                                                 <div className="text-xs text-gray-400">
-                                                                    Total
+                                                                    {t('ความยาวรวมทั้งหมด')}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -1823,7 +1782,7 @@ export default function GreenhouseSummary() {
                                                 ) : (
                                                     <div className="mt-2 rounded bg-gray-600 p-2 text-center">
                                                         <span className="text-xs text-gray-400">
-                                                            No pipe system in this plot.
+                                                            {t('ไม่มีระบบท่อในแปลงนี้')}
                                                         </span>
                                                     </div>
                                                 )}
@@ -1849,7 +1808,7 @@ export default function GreenhouseSummary() {
                                                         </div>
                                                         <div className="text-right">
                                                             <div className="text-xs text-gray-400">
-                                                                Controlled Environment
+                                                                {t('สภาพแวดล้อมควบคุม')}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -1857,7 +1816,7 @@ export default function GreenhouseSummary() {
                                             )) || (
                                                 <div className="rounded-lg bg-gray-700 p-2 text-center">
                                                     <span className="text-sm text-gray-400">
-                                                        No crops selected.
+                                                        {t('ไม่มีพืชที่เลือกไว้')}
                                                     </span>
                                                 </div>
                                             )}
@@ -1868,8 +1827,7 @@ export default function GreenhouseSummary() {
 
                             <div className="hidden print:mt-8 print:block print:text-center">
                                 <p className="text-xs text-gray-500">
-                                    This document was generated by the automated greenhouse planning
-                                    system - Page 2/2
+                                    {t('เอกสารนี้สร้างโดยระบบวางแผนโรงเรือนอัตโนมัติ - หน้า {num}/{total}').replace('{num}', '2').replace('{total}', '2')}
                                 </p>
                             </div>
                         </div>
@@ -1879,8 +1837,7 @@ export default function GreenhouseSummary() {
 
             <div className="print:page-break-after-avoid hidden print:mt-8 print:block print:text-center">
                 <p className="text-xs text-gray-500">
-                    This document was generated by the automated greenhouse planning system - Page
-                    1/2
+                    {t('เอกสารนี้สร้างโดยระบบวางแผนโรงเรือนอัตโนมัติ - หน้า {num}/{total}').replace('{num}', '1').replace('{total}', '2')}
                 </p>
             </div>
         </div>
