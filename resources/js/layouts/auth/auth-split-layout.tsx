@@ -13,7 +13,18 @@ export default function AuthSplitLayout({
     title,
     description,
 }: PropsWithChildren<AuthLayoutProps>) {
-    const { name, quote } = usePage<SharedData>().props;
+    // Defensive usePage call with error handling
+    let name = '';
+    let quote = null;
+    try {
+        const page = usePage<SharedData>();
+        name = page.props.name;
+        quote = page.props.quote;
+    } catch (error) {
+        console.warn('Inertia context not available in AuthSplitLayout, using fallback values');
+        name = 'WaterApp';
+        quote = null;
+    }
 
     return (
         <div className="relative grid h-dvh flex-col items-center justify-center px-8 sm:px-0 lg:max-w-none lg:grid-cols-2 lg:px-0">

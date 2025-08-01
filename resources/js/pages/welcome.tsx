@@ -2,7 +2,14 @@ import { type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
 
 export default function Welcome() {
-    const { auth } = usePage<SharedData>().props;
+    // Defensive usePage call with error handling
+    let auth;
+    try {
+        auth = usePage<SharedData>().props.auth;
+    } catch (error) {
+        console.warn('Inertia context not available in Welcome, using fallback values');
+        auth = { user: null };
+    }
 
     return (
         <>

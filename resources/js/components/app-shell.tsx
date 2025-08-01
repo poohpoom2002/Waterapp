@@ -8,7 +8,14 @@ interface AppShellProps {
 }
 
 export function AppShell({ children, variant = 'header' }: AppShellProps) {
-    const isOpen = usePage<SharedData>().props.sidebarOpen;
+    // Defensive usePage call with error handling
+    let isOpen = false;
+    try {
+        isOpen = usePage<SharedData>().props.sidebarOpen;
+    } catch (error) {
+        console.warn('Inertia context not available in AppShell, using fallback values');
+        isOpen = false;
+    }
 
     if (variant === 'header') {
         return <div className="flex min-h-screen w-full flex-col">{children}</div>;

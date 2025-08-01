@@ -12,7 +12,15 @@ interface NavItem {
 }
 
 const Navigation: React.FC = () => {
-    const { url } = usePage();
+    // Defensive usePage call with error handling
+    let url = '';
+    try {
+        url = usePage().url;
+    } catch (error) {
+        console.warn('Inertia context not available in Navigation, using fallback values');
+        url = '';
+    }
+    
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
