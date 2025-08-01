@@ -245,8 +245,18 @@ const GoogleMapsResultsOverlays: React.FC<{
 };
 
 function EnhancedHorticultureResultsPageContent() {
-    const page = usePage();
-    const auth = (page.props as any).auth;
+    // Defensive usePage call with error handling
+    let page;
+    let auth;
+    try {
+        page = usePage();
+        auth = (page.props as any).auth;
+    } catch (error) {
+        console.warn('Inertia context not available in HorticultureResultsPage, using fallback values');
+        page = { props: {} };
+        auth = null;
+    }
+    
     const { t } = useLanguage();
     const [projectData, setProjectData] = useState<HorticultureProjectData | null>(null);
     const [projectSummary, setProjectSummary] = useState<ProjectSummaryData | null>(null);

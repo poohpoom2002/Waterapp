@@ -6,8 +6,18 @@ import UserAvatar from './UserAvatar';
 
 const Navbar: React.FC = () => {
     useLanguage();
-    const page = usePage();
-    const auth = (page.props as any).auth;
+    
+    // Defensive usePage call with error handling
+    let page;
+    let auth;
+    try {
+        page = usePage();
+        auth = (page.props as any).auth;
+    } catch (error) {
+        console.warn('Inertia context not available in Navbar, using fallback values');
+        page = { props: {} };
+        auth = null;
+    }
 
     return (
         <nav className="border-b border-gray-700 bg-gray-800 shadow-lg">

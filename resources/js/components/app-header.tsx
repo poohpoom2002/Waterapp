@@ -53,8 +53,18 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
-    const page = usePage<SharedData>();
-    const { auth } = page.props;
+    // Defensive usePage call with error handling
+    let page;
+    let auth;
+    try {
+        page = usePage<SharedData>();
+        auth = page.props.auth;
+    } catch (error) {
+        console.warn('Inertia context not available in AppHeader, using fallback values');
+        page = { props: { auth: null }, url: '' };
+        auth = null;
+    }
+    
     const getInitials = useInitials();
     return (
         <>

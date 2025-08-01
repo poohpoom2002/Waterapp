@@ -862,8 +862,19 @@ const EditFolderModal = ({
 
 export default function Home() {
     const { t } = useLanguage();
-    const page = usePage();
-    const auth = (page.props as any).auth;
+    
+    // Defensive usePage call with error handling
+    let page;
+    let auth;
+    try {
+        page = usePage();
+        auth = (page.props as any).auth;
+    } catch (error) {
+        console.warn('Inertia context not available, using fallback values');
+        page = { props: {} };
+        auth = null;
+    }
+    
     const [fields, setFields] = useState<Field[]>([]);
     const [folders, setFolders] = useState<Folder[]>([]);
     const [loading, setLoading] = useState(true);

@@ -27,7 +27,16 @@ interface ProfileProps {
 
 export default function Profile() {
     const { t } = useLanguage();
-    const { auth } = usePage<ProfileProps>().props;
+    
+    // Defensive usePage call with error handling
+    let auth;
+    try {
+        auth = usePage<ProfileProps>().props.auth;
+    } catch (error) {
+        console.warn('Inertia context not available in Profile, using fallback values');
+        auth = { user: null };
+    }
+    
     const user = auth.user;
 
     const [isEditing, setIsEditing] = useState(false);
