@@ -72,14 +72,14 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 const zoneInput = zoneInputs[zoneId];
                 if (!zoneInput) return { zoneId, flow: 0, head: 0 };
 
-                const flowLPH =
+                const flowLPM =
                     (zoneInput.totalTrees * zoneInput.waterPerTreeLiters) /
-                    (zoneInput.irrigationTimeMinutes / 60);
+                    (zoneInput.irrigationTimeMinutes);
                 const headTotal = zoneInput.staticHeadM + zoneInput.pressureHeadM;
 
                 return {
                     zoneId,
-                    flow: flowLPH / 60,
+                    flow: flowLPM,
                     head: headTotal,
                 };
             })
