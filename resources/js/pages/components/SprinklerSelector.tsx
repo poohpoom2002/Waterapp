@@ -108,7 +108,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                     <p>
                         {t('อัตราการไหล')} {projectMode === 'garden' ? t('ต่อหัวฉีด') : t('ต่อหัว')}:{' '}
                         <span className="font-bold text-blue-300">
-                            {results.waterPerSprinklerLPH.toFixed(1)} {t('ลิตร/ชั่วโมง')}
+                            {results.waterPerSprinklerLPM.toFixed(1)} {t('ลิตร/นาที')}
                         </span>
                     </p>
                     <p>

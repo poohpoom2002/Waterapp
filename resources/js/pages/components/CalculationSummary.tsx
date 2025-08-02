@@ -851,7 +851,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             🚰 {t('น้ำต่อหัว')}{getEquipmentName()}
                         </h3>
                         <p className="text-lg font-bold">
-                            {results.waterPerSprinklerLPH.toFixed(1)} {t('ลิตร/ชั่วโมง')}
+                            {results.waterPerSprinklerLPM.toFixed(1)} {t('ลิตร/นาที')}
                         </p>
                         <p className="text-sm text-gray-300">
                             ({results.waterPerSprinklerLPM.toFixed(3)} {t('ลิตร/นาที')})
