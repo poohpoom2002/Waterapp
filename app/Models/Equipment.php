@@ -1,5 +1,5 @@
 <?php
-// app/Models/Equipment.php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -19,6 +19,7 @@ class Equipment extends Model
         'brand',
         'image',
         'price',
+        'stock',
         'description',
         'is_active'
     ];
@@ -26,6 +27,7 @@ class Equipment extends Model
     protected $casts = [
         'category_id' => 'integer',
         'price' => 'decimal:2',
+        'stock' => 'integer',
         'is_active' => 'boolean'
     ];
 
@@ -46,7 +48,34 @@ class Equipment extends Model
         return $this->hasMany(PumpAccessory::class, 'pump_id');
     }
 
-    // ปรับปรุง method สำหรับ attributes ให้แสดงผลได้ถูกต้อง
+    public static function validateUniqueProductCode($productCode, $excludeId = null)
+    {
+        if (empty($productCode) || $productCode === '-' || $productCode === null) {
+            return true;
+        }
+
+        $query = self::where('product_code', $productCode)
+                     ->where('product_code', '!=', '')
+                     ->where('product_code', '!=', '-')
+                     ->whereNotNull('product_code');
+                     
+        if ($excludeId) {
+            $query->where('id', '!=', $excludeId);
+        }
+        
+        $count = $query->count();
+        
+        // Log for debugging
+        \Log::info('Product code validation', [
+            'product_code' => $productCode,
+            'exclude_id' => $excludeId,
+            'count' => $count,
+            'is_valid' => $count === 0
+        ]);
+        
+        return $count === 0;
+    }
+
     public function getAttributesArray()
     {
         $result = [];
@@ -58,7 +87,6 @@ class Equipment extends Model
                     $attributeValue = $value->value;
                 }
                 
-                // แปลงข้อมูลให้เหมาะสมกับการคำนวณ
                 if (is_array($attributeValue)) {
                     if (count($attributeValue) === 2 && is_numeric($attributeValue[0]) && is_numeric($attributeValue[1])) {
                         $result[$value->attribute->attribute_name] = [(float)$attributeValue[0], (float)$attributeValue[1]];
@@ -77,7 +105,6 @@ class Equipment extends Model
         return $result;
     }
 
-    // เพิ่มฟังก์ชันสำหรับ format attributes ให้แสดงผลสวย
     public function getFormattedAttributes()
     {
         $formatted = [];
@@ -113,7 +140,6 @@ class Equipment extends Model
             }
         }
 
-        // Sort by sort_order
         usort($formatted, function($a, $b) {
             return $a['sort_order'] <=> $b['sort_order'];
         });
@@ -121,7 +147,6 @@ class Equipment extends Model
         return $formatted;
     }
 
-    // ฟังก์ชันสำหรับ format ค่า attribute ให้แสดงผลสวย
     private function formatAttributeValue($value, $attribute)
     {
         if ($value === null || $value === '') {
@@ -132,11 +157,9 @@ class Equipment extends Model
             case 'array':
                 if (is_array($value)) {
                     if (count($value) === 2 && is_numeric($value[0]) && is_numeric($value[1])) {
-                        // Range values
                         $formatted = number_format($value[0], 2) . ' - ' . number_format($value[1], 2);
                         return $attribute->unit ? $formatted . ' ' . $attribute->unit : $formatted;
                     } else {
-                        // Multiple values
                         $formatted = implode(', ', $value);
                         return $attribute->unit ? $formatted . ' ' . $attribute->unit : $formatted;
                     }
@@ -161,7 +184,6 @@ class Equipment extends Model
         }
     }
 
-    // ปรับปรุง toCalculationFormat เพื่อให้สอดคล้องกับ static files
     public function toCalculationFormat()
 {
     $attributes = $this->getAttributesArray();
@@ -174,129 +196,128 @@ class Equipment extends Model
         'brand' => $this->brand,
         'image' => $this->image_url,
         'price' => (float)$this->price,
+        'stock' => $this->stock,
         'is_active' => $this->is_active,
         'category_id' => $this->category_id,
-        'categoryId' => $this->category_id, // เพื่อ backward compatibility
+        'categoryId' => $this->category_id,
         'description' => $this->description,
         'created_at' => $this->created_at,
         'updated_at' => $this->updated_at,
     ];
 
-    // รวม attributes เข้ากับข้อมูลพื้นฐาน
     $result = array_merge($baseData, $attributes);
 
-    // เพิ่ม pump accessories ถ้าเป็นปั๊ม
     if ($this->category && $this->category->name === 'pump') {
         $result['pumpAccessories'] = $this->pumpAccessories->map(function($accessory) {
             return [
                 'id' => $accessory->id,
-                'accessory_type' => $accessory->accessory_type,
+                'product_code' => $accessory->product_code,
                 'name' => $accessory->name,
-                'image' => $accessory->image_url,  // เพิ่มฟิลด์ image_url
+                'image' => $accessory->image_url,
                 'size' => $accessory->size,
-                'specifications' => $accessory->specifications,
                 'price' => (float)$accessory->price,
+                'stock' => $accessory->stock,
+                'quantity' => $accessory->quantity,
                 'is_included' => $accessory->is_included,
                 'sort_order' => $accessory->sort_order,
+                'description' => $accessory->description, // ⭐ เพิ่มบรรทัดนี้
             ];
         })->toArray();
 
-        // เพิ่ม legacy pumpAccessory field สำหรับ backward compatibility
         $result['pumpAccessory'] = $result['pumpAccessories'];
     }
 
     return $result;
 }
 
-    // ปรับปรุง toDetailedFormat สำหรับ CRUD
     public function toDetailedFormat()
-{
-    try {
-        $result = [
-            'id' => $this->id,
-            'category_id' => $this->category_id,
-            'categoryId' => $this->category_id,
-            'product_code' => $this->product_code,
-            'productCode' => $this->product_code,
-            'name' => $this->name,
-            'brand' => $this->brand,
-            'image' => $this->image_url,
-            'price' => (float)$this->price,
-            'description' => $this->description,
-            'is_active' => $this->is_active,
-            'category' => $this->category ? [
-                'id' => $this->category->id,
-                'name' => $this->category->name,
-                'display_name' => $this->category->display_name,
-                'icon' => $this->category->icon,
-                'attributes' => $this->category->attributes->map(function($attr) {
-                    return [
-                        'id' => $attr->id,
-                        'attribute_name' => $attr->attribute_name,
-                        'display_name' => $attr->display_name,
-                        'data_type' => $attr->data_type,
-                        'unit' => $attr->unit,
-                        'is_required' => $attr->is_required,
-                        'sort_order' => $attr->sort_order,
-                    ];
-                })->toArray()
-            ] : null,
-            'attributes' => $this->getStructuredAttributes(),
-            'formatted_attributes' => $this->getFormattedAttributes(),
-            'attributes_raw' => $this->getAttributesArray(),
-            'pumpAccessories' => $this->category && $this->category->name === 'pump' 
-                ? $this->pumpAccessories->map(function($accessory) {
-                    return [
-                        'id' => $accessory->id,
-                        'accessory_type' => $accessory->accessory_type,
-                        'name' => $accessory->name,
-                        'image' => $accessory->image_url,  // เพิ่มฟิลด์ image_url
-                        'size' => $accessory->size,
-                        'specifications' => $accessory->specifications,
-                        'price' => (float)$accessory->price,
-                        'is_included' => $accessory->is_included,
-                        'sort_order' => $accessory->sort_order,
-                    ];
-                })->sortBy('sort_order')->values()->toArray()
-                : [],
-            'created_at' => $this->created_at,
-            'updated_at' => $this->updated_at,
-        ];
+    {
+        try {
+            $result = [
+                'id' => $this->id,
+                'category_id' => $this->category_id,
+                'categoryId' => $this->category_id,
+                'product_code' => $this->product_code,
+                'productCode' => $this->product_code,
+                'name' => $this->name,
+                'brand' => $this->brand,
+                'image' => $this->image_url,
+                'price' => (float)$this->price,
+                'stock' => $this->stock,
+                'description' => $this->description,
+                'is_active' => $this->is_active,
+                'category' => $this->category ? [
+                    'id' => $this->category->id,
+                    'name' => $this->category->name,
+                    'display_name' => $this->category->display_name,
+                    'icon' => $this->category->icon,
+                    'attributes' => $this->category->attributes->map(function($attr) {
+                        return [
+                            'id' => $attr->id,
+                            'attribute_name' => $attr->attribute_name,
+                            'display_name' => $attr->display_name,
+                            'data_type' => $attr->data_type,
+                            'unit' => $attr->unit,
+                            'is_required' => $attr->is_required,
+                            'sort_order' => $attr->sort_order,
+                        ];
+                    })->toArray()
+                ] : null,
+                'attributes' => $this->getStructuredAttributes(),
+                'formatted_attributes' => $this->getFormattedAttributes(),
+                'attributes_raw' => $this->getAttributesArray(),
+                'pumpAccessories' => $this->category && $this->category->name === 'pump' 
+                    ? $this->pumpAccessories->map(function($accessory) {
+                        return [
+                            'id' => $accessory->id,
+                            'product_code' => $accessory->product_code,
+                            'name' => $accessory->name,
+                            'image' => $accessory->image_url,
+                            'size' => $accessory->size,
+                            'price' => (float)$accessory->price,
+                            'stock' => $accessory->stock,
+                            'quantity' => $accessory->quantity,
+                            'is_included' => $accessory->is_included,
+                            'sort_order' => $accessory->sort_order,
+                            'description' => $accessory->description,
+                        ];
+                    })->sortBy('sort_order')->values()->toArray()
+                    : [],
+                'created_at' => $this->created_at,
+                'updated_at' => $this->updated_at,
+            ];
 
-        // Debug log for first few records
-        if ($this->id <= 3) {
-            \Log::info("Equipment toDetailedFormat for ID {$this->id}:", [
-                'basic_data' => [
-                    'id' => $this->id,
-                    'name' => $this->name,
-                    'product_code' => $this->product_code,
-                    'category_id' => $this->category_id,
-                    'is_active' => $this->is_active
-                ],
-                'relationships_loaded' => [
-                    'category' => $this->relationLoaded('category'),
-                    'attributeValues' => $this->relationLoaded('attributeValues'),
-                    'pumpAccessories' => $this->relationLoaded('pumpAccessories')
-                ]
-            ]);
+            if ($this->id <= 3) {
+                \Log::info("Equipment toDetailedFormat for ID {$this->id}:", [
+                    'basic_data' => [
+                        'id' => $this->id,
+                        'name' => $this->name,
+                        'product_code' => $this->product_code,
+                        'category_id' => $this->category_id,
+                        'is_active' => $this->is_active
+                    ],
+                    'relationships_loaded' => [
+                        'category' => $this->relationLoaded('category'),
+                        'attributeValues' => $this->relationLoaded('attributeValues'),
+                        'pumpAccessories' => $this->relationLoaded('pumpAccessories')
+                    ]
+                ]);
+            }
+
+            return $result;
+        } catch (\Exception $e) {
+            \Log::error("Error in toDetailedFormat for equipment ID {$this->id}: " . $e->getMessage());
+            
+            return [
+                'id' => $this->id,
+                'name' => $this->name,
+                'product_code' => $this->product_code,
+                'price' => (float)$this->price,
+                'error' => $e->getMessage()
+            ];
         }
-
-        return $result;
-    } catch (\Exception $e) {
-        \Log::error("Error in toDetailedFormat for equipment ID {$this->id}: " . $e->getMessage());
-        
-        // Return minimal format in case of error
-        return [
-            'id' => $this->id,
-            'name' => $this->name,
-            'product_code' => $this->product_code,
-            'price' => (float)$this->price,
-            'error' => $e->getMessage()
-        ];
     }
-}
 
-    // Helper method สำหรับ validation attributes
     public function validateAttributes()
     {
         $errors = [];
@@ -344,7 +365,6 @@ class Equipment extends Model
             }
         }
         
-        // Sort by sort_order
         usort($result, function($a, $b) {
             return $a['sort_order'] <=> $b['sort_order'];
         });
@@ -358,31 +378,25 @@ class Equipment extends Model
             return null;
         }
 
-        // ถ้าเป็น URL เต็มแล้ว
         if (filter_var($this->image, FILTER_VALIDATE_URL)) {
             return $this->image;
         }
 
-        // ถ้าเริ่มด้วย /storage/ แล้ว
         if (str_starts_with($this->image, '/storage/')) {
             return $this->image;
         }
 
-        // ถ้าเริ่มด้วย storage/ (ไม่มี /)
         if (str_starts_with($this->image, 'storage/')) {
             return '/' . $this->image;
         }
 
-        // ถ้าเป็น path ที่เริ่มด้วย images/
         if (str_starts_with($this->image, 'images/')) {
             return Storage::url($this->image);
         }
 
-        // ถ้าไม่มี path prefix ให้เพิ่ม
         return Storage::url('images/' . basename($this->image));
     }
 
-    // เพิ่ม static methods สำหรับ bulk operations
     public static function bulkUpdateStatus($ids, $isActive)
     {
         return self::whereIn('id', $ids)->update(['is_active' => $isActive]);
@@ -390,14 +404,12 @@ class Equipment extends Model
 
     public static function bulkDelete($ids)
     {
-        // ลบ related data ก่อน
         EquipmentAttributeValue::whereIn('equipment_id', $ids)->delete();
         PumpAccessory::whereIn('pump_id', $ids)->delete();
         
         return self::whereIn('id', $ids)->delete();
     }
 
-    // Scopes
     public function scopeActive($query)
     {
         return $query->where('is_active', 1);
