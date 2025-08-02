@@ -2,6 +2,27 @@ import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useLanguage } from '../contexts/LanguageContext'; // Import useLanguage hook
 
+// Define proper types for the component
+interface ChatMessage {
+    role: 'user' | 'assistant';
+    content: string;
+}
+
+interface Position {
+    x: number;
+    y: number;
+}
+
+interface DragOffset {
+    x: number;
+    y: number;
+}
+
+interface QuickSuggestion {
+    icon: string;
+    query: string;
+}
+
 // AI Assistant Icon with green theme
 const AiIcon = () => (
     <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500 text-white shadow-lg ring-2 ring-white ring-opacity-30 animate-pulse">
@@ -45,9 +66,9 @@ const TypingIndicator = () => {
 };
 
 // Quick Suggestions for Irrigation System
-const QuickSuggestions = ({ onSuggestionSelect }) => {
+const QuickSuggestions = ({ onSuggestionSelect }: { onSuggestionSelect: (suggestion: string) => void }) => {
     const { t } = useLanguage();
-    const suggestions = [
+    const suggestions: QuickSuggestion[] = [
         { icon: '💧', query: t('วิธีคำนวณปริมาณน้ำที่พืชต้องการ') },
         { icon: '🌱', query: t('ระบบน้ำหยดที่เหมาะกับพืชสวนขนาดเล็ก') },
         { icon: '⏰', query: t('กำหนดเวลาให้น้ำที่เหมาะสมแต่ละฤดูกาล') },
@@ -95,12 +116,22 @@ const FloatingParticles = () => (
 );
 
 // Main Component
-const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
+const FloatingAiChat = ({ 
+    isOpen, 
+    onClose, 
+    onMinimize, 
+    isMinimized 
+}: { 
+    isOpen: boolean; 
+    onClose: () => void; 
+    onMinimize: () => void; 
+    isMinimized: boolean; 
+}) => {
     const { t } = useLanguage(); // Use language context
     const [message, setMessage] = useState('');
-    const [chatHistory, setChatHistory] = useState([]);
+    const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
     const [isTyping, setIsTyping] = useState(false);
-    const [position, setPosition] = useState({ x: 0, y: 0 });
+    const [position, setPosition] = useState<Position>({ x: 0, y: 0 });
     const [showSuggestions, setShowSuggestions] = useState(false);
 
     // Position centered when opened
@@ -123,11 +154,11 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
     }, [isOpen, isMinimized]); // Add isMinimized dependency
 
     const [isDragging, setIsDragging] = useState(false);
-    const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+    const [dragOffset, setDragOffset] = useState<DragOffset>({ x: 0, y: 0 });
 
-    const chatContainerRef = useRef(null);
-    const textareaRef = useRef(null);
-    const windowRef = useRef(null);
+    const chatContainerRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const windowRef = useRef<HTMLDivElement>(null);
 
     // Auto-scroll to bottom
     useEffect(() => {
@@ -146,22 +177,24 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
     }, [message]);
 
     // Dragging functionality
-    const handleMouseDown = (e) => {
-        if (e.target.closest('.no-drag')) return;
+    const handleMouseDown = (e: React.MouseEvent) => {
+        if (e.target instanceof Element && e.target.closest('.no-drag')) return;
 
         setIsDragging(true);
-        const rect = windowRef.current.getBoundingClientRect();
-        setDragOffset({
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top,
-        });
+        if (windowRef.current) {
+            const rect = windowRef.current.getBoundingClientRect();
+            setDragOffset({
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top,
+            });
+        }
         
         // Prevent text selection during drag
         e.preventDefault();
         document.body.style.userSelect = 'none';
     };
 
-    const handleMouseMove = (e) => {
+    const handleMouseMove = (e: MouseEvent) => {
         if (!isDragging) return;
 
         const newX = e.clientX - dragOffset.x;
@@ -232,7 +265,7 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
         return () => window.removeEventListener('resize', handleResize);
     }, [isOpen, isMinimized]);
 
-    const handleSuggestionClick = (suggestion) => {
+    const handleSuggestionClick = (suggestion: string) => {
         sendMessage(suggestion);
         setShowSuggestions(false);
     };
@@ -246,7 +279,7 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
     const sendMessage = async (messageToSend = message) => {
         if (!messageToSend.trim() || isTyping) return;
 
-        const newMessage = { role: 'user', content: messageToSend };
+        const newMessage: ChatMessage = { role: 'user', content: messageToSend };
         const updatedHistory = [...chatHistory, newMessage];
         setChatHistory(updatedHistory);
         setMessage('');
@@ -265,7 +298,7 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
             });
 
             const data = await response.json();
-            const aiReply = { role: 'assistant', content: data.reply };
+            const aiReply: ChatMessage = { role: 'assistant', content: data.reply };
             setChatHistory((prev) => [...prev, aiReply]);
         } catch (error) {
             console.error('AI Error:', error);
@@ -287,7 +320,7 @@ const FloatingAiChat = ({ isOpen, onClose, onMinimize, isMinimized }) => {
     return (
         <>
             {/* Custom CSS for animations */}
-            <style jsx>{`
+            <style>{`
                 @keyframes float {
                     0%, 100% { transform: translateY(0px) rotate(0deg); }
                     33% { transform: translateY(-10px) rotate(5deg); }
