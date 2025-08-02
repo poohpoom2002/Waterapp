@@ -91,66 +91,63 @@ const calculateSprinklerPressure = (sprinkler: any, defaultPressure: number): nu
 };
 
 const calculateSprinklerBasedFlow = (sprinkler: any, input: IrrigationInput) => {
-    const totalWaterPerHour =
+    const totalWaterPerMinute =
         (input.totalTrees * input.waterPerTreeLiters) / (input.irrigationTimeMinutes / 60);
     const totalSprinklers = Math.ceil(input.totalTrees * input.sprinklersPerTree);
 
     if (!sprinkler) {
         return {
-            totalFlowLPH: formatNumber(totalWaterPerHour, 1),
-            totalFlowLPM: formatNumber(totalWaterPerHour / 60, 1),
+            totalFlowLPM: formatNumber(totalWaterPerMinute, 1),
             sprinklersUsed: totalSprinklers,
         };
     }
 
     try {
-        let sprinklerFlowLPH;
-        const flowData = sprinkler.waterVolumeLitersPerHour || sprinkler.waterVolumeL_H;
+        let sprinklerFlowLPM;
+        const flowData = sprinkler.waterVolumeLitersPerMinute || sprinkler.waterVolumeLitersPerMinute;
 
         if (Array.isArray(flowData)) {
             const avgFlow = (flowData[0] + flowData[1]) / 2;
-            sprinklerFlowLPH = avgFlow;
+            sprinklerFlowLPM = avgFlow;
         } else if (typeof flowData === 'string' && flowData.includes('-')) {
             const parts = flowData.split('-');
             const min = parseFloat(parts[0]);
             const max = parseFloat(parts[1]);
             const avgFlow = (min + max) / 2;
-            sprinklerFlowLPH = avgFlow;
+            sprinklerFlowLPM = avgFlow;
         } else {
-            sprinklerFlowLPH = parseFloat(String(flowData)) || 0;
+            sprinklerFlowLPM = parseFloat(String(flowData)) || 0;
         }
 
-        if (sprinklerFlowLPH <= 0 || isNaN(sprinklerFlowLPH)) {
+        if (sprinklerFlowLPM <= 0 || isNaN(sprinklerFlowLPM)) {
             throw new Error('Invalid sprinkler flow rate');
         }
 
-        const expectedFlowPerSprinkler = totalWaterPerHour / totalSprinklers;
+        const expectedFlowPerSprinkler = totalWaterPerMinute / totalSprinklers;
 
-        if (sprinklerFlowLPH > expectedFlowPerSprinkler * 3) {
+        if (sprinklerFlowLPM > expectedFlowPerSprinkler * 3) {
             throw new Error('Sprinkler flow too high');
         }
 
-        if (sprinklerFlowLPH < expectedFlowPerSprinkler / 3) {
+        if (sprinklerFlowLPM < expectedFlowPerSprinkler / 3) {
             throw new Error('Sprinkler flow too low');
         }
 
         const effectiveFlowPerSprinkler = Math.min(
-            sprinklerFlowLPH,
+            sprinklerFlowLPM,
             expectedFlowPerSprinkler * 1.2
         );
-        const totalFlowLPH = effectiveFlowPerSprinkler * totalSprinklers;
+        const totalFlowLPM = effectiveFlowPerSprinkler * totalSprinklers;
 
         return {
-            totalFlowLPH: formatNumber(totalFlowLPH, 1),
-            totalFlowLPM: formatNumber(totalFlowLPH / 60, 1),
-            sprinklerFlowLPH: formatNumber(effectiveFlowPerSprinkler, 1),
+            totalFlowLPM: totalFlowLPM,
+            sprinklerFlowLPM: formatNumber(effectiveFlowPerSprinkler, 1),
             sprinklersUsed: totalSprinklers,
         };
     } catch (error) {
         return {
-            totalFlowLPH: formatNumber(totalWaterPerHour, 1),
-            totalFlowLPM: formatNumber(totalWaterPerHour / 60, 1),
-            sprinklerFlowLPH: formatNumber(totalWaterPerHour / totalSprinklers, 1),
+            totalFlowLPM: totalWaterPerMinute,
+            sprinklerFlowLPM: totalWaterPerMinute / totalSprinklers,
             sprinklersUsed: totalSprinklers,
         };
     }
@@ -162,9 +159,8 @@ const calculateFlowRequirements = (input: IrrigationInput, selectedSprinkler: an
     const totalSprinklers =
         sprinklerFlow.sprinklersUsed || Math.ceil(input.totalTrees * input.sprinklersPerTree);
 
-    const flowPerSprinklerLPH =
-        sprinklerFlow.sprinklerFlowLPH || sprinklerFlow.totalFlowLPH / totalSprinklers;
-    const flowPerSprinklerLPM = flowPerSprinklerLPH / 60;
+    const flowPerSprinklerLPM =
+        sprinklerFlow.sprinklerFlowLPM || sprinklerFlow.totalFlowLPM / totalSprinklers;
 
     const branchFlowLPM = flowPerSprinklerLPM * Math.min(input.sprinklersPerLongestBranch, 20);
 
@@ -176,13 +172,11 @@ const calculateFlowRequirements = (input: IrrigationInput, selectedSprinkler: an
     const mainFlowLPM =
         input.longestMainPipeM > 0 ? Math.min(sprinklerFlow.totalFlowLPM, secondaryFlowLPM * 2) : 0;
 
-    return {
-        totalFlowLPH: sprinklerFlow.totalFlowLPH,
+    return {    
         totalFlowLPM: sprinklerFlow.totalFlowLPM,
         totalSprinklers,
         sprinklersPerZone: formatNumber(totalSprinklers / input.numberOfZones, 1),
-        flowPerSprinklerLPH: formatNumber(flowPerSprinklerLPH, 1),
-        flowPerSprinklerLPM: formatNumber(flowPerSprinklerLPM, 3),
+        flowPerSprinklerLPM: flowPerSprinklerLPM,
         branchFlowLPM: formatNumber(branchFlowLPM, 1),
         secondaryFlowLPM: formatNumber(secondaryFlowLPM, 1),
         mainFlowLPM: formatNumber(mainFlowLPM, 1),
@@ -629,9 +623,9 @@ export const useCalculations = (
 
                     switch (categoryType) {
                         case 'sprinkler':
-                            if (transformed.waterVolumeLitersPerHour !== undefined) {
-                                transformed.waterVolumeLitersPerHour = parseRangeValue(
-                                    transformed.waterVolumeLitersPerHour
+                            if (transformed.waterVolumeLitersPerMinute !== undefined) {
+                                transformed.waterVolumeLitersPerMinute = parseRangeValue(
+                                    transformed.waterVolumeLitersPerMinute
                                 );
                             }
                             if (transformed.radiusMeters !== undefined) {
@@ -947,13 +941,10 @@ export const useCalculations = (
         }
 
         return {
-            totalWaterRequiredLPH: flowData.totalFlowLPH,
             totalWaterRequiredLPM: flowData.totalFlowLPM,
-            waterPerZoneLPH: formatNumber(flowData.totalFlowLPH / sanitizedInput.numberOfZones, 1),
             waterPerZoneLPM: formatNumber(flowData.totalFlowLPM / sanitizedInput.numberOfZones, 1),
             totalSprinklers: flowData.totalSprinklers,
             sprinklersPerZone: flowData.sprinklersPerZone,
-            waterPerSprinklerLPH: flowData.flowPerSprinklerLPH,
             waterPerSprinklerLPM: flowData.flowPerSprinklerLPM,
 
             recommendedSprinklers: [],
@@ -1030,69 +1021,8 @@ export const useCalculations = (
             projectSummary,
 
             calculationMetadata: {
-                equipmentCounts: {
-                    sprinklers: sprinklerData.length,
-                    pumps: pumpData.length,
-                    pipes: pipeData.length,
-                },
-                selectedEquipment: {
-                    sprinkler: selectedSprinkler?.name || null,
-                    pressureSource: selectedSprinkler ? 'sprinkler' : 'manual',
-                },
-                autoSelectedEquipment: {
-                    branchPipe: autoSelectedBranchPipe?.productCode || null,
-                    secondaryPipe: autoSelectedSecondaryPipe?.productCode || null,
-                    mainPipe: autoSelectedMainPipe?.productCode || null,
-                    pump: autoSelectedPump?.productCode || null,
-                },
-                analysisTimestamp: new Date().toISOString(),
-                dataSource: 'database',
-                systemComplexity,
-                systemRequirements: {
-                    farmSize: sanitizedInput.farmSizeRai,
-                    complexity: systemComplexity,
-                    totalFlow: requiredPumpFlow,
-                    totalHead: pumpHeadRequired,
-                    safetyFactor: safetyFactor,
-                },
-                flowCalculations: {
-                    totalFlowLPH: flowData.totalFlowLPH,
-                    flowPerSprinkler: flowData.flowPerSprinklerLPM,
-                    branchFlow: flowData.branchFlowLPM,
-                    secondaryFlow: flowData.secondaryFlowLPM,
-                    mainFlow: flowData.mainFlowLPM,
-                    pumpFlow: requiredPumpFlow,
-                    sprinklerBased: !!selectedSprinkler,
-                },
-                multiZoneInfo: allZoneData
-                    ? {
-                          totalZones: allZoneData.length,
-                          simultaneousZones: sanitizedInput.simultaneousZones,
-                          calculationMethod:
-                              allZoneData.length > 1 ? 'multi-zone-optimized' : 'single-zone',
-                          operationGroups: zoneOperationGroups,
-                          criticalGroup: projectSummary?.criticalGroup,
-                          projectSummary: projectSummary,
-                      }
-                    : undefined,
-                headLossAnalysis: {
-                    ratio: headLossValidation.ratio,
-                    isValid: headLossValidation.isValid,
-                    severity: headLossValidation.severity,
-                    recommendation: headLossValidation.recommendation,
-                    breakdown: {
-                        branch: formatNumber(branchLoss.total, 3),
-                        secondary: formatNumber(secondaryLoss.total, 3),
-                        main: formatNumber(mainLoss.total, 3),
-                        connection: formatNumber(connectionLoss, 3),
-                        total: formatNumber(totalHeadLoss, 3),
-                    },
-                },
-                inputValidation: {
-                    originalInput: input,
-                    sanitizedInput: sanitizedInput,
-                    changesApplied: JSON.stringify(input) !== JSON.stringify(sanitizedInput),
-                },
+                totalWaterRequiredLPM: flowData.totalFlowLPM,
+                waterPerZoneLPM: formatNumber(flowData.totalFlowLPM / sanitizedInput.numberOfZones, 1),
             },
         };
     }, [

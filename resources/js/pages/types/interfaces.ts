@@ -56,7 +56,7 @@ export interface AnalyzedSprinkler {
     productCode: string;
     name: string;
     brand_name: string;
-    waterVolumeLitersPerHour: number;
+    waterVolumeLitersPerMinute: number;
     radiusMeters: number;
     pressureBar: number;
     price: number;
@@ -103,27 +103,43 @@ export interface AnalyzedPump {
     description?: string;
     suction_depth_m?: number;
     weight_kg?: number;
-    flow_rate_lpm?: any;
-    head_m?: any;
-    pumpAccessories?: any[];
+    flow_rate_lpm?: number;
+    head_m?: number;
+    pumpAccessories?: PumpAccessory[];
+}
+
+export interface PumpAccessory {
+    id: number;
+    productCode: string;
+    name: string;
+    brand: string;
+}
+
+export interface HeadLossValidation {
+    isValid: boolean;
+    ratio: number;
+    recommendation: string;
+    severity: 'good' | 'warning' | 'critical';
+}
+
+export interface CalculationMetadata {
+    totalWaterRequiredLPM: number;
+    waterPerZoneLPM: number;
 }
 
 export interface CalculationResults {
-    headLossValidation: any;
-    calculationMetadata: any;
-    totalWaterRequiredLPH: number;
+    headLossValidation: HeadLossValidation;
+    calculationMetadata: CalculationMetadata;
     totalWaterRequiredLPM: number;
-    waterPerZoneLPH: number;
     waterPerZoneLPM: number;
     totalSprinklers: number;
     sprinklersPerZone: number;
-    waterPerSprinklerLPH: number;
     waterPerSprinklerLPM: number;
-    recommendedSprinklers: any[];
-    recommendedBranchPipe: any[];
-    recommendedSecondaryPipe: any[];
-    recommendedMainPipe: any[];
-    recommendedPump: any[];
+    recommendedSprinklers: AnalyzedSprinkler[];
+    recommendedBranchPipe: AnalyzedPipe[];
+    recommendedSecondaryPipe: AnalyzedPipe[];
+    recommendedMainPipe: AnalyzedPipe[];
+    recommendedPump: AnalyzedPump[];
 
     analyzedBranchPipes?: AnalyzedPipe[];
     analyzedSecondaryPipes?: AnalyzedPipe[];
@@ -200,11 +216,18 @@ export interface ZoneResults {
     pressureHead: number;
     totalHead: number;
     autoSelectedPipes: {
-        branch?: any;
-        secondary?: any;
-        main?: any;
+        branch?: AnalyzedPipe;
+        secondary?: AnalyzedPipe;
+        main?: AnalyzedPipe;
     };
     sprinklerCount: number;
+}
+
+export interface ZoneOperationGroup {
+    id: string;
+    zones: string[];
+    order: number;
+    label: string;
 }
 
 export interface ProjectSummary {
@@ -214,7 +237,7 @@ export interface ProjectSummary {
     operationMode: string;
     selectedGroupFlowLPM: number;
     selectedGroupHeadM: number;
-    criticalGroup?: any;
+    criticalGroup?: ZoneOperationGroup;
 }
 
 export interface QuotationData {
