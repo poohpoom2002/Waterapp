@@ -6,7 +6,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { Wrapper, Status } from '@googlemaps/react-wrapper';
 import * as turf from '@turf/turf';
 import lineIntersect from '@turf/line-intersect';
-import { getCropByValue } from '@/pages/utils/cropData';
+import { getCropByValue, getTranslatedCropByValue, type TranslatedCrop } from '@/pages/utils/cropData';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
     ZONE_COLORS,
@@ -117,19 +117,10 @@ const DEFAULT_IRRIGATION_SETTINGS = {
 } as const;
 
 const getGoogleMapsConfig = () => {
-    const apiKey = import.meta.env.VITE_Maps_API_KEY || '';
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
     
     if (!apiKey) {
-        console.error('❌ Google Maps API Key not found! Please set VITE_Maps_API_KEY in .env file');
-        console.log('Environment variables:', {
-            NODE_ENV: import.meta.env.MODE,
-            Available_VITE_vars: Object.keys(import.meta.env).filter(key => key.startsWith('VITE_'))
-        });
-    } else {
-        console.log('✅ Google Maps API Key loaded:', {
-            length: apiKey.length,
-            preview: `${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)}`
-        });
+        console.error('❌ Google Maps API Key not found! Please set VITE_GOOGLE_MAPS_API_KEY in .env file');
     }
 
     return {
@@ -591,7 +582,7 @@ interface FieldMapProps {
 }
 
 export default function FieldMap({ crops, irrigation }: FieldMapProps) {
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
     
     // Custom hooks for state management
     const urlParams = new URLSearchParams(window.location.search);
@@ -730,15 +721,21 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
 
     const createEquipmentMarkerIcon = useCallback(
         (equipmentType: EquipmentType, equipmentConfig: any) => {
+            // Determine size based on equipment type
+            const isValve = equipmentType === 'solenoid' || equipmentType === 'ballvalve';
+            const size = isValve ? 40 : 50;
+            const radius = isValve ? 18 : 23;
+            const center = size / 2;
+            
             const svg = `
-            <svg width="50" height="50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">
+            <svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}">
                 <defs>
                     <filter id="equipment-shadow-${Date.now()}" x="-20%" y="-20%" width="140%" height="140%">
                         <feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.3)"/>
                     </filter>
                 </defs>
-                <circle cx="25" cy="25" r="23" fill="white" stroke="${equipmentConfig.color || '#4F46E5'}" stroke-width="3" filter="url(#equipment-shadow-${Date.now()})"/>
-                <text x="25" y="32" text-anchor="middle" font-size="24" fill="${equipmentConfig.color || '#4F46E5'}" font-family="Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif">${equipmentConfig.icon || '🔧'}</text>
+                <circle cx="${center}" cy="${center}" r="${radius}" fill="white" stroke="${equipmentConfig.color || '#4F46E5'}" stroke-width="3" filter="url(#equipment-shadow-${Date.now()})"/>
+                <text x="${center}" y="${center + 5}" text-anchor="middle" font-size="${equipmentConfig.icon.length > 1 ? '12' : '18'}" font-weight="bold" fill="${equipmentConfig.color || '#4F46E5'}" font-family="Arial, Helvetica, sans-serif">${equipmentConfig.icon || 'P'}</text>
             </svg>
         `;
 
@@ -746,8 +743,8 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
 
             return {
                 url: `data:image/svg+xml;charset=UTF-8,${encodedSvg}`,
-                scaledSize: new google.maps.Size(50, 50),
-                anchor: new google.maps.Point(25, 25),
+                scaledSize: new google.maps.Size(size, size),
+                anchor: new google.maps.Point(center, center),
             };
         },
         []
@@ -790,8 +787,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             if (savedData) {
                 try {
                     const parsedData = JSON.parse(savedData);
-                    console.log('🔄 Loading saved project data for editing:', parsedData);
-
+                    
                     if (parsedData.selectedCrops) setSelectedCrops(parsedData.selectedCrops);
                     if (parsedData.fieldAreaSize) setFieldAreaSize(parsedData.fieldAreaSize);
                     if (parsedData.zoneAssignments) setZoneAssignments(parsedData.zoneAssignments);
@@ -822,7 +818,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                         stages[targetStep] as 'field' | 'zones' | 'pipes' | 'irrigation'
                     );
 
-                    console.log(`✅ Edit mode: Set to step ${targetStep}`);
+
                 } catch (error) {
                     console.error('Error loading saved data for editing:', error);
                     handleError(t('Failed to load saved project data'));
@@ -843,8 +839,128 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
     }, [isEditMode, targetStep, crops, irrigation]);
 
     const selectedCropObjects = selectedCrops
-        .map((cropValue) => getCropByValue(cropValue))
-        .filter(Boolean);
+        .map((cropValue) => getTranslatedCropByValue(cropValue, language))
+        .filter(Boolean) as TranslatedCrop[];
+
+    // Initialize crop spacing from cropData
+    useEffect(() => {
+        if (selectedCropObjects.length > 0) {
+            const newRowSpacing: Record<string, number> = {};
+            const newPlantSpacing: Record<string, number> = {};
+            
+            selectedCropObjects.forEach((crop) => {
+                if (rowSpacing[crop.value] === undefined) {
+                    newRowSpacing[crop.value] = crop.rowSpacing;
+                }
+                if (plantSpacing[crop.value] === undefined) {
+                    newPlantSpacing[crop.value] = crop.plantSpacing;
+                }
+            });
+
+
+            
+            if (Object.keys(newRowSpacing).length > 0) {
+                setRowSpacing(prev => ({ ...prev, ...newRowSpacing }));
+            }
+            if (Object.keys(newPlantSpacing).length > 0) {
+                setPlantSpacing(prev => ({ ...prev, ...newPlantSpacing }));
+            }
+            
+
+        }
+    }, [selectedCropObjects, setRowSpacing, setPlantSpacing]);
+
+    // Clean up spacing data when crops are removed
+    useEffect(() => {
+        const currentCropValues = selectedCropObjects.map(crop => crop.value);
+        
+        setRowSpacing(prev => {
+            const filtered: Record<string, number> = {};
+            Object.entries(prev).forEach(([cropValue, spacing]) => {
+                if (currentCropValues.includes(cropValue)) {
+                    filtered[cropValue] = spacing;
+                }
+            });
+            return filtered;
+        });
+        
+        setPlantSpacing(prev => {
+            const filtered: Record<string, number> = {};
+            Object.entries(prev).forEach(([cropValue, spacing]) => {
+                if (currentCropValues.includes(cropValue)) {
+                    filtered[cropValue] = spacing;
+                }
+            });
+            return filtered;
+        });
+        
+        setTempRowSpacing(prev => {
+            const filtered: Record<string, string> = {};
+            Object.entries(prev).forEach(([cropValue, spacing]) => {
+                if (currentCropValues.includes(cropValue)) {
+                    filtered[cropValue] = spacing;
+                }
+            });
+            return filtered;
+        });
+        
+        setTempPlantSpacing(prev => {
+            const filtered: Record<string, string> = {};
+            Object.entries(prev).forEach(([cropValue, spacing]) => {
+                if (currentCropValues.includes(cropValue)) {
+                    filtered[cropValue] = spacing;
+                }
+            });
+            return filtered;
+        });
+    }, [selectedCropObjects, setRowSpacing, setPlantSpacing, setTempRowSpacing, setTempPlantSpacing]);
+
+    // Helper function to get crop spacing info with fallback
+    const getCropSpacingInfo = useCallback((cropValue: string) => {
+        const crop = getTranslatedCropByValue(cropValue, language);
+        
+
+        
+        return {
+            defaultRowSpacing: crop?.rowSpacing || 50,
+            defaultPlantSpacing: crop?.plantSpacing || 30,
+            currentRowSpacing: rowSpacing[cropValue] || crop?.rowSpacing || 50,
+            currentPlantSpacing: plantSpacing[cropValue] || crop?.plantSpacing || 30,
+            waterRequirement: crop?.waterRequirement || 0,
+            irrigationNeedsKey: crop?.irrigationNeedsKey || 'medium',
+            growthPeriod: crop?.growthPeriod || 90
+        };
+    }, [language, rowSpacing, plantSpacing]);
+
+    // Reset spacing to defaults function
+    const resetSpacingToDefaults = useCallback(() => {
+        // รีเซ็ตโดยตรง ไม่มี confirmation
+        const newRowSpacing: Record<string, number> = {};
+        const newPlantSpacing: Record<string, number> = {};
+        
+        selectedCropObjects.forEach((crop) => {
+            newRowSpacing[crop.value] = crop.rowSpacing;
+            newPlantSpacing[crop.value] = crop.plantSpacing;
+        });
+        
+        setRowSpacing(newRowSpacing);
+        setPlantSpacing(newPlantSpacing);
+        setTempRowSpacing({});
+        setTempPlantSpacing({});
+        setEditingRowSpacingForCrop(null);
+        setEditingPlantSpacingForCrop(null);
+        
+
+    }, [
+        selectedCropObjects,
+        setRowSpacing,
+        setPlantSpacing,
+        setTempRowSpacing,
+        setTempPlantSpacing,
+        setEditingRowSpacingForCrop,
+        setEditingPlantSpacingForCrop,
+        t
+    ]);
 
     const handleError = useCallback((errorMessage: string) => {
         setError(errorMessage);
@@ -1375,7 +1491,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
 
             setTimeout(() => {
                 setIsResetting(false);
-                console.log('🧹 Reset completed');
+
             }, 300);
         }
     }, [
@@ -2330,9 +2446,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                         ...prev,
                         [zoneId]: { ...prev[zoneId], dripPointCount: totalDripPoints },
                     }));
-                    console.log(
-                        `Zone ${zone.name}: Total Drip Points Calculated: ${totalDripPoints}`
-                    );
+
                 } else {
                     const defaultSettings =
                         DEFAULT_IRRIGATION_SETTINGS[
@@ -2613,10 +2727,21 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
     const handleRowSpacingConfirm = useCallback(
         (cropValue: string) => {
             const tempValue = tempRowSpacing[cropValue];
+            const crop = getTranslatedCropByValue(cropValue, language);
+            
             if (tempValue && !isNaN(parseFloat(tempValue))) {
+                const numValue = parseFloat(tempValue);
+                
+                // Simple validation - ตรวจสอบแค่ช่วงที่เหมาะสม
+                if (numValue < 5 || numValue > 300) {
+                    handleError(t('Row spacing should be between 5cm and 300cm'));
+                    return;
+                }
+                
+                // อัปเดตค่าโดยตรง ไม่มี confirmation
                 setRowSpacing((prev) => ({
                     ...prev,
-                    [cropValue]: parseFloat(tempValue),
+                    [cropValue]: numValue,
                 }));
                 setEditingRowSpacingForCrop(null);
                 setTempRowSpacing((prev) => {
@@ -2624,11 +2749,13 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     delete updated[cropValue];
                     return updated;
                 });
+                
+
             } else {
                 handleError(t('Please enter a valid row spacing value'));
             }
         },
-        [tempRowSpacing, setRowSpacing, setEditingRowSpacingForCrop, setTempRowSpacing, handleError, t]
+        [tempRowSpacing, setRowSpacing, setEditingRowSpacingForCrop, setTempRowSpacing, handleError, t, language]
     );
 
     const handleRowSpacingCancel = useCallback(
@@ -2646,10 +2773,21 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
     const handlePlantSpacingConfirm = useCallback(
         (cropValue: string) => {
             const tempValue = tempPlantSpacing[cropValue];
+            const crop = getTranslatedCropByValue(cropValue, language);
+            
             if (tempValue && !isNaN(parseFloat(tempValue))) {
+                const numValue = parseFloat(tempValue);
+                
+                // Simple validation - ตรวจสอบแค่ช่วงที่เหมาะสม
+                if (numValue < 5 || numValue > 200) {
+                    handleError(t('Plant spacing should be between 5cm and 200cm'));
+                    return;
+                }
+                
+                // อัปเดตค่าโดยตรง ไม่มี confirmation
                 setPlantSpacing((prev) => ({
                     ...prev,
-                    [cropValue]: parseFloat(tempValue),
+                    [cropValue]: numValue,
                 }));
                 setEditingPlantSpacingForCrop(null);
                 setTempPlantSpacing((prev) => {
@@ -2657,6 +2795,8 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     delete updated[cropValue];
                     return updated;
                 });
+                
+
             } else {
                 handleError(t('Please enter a valid plant spacing value'));
             }
@@ -2668,6 +2808,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             setTempPlantSpacing,
             handleError,
             t,
+            language,
         ]
     );
 
@@ -2775,7 +2916,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 setTimeout(() => {
                     try {
                         const parsedData = JSON.parse(savedData);
-                        console.log('🗺️ Restoring map objects for editing...');
+            
                         clearAllMapObjects();
 
                         if (parsedData.mainField && parsedData.mainField.coordinates) {
@@ -3063,7 +3204,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                         }
 
                         setHasRestoredOnce(true);
-                        console.log('✅ Successfully restored all map objects for editing');
+
                     } catch (error) {
                         console.error('Error restoring map objects:', error);
                         handleError(t('Failed to load saved project data'));
@@ -3438,7 +3579,10 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                         setIrrigationSettings={setIrrigationSettings}
                                         dripSpacing={dripSpacing}
                                         setDripSpacing={setDripSpacing}
+                                        getCropSpacingInfo={getCropSpacingInfo}
+                                        resetSpacingToDefaults={resetSpacingToDefaults}
                                         t={t}
+                                        language={language}
                                     />
                                 </div>
                             </div>

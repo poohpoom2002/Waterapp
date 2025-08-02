@@ -442,17 +442,108 @@ const calculatePlantingPoints = (
 ): number => {
     if (!zoneArea || !crop) return 0;
 
-    const rowSpacing = customRowSpacing || crop.rowSpacing / 100;
-    const plantSpacing = customPlantSpacing || crop.plantSpacing / 100;
+    // 🔥 เพิ่มบรรทัดนี้
+    console.log(`🧮 calculatePlantingPoints called:`, {
+        zoneArea: zoneArea.toFixed(2),
+        cropName: crop.name,
+        cropRowSpacing: crop.rowSpacing,
+        cropPlantSpacing: crop.plantSpacing,
+        customRowSpacing,
+        customPlantSpacing
+    });
+
+    // แปลงหน่วยจาก cm เป็น m
+    const rowSpacing = (customRowSpacing || crop.rowSpacing) / 100;
+    const plantSpacing = (customPlantSpacing || crop.plantSpacing) / 100;
+
+    // 🔥 เพิ่มบรรทัดนี้
+    console.log(`📏 Spacing calculation:`, {
+        rowSpacing: `${rowSpacing} m`,
+        plantSpacing: `${plantSpacing} m`,
+        original: `${crop.rowSpacing}x${crop.plantSpacing} cm`
+    });
 
     if (!rowSpacing || !plantSpacing) return 0;
 
-    const rowsPerSquareMeter = 1 / rowSpacing;
-    const plantsPerRowPerMeter = 1 / plantSpacing;
-    const plantsPerSquareMeter = rowsPerSquareMeter * plantsPerRowPerMeter;
+    // คำนวณจำนวนต้นต่อตารางเมตร
+    // ตัวอย่าง: ระยะห่างแถว 25cm, ระยะห่างต้น 25cm
+    // จำนวนต้นต่อตารางเมตร = (1/0.25) * (1/0.25) = 4 * 4 = 16 ต้น/ตร.ม.
+    const plantsPerSquareMeter = (1 / rowSpacing) * (1 / plantSpacing);
     const totalPlants = Math.floor(zoneArea * plantsPerSquareMeter);
 
+    console.log(`🌱 Plant calculation details:`, {
+        zoneAreaM2: zoneArea.toFixed(2),
+        rowSpacingM: rowSpacing.toFixed(2),
+        plantSpacingM: plantSpacing.toFixed(2),
+        plantsPerSqm: plantsPerSquareMeter.toFixed(1),
+        totalPlants: totalPlants.toLocaleString()
+    });
+
     return totalPlants;
+};
+
+// คำนวณจำนวนจุดปลูกจากท่อย่อยที่มีอยู่จริง
+const calculatePlantingPointsFromPipes = (
+    pipes: any[],
+    zoneId: string,
+    crop: any,
+    customRowSpacing?: number,
+    customPlantSpacing?: number
+): number => {
+    if (!pipes || !crop) return 0;
+
+    // แปลงหน่วยจาก cm เป็น m
+    const rowSpacing = (customRowSpacing || crop.rowSpacing) / 100;
+    const plantSpacing = (customPlantSpacing || crop.plantSpacing) / 100;
+
+    if (!rowSpacing || !plantSpacing) return 0;
+
+    // หาท่อย่อยที่อยู่ในโซนนี้
+    const zonePipes = pipes.filter(pipe => 
+        pipe.type === 'lateral' && pipe.zoneId?.toString() === zoneId
+    );
+
+    console.log(`🔧 Calculating planting points from pipes for zone ${zoneId}:`, {
+        totalPipes: zonePipes.length,
+        cropName: crop.name,
+        rowSpacing: `${rowSpacing} m`,
+        plantSpacing: `${plantSpacing} m`
+    });
+
+    let totalPlantingPoints = 0;
+
+    zonePipes.forEach((pipe, pipeIndex) => {
+        if (pipe.coordinates && pipe.coordinates.length >= 2) {
+            let pipeLength = 0;
+            
+            // คำนวณความยาวท่อย่อย
+            for (let i = 0; i < pipe.coordinates.length - 1; i++) {
+                const start = pipe.coordinates[i];
+                const end = pipe.coordinates[i + 1];
+                
+                // คำนวณระยะทางระหว่างจุด (ใช้ Haversine formula หรือ Google Maps API)
+                const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                    new google.maps.LatLng(start.lat, start.lng),
+                    new google.maps.LatLng(end.lat, end.lng)
+                );
+                pipeLength += distance;
+            }
+
+            // คำนวณจำนวนจุดปลูกตามความยาวท่อย่อย
+            // ระยะห่างระหว่างจุดปลูก = plantSpacing
+            const plantingPointsInPipe = Math.floor(pipeLength / plantSpacing) + 1;
+            totalPlantingPoints += plantingPointsInPipe;
+
+            console.log(`📏 Pipe ${pipeIndex + 1}:`, {
+                pipeLength: `${pipeLength.toFixed(2)} m`,
+                plantingPoints: plantingPointsInPipe,
+                spacing: `${plantSpacing} m`
+            });
+        }
+    });
+
+    console.log(`🌱 Total planting points from pipes: ${totalPlantingPoints.toLocaleString()}`);
+    return totalPlantingPoints;
 };
 
 const calculateYieldAndPrice = (
@@ -920,18 +1011,17 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
 
                         const effectiveRowSpacing = rowSpacing[assignedCropValue]
                             ? rowSpacing[assignedCropValue]
-                            : crop.rowSpacing / 100;
+                            : crop.rowSpacing;
 
                         const effectivePlantSpacing = plantSpacing[assignedCropValue]
                             ? plantSpacing[assignedCropValue]
-                            : crop.plantSpacing / 100;
+                            : crop.plantSpacing;
 
-                        const totalPlantingPoints = calculatePlantingPoints(
-                            zoneArea,
-                            crop,
-                            effectiveRowSpacing,
-                            effectivePlantSpacing
-                        );
+                        // คำนวณจำนวนจุดปลูกจากท่อย่อยที่มีอยู่จริง (ถ้ามี)
+                        // ถ้าไม่มีท่อย่อย ให้คำนวณจากพื้นที่โซน
+                        const totalPlantingPoints = pipes && pipes.length > 0
+                            ? calculatePlantingPointsFromPipes(pipes, zoneId, crop, effectiveRowSpacing, effectivePlantSpacing)
+                            : calculatePlantingPoints(zoneArea, crop, effectiveRowSpacing, effectivePlantSpacing);
 
                         const { estimatedYield, estimatedPrice } = calculateYieldAndPrice(
                             zoneArea,
@@ -966,14 +1056,19 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                             growthPeriod: crop.growthPeriod,
                             irrigationNeeds: crop.irrigationNeeds,
                             irrigationType: irrigationAssignments[zoneId] || t('Not defined'),
+                            calculationMethod: pipes && pipes.length > 0 ? 'จากท่อย่อย' : 'จากพื้นที่โซน',
                         };
 
+                        // ตรวจสอบว่าคำนวณจากท่อย่อยหรือพื้นที่โซน
+                        const calculationMethod = pipes && pipes.length > 0 ? 'จากท่อย่อย' : 'จากพื้นที่โซน';
+                        
                         console.log(
                             `📊 Zone ${zone.name} calculations with cropData (per irrigation):`,
                             {
                                 area: `${Math.round(zoneArea)} ตร.ม. (${Math.round((zoneArea / 1600) * 100) / 100} ไร่)`,
                                 crop: crop.name,
                                 category: crop.category,
+                                calculationMethod: calculationMethod,
                                 rowSpacing: `${effectiveRowSpacing} ม. (จาก cropData: ${crop.rowSpacing} ซม.)`,
                                 plantSpacing: `${effectivePlantSpacing} ม. (จาก cropData: ${crop.plantSpacing} ซม.)`,
                                 plantingPoints: totalPlantingPoints.toLocaleString(),

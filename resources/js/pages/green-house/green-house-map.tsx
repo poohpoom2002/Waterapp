@@ -39,6 +39,12 @@ interface IrrigationElement {
     spacing?: number;
 }
 
+// History state interface
+interface HistoryState {
+    shapes: Shape[];
+    irrigationElements: IrrigationElement[];
+}
+
 interface Tool {
     id: string;
     name: string;
@@ -148,6 +154,84 @@ export default function GreenhouseMap() {
     // Image cache for component icons
     const [componentImages, setComponentImages] = useState<{ [key: string]: HTMLImageElement }>({});
 
+    // ⭐ NEW: Undo/Redo states
+    const [history, setHistory] = useState<HistoryState[]>([{ shapes: [], irrigationElements: [] }]);
+    const [historyIndex, setHistoryIndex] = useState(0);
+
+    // ⭐ NEW: Add to history function
+    const addToHistory = useCallback(
+        (newShapes: Shape[], newIrrigationElements: IrrigationElement[]) => {
+            const newHistory = history.slice(0, historyIndex + 1);
+            newHistory.push({
+                shapes: [...newShapes],
+                irrigationElements: [...newIrrigationElements]
+            });
+            setHistory(newHistory);
+            setHistoryIndex(newHistory.length - 1);
+        },
+        [history, historyIndex]
+    );
+
+    // Finish drawing function - moved before useEffect that uses it
+    const finishDrawing = useCallback(() => {
+        if (currentPath.length < 2) {
+            setIsDrawing(false);
+            setCurrentPath([]);
+            return;
+        }
+
+        const elementTypes = {
+            'main-pipe': { color: '#3B82F6', width: 6 },
+            'sub-pipe': { color: '#10B981', width: 4 },
+            'drip-line': { color: '#06B6D4', width: 2 },
+        };
+
+        const config = elementTypes[selectedTool as keyof typeof elementTypes];
+        if (!config) return;
+
+        const newElement: IrrigationElement = {
+            id: `${selectedTool}-${Date.now()}`,
+            type: selectedTool as IrrigationElement['type'],
+            points: [...currentPath],
+            color: config.color,
+            width: config.width,
+            spacing: selectedTool === 'drip-line' ? globalDripSpacing : undefined,
+        };
+
+        const newIrrigationElements = [...irrigationElements, newElement];
+        setIrrigationElements(newIrrigationElements);
+        
+        // ⭐ NEW: Add to history when finishing drawing
+        addToHistory(shapes, newIrrigationElements);
+        
+        setIsDrawing(false);
+        setCurrentPath([]);
+    }, [currentPath, selectedTool, globalDripSpacing, irrigationElements, shapes, addToHistory]);
+
+    // ⭐ NEW: Undo function
+    const undo = useCallback(() => {
+        if (historyIndex > 0) {
+            const newIndex = historyIndex - 1;
+            setHistoryIndex(newIndex);
+            const previousState = history[newIndex];
+            setShapes([...previousState.shapes]);
+            setIrrigationElements([...previousState.irrigationElements]);
+            setSelectedElement(null);
+        }
+    }, [history, historyIndex]);
+
+    // ⭐ NEW: Redo function
+    const redo = useCallback(() => {
+        if (historyIndex < history.length - 1) {
+            const newIndex = historyIndex + 1;
+            setHistoryIndex(newIndex);
+            const nextState = history[newIndex];
+            setShapes([...nextState.shapes]);
+            setIrrigationElements([...nextState.irrigationElements]);
+            setSelectedElement(null);
+        }
+    }, [history, historyIndex]);
+
     // Load component images
     useEffect(() => {
         const imageConfigs = {
@@ -206,6 +290,10 @@ export default function GreenhouseMap() {
                 const parsedShapes = JSON.parse(decodeURIComponent(shapesParam));
                 console.log('Map: Loaded', parsedShapes.length, 'shapes');
                 setShapes(parsedShapes);
+                
+                // ⭐ NEW: Initialize history with loaded shapes
+                setHistory([{ shapes: [], irrigationElements: [] }, { shapes: parsedShapes, irrigationElements: [] }]);
+                setHistoryIndex(1);
             } catch (error) {
                 console.error('Error parsing shapes:', error);
             }
@@ -223,6 +311,14 @@ export default function GreenhouseMap() {
                             parsedData.irrigationElements
                         );
                         setIrrigationElements(parsedData.irrigationElements);
+                        
+                        // ⭐ NEW: Update history with loaded irrigation elements
+                        const currentShapes = shapesParam ? JSON.parse(decodeURIComponent(shapesParam)) : [];
+                        setHistory([
+                            { shapes: [], irrigationElements: [] }, 
+                            { shapes: currentShapes, irrigationElements: parsedData.irrigationElements }
+                        ]);
+                        setHistoryIndex(1);
                     }
                 } catch (error) {
                     console.error('Error loading irrigation data:', error);
@@ -234,6 +330,87 @@ export default function GreenhouseMap() {
             setIrrigationElements([]);
         }
     }, []);
+
+    // ⭐ NEW: Initialize history when no shapes are loaded from URL
+    useEffect(() => {
+        if (history.length === 1 && history[0].shapes.length === 0 && history[0].irrigationElements.length === 0) {
+            if (shapes.length > 0 || irrigationElements.length > 0) {
+                setHistory([
+                    { shapes: [], irrigationElements: [] },
+                    { shapes: [...shapes], irrigationElements: [...irrigationElements] }
+                ]);
+                setHistoryIndex(1);
+            }
+        }
+    }, [shapes, irrigationElements, history]);
+
+
+
+    // ⭐ NEW: Keyboard shortcuts for undo/redo
+    useEffect(() => {
+        const handleKeyPress = (e: KeyboardEvent) => {
+            // Prevent handling if user is typing in an input
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) {
+                return;
+            }
+
+            switch (e.key) {
+                case 'Enter':
+                    if (isDrawing) {
+                        e.preventDefault();
+                        finishDrawing();
+                    }
+                    break;
+                case 'Escape':
+                    e.preventDefault();
+                    setIsDrawing(false);
+                    setCurrentPath([]);
+                    setIsPanning(false);
+                    setLastPanPoint(null);
+                    setIsDragging(false);
+                    setDragOffset({ x: 0, y: 0 });
+                    setSelectedElement(null);
+                    setShowCropSelector(false);
+                    break;
+                case ' ':
+                    if (!isDrawing) {
+                        e.preventDefault();
+                        setZoom(1);
+                        setPan({ x: 0, y: 0 });
+                    }
+                    break;
+                case 'Delete':
+                    if (selectedElement && selectedTool === 'select') {
+                        e.preventDefault();
+                        deleteElement();
+                    }
+                    break;
+                // ⭐ NEW: Undo with Ctrl+Z
+                case 'z':
+                    if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
+                        e.preventDefault();
+                        undo();
+                    }
+                    break;
+                // ⭐ NEW: Redo with Ctrl+Y or Ctrl+Shift+Z
+                case 'y':
+                    if (e.ctrlKey || e.metaKey) {
+                        e.preventDefault();
+                        redo();
+                    }
+                    break;
+            }
+
+            // ⭐ NEW: Handle Ctrl+Shift+Z for redo
+            if (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+                e.preventDefault();
+                redo();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyPress);
+        return () => window.removeEventListener('keydown', handleKeyPress);
+    }, [isDrawing, selectedElement, selectedTool, finishDrawing, undo, redo]);
 
     // Memoized crop lookup function
     const getCropByValue = useCallback((value: string): Crop | undefined => {
@@ -1058,7 +1235,11 @@ export default function GreenhouseMap() {
                             radius: config.radius,
                         };
 
-                        setIrrigationElements((prev) => [...prev, newElement]);
+                        const newIrrigationElements = [...irrigationElements, newElement];
+                        setIrrigationElements(newIrrigationElements);
+                        
+                        // ⭐ NEW: Add to history when adding new element
+                        addToHistory(shapes, newIrrigationElements);
                     }
                     return;
                 }
@@ -1073,6 +1254,9 @@ export default function GreenhouseMap() {
             isDrawing,
             globalRadius,
             t,
+            irrigationElements,
+            shapes,
+            addToHistory,
         ]
     );
 
@@ -1227,88 +1411,14 @@ export default function GreenhouseMap() {
         }
     }, [isPanning, isDragging]);
 
-    // Finish drawing
-    const finishDrawing = useCallback(() => {
-        if (currentPath.length < 2) {
-            setIsDrawing(false);
-            setCurrentPath([]);
-            return;
-        }
-
-        const elementTypes = {
-            'main-pipe': { color: '#3B82F6', width: 6 },
-            'sub-pipe': { color: '#10B981', width: 4 },
-            'drip-line': { color: '#06B6D4', width: 2 },
-        };
-
-        const config = elementTypes[selectedTool as keyof typeof elementTypes];
-        if (!config) return;
-
-        const newElement: IrrigationElement = {
-            id: `${selectedTool}-${Date.now()}`,
-            type: selectedTool as IrrigationElement['type'],
-            points: [...currentPath],
-            color: config.color,
-            width: config.width,
-            spacing: selectedTool === 'drip-line' ? globalDripSpacing : undefined,
-        };
-
-        setIrrigationElements((prev) => [...prev, newElement]);
-        setIsDrawing(false);
-        setCurrentPath([]);
-    }, [currentPath, selectedTool, globalDripSpacing]);
-
-    // Fixed key handlers
-    useEffect(() => {
-        const handleKeyPress = (e: KeyboardEvent) => {
-            // Prevent handling if user is typing in an input
-            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) {
-                return;
-            }
-
-            switch (e.key) {
-                case 'Enter':
-                    if (isDrawing) {
-                        e.preventDefault();
-                        finishDrawing();
-                    }
-                    break;
-                case 'Escape':
-                    e.preventDefault();
-                    setIsDrawing(false);
-                    setCurrentPath([]);
-                    setIsPanning(false);
-                    setLastPanPoint(null);
-                    setIsDragging(false);
-                    setDragOffset({ x: 0, y: 0 });
-                    setSelectedElement(null);
-                    setShowCropSelector(false);
-                    break;
-                case ' ':
-                    if (!isDrawing) {
-                        e.preventDefault();
-                        setZoom(1);
-                        setPan({ x: 0, y: 0 });
-                    }
-                    break;
-                case 'Delete':
-                    if (selectedElement && selectedTool === 'select') {
-                        e.preventDefault();
-                        deleteElement();
-                    }
-                    break;
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyPress);
-        return () => window.removeEventListener('keydown', handleKeyPress);
-    }, [isDrawing, selectedElement, selectedTool, finishDrawing]);
-
     // Utility functions
     const deleteElement = useCallback(() => {
         if (selectedElement) {
             // Find the element to delete
             const elementToDelete = irrigationElements.find((el) => el.id === selectedElement);
+
+            let newShapes = shapes;
+            let newIrrigationElements = irrigationElements;
 
             // หากเป็นท่อย่อย ให้หาและลบสปริงเกลอร์ที่เกี่ยวข้องด้วย
             if (elementToDelete && elementToDelete.type === 'sub-pipe') {
@@ -1362,10 +1472,8 @@ export default function GreenhouseMap() {
                     });
 
                 // ลบท่อย่อยและสปริงเกลอร์ที่เกี่ยวข้อง
-                setIrrigationElements((prev) =>
-                    prev.filter(
-                        (el) => el.id !== selectedElement && !relatedSprinklers.includes(el.id)
-                    )
+                newIrrigationElements = irrigationElements.filter(
+                    (el) => el.id !== selectedElement && !relatedSprinklers.includes(el.id)
                 );
 
                 // แสดงข้อความแจ้งเตือน
@@ -1376,16 +1484,20 @@ export default function GreenhouseMap() {
                 }
             } else if (elementToDelete && elementToDelete.type === 'drip-line') {
                 // If it's a drip line, delete only the drip line
-                setIrrigationElements((prev) => prev.filter((el) => el.id !== selectedElement));
+                newIrrigationElements = irrigationElements.filter((el) => el.id !== selectedElement);
             } else {
                 // For other elements, delete normally
-                setShapes((prev) => prev.filter((s) => s.id !== selectedElement));
-                setIrrigationElements((prev) => prev.filter((el) => el.id !== selectedElement));
+                newShapes = shapes.filter((s) => s.id !== selectedElement);
+                newIrrigationElements = irrigationElements.filter((el) => el.id !== selectedElement);
             }
 
+            // ⭐ NEW: Add to history when deleting
+            setShapes(newShapes);
+            setIrrigationElements(newIrrigationElements);
+            addToHistory(newShapes, newIrrigationElements);
             setSelectedElement(null);
         }
-    }, [selectedElement, irrigationElements, t]);
+    }, [selectedElement, irrigationElements, t, shapes, addToHistory]);
 
     const autoGenerateSprinklers = useCallback(() => {
         if (!canAutoGenerate) {
@@ -1487,12 +1599,17 @@ export default function GreenhouseMap() {
         });
 
         if (newSprinklers.length > 0) {
-            setIrrigationElements((prev) => [...prev, ...newSprinklers]);
+            const newIrrigationElements = [...irrigationElements, ...newSprinklers];
+            setIrrigationElements(newIrrigationElements);
+            
+            // ⭐ NEW: Add to history when auto-generating sprinklers
+            addToHistory(shapes, newIrrigationElements);
+            
             alert(t('สร้างมินิสปริงเกลอร์ {count} ตัวตามแนวท่อย่อยใหม่เรียบร้อยแล้ว').replace('{count}', newSprinklers.length.toString()));
         } else {
             alert(t('ท่อย่อยทั้งหมดมีมินิสปริงเกลอร์อยู่แล้ว'));
         }
-    }, [canAutoGenerate, selectedIrrigationMethod, irrigationElements, globalRadius, t]);
+    }, [canAutoGenerate, selectedIrrigationMethod, irrigationElements, globalRadius, t, shapes, addToHistory]);
 
     const autoGenerateDripLines = useCallback(() => {
         if (!canAutoGenerate) {
@@ -1552,88 +1669,109 @@ export default function GreenhouseMap() {
         });
 
         if (newDripLines.length > 0) {
-            setIrrigationElements((prev) => [...prev, ...newDripLines]);
+            const newIrrigationElements = [...irrigationElements, ...newDripLines];
+            setIrrigationElements(newIrrigationElements);
+            
+            // ⭐ NEW: Add to history when auto-generating drip lines
+            addToHistory(shapes, newIrrigationElements);
+            
             alert(t('สร้างสายน้ำหยด {count} เส้นตามแนวท่อย่อยใหม่เรียบร้อยแล้ว').replace('{count}', newDripLines.length.toString()));
         } else {
             alert(t('ท่อย่อยทั้งหมดมีสายน้ำหยดอยู่แล้ว'));
         }
-    }, [canAutoGenerate, selectedIrrigationMethod, irrigationElements, globalDripSpacing, t]);
+    }, [canAutoGenerate, selectedIrrigationMethod, irrigationElements, globalDripSpacing, t, shapes, addToHistory]);
 
     const assignCropToPlot = useCallback(
         (cropValue: string) => {
             if (selectedPlot) {
-                setShapes((prev) =>
-                    prev.map((shape) => {
-                        if (shape.id === selectedPlot) {
-                            return { ...shape, cropType: cropValue };
-                        }
-                        return shape;
-                    })
-                );
+                const newShapes = shapes.map((shape) => {
+                    if (shape.id === selectedPlot) {
+                        return { ...shape, cropType: cropValue };
+                    }
+                    return shape;
+                });
+                
+                setShapes(newShapes);
+                
+                // ⭐ NEW: Add to history when assigning crop
+                addToHistory(newShapes, irrigationElements);
+                
                 setShowCropSelector(false);
                 setSelectedPlot(null);
             }
         },
-        [selectedPlot]
+        [selectedPlot, shapes, irrigationElements, addToHistory]
     );
 
     // Radius adjustment functions
     const updateAllSprinklerRadius = useCallback((newRadius: number) => {
         const radiusInPixels = newRadius * 20;
-        setIrrigationElements((prev) =>
-            prev.map((el) => {
-                if (el.type === 'sprinkler') {
-                    return { ...el, radius: radiusInPixels };
-                }
-                return el;
-            })
-        );
+        const newIrrigationElements = irrigationElements.map((el) => {
+            if (el.type === 'sprinkler') {
+                return { ...el, radius: radiusInPixels };
+            }
+            return el;
+        });
+        
+        setIrrigationElements(newIrrigationElements);
         setGlobalRadius(newRadius);
-    }, []);
+        
+        // ⭐ NEW: Add to history when updating radius
+        addToHistory(shapes, newIrrigationElements);
+    }, [irrigationElements, shapes, addToHistory]);
 
     const updateSelectedSprinklerRadius = useCallback(
         (newRadius: number) => {
             if (selectedElement) {
                 const radiusInPixels = newRadius * 20;
-                setIrrigationElements((prev) =>
-                    prev.map((el) => {
-                        if (el.id === selectedElement && el.type === 'sprinkler') {
-                            return { ...el, radius: radiusInPixels };
-                        }
-                        return el;
-                    })
-                );
+                const newIrrigationElements = irrigationElements.map((el) => {
+                    if (el.id === selectedElement && el.type === 'sprinkler') {
+                        return { ...el, radius: radiusInPixels };
+                    }
+                    return el;
+                });
+                
+                setIrrigationElements(newIrrigationElements);
+                
+                // ⭐ NEW: Add to history when updating selected sprinkler radius
+                addToHistory(shapes, newIrrigationElements);
             }
         },
-        [selectedElement]
+        [selectedElement, irrigationElements, shapes, addToHistory]
     );
 
     const updateGlobalDripSpacing = useCallback((newSpacing: number) => {
-        setIrrigationElements((prev) =>
-            prev.map((el) => {
-                if (el.type === 'drip-line') {
-                    return { ...el, spacing: newSpacing };
-                }
-                return el;
-            })
-        );
+        const newIrrigationElements = irrigationElements.map((el) => {
+            if (el.type === 'drip-line') {
+                return { ...el, spacing: newSpacing };
+            }
+            return el;
+        });
+        
+        setIrrigationElements(newIrrigationElements);
         setGlobalDripSpacing(newSpacing);
-    }, []);
+        
+        // ⭐ NEW: Add to history when updating drip spacing
+        addToHistory(shapes, newIrrigationElements);
+    }, [irrigationElements, shapes, addToHistory]);
 
     const updateSelectedDripSpacing = useCallback(
         (newSpacing: number) => {
             if (selectedElement) {
-                setIrrigationElements((prev) =>
-                    prev.map((el) => {
-                        if (el.id === selectedElement && el.type === 'drip-line') {
-                            return { ...el, spacing: newSpacing };
-                        }
-                        return el;
-                    })
-                );
+                const newIrrigationElements = irrigationElements.map((el) => {
+                    if (el.id === selectedElement && el.type === 'drip-line') {
+                        return { ...el, spacing: newSpacing };
+                    }
+                    return el;
+                });
+                
+                setIrrigationElements(newIrrigationElements);
+                
+                // ⭐ NEW: Add to history when updating selected drip spacing
+                addToHistory(shapes, newIrrigationElements);
             }
         },
-        [selectedElement]
+        [selectedElement, irrigationElements, shapes, addToHistory]
     );
 
     // Statistics
@@ -2205,21 +2343,49 @@ export default function GreenhouseMap() {
                             {(zoom * 100).toFixed(0)}%
                         </div>
 
+                        {/* ⭐ NEW: Undo/Redo Controls - top left */}
+                        <div className="absolute left-4 top-4 flex space-x-2">
+                            <button
+                                onClick={undo}
+                                disabled={historyIndex <= 0}
+                                className={`rounded px-3 py-2 text-sm shadow-lg transition-colors ${
+                                    historyIndex <= 0
+                                        ? 'cursor-not-allowed bg-gray-800 text-gray-500'
+                                        : 'bg-gray-700 text-white hover:bg-gray-600'
+                                }`}
+                                title={t('เลิกทำ: Ctrl+Z')}
+                            >
+                                ↶ {t('เลิกทำ')}
+                            </button>
+                            <button
+                                onClick={redo}
+                                disabled={historyIndex >= history.length - 1}
+                                className={`rounded px-3 py-2 text-sm shadow-lg transition-colors ${
+                                    historyIndex >= history.length - 1
+                                        ? 'cursor-not-allowed bg-gray-800 text-gray-500'
+                                        : 'bg-gray-700 text-white hover:bg-gray-600'
+                                }`}
+                                title={t('ทำซ้ำ: Ctrl+Y')}
+                            >
+                                ↷ {t('ทำซ้ำ')}
+                            </button>
+                        </div>
+
                         {/* Status Messages */}
                         {isDrawing && (
-                            <div className="absolute left-4 top-4 rounded bg-blue-600 px-3 py-1 text-sm text-white">
+                            <div className="absolute left-4 top-20 rounded bg-blue-600 px-3 py-1 text-sm text-white">
                                 {t('กำลังวาด {tool}... (กด Enter เพื่อจบ, Escape เพื่อยกเลิก)').replace('{tool}', selectedTool)}
                             </div>
                         )}
 
                         {isDragging && (
-                            <div className="absolute left-4 top-4 rounded bg-yellow-600 px-3 py-1 text-sm text-white">
+                            <div className="absolute left-4 top-20 rounded bg-yellow-600 px-3 py-1 text-sm text-white">
                                 🤏 {t('กำลังขยับองค์ประกอบ... (ไม่กด Ctrl)')}
                             </div>
                         )}
 
                         {isPanning && (
-                            <div className="absolute left-4 top-4 rounded bg-purple-600 px-3 py-1 text-sm text-white">
+                            <div className="absolute left-4 top-20 rounded bg-purple-600 px-3 py-1 text-sm text-white">
                                 🤏 {t('กำลังเลื่อนมุมมอง... (Ctrl+Drag หรือ คลิกพื้นที่ว่าง)')}
                             </div>
                         )}
@@ -2237,8 +2403,12 @@ export default function GreenhouseMap() {
 
                             <button
                                 onClick={() => {
-                                    setIrrigationElements([]);
+                                    const newIrrigationElements: IrrigationElement[] = [];
+                                    setIrrigationElements(newIrrigationElements);
                                     setSelectedElement(null);
+                                    
+                                    // ⭐ NEW: Add to history when clearing irrigation
+                                    addToHistory(shapes, newIrrigationElements);
                                 }}
                                 className="rounded bg-orange-600 px-4 py-2 text-sm text-white shadow-lg transition-colors hover:bg-orange-700"
                             >
@@ -2653,15 +2823,18 @@ export default function GreenhouseMap() {
                                 <button
                                     onClick={() => {
                                         if (selectedPlot) {
-                                            setShapes((prev) =>
-                                                prev.map((shape) => {
-                                                    if (shape.id === selectedPlot) {
-                                                        const { cropType, ...shapeWithoutCrop } = shape;
-                                                        return shapeWithoutCrop;
-                                                    }
-                                                    return shape;
-                                                })
-                                            );
+                                            const newShapes = shapes.map((shape) => {
+                                                if (shape.id === selectedPlot) {
+                                                    const { cropType, ...shapeWithoutCrop } = shape;
+                                                    return shapeWithoutCrop;
+                                                }
+                                                return shape;
+                                            });
+                                            
+                                            setShapes(newShapes);
+                                            
+                                            // ⭐ NEW: Add to history when removing crop
+                                            addToHistory(newShapes, irrigationElements);
                                         }
                                         setShowCropSelector(false);
                                         setSelectedPlot(null);

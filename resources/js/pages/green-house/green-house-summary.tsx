@@ -82,6 +82,12 @@ export default function GreenhouseSummary() {
     // Image cache for component icons
     const [componentImages, setComponentImages] = useState<{ [key: string]: HTMLImageElement }>({});
 
+    // New state for action buttons
+    const [savingToDatabase, setSavingToDatabase] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
+    const [isCreatingNewProject, setIsCreatingNewProject] = useState(false);
+
     // Load component images
     useEffect(() => {
         const imageConfigs = {
@@ -113,29 +119,160 @@ export default function GreenhouseSummary() {
         loadImages().catch(console.error);
     }, []);
 
-    // NEW: Handle navigation to equipment calculator
-    const handleCalculateEquipment = async () => { // ทำให้ฟังก์ชันเป็น async
+    // NEW: Handle save project to database
+    const handleSaveToDatabase = async () => {
+        if (!summaryData) {
+            alert(t('ไม่พบข้อมูลโรงเรือน กรุณาสร้างการออกแบบโรงเรือนใหม่'));
+            return;
+        }
+
+        setSavingToDatabase(true);
+        setSaveError(null);
+        setSaveSuccess(false);
+
+        try {
+            // Convert summary data to the format expected by the backend
+            const greenhouseData: GreenhousePlanningData = calculateAllGreenhouseStats({
+                shapes: summaryData.shapes || [],
+                irrigationElements: summaryData.irrigationElements || [],
+                selectedCrops: summaryData.selectedCrops || [],
+                irrigationMethod: summaryData.irrigationMethod || 'mini-sprinkler',
+                planningMethod: summaryData.planningMethod || 'draw',
+                createdAt: summaryData.createdAt,
+                updatedAt: new Date().toISOString(),
+            });
+
+            // Check if editing existing project
+            const urlParams = new URLSearchParams(window.location.search);
+            let fieldId = urlParams.get('fieldId') || localStorage.getItem('editingGreenhouseId');
+
+            if (fieldId && (fieldId === 'null' || fieldId === 'undefined' || fieldId === '')) {
+                fieldId = null;
+                localStorage.removeItem('editingGreenhouseId');
+            }
+
+            const requestData = {
+                field_name: `${t('โรงเรือน')} - ${new Date().toLocaleDateString('th-TH')}`,
+                customer_name: '',
+                category: 'greenhouse',
+                area_coordinates: summaryData.shapes.filter(s => s.type === 'greenhouse').map(shape => 
+                    shape.points.map(p => ({ lat: p.y / 1000, lng: p.x / 1000 })) // Convert canvas coordinates
+                ).flat(),
+                plant_type_id: 1, // Default greenhouse plant type
+                total_plants: summaryData.shapes.filter(s => s.type === 'plot').length,
+                total_area: greenhouseData.summary.totalGreenhouseArea,
+                total_water_need: greenhouseData.summary.overallProduction.waterRequirementPerIrrigation,
+                area_type: 'greenhouse',
+                greenhouse_data: {
+                    shapes: summaryData.shapes,
+                    irrigationElements: summaryData.irrigationElements,
+                    selectedCrops: summaryData.selectedCrops,
+                    irrigationMethod: summaryData.irrigationMethod,
+                    planningMethod: summaryData.planningMethod,
+                    metrics: greenhouseData,
+                },
+            };
+
+            let response;
+            if (fieldId && fieldId !== 'null' && fieldId !== 'undefined') {
+                // Update existing project
+                response = await fetch(`/api/greenhouse-fields/${fieldId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'X-CSRF-TOKEN':
+                            document
+                                .querySelector('meta[name="csrf-token"]')
+                                ?.getAttribute('content') || '',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData),
+                });
+            } else {
+                // Create new project
+                response = await fetch('/api/save-greenhouse-field', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN':
+                            document
+                                .querySelector('meta[name="csrf-token"]')
+                                ?.getAttribute('content') || '',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData),
+                });
+            }
+
+            const responseData = await response.json();
+
+            if (responseData.success) {
+                setSaveSuccess(true);
+                localStorage.removeItem('editingGreenhouseId');
+                
+                // Show success message
+                setTimeout(() => {
+                    setSaveSuccess(false);
+                }, 3000);
+            } else {
+                throw new Error(responseData.message || 'Failed to save greenhouse project');
+            }
+        } catch (error) {
+            console.error('❌ Error saving greenhouse project:', error);
+            const errorMessage =
+                error instanceof Error
+                    ? error.message || 'Error saving project'
+                    : 'An unexpected error occurred';
+            setSaveError(errorMessage);
+        } finally {
+            setSavingToDatabase(false);
+        }
+    };
+
+    // NEW: Handle new project
+    const handleNewProject = async () => {
+        setIsCreatingNewProject(true);
+        
+        try {
+            // Clear localStorage data
+            localStorage.removeItem('greenhousePlanningData');
+            localStorage.removeItem('editingGreenhouseId');
+            
+            // Capture and save map image before navigating
+            await handleExportMapToProduct();
+            
+            // Navigate to crop selection page to start new project
+            setTimeout(() => {
+                router.visit('/greenhouse-crop');
+            }, 1000);
+            
+        } catch (error) {
+            console.error('Error creating new project:', error);
+            // Still navigate even if image capture fails
+            router.visit('/greenhouse-crop');
+        } finally {
+            setIsCreatingNewProject(false);
+        }
+    };
+
+    // Enhanced handleCalculateEquipment function
+    const handleCalculateEquipment = async () => {
         if (summaryData) {
-            // --- เพิ่มส่วนการจับภาพ canvas และบันทึกลง localStorage ---
+            // Capture canvas image and save to localStorage
             if (canvasRef.current) {
                 try {
                     console.log('Capturing canvas image...');
                     const canvas = await html2canvas(canvasRef.current, {
-                        backgroundColor: '#000000', // กำหนดพื้นหลังให้เป็นสีเดียวกับ Canvas
+                        backgroundColor: '#000000',
                         useCORS: true,
                     });
                     const image = canvas.toDataURL('image/png');
                     
-                    // บันทึกภาพลงใน localStorage ด้วย key ที่หน้า product.tsx รอรับอยู่
                     localStorage.setItem('projectMapImage', image); 
-                    
                     console.log('✅ Image saved to localStorage successfully.');
                 } catch (error) {
                     console.error('Error capturing canvas image:', error);
                     alert(t('เกิดข้อผิดพลาดในการสร้างภาพแผนผัง'));
                 }
             }
-            // --- จบส่วนที่เพิ่มเข้ามา ---
 
             // Convert summary data to GreenhousePlanningData format
             const greenhouseData: GreenhousePlanningData = calculateAllGreenhouseStats({
@@ -159,6 +296,26 @@ export default function GreenhouseSummary() {
         } else {
             alert(t('ไม่พบข้อมูลโรงเรือน กรุณาสร้างการออกแบบโรงเรือนใหม่'));
         }
+    };
+
+    // Function to export map image to product page
+    const handleExportMapToProduct = async () => {
+        if (canvasRef.current) {
+            try {
+                const canvas = await html2canvas(canvasRef.current, {
+                    backgroundColor: '#000000',
+                    useCORS: true,
+                });
+                const image = canvas.toDataURL('image/png');
+                localStorage.setItem('projectMapImage', image);
+                localStorage.setItem('projectType', 'greenhouse');
+                return true;
+            } catch (error) {
+                console.error('Error capturing canvas image:', error);
+                return false;
+            }
+        }
+        return false;
     };
 
     const handleEditProject = () => {
@@ -199,6 +356,9 @@ export default function GreenhouseSummary() {
         handleEditProject(); // Use the same function
     };
 
+    // Rest of the existing code remains the same...
+    // [All other functions and useEffect hooks remain unchanged]
+    
     useEffect(() => {
         // Get data from URL parameters
         const urlParams = new URLSearchParams(window.location.search);
@@ -613,7 +773,7 @@ export default function GreenhouseSummary() {
                 solenoidValves: 0,
                 ballValves: 0,
                 sprinklers: 0,
-                dripLines: 0,
+                dripPoints: 0,
             };
         }
 
@@ -631,6 +791,29 @@ export default function GreenhouseSummary() {
                 totalLength += segmentLength;
             }
             return totalLength / 25;
+        };
+
+        // Calculate drip points from drip lines
+        const calculateDripPoints = (dripLine: IrrigationElement) => {
+            if (dripLine.points.length < 2) return 0;
+            
+            const spacing = (dripLine.spacing || 0.3) * 20; // Convert to pixels (0.3m default spacing)
+            let totalPoints = 0;
+
+            for (let i = 0; i < dripLine.points.length - 1; i++) {
+                const p1 = dripLine.points[i];
+                const p2 = dripLine.points[i + 1];
+                
+                const segmentLength = Math.sqrt(
+                    Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2)
+                );
+                
+                // Calculate number of drip points in this segment
+                const pointsInSegment = Math.floor(segmentLength / spacing);
+                totalPoints += pointsInSegment;
+            }
+            
+            return totalPoints;
         };
 
         const mainPipes = elements.filter((e) => e.type === 'main-pipe');
@@ -654,6 +837,10 @@ export default function GreenhouseSummary() {
         const maxTotalPipeLength = maxMainPipeLength + maxSubPipeLength;
         const totalPipeLength = totalMainPipeLength + totalSubPipeLength;
 
+        // Calculate total drip points
+        const dripLines = elements.filter((e) => e.type === 'drip-line');
+        const totalDripPoints = dripLines.reduce((sum, dripLine) => sum + calculateDripPoints(dripLine), 0);
+
         return {
             maxMainPipeLength: Math.round(maxMainPipeLength * 100) / 100,
             maxSubPipeLength: Math.round(maxSubPipeLength * 100) / 100,
@@ -665,7 +852,7 @@ export default function GreenhouseSummary() {
             solenoidValves: elements.filter((e) => e.type === 'solenoid-valve').length,
             ballValves: elements.filter((e) => e.type === 'ball-valve').length,
             sprinklers: elements.filter((e) => e.type === 'sprinkler').length,
-            dripLines: elements.filter((e) => e.type === 'drip-line').length,
+            dripPoints: totalDripPoints,
         };
     };
 
@@ -1137,7 +1324,7 @@ export default function GreenhouseSummary() {
                                                 strokeLinecap="round"
                                                 strokeLinejoin="round"
                                                 strokeWidth={2}
-                                                d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                                                d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 002 2z"
                                             />
                                         </svg>
                                         🧮 {t('คำนวณอุปกรณ์')}
@@ -1202,6 +1389,7 @@ export default function GreenhouseSummary() {
             {/* Add padding top to account for fixed navbar */}
             <div className="pt-16 print:pt-0"></div>
 
+            {/* Enhanced Header Section with Action Buttons */}
             <div className="border-b border-gray-700 bg-gray-800 print:hidden print:border-gray-300 print:bg-white">
                 <div className="container mx-auto px-4 py-4">
                     <div className="mx-auto max-w-7xl">
@@ -1235,10 +1423,110 @@ export default function GreenhouseSummary() {
                                 </p>
                             </div>
 
-                            <div className="flex-shrink-0">
+                            {/* Enhanced Action Buttons Section */}
+                            <div className="flex flex-col gap-3 sm:flex-row">
+                                {/* Save Project Button */}
+                                <button
+                                    onClick={handleSaveToDatabase}
+                                    disabled={savingToDatabase}
+                                    className="inline-flex items-center rounded-lg bg-purple-600 px-6 py-3 font-semibold text-white transition-all duration-200 hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    {savingToDatabase ? (
+                                        <>
+                                            <svg
+                                                className="mr-2 h-4 w-4 animate-spin"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <circle
+                                                    className="opacity-25"
+                                                    cx="12"
+                                                    cy="12"
+                                                    r="10"
+                                                    stroke="currentColor"
+                                                    strokeWidth="4"
+                                                ></circle>
+                                                <path
+                                                    className="opacity-75"
+                                                    fill="currentColor"
+                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                                ></path>
+                                            </svg>
+                                            {t('กำลังบันทึก...')}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg
+                                                className="mr-2 h-5 w-5"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+                                                />
+                                            </svg>
+                                            💾 {t('บันทึกโครงการ')}
+                                        </>
+                                    )}
+                                </button>
+
+                                {/* New Project Button */}
+                                <button
+                                    onClick={handleNewProject}
+                                    disabled={isCreatingNewProject}
+                                    className="inline-flex items-center rounded-lg bg-green-600 px-6 py-3 font-semibold text-white transition-all duration-200 hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    {isCreatingNewProject ? (
+                                        <>
+                                            <svg
+                                                className="mr-2 h-4 w-4 animate-spin"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <circle
+                                                    className="opacity-25"
+                                                    cx="12"
+                                                    cy="12"
+                                                    r="10"
+                                                    stroke="currentColor"
+                                                    strokeWidth="4"
+                                                ></circle>
+                                                <path
+                                                    className="opacity-75"
+                                                    fill="currentColor"
+                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                                ></path>
+                                            </svg>
+                                            {t('กำลังสร้าง...')}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg
+                                                className="mr-2 h-5 w-5"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                                                />
+                                            </svg>
+                                            ➕ {t('โครงการใหม่')}
+                                        </>
+                                    )}
+                                </button>
+
+                                {/* Calculate Equipment Button */}
                                 <button
                                     onClick={handleCalculateEquipment}
-                                    className="inline-flex transform items-center rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 font-semibold text-white transition-all duration-200 hover:scale-105 hover:from-purple-700 hover:to-blue-700 hover:shadow-lg"
+                                    className="inline-flex items-center rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition-all duration-200 hover:bg-blue-700"
                                 >
                                     <svg
                                         className="mr-2 h-5 w-5"
@@ -1250,13 +1538,26 @@ export default function GreenhouseSummary() {
                                             strokeLinecap="round"
                                             strokeLinejoin="round"
                                             strokeWidth={2}
-                                            d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                                            d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 002 2z"
                                         />
                                     </svg>
                                     🧮 {t('คำนวณอุปกรณ์')}
                                 </button>
                             </div>
                         </div>
+
+                        {/* Status Messages */}
+                        {saveSuccess && (
+                            <div className="mt-4 rounded-lg bg-green-800 p-3 text-green-100">
+                                ✅ {t('บันทึกโครงการสำเร็จแล้ว!')}
+                            </div>
+                        )}
+                        
+                        {saveError && (
+                            <div className="mt-4 rounded-lg bg-red-800 p-3 text-red-100">
+                                ❌ {t('เกิดข้อผิดพลาด')}: {saveError}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -1272,6 +1573,7 @@ export default function GreenhouseSummary() {
                 </p>
             </div>
 
+            {/* Rest of the existing content remains the same... */}
             <div className="container mx-auto px-4 py-4 print:px-0 print:py-0">
                 <div className="mx-auto max-w-7xl">
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 print:grid-cols-1 print:gap-4">
@@ -1494,7 +1796,7 @@ export default function GreenhouseSummary() {
                                         </div>
                                         <div className="rounded bg-gray-700 p-1 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-2">
                                             <div className="text-sm font-bold text-purple-400 print:text-sm print:text-black">
-                                                {irrigationMetrics.dripLines}
+                                                {irrigationMetrics.dripPoints}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
                                                 {t('สายน้ำหยด')}
@@ -1504,28 +1806,17 @@ export default function GreenhouseSummary() {
                                 </div>
                             </div>
 
+                            {/* Updated Management Section - removed from print */}
                             <div className="rounded-lg bg-gray-800 p-4 print:hidden">
                                 <h2 className="mb-3 text-lg font-bold text-purple-400">
                                     📋 {t('การจัดการ')}
                                 </h2>
-                                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                                <div className="grid grid-cols-1 gap-3">
                                     <button
                                         onClick={handleBackNavigation}
                                         className="rounded-lg bg-blue-600 px-4 py-2 text-center font-semibold text-white transition-colors hover:bg-blue-700"
                                     >
                                         🔄 {t('แก้ไขโครงการ')}
-                                    </button>
-                                    <button
-                                        onClick={handleCalculateEquipment}
-                                        className="rounded-lg bg-purple-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-purple-700"
-                                    >
-                                        🧮 {t('คำนวณอุปกรณ์')}
-                                    </button>
-                                    <button
-                                        onClick={handlePrint}
-                                        className="rounded-lg bg-green-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-green-700"
-                                    >
-                                        🖨️ {t('พิมพ์แบบแปลน')}
                                     </button>
                                 </div>
                             </div>
@@ -1558,6 +1849,7 @@ export default function GreenhouseSummary() {
                                 </div>
                             </div>
 
+                            {/* Rest of the existing content for plants and notes... */}
                             <div className="hidden print:mt-8 print:block">
                                 <div className="border border-gray-300 bg-gray-50 p-4">
                                     <h3 className="mb-3 text-sm font-bold text-black">

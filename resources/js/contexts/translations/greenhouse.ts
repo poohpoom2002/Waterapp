@@ -387,6 +387,17 @@ export const greenhouseTranslations = {
         'ขนาดและตำแหน่งอาจต้องปรับตามสภาพพื้นที่จริง': 
             'Sizes and positions may need to be adjusted according to actual site conditions.',
         'ความยาวท่อทั้งหมด': 'Total pipe length',
+
+        // === GENERAL INSTRUCTIONS ===
+        'ซูม: ล้อเมาส์ (เมื่อเมาส์อยู่เหนือ Canvas)': 'Zoom: Mouse wheel (when mouse is over Canvas)',
+        'เลื่อน: ลากด้วยเมาส์ในโหมดเลือก หรือ Ctrl+ลาก': 'Pan: Drag with mouse in select mode or Ctrl+drag',
+        'รีเซ็ตมุมมอง: กดแป้น Spacebar': 'Reset view: Press Spacebar',
+        'จบการวาดทันที: ดับเบิลคลิก': 'Finish drawing immediately: Double-click',
+        'ยกเลิก: กด Escape': 'Cancel: Press Escape',
+        'เลิกทำ: Ctrl+Z': 'Undo: Ctrl+Z',
+        'ทำซ้ำ: Ctrl+Y หรือ Ctrl+Shift+Z': 'Redo: Ctrl+Y or Ctrl+Shift+Z',
+        'เขียว: ระยะขอบ (แต่ละด้าน)': 'Green: Edge distance (each side)',
+        'เหลือง: ระยะรวม (ทั้งหมด)': 'Yellow: Total distance (overall)',
     },
     th: {
         // === BASIC ACTIONS ===
@@ -772,5 +783,16 @@ export const greenhouseTranslations = {
         'ขนาดและตำแหน่งอาจต้องปรับตามสภาพพื้นที่จริง': 
             'ขนาดและตำแหน่งอาจต้องปรับตามสภาพพื้นที่จริง',
         'ความยาวท่อทั้งหมด': 'ความยาวท่อทั้งหมด',
+
+        // === GENERAL INSTRUCTIONS ===
+        'ซูม: ล้อเมาส์ (เมื่อเมาส์อยู่เหนือ Canvas)': 'ซูม: ล้อเมาส์ (เมื่อเมาส์อยู่เหนือ Canvas)',
+        'เลื่อน: ลากด้วยเมาส์ในโหมดเลือก หรือ Ctrl+ลาก': 'เลื่อน: ลากด้วยเมาส์ในโหมดเลือก หรือ Ctrl+ลาก',
+        'รีเซ็ตมุมมอง: กดแป้น Spacebar': 'รีเซ็ตมุมมอง: กดแป้น Spacebar',
+        'จบการวาดทันที: ดับเบิลคลิก': 'จบการวาดทันที: ดับเบิลคลิก',
+        'ยกเลิก: กด Escape': 'ยกเลิก: กด Escape',
+        'เลิกทำ: Ctrl+Z': 'เลิกทำ: Ctrl+Z',
+        'ทำซ้ำ: Ctrl+Y หรือ Ctrl+Shift+Z': 'ทำซ้ำ: Ctrl+Y หรือ Ctrl+Shift+Z',
+        'เขียว: ระยะขอบ (แต่ละด้าน)': 'เขียว: ระยะขอบ (แต่ละด้าน)',
+        'เหลือง: ระยะรวม (ทั้งหมด)': 'เหลือง: ระยะรวม (ทั้งหมด)',
     },
 };
