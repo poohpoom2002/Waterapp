@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
     ZONE_COLORS,
     OBSTACLE_TYPES,
@@ -12,8 +12,7 @@ import {
     type MapTileType,
     type ObstacleType,
 } from '@/pages/utils/fieldMapConstants';
-import { getCropByValue } from '@/pages/utils/cropData';
-import Tooltip from './Tooltip';
+import { getTranslatedCropByValue, type TranslatedCrop } from '@/pages/utils/cropData';
 import FieldMapCropSpacing from './FieldMapCropSpacing';
 
 interface FieldMapToolsPanelProps {
@@ -24,6 +23,18 @@ interface FieldMapToolsPanelProps {
     nextStep: () => void;
     previousStep: () => void;
     resetAll: () => void;
+
+     // NEW: เพิ่ม props สำหรับ crop spacing functions
+     getCropSpacingInfo?: (cropValue: string) => {
+        defaultRowSpacing: number;
+        defaultPlantSpacing: number;
+        currentRowSpacing: number;
+        currentPlantSpacing: number;
+        waterRequirement: number;
+        irrigationNeedsKey: 'low' | 'medium' | 'high';
+        growthPeriod: number;
+    };
+    resetSpacingToDefaults?: () => void;
 
     // Field data
     mainField: any;
@@ -102,15 +113,15 @@ interface FieldMapToolsPanelProps {
     plantingPoints: any[];
 
     // Crop spacing props
-    selectedCropObjects: any[];
-    rowSpacing: any;
+    selectedCropObjects: TranslatedCrop[];
+    rowSpacing: Record<string, number>;
     tempRowSpacing: any;
     setTempRowSpacing: (spacing: any) => void;
     editingRowSpacingForCrop: string | null;
     setEditingRowSpacingForCrop: (crop: string | null) => void;
     handleRowSpacingConfirm: (cropValue: string) => void;
     handleRowSpacingCancel: (cropValue: string) => void;
-    plantSpacing: any;
+    plantSpacing: Record<string, number>;
     tempPlantSpacing: any;
     setTempPlantSpacing: (spacing: any) => void;
     editingPlantSpacingForCrop: string | null;
@@ -121,6 +132,7 @@ interface FieldMapToolsPanelProps {
     dripSpacing: Record<string, number>;
     setDripSpacing: React.Dispatch<React.SetStateAction<Record<string, number>>>;
     t: (key: string) => string;
+    language: 'en' | 'th';
 }
 
 const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
@@ -204,14 +216,125 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
     handleCaptureMapAndSummary,
     dripSpacing,
     setDripSpacing,
+    getCropSpacingInfo,
+    resetSpacingToDefaults,
     t,
+    language = 'en',
 }) => {
-    // Fanggy005 EDIT: Configuration for radius-based irrigation systems
+    // Configuration for radius-based irrigation systems
     const irrigationRadiusConfig = {
         sprinkler: { min: 3, max: 15, step: 0.5, defaultValue: 8 },
         mini_sprinkler: { min: 0.5, max: 3, step: 0.1, defaultValue: 1.5 },
         micro_spray: { min: 3, max: 8, step: 0.5, defaultValue: 5 },
     };
+
+    // Get irrigation recommendation based on crop
+    const getIrrigationRecommendation = (cropValue: string): string[] => {
+        const crop = getTranslatedCropByValue(cropValue, language);
+        if (!crop) return [];
+
+        const recommendations: string[] = [];
+        
+        switch (crop.irrigationNeedsKey) {
+            case 'high':
+                recommendations.push('sprinkler', 'drip-tape');
+                break;
+            case 'medium':
+                recommendations.push('mini_sprinkler', 'micro_spray', 'drip-tape');
+                break;
+            case 'low':
+                recommendations.push('micro_spray', 'drip-tape');
+                break;
+        }
+        
+        return recommendations;
+    };
+
+    // Calculate optimal drip spacing based on crop
+    const getOptimalDripSpacing = (cropValue: string): number => {
+        const crop = getTranslatedCropByValue(cropValue, language);
+        if (!crop) return 0.3;
+
+        // Base drip spacing on plant spacing
+        const plantSpacingInMeters = crop.plantSpacing / 100; // Convert cm to meters
+        return Math.max(0.2, Math.min(0.5, plantSpacingInMeters));
+    };
+
+    const calculatePlantsInZone = useCallback((zoneId: string): number => {
+        const zone = zones.find(z => z.id.toString() === zoneId);
+        const assignedCrop = zoneAssignments[zoneId];
+        
+        if (!zone || !assignedCrop) return 0;
+        
+        console.log(`🧮 Calculating plants for zone ${zoneId}:`, {
+            zoneName: zone.name,
+            cropValue: assignedCrop
+        });
+        
+        // ตรวจสอบข้อมูล spacing ปัจจุบัน
+        const currentRowSpacing = rowSpacing[assignedCrop] || 25; // default 25cm for rice
+        const currentPlantSpacing = plantSpacing[assignedCrop] || 25; // default 25cm for rice
+        
+        console.log(`📏 Current spacing:`, {
+            rowSpacing: `${currentRowSpacing} cm`,
+            plantSpacing: `${currentPlantSpacing} cm`
+        });
+        
+        try {
+            // คำนวณพื้นที่ zone
+            const polygonCoords = zone.coordinates.map((coord: any) => [coord.lng, coord.lat]);
+            const firstPoint = polygonCoords[0];
+            const lastPoint = polygonCoords[polygonCoords.length - 1];
+            
+            if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
+                polygonCoords.push(firstPoint);
+            }
+            
+            const turfPolygon = turf.polygon([polygonCoords]);
+            const areaInSquareMeters = turf.area(turfPolygon);
+            
+            console.log(`📐 Zone area: ${areaInSquareMeters.toFixed(2)} ตร.ม.`);
+            
+            // ตรวจสอบว่าพื้นที่สมเหตุสมผลหรือไม่
+            if (areaInSquareMeters < 1) {
+                console.warn(`⚠️ Zone area too small: ${areaInSquareMeters} ตร.ม.`);
+                return 0;
+            }
+            
+            // แปลง cm เป็น m (ต้องแน่ใจว่าหน่วยถูก)
+            const rowSpacingInM = currentRowSpacing / 100;
+            const plantSpacingInM = currentPlantSpacing / 100;
+            
+            // คำนวณจำนวนต้นต่อ ตร.ม.
+            const plantsPerSquareMeter = 1 / (rowSpacingInM * plantSpacingInM);
+            
+            // จำนวนต้นทั้งหมดใน zone
+            const totalPlants = Math.floor(areaInSquareMeters * plantsPerSquareMeter);
+            
+            console.log(`🌱 Plant calculation details:`, {
+                areaM2: areaInSquareMeters.toFixed(2),
+                rowSpacingM: rowSpacingInM.toFixed(2),
+                plantSpacingM: plantSpacingInM.toFixed(2),
+                plantsPerSqm: plantsPerSquareMeter.toFixed(1),
+                totalPlants: totalPlants.toLocaleString()
+            });
+            
+            // เตือนถ้าจำนวนต้นน้อยผิดปกติ
+            if (totalPlants < 100 && areaInSquareMeters > 100) {
+                console.warn(`⚠️ Unusually low plant count for area:`, {
+                    plants: totalPlants,
+                    area: areaInSquareMeters.toFixed(2),
+                    possibleIssue: 'Check spacing units or crop data'
+                });
+            }
+            
+            return totalPlants;
+            
+        } catch (error) {
+            console.error('Error calculating plants in zone:', error);
+            return 0;
+        }
+    }, [zones, zoneAssignments, rowSpacing, plantSpacing]);
 
     return (
         <>
@@ -251,6 +374,8 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                 setEditingPlantSpacingForCrop={setEditingPlantSpacingForCrop}
                                 handlePlantSpacingConfirm={handlePlantSpacingConfirm}
                                 handlePlantSpacingCancel={handlePlantSpacingCancel}
+                                getCropSpacingInfo={getCropSpacingInfo}
+                                resetSpacingToDefaults={resetSpacingToDefaults}
                                 t={t}
                             />
                         </div>
@@ -269,7 +394,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                         {fieldAreaSize > 0
                                             ? fieldAreaSize >= 1600
                                                 ? `${(fieldAreaSize / 1600).toFixed(2)} ${t('Rai')}`
-                                                : `${fieldAreaSize.toFixed(0)} ${t('m.')}`
+                                                : `${fieldAreaSize.toFixed(0)} ${t('m²')}`
                                             : t('Calculating...')}
                                     </span>
                                 </div>
@@ -412,6 +537,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                             <div className="grid gap-3">
                                 {zones.map((zone: any, index: number) => {
                                     const assignedCrop = zoneAssignments[zone.id];
+                                    const cropData = assignedCrop ? getTranslatedCropByValue(assignedCrop, language) : null;
 
                                     return (
                                         <div
@@ -462,15 +588,44 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                     {t('Select a crop for this zone...')}
                                                 </option>
                                                 {selectedCrops.map((cropValue) => {
-                                                    const crop = getCropByValue(cropValue);
+                                                    const crop = getTranslatedCropByValue(cropValue, language);
                                                     return crop ? (
                                                         <option key={crop.value} value={crop.value}>
-                                                            {crop.icon}{' '}
-                                                            {crop.name.split('/')[0].trim()}
+                                                            {crop.icon} {crop.name}
                                                         </option>
                                                     ) : null;
                                                 })}
                                             </select>
+
+                                            {/* Show crop information when assigned */}
+                                            {cropData && (
+                                                <div className="mt-3 rounded border border-gray-600 bg-gray-800/50 p-2">
+                                                    <div className="text-xs text-gray-300">
+                                                        <div className="flex justify-between">
+                                                            <span>{t('Row Spacing')}:</span>
+                                                            <span className="text-white">{cropData.rowSpacing} cm</span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span>{t('Plant Spacing')}:</span>
+                                                            <span className="text-white">{cropData.plantSpacing} cm</span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span>{t('Water Needs')}:</span>
+                                                            <span className={`${
+                                                                cropData.irrigationNeedsKey === 'high' ? 'text-red-300' :
+                                                                cropData.irrigationNeedsKey === 'medium' ? 'text-yellow-300' :
+                                                                'text-green-300'
+                                                            }`}>
+                                                                {cropData.irrigationNeeds}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span>{t('Growth Period')}:</span>
+                                                            <span className="text-white">{cropData.growthPeriod} {t('days')}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}
@@ -741,12 +896,11 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                             <div className="grid gap-3">
                                 {zones.map((zone: any, index: number) => {
                                     const irrigationType = irrigationAssignments[zone.id];
-                                    const dripPointCount =
-                                        zoneSummaries[zone.id]?.dripPointCount || 0;
-                                    const currentRadiusConfig =
-                                        irrigationRadiusConfig[
-                                            irrigationType as keyof typeof irrigationRadiusConfig
-                                        ];
+                                    const assignedCrop = zoneAssignments[zone.id];
+                                    const cropData = assignedCrop ? getTranslatedCropByValue(assignedCrop, language) : null;
+                                    const dripPointCount = zoneSummaries[zone.id]?.dripPointCount || 0;
+                                    const currentRadiusConfig = irrigationRadiusConfig[irrigationType as keyof typeof irrigationRadiusConfig];
+                                    const recommendations = assignedCrop ? getIrrigationRecommendation(assignedCrop) : [];
 
                                     return (
                                         <div
@@ -771,6 +925,36 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                 </div>
                                             </div>
 
+                                            {/* Show crop info and recommendations */}
+                                            {cropData && (
+                                                <div className="mb-3 rounded border border-gray-600 bg-gray-800/50 p-2">
+                                                    <div className="flex items-center space-x-2 text-xs">
+                                                        <span className="text-lg">{cropData.icon}</span>
+                                                        <span className="text-white font-medium">{cropData.name}</span>
+                                                        <span className={`px-2 py-0.5 rounded text-xs ${
+                                                            cropData.irrigationNeedsKey === 'high' ? 'bg-red-500/20 text-red-300' :
+                                                            cropData.irrigationNeedsKey === 'medium' ? 'bg-yellow-500/20 text-yellow-300' :
+                                                            'bg-green-500/20 text-green-300'
+                                                        }`}>
+                                                            {cropData.irrigationNeeds}
+                                                        </span>
+                                                    </div>
+                                                    {recommendations.length > 0 && (
+                                                        <div className="mt-1 text-xs text-gray-400">
+                                                            💡 {t('Recommended')}: {recommendations.map(r => {
+                                                                switch(r) {
+                                                                    case 'sprinkler': return t('Sprinkler');
+                                                                    case 'mini_sprinkler': return t('Mini Sprinkler');
+                                                                    case 'micro_spray': return t('Micro Spray');
+                                                                    case 'drip-tape': return t('Drip System');
+                                                                    default: return r;
+                                                                }
+                                                            }).join(', ')}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
                                             <select
                                                 value={irrigationType || ''}
                                                 onChange={(e) => {
@@ -779,6 +963,15 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                             ...prev,
                                                             [zone.id]: e.target.value,
                                                         }));
+                                                        
+                                                        // Set optimal drip spacing if drip system is selected
+                                                        if (e.target.value === 'drip-tape' && assignedCrop) {
+                                                            const optimalSpacing = getOptimalDripSpacing(assignedCrop);
+                                                            setDripSpacing(prev => ({
+                                                                ...prev,
+                                                                [zone.id]: optimalSpacing
+                                                            }));
+                                                        }
                                                     } else {
                                                         clearIrrigationForZone(zone.id);
                                                     }
@@ -788,14 +981,18 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                 <option value="">
                                                     {t('Select irrigation system...')}
                                                 </option>
-                                                <option value="sprinkler">🌿 {t('Sprinkler')}</option>
-                                                <option value="mini_sprinkler">
-                                                    🌱 {t('Mini Sprinkler')}
+                                                <option value="sprinkler" className={recommendations.includes('sprinkler') ? 'bg-green-700' : ''}>
+                                                    🌿 {t('Sprinkler')} {recommendations.includes('sprinkler') ? '⭐' : ''}
                                                 </option>
-                                                <option value="micro_spray">
-                                                    💦 {t('Micro Spray')}
+                                                <option value="mini_sprinkler" className={recommendations.includes('mini_sprinkler') ? 'bg-green-700' : ''}>
+                                                    🌱 {t('Mini Sprinkler')} {recommendations.includes('mini_sprinkler') ? '⭐' : ''}
                                                 </option>
-                                                <option value="drip-tape">💧 {t('Drip System')}</option>
+                                                <option value="micro_spray" className={recommendations.includes('micro_spray') ? 'bg-green-700' : ''}>
+                                                    💦 {t('Micro Spray')} {recommendations.includes('micro_spray') ? '⭐' : ''}
+                                                </option>
+                                                <option value="drip-tape" className={recommendations.includes('drip-tape') ? 'bg-green-700' : ''}>
+                                                    💧 {t('Drip System')} {recommendations.includes('drip-tape') ? '⭐' : ''}
+                                                </option>
                                             </select>
 
                                             {irrigationType && (
@@ -811,7 +1008,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                                     htmlFor={`drip-spacing-${zone.id}`}
                                                                     className="block text-xs font-medium text-gray-400"
                                                                 >
-                                                                    {t('Spacing')} (m):
+                                                                    {t('Emitter Spacing')} (m):
                                                                 </label>
                                                                 <div className="flex items-center space-x-2">
                                                                     <input
@@ -820,37 +1017,33 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                                         min={0.2}
                                                                         max={0.5}
                                                                         step={0.05}
-                                                                        value={
-                                                                            dripSpacing[zone.id] ||
-                                                                            0.3
-                                                                        }
+                                                                        value={dripSpacing[zone.id] || (assignedCrop ? getOptimalDripSpacing(assignedCrop) : 0.3)}
                                                                         onChange={(e) =>
                                                                             setDripSpacing({
                                                                                 ...dripSpacing,
-                                                                                [zone.id]:
-                                                                                    parseFloat(
-                                                                                        e.target
-                                                                                            .value
-                                                                                    ),
+                                                                                [zone.id]: parseFloat(e.target.value),
                                                                             })
                                                                         }
                                                                         className="w-full"
                                                                     />
                                                                     <span className="text-sm font-semibold text-white">
-                                                                        {(
-                                                                            dripSpacing[zone.id] ||
-                                                                            0.3
-                                                                        ).toFixed(2)}
-                                                                        m
+                                                                        {(dripSpacing[zone.id] || (assignedCrop ? getOptimalDripSpacing(assignedCrop) : 0.3)).toFixed(2)}m
                                                                     </span>
                                                                 </div>
                                                                 <div className="text-xs text-gray-500">
                                                                     {t('Spacing between emitters on the tape')}
                                                                 </div>
+                                                                {cropData && (
+                                                                    <div className="text-xs text-cyan-300">
+                                                                        💡 {t('Optimal for {cropName}: {spacing}m')
+                                                                            .replace('{cropName}', cropData.name)
+                                                                            .replace('{spacing}', getOptimalDripSpacing(assignedCrop || '').toFixed(2))}
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                             {dripPointCount > 0 && (
                                                                 <div className="text-xs text-cyan-300">
-                                                                    {t('Calculated approximately {count} points')
+                                                                    {t('Estimated {count} emitters for this zone')
                                                                         .replace('{count}', dripPointCount.toLocaleString())}
                                                                 </div>
                                                             )}
@@ -862,76 +1055,47 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                                     htmlFor={`radius-${zone.id}`}
                                                                     className="block text-xs font-medium text-gray-400"
                                                                 >
-                                                                    {t('Radius')} (m):
+                                                                    {t('Coverage Radius')} (m):
                                                                 </label>
                                                                 <div className="flex items-center space-x-2">
                                                                     <input
                                                                         id={`radius-${zone.id}`}
                                                                         type="range"
-                                                                        min={
-                                                                            currentRadiusConfig.min
-                                                                        }
-                                                                        max={
-                                                                            currentRadiusConfig.max
-                                                                        }
-                                                                        step={
-                                                                            currentRadiusConfig.step
-                                                                        }
-                                                                        value={
-                                                                            irrigationRadius[
-                                                                                zone.id
-                                                                            ] ||
-                                                                            currentRadiusConfig.defaultValue
-                                                                        }
+                                                                        min={currentRadiusConfig.min}
+                                                                        max={currentRadiusConfig.max}
+                                                                        step={currentRadiusConfig.step}
+                                                                        value={irrigationRadius[zone.id] || currentRadiusConfig.defaultValue}
                                                                         onChange={(e) =>
                                                                             setIrrigationRadius({
                                                                                 ...irrigationRadius,
-                                                                                [zone.id]:
-                                                                                    parseFloat(
-                                                                                        e.target
-                                                                                            .value
-                                                                                    ),
+                                                                                [zone.id]: parseFloat(e.target.value),
                                                                             })
                                                                         }
                                                                         className="w-full"
                                                                     />
                                                                     <span className="text-sm font-semibold text-white">
-                                                                        {(
-                                                                            irrigationRadius[
-                                                                                zone.id
-                                                                            ] ||
-                                                                            currentRadiusConfig.defaultValue
-                                                                        ).toFixed(2)}
-                                                                        m
+                                                                        {(irrigationRadius[zone.id] || currentRadiusConfig.defaultValue).toFixed(2)}m
                                                                     </span>
                                                                 </div>
                                                             </div>
                                                             <div className="flex items-center justify-between">
                                                                 <span className="text-xs text-gray-400">
-                                                                    {t('Overlap')}:
+                                                                    {t('Overlap Coverage')}:
                                                                 </span>
                                                                 <label className="flex items-center space-x-2">
                                                                     <input
                                                                         type="checkbox"
-                                                                        checked={
-                                                                            sprinklerOverlap[
-                                                                                zone.id
-                                                                            ] || false
-                                                                        }
+                                                                        checked={sprinklerOverlap[zone.id] || false}
                                                                         onChange={(e) =>
                                                                             setSprinklerOverlap({
                                                                                 ...sprinklerOverlap,
-                                                                                [zone.id]:
-                                                                                    e.target
-                                                                                        .checked,
+                                                                                [zone.id]: e.target.checked,
                                                                             })
                                                                         }
                                                                         className="h-3 w-3 rounded border-gray-600 bg-gray-700 text-cyan-600 focus:ring-cyan-500"
                                                                     />
                                                                     <span className="text-xs text-white">
-                                                                        {sprinklerOverlap[zone.id]
-                                                                            ? t('On')
-                                                                            : t('Off')}
+                                                                        {sprinklerOverlap[zone.id] ? t('Enabled') : t('Disabled')}
                                                                     </span>
                                                                 </label>
                                                             </div>
@@ -940,25 +1104,16 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
 
                                                     <div className="mt-3 flex space-x-2">
                                                         <button
-                                                            onClick={() =>
-                                                                generateIrrigationForZone(
-                                                                    zone,
-                                                                    irrigationType
-                                                                )
-                                                            }
+                                                            onClick={() => generateIrrigationForZone(zone, irrigationType)}
                                                             className="flex-1 rounded border border-white bg-cyan-600 px-3 py-1 text-xs text-white transition-colors hover:bg-cyan-700"
                                                         >
-                                                            🚿 {t('Generate Irrigation')}
+                                                            🚿 {t('Generate')}
                                                         </button>
                                                         <button
-                                                            onClick={() =>
-                                                                clearIrrigationForZone(
-                                                                    zone.id.toString()
-                                                                )
-                                                            }
+                                                            onClick={() => clearIrrigationForZone(zone.id.toString())}
                                                             className="rounded border border-white bg-red-600 px-3 py-1 text-xs text-white transition-colors hover:bg-red-700"
                                                         >
-                                                            🗑️ {t('Clear Irrigation')}
+                                                            🗑️ {t('Clear')}
                                                         </button>
                                                     </div>
                                                 </div>

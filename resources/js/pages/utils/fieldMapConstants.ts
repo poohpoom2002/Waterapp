@@ -94,21 +94,21 @@ export const MAP_TILES = {
 export const EQUIPMENT_TYPES = {
     pump: {
         name: 'Water Pump', // Translation key - ใช้ใน fieldcrop.ts
-        icon: '⚡',
+        icon: 'P',
         imageUrl: '/generateTree/wtpump.png',
         description: 'Water pump for suction and delivery',
         color: '#DC2626',
     },
     ballvalve: {
         name: 'Ball Valve', // Translation key - ใช้ใน fieldcrop.ts
-        icon: '🔘',
+        icon: 'BV',
         imageUrl: '/generateTree/ballv.png',
         description: 'Valve for controlling water flow',
         color: '#2563EB',
     },
     solenoid: {
         name: 'Solenoid Valve', // Translation key - ใช้ใน fieldcrop.ts
-        icon: '🔌',
+        icon: 'SV',
         imageUrl: '/generateTree/solv.png',
         description: 'Automatic valve controlled by electricity',
         color: '#16A34A',

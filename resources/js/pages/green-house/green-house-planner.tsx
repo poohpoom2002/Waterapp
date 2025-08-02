@@ -255,6 +255,23 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
         }
     }, [history, historyIndex]);
 
+    // Update shape names when language changes
+    useEffect(() => {
+        const shapeTypeNames = {
+            greenhouse: `🏠 ${t('โรงเรือน')}`,
+            plot: `🌱 ${t('แปลงปลูก')}`,
+            walkway: `🚶 ${t('ทางเดิน')}`,
+            'water-source': `💧 ${t('แหล่งน้ำ')}`,
+        };
+
+        setShapes(prevShapes => 
+            prevShapes.map(shape => ({
+                ...shape,
+                name: shapeTypeNames[shape.type as keyof typeof shapeTypeNames] || shape.name
+            }))
+        );
+    }, [t]);
+
     // Parse crops from URL parameter
     useEffect(() => {
         if (crops) {
@@ -1261,7 +1278,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
     };
 
     // Finish drawing
-    const finishDrawing = () => {
+    const finishDrawing = useCallback(() => {
         if (currentPath.length < 2) {
             setIsDrawing(false);
             setCurrentPath([]);
@@ -1291,7 +1308,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
         addToHistory([...shapes, newShape]);
         setIsDrawing(false);
         setCurrentPath([]);
-    };
+    }, [currentPath, selectedTool, t, shapes, addToHistory]);
 
     // Handle key press
     useEffect(() => {
