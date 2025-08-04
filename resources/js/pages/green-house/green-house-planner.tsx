@@ -3,6 +3,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Navbar from '../../components/Navbar';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface GreenhousePlannerProps {
     crops?: string;
@@ -37,119 +38,11 @@ interface Tool {
     instructions: string[];
 }
 
-const tools: Tool[] = [
-    {
-        id: 'select',
-        name: 'Select',
-        icon: '↖️',
-        cursor: 'default',
-        description: 'Select and edit objects',
-        instructions: [
-            'Click to select objects',
-            'Drag to move objects (without holding Ctrl)',
-            'Press Ctrl+Click to pan view',
-            'Click empty space to pan view',
-            'Press Delete to delete selected object',
-            'Press Escape to cancel selection',
-            'Show measurement data when selecting objects',
-        ],
-    },
-    {
-        id: 'greenhouse',
-        name: 'Greenhouse',
-        icon: '🏠',
-        cursor: 'crosshair',
-        description: 'Draw greenhouse structure',
-        instructions: [
-            'Click to start drawing greenhouse structure',
-            'Click continuously to create corners',
-            'Click on the first point (green) to close the shape',
-            'Press Enter to finish drawing',
-            'Greenhouse will appear as green area',
-            '🟢 Green: Edge distance',
-            '🟡 Yellow: Total distance',
-        ],
-    },
-    {
-        id: 'plot',
-        name: 'Growing Plot',
-        icon: '🌱',
-        cursor: 'crosshair',
-        description: 'Draw crop growing plots',
-        instructions: [
-            'Click to start drawing growing plot',
-            'Click continuously to define plot shape',
-            'Click on the first point (green) to close the shape',
-            'Press Enter to finish drawing',
-            'Plot will appear as yellow area',
-            '🟢 Green: Edge distance',
-            '🟡 Yellow: Total distance',
-        ],
-    },
-    {
-        id: 'walkway',
-        name: 'Walkway',
-        icon: '🚶',
-        cursor: 'crosshair',
-        description: 'Draw walkways in greenhouse',
-        instructions: [
-            'Click to start drawing walkway',
-            'Click continuously to create walkway path',
-            'Click on the first point (green) to close the shape',
-            'Press Enter to finish drawing',
-            'Walkway will appear as gray area',
-            '🟢 Green: Edge distance',
-            '🟡 Yellow: Total distance',
-        ],
-    },
-    {
-        id: 'water',
-        name: 'Water Source',
-        icon: '💧',
-        cursor: 'crosshair',
-        description: 'Define water source location',
-        instructions: [
-            'Click once for point water source',
-            'Or click multiple points for large water source',
-            'Click on the first point (green) to close the shape',
-            'Press Enter to finish drawing',
-            'Water source will appear in blue with 💧 icon',
-            '🟢 Green: Edge distance',
-            '🟡 Yellow: Total distance',
-        ],
-    },
-    {
-        id: 'measure',
-        name: 'Measure',
-        icon: '📏',
-        cursor: 'crosshair',
-        description: 'Measure distance between points (1 grid = 1 meter)',
-        instructions: [
-            'Click first point to start measuring',
-            'Click second point to measure distance',
-            'Distance will be shown in meters automatically',
-            '1 grid square = 1 meter',
-            'Press Escape to cancel measurement',
-        ],
-    },
-];
-
-const generalInstructions = [
-    { icon: '🖱️', text: 'Zoom: Mouse wheel (when mouse is over Canvas)' },
-    { icon: '✋', text: 'Pan: Drag with mouse in select mode or Ctrl+drag' },
-    { icon: '🔄', text: 'Reset view: Press Spacebar' },
-    { icon: '⚡', text: 'Finish drawing immediately: Double-click' },
-    { icon: '🚫', text: 'Cancel: Press Escape' },
-    { icon: '↶', text: 'Undo: Ctrl+Z' },
-    { icon: '↷', text: 'Redo: Ctrl+Y or Ctrl+Shift+Z' },
-    { icon: '🟢', text: 'Green: Edge distance (per side)' },
-    { icon: '🟡', text: 'Yellow: Total distance (overall)' },
-];
-
 const GRID_SIZE = 25;
 const CANVAS_SIZE = { width: 2400, height: 1600 };
 
 export default function GreenhousePlanner({ crops, method, irrigation }: GreenhousePlannerProps) {
+    const { t } = useLanguage();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [selectedTool, setSelectedTool] = useState<string>('select');
     const [shapes, setShapes] = useState<Shape[]>([]);
@@ -181,6 +74,116 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
     // Undo/Redo states
     const [history, setHistory] = useState<Shape[][]>([[]]);
     const [historyIndex, setHistoryIndex] = useState(0);
+
+    // Define tools with translation
+    const tools: Tool[] = [
+        {
+            id: 'select',
+            name: t('เลือก'),
+            icon: '↖️',
+            cursor: 'default',
+            description: t('เลือกและแก้ไขออบเจ็ค'),
+            instructions: [
+                t('คลิกเพื่อเลือกออบเจ็ค'),
+                t('ลากเพื่อขยับออบเจ็ค (ไม่กด Ctrl)'),
+                t('กด Ctrl+คลิก เพื่อเลื่อนมุมมอง'),
+                t('คลิกพื้นที่ว่างเพื่อเลื่อนมุมมอง'),
+                t('กด Delete เพื่อลบออบเจ็คที่เลือก'),
+                t('กด Escape เพื่อยกเลิกการเลือก'),
+                t('แสดงข้อมูลการวัดเมื่อเลือกออบเจ็ค'),
+            ],
+        },
+        {
+            id: 'greenhouse',
+            name: t('โรงเรือน'),
+            icon: '🏠',
+            cursor: 'crosshair',
+            description: t('วาดโครงสร้างโรงเรือน'),
+            instructions: [
+                t('คลิกเพื่อเริ่มวาดโครงสร้างโรงเรือน'),
+                t('คลิกต่อเนื่องเพื่อสร้างมุม'),
+                t('คลิกจุดแรก (สีเขียว) เพื่อปิดรูปร่าง'),
+                t('กด Enter เพื่อจบการวาด'),
+                t('โรงเรือนจะแสดงเป็นพื้นที่สีเขียว'),
+                t('🟢 เขียว: ระยะขอบ'),
+                t('🟡 เหลือง: ระยะรวม'),
+            ],
+        },
+        {
+            id: 'plot',
+            name: t('แปลงปลูก'),
+            icon: '🌱',
+            cursor: 'crosshair',
+            description: t('วาดแปลงปลูกพืช'),
+            instructions: [
+                t('คลิกเพื่อเริ่มวาดแปลงปลูก'),
+                t('คลิกต่อเนื่องเพื่อกำหนดรูปร่างแปลง'),
+                t('คลิกจุดแรก (สีเขียว) เพื่อปิดรูปร่าง'),
+                t('กด Enter เพื่อจบการวาด'),
+                t('แปลงจะแสดงเป็นพื้นที่สีเหลือง'),
+                t('🟢 เขียว: ระยะขอบ'),
+                t('🟡 เหลือง: ระยะรวม'),
+            ],
+        },
+        {
+            id: 'walkway',
+            name: t('ทางเดิน'),
+            icon: '🚶',
+            cursor: 'crosshair',
+            description: t('วาดทางเดินในโรงเรือน'),
+            instructions: [
+                t('คลิกเพื่อเริ่มวาดทางเดิน'),
+                t('คลิกต่อเนื่องเพื่อสร้างเส้นทางเดิน'),
+                t('คลิกจุดแรก (สีเขียว) เพื่อปิดรูปร่าง'),
+                t('กด Enter เพื่อจบการวาด'),
+                t('ทางเดินจะแสดงเป็นพื้นที่สีเทา'),
+                t('🟢 เขียว: ระยะขอบ'),
+                t('🟡 เหลือง: ระยะรวม'),
+            ],
+        },
+        {
+            id: 'water',
+            name: t('แหล่งน้ำ'),
+            icon: '💧',
+            cursor: 'crosshair',
+            description: t('กำหนดตำแหน่งแหล่งน้ำ'),
+            instructions: [
+                t('คลิกครั้งเดียวสำหรับแหล่งน้ำจุด'),
+                t('หรือคลิกหลายจุดสำหรับแหล่งน้ำขนาดใหญ่'),
+                t('คลิกจุดแรก (สีเขียว) เพื่อปิดรูปร่าง'),
+                t('กด Enter เพื่อจบการวาด'),
+                t('แหล่งน้ำจะแสดงเป็นสีน้ำเงินพร้อมไอคอน 💧'),
+                t('🟢 เขียว: ระยะขอบ'),
+                t('🟡 เหลือง: ระยะรวม'),
+            ],
+        },
+        {
+            id: 'measure',
+            name: t('วัดระยะ'),
+            icon: '📏',
+            cursor: 'crosshair',
+            description: t('วัดระยะห่างระหว่างจุด (1 กริด = 1 เมตร)'),
+            instructions: [
+                t('คลิกจุดแรกเพื่อเริ่มวัด'),
+                t('คลิกจุดที่สองเพื่อวัดระยะ'),
+                t('ระยะจะแสดงเป็นเมตรโดยอัตโนมัติ'),
+                t('1 ช่องกริด = 1 เมตร'),
+                t('กด Escape เพื่อยกเลิกการวัด'),
+            ],
+        },
+    ];
+
+    const generalInstructions = [
+        { icon: '🖱️', text: t('ซูม: ล้อเมาส์ (เมื่อเมาส์อยู่เหนือ Canvas)') },
+        { icon: '✋', text: t('เลื่อน: ลากด้วยเมาส์ในโหมดเลือก หรือ Ctrl+ลาก') },
+        { icon: '🔄', text: t('รีเซ็ตมุมมอง: กดแป้น Spacebar') },
+        { icon: '⚡', text: t('จบการวาดทันที: ดับเบิลคลิก') },
+        { icon: '🚫', text: t('ยกเลิก: กด Escape') },
+        { icon: '↶', text: t('เลิกทำ: Ctrl+Z') },
+        { icon: '↷', text: t('ทำซ้ำ: Ctrl+Y หรือ Ctrl+Shift+Z') },
+        { icon: '🟢', text: t('เขียว: ระยะขอบ (แต่ละด้าน)') },
+        { icon: '🟡', text: t('เหลือง: ระยะรวม (ทั้งหมด)') },
+    ];
 
     // Calculate distance between two points in meters
     const calculateDistance = useCallback((point1: Point, point2: Point): number => {
@@ -251,6 +254,23 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
             setSelectedShape(null);
         }
     }, [history, historyIndex]);
+
+    // Update shape names when language changes
+    useEffect(() => {
+        const shapeTypeNames = {
+            greenhouse: `🏠 ${t('โรงเรือน')}`,
+            plot: `🌱 ${t('แปลงปลูก')}`,
+            walkway: `🚶 ${t('ทางเดิน')}`,
+            'water-source': `💧 ${t('แหล่งน้ำ')}`,
+        };
+
+        setShapes(prevShapes => 
+            prevShapes.map(shape => ({
+                ...shape,
+                name: shapeTypeNames[shape.type as keyof typeof shapeTypeNames] || shape.name
+            }))
+        );
+    }, [t]);
 
     // Parse crops from URL parameter
     useEffect(() => {
@@ -452,11 +472,11 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 ctx.fillStyle = '#000000';
                 ctx.font = 'bold 11px Inter, sans-serif';
                 ctx.textAlign = 'center';
-                ctx.fillText(`Perimeter: ${perimeter.toFixed(1)}m`, infoX + 80, infoY + 18);
-                ctx.fillText(`Area: ${area.toFixed(1)}m²`, infoX + 80, infoY + 35);
+                ctx.fillText(`${t('เส้นรอบรูป')}: ${perimeter.toFixed(1)}m`, infoX + 80, infoY + 18);
+                ctx.fillText(`${t('พื้นที่')}: ${area.toFixed(1)}m²`, infoX + 80, infoY + 35);
             }
         },
-        [calculateDistance, calculatePerimeter, calculatePolygonArea]
+        [calculateDistance, calculatePerimeter, calculatePolygonArea, t]
     );
 
     // Draw shapes
@@ -742,7 +762,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
 
                 // Background
                 ctx.fillStyle = 'rgba(255, 193, 7, 0.95)'; // Yellow
-                const mouseText = `Total ${totalDistance.toFixed(1)}m`;
+                const mouseText = `${t('รวม')} ${totalDistance.toFixed(1)}m`;
                 ctx.font = 'bold 13px Inter, sans-serif';
                 const mouseTextWidth = ctx.measureText(mouseText).width;
                 ctx.fillRect(mouseTextX - 4, mouseTextY - 15, mouseTextWidth + 8, 20);
@@ -781,8 +801,8 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 ctx.fillStyle = '#FFFFFF';
                 ctx.font = 'bold 13px Inter, sans-serif';
                 ctx.textAlign = 'left';
-                ctx.fillText(`Perimeter: ${perimeter.toFixed(1)}m`, infoX + 10, infoY + 25);
-                ctx.fillText(`Area: ${area.toFixed(1)}m²`, infoX + 10, infoY + 50);
+                ctx.fillText(`${t('เส้นรอบรูป')}: ${perimeter.toFixed(1)}m`, infoX + 10, infoY + 25);
+                ctx.fillText(`${t('พื้นที่')}: ${area.toFixed(1)}m²`, infoX + 10, infoY + 50);
             }
         },
         [
@@ -792,6 +812,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
             calculatePerimeter,
             calculatePolygonArea,
             isDrawing,
+            t,
         ]
     );
 
@@ -1257,7 +1278,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
     };
 
     // Finish drawing
-    const finishDrawing = () => {
+    const finishDrawing = useCallback(() => {
         if (currentPath.length < 2) {
             setIsDrawing(false);
             setCurrentPath([]);
@@ -1265,10 +1286,10 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
         }
 
         const shapeTypes = {
-            greenhouse: { color: '#10B981', fillColor: '#10B98120', name: '🏠 Greenhouse' },
-            plot: { color: '#F59E0B', fillColor: '#F59E0B20', name: '🌱 Growing Plot' },
-            walkway: { color: '#6B7280', fillColor: '#6B728020', name: '🚶 Walkway' },
-            water: { color: '#3B82F6', fillColor: '#3B82F640', name: '💧 Water Source' },
+            greenhouse: { color: '#10B981', fillColor: '#10B98120', name: `🏠 ${t('โรงเรือน')}` },
+            plot: { color: '#F59E0B', fillColor: '#F59E0B20', name: `🌱 ${t('แปลงปลูก')}` },
+            walkway: { color: '#6B7280', fillColor: '#6B728020', name: `🚶 ${t('ทางเดิน')}` },
+            water: { color: '#3B82F6', fillColor: '#3B82F640', name: `💧 ${t('แหล่งน้ำ')}` },
         };
 
         const config = shapeTypes[selectedTool as keyof typeof shapeTypes];
@@ -1287,7 +1308,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
         addToHistory([...shapes, newShape]);
         setIsDrawing(false);
         setCurrentPath([]);
-    };
+    }, [currentPath, selectedTool, t, shapes, addToHistory]);
 
     // Handle key press
     useEffect(() => {
@@ -1381,12 +1402,12 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
         const plots = shapes.filter((s) => s.type === 'plot');
 
         if (greenhouses.length === 0) {
-            alert('Please draw at least 1 greenhouse structure');
+            alert(t('กรุณาวาดโครงสร้างโรงเรือนอย่างน้อย 1 อัน'));
             return;
         }
 
         if (plots.length === 0) {
-            alert('Please draw at least 1 growing plot');
+            alert(t('กรุณาวาดแปลงปลูกอย่างน้อย 1 แปลง'));
             return;
         }
 
@@ -1434,26 +1455,25 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                         <div className="flex items-center space-x-4">
                             <div>
                                 <h1 className="text-xl font-bold">
-                                    Greenhouse Area Design with Distance Measurement
+                                    {t('ออกแบบพื้นที่โรงเรือน พร้อมระบบวัดระยะ')}
                                 </h1>
                                 <p className="text-sm text-gray-400">
-                                    Draw your greenhouse structure and growing plots - Area 2400x1600 pixels (1
-                                    grid = 1 meter)
+                                    {t('วาดโครงสร้างโรงเรือนและแปลงปลูกของคุณ - พื้นที่ 2400x1600 pixels (1 grid = 1 เมตร)')}
                                     <span className="ml-2 text-blue-300">
-                                        Real-time distance measurement display
+                                        {t('แสดงการวัดระยะแบบ Real-time')}
                                     </span>
                                 </p>
                             </div>
                         </div>
 
                         <div className="flex items-center space-x-2 text-sm text-gray-400">
-                            <span className="text-green-400">✓ Select Crops</span>
+                            <span className="text-green-400">✓ {t('เลือกพืช')}</span>
                             <span>→</span>
-                            <span className="text-green-400">✓ Planning Method</span>
+                            <span className="text-green-400">✓ {t('เลือกวิธีการวางแผน')}</span>
                             <span>→</span>
-                            <span className="font-medium text-blue-400">Design Area</span>
+                            <span className="font-medium text-blue-400">{t('ออกแบบพื้นที่')}</span>
                             <span>→</span>
-                            <span>Irrigation System</span>
+                            <span>{t('ระบบน้ำ')}</span>
                         </div>
                     </div>
                 </div>
@@ -1465,7 +1485,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                         <div className="flex-1 overflow-y-auto p-4">
                             {/* Selected Crops */}
                             <div className="mb-4">
-                                <h3 className="mb-2 text-sm font-medium text-gray-300">Selected Crops</h3>
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">{t('พืชที่เลือก')}</h3>
                                 <div className="flex flex-wrap gap-1">
                                     {selectedCrops.map((crop, index) => (
                                         <span
@@ -1480,7 +1500,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
 
                             {/* Tools */}
                             <div className="mb-4">
-                                <h3 className="mb-3 text-sm font-medium text-gray-300">Tools</h3>
+                                <h3 className="mb-3 text-sm font-medium text-gray-300">{t('เครื่องมือ')}</h3>
                                 <div className="space-y-1">
                                     {tools.map((tool) => (
                                         <div key={tool.id} className="relative">
@@ -1522,7 +1542,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                             {/* Quick Instructions */}
                             <div className="mb-4">
                                 <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                    General Instructions
+                                    {t('คำแนะนำทั่วไป')}
                                 </h3>
                                 <div className="space-y-1">
                                     {generalInstructions.map((instruction, index) => (
@@ -1541,7 +1561,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
 
                             {/* View Controls */}
                             <div className="mb-4 space-y-2">
-                                <h3 className="text-sm font-medium text-gray-300">View Options</h3>
+                                <h3 className="text-sm font-medium text-gray-300">{t('ตัวเลือกมุมมอง')}</h3>
                                 <div className="flex flex-col space-y-2">
                                     <button
                                         onClick={() => setShowGrid(!showGrid)}
@@ -1551,7 +1571,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                                 : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                         }`}
                                     >
-                                        Show Grid (1 square = 1m)
+                                        {t('แสดงกริด (1 ช่อง = 1m)')}
                                     </button>
                                     <button
                                         onClick={() => setShowCoordinates(!showCoordinates)}
@@ -1561,7 +1581,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                                 : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                         }`}
                                     >
-                                        Show Coordinates
+                                        {t('แสดงพิกัด')}
                                     </button>
                                     <button
                                         onClick={() => {
@@ -1570,7 +1590,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                         }}
                                         className="rounded bg-gray-700 px-3 py-2 text-xs text-gray-300 transition-colors hover:bg-gray-600"
                                     >
-                                        🔄 Reset View
+                                        🔄 {t('รีเซ็ตมุมมอง')}
                                     </button>
                                 </div>
                             </div>
@@ -1578,16 +1598,16 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                             {/* Canvas Info */}
                             <div className="mb-4">
                                 <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                    Canvas Info
+                                    {t('ข้อมูล Canvas')}
                                 </h3>
                                 <div className="space-y-1 text-xs text-gray-400">
                                     <p>
-                                        Size: {CANVAS_SIZE.width} × {CANVAS_SIZE.height} px
+                                        {t('ขนาด')}: {CANVAS_SIZE.width} × {CANVAS_SIZE.height} px
                                     </p>
-                                    <p>Grid: {GRID_SIZE} px = 1 meter</p>
-                                    <p>Zoom: {(zoom * 100).toFixed(0)}%</p>
+                                    <p>{t('Grid')}: {GRID_SIZE} px = 1 {t('เมตรหน่วย')}</p>
+                                    <p>{t('Zoom')}: {(zoom * 100).toFixed(0)}%</p>
                                     <p>
-                                        Pan: ({pan.x.toFixed(0)}, {pan.y.toFixed(0)})
+                                        {t('Pan')}: ({pan.x.toFixed(0)}, {pan.y.toFixed(0)})
                                     </p>
                                 </div>
                             </div>
@@ -1627,7 +1647,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                         {/* Coordinates Display - bottom left */}
                         {showCoordinates && (
                             <div className="absolute bottom-4 left-4 rounded bg-black/50 px-3 py-1 text-sm text-white">
-                                X: {mousePos.x.toFixed(0)}, Y: {mousePos.y.toFixed(0)} | Zoom:{' '}
+                                X: {mousePos.x.toFixed(0)}, Y: {mousePos.y.toFixed(0)} | {t('Zoom')}:{' '}
                                 {(zoom * 100).toFixed(0)}%
                             </div>
                         )}
@@ -1642,9 +1662,9 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                         ? 'cursor-not-allowed bg-gray-800 text-gray-500'
                                         : 'bg-gray-700 text-white hover:bg-gray-600'
                                 }`}
-                                title="Undo (Ctrl+Z)"
+                                title={t('เลิกทำ: Ctrl+Z')}
                             >
-                                ↶ Undo
+                                ↶ {t('เลิกทำ')}
                             </button>
                             <button
                                 onClick={redo}
@@ -1654,34 +1674,34 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                         ? 'cursor-not-allowed bg-gray-800 text-gray-500'
                                         : 'bg-gray-700 text-white hover:bg-gray-600'
                                 }`}
-                                title="Redo (Ctrl+Y)"
+                                title={t('ทำซ้ำ: Ctrl+Y')}
                             >
-                                ↷ Redo
+                                ↷ {t('ทำซ้ำ')}
                             </button>
                         </div>
 
                         {/* Status Messages */}
                         {isDrawing && (
                             <div className="absolute left-4 top-20 rounded bg-blue-600 px-3 py-1 text-sm text-white">
-                                Drawing... 🟢 Edge distance 🟡 Total distance (Enter=finish, Escape=cancel)
+                                {t('กำลังวาด... 🟢 ระยะรอบด้าน 🟡 ระยะรวม (Enter=จบ, Escape=ยกเลิก)')}
                             </div>
                         )}
 
                         {measuringMode && !measureEnd && (
                             <div className="absolute left-4 top-20 rounded bg-red-600 px-3 py-1 text-sm text-white">
-                                Click second point to measure distance (1 grid = 1m, Escape to cancel)
+                                {t('คลิกจุดที่สองเพื่อวัดระยะ (1 กริด = 1m, Escape เพื่อยกเลิก)')}
                             </div>
                         )}
 
                         {isDragging && (
                             <div className="absolute left-4 top-20 rounded bg-yellow-600 px-3 py-1 text-sm text-white">
-                                🤏 Moving object... (not holding Ctrl)
+                                🤏 {t('กำลังขยับองค์ประกอบ... (ไม่กด Ctrl)')}
                             </div>
                         )}
 
                         {isPanning && (
                             <div className="absolute left-4 top-20 rounded bg-purple-600 px-3 py-1 text-sm text-white">
-                                🤏 Panning view... (Ctrl+Drag or click empty space)
+                                🤏 {t('กำลังเลื่อนมุมมอง... (Ctrl+Drag หรือ คลิกพื้นที่ว่าง)')}
                             </div>
                         )}
 
@@ -1692,7 +1712,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                     onClick={deleteShape}
                                     className="rounded bg-orange-600 px-4 py-2 text-sm text-white shadow-lg transition-colors hover:bg-orange-700"
                                 >
-                                    ❌ Delete Selected Object
+                                    ❌ {t('ลบองค์ประกอบ')}
                                 </button>
                             )}
 
@@ -1700,7 +1720,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                 onClick={clearAll}
                                 className="rounded bg-red-600 px-4 py-2 text-sm text-white shadow-lg transition-colors hover:bg-red-700"
                             >
-                                🗑️ Clear All
+                                🗑️ {t('ล้างทั้งหมด')}
                             </button>
                         </div>
                     </div>
@@ -1708,10 +1728,10 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                     {/* Properties Panel */}
                     <div className="flex w-64 flex-col border-l border-gray-700 bg-gray-800">
                         <div className="flex-1 overflow-y-auto p-4">
-                            <h3 className="mb-3 text-sm font-medium text-gray-300">Object List</h3>
+                            <h3 className="mb-3 text-sm font-medium text-gray-300">{t('รายการออบเจ็ค')}</h3>
 
                             {shapes.length === 0 ? (
-                                <p className="text-sm text-gray-500">No objects yet</p>
+                                <p className="text-sm text-gray-500">{t('ยังไม่มีออบเจ็ค')}</p>
                             ) : (
                                 <div className="mb-4 space-y-2">
                                     {shapes.map((shape) => (
@@ -1735,7 +1755,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                                 <span className="truncate">{shape.name}</span>
                                                 <div className="flex items-center space-x-2">
                                                     <span className="ml-2 text-xs text-gray-400">
-                                                        {shape.points.length} points
+                                                        {shape.points.length} {t('จุด')}
                                                     </span>
                                                     {selectedShape === shape.id && (
                                                         <button
@@ -1744,7 +1764,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                                                 deleteShape();
                                                             }}
                                                             className="text-red-400 transition-colors hover:text-red-300"
-                                                            title="Delete object (Delete)"
+                                                            title={t('ลบออบเจ็ค (Delete)')}
                                                         >
                                                             🗑️
                                                         </button>
@@ -1761,14 +1781,14 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                 <div className="mb-4 border-t border-gray-700 pt-4">
                                     <div className="mb-2 flex items-center justify-between">
                                         <h4 className="text-sm font-medium text-yellow-300">
-                                            Selected Object
+                                            {t('ออบเจ็คที่เลือก')}
                                         </h4>
                                         <button
                                             onClick={deleteShape}
                                             className="rounded bg-red-900/30 px-2 py-1 text-xs text-red-400 transition-colors hover:bg-red-900/50 hover:text-red-300"
-                                            title="Delete object (Delete)"
+                                            title={t('ลบออบเจ็ค (Delete)')}
                                         >
-                                            🗑️ Delete
+                                            🗑️ {t('ลบ')}
                                         </button>
                                     </div>
                                     {(() => {
@@ -1777,13 +1797,13 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                         return (
                                             <div className="space-y-1 text-xs text-gray-300">
                                                 <p>
-                                                    <strong>Name:</strong> {shape.name}
+                                                    <strong>{t('ชื่อ')}:</strong> {shape.name}
                                                 </p>
                                                 <p>
-                                                    <strong>Type:</strong> {shape.type}
+                                                    <strong>{t('ประเภท')}:</strong> {shape.type}
                                                 </p>
                                                 <p>
-                                                    <strong>Points:</strong> {shape.points.length}
+                                                    <strong>{t('จำนวนจุด')}:</strong> {shape.points.length}
                                                 </p>
                                                 {shape.type !== 'measurement' &&
                                                     shape.points.length >= 2 && (
@@ -1791,14 +1811,14 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                                             {shape.points.length >= 3 && (
                                                                 <>
                                                                     <p>
-                                                                        <strong>Perimeter:</strong>{' '}
+                                                                        <strong>{t('เส้นรอบรูป')}:</strong>{' '}
                                                                         {calculatePerimeter(
                                                                             shape.points
                                                                         ).toFixed(1)}
                                                                         m
                                                                     </p>
                                                                     <p>
-                                                                        <strong>Area:</strong>{' '}
+                                                                        <strong>{t('พื้นที่')}:</strong>{' '}
                                                                         {calculatePolygonArea(
                                                                             shape.points
                                                                         ).toFixed(1)}
@@ -1808,7 +1828,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                                             )}
                                                             {shape.points.length === 2 && (
                                                                 <p>
-                                                                    <strong>Distance:</strong>{' '}
+                                                                    <strong>{t('ระยะทาง')}:</strong>{' '}
                                                                     {calculateDistance(
                                                                         shape.points[0],
                                                                         shape.points[1]
@@ -1818,7 +1838,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                                             )}
                                                             <div className="mt-2 space-y-1">
                                                                 <p>
-                                                                    <strong>Each side length:</strong>
+                                                                    <strong>{t('ขนาดแต่ละด้าน')}:</strong>
                                                                 </p>
                                                                 {shape.points.map((point, i) => {
                                                                     if (
@@ -1840,7 +1860,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                                                             key={i}
                                                                             className="ml-2 text-xs text-gray-400"
                                                                         >
-                                                                            Side {i + 1}:{' '}
+                                                                            {t('ด้านที่ {num}:').replace('{num}', (i + 1).toString())}{' '}
                                                                             {distance.toFixed(1)}m
                                                                         </p>
                                                                     );
@@ -1849,9 +1869,9 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                                         </>
                                                     )}
                                                 <div className="mt-2 text-xs text-yellow-300">
-                                                    <p>• Drag to move (without holding Ctrl)</p>
-                                                    <p>• Ctrl+click to pan view</p>
-                                                    <p>• Press Delete to remove</p>
+                                                    <p>• {t('ลากเพื่อขยับ (ไม่กด Ctrl)')}</p>
+                                                    <p>• {t('Ctrl+คลิกเพื่อเลื่อนมุมมอง')}</p>
+                                                    <p>• {t('กด Delete เพื่อลบ')}</p>
                                                 </div>
                                             </div>
                                         );
@@ -1861,36 +1881,36 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
 
                             {/* Statistics */}
                             <div className="border-t border-gray-700 pt-4">
-                                <h4 className="mb-2 text-sm font-medium text-gray-300">Statistics</h4>
+                                <h4 className="mb-2 text-sm font-medium text-gray-300">{t('สถิติ')}</h4>
                                 <div className="space-y-2">
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-400">Greenhouses:</span>
+                                        <span className="text-gray-400">{t('โรงเรือน')}:</span>
                                         <span>
                                             {shapes.filter((s) => s.type === 'greenhouse').length}
                                         </span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-400">Growing plots:</span>
+                                        <span className="text-gray-400">{t('แปลงปลูก')}:</span>
                                         <span>{shapes.filter((s) => s.type === 'plot').length}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-400">Walkways:</span>
+                                        <span className="text-gray-400">{t('ทางเดิน')}:</span>
                                         <span>{shapes.filter((s) => s.type === 'walkway').length}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-400">Water sources:</span>
+                                        <span className="text-gray-400">{t('แหล่งน้ำ')}:</span>
                                         <span>
                                             {shapes.filter((s) => s.type === 'water-source').length}
                                         </span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-400">Measurements:</span>
+                                        <span className="text-gray-400">{t('การวัด')}:</span>
                                         <span>
                                             {shapes.filter((s) => s.type === 'measurement').length}
                                         </span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-400">Total:</span>
+                                        <span className="text-gray-400">{t('รวม')}:</span>
                                         <span className="font-bold">{shapes.length}</span>
                                     </div>
 
@@ -1901,7 +1921,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                         <>
                                             <div className="mt-2 border-t border-gray-600 pt-2">
                                                 <h5 className="mb-1 text-xs font-medium text-gray-400">
-                                                    Total Area (m²)
+                                                    {t('พื้นที่รวม (m²)')}
                                                 </h5>
                                                 {['greenhouse', 'plot', 'walkway', 'water-source'].map(
                                                     (type) => {
@@ -1919,10 +1939,10 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                                         if (totalArea === 0) return null;
 
                                                         const typeNames = {
-                                                            greenhouse: 'Greenhouse',
-                                                            plot: 'Growing plot',
-                                                            walkway: 'Walkway',
-                                                            'water-source': 'Water source',
+                                                            greenhouse: t('โรงเรือน'),
+                                                            plot: t('แปลงปลูก'),
+                                                            walkway: t('ทางเดิน'),
+                                                            'water-source': t('แหล่งน้ำ'),
                                                         };
 
                                                         return (
@@ -1974,14 +1994,14 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                     d="M10 19l-7-7m0 0l7-7m-7 7h18"
                                 />
                             </svg>
-                            Back
+                            {t('กลับ')}
                         </button>
 
                         <button
                             onClick={handleProceed}
                             className="flex items-center rounded bg-green-600 px-6 py-2 text-white transition-colors hover:bg-green-700"
                         >
-                            Next Step: Choose Irrigation System
+                            {t('ไปขั้นตอนถัดไป: เลือกระบบน้ำ')}
                             <svg
                                 className="ml-2 h-4 w-4"
                                 fill="none"

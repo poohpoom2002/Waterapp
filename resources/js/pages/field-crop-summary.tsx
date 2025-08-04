@@ -22,6 +22,8 @@ import {
 } from '@/pages/utils/fieldMapConstants';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import { useLanguage } from '../contexts/LanguageContext';
+import { fieldCropTranslations } from '../contexts/translations/fieldcrop';
 
 // Enhanced Google Maps component for better image capture
 const GoogleMapsDisplay = ({
@@ -45,6 +47,7 @@ const GoogleMapsDisplay = ({
     irrigationLines: any[];
     onMapReady?: (map: google.maps.Map) => void;
 }) => {
+    const { t } = useLanguage();
     const mapRef = useRef<HTMLDivElement>(null);
     const googleMapRef = useRef<google.maps.Map | null>(null);
     const [isLoaded, setIsLoaded] = useState(false);
@@ -55,7 +58,7 @@ const GoogleMapsDisplay = ({
         if (!window.google?.maps) {
             const loadGoogleMaps = () => {
                 const script = document.createElement('script');
-                script.src = `https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=geometry,drawing`;
+                script.src = `https://maps.googleapis.com/maps/api/js?key=YOUR_Maps_API_KEY&libraries=geometry,drawing`;
                 script.async = true;
                 script.defer = true;
                 script.onload = () => {
@@ -137,10 +140,7 @@ const GoogleMapsDisplay = ({
             // Draw pipes
             pipes.forEach((pipe) => {
                 if (pipe.coordinates && Array.isArray(pipe.coordinates)) {
-                    const pipeConfig = PIPE_TYPES[pipe.type as PipeType] || {
-                        color: '#888888',
-                        weight: 3,
-                    };
+                    const pipeConfig = PIPE_TYPES[pipe.type as PipeType] || { color: '#888888', weight: 3 };
 
                     const pipePath = pipe.coordinates.map((coord: any) => {
                         if (Array.isArray(coord)) {
@@ -275,7 +275,7 @@ const GoogleMapsDisplay = ({
             <div className="flex h-full items-center justify-center bg-gray-700">
                 <div className="text-center">
                     <div className="mb-2 text-2xl">🗺️</div>
-                    <p className="text-sm text-gray-400">กำลังโหลด Google Maps...</p>
+                    <p className="text-sm text-gray-400">{t('Loading Google Maps...')}</p>
                 </div>
             </div>
         );
@@ -288,7 +288,7 @@ const GoogleMapsDisplay = ({
                 <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-gray-700/75">
                     <div className="text-center">
                         <div className="mb-2 inline-block h-6 w-6 animate-spin rounded-full border-b-2 border-blue-400"></div>
-                        <p className="text-sm text-gray-300">กำลังโหลดแผนที่...</p>
+                        <p className="text-sm text-gray-300">{t('Loading Map...')}</p>
                     </div>
                 </div>
             )}
@@ -463,17 +463,108 @@ const calculatePlantingPoints = (
 ): number => {
     if (!zoneArea || !crop) return 0;
 
-    const rowSpacing = customRowSpacing || crop.rowSpacing / 100;
-    const plantSpacing = customPlantSpacing || crop.plantSpacing / 100;
+    // 🔥 เพิ่มบรรทัดนี้
+    console.log(`🧮 calculatePlantingPoints called:`, {
+        zoneArea: zoneArea.toFixed(2),
+        cropName: crop.name,
+        cropRowSpacing: crop.rowSpacing,
+        cropPlantSpacing: crop.plantSpacing,
+        customRowSpacing,
+        customPlantSpacing
+    });
+
+    // แปลงหน่วยจาก cm เป็น m
+    const rowSpacing = (customRowSpacing || crop.rowSpacing) / 100;
+    const plantSpacing = (customPlantSpacing || crop.plantSpacing) / 100;
+
+    // 🔥 เพิ่มบรรทัดนี้
+    console.log(`📏 Spacing calculation:`, {
+        rowSpacing: `${rowSpacing} m`,
+        plantSpacing: `${plantSpacing} m`,
+        original: `${crop.rowSpacing}x${crop.plantSpacing} cm`
+    });
 
     if (!rowSpacing || !plantSpacing) return 0;
 
-    const rowsPerSquareMeter = 1 / rowSpacing;
-    const plantsPerRowPerMeter = 1 / plantSpacing;
-    const plantsPerSquareMeter = rowsPerSquareMeter * plantsPerRowPerMeter;
+    // คำนวณจำนวนต้นต่อตารางเมตร
+    // ตัวอย่าง: ระยะห่างแถว 25cm, ระยะห่างต้น 25cm
+    // จำนวนต้นต่อตารางเมตร = (1/0.25) * (1/0.25) = 4 * 4 = 16 ต้น/ตร.ม.
+    const plantsPerSquareMeter = (1 / rowSpacing) * (1 / plantSpacing);
     const totalPlants = Math.floor(zoneArea * plantsPerSquareMeter);
 
+    console.log(`🌱 Plant calculation details:`, {
+        zoneAreaM2: zoneArea.toFixed(2),
+        rowSpacingM: rowSpacing.toFixed(2),
+        plantSpacingM: plantSpacing.toFixed(2),
+        plantsPerSqm: plantsPerSquareMeter.toFixed(1),
+        totalPlants: totalPlants.toLocaleString()
+    });
+
     return totalPlants;
+};
+
+// คำนวณจำนวนจุดปลูกจากท่อย่อยที่มีอยู่จริง
+const calculatePlantingPointsFromPipes = (
+    pipes: any[],
+    zoneId: string,
+    crop: any,
+    customRowSpacing?: number,
+    customPlantSpacing?: number
+): number => {
+    if (!pipes || !crop) return 0;
+
+    // แปลงหน่วยจาก cm เป็น m
+    const rowSpacing = (customRowSpacing || crop.rowSpacing) / 100;
+    const plantSpacing = (customPlantSpacing || crop.plantSpacing) / 100;
+
+    if (!rowSpacing || !plantSpacing) return 0;
+
+    // หาท่อย่อยที่อยู่ในโซนนี้
+    const zonePipes = pipes.filter(pipe => 
+        pipe.type === 'lateral' && pipe.zoneId?.toString() === zoneId
+    );
+
+    console.log(`🔧 Calculating planting points from pipes for zone ${zoneId}:`, {
+        totalPipes: zonePipes.length,
+        cropName: crop.name,
+        rowSpacing: `${rowSpacing} m`,
+        plantSpacing: `${plantSpacing} m`
+    });
+
+    let totalPlantingPoints = 0;
+
+    zonePipes.forEach((pipe, pipeIndex) => {
+        if (pipe.coordinates && pipe.coordinates.length >= 2) {
+            let pipeLength = 0;
+            
+            // คำนวณความยาวท่อย่อย
+            for (let i = 0; i < pipe.coordinates.length - 1; i++) {
+                const start = pipe.coordinates[i];
+                const end = pipe.coordinates[i + 1];
+                
+                // คำนวณระยะทางระหว่างจุด (ใช้ Haversine formula หรือ Google Maps API)
+                const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                    new google.maps.LatLng(start.lat, start.lng),
+                    new google.maps.LatLng(end.lat, end.lng)
+                );
+                pipeLength += distance;
+            }
+
+            // คำนวณจำนวนจุดปลูกตามความยาวท่อย่อย
+            // ระยะห่างระหว่างจุดปลูก = plantSpacing
+            const plantingPointsInPipe = Math.floor(pipeLength / plantSpacing) + 1;
+            totalPlantingPoints += plantingPointsInPipe;
+
+            console.log(`📏 Pipe ${pipeIndex + 1}:`, {
+                pipeLength: `${pipeLength.toFixed(2)} m`,
+                plantingPoints: plantingPointsInPipe,
+                spacing: `${plantSpacing} m`
+            });
+        }
+    });
+
+    console.log(`🌱 Total planting points from pipes: ${totalPlantingPoints.toLocaleString()}`);
+    return totalPlantingPoints;
 };
 
 const calculateYieldAndPrice = (
@@ -848,6 +939,7 @@ const calculateZoneIrrigationCounts = (
 };
 
 export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
+    const { t } = useLanguage();
     const [summaryData, setSummaryData] = useState<any>(null);
     const [dataSource, setDataSource] = useState<string>('');
     const [calculatedZoneSummaries, setCalculatedZoneSummaries] = useState<Record<string, any>>({});
@@ -907,7 +999,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
         if (mapImageCaptured || isCapturingImage) return;
 
         setIsCapturingImage(true);
-        setCaptureStatus('กำลังจับภาพแผนที่...');
+        setCaptureStatus(t('Capturing...'));
 
         try {
             let mapElement: HTMLElement | null = null;
@@ -926,33 +1018,33 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
             }
 
             if (mapElement) {
-                setCaptureStatus('กำลังประมวลผลภาพ...');
+                setCaptureStatus(t('Processing...'));
                 const imageUrl = await captureMapImage(mapElement, 'field-crop');
 
                 if (imageUrl) {
                     const isVerified = verifyImageSave();
                     if (isVerified) {
                         setMapImageCaptured(true);
-                        setCaptureStatus('บันทึกภาพแผนที่สำเร็จ!');
+                        setCaptureStatus(t('Successfully saved'));
                         console.log('✅ Map image captured and verified for product page');
 
                         // Clear status after delay
                         setTimeout(() => setCaptureStatus(''), 3000);
                     } else {
-                        setCaptureStatus('เกิดข้อผิดพลาดในการบันทึก');
+                        setCaptureStatus(t('Error'));
                         setTimeout(() => setCaptureStatus(''), 3000);
                     }
                 } else {
-                    setCaptureStatus('ไม่สามารถจับภาพได้');
+                    setCaptureStatus(t('Error'));
                     setTimeout(() => setCaptureStatus(''), 3000);
                 }
             } else {
-                setCaptureStatus('ไม่พบแผนที่');
+                setCaptureStatus(t('Error'));
                 setTimeout(() => setCaptureStatus(''), 3000);
             }
         } catch (error) {
             console.error('❌ Error in handleCaptureMapImage:', error);
-            setCaptureStatus('เกิดข้อผิดพลาด');
+            setCaptureStatus(t('Error'));
             setTimeout(() => setCaptureStatus(''), 3000);
         } finally {
             setIsCapturingImage(false);
@@ -969,6 +1061,13 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
         } else if (captureStatus.includes('ข้อผิดพลาด') || captureStatus.includes('ไม่สามารถ')) {
             alert('เกิดข้อผิดพลาดในการบันทึกภาพ โปรดลองอีกครั้ง');
         }
+    };
+
+    // Placeholder for Save Project functionality
+    const handleSaveProject = () => {
+        console.log('💾 Save Project button clicked.');
+        alert(t('Project has been saved. (Placeholder)'));
+        // In a real application, this would trigger an API call or more complex localStorage logic
     };
 
     const {
@@ -1010,18 +1109,17 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
 
                         const effectiveRowSpacing = rowSpacing[assignedCropValue]
                             ? rowSpacing[assignedCropValue]
-                            : crop.rowSpacing / 100;
+                            : crop.rowSpacing;
 
                         const effectivePlantSpacing = plantSpacing[assignedCropValue]
                             ? plantSpacing[assignedCropValue]
-                            : crop.plantSpacing / 100;
+                            : crop.plantSpacing;
 
-                        const totalPlantingPoints = calculatePlantingPoints(
-                            zoneArea,
-                            crop,
-                            effectiveRowSpacing,
-                            effectivePlantSpacing
-                        );
+                        // คำนวณจำนวนจุดปลูกจากท่อย่อยที่มีอยู่จริง (ถ้ามี)
+                        // ถ้าไม่มีท่อย่อย ให้คำนวณจากพื้นที่โซน
+                        const totalPlantingPoints = pipes && pipes.length > 0
+                            ? calculatePlantingPointsFromPipes(pipes, zoneId, crop, effectiveRowSpacing, effectivePlantSpacing)
+                            : calculatePlantingPoints(zoneArea, crop, effectiveRowSpacing, effectivePlantSpacing);
 
                         const { estimatedYield, estimatedPrice } = calculateYieldAndPrice(
                             zoneArea,
@@ -1070,12 +1168,16 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                             totalIrrigationPoints: zoneIrrigationCounts.total,
                         };
 
+                        // ตรวจสอบว่าคำนวณจากท่อย่อยหรือพื้นที่โซน
+                        const calculationMethod = pipes && pipes.length > 0 ? 'จากท่อย่อย' : 'จากพื้นที่โซน';
+                        
                         console.log(
                             `📊 Zone ${zone.name} calculations with cropData (per irrigation):`,
                             {
                                 area: `${Math.round(zoneArea)} ตร.ม. (${Math.round((zoneArea / 1600) * 100) / 100} ไร่)`,
                                 crop: crop.name,
                                 category: crop.category,
+                                calculationMethod: calculationMethod,
                                 rowSpacing: `${effectiveRowSpacing} ม. (จาก cropData: ${crop.rowSpacing} ซม.)`,
                                 plantSpacing: `${effectivePlantSpacing} ม. (จาก cropData: ${crop.plantSpacing} ซม.)`,
                                 plantingPoints: totalPlantingPoints.toLocaleString(),
@@ -1098,7 +1200,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                     newZoneSummaries[zoneId] = {
                         zoneId: zoneId,
                         zoneName: zone.name,
-                        cropName: 'ไม่ได้กำหนด',
+                        cropName: t('Not defined'),
                         cropValue: null,
                         cropIcon: '❓',
                         cropCategory: null,
@@ -1146,11 +1248,12 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
         plantSpacing,
         irrigationAssignments,
         pipes,
+        t,
     ]);
 
     const handleCalculateEquipment = () => {
         if (!summaryData) {
-            alert('ไม่พบข้อมูลโปรเจกต์สำหรับคำนวณ');
+            alert(t('No project to calculate'));
             return;
         }
 
@@ -1339,25 +1442,24 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
 
     if (!summaryData) {
         return (
-            <div className="flex h-screen flex-col overflow-hidden bg-gray-900 text-white">
-                <Head title="Field Crop Summary - No Data" />
+            <div className="min-h-screen bg-gray-900 text-white">
+                <Head title={`${t('Field Crop Summary')} - ${t('No data to show')}`} />
                 <Navbar />
-                <div className="flex flex-1 items-center justify-center overflow-y-auto">
-                    <div className="container mx-auto px-4 py-6">
+                <div className="flex items-center justify-center px-4 py-12">
+                    <div className="container mx-auto">
                         <div className="rounded-lg bg-gray-800 p-8 text-center">
                             <div className="mb-4 text-6xl">📋</div>
                             <h2 className="mb-4 text-2xl font-bold text-yellow-400">
-                                No Project Data Found
+                                {t('No Project Data Found')}
                             </h2>
                             <p className="mb-6 text-gray-400">
-                                Please return to the Field Map page, complete the steps, and click
-                                "View Summary".
+                                {t('Please return to the Field Map page, complete the steps, and click "View Summary".')}
                             </p>
                             <Link
                                 href="/field-map"
                                 className="inline-flex items-center rounded-lg bg-blue-600 px-6 py-3 text-white transition-colors hover:bg-blue-700"
                             >
-                                🗺️ Go to Field Map
+                                🗺️ {t('Go to Field Map')}
                             </Link>
                         </div>
                     </div>
@@ -1367,12 +1469,16 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
     }
 
     return (
-        <div className="flex h-screen flex-col overflow-hidden bg-gray-900 text-white print:bg-white print:text-black">
-            <Head title="Field Crop Summary - Irrigation Planning" />
+        <div className="min-h-screen bg-gray-900 text-white print:bg-white print:text-black">
+            <Head title={`${t('Field Crop Summary')} - ${t('Irrigation Planning Summary')}`} />
 
-            <Navbar />
+            {/* Fixed Navbar */}
+            <div className="sticky top-0 z-50">
+                <Navbar />
+            </div>
 
-            <div className="border-b border-gray-700 bg-gray-800 print:hidden">
+            {/* Fixed Header Section */}
+            <div className="top-16 z-40 border-b border-gray-700 bg-gray-800 print:hidden">
                 <div className="container mx-auto px-4 py-4">
                     <div className="mx-auto max-w-7xl">
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -1394,15 +1500,15 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                             d="M10 19l-7-7m0 0l7-7m-7 7h18"
                                         />
                                     </svg>
-                                    Back to Field Map
+                                    {t('Back to Field Map')}
                                 </Link>
-                                <h1 className="mb-1 text-3xl font-bold">📊 Field Crop Summary</h1>
+                                <h1 className="mb-1 text-3xl font-bold">📊 {t('Field Crop Summary')}</h1>
                                 <p className="mb-2 text-gray-400">
-                                    Complete overview of your irrigation planning project
+                                    {t('Complete overview of your irrigation planning project')}
                                 </p>
                             </div>
 
-                            <div className="flex-shrink-0 space-x-3">
+                            <div className="flex flex-shrink-0 flex-wrap items-center gap-3">
                                 {/* Enhanced Map capture button */}
                                 <button
                                     onClick={handleManualCapture}
@@ -1418,7 +1524,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                     {isCapturingImage ? (
                                         <>
                                             <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
-                                            กำลังจับภาพ...
+                                            {t('Capturing...')}
                                         </>
                                     ) : (
                                         <>
@@ -1448,6 +1554,24 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                     )}
                                 </button>
 
+                                {/* Save Project Button */}
+                                <button
+                                    onClick={handleSaveProject}
+                                    className="inline-flex transform items-center rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500 px-6 py-3 font-semibold text-white transition-all duration-200 hover:scale-105 hover:from-teal-600 hover:to-cyan-600 hover:shadow-lg"
+                                >
+                                    <svg className="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                                    {t('Save Project')}
+                                </button>
+
+                                {/* New Project Button */}
+                                <Link
+                                    href="/field-map"
+                                    className="inline-flex transform items-center rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 px-6 py-3 font-semibold text-white transition-all duration-200 hover:scale-105 hover:from-blue-600 hover:to-indigo-600 hover:shadow-lg"
+                                >
+                                    <svg className="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                    {t('New Project')}
+                                </Link>
+
                                 <button
                                     onClick={handleCalculateEquipment}
                                     className="inline-flex transform items-center rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 font-semibold text-white transition-all duration-200 hover:scale-105 hover:from-purple-700 hover:to-blue-700 hover:shadow-lg"
@@ -1465,7 +1589,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                             d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
                                         />
                                     </svg>
-                                    🧮 คำนวณอุปกรณ์
+                                    🧮 {t('Calculate Equipment')}
                                 </button>
                             </div>
                         </div>
@@ -1484,10 +1608,10 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                 }`}
                             >
                                 <div className="flex items-center gap-2">
-                                    {captureStatus.includes('กำลัง') && (
+                                    {captureStatus.includes(t('Capturing...')) && (
                                         <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current"></div>
                                     )}
-                                    <span>{captureStatus}</span>
+                                    <span>{t('Image capture status:')} {captureStatus}</span>
                                 </div>
                             </div>
                         )}
@@ -1495,13 +1619,15 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                 </div>
             </div>
 
+            {/* Print header - only visible when printing */}
             <div className="hidden print:mb-4 print:block">
-                <h1 className="text-2xl font-bold text-black">📊 Field Crop Summary</h1>
-                <p className="text-gray-600">Generated on {new Date().toLocaleDateString()}</p>
+                <h1 className="text-2xl font-bold text-black">📊 {t('Field Crop Summary')}</h1>
+                <p className="text-gray-600">{t('Generated on {date}').replace('{date}', new Date().toLocaleDateString())}</p>
                 <hr className="my-2 border-gray-300" />
             </div>
 
-            <div className="print:print-layout flex-1 overflow-y-auto">
+            {/* Scrollable Main Content */}
+            <div className="print:print-layout">
                 <div className="container mx-auto px-4 py-4">
                     <div className="mx-auto max-w-7xl print:max-w-none">
                         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 print:grid-cols-2 print:gap-6">
@@ -1511,10 +1637,10 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                     <div className="flex h-full flex-col">
                                         <div className="print:print-map-header border-b border-gray-600 bg-gray-700 p-2">
                                             <h3 className="text-sm font-semibold text-white print:text-black">
-                                                🗺️ Project Map Overview
+                                                🗺️ {t('Project Map Overview')}
                                                 {mapImageCaptured && (
                                                     <span className="ml-2 text-xs text-green-400 print:text-green-600">
-                                                        ✅ บันทึกแล้ว
+                                                        {t('✅ Image Saved')}
                                                     </span>
                                                 )}
                                             </h3>
@@ -1542,10 +1668,10 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                     </div>
                                 </div>
 
-                                {/* Rest of the component remains the same... */}
+                                {/* Rest of the component with translation */}
                                 <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
                                     <h2 className="mb-3 text-lg font-bold text-green-400 print:text-base print:text-black">
-                                        🏡 Project Overview
+                                        🏡 {t('Project Overview')}
                                     </h2>
                                     <div className="grid grid-cols-5 gap-2 print:gap-1">
                                         <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-1">
@@ -1553,7 +1679,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                 {areaInRai.toFixed(2)}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-gray-600">
-                                                ไร่
+                                                {t('Rai')}
                                             </div>
                                         </div>
                                         <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-1">
@@ -1561,7 +1687,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                 {totalZones}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-gray-600">
-                                                โซน
+                                                {t('zones')}
                                             </div>
                                         </div>
                                         <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-1">
@@ -1569,7 +1695,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                 {totalPlantingPoints.toLocaleString()}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-gray-600">
-                                                จุดปลูก
+                                                {t('Planting Points')}
                                             </div>
                                         </div>
                                         <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-1">
@@ -1589,48 +1715,48 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                 {totalEstimatedYield.toLocaleString()}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-gray-600">
-                                                กก.
+                                                {t('kg')}
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Infrastructure Summary - keeping existing code */}
+                                {/* Infrastructure Summary - keeping existing code with translation */}
                                 <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
                                     <h2 className="mb-3 text-lg font-bold text-purple-400 print:text-base print:text-black">
-                                        🔧 Infrastructure Summary
+                                        🔧 {t('Infrastructure Summary')}
                                     </h2>
                                     <div className="mb-3">
                                         <h3 className="mb-2 text-sm font-semibold text-blue-400 print:text-xs print:text-black">
-                                            📏 Pipe System (วาดเสร็จแล้วเท่านั้น)
+                                            📏 {t('Pipe System (finished drawing only)')}
                                         </h3>
                                         <div className="space-y-2">
                                             <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
                                                 <div className="mb-1 flex items-center justify-between">
                                                     <span className="text-xs font-medium text-blue-300 print:text-black">
-                                                        Main Pipes
+                                                        {t('Main Pipes')}
                                                     </span>
                                                     <span className="text-xs font-bold text-blue-400 print:text-black">
-                                                        {mainPipeStats.count} ท่อ
+                                                        {mainPipeStats.count} {t('pipes')}
                                                     </span>
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-1 text-xs">
                                                     <div>
                                                         <span className="text-gray-400 print:text-gray-600">
-                                                            ยาวสุด:{' '}
+                                                            {t('Longest:')}{' '}
                                                         </span>
                                                         <span className="font-medium text-blue-300 print:text-black">
                                                             {mainPipeStats.longestLength.toLocaleString()}{' '}
-                                                            ม.
+                                                            {t('m.')}
                                                         </span>
                                                     </div>
                                                     <div>
                                                         <span className="text-gray-400 print:text-gray-600">
-                                                            รวม:{' '}
+                                                            {t('Total:')}{' '}
                                                         </span>
                                                         <span className="font-medium text-blue-300 print:text-black">
                                                             {mainPipeStats.totalLength.toLocaleString()}{' '}
-                                                            ม.
+                                                            {t('m.')}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -1639,29 +1765,29 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                             <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
                                                 <div className="mb-1 flex items-center justify-between">
                                                     <span className="text-xs font-medium text-green-300 print:text-black">
-                                                        Submain Pipes
+                                                        {t('Submain Pipes')}
                                                     </span>
                                                     <span className="text-xs font-bold text-green-400 print:text-black">
-                                                        {submainPipeStats.count} ท่อ
+                                                        {submainPipeStats.count} {t('pipes')}
                                                     </span>
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-1 text-xs">
                                                     <div>
                                                         <span className="text-gray-400 print:text-gray-600">
-                                                            ยาวสุด:{' '}
+                                                            {t('Longest:')}{' '}
                                                         </span>
                                                         <span className="font-medium text-green-300 print:text-black">
                                                             {submainPipeStats.longestLength.toLocaleString()}{' '}
-                                                            ม.
+                                                            {t('m.')}
                                                         </span>
                                                     </div>
                                                     <div>
                                                         <span className="text-gray-400 print:text-gray-600">
-                                                            รวม:{' '}
+                                                            {t('Total:')}{' '}
                                                         </span>
                                                         <span className="font-medium text-green-300 print:text-black">
                                                             {submainPipeStats.totalLength.toLocaleString()}{' '}
-                                                            ม.
+                                                            {t('m.')}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -1670,29 +1796,29 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                             <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
                                                 <div className="mb-1 flex items-center justify-between">
                                                     <span className="text-xs font-medium text-purple-300 print:text-black">
-                                                        Lateral Pipes
+                                                        {t('Lateral Pipes')}
                                                     </span>
                                                     <span className="text-xs font-bold text-purple-400 print:text-black">
-                                                        {lateralPipeStats.count} ท่อ
+                                                        {lateralPipeStats.count} {t('pipes')}
                                                     </span>
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-1 text-xs">
                                                     <div>
                                                         <span className="text-gray-400 print:text-gray-600">
-                                                            ยาวสุด:{' '}
+                                                            {t('Longest:')}{' '}
                                                         </span>
                                                         <span className="font-medium text-purple-300 print:text-black">
                                                             {lateralPipeStats.longestLength.toLocaleString()}{' '}
-                                                            ม.
+                                                            {t('m.')}
                                                         </span>
                                                     </div>
                                                     <div>
                                                         <span className="text-gray-400 print:text-gray-600">
-                                                            รวม:{' '}
+                                                            {t('Total:')}{' '}
                                                         </span>
                                                         <span className="font-medium text-purple-300 print:text-black">
                                                             {lateralPipeStats.totalLength.toLocaleString()}{' '}
-                                                            ม.
+                                                            {t('m.')}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -1701,7 +1827,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                             <div className="rounded bg-blue-900/30 p-2 print:border print:bg-blue-50">
                                                 <div className="text-center">
                                                     <span className="text-xs font-medium text-blue-300 print:text-blue-800">
-                                                        ความยาวท่อที่ยาวสุดรวม:{' '}
+                                                        {t('Total longest pipe combined length:')}{' '}
                                                     </span>
                                                     <span className="text-sm font-bold text-blue-100 print:text-blue-900">
                                                         {(
@@ -1709,12 +1835,12 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                             submainPipeStats.longestLength +
                                                             lateralPipeStats.longestLength
                                                         ).toLocaleString()}{' '}
-                                                        ม.
+                                                        {t('m.')}
                                                     </span>
                                                 </div>
                                                 <div className="mt-1 text-center">
                                                     <span className="text-xs font-medium text-blue-300 print:text-blue-800">
-                                                        ความยาวท่อรวมทั้งหมด:{' '}
+                                                        {t('Total all pipe length:')}{' '}
                                                     </span>
                                                     <span className="text-sm font-bold text-blue-100 print:text-blue-900">
                                                         {(
@@ -1722,7 +1848,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                             submainPipeStats.totalLength +
                                                             lateralPipeStats.totalLength
                                                         ).toLocaleString()}{' '}
-                                                        ม.
+                                                        {t('m.')}
                                                     </span>
                                                 </div>
                                             </div>
@@ -1730,34 +1856,34 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                     </div>
                                     <div className="mb-3">
                                         <h3 className="mb-2 text-sm font-semibold text-orange-400 print:text-xs print:text-black">
-                                            ⚙️ Equipment
+                                            ⚙️ {t('Equipment')}
                                         </h3>
                                         <div className="grid grid-cols-3 gap-1">
                                             <div className="rounded bg-gray-700 p-1 text-center print:border">
                                                 <div className="text-sm font-bold text-orange-400">
                                                     {pumpCount}
                                                 </div>
-                                                <div className="text-xs text-gray-400">Pumps</div>
+                                                <div className="text-xs text-gray-400">{t('Pumps')}</div>
                                             </div>
                                             <div className="rounded bg-gray-700 p-1 text-center print:border">
                                                 <div className="text-sm font-bold text-red-400">
                                                     {valveCount}
                                                 </div>
-                                                <div className="text-xs text-gray-400">Valves</div>
+                                                <div className="text-xs text-gray-400">{t('Valves')}</div>
                                             </div>
                                             <div className="rounded bg-gray-700 p-1 text-center print:border">
                                                 <div className="text-sm font-bold text-yellow-400">
                                                     {solenoidCount}
                                                 </div>
                                                 <div className="text-xs text-gray-400">
-                                                    Solenoids
+                                                    {t('Solenoids')}
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                     <div>
                                         <h3 className="mb-2 text-sm font-semibold text-cyan-400 print:text-xs print:text-black">
-                                            💧 Irrigation System
+                                            💧 {t('Irrigation System')}
                                         </h3>
                                         <div className="grid grid-cols-2 gap-1">
                                             <div className="rounded bg-gray-700 p-1 text-center print:border">
@@ -1765,7 +1891,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                     {sprinklerPoints}
                                                 </div>
                                                 <div className="text-xs text-gray-400">
-                                                    Sprinklers
+                                                    {t('Sprinklers')}
                                                 </div>
                                             </div>
                                             <div className="rounded bg-gray-700 p-1 text-center print:border">
@@ -1773,7 +1899,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                     {miniSprinklerPoints}
                                                 </div>
                                                 <div className="text-xs text-gray-400">
-                                                    Mini Sprinklers
+                                                    {t('Mini Sprinklers')}
                                                 </div>
                                             </div>
                                             <div className="rounded bg-gray-700 p-1 text-center print:border">
@@ -1781,7 +1907,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                     {microSprayPoints}
                                                 </div>
                                                 <div className="text-xs text-gray-400">
-                                                    Micro Sprays
+                                                    {t('Micro Sprays')}
                                                 </div>
                                             </div>
                                             <div className="rounded bg-gray-700 p-1 text-center print:border">
@@ -1789,7 +1915,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                     {dripPoints + dripLines}
                                                 </div>
                                                 <div className="text-xs text-gray-400">
-                                                    Drip Points
+                                                    {t('Drip Points')}
                                                 </div>
                                             </div>
                                         </div>
@@ -1810,27 +1936,27 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                     </div>
                                 </div>
 
-                                {/* Financial & Water Summary - keeping existing code */}
+                                {/* Financial & Water Summary - keeping existing code with translation */}
                                 <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
                                     <h2 className="mb-3 text-lg font-bold text-green-400 print:text-base print:text-black">
-                                        💰 Financial & Water Summary
+                                        💰 {t('Financial & Water Summary')}
                                     </h2>
                                     <div className="space-y-3 print:space-y-2">
                                         <div className="space-y-2">
                                             <div className="rounded-lg bg-gray-700 p-2 print:border print:bg-gray-50">
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-sm text-gray-400 print:text-gray-700">
-                                                        Total Estimated Yield
+                                                        {t('Total Estimated Yield')}
                                                     </span>
                                                     <span className="text-sm font-bold text-yellow-400 print:text-black">
-                                                        {totalEstimatedYield.toLocaleString()} กก.
+                                                        {totalEstimatedYield.toLocaleString()} {t('kg')}
                                                     </span>
                                                 </div>
                                             </div>
                                             <div className="rounded-lg bg-gray-700 p-2 print:border print:bg-gray-50">
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-sm text-gray-400 print:text-gray-700">
-                                                        Total Estimated Income
+                                                        {t('Total Estimated Income')}
                                                     </span>
                                                     <span className="text-sm font-bold text-green-400 print:text-black">
                                                         ฿{totalEstimatedIncome.toLocaleString()}
@@ -1841,20 +1967,19 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
 
                                         <div className="rounded-lg bg-cyan-900/30 p-3 print:border-2 print:border-cyan-200 print:bg-cyan-50">
                                             <h3 className="mb-2 text-sm font-semibold text-cyan-300 print:text-cyan-800">
-                                                💧 Total Water Requirements (ลิตรต่อครั้ง - from
-                                                cropData)
+                                                💧 {t('Total Water Requirements (liters per irrigation - from cropData)')}
                                             </h3>
                                             <div className="grid grid-cols-2 gap-3">
                                                 <div className="space-y-1">
                                                     <div className="text-xs text-cyan-200 print:text-cyan-700">
-                                                        Total Farm Area: {areaInRai.toFixed(2)} ไร่
+                                                        {t('Total Farm Area:')} {areaInRai.toFixed(2)} {t('Rai')}
                                                     </div>
                                                     <div className="text-xs text-cyan-200 print:text-cyan-700">
-                                                        Total Plants:{' '}
-                                                        {totalPlantingPoints.toLocaleString()} ต้น
+                                                        {t('Total Plants:')}{' '}
+                                                        {totalPlantingPoints.toLocaleString()} {t('trees')}
                                                     </div>
                                                     <div className="text-xs text-cyan-200 print:text-cyan-700">
-                                                        Active Zones:{' '}
+                                                        {t('Active Zones:')}{' '}
                                                         {
                                                             Object.keys(
                                                                 calculatedZoneSummaries
@@ -1864,18 +1989,18 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                                         .cropValue
                                                             ).length
                                                         }{' '}
-                                                        zones
+                                                        {t('zones')}
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
                                                     <div className="mb-1 text-xs text-cyan-200 print:text-cyan-700">
-                                                        Water Need per Irrigation:
+                                                        {t('Water Need per Irrigation:')}
                                                     </div>
                                                     <div className="text-xl font-bold text-cyan-100 print:text-cyan-800">
                                                         {totalWaterRequirementPerIrrigation.toLocaleString()}
                                                     </div>
                                                     <div className="text-xs text-cyan-200 print:text-cyan-700">
-                                                        ลิตร/ครั้ง
+                                                        {t('Liters/irrigation')}
                                                     </div>
                                                     <div className="mt-1 text-xs text-cyan-200 print:text-cyan-700">
                                                         (
@@ -1883,14 +2008,14 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                             totalWaterRequirementPerIrrigation /
                                                             1000
                                                         ).toFixed(1)}{' '}
-                                                        ลบ.ม./ครั้ง)
+                                                        {t('m³/irrigation')})
                                                     </div>
                                                 </div>
                                             </div>
 
                                             <div className="mt-3 border-t border-cyan-700 pt-2 print:border-cyan-300">
                                                 <div className="mb-2 text-xs font-medium text-cyan-200 print:text-cyan-700">
-                                                    Water Requirements by Zone (per irrigation):
+                                                    {t('Water Requirements by Zone (per irrigation):')}
                                                 </div>
                                                 <div className="max-h-24 space-y-1 overflow-y-auto">
                                                     {Object.values(calculatedZoneSummaries)
@@ -1902,11 +2027,11 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                             >
                                                                 <span className="text-cyan-200 print:text-cyan-700">
                                                                     {summary.zoneName} (
-                                                                    {summary.zoneAreaRai} ไร่)
+                                                                    {summary.zoneAreaRai} {t('Rai')})
                                                                 </span>
                                                                 <span className="font-medium text-cyan-100 print:text-cyan-800">
                                                                     {summary.waterRequirementPerIrrigation.toLocaleString()}{' '}
-                                                                    ล./ครั้ง
+                                                                    {t('Liters/irrigation')}
                                                                 </span>
                                                             </div>
                                                         ))}
@@ -1917,7 +2042,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                 <div className="grid grid-cols-2 gap-2 text-xs">
                                                     <div className="rounded bg-cyan-800/50 p-2 text-center print:bg-cyan-100">
                                                         <div className="text-cyan-200 print:text-cyan-700">
-                                                            Monthly
+                                                            {t('Monthly')}
                                                         </div>
                                                         <div className="font-bold text-cyan-100 print:text-cyan-800">
                                                             {(
@@ -1927,12 +2052,12 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                             ).toFixed(1)}
                                                         </div>
                                                         <div className="text-cyan-200 print:text-cyan-700">
-                                                            ลบ.ม./เดือน
+                                                            {t('m³/month')}
                                                         </div>
                                                     </div>
                                                     <div className="rounded bg-cyan-800/50 p-2 text-center print:bg-cyan-100">
                                                         <div className="text-cyan-200 print:text-cyan-700">
-                                                            Yearly
+                                                            {t('Yearly')}
                                                         </div>
                                                         <div className="font-bold text-cyan-100 print:text-cyan-800">
                                                             {(
@@ -1942,7 +2067,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                             ).toFixed(0)}
                                                         </div>
                                                         <div className="text-cyan-200 print:text-cyan-700">
-                                                            ลบ.ม./ปี
+                                                            {t('m³/year')}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1954,30 +2079,30 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                 {/* Action Buttons */}
                                 <div className="rounded-lg bg-gray-800 p-4 print:hidden">
                                     <h2 className="mb-3 text-lg font-bold text-purple-400">
-                                        📋 Actions
+                                        📋 {t('Actions')}
                                     </h2>
                                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                                         <Link
                                             href="/field-map?edit=true&step=4"
                                             className="rounded-lg bg-blue-600 px-4 py-2 text-center font-semibold text-white hover:bg-blue-700"
                                         >
-                                            🔄 Edit Project
+                                            🔄 {t('Edit Project')}
                                         </Link>
                                         <button
                                             onClick={() => window.print()}
                                             className="rounded-lg bg-green-600 px-4 py-2 font-semibold text-white hover:bg-green-700"
                                         >
-                                            🖨️ Print Summary
+                                            🖨️ {t('Print Summary')}
                                         </button>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Right Column: Zone Details - keeping existing code structure */}
+                            {/* Right Column: Zone Details - keeping existing code structure with translation */}
                             <div className="space-y-4 print:contents">
                                 <div className="print:print-other-content rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
                                     <h2 className="mb-3 text-lg font-bold text-blue-400 print:text-base print:text-black">
-                                        🎯 Zone Details & Irrigation Systems (ลิตรต่อครั้ง)
+                                        🎯 {t('Zone Details & Irrigation Systems (liters per irrigation)')}
                                     </h2>
                                     <div className="space-y-3 print:space-y-2">
                                         {actualZones.map((zone) => {
@@ -2025,10 +2150,10 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                             <div className="grid grid-cols-4 gap-2 text-xs">
                                                                 <div className="rounded bg-gray-600 p-2 text-center print:bg-gray-100">
                                                                     <div className="text-gray-400 print:text-gray-600">
-                                                                        Area
+                                                                        {t('Area')}
                                                                     </div>
                                                                     <div className="font-semibold text-blue-400 print:text-black">
-                                                                        {summary.zoneAreaRai} ไร่
+                                                                        {summary.zoneAreaRai} {t('Rai')}
                                                                     </div>
                                                                     <div className="text-xs text-gray-400 print:text-gray-600">
                                                                         {summary.zoneArea} ตร.ม.
@@ -2036,13 +2161,13 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                                 </div>
                                                                 <div className="rounded bg-gray-600 p-2 text-center print:bg-gray-100">
                                                                     <div className="text-gray-400 print:text-gray-600">
-                                                                        Plants
+                                                                        {t('Plants')}
                                                                     </div>
                                                                     <div className="font-semibold text-green-400 print:text-black">
                                                                         {summary.totalPlantingPoints.toLocaleString()}
                                                                     </div>
                                                                     <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                        ต้น
+                                                                        {t('trees')}
                                                                     </div>
                                                                 </div>
                                                                 <div className="rounded bg-gray-600 p-2 text-center print:bg-gray-100">
@@ -2117,46 +2242,44 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
 
                                                             <div className="rounded-lg bg-cyan-900/30 p-3 print:border print:bg-cyan-50">
                                                                 <h4 className="mb-2 text-sm font-semibold text-cyan-300 print:text-cyan-800">
-                                                                    💧 Water Requirements
-                                                                    (ลิตรต่อครั้ง - from cropData)
+                                                                    💧 {t('Water Requirements (liters per irrigation - from cropData)')}
                                                                 </h4>
                                                                 <div className="grid grid-cols-2 gap-3 text-xs">
                                                                     <div>
                                                                         <div className="mb-1 text-cyan-200 print:text-cyan-700">
-                                                                            Zone Area:{' '}
+                                                                            {t('Zone Area:')}{' '}
                                                                             {summary.zoneAreaRai}{' '}
-                                                                            ไร่
+                                                                            {t('Rai')}
                                                                         </div>
                                                                         <div className="mb-1 text-cyan-200 print:text-cyan-700">
-                                                                            Plants:{' '}
+                                                                            {t('Plants:')}{' '}
                                                                             {summary.totalPlantingPoints.toLocaleString()}{' '}
-                                                                            ต้น
+                                                                            {t('trees')}
                                                                         </div>
                                                                         <div className="mb-1 text-cyan-200 print:text-cyan-700">
-                                                                            Rate:{' '}
+                                                                            {t('Rate:')}{' '}
                                                                             {summary.cropWaterPerPlantPerIrrigation.toFixed(
                                                                                 1
                                                                             )}{' '}
-                                                                            ลิตร/ต้น/ครั้ง
+                                                                            {t('liters/plant/irrigation')}
                                                                         </div>
                                                                         <div className="text-cyan-200 print:text-cyan-700">
-                                                                            (จาก cropData:{' '}
+                                                                            ({t('from cropData:')}{' '}
                                                                             {
                                                                                 summary.cropWaterPerPlant
                                                                             }{' '}
-                                                                            ลิตร/ต้น/ครั้ง)
+                                                                            {t('liters/plant/irrigation')})
                                                                         </div>
                                                                     </div>
                                                                     <div className="text-right">
                                                                         <div className="mb-1 text-xs text-cyan-200 print:text-cyan-700">
-                                                                            Water Need per
-                                                                            Irrigation:
+                                                                            {t('Water Need per Irrigation:')}
                                                                         </div>
                                                                         <div className="text-lg font-bold text-cyan-100 print:text-cyan-800">
                                                                             {summary.waterRequirementPerIrrigation.toLocaleString()}
                                                                         </div>
                                                                         <div className="text-xs text-cyan-200 print:text-cyan-700">
-                                                                            ลิตร/ครั้ง
+                                                                            {t('Liters/irrigation')}
                                                                         </div>
                                                                         <div className="mt-1 text-xs text-cyan-200 print:text-cyan-700">
                                                                             (
@@ -2164,36 +2287,35 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                                                 summary.waterRequirementPerIrrigation /
                                                                                 1000
                                                                             ).toFixed(1)}{' '}
-                                                                            ลบ.ม./ครั้ง)
+                                                                            {t('m³/irrigation')})
                                                                         </div>
                                                                     </div>
                                                                 </div>
                                                                 <div className="mt-2 rounded bg-cyan-800/30 p-2 text-xs text-cyan-200 print:bg-cyan-100 print:text-cyan-700">
-                                                                    <strong>การคำนวณ:</strong>{' '}
+                                                                    <strong>{t('Calculation:')}</strong>{' '}
                                                                     {summary.totalPlantingPoints.toLocaleString()}{' '}
-                                                                    ต้น ×{' '}
+                                                                    {t('trees')} ×{' '}
                                                                     {summary.cropWaterPerPlantPerIrrigation.toFixed(
                                                                         1
                                                                     )}{' '}
-                                                                    ลิตร/ต้น/ครั้ง ={' '}
+                                                                    {t('liters/plant/irrigation')} ={' '}
                                                                     {summary.waterRequirementPerIrrigation.toLocaleString()}{' '}
-                                                                    ลิตร/ครั้ง
+                                                                    {t('Liters/irrigation')}
                                                                 </div>
                                                             </div>
 
                                                             <div className="rounded-lg bg-blue-900/30 p-3 print:border print:bg-blue-50">
                                                                 <h4 className="mb-2 text-sm font-semibold text-blue-300 print:text-blue-800">
-                                                                    🔧 Irrigation System & Pipe
-                                                                    Network
+                                                                    🔧 {t('Irrigation System & Pipe Network')}
                                                                 </h4>
 
                                                                 <div className="mb-3">
                                                                     <div className="mb-1 text-xs font-medium text-blue-200 print:text-blue-700">
-                                                                        Irrigation Type:
+                                                                        {t('Irrigation Type:')}
                                                                     </div>
                                                                     <div className="text-sm font-semibold text-blue-100 print:text-blue-900">
                                                                         {irrigationType ||
-                                                                            'ไม่ได้กำหนด'}
+                                                                            t('Not defined')}
                                                                     </div>
                                                                 </div>
 
@@ -2241,36 +2363,35 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
 
                                                                 <div className="space-y-3">
                                                                     <div className="border-b border-blue-700 pb-1 text-xs font-medium text-blue-200 print:border-blue-300 print:text-blue-700">
-                                                                        Pipe System Details in Zone:
+                                                                        {t('Pipe System Details in Zone:')}
                                                                     </div>
 
                                                                     <div className="rounded border border-cyan-600 bg-cyan-800/40 p-3 print:border-cyan-300 print:bg-cyan-100">
                                                                         <div className="mb-3 text-center">
                                                                             <div className="text-sm font-bold text-cyan-200 print:text-cyan-800">
-                                                                                📊 Zone Pipe Summary
+                                                                                📊 {t('Zone Pipe Summary')}
                                                                             </div>
                                                                         </div>
 
                                                                         <div className="mb-3">
                                                                             <div className="mb-2 grid grid-cols-4 gap-1 text-xs">
                                                                                 <div className="font-medium text-cyan-200 print:text-cyan-700">
-                                                                                    ประเภทท่อ
+                                                                                    {t('Pipe type')}
                                                                                 </div>
                                                                                 <div className="text-center font-medium text-cyan-200 print:text-cyan-700">
-                                                                                    จำนวน
+                                                                                    {t('Count')}
                                                                                 </div>
                                                                                 <div className="text-center font-medium text-cyan-200 print:text-cyan-700">
-                                                                                    ยาวสุด(ม.)
+                                                                                    {t('Longest (m)')}
                                                                                 </div>
                                                                                 <div className="text-center font-medium text-cyan-200 print:text-cyan-700">
-                                                                                    รวม(ม.)
+                                                                                    {t('Total (m)')}
                                                                                 </div>
                                                                             </div>
                                                                             <div className="space-y-1">
                                                                                 <div className="grid grid-cols-4 gap-1 rounded bg-blue-700/20 p-1 text-xs print:bg-blue-50">
                                                                                     <div className="text-blue-200 print:text-blue-800">
-                                                                                        🔵 Main
-                                                                                        Pipes
+                                                                                        🔵 {t('Main Pipes')}
                                                                                     </div>
                                                                                     <div className="text-center font-semibold text-blue-100 print:text-blue-900">
                                                                                         {
@@ -2288,8 +2409,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                                                 </div>
                                                                                 <div className="grid grid-cols-4 gap-1 rounded bg-green-700/20 p-1 text-xs print:bg-green-50">
                                                                                     <div className="text-green-200 print:text-green-800">
-                                                                                        🟢 Submain
-                                                                                        Pipes
+                                                                                        🟢 {t('Submain Pipes')}
                                                                                     </div>
                                                                                     <div className="text-center font-semibold text-green-100 print:text-green-900">
                                                                                         {
@@ -2307,8 +2427,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                                                 </div>
                                                                                 <div className="grid grid-cols-4 gap-1 rounded bg-purple-700/20 p-1 text-xs print:bg-purple-50">
                                                                                     <div className="text-purple-200 print:text-purple-800">
-                                                                                        🟣 Lateral
-                                                                                        Pipes
+                                                                                        🟣 {t('Lateral Pipes')}
                                                                                     </div>
                                                                                     <div className="text-center font-semibold text-purple-100 print:text-purple-900">
                                                                                         {
@@ -2330,11 +2449,11 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                                         <div className="grid grid-cols-2 gap-2 border-t border-cyan-600 pt-2 text-xs print:border-cyan-300">
                                                                             <div className="rounded bg-cyan-700/30 p-2 text-center print:bg-cyan-50">
                                                                                 <div className="mb-1 text-xs text-cyan-200 print:text-cyan-700">
-                                                                                    ความยาวท่อที่ยาวสุดรวม
+                                                                                    {t('Total longest pipe combined:')}
                                                                                 </div>
                                                                                 <div className="text-sm font-bold text-cyan-100 print:text-cyan-900">
                                                                                     {zonePipeStats.totalLongestLength.toLocaleString()}{' '}
-                                                                                    ม.
+                                                                                    {t('m.')}
                                                                                 </div>
                                                                                 <div className="mt-1 text-xs text-cyan-300 print:text-cyan-600">
                                                                                     (
@@ -2360,11 +2479,11 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                                             </div>
                                                                             <div className="rounded bg-cyan-700/30 p-2 text-center print:bg-cyan-50">
                                                                                 <div className="mb-1 text-xs text-cyan-200 print:text-cyan-700">
-                                                                                    ความยาวท่อรวมทั้งหมด
+                                                                                    {t('Total all pipe combined:')}
                                                                                 </div>
                                                                                 <div className="text-sm font-bold text-cyan-100 print:text-cyan-900">
                                                                                     {zonePipeStats.totalLength.toLocaleString()}{' '}
-                                                                                    ม.
+                                                                                    {t('m.')}
                                                                                 </div>
                                                                                 <div className="mt-1 text-xs text-cyan-300 print:text-cyan-600">
                                                                                     (
@@ -2392,12 +2511,12 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
 
                                                                         <div className="mt-2 border-t border-cyan-600 pt-2 text-center print:border-cyan-300">
                                                                             <div className="text-xs text-cyan-200 print:text-cyan-700">
-                                                                                Total Pipes in Zone:{' '}
+                                                                                {t('Total Pipes in Zone:')}{' '}
                                                                                 <span className="font-bold text-cyan-100 print:text-cyan-900">
                                                                                     {
                                                                                         zonePipeStats.total
                                                                                     }{' '}
-                                                                                    ท่อ
+                                                                                    {t('pipes')}
                                                                                 </span>
                                                                             </div>
                                                                         </div>

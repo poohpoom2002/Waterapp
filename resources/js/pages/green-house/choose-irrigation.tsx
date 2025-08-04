@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Navbar from '../../components/Navbar';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 // --- Definition of irrigation system options ---
 interface IrrigationOption {
@@ -11,35 +12,37 @@ interface IrrigationOption {
     developmentMessage?: string;
 }
 
-const irrigationOptions: IrrigationOption[] = [
-    {
-        id: 'mini-sprinkler',
-        name: 'Mini Sprinkler',
-        icon: '💧',
-        description: 'Provides water in narrow circles, suitable for vegetable plots or shrubs',
-    },
-    {
-        id: 'drip',
-        name: 'Drip Irrigation',
-        icon: '💧🌱',
-        description: 'Maximum water savings by delivering water directly to plant roots',
-    },
-    {
-        id: 'mixed',
-        name: 'Mixed System',
-        icon: '🔄',
-        description: 'Combines different systems to suit various types of plants',
-        disabled: true,
-        developmentMessage: 'Under Development',
-    },
-];
-
 // --- React Component ---
 export default function ChooseIrrigationMethod() {
+    const { t } = useLanguage();
     const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
     const [crops, setCrops] = useState<string>('');
     const [shapes, setShapes] = useState<string>('');
     const [method, setMethod] = useState<string>('');
+
+    // Define irrigation options with translation
+    const irrigationOptions: IrrigationOption[] = [
+        {
+            id: 'mini-sprinkler',
+            name: t('มินิสปริงเกลอร์'),
+            icon: '💧',
+            description: t('ให้น้ำเป็นวงแคบลงมา เหมาะสำหรับแปลงผักหรือไม้พุ่ม'),
+        },
+        {
+            id: 'drip',
+            name: t('น้ำหยด'),
+            icon: '💧🌱',
+            description: t('ประหยัดน้ำสูงสุด โดยให้น้ำโดยตรงที่โคนต้นพืช'),
+        },
+        {
+            id: 'mixed',
+            name: t('แบบผสม'),
+            icon: '🔄',
+            description: t('ผสมผสานระบบต่างๆ เพื่อให้เหมาะกับพืชหลากหลายชนิด'),
+            disabled: true,
+            developmentMessage: t('กำลังพัฒนา'),
+        },
+    ];
 
     // Parse URL parameters
     useEffect(() => {
@@ -85,7 +88,7 @@ export default function ChooseIrrigationMethod() {
     // Function to proceed to next step
     const handleProceed = () => {
         if (!selectedMethod) {
-            alert('Please select the desired irrigation system');
+            alert(t('กรุณาเลือกระบบน้ำที่ต้องการ'));
             return;
         }
 
@@ -125,22 +128,22 @@ export default function ChooseIrrigationMethod() {
                     <div className="w-full max-w-4xl">
                         {/* Header */}
                         <div className="mb-10 text-center">
-                            <h1 className="text-3xl font-bold text-white">Choose Irrigation System</h1>
+                            <h1 className="text-3xl font-bold text-white">{t('เลือกระบบการให้น้ำ')}</h1>
                             <p className="text-md mt-2 text-gray-400">
-                                Please select the irrigation method that suits your needs
+                                {t('โปรดเลือกวิธีการให้น้ำที่เหมาะสมกับความต้องการของคุณ')}
                             </p>
 
                             {/* Progress indicator */}
                             <div className="mt-4 flex items-center justify-center space-x-2 text-sm text-gray-400">
-                                <span className="text-green-400">✓ Select Crops</span>
+                                <span className="text-green-400">✓ {t('เลือกพืช')}</span>
                                 <span>→</span>
-                                <span className="text-green-400">✓ Planning Method</span>
+                                <span className="text-green-400">✓ {t('เลือกวิธีการวางแผน')}</span>
                                 <span>→</span>
-                                <span className="text-green-400">✓ Design Area</span>
+                                <span className="text-green-400">✓ {t('ออกแบบพื้นที่')}</span>
                                 <span>→</span>
-                                <span className="font-medium text-blue-400">Select Water System</span>
+                                <span className="font-medium text-blue-400">{t('เลือกระบบน้ำ')}</span>
                                 <span>→</span>
-                                <span>Design Water System</span>
+                                <span>{t('ออกแบบระบบน้ำ')}</span>
                             </div>
                         </div>
 
@@ -148,11 +151,11 @@ export default function ChooseIrrigationMethod() {
                         {(crops || shapes) && (
                             <div className="mb-8 rounded-lg border border-gray-700 bg-gray-800 p-4">
                                 <h3 className="mb-2 text-lg font-medium text-green-400">
-                                    Selected Data
+                                    {t('ข้อมูลที่เลือกไว้')}
                                 </h3>
                                 {crops && (
                                     <div className="mb-2">
-                                        <span className="text-sm text-gray-400">Selected Crops: </span>
+                                        <span className="text-sm text-gray-400">{t('พืชที่เลือก')}: </span>
                                         <div className="mt-1 flex flex-wrap gap-1">
                                             {crops.split(',').map((crop, index) => (
                                                 <span
@@ -167,19 +170,20 @@ export default function ChooseIrrigationMethod() {
                                 )}
                                 {shapes && (
                                     <div className="text-sm text-gray-400">
-                                        ✓ Has greenhouse design drawn (
-                                        {(() => {
+                                        ✓ {(() => {
                                             try {
-                                                return JSON.parse(decodeURIComponent(shapes)).length;
+                                                const count = JSON.parse(decodeURIComponent(shapes)).length;
+                                                return t('มีแบบโรงเรือนที่วาดไว้แล้ว ({count} องค์ประกอบ)').replace('{count}', count.toString());
                                             } catch {
-                                                return 'Data Error';
+                                                return t('ข้อมูลผิดพลาด');
                                             }
-                                        })()}{' '}
-                                        elements)
+                                        })()}
                                     </div>
                                 )}
                                 {method && (
-                                    <div className="text-sm text-gray-400">Planning Method: {method}</div>
+                                    <div className="text-sm text-gray-400">
+                                        {t('วิธีการวางแผน')}: {method}
+                                    </div>
                                 )}
                             </div>
                         )}
@@ -234,7 +238,7 @@ export default function ChooseIrrigationMethod() {
                                     </span>
                                     <div>
                                         <h4 className="font-medium text-blue-300">
-                                            Selected:{' '}
+                                            {t('เลือก')}:{' '}
                                             {
                                                 irrigationOptions.find((opt) => opt.id === selectedMethod)
                                                     ?.name
@@ -270,7 +274,7 @@ export default function ChooseIrrigationMethod() {
                                         d="M10 19l-7-7m0 0l7-7m-7 7h18"
                                     />
                                 </svg>
-                                Back to Area Design
+                                {t('กลับไปออกแบบพื้นที่')}
                             </button>
 
                             <button
@@ -282,7 +286,7 @@ export default function ChooseIrrigationMethod() {
                                         : 'bg-green-600 hover:bg-green-700'
                                 }`}
                             >
-                                Go to Water System Design
+                                {t('ไปออกแบบระบบน้ำ')}
                                 <svg
                                     className="ml-2 h-5 w-5"
                                     fill="none"
