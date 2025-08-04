@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// resources\js\pages\components\InputForm.tsx - Enhanced with Field-Crop and Greenhouse Support
 import React, { useEffect, useState } from 'react';
 import { IrrigationInput, ProjectMode } from '../types/interfaces';
 import { formatNumber } from '../utils/calculations';
@@ -37,12 +36,10 @@ interface SprinklerPressureInfo {
     sprinklerName: string;
 }
 
-// Add type guard for PlantData with category
 interface PlantDataWithCategory extends PlantData {
     category?: string;
 }
 
-// Type guard function
 const hasCategory = (plantData: PlantData): plantData is PlantDataWithCategory => {
     return 'category' in plantData;
 };
@@ -52,13 +49,13 @@ const InputForm: React.FC<InputFormProps> = ({
     onInputChange,
     selectedSprinkler,
     activeZone,
-    projectMode = 'horticulture',
+    projectMode = 'horticulture' as ProjectMode,
 }) => {
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [validationMessages, setValidationMessages] = useState<string[]>([]);
     const [pipeData, setPipeData] = useState<any[]>([]);
     const { t } = useLanguage();
-    
+
     useEffect(() => {
         const fetchPipeData = async () => {
             try {
@@ -160,40 +157,58 @@ const InputForm: React.FC<InputFormProps> = ({
         });
     };
 
-    useEffect(() => {
-        const messages: string[] = [];
-
-        if (input.totalTrees < 1) {
-            const itemName = projectMode === 'garden' ? t('จำนวนหัวฉีด') : 
-                           projectMode === 'field-crop' ? t('จำนวนต้นไม้') :
-                           projectMode === 'greenhouse' ? t('จำนวนต้นไม้') : t('จำนวนต้นไม้');
-            messages.push(`${itemName}${t('ต้องมากกว่า 0')}`);
+    const updateInputOnBlur = (field: keyof IrrigationInput, value: string) => {
+        const numValue = parseFloat(value);
+        if (isNaN(numValue) || value === '') {
+            let defaultValue = 0;
+            switch (field) {
+                case 'totalTrees':
+                    defaultValue = 1;
+                    break;
+                case 'waterPerTreeLiters':
+                    defaultValue = 0.1;
+                    break;
+                case 'numberOfZones':
+                    defaultValue = 1;
+                    break;
+                case 'irrigationTimeMinutes':
+                    defaultValue = 45;
+                    break;
+                case 'sprinklersPerTree':
+                    defaultValue = 1;
+                    break;
+                case 'sprinklersPerLongestBranch':
+                case 'sprinklersPerBranch':
+                    defaultValue = input.sprinklersPerBranch || 1;
+                    break;
+                case 'branchesPerLongestSecondary':
+                case 'branchesPerSecondary':
+                    defaultValue = input.branchesPerSecondary || 1;
+                    break;
+                default:
+                    defaultValue = 0;
+            }
+            updateInput(field, defaultValue);
+        } else {
+            updateInput(field, numValue);
         }
-
-        const estimatedVelocity = calculateEstimatedVelocity(input);
-        if (estimatedVelocity > 2.5) {
-            messages.push('⚠️ ' + t('ความเร็วน้ำอาจสูงเกินไป - ควรใช้ท่อขนาดใหญ่ขึ้น'));
-        } else if (estimatedVelocity < 0.6) {
-            messages.push('⚠️ ' + t('ความเร็วน้ำอาจต่ำเกินไป - อาจมีการตกตะกอน'));
-        }
-
-        if (input.longestBranchPipeM > 200 || input.longestSecondaryPipeM > 300) {
-            messages.push('⚠️ ' + t('ระยะท่อยาวมาก - อาจมี Head Loss สูง (>20%)'));
-        }
-
-        setValidationMessages(messages);
-    }, [input, projectMode, t]);
+    };
 
     const calculateEstimatedVelocity = (input: IrrigationInput): number => {
-        const estimatedFlow =
-            (input.totalTrees * input.waterPerTreeLiters) /
-            (input.irrigationTimeMinutes || 30) /
-            60;
-        const estimatedDiameter = Math.sqrt((4 * (estimatedFlow / 60000)) / (Math.PI * 1.5));
-        const recommendedSize = estimatedDiameter * 1000;
-
+        let estimatedFlow: number;
+        
+        if (projectMode === 'greenhouse' || projectMode === 'garden') {
+            estimatedFlow = (input.totalTrees * input.waterPerTreeLiters) / (input.irrigationTimeMinutes || 30) / 60;
+        } else if (projectMode === 'field-crop') {
+            estimatedFlow = (input.totalTrees * input.waterPerTreeLiters) / 60;
+        } else {
+            estimatedFlow = (input.totalTrees * input.waterPerTreeLiters) / (input.irrigationTimeMinutes || 30) / 60;
+        }
+        
+        const estimatedDiameter = Math.sqrt((4 * estimatedFlow) / (Math.PI * 1.5));
+        
         const pipeArea = Math.PI * Math.pow(0.032 / 2, 2);
-        return estimatedFlow / 60000 / pipeArea;
+        return estimatedFlow / pipeArea;
     };
 
     const getSprinklerPressureInfo = (): SprinklerPressureInfo | null => {
@@ -234,7 +249,11 @@ const InputForm: React.FC<InputFormProps> = ({
     };
 
     const calculateBranchPipeStats = (): BranchPipeStats | null => {
-        if (projectMode === 'garden' || projectMode === 'field-crop' || projectMode === 'greenhouse') {
+        if (
+            projectMode === 'garden' ||
+            projectMode === 'field-crop' ||
+            projectMode === 'greenhouse'
+        ) {
             return null;
         }
 
@@ -314,9 +333,9 @@ const InputForm: React.FC<InputFormProps> = ({
             case 'garden':
                 return t('หัวฉีด');
             case 'field-crop':
-                return t('ต้นไม้');
+                return t('หัวฉีด');
             case 'greenhouse':
-                return t('ต้นไม้');
+                return t('หัวฉีด');
             default:
                 return t('ต้นไม้');
         }
@@ -329,18 +348,17 @@ const InputForm: React.FC<InputFormProps> = ({
             case 'greenhouse':
                 return t('ตร.ม.');
             default:
-                return t('ไร่');
+                return t('ตร.ม.');
         }
     };
 
     const getAreaConversionFactor = () => {
         switch (projectMode) {
             case 'garden':
-                return 1600;
             case 'greenhouse':
-                return 1600;
-            default:
                 return 1;
+            default:
+                return 1600;
         }
     };
 
@@ -357,94 +375,74 @@ const InputForm: React.FC<InputFormProps> = ({
         }
     };
 
+    const getWaterPerItemLabel = () => {
+        switch (projectMode) {
+            case 'field-crop':
+                return t('น้ำต่อหัว (ลิตร/นาที)');
+            case 'greenhouse':
+                return t('น้ำต่อหัวฉีด (ลิตร/ครั้ง)');
+            case 'garden':
+                return t('น้ำต่อหัวฉีด (ลิตร/ครั้ง)');
+            default:
+                return t('น้ำต่อ') + getItemName() + t(' (ลิตร/ครั้ง)');
+        }
+    };
+
+    const getQuantityLabel = () => {
+        switch (projectMode) {
+            case 'greenhouse':
+                return t('จำนวนหัวฉีด');
+            case 'garden':
+                return t('จำนวนหัวฉีด');
+            case 'field-crop':
+                return t('จำนวนหัวฉีด');
+            default:
+                return t('จำนวนต้นไม้');
+        }
+    };
+
+    const shouldShowSprinklersPerTree = () => {
+        return (
+            projectMode !== 'field-crop' && projectMode !== 'greenhouse' && projectMode !== 'garden'
+        );
+    };
+
     return (
         <div className="mb-6 rounded-lg bg-gray-800 p-4">
-            {(activeZone || isMultiZone) && (
-                <div className="mb-4 space-y-2">
-                    {activeZone && (
-                        <div className="rounded bg-blue-900 p-3">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-lg font-semibold text-blue-300">
-                                    {getProjectIcon()} {activeZone.name}
-                                    {isMultiZone && (
-                                        <span className="ml-2 text-sm font-normal text-blue-200">
-                                            ({t('โซน')} {activeZone.id}/{input.numberOfZones})
-                                        </span>
-                                    )}
-                                </h3>
-                                {isMultiZone && (
-                                    <div className="text-sm text-purple-200">
-                                        <span>{t('รูปแบบ:')}</span>
-                                        <span className="font-medium">
-                                            {input.simultaneousZones === input.numberOfZones ? t('พร้อมกัน') : 
-                                             input.simultaneousZones === 1 ? t('ทีละโซน') : t('บางส่วน')}
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="mt-2 grid grid-cols-2 gap-4 text-sm text-gray-300 md:grid-cols-4">
-                                <div>
-                                    <p className="text-blue-200">{t('พื้นที่:')}</p>
-                                    <p className="font-medium text-white">
-                                        {projectMode === 'garden' || projectMode === 'greenhouse'
-                                            ? activeZone.area >= 1600 
-                                                ? `${(activeZone.area / 1600).toFixed(1)} ไร่`
-                                                : `${activeZone.area.toFixed(2)} ตร.ม.`
-                                            : activeZone.area >= 1600 
-                                                ? `${(activeZone.area / 1600).toFixed(1)} ไร่`
-                                                : `${activeZone.area.toFixed(2)} ตร.ม.`}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-blue-200">
-                                        {t('จำนวน')}{getItemName()}:
-                                    </p>
-                                    <p className="font-medium text-white">
-                                        {activeZone.plantCount} {getItemName()}
-                                    </p>
-                                </div>
-                                {((projectMode === 'horticulture' && activeZone.plantData) ||
-                                  (projectMode === 'field-crop' && activeZone.plantData) ||
-                                  (projectMode === 'greenhouse' && activeZone.plantData)) && (
-                                    <>
-                                        <div>
-                                            <p className="text-blue-200">{t('พืชที่ปลูก:')}</p>
-                                            <p className="font-medium text-white">
-                                                {activeZone.plantData?.name || t('ไม่ระบุ')}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <p className="text-blue-200">{t('น้ำ/วัน:')}</p>
-                                            <p className="font-medium text-white">
-                                                {Math.round(activeZone.totalWaterNeed)} {t('ลิตร')}
-                                            </p>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="space-y-4">
-                    <h2 className="text-lg font-semibold text-green-400">📋 {t('ข้อมูลพื้นฐาน')}</h2>
-                    
-                    <div className="grid grid-cols-2 gap-3 bg-gray-700 p-2 rounded-lg">
+                    <h2 className="text-lg font-semibold text-green-400">
+                        📋 {t('ข้อมูลพื้นฐาน')}
+                    </h2>
+
+                    <div className="grid grid-cols-2 gap-3 rounded-lg bg-gray-700 p-2">
                         <div>
                             <label className="mb-2 block text-sm font-medium">
-                                {t('ขนาดพื้นที่')} ({getAreaUnit()})
+                                {t('ขนาดพื้นที่')} ({getAreaUnit()}) ({input.farmSizeRai.toFixed(2)} {t('ไร่')})
                             </label>
                             <input
                                 type="number"
-                                value={(input.farmSizeRai * getAreaConversionFactor()).toFixed(2)}
-                                onChange={(e) =>
-                                    updateInput(
-                                        'farmSizeRai',
-                                        parseFloat(e.target.value) / getAreaConversionFactor() || 0
-                                    )
+                                defaultValue={
+                                    projectMode === 'greenhouse' || projectMode === 'garden'
+                                        ? input.farmSizeRai.toFixed(2)
+                                        : (input.farmSizeRai * 1600).toFixed(2)
                                 }
+                                onChange={(e) => {
+                                    const value = parseFloat(e.target.value) || 0;
+                                    if (projectMode === 'greenhouse' || projectMode === 'garden') {
+                                        updateInput('farmSizeRai', value);
+                                    } else {
+                                        updateInput('farmSizeRai', value / 1600);
+                                    }
+                                }}
+                                onBlur={(e) => {
+                                    const value = e.target.value;
+                                    if (value === '' || isNaN(parseFloat(value))) {
+                                        e.target.value = projectMode === 'greenhouse' || projectMode === 'garden'
+                                            ? input.farmSizeRai.toFixed(2)
+                                            : (input.farmSizeRai * 1600).toFixed(2);
+                                    }
+                                }}
                                 step="0.1"
                                 min="0"
                                 className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
@@ -453,12 +451,18 @@ const InputForm: React.FC<InputFormProps> = ({
 
                         <div>
                             <label className="mb-2 block text-sm font-medium">
-                                {t('จำนวน')}{getItemName()} ({getItemName()})
+                                {getQuantityLabel()}
                             </label>
                             <input
                                 type="number"
-                                value={input.totalTrees}
-                                onChange={(e) => updateInput('totalTrees', parseInt(e.target.value) || 0)}
+                                defaultValue={input.totalTrees}
+                                onChange={(e) => {
+                                    const value = parseInt(e.target.value);
+                                    if (!isNaN(value)) {
+                                        updateInput('totalTrees', value);
+                                    }
+                                }}
+                                onBlur={(e) => updateInputOnBlur('totalTrees', e.target.value)}
                                 min="1"
                                 step="1"
                                 className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
@@ -467,12 +471,18 @@ const InputForm: React.FC<InputFormProps> = ({
 
                         <div>
                             <label className="mb-2 block text-sm font-medium">
-                                {t('น้ำต่อ')}{getItemName()} ({t('ลิตร/วัน')})
+                                {getWaterPerItemLabel()}
                             </label>
                             <input
                                 type="number"
-                                value={input.waterPerTreeLiters}
-                                onChange={(e) => updateInput('waterPerTreeLiters', parseFloat(e.target.value) || 0)}
+                                defaultValue={input.waterPerTreeLiters}
+                                onChange={(e) => {
+                                    const value = parseFloat(e.target.value);
+                                    if (!isNaN(value)) {
+                                        updateInput('waterPerTreeLiters', value);
+                                    }
+                                }}
+                                onBlur={(e) => updateInputOnBlur('waterPerTreeLiters', e.target.value)}
                                 step="0.1"
                                 min="0.1"
                                 className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
@@ -480,57 +490,90 @@ const InputForm: React.FC<InputFormProps> = ({
                         </div>
 
                         <div>
-                            <label className="mb-2 block text-sm font-medium">{t('เวลารดน้ำ (นาที/ครั้ง)')}</label>
+                            <label className="mb-2 block text-sm font-medium">
+                                {t('เวลารดน้ำ (นาที/ครั้ง)')}
+                            </label>
                             <input
                                 type="number"
                                 step="1"
-                                value={input.irrigationTimeMinutes}
-                                onChange={(e) => updateInput('irrigationTimeMinutes', parseInt(e.target.value) || 45)}
+                                defaultValue={input.irrigationTimeMinutes}
+                                onChange={(e) => {
+                                    const value = parseInt(e.target.value);
+                                    if (!isNaN(value)) {
+                                        updateInput('irrigationTimeMinutes', value);
+                                    }
+                                }}
+                                onBlur={(e) => updateInputOnBlur('irrigationTimeMinutes', e.target.value)}
                                 className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                             />
                         </div>
                     </div>
 
-                    <div className="bg-gray-700 p-2 rounded-lg">
-                        <h3 className="mb-3 text-base font-semibold text-orange-400">⚙️ {t('การตั้งค่าระบบ')}</h3>
+                    <div className="rounded-lg bg-gray-700 p-2">
+                        <h3 className="mb-3 text-base font-semibold text-orange-400">
+                            ⚙️ {t('การตั้งค่าระบบ')}
+                        </h3>
                         <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="mb-2 block text-sm font-medium">
-                                    {projectMode === 'garden' ? t('อัตราส่วนหัวฉีด') : 
-                                     projectMode === 'field-crop' ? t('สปริงเกอร์ต่อต้น') :
-                                     projectMode === 'greenhouse' ? t('สปริงเกอร์ต่อต้น') : t('สปริงเกอร์ต่อต้น')}
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.1"
-                                    value={input.sprinklersPerTree.toFixed(1)}
-                                    onChange={(e) => updateInput('sprinklersPerTree', parseFloat(e.target.value) || 1)}
-                                    min="0.1"
-                                    max="5"
-                                    className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
-                                />
-                            </div>
+                            {shouldShowSprinklersPerTree() && (
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium">
+                                        {t('หัวฉีดต่อต้น')}
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="1"
+                                        defaultValue={input.sprinklersPerTree}
+                                        onChange={(e) => {
+                                            const value = parseFloat(e.target.value);
+                                            if (!isNaN(value)) {
+                                                updateInput('sprinklersPerTree', value);
+                                            }
+                                        }}
+                                        onBlur={(e) => updateInputOnBlur('sprinklersPerTree', e.target.value)}
+                                        min="1"
+                                        max="5"
+                                        className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
+                                    />
+                                </div>
+                            )}
 
                             <div>
                                 <label className="mb-2 block text-sm font-medium">
-                                    {t('ความสูงจาก')}{getWaterSourceLabel()}{t('ไปจุดสูงสุด (ม.)')}
+                                    {t('ความสูงจาก')}
+                                    {getWaterSourceLabel()}
+                                    {t('ไปจุดสูงสุด (ม.)')}
                                 </label>
                                 <input
                                     type="number"
                                     step="0.1"
-                                    value={input.staticHeadM.toFixed(1)}
-                                    onChange={(e) => updateInput('staticHeadM', parseFloat(e.target.value) || 0)}
+                                    defaultValue={input.staticHeadM.toFixed(1)}
+                                    onChange={(e) => {
+                                        const value = parseFloat(e.target.value);
+                                        if (!isNaN(value)) {
+                                            updateInput('staticHeadM', value);
+                                        }
+                                    }}
+                                    onBlur={(e) => {
+                                        const value = e.target.value;
+                                        if (value === '' || isNaN(parseFloat(value))) {
+                                            e.target.value = input.staticHeadM.toFixed(1);
+                                        }
+                                    }}
                                     min="0"
                                     className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                                 />
                             </div>
 
                             <div>
-                                <label className="mb-2 block text-sm font-medium">{t('จำนวนโซน')}</label>
+                                <label className="mb-2 block text-sm font-medium">
+                                    {t('จำนวนโซน')}
+                                </label>
                                 <input
                                     type="number"
                                     value={input.numberOfZones}
-                                    onChange={(e) => updateInput('numberOfZones', parseInt(e.target.value) || 1)}
+                                    onChange={(e) =>
+                                        updateInput('numberOfZones', parseInt(e.target.value) || 1)
+                                    }
                                     min="1"
                                     step="1"
                                     className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
@@ -539,11 +582,24 @@ const InputForm: React.FC<InputFormProps> = ({
                             </div>
 
                             <div>
-                                <label className="mb-2 block text-sm font-medium">{t('อายุท่อ (ปี)')}</label>
+                                <label className="mb-2 block text-sm font-medium">
+                                    {t('อายุท่อ (ปี)')}
+                                </label>
                                 <input
                                     type="number"
-                                    value={input.pipeAgeYears}
-                                    onChange={(e) => updateInput('pipeAgeYears', parseInt(e.target.value) || 0)}
+                                    defaultValue={input.pipeAgeYears}
+                                    onChange={(e) => {
+                                        const value = parseInt(e.target.value);
+                                        if (!isNaN(value)) {
+                                            updateInput('pipeAgeYears', value);
+                                        }
+                                    }}
+                                    onBlur={(e) => {
+                                        const value = e.target.value;
+                                        if (value === '' || isNaN(parseInt(value))) {
+                                            e.target.value = input.pipeAgeYears.toString();
+                                        }
+                                    }}
                                     min="0"
                                     max="50"
                                     step="1"
@@ -556,62 +612,113 @@ const InputForm: React.FC<InputFormProps> = ({
 
                 <div className="space-y-4">
                     <h3 className="text-base font-semibold text-blue-400">🔧 {t('ข้อมูลท่อ')}</h3>
-                    
+
                     <div className="rounded-lg bg-gray-700 p-3">
-                        <h4 className="mb-2 text-sm font-medium text-purple-300">🔹 {t('ท่อย่อย (Branch Pipe)')}</h4>
+                        <h4 className="mb-2 text-sm font-medium text-purple-300">
+                            🔹 {t('ท่อย่อย (Branch Pipe)')}
+                        </h4>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="mb-1 block text-sm">{t('ท่อเส้นที่ยาวที่สุด (ม.)')}</label>
+                                <label className="mb-1 block text-sm">
+                                    {t('ท่อเส้นที่ยาวที่สุด (ม.)')}
+                                </label>
                                 <input
                                     type="number"
-                                    value={input.longestBranchPipeM.toFixed(1)}
-                                    onChange={(e) => updateInput('longestBranchPipeM', parseFloat(e.target.value) || 0)}
+                                    defaultValue={input.longestBranchPipeM.toFixed(1)}
+                                    onChange={(e) => {
+                                        const value = parseFloat(e.target.value);
+                                        if (!isNaN(value)) {
+                                            updateInput('longestBranchPipeM', value);
+                                        }
+                                    }}
+                                    onBlur={(e) => {
+                                        const value = e.target.value;
+                                        if (value === '' || isNaN(parseFloat(value))) {
+                                            e.target.value = input.longestBranchPipeM.toFixed(1);
+                                        }
+                                    }}
                                     step="0.1"
                                     min="0"
                                     className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-sm text-white focus:border-blue-400"
                                 />
                             </div>
                             <div>
-                                <label className="mb-1 block text-sm">{t('ท่อรวมทั้งหมด (ม.)')}</label>
+                                <label className="mb-1 block text-sm">
+                                    {t('ท่อรวมทั้งหมด (ม.)')}
+                                </label>
                                 <input
                                     type="number"
-                                    value={input.totalBranchPipeM.toFixed(1)}
-                                    onChange={(e) => updateInput('totalBranchPipeM', parseFloat(e.target.value) || 0)}
+                                    defaultValue={input.totalBranchPipeM.toFixed(1)}
+                                    onChange={(e) => {
+                                        const value = parseFloat(e.target.value);
+                                        if (!isNaN(value)) {
+                                            updateInput('totalBranchPipeM', value);
+                                        }
+                                    }}
+                                    onBlur={(e) => {
+                                        const value = e.target.value;
+                                        if (value === '' || isNaN(parseFloat(value))) {
+                                            e.target.value = input.totalBranchPipeM.toFixed(1);
+                                        }
+                                    }}
                                     step="0.1"
                                     min="0"
                                     className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-sm text-white focus:border-blue-400"
                                 />
                             </div>
                         </div>
-                        {branchStats && (
-                            <p className="mt-1 text-xs text-purple-300">
-                                {t('จากระบบ:')} {branchStats.longestBranchLength.toFixed(1)} {t('ม.')} ({t('ยาวสุด')})
-                            </p>
-                        )}
                     </div>
 
                     <div className="rounded-lg bg-gray-700 p-3">
                         {input.longestSecondaryPipeM > 0 ? (
                             <>
-                                <h4 className="mb-2 text-sm font-medium text-orange-300">🔸 {t('ท่อเมนรอง (Secondary)')}</h4>
+                                <h4 className="mb-2 text-sm font-medium text-orange-300">
+                                    🔸 {t('ท่อเมนรอง (Secondary)')}
+                                </h4>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label className="mb-1 block text-sm">{t('ท่อเส้นที่ยาวที่สุด (ม.)')}</label>
+                                        <label className="mb-1 block text-sm">
+                                            {t('ท่อเส้นที่ยาวที่สุด (ม.)')}
+                                        </label>
                                         <input
                                             type="number"
-                                            value={input.longestSecondaryPipeM.toFixed(1)}
-                                            onChange={(e) => updateInput('longestSecondaryPipeM', parseFloat(e.target.value) || 0)}
+                                            defaultValue={input.longestSecondaryPipeM.toFixed(1)}
+                                            onChange={(e) => {
+                                                const value = parseFloat(e.target.value);
+                                                if (!isNaN(value)) {
+                                                    updateInput('longestSecondaryPipeM', value);
+                                                }
+                                            }}
+                                            onBlur={(e) => {
+                                                const value = e.target.value;
+                                                if (value === '' || isNaN(parseFloat(value))) {
+                                                    e.target.value = input.longestSecondaryPipeM.toFixed(1);
+                                                }
+                                            }}
                                             step="0.1"
                                             min="0"
                                             className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-sm text-white focus:border-blue-400"
                                         />
                                     </div>
                                     <div>
-                                        <label className="mb-1 block text-sm">{t('ท่อรวมทั้งหมด (ม.)')}</label>
+                                        <label className="mb-1 block text-sm">
+                                            {t('ท่อรวมทั้งหมด (ม.)')}
+                                        </label>
                                         <input
                                             type="number"
-                                            value={input.totalSecondaryPipeM.toFixed(1)}
-                                            onChange={(e) => updateInput('totalSecondaryPipeM', parseFloat(e.target.value) || 0)}
+                                            defaultValue={input.totalSecondaryPipeM.toFixed(1)}
+                                            onChange={(e) => {
+                                                const value = parseFloat(e.target.value);
+                                                if (!isNaN(value)) {
+                                                    updateInput('totalSecondaryPipeM', value);
+                                                }
+                                            }}
+                                            onBlur={(e) => {
+                                                const value = e.target.value;
+                                                if (value === '' || isNaN(parseFloat(value))) {
+                                                    e.target.value = input.totalSecondaryPipeM.toFixed(1);
+                                                }
+                                            }}
                                             step="0.1"
                                             min="0"
                                             className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-sm text-white focus:border-blue-400"
@@ -625,7 +732,9 @@ const InputForm: React.FC<InputFormProps> = ({
                                     <div className="mb-1 text-2xl">➖</div>
                                     <p className="text-sm">{t('ไม่ใช้ท่อเมนรอง')}</p>
                                 </div>
-                                {projectMode === 'horticulture' && (
+                                {(projectMode === 'horticulture' ||
+                                    projectMode === 'field-crop' ||
+                                    projectMode === 'greenhouse') && (
                                     <button
                                         onClick={() => updateInput('longestSecondaryPipeM', 50)}
                                         className="text-sm text-blue-400 hover:text-blue-300"
@@ -640,25 +749,53 @@ const InputForm: React.FC<InputFormProps> = ({
                     <div className="rounded-lg bg-gray-700 p-3">
                         {input.longestMainPipeM > 0 ? (
                             <>
-                                <h4 className="mb-2 text-sm font-medium text-cyan-300">🔷 {t('ท่อเมนหลัก')} (Main)</h4>
+                                <h4 className="mb-2 text-sm font-medium text-cyan-300">
+                                    🔷 {t('ท่อเมนหลัก')} (Main)
+                                </h4>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label className="mb-1 block text-sm">{t('ท่อเส้นที่ยาวที่สุด (ม.)')}</label>
+                                        <label className="mb-1 block text-sm">
+                                            {t('ท่อเส้นที่ยาวที่สุด (ม.)')}
+                                        </label>
                                         <input
                                             type="number"
-                                            value={input.longestMainPipeM.toFixed(1)}
-                                            onChange={(e) => updateInput('longestMainPipeM', parseFloat(e.target.value) || 0)}
+                                            defaultValue={input.longestMainPipeM.toFixed(1)}
+                                            onChange={(e) => {
+                                                const value = parseFloat(e.target.value);
+                                                if (!isNaN(value)) {
+                                                    updateInput('longestMainPipeM', value);
+                                                }
+                                            }}
+                                            onBlur={(e) => {
+                                                const value = e.target.value;
+                                                if (value === '' || isNaN(parseFloat(value))) {
+                                                    e.target.value = input.longestMainPipeM.toFixed(1);
+                                                }
+                                            }}
                                             step="0.1"
                                             min="0"
                                             className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-sm text-white focus:border-blue-400"
                                         />
                                     </div>
                                     <div>
-                                        <label className="mb-1 block text-sm">{t('ท่อรวมทั้งหมด (ม.)')}</label>
+                                        <label className="mb-1 block text-sm">
+                                            {t('ท่อรวมทั้งหมด (ม.)')}
+                                        </label>
                                         <input
                                             type="number"
-                                            value={input.totalMainPipeM.toFixed(1)}
-                                            onChange={(e) => updateInput('totalMainPipeM', parseFloat(e.target.value) || 0)}
+                                            defaultValue={input.totalMainPipeM.toFixed(1)}
+                                            onChange={(e) => {
+                                                const value = parseFloat(e.target.value);
+                                                if (!isNaN(value)) {
+                                                    updateInput('totalMainPipeM', value);
+                                                }
+                                            }}
+                                            onBlur={(e) => {
+                                                const value = e.target.value;
+                                                if (value === '' || isNaN(parseFloat(value))) {
+                                                    e.target.value = input.totalMainPipeM.toFixed(1);
+                                                }
+                                            }}
                                             step="0.1"
                                             min="0"
                                             className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-sm text-white focus:border-blue-400"
@@ -672,7 +809,9 @@ const InputForm: React.FC<InputFormProps> = ({
                                     <div className="mb-1 text-2xl">➖</div>
                                     <p className="text-sm">{t('ไม่ใช้ท่อเมนหลัก')}</p>
                                 </div>
-                                {projectMode === 'horticulture' && (
+                                {(projectMode === 'horticulture' ||
+                                    projectMode === 'field-crop' ||
+                                    projectMode === 'greenhouse') && (
                                     <button
                                         onClick={() => updateInput('longestMainPipeM', 100)}
                                         className="text-sm text-blue-400 hover:text-blue-300"
@@ -692,29 +831,54 @@ const InputForm: React.FC<InputFormProps> = ({
                     onClick={() => setShowAdvanced(!showAdvanced)}
                     className="text-sm text-blue-400 hover:text-blue-300"
                 >
-                    {showAdvanced ? '🔽 ' + t('ซ่อนการตั้งค่าขั้นสูง') : '🔼 ' + t('แสดงการตั้งค่าขั้นสูง')}
+                    {showAdvanced
+                        ? ' 🔼' + t('ซ่อนการตั้งค่าขั้นสูง')
+                        : '🔽 ' + t('แสดงการตั้งค่าขั้นสูง')}
                 </button>
 
                 {showAdvanced && (
                     <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div className="rounded-lg bg-gray-700 p-3">
-                            <h4 className="mb-3 text-sm font-medium text-blue-300">🔧 {t('ค่าขั้นสูง')}</h4>
+                            <h4 className="mb-3 text-sm font-medium text-blue-300">
+                                🔧 {t('ค่าขั้นสูง')}
+                            </h4>
                             <div className="space-y-3">
                                 <div>
                                     <label className="mb-2 block text-sm font-medium">
-                                        {getItemName()}{t('ต่อท่อย่อย 1 เส้น (เส้นที่ยาวที่สุด)')}
+                                        {projectMode === 'greenhouse'
+                                            ? t('หัวฉีดต่อท่อย่อย 1 เส้น (เส้นที่ยาวที่สุด)')
+                                            : projectMode === 'field-crop'
+                                              ? t('หัวฉีดต่อท่อย่อย 1 เส้น (เส้นที่ยาวที่สุด)')
+                                              : getItemName() +
+                                                t('ต่อท่อย่อย 1 เส้น (เส้นที่ยาวที่สุด)')}
                                     </label>
                                     <input
                                         type="number"
                                         min="1"
-                                        value={input.sprinklersPerLongestBranch || input.sprinklersPerBranch}
-                                        onChange={(e) => updateInput('sprinklersPerLongestBranch', parseInt(e.target.value) || 1)}
+                                        defaultValue={
+                                            input.sprinklersPerLongestBranch ||
+                                            input.sprinklersPerBranch
+                                        }
+                                        onChange={(e) => {
+                                            const value = parseInt(e.target.value);
+                                            if (!isNaN(value)) {
+                                                updateInput('sprinklersPerLongestBranch', value);
+                                            }
+                                        }}
+                                        onBlur={(e) => updateInputOnBlur('sprinklersPerLongestBranch', e.target.value)}
                                         step="1"
                                         className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                                     />
+                                    {projectMode === 'greenhouse' && (
+                                        <p className="mt-1 text-xs text-gray-400">
+                                            {t('จำนวนหัวฉีดสูงสุดในแต่ละแถวหรือท่อย่อย')}
+                                        </p>
+                                    )}
                                 </div>
 
-                                {projectMode === 'horticulture' && (
+                                {(projectMode === 'horticulture' ||
+                                    projectMode === 'field-crop' ||
+                                    projectMode === 'greenhouse') && (
                                     <div>
                                         <label className="mb-2 block text-sm font-medium">
                                             {t('ท่อย่อยต่อท่อรอง 1 เส้น (เส้นที่ยาวที่สุด)')}
@@ -722,193 +886,105 @@ const InputForm: React.FC<InputFormProps> = ({
                                         <input
                                             type="number"
                                             min="1"
-                                            value={input.branchesPerLongestSecondary || input.branchesPerSecondary}
-                                            onChange={(e) => updateInput('branchesPerLongestSecondary', parseInt(e.target.value) || 1)}
+                                            defaultValue={
+                                                input.branchesPerLongestSecondary ||
+                                                input.branchesPerSecondary
+                                            }
+                                            onChange={(e) => {
+                                                const value = parseInt(e.target.value);
+                                                if (!isNaN(value)) {
+                                                    updateInput('branchesPerLongestSecondary', value);
+                                                }
+                                            }}
+                                            onBlur={(e) => updateInputOnBlur('branchesPerLongestSecondary', e.target.value)}
                                             step="1"
                                             className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                                         />
+                                        {projectMode === 'greenhouse' && (
+                                            <p className="mt-1 text-xs text-gray-400">
+                                                {t(
+                                                    'จำนวนท่อย่อยสูงสุดที่เชื่อมต่อกับท่อรองแต่ละเส้น'
+                                                )}
+                                            </p>
+                                        )}
                                     </div>
                                 )}
                             </div>
                         </div>
 
                         <div className="rounded-lg bg-gray-700 p-3">
-                            <h4 className="mb-3 text-sm font-medium text-blue-300">🔧 {t('ท่อเสริมต่อหัวสปริงเกอร์')}</h4>
+                            <h4 className="mb-3 text-sm font-medium text-blue-300">
+                                🔧 {t('ท่อเสริมต่อหัวสปริงเกอร์')}
+                            </h4>
                             <div className="space-y-3">
                                 <div>
-                                    <label className="mb-2 block text-sm font-medium">{t('เลือกชนิดท่อ')}</label>
+                                    <label className="mb-2 block text-sm font-medium">
+                                        {t('เลือกชนิดท่อ')}
+                                    </label>
                                     <select
                                         value={input.extraPipePerSprinkler?.pipeId || ''}
                                         onChange={(e) => {
-                                            const pipeId = e.target.value ? parseInt(e.target.value) : null;
+                                            const pipeId = e.target.value
+                                                ? parseInt(e.target.value)
+                                                : null;
                                             onInputChange({
                                                 ...input,
                                                 extraPipePerSprinkler: {
                                                     pipeId,
-                                                    lengthPerHead: input.extraPipePerSprinkler?.lengthPerHead || 0,
+                                                    lengthPerHead:
+                                                        input.extraPipePerSprinkler
+                                                            ?.lengthPerHead || 0,
                                                 },
                                             });
                                         }}
                                         className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                                     >
                                         <option value="">-- {t('ไม่ใช้ท่อเสริม')} --</option>
-                                        {pipeData && pipeData.map((pipe) => (
-                                            <option key={pipe.id} value={pipe.id}>
-                                                {pipe.name || pipe.productCode} - {pipe.sizeMM}mm - {pipe.price?.toLocaleString()} บาท/ม้วน
-                                            </option>
-                                        ))}
+                                        {pipeData &&
+                                            pipeData.map((pipe) => (
+                                                <option key={pipe.id} value={pipe.id}>
+                                                    {pipe.name || pipe.productCode} - {pipe.sizeMM}
+                                                    mm - {pipe.price?.toLocaleString()} บาท/ม้วน
+                                                </option>
+                                            ))}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="mb-2 block text-sm font-medium">{t('ความยาวต่อหัว (เมตร)')}</label>
+                                    <label className="mb-2 block text-sm font-medium">
+                                        {t('ความยาวต่อหัว (เมตร)')}
+                                    </label>
                                     <input
                                         type="number"
                                         min="0"
                                         step="0.1"
-                                        value={input.extraPipePerSprinkler?.lengthPerHead || ''}
+                                        defaultValue={input.extraPipePerSprinkler?.lengthPerHead || ''}
                                         onChange={(e) => {
                                             const lengthPerHead = parseFloat(e.target.value) || 0;
                                             onInputChange({
                                                 ...input,
                                                 extraPipePerSprinkler: {
-                                                    pipeId: input.extraPipePerSprinkler?.pipeId ?? null,
+                                                    pipeId:
+                                                        input.extraPipePerSprinkler?.pipeId ?? null,
                                                     lengthPerHead,
                                                 },
                                             });
                                         }}
+                                        onBlur={(e) => {
+                                            const value = e.target.value;
+                                            if (value === '' || isNaN(parseFloat(value))) {
+                                                e.target.value = (input.extraPipePerSprinkler?.lengthPerHead || 0).toString();
+                                            }
+                                        }}
                                         className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                                         placeholder="0.5"
                                     />
-                                    <p className="mt-1 text-xs text-gray-400">{t('เช่น 0.5-1 เมตร/หัว')}</p>
+                                    <p className="mt-1 text-xs text-gray-400">
+                                        {projectMode === 'greenhouse'
+                                            ? t('เช่น 0.3-0.8 เมตร/หัว สำหรับโรงเรือน')
+                                            : t('เช่น 0.5-1 เมตร/หัว')}
+                                    </p>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            <div className="mt-4 space-y-3">
-                {validationMessages.length > 0 && (
-                    <div className="rounded bg-yellow-900 p-3">
-                        <div className="space-y-1">
-                            {validationMessages.map((message, index) => (
-                                <p key={index} className="text-sm text-yellow-200">
-                                    {message}
-                                </p>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {activeZone && activeZone.plantData && (projectMode === 'horticulture' || projectMode === 'field-crop' || projectMode === 'greenhouse') && (
-                    <div className="rounded bg-green-900 p-3">
-                        <h4 className="mb-2 text-sm font-semibold text-green-300">🌿 {t('ข้อมูลการปลูกพืชในโซน')}</h4>
-                        <div className="grid grid-cols-2 gap-4 text-sm text-gray-300 md:grid-cols-4">
-                            <div>
-                                <p className="text-green-200">{t('ชนิดพืช:')}</p>
-                                <p className="font-bold text-white">{activeZone.plantData.name}</p>
-                            </div>
-                            {activeZone.plantData.plantSpacing && (
-                                <div>
-                                    <p className="text-green-200">{t('ระยะปลูก:')}</p>
-                                    <p className="font-bold text-white">{activeZone.plantData.plantSpacing} {t('ม.')}</p>
-                                </div>
-                            )}
-                            {activeZone.plantData.rowSpacing && (
-                                <div>
-                                    <p className="text-green-200">{t('ระยะแถว:')}</p>
-                                    <p className="font-bold text-white">{activeZone.plantData.rowSpacing} {t('ม.')}</p>
-                                </div>
-                            )}
-                            <div>
-                                <p className="text-green-200">{t('น้ำ/ต้น/วัน:')}</p>
-                                <p className="font-bold text-white">{activeZone.plantData.waterNeed} {t('ลิตร')}</p>
-                            </div>
-                        </div>
-                        <div className="mt-2 text-xs text-green-200">
-                            <p>
-                                💡 {t('ความหนาแน่น:')} {(() => {
-                                    const isGardenOrGreenhouse = (projectMode as string) === 'garden' || (projectMode as string) === 'greenhouse';
-                                    return isGardenOrGreenhouse
-                                        ? activeZone.area >= 1600 
-                                            ? `${(activeZone.plantCount / (activeZone.area / 1600)).toFixed(0)} ${t('ต้น/ไร่')}`
-                                            : `${(activeZone.plantCount / activeZone.area).toFixed(0)} ${t('ต้น/ตร.ม.')}`
-                                        : activeZone.area >= 1600 
-                                            ? `${(activeZone.plantCount / (activeZone.area / 1600)).toFixed(0)} ${t('ต้น/ไร่')}`
-                                            : `${(activeZone.plantCount / activeZone.area).toFixed(0)} ${t('ต้น/ตร.ม.')}`;
-                                })()}
-                            </p>
-                        </div>
-                    </div>
-                )}
-
-                {activeZone && activeZone.plantData && projectMode === 'field-crop' && (
-                    <div className="rounded bg-blue-900 p-3">
-                        <h4 className="mb-2 text-sm font-semibold text-blue-300">🌾 {t('ข้อมูลการปลูกพืชไร่ในโซน')}</h4>
-                        <div className="grid grid-cols-2 gap-4 text-sm text-gray-300 md:grid-cols-4">
-                            <div>
-                                <p className="text-blue-200">{t('ชนิดพืช:')}</p>
-                                <p className="font-bold text-white">{activeZone.plantData.name}</p>
-                            </div>
-                            <div>
-                                <p className="text-blue-200">{t('หมวดหมู่:')}</p>
-                                <p className="font-bold text-white">
-                                    {activeZone.plantData && hasCategory(activeZone.plantData) 
-                                        ? activeZone.plantData.category || t('ไม่ระบุ')
-                                        : t('ไม่ระบุ')}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-blue-200">{t('น้ำ/ต้น/วัน:')}</p>
-                                <p className="font-bold text-white">{activeZone.plantData.waterNeed} {t('ลิตร')}</p>
-                            </div>
-                            <div>
-                                <p className="text-blue-200">{t('พื้นที่โซน:')}</p>
-                                <p className="font-bold text-white">{activeZone.area >= 1600 
-                                    ? `${(activeZone.area / 1600).toFixed(1)} ไร่`
-                                    : `${activeZone.area.toFixed(2)} ตร.ม.`}
-                                </p>
-                            </div>
-                        </div>
-                        <div className="mt-2 text-xs text-blue-200">
-                            <p>
-                                💡 {t('ความหนาแน่น:')} {activeZone.area >= 1600 
-                                    ? `${(activeZone.plantCount / (activeZone.area / 1600)).toFixed(0)} ${t('ต้น/ไร่')}`
-                                    : `${(activeZone.plantCount / activeZone.area).toFixed(0)} ${t('ต้น/ตร.ม.')}`}
-                            </p>
-                        </div>
-                    </div>
-                )}
-
-                {activeZone && activeZone.plantData && projectMode === 'greenhouse' && (
-                    <div className="rounded bg-purple-900 p-3">
-                        <h4 className="mb-2 text-sm font-semibold text-purple-300">🏠 {t('ข้อมูลการปลูกในโรงเรือน')}</h4>
-                        <div className="grid grid-cols-2 gap-4 text-sm text-gray-300 md:grid-cols-4">
-                            <div>
-                                <p className="text-purple-200">{t('ชนิดพืช:')}</p>
-                                <p className="font-bold text-white">{activeZone.plantData.name}</p>
-                            </div>
-                            <div>
-                                <p className="text-purple-200">{t('หมวดหมู่:')}</p>
-                                <p className="font-bold text-white">
-                                    {activeZone.plantData && hasCategory(activeZone.plantData) 
-                                        ? activeZone.plantData.category || t('ไม่ระบุ')
-                                        : t('ไม่ระบุ')}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-purple-200">{t('น้ำ/ต้น/วัน:')}</p>
-                                <p className="font-bold text-white">{activeZone.plantData.waterNeed} {t('ลิตร')}</p>
-                            </div>
-                            <div>
-                                <p className="text-purple-200">{t('พื้นที่แปลง:')}</p>
-                                <p className="font-bold text-white">{activeZone.area.toFixed(2)} {t('ตร.ม.')}</p>
-                            </div>
-                        </div>
-                        <div className="mt-2 text-xs text-purple-200">
-                            <p>
-                                💡 {t('ความหนาแน่น:')} {(activeZone.plantCount / activeZone.area).toFixed(0)} {t('ต้น/ตร.ม.')}
-                            </p>
                         </div>
                     </div>
                 )}

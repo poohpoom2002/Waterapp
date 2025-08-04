@@ -400,6 +400,10 @@ export default function GreenhouseSummary() {
                 totalSubPipeLength: 0,
                 totalPipeLength: 0,
                 hasPipes: false,
+                // เพิ่มข้อมูล emitters
+                sprinklerCount: 0,
+                dripEmitterCount: 0,
+                totalEmitters: 0,
             };
 
             // Find main pipes and sub pipes
@@ -516,6 +520,56 @@ export default function GreenhouseSummary() {
                     plotPipeData.hasPipes = true;
                 }
             });
+
+            // คำนวณจำนวน emitters ในแปลงนี้
+            const sprinklers = elements.filter((e) => e.type === 'sprinkler');
+            const dripLines = elements.filter((e) => e.type === 'drip-line');
+
+            // นับสปริงเกอร์ในแปลงนี้
+            sprinklers.forEach((sprinkler) => {
+                if (sprinkler.points.length > 0) {
+                    const sprinklerPoint = sprinkler.points[0]; // สปริงเกอร์มีจุดเดียว
+                    if (isPointInPolygon(sprinklerPoint, plot.points)) {
+                        plotPipeData.sprinklerCount++;
+                    }
+                }
+            });
+
+            // นับหัวหยดในแปลงนี้
+            dripLines.forEach((dripLine) => {
+                if (dripLine.points.length > 0 && dripLine.spacing) {
+                    // คำนวณจำนวนหัวหยดตามความยาวท่อและระยะห่าง
+                    let dripLengthInPlot = 0;
+                    
+                    for (let i = 0; i < dripLine.points.length - 1; i++) {
+                        const p1 = dripLine.points[i];
+                        const p2 = dripLine.points[i + 1];
+                        
+                        // ตรวจสอบว่าส่วนของท่อนี้อยู่ในแปลงหรือไม่
+                        const midPoint = {
+                            x: (p1.x + p2.x) / 2,
+                            y: (p1.y + p2.y) / 2,
+                        };
+
+                        if (
+                            isPointInPolygon(p1, plot.points) ||
+                            isPointInPolygon(p2, plot.points) ||
+                            isPointInPolygon(midPoint, plot.points)
+                        ) {
+                            const segmentLength = distanceBetweenPoints(p1, p2) / 25; // แปลงเป็นเมตร
+                            dripLengthInPlot += segmentLength;
+                        }
+                    }
+                    
+                    // คำนวณจำนวนหัวหยด (ความยาวท่อ / ระยะห่าง + 1)
+                    if (dripLengthInPlot > 0 && dripLine.spacing > 0) {
+                        const emittersInThisLine = Math.floor(dripLengthInPlot / dripLine.spacing) + 1;
+                        plotPipeData.dripEmitterCount += emittersInThisLine;
+                    }
+                }
+            });
+
+            plotPipeData.totalEmitters = plotPipeData.sprinklerCount + plotPipeData.dripEmitterCount;
 
             plotPipeData.maxSubPipeLength = Math.round(maxSubPipeLength * 100) / 100;
             plotPipeData.maxTotalPipeLength =
@@ -1448,6 +1502,38 @@ export default function GreenhouseSummary() {
                                 </div>
 
                                 <div className="mb-3">
+                                    <h3 className="mb-2 text-sm font-semibold text-orange-400 print:text-sm print:text-black">
+                                        💧 Irrigation Emitters
+                                    </h3>
+                                    <div className="grid grid-cols-3 gap-1 print:gap-2">
+                                        <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
+                                            <div className="text-sm font-bold text-blue-400 print:text-sm print:text-black">
+                                                {plotPipeData.reduce((sum, plot) => sum + plot.sprinklerCount, 0)}
+                                            </div>
+                                            <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
+                                                Total Sprinklers
+                                            </div>
+                                        </div>
+                                        <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
+                                            <div className="text-sm font-bold text-green-400 print:text-sm print:text-black">
+                                                {plotPipeData.reduce((sum, plot) => sum + plot.dripEmitterCount, 0)}
+                                            </div>
+                                            <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
+                                                Total Drip Emitters
+                                            </div>
+                                        </div>
+                                        <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
+                                            <div className="text-sm font-bold text-purple-400 print:text-sm print:text-black">
+                                                {plotPipeData.reduce((sum, plot) => sum + plot.totalEmitters, 0)}
+                                            </div>
+                                            <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
+                                                Total Emitters
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mb-3">
                                     <h3 className="mb-2 text-sm font-semibold text-red-400 print:text-sm print:text-black">
                                         🔧 Control Equipment
                                     </h3>
@@ -1479,29 +1565,7 @@ export default function GreenhouseSummary() {
                                     </div>
                                 </div>
 
-                                <div>
-                                    <h3 className="mb-2 text-sm font-semibold text-cyan-400 print:text-sm print:text-black">
-                                        💧 Irrigation Emitters
-                                    </h3>
-                                    <div className="grid grid-cols-2 gap-1 print:gap-2">
-                                        <div className="rounded bg-gray-700 p-1 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-2">
-                                            <div className="text-sm font-bold text-cyan-400 print:text-sm print:text-black">
-                                                {irrigationMetrics.sprinklers}
-                                            </div>
-                                            <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                Sprinklers
-                                            </div>
-                                        </div>
-                                        <div className="rounded bg-gray-700 p-1 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-2">
-                                            <div className="text-sm font-bold text-purple-400 print:text-sm print:text-black">
-                                                {irrigationMetrics.dripLines}
-                                            </div>
-                                            <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                Drip Lines
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+
                             </div>
 
                             <div className="rounded-lg bg-gray-800 p-4 print:hidden">
@@ -1683,12 +1747,78 @@ export default function GreenhouseSummary() {
                                                                     </div>
                                                                 </div>
                                                             </div>
+                                                            {/* Irrigation Emitters Information */}
+                                                            <div className="mt-2 border-t border-gray-200 pt-2">
+                                                                <div className="mb-2 text-xs font-semibold text-gray-700">
+                                                                    💧 Irrigation Emitters
+                                                                </div>
+                                                                <div className="grid grid-cols-3 gap-2">
+                                                                    <div className="border border-gray-200 bg-blue-50 p-2 text-center">
+                                                                        <div className="text-xs font-bold text-blue-600">
+                                                                            {plot.sprinklerCount}
+                                                                        </div>
+                                                                        <div className="text-xs text-gray-600">
+                                                                            Sprinklers
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="border border-gray-200 bg-green-50 p-2 text-center">
+                                                                        <div className="text-xs font-bold text-green-600">
+                                                                            {plot.dripEmitterCount}
+                                                                        </div>
+                                                                        <div className="text-xs text-gray-600">
+                                                                            Drip Emitters
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="border border-gray-200 bg-purple-50 p-2 text-center">
+                                                                        <div className="text-xs font-bold text-purple-600">
+                                                                            {plot.totalEmitters}
+                                                                        </div>
+                                                                        <div className="text-xs text-gray-600">
+                                                                            Total
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     ) : (
-                                                        <div className="border border-gray-200 bg-gray-50 p-2 text-center">
-                                                            <span className="text-xs text-gray-600">
-                                                                No pipe system in this plot.
-                                                            </span>
+                                                        <div className="space-y-2">
+                                                            <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                                <span className="text-xs text-gray-600">
+                                                                    No pipe system in this plot.
+                                                                </span>
+                                                            </div>
+                                                            {/* Irrigation Emitters Information - Even without pipes */}
+                                                            <div className="border-t border-gray-200 pt-2">
+                                                                <div className="mb-2 text-xs font-semibold text-gray-700">
+                                                                    💧 Irrigation Emitters
+                                                                </div>
+                                                                <div className="grid grid-cols-3 gap-2">
+                                                                    <div className="border border-gray-200 bg-blue-50 p-2 text-center">
+                                                                        <div className="text-xs font-bold text-blue-600">
+                                                                            {plot.sprinklerCount}
+                                                                        </div>
+                                                                        <div className="text-xs text-gray-600">
+                                                                            Sprinklers
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="border border-gray-200 bg-green-50 p-2 text-center">
+                                                                        <div className="text-xs font-bold text-green-600">
+                                                                            {plot.dripEmitterCount}
+                                                                        </div>
+                                                                        <div className="text-xs text-gray-600">
+                                                                            Drip Emitters
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="border border-gray-200 bg-purple-50 p-2 text-center">
+                                                                        <div className="text-xs font-bold text-purple-600">
+                                                                            {plot.totalEmitters}
+                                                                        </div>
+                                                                        <div className="text-xs text-gray-600">
+                                                                            Total
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     )}
                                                 </div>
@@ -1819,14 +1949,80 @@ export default function GreenhouseSummary() {
                                                                 </div>
                                                             </div>
                                                         </div>
+                                                        {/* Irrigation Emitters Information */}
+                                                        <div className="mt-2 border-t border-gray-600 pt-2">
+                                                            <div className="mb-2 text-xs font-semibold text-gray-300">
+                                                                💧 Irrigation Emitters
+                                                            </div>
+                                                            <div className="grid grid-cols-3 gap-2">
+                                                                <div className="rounded bg-blue-600/20 p-2 text-center">
+                                                                    <div className="text-xs font-bold text-blue-400">
+                                                                        {plot.sprinklerCount}
+                                                                    </div>
+                                                                    <div className="text-xs text-gray-400">
+                                                                        Sprinklers
+                                                                    </div>
+                                                                </div>
+                                                                <div className="rounded bg-green-600/20 p-2 text-center">
+                                                                    <div className="text-xs font-bold text-green-400">
+                                                                        {plot.dripEmitterCount}
+                                                                    </div>
+                                                                    <div className="text-xs text-gray-400">
+                                                                        Drip Emitters
+                                                                    </div>
+                                                                </div>
+                                                                <div className="rounded bg-purple-600/20 p-2 text-center">
+                                                                    <div className="text-xs font-bold text-purple-400">
+                                                                        {plot.totalEmitters}
+                                                                    </div>
+                                                                    <div className="text-xs text-gray-400">
+                                                                        Total
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                ) : (
-                                                    <div className="mt-2 rounded bg-gray-600 p-2 text-center">
-                                                        <span className="text-xs text-gray-400">
-                                                            No pipe system in this plot.
-                                                        </span>
-                                                    </div>
-                                                )}
+                                                                                                    ) : (
+                                                        <div className="mt-2 space-y-2">
+                                                            <div className="rounded bg-gray-600 p-2 text-center">
+                                                                <span className="text-xs text-gray-400">
+                                                                    No pipe system in this plot.
+                                                                </span>
+                                                            </div>
+                                                            {/* Irrigation Emitters Information - Even without pipes */}
+                                                            <div className="border-t border-gray-600 pt-2">
+                                                                <div className="mb-2 text-xs font-semibold text-gray-300">
+                                                                    💧 Irrigation Emitters
+                                                                </div>
+                                                                <div className="grid grid-cols-3 gap-2">
+                                                                    <div className="rounded bg-blue-600/20 p-2 text-center">
+                                                                        <div className="text-xs font-bold text-blue-400">
+                                                                            {plot.sprinklerCount}
+                                                                        </div>
+                                                                        <div className="text-xs text-gray-400">
+                                                                            Sprinklers
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="rounded bg-green-600/20 p-2 text-center">
+                                                                        <div className="text-xs font-bold text-green-400">
+                                                                            {plot.dripEmitterCount}
+                                                                        </div>
+                                                                        <div className="text-xs text-gray-400">
+                                                                            Drip Emitters
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="rounded bg-purple-600/20 p-2 text-center">
+                                                                        <div className="text-xs font-bold text-purple-400">
+                                                                            {plot.totalEmitters}
+                                                                        </div>
+                                                                        <div className="text-xs text-gray-400">
+                                                                            Total
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                             </div>
                                         ))
                                     ) : (

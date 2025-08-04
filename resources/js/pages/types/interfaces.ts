@@ -1,4 +1,6 @@
 // resources\js\pages\types\interfaces.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { PlantData } from "@/utils/horticultureUtils";
 export interface IrrigationInput {
     farmSizeRai: number;
     totalTrees: number;
@@ -22,8 +24,8 @@ export interface IrrigationInput {
     branchesPerLongestSecondary: number;
     secondariesPerLongestMain: number;
     extraPipePerSprinkler?: {
-        pipeId: number | null; // id ของท่อที่เลือกจาก database
-        lengthPerHead: number; // ความยาวต่อหัว (เมตร)
+        pipeId: number | null; 
+        lengthPerHead: number; 
     };
 }
 
@@ -202,6 +204,17 @@ export interface CalculationResults {
     projectSummary?: ProjectSummary;
 }
 
+export interface Zone {
+    id: string;
+    name: string;
+    area: number; 
+    plantCount: number; 
+    sprinklerCount?: number; 
+    coordinates: any[];
+    totalWaterNeed: number;
+    plantData?: PlantData;
+}
+
 export interface ZoneResults {
     zoneId: string;
     zoneName: string;
@@ -256,11 +269,10 @@ export interface QuotationDataCustomer {
 
 export type PipeType = 'branch' | 'secondary' | 'main';
 
-// Field-crop and greenhouse specific interfaces
 export interface FieldCropZone {
     id: string;
     name: string;
-    area: number; // square meters
+    area: number; 
     areaInRai: number;
     coordinates: any[];
     cropType?: string;
@@ -277,7 +289,7 @@ export interface FieldCropZone {
 export interface GreenhousePlot {
     plotId: string;
     plotName: string;
-    area: number; // square meters
+    area: number; 
     cropType?: string;
     totalPlants: number;
     waterRequirementPerIrrigation: number;
@@ -303,5 +315,5 @@ export interface ProjectModeConfig {
     usesPump: boolean;
     supportsMultiZone: boolean;
     areaUnit: 'rai' | 'sqm';
-    itemName: string; // 'ต้นไม้' | 'หัวฉีด' etc.
+    itemName: string;
 }
