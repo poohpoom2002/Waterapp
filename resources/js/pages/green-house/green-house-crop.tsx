@@ -80,10 +80,6 @@ export default function GreenhouseCrop({ cropType, crops }) {
         return language === 'th' ? (crop.nameTh || crop.name) : (crop.nameEn || crop.name);
     };
 
-    const getCropDisplayDescription = (crop: Crop) => {
-        return language === 'th' ? (crop.descriptionTh || crop.description) : (crop.descriptionEn || crop.description);
-    };
-
     const getCategoryDisplayName = (categoryKey: string) => {
         const category = categories[categoryKey];
         if (!category) return categoryKey;

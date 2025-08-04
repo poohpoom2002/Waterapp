@@ -3,9 +3,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Navbar from '../../components/Navbar';
 import { Head, Link, router } from '@inertiajs/react';
 import { Wrapper, Status } from '@googlemaps/react-wrapper';
-import { getCropByValue } from '@/pages/utils/cropData';
 import { PIPE_TYPES, EQUIPMENT_TYPES, type EquipmentType } from '@/pages/utils/fieldMapConstants';
-import { useMapState, useStepWizard, useFieldZoneState, usePipeSystemState, useEquipmentState } from '@/pages/hooks/useFieldMapState';
+import { useMapState, useStepWizard, usePipeSystemState, useEquipmentState } from '@/pages/hooks/useFieldMapState';
 import ErrorBoundary from '@/pages/components/ErrorBoundary';
 import ErrorMessage from '@/pages/components/ErrorMessage';
 import LoadingSpinner from '@/pages/components/LoadingSpinner';
@@ -114,12 +113,6 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
             drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYLINE);
         }
     };
-    
-    const stopDrawing = () => {
-        if (drawingManager) {
-            drawingManager.setDrawingMode(null);
-        }
-    };
 
     return (
         <>
@@ -147,13 +140,11 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
 export default function Step3_PipeSystem() {
     const mapState = useMapState();
     const stepWizard = useStepWizard();
-    const fieldZoneState = useFieldZoneState();
     const pipeSystemState = usePipeSystemState();
     const equipmentState = useEquipmentState();
 
     const { mapCenter, setMapCenter, mapZoom, setMapZoom, mapType } = mapState;
     const { setCurrentStep, setStepCompleted } = stepWizard;
-    const { mainField, setMainField, zones, setZones, obstacles, setObstacles } = fieldZoneState;
     const { pipes, setPipes, currentPipeType, setCurrentPipeType } = pipeSystemState;
     const { equipmentIcons, setEquipmentIcons, isPlacingEquipment, setIsPlacingEquipment, selectedEquipmentType, setSelectedEquipmentType } = equipmentState;
 
@@ -173,7 +164,9 @@ export default function Step3_PipeSystem() {
                 }
                 setMapCenter(data.mapCenter);
                 setMapZoom(data.mapZoom);
-            } catch (e) { router.visit('/step1-field-area'); }
+            } catch {
+                router.visit('/step1-field-area');
+            }
         } else {
             router.visit('/step1-field-area');
         }

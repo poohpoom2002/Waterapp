@@ -1,8 +1,3 @@
-/* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// green-house-summary.tsx - Updated to integrate with product page and include Navbar
-
 import { Head } from '@inertiajs/react';
 import { useState, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
@@ -11,6 +6,11 @@ import { greenhouseCrops, getCropByValue } from '../components/Greenhouse/CropDa
 import { saveGreenhouseData, GreenhousePlanningData, calculateAllGreenhouseStats } from '@/utils/greenHouseData';
 import Navbar from '../../components/Navbar';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { 
+    calculatePlotBasedWaterRequirements, 
+    PlotBasedWaterSummary,
+    type PlotWaterCalculation
+} from '../components/Greenhouse/WaterCalculation';
 
 interface Point {
     x: number;
@@ -402,7 +402,7 @@ export default function GreenhouseSummary() {
                         selectedCrops: crops ? crops.split(',') : [],
                         planningMethod: (method as 'draw' | 'import') || 'draw',
                         shapes: shapesParam ? JSON.parse(decodeURIComponent(shapesParam)) : [],
-                        irrigationMethod: (irrigationParam as any) || 'mini-sprinkler',
+                        irrigationMethod: (irrigationParam as 'mini-sprinkler' | 'drip' | 'mixed') || 'mini-sprinkler',
                         irrigationElements: [], // Initialize empty array for irrigation elements
                         createdAt: new Date().toISOString(),
                     };
@@ -415,7 +415,7 @@ export default function GreenhouseSummary() {
                 selectedCrops: crops ? crops.split(',') : [],
                 planningMethod: (method as 'draw' | 'import') || 'draw',
                 shapes: shapesParam ? JSON.parse(decodeURIComponent(shapesParam)) : [],
-                irrigationMethod: (irrigationParam as any) || 'mini-sprinkler',
+                irrigationMethod: (irrigationParam as 'mini-sprinkler' | 'drip' | 'mixed') || 'mini-sprinkler',
                 irrigationElements: [], // Initialize empty array for irrigation elements
                 createdAt: new Date().toISOString(),
             };
@@ -694,6 +694,53 @@ export default function GreenhouseSummary() {
     };
 
     const plotPipeData = calculatePipeInPlots();
+
+    // Calculate water requirements for each plot
+    const calculateWaterRequirements = () => {
+        if (!summaryData?.shapes) {
+            return {
+                waterSummary: null,
+                plotWaterCalculations: []
+            };
+        }
+
+        const plots = summaryData.shapes.filter((s) => s.type === 'plot');
+        
+        if (plots.length === 0) {
+            return {
+                waterSummary: null,
+                plotWaterCalculations: []
+            };
+        }
+
+        // Convert shapes to format expected by water calculation
+        const shapesForWaterCalc = plots.map(plot => ({
+            id: plot.id,
+            type: plot.type,
+            name: plot.name,
+            points: plot.points,
+            cropType: plot.cropType || (summaryData.selectedCrops && summaryData.selectedCrops[0]) || 'tomato'
+        }));
+
+        try {
+            const waterSummary = calculatePlotBasedWaterRequirements(shapesForWaterCalc);
+            return {
+                waterSummary,
+                plotWaterCalculations: waterSummary.plotCalculations
+            };
+        } catch (error) {
+            console.error('Error calculating water requirements:', error);
+            return {
+                waterSummary: null,
+                plotWaterCalculations: []
+            };
+        }
+    };
+
+    const { waterSummary, plotWaterCalculations }: {
+        waterSummary: PlotBasedWaterSummary | null;
+        plotWaterCalculations: PlotWaterCalculation[];
+    } = calculateWaterRequirements();
 
     // Calculate metrics from shapes data
     const calculateMetrics = () => {
@@ -1085,17 +1132,17 @@ export default function GreenhouseSummary() {
         });
     };
 
-    // Simple print function that shows browser print dialog
-    const handlePrint = () => {
+    // Print function for browser print dialog - available for future use
+    const handlePrint = (): void => {
         window.print();
     };
 
-    // Temporarily disable the save data button
-    const handleSaveData = () => {
-        alert(
-            t('ฟีเจอร์การบันทึกข้อมูลยังอยู่ระหว่างการพัฒนา กรุณารอการอัพเดทในเวอร์ชันถัดไป')
-        );
-    };
+    // Add to window object for potential debugging or future use
+    if (typeof window !== 'undefined') {
+        (window as Window & { debugHandlePrint?: () => void }).debugHandlePrint = handlePrint;
+    }
+
+
 
     // Update canvas when data changes
     useEffect(() => {
@@ -1687,8 +1734,70 @@ export default function GreenhouseSummary() {
 
                             <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-4">
                                 <h2 className="mb-3 text-lg font-bold text-purple-400 print:text-lg print:text-black">
-                                    ⚙️ {t('สรุปอุปกรณ์การให้น้ำ')}
+                                    💧 {t('สรุปความต้องการน้ำ')}
                                 </h2>
+                                
+                                {waterSummary && (
+                                    <div className="mb-4 space-y-3">
+                                        <div className="grid grid-cols-3 gap-2 print:gap-3">
+                                            <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
+                                                <div className="text-sm font-bold text-blue-400 print:text-sm print:text-black">
+                                                    {waterSummary.dailyTotal.optimal.toFixed(1)} {t('ลิตร/วัน')}
+                                                </div>
+                                                <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
+                                                    {t('น้ำที่ต้องการต่อวัน')}
+                                                </div>
+                                            </div>
+                                            <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
+                                                <div className="text-sm font-bold text-green-400 print:text-sm print:text-black">
+                                                    {waterSummary.weeklyTotal.optimal.toFixed(1)} {t('ลิตร/สัปดาห์')}
+                                                </div>
+                                                <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
+                                                    {t('น้ำที่ต้องการต่อสัปดาห์')}
+                                                </div>
+                                            </div>
+                                            <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
+                                                <div className="text-sm font-bold text-purple-400 print:text-sm print:text-black">
+                                                    {waterSummary.monthlyTotal.optimal.toFixed(1)} {t('ลิตร/เดือน')}
+                                                </div>
+                                                <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
+                                                    {t('น้ำที่ต้องการต่อเดือน')}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-3 gap-2 print:gap-3">
+                                            <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
+                                                <div className="text-sm font-bold text-cyan-400 print:text-sm print:text-black">
+                                                    {waterSummary.totalPlants}
+                                                </div>
+                                                <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
+                                                    {t('จำนวนต้นพืชทั้งหมด')}
+                                                </div>
+                                            </div>
+                                            <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
+                                                <div className="text-sm font-bold text-yellow-400 print:text-sm print:text-black">
+                                                    {waterSummary.waterIntensityStats.averageIntensity.toFixed(1)} {t('ลิตร/ตร.ม./วัน')}
+                                                </div>
+                                                <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
+                                                    {t('ความเข้มข้นน้ำเฉลี่ย')}
+                                                </div>
+                                            </div>
+                                            <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
+                                                <div className="text-sm font-bold text-pink-400 print:text-sm print:text-black">
+                                                    {waterSummary.plantingEfficiency.utilizationRate.toFixed(1)}%
+                                                </div>
+                                                <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
+                                                    {t('อัตราการใช้พื้นที่')}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <h3 className="mb-3 text-lg font-bold text-purple-400 print:text-lg print:text-black">
+                                    ⚙️ {t('สรุปอุปกรณ์การให้น้ำ')}
+                                </h3>
 
                                 <div className="mb-3">
                                     <h3 className="mb-2 text-sm font-semibold text-orange-400 print:text-sm print:text-black">
@@ -1876,93 +1985,184 @@ export default function GreenhouseSummary() {
                             <div className="hidden print:mt-6 print:block">
                                 <div className="border border-gray-300 bg-white p-4">
                                     <h3 className="mb-3 text-sm font-bold text-black">
-                                        🌱 {t('ข้อมูลการปลูก')}
+                                        🌱 {t('ข้อมูลการปลูกและความต้องการน้ำ')}
                                     </h3>
+                                    
+                                    {waterSummary && (
+                                        <div className="mb-4 border-b border-gray-200 pb-3">
+                                            <h4 className="mb-2 text-sm font-bold text-black">
+                                                💧 {t('สรุปความต้องการน้ำทั้งหมด')}
+                                            </h4>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                    <div className="text-xs font-bold text-black">
+                                                        {waterSummary.dailyTotal.optimal.toFixed(1)} {t('ลิตร/วัน')}
+                                                    </div>
+                                                    <div className="text-xs text-gray-600">
+                                                        {t('น้ำที่ต้องการต่อวัน')}
+                                                    </div>
+                                                </div>
+                                                <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                    <div className="text-xs font-bold text-black">
+                                                        {waterSummary.weeklyTotal.optimal.toFixed(1)} {t('ลิตร/สัปดาห์')}
+                                                    </div>
+                                                    <div className="text-xs text-gray-600">
+                                                        {t('น้ำที่ต้องการต่อสัปดาห์')}
+                                                    </div>
+                                                </div>
+                                                <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                    <div className="text-xs font-bold text-black">
+                                                        {waterSummary.monthlyTotal.optimal.toFixed(1)} {t('ลิตร/เดือน')}
+                                                    </div>
+                                                    <div className="text-xs text-gray-600">
+                                                        {t('น้ำที่ต้องการต่อเดือน')}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                     <div className="space-y-3">
-                                        {plotPipeData.length > 0 ? (
-                                            plotPipeData.map((plot, index) => (
+                                        {plotWaterCalculations.length > 0 ? (
+                                            plotWaterCalculations.map((plotWater, index) => {
+                                                const plotPipe = plotPipeData.find(p => p.plotName === plotWater.plotName) || plotPipeData[index];
+                                                return (
                                                 <div
                                                     key={index}
                                                     className="border-b border-gray-200 pb-3"
                                                 >
                                                     <div className="mb-2 flex items-center justify-between">
                                                         <span className="text-sm font-semibold text-gray-700">
-                                                            {getCropIcon(plot.cropType)}{' '}
-                                                            {plot.plotName}
+                                                            {getCropIcon(plotWater.cropType)}{' '}
+                                                            {plotWater.plotName}
                                                         </span>
                                                         <span className="text-xs text-gray-500">
                                                             {t('สภาพแวดล้อมควบคุม')}
                                                         </span>
                                                     </div>
                                                     <p className="mb-2 text-xs text-gray-600">
-                                                        {t('พืชที่ปลูก')}: {plot.cropType}
+                                                        {t('พืชที่ปลูก')}: {plotWater.cropName}
                                                     </p>
 
-                                                    {plot.hasPipes ? (
-                                                        <div className="space-y-2">
-                                                            <div className="grid grid-cols-3 gap-2">
-                                                                <div className="border border-gray-200 bg-gray-50 p-2 text-center">
-                                                                    <div className="text-xs font-bold text-black">
-                                                                        {plot.maxMainPipeLength.toFixed(1)} {t('เมตร')}
-                                                                    </div>
-                                                                    <div className="text-xs text-gray-600">
-                                                                        {t('ท่อเมนสูงสุด')}
-                                                                    </div>
+                                                    {/* Water Requirements for this plot */}
+                                                    <div className="mb-3 border border-gray-200 bg-gray-50 p-2">
+                                                        <h5 className="mb-2 text-xs font-bold text-black">
+                                                            💧 {t('ความต้องการน้ำ')}
+                                                        </h5>
+                                                        <div className="grid grid-cols-3 gap-1">
+                                                            <div className="border border-gray-200 bg-white p-1 text-center">
+                                                                <div className="text-xs font-bold text-black">
+                                                                    {plotWater.dailyWaterNeed.optimal.toFixed(1)} {t('ลิตร/วัน')}
                                                                 </div>
-                                                                <div className="border border-gray-200 bg-gray-50 p-2 text-center">
-                                                                    <div className="text-xs font-bold text-black">
-                                                                        {plot.maxSubPipeLength.toFixed(1)} {t('เมตร')}
-                                                                    </div>
-                                                                    <div className="text-xs text-gray-600">
-                                                                        {t('ท่อย่อยสูงสุด')}
-                                                                    </div>
-                                                                </div>
-                                                                <div className="border border-gray-200 bg-gray-50 p-2 text-center">
-                                                                    <div className="text-xs font-bold text-black">
-                                                                        {plot.maxTotalPipeLength.toFixed(1)} {t('เมตร')}
-                                                                    </div>
-                                                                    <div className="text-xs text-gray-600">
-                                                                        {t('ความยาวสูงสุดรวม')}
-                                                                    </div>
+                                                                <div className="text-xs text-gray-600">
+                                                                    {t('ต่อวัน')}
                                                                 </div>
                                                             </div>
-                                                            <div className="grid grid-cols-3 gap-2">
-                                                                <div className="border border-gray-200 bg-gray-50 p-2 text-center">
-                                                                    <div className="text-xs font-bold text-black">
-                                                                        {plot.totalMainPipeLength.toFixed(1)} {t('เมตร')}
-                                                                    </div>
-                                                                    <div className="text-xs text-gray-600">
-                                                                        {t('ท่อเมนทั้งหมด')}
-                                                                    </div>
+                                                            <div className="border border-gray-200 bg-white p-1 text-center">
+                                                                <div className="text-xs font-bold text-black">
+                                                                    {plotWater.weeklyWaterNeed.optimal.toFixed(1)} {t('ลิตร/สัปดาห์')}
                                                                 </div>
-                                                                <div className="border border-gray-200 bg-gray-50 p-2 text-center">
-                                                                    <div className="text-xs font-bold text-black">
-                                                                        {plot.totalSubPipeLength.toFixed(1)} {t('เมตร')}
-                                                                    </div>
-                                                                    <div className="text-xs text-gray-600">
-                                                                        {t('ท่อย่อยทั้งหมด')}
-                                                                    </div>
+                                                                <div className="text-xs text-gray-600">
+                                                                    {t('ต่อสัปดาห์')}
                                                                 </div>
-                                                                <div className="border border-gray-200 bg-gray-50 p-2 text-center">
-                                                                    <div className="text-xs font-bold text-black">
-                                                                        {plot.totalPipeLength.toFixed(1)} {t('เมตร')}
-                                                                    </div>
-                                                                    <div className="text-xs text-gray-600">
-                                                                        {t('ความยาวรวมทั้งหมด')}
-                                                                    </div>
+                                                            </div>
+                                                            <div className="border border-gray-200 bg-white p-1 text-center">
+                                                                <div className="text-xs font-bold text-black">
+                                                                    {plotWater.monthlyWaterNeed.optimal.toFixed(1)} {t('ลิตร/เดือน')}
+                                                                </div>
+                                                                <div className="text-xs text-gray-600">
+                                                                    {t('ต่อเดือน')}
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                    ) : (
-                                                        <div className="border border-gray-200 bg-gray-50 p-2 text-center">
-                                                            <span className="text-xs text-gray-600">
-                                                                {t('ไม่มีระบบท่อในแปลงนี้')}
-                                                            </span>
+                                                        <div className="mt-2 grid grid-cols-2 gap-1">
+                                                            <div className="border border-gray-200 bg-white p-1 text-center">
+                                                                <div className="text-xs font-bold text-black">
+                                                                    {plotWater.totalPlants} {t('ต้น')}
+                                                                </div>
+                                                                <div className="text-xs text-gray-600">
+                                                                    {t('จำนวนพืช')}
+                                                                </div>
+                                                            </div>
+                                                            <div className="border border-gray-200 bg-white p-1 text-center">
+                                                                <div className="text-xs font-bold text-black">
+                                                                    {plotWater.waterIntensity.litersPerSquareMeter.toFixed(1)} {t('ลิตร/ตร.ม./วัน')}
+                                                                </div>
+                                                                <div className="text-xs text-gray-600">
+                                                                    {t('ความเข้มข้นน้ำ')}
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                    )}
-                                                </div>
-                                            ))
-                                        ) : (
+                                                    </div>
+
+                                                                                                         {plotPipe && plotPipe.hasPipes ? (
+                                                         <div className="space-y-2">
+                                                             <h5 className="mb-2 text-xs font-bold text-black">
+                                                                 🔧 {t('ระบบท่อ')}
+                                                             </h5>
+                                                             <div className="grid grid-cols-3 gap-2">
+                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                                     <div className="text-xs font-bold text-black">
+                                                                         {plotPipe.maxMainPipeLength.toFixed(1)} {t('เมตร')}
+                                                                     </div>
+                                                                     <div className="text-xs text-gray-600">
+                                                                         {t('ท่อเมนสูงสุด')}
+                                                                     </div>
+                                                                 </div>
+                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                                     <div className="text-xs font-bold text-black">
+                                                                         {plotPipe.maxSubPipeLength.toFixed(1)} {t('เมตร')}
+                                                                     </div>
+                                                                     <div className="text-xs text-gray-600">
+                                                                         {t('ท่อย่อยสูงสุด')}
+                                                                     </div>
+                                                                 </div>
+                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                                     <div className="text-xs font-bold text-black">
+                                                                         {plotPipe.maxTotalPipeLength.toFixed(1)} {t('เมตร')}
+                                                                     </div>
+                                                                     <div className="text-xs text-gray-600">
+                                                                         {t('ความยาวสูงสุดรวม')}
+                                                                     </div>
+                                                                 </div>
+                                                             </div>
+                                                             <div className="grid grid-cols-3 gap-2">
+                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                                     <div className="text-xs font-bold text-black">
+                                                                         {plotPipe.totalMainPipeLength.toFixed(1)} {t('เมตร')}
+                                                                     </div>
+                                                                     <div className="text-xs text-gray-600">
+                                                                         {t('ท่อเมนทั้งหมด')}
+                                                                     </div>
+                                                                 </div>
+                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                                     <div className="text-xs font-bold text-black">
+                                                                         {plotPipe.totalSubPipeLength.toFixed(1)} {t('เมตร')}
+                                                                     </div>
+                                                                     <div className="text-xs text-gray-600">
+                                                                         {t('ท่อย่อยทั้งหมด')}
+                                                                     </div>
+                                                                 </div>
+                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                                     <div className="text-xs font-bold text-black">
+                                                                         {plotPipe.totalPipeLength.toFixed(1)} {t('เมตร')}
+                                                                     </div>
+                                                                     <div className="text-xs text-gray-600">
+                                                                         {t('ความยาวรวมทั้งหมด')}
+                                                                     </div>
+                                                                 </div>
+                                                             </div>
+                                                         </div>
+                                                     ) : (
+                                                         <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                             <span className="text-xs text-gray-600">
+                                                                 {t('ไม่มีระบบท่อในแปลงนี้')}
+                                                             </span>
+                                                         </div>
+                                                     )}
+                                                 </div>
+                                             );
+                                         })
+                                         ) : (
                                             <>
                                                 {summaryData?.selectedCrops?.map((crop, index) => (
                                                     <div
@@ -1989,98 +2189,155 @@ export default function GreenhouseSummary() {
 
                             <div className="rounded-lg bg-gray-800 p-4 print:hidden">
                                 <h2 className="mb-3 text-lg font-bold text-yellow-400">
-                                    🌱 {t('ข้อมูลการปลูก')}
+                                    🌱 {t('ข้อมูลการปลูกและความต้องการน้ำ')}
                                 </h2>
                                 <div className="space-y-3">
-                                    {plotPipeData.length > 0 ? (
-                                        plotPipeData.map((plot, index) => (
-                                            <div key={index} className="rounded-lg bg-gray-700 p-3">
-                                                <div className="mb-2 flex items-center justify-between">
-                                                    <div className="flex items-center space-x-2">
-                                                        <span className="text-lg">
-                                                            {getCropIcon(plot.cropType)}
-                                                        </span>
-                                                        <div>
-                                                            <h3 className="text-sm font-semibold text-white">
-                                                                {plot.plotName}
-                                                            </h3>
-                                                            <p className="text-xs text-gray-400">
-                                                                {t('พืชที่ปลูก')}: {plot.cropType}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <div className="text-xs text-gray-400">
-                                                            {t('สภาพแวดล้อมควบคุม')}
-                                                        </div>
-                                                    </div>
-                                                </div>
+                                    {plotWaterCalculations.length > 0 ? (
+                                        plotWaterCalculations.map((plotWater, index) => {
+                                            const plotPipe = plotPipeData.find(p => p.plotName === plotWater.plotName) || plotPipeData[index];
+                                                                                         return (
+                                             <div key={index} className="rounded-lg bg-gray-700 p-3">
+                                                 <div className="mb-2 flex items-center justify-between">
+                                                     <div className="flex items-center space-x-2">
+                                                         <span className="text-lg">
+                                                             {getCropIcon(plotWater.cropType)}
+                                                         </span>
+                                                         <div>
+                                                             <h3 className="text-sm font-semibold text-white">
+                                                                 {plotWater.plotName}
+                                                             </h3>
+                                                             <p className="text-xs text-gray-400">
+                                                                 {t('พืชที่ปลูก')}: {plotWater.cropName}
+                                                             </p>
+                                                         </div>
+                                                     </div>
+                                                     <div className="text-right">
+                                                         <div className="text-xs text-gray-400">
+                                                             {t('สภาพแวดล้อมควบคุม')}
+                                                         </div>
+                                                     </div>
+                                                 </div>
 
-                                                {plot.hasPipes ? (
-                                                    <div className="mt-2 space-y-2">
-                                                        <div className="grid grid-cols-3 gap-2">
-                                                            <div className="rounded bg-gray-600 p-2 text-center">
-                                                                <div className="text-xs font-bold text-blue-400">
-                                                                    {plot.maxMainPipeLength.toFixed(1)} {t('เมตร')}
-                                                                </div>
-                                                                <div className="text-xs text-gray-400">
-                                                                    {t('ท่อเมนสูงสุด')}
-                                                                </div>
-                                                            </div>
-                                                            <div className="rounded bg-gray-600 p-2 text-center">
-                                                                <div className="text-xs font-bold text-green-400">
-                                                                    {plot.maxSubPipeLength.toFixed(1)} {t('เมตร')}
-                                                                </div>
-                                                                <div className="text-xs text-gray-400">
-                                                                    {t('ท่อย่อยสูงสุด')}
-                                                                </div>
-                                                            </div>
-                                                            <div className="rounded bg-gray-600 p-2 text-center">
-                                                                <div className="text-xs font-bold text-purple-400">
-                                                                    {plot.maxTotalPipeLength.toFixed(1)} {t('เมตร')}
-                                                                </div>
-                                                                <div className="text-xs text-gray-400">
-                                                                    {t('ความยาวสูงสุดรวม')}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div className="grid grid-cols-3 gap-2">
-                                                            <div className="rounded bg-gray-600 p-2 text-center">
-                                                                <div className="text-xs font-bold text-cyan-400">
-                                                                    {plot.totalMainPipeLength.toFixed(1)} {t('เมตร')}
-                                                                </div>
-                                                                <div className="text-xs text-gray-400">
-                                                                    {t('ท่อเมนทั้งหมด')}
-                                                                </div>
-                                                            </div>
-                                                            <div className="rounded bg-gray-600 p-2 text-center">
-                                                                <div className="text-xs font-bold text-yellow-400">
-                                                                    {plot.totalSubPipeLength.toFixed(1)} {t('เมตร')}
-                                                                </div>
-                                                                <div className="text-xs text-gray-400">
-                                                                    {t('ท่อย่อยทั้งหมด')}
-                                                                </div>
-                                                            </div>
-                                                            <div className="rounded bg-gray-600 p-2 text-center">
-                                                                <div className="text-xs font-bold text-pink-400">
-                                                                    {plot.totalPipeLength.toFixed(1)} {t('เมตร')}
-                                                                </div>
-                                                                <div className="text-xs text-gray-400">
-                                                                    {t('ความยาวรวมทั้งหมด')}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <div className="mt-2 rounded bg-gray-600 p-2 text-center">
-                                                        <span className="text-xs text-gray-400">
-                                                            {t('ไม่มีระบบท่อในแปลงนี้')}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))
-                                    ) : (
+                                                 {/* Water Requirements Section */}
+                                                 <div className="mb-3 rounded bg-gray-600 p-2">
+                                                     <h4 className="mb-2 text-xs font-semibold text-cyan-400">
+                                                         💧 {t('ความต้องการน้ำ')}
+                                                     </h4>
+                                                     <div className="grid grid-cols-3 gap-1">
+                                                         <div className="rounded bg-gray-500 p-1 text-center">
+                                                             <div className="text-xs font-bold text-blue-400">
+                                                                 {plotWater.dailyWaterNeed.optimal.toFixed(1)} {t('ลิตร/วัน')}
+                                                             </div>
+                                                             <div className="text-xs text-gray-300">
+                                                                 {t('ต่อวัน')}
+                                                             </div>
+                                                         </div>
+                                                         <div className="rounded bg-gray-500 p-1 text-center">
+                                                             <div className="text-xs font-bold text-green-400">
+                                                                 {plotWater.weeklyWaterNeed.optimal.toFixed(1)} {t('ลิตร/สัปดาห์')}
+                                                             </div>
+                                                             <div className="text-xs text-gray-300">
+                                                                 {t('ต่อสัปดาห์')}
+                                                             </div>
+                                                         </div>
+                                                         <div className="rounded bg-gray-500 p-1 text-center">
+                                                             <div className="text-xs font-bold text-purple-400">
+                                                                 {plotWater.monthlyWaterNeed.optimal.toFixed(1)} {t('ลิตร/เดือน')}
+                                                             </div>
+                                                             <div className="text-xs text-gray-300">
+                                                                 {t('ต่อเดือน')}
+                                                             </div>
+                                                         </div>
+                                                     </div>
+                                                     <div className="mt-2 grid grid-cols-2 gap-1">
+                                                         <div className="rounded bg-gray-500 p-1 text-center">
+                                                             <div className="text-xs font-bold text-yellow-400">
+                                                                 {plotWater.totalPlants} {t('ต้น')}
+                                                             </div>
+                                                             <div className="text-xs text-gray-300">
+                                                                 {t('จำนวนพืช')}
+                                                             </div>
+                                                         </div>
+                                                         <div className="rounded bg-gray-500 p-1 text-center">
+                                                             <div className="text-xs font-bold text-pink-400">
+                                                                 {plotWater.waterIntensity.litersPerSquareMeter.toFixed(1)} {t('ลิตร/ตร.ม./วัน')}
+                                                             </div>
+                                                             <div className="text-xs text-gray-300">
+                                                                 {t('ความเข้มข้นน้ำ')}
+                                                             </div>
+                                                         </div>
+                                                     </div>
+                                                 </div>
+
+                                                                                                  {plotPipe && plotPipe.hasPipes ? (
+                                                     <div className="mt-2 space-y-2">
+                                                         <h4 className="mb-2 text-xs font-semibold text-orange-400">
+                                                             🔧 {t('ระบบท่อ')}
+                                                         </h4>
+                                                         <div className="grid grid-cols-3 gap-2">
+                                                             <div className="rounded bg-gray-600 p-2 text-center">
+                                                                 <div className="text-xs font-bold text-blue-400">
+                                                                     {plotPipe.maxMainPipeLength.toFixed(1)} {t('เมตร')}
+                                                                 </div>
+                                                                 <div className="text-xs text-gray-400">
+                                                                     {t('ท่อเมนสูงสุด')}
+                                                                 </div>
+                                                             </div>
+                                                             <div className="rounded bg-gray-600 p-2 text-center">
+                                                                 <div className="text-xs font-bold text-green-400">
+                                                                     {plotPipe.maxSubPipeLength.toFixed(1)} {t('เมตร')}
+                                                                 </div>
+                                                                 <div className="text-xs text-gray-400">
+                                                                     {t('ท่อย่อยสูงสุด')}
+                                                                 </div>
+                                                             </div>
+                                                             <div className="rounded bg-gray-600 p-2 text-center">
+                                                                 <div className="text-xs font-bold text-purple-400">
+                                                                     {plotPipe.maxTotalPipeLength.toFixed(1)} {t('เมตร')}
+                                                                 </div>
+                                                                 <div className="text-xs text-gray-400">
+                                                                     {t('ความยาวสูงสุดรวม')}
+                                                                 </div>
+                                                             </div>
+                                                         </div>
+                                                         <div className="grid grid-cols-3 gap-2">
+                                                             <div className="rounded bg-gray-600 p-2 text-center">
+                                                                 <div className="text-xs font-bold text-cyan-400">
+                                                                     {plotPipe.totalMainPipeLength.toFixed(1)} {t('เมตร')}
+                                                                 </div>
+                                                                 <div className="text-xs text-gray-400">
+                                                                     {t('ท่อเมนทั้งหมด')}
+                                                                 </div>
+                                                             </div>
+                                                             <div className="rounded bg-gray-600 p-2 text-center">
+                                                                 <div className="text-xs font-bold text-yellow-400">
+                                                                     {plotPipe.totalSubPipeLength.toFixed(1)} {t('เมตร')}
+                                                                 </div>
+                                                                 <div className="text-xs text-gray-400">
+                                                                     {t('ท่อย่อยทั้งหมด')}
+                                                                 </div>
+                                                             </div>
+                                                             <div className="rounded bg-gray-600 p-2 text-center">
+                                                                 <div className="text-xs font-bold text-pink-400">
+                                                                     {plotPipe.totalPipeLength.toFixed(1)} {t('เมตร')}
+                                                                 </div>
+                                                                 <div className="text-xs text-gray-400">
+                                                                     {t('ความยาวรวมทั้งหมด')}
+                                                                 </div>
+                                                             </div>
+                                                         </div>
+                                                     </div>
+                                                 ) : (
+                                                     <div className="mt-2 rounded bg-gray-600 p-2 text-center">
+                                                         <span className="text-xs text-gray-400">
+                                                             {t('ไม่มีระบบท่อในแปลงนี้')}
+                                                         </span>
+                                                     </div>
+                                                 )}
+                                             </div>
+                                         );
+                                     })
+                                     ) : (
                                         <>
                                             {summaryData?.selectedCrops?.map((crop, index) => (
                                                 <div

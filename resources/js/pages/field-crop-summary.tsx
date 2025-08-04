@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Head, Link, router } from '@inertiajs/react';
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
 import { useState, useEffect, useRef } from 'react';
@@ -7,19 +5,147 @@ import * as turf from '@turf/turf';
 import { getCropByValue } from '@/pages/utils/cropData';
 import { calculateEnhancedFieldStats, saveEnhancedFieldCropData, FieldCropData } from '@/utils/fieldCropData';
 import {
-    ZONE_COLORS,
-    OBSTACLE_TYPES,
     PIPE_TYPES,
-    MAP_TILES,
     EQUIPMENT_TYPES,
     type PipeType,
     type EquipmentType,
-    type ObstacleType,
 } from '@/pages/utils/fieldMapConstants';
 import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
 import { useLanguage } from '../contexts/LanguageContext';
-import { fieldCropTranslations } from '../contexts/translations/fieldcrop';
+
+// Proper TypeScript interfaces
+interface Coordinate {
+    lat: number;
+    lng: number;
+}
+
+interface Zone {
+    id: string | number;
+    name: string;
+    color: string;
+    coordinates: Coordinate[];
+}
+
+interface Pipe {
+    id: string | number;
+    type: string;
+    coordinates: Coordinate[];
+    color?: string;
+    zoneId?: string | number;
+    pathOptions?: {
+        color: string;
+    };
+}
+
+interface Equipment {
+    id: string | number;
+    type: string;
+    lat: number;
+    lng: number;
+    name?: string;
+}
+
+interface IrrigationPoint {
+    id: string | number;
+    lat: number;
+    lng: number;
+    type: string;
+    radius?: number;
+    position?: [number, number];
+}
+
+interface IrrigationLine {
+    id: string | number;
+    coordinates: Coordinate[];
+    type: string;
+}
+
+interface MainField {
+    coordinates: Coordinate[];
+}
+
+interface ZoneSummary {
+    zoneId: string;
+    zoneName: string;
+    cropName: string;
+    cropValue: string | null;
+    cropIcon: string;
+    cropCategory: string | null;
+    zoneArea: number;
+    zoneAreaRai: number;
+    rowSpacing: number;
+    plantSpacing: number;
+    totalPlantingPoints: number;
+    estimatedYield: number;
+    estimatedPrice: number;
+    waterRequirementPerIrrigation: number;
+    waterRequirementPerDay: number;
+    cropYieldPerRai: number;
+    cropPricePerKg: number;
+    cropWaterPerPlant: number;
+    cropWaterPerPlantPerIrrigation: number;
+    growthPeriod: number;
+    irrigationNeeds: string;
+    irrigationType: string;
+    calculationMethod?: string;
+}
+
+interface FieldCropSummaryProps {
+    mainField?: MainField;
+    fieldAreaSize?: number;
+    selectedCrops?: string[];
+    zones?: Zone[];
+    zoneAssignments?: Record<string, string>;
+    zoneSummaries?: Record<string, ZoneSummary>;
+    pipes?: Pipe[];
+    equipmentIcons?: Equipment[];
+    irrigationPoints?: IrrigationPoint[];
+    irrigationLines?: IrrigationLine[];
+    irrigationAssignments?: Record<string, string>;
+    irrigationSettings?: Record<string, unknown>;
+    rowSpacing?: Record<string, number>;
+    plantSpacing?: Record<string, number>;
+    mapCenter?: [number, number];
+    mapZoom?: number;
+    mapType?: string;
+    summary?: Record<string, unknown>;
+    equipment?: Equipment[];
+}
+
+interface GoogleMapsDisplayProps {
+    center: [number, number];
+    zoom: number;
+    mainField?: MainField;
+    zones: Zone[];
+    pipes: Pipe[];
+    equipment: Equipment[];
+    irrigationPoints: IrrigationPoint[];
+    irrigationLines: IrrigationLine[];
+    onMapReady?: (map: google.maps.Map) => void;
+}
+
+// Additional type definitions for pipe calculations
+interface PipeStats {
+    count: number;
+    longestLength: number;
+    totalLength: number;
+}
+
+interface ZonePipeStats {
+    main: PipeStats;
+    submain: PipeStats;
+    lateral: PipeStats;
+    total: number;
+    totalLength: number;
+    totalLongestLength: number;
+}
+
+interface CoordinateArray extends Array<number> {
+    0: number;
+    1: number;
+}
+
+type CoordinateInput = Coordinate | CoordinateArray;
 
 // Enhanced Google Maps component for better image capture
 const GoogleMapsDisplay = ({
@@ -32,17 +158,7 @@ const GoogleMapsDisplay = ({
     irrigationPoints,
     irrigationLines,
     onMapReady
-}: {
-    center: [number, number];
-    zoom: number;
-    mainField: any;
-    zones: any[];
-    pipes: any[];
-    equipment: any[];
-    irrigationPoints: any[];
-    irrigationLines: any[];
-    onMapReady?: (map: google.maps.Map) => void;
-}) => {
+}: GoogleMapsDisplayProps) => {
     const { t } = useLanguage();
     const mapRef = useRef<HTMLDivElement>(null);
     const googleMapRef = useRef<google.maps.Map | null>(null);
@@ -54,7 +170,7 @@ const GoogleMapsDisplay = ({
         if (!window.google?.maps) {
             const loadGoogleMaps = () => {
                 const script = document.createElement('script');
-                script.src = `https://maps.googleapis.com/maps/api/js?key=YOUR_Maps_API_KEY&libraries=geometry,drawing`;
+                script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.GOOGLE_MAPS_API_KEY}&libraries=geometry,drawing`;
                 script.async = true;
                 script.defer = true;
                 script.onload = () => {
@@ -93,7 +209,7 @@ const GoogleMapsDisplay = ({
 
             // Draw main field boundary
             if (mainField && mainField.coordinates && Array.isArray(mainField.coordinates)) {
-                const fieldPath = mainField.coordinates.map((coord: any) => {
+                const fieldPath = mainField.coordinates.map((coord: Coordinate) => {
                     if (Array.isArray(coord)) {
                         return { lat: coord[0], lng: coord[1] };
                     }
@@ -114,7 +230,7 @@ const GoogleMapsDisplay = ({
             // Draw zones
             zones.forEach((zone) => {
                 if (zone.coordinates && Array.isArray(zone.coordinates)) {
-                    const zonePath = zone.coordinates.map((coord: any) => {
+                    const zonePath = zone.coordinates.map((coord: Coordinate) => {
                         if (Array.isArray(coord)) {
                             return { lat: coord[0], lng: coord[1] };
                         }
@@ -138,7 +254,7 @@ const GoogleMapsDisplay = ({
                 if (pipe.coordinates && Array.isArray(pipe.coordinates)) {
                     const pipeConfig = PIPE_TYPES[pipe.type as PipeType] || { color: '#888888', weight: 3 };
 
-                    const pipePath = pipe.coordinates.map((coord: any) => {
+                    const pipePath = pipe.coordinates.map((coord: Coordinate) => {
                         if (Array.isArray(coord)) {
                             return { lat: coord[0], lng: coord[1] };
                         }
@@ -181,7 +297,7 @@ const GoogleMapsDisplay = ({
             });
 
             // Draw irrigation points
-            irrigationPoints.forEach((point, index) => {
+            irrigationPoints.forEach((point) => {
                 let lat, lng;
                 if (point.lat && point.lng) {
                     [lat, lng] = [point.lat, point.lng];
@@ -229,7 +345,7 @@ const GoogleMapsDisplay = ({
             // Draw irrigation lines
             irrigationLines.forEach((line) => {
                 if (line.coordinates && Array.isArray(line.coordinates)) {
-                    const linePath = line.coordinates.map((coord: any) => {
+                    const linePath = line.coordinates.map((coord: Coordinate) => {
                         if (Array.isArray(coord)) {
                             return { lat: coord[0], lng: coord[1] };
                         }
@@ -379,35 +495,13 @@ const verifyImageSave = (): boolean => {
     return false;
 };
 
-interface FieldCropSummaryProps {
-    mainField?: any;
-    fieldAreaSize?: number;
-    selectedCrops?: string[];
-    zones?: any[];
-    zoneAssignments?: any;
-    zoneSummaries?: any;
-    pipes?: any[];
-    equipmentIcons?: any[];
-    irrigationPoints?: any[];
-    irrigationLines?: any[];
-    irrigationAssignments?: any;
-    irrigationSettings?: any;
-    rowSpacing?: any;
-    plantSpacing?: any;
-    mapCenter?: [number, number];
-    mapZoom?: number;
-    mapType?: string;
-    summary?: any;
-    equipment?: any[];
-}
-
 // Existing functions remain unchanged (copied from original)
-const calculateZoneArea = (coordinates: any[]): number => {
+const calculateZoneArea = (coordinates: Coordinate[]): number => {
     if (!coordinates || coordinates.length < 3) return 0;
 
     try {
         const turfCoords = coordinates
-            .map((coord: any) => {
+            .map((coord: Coordinate) => {
                 if (Array.isArray(coord) && coord.length === 2) {
                     return [coord[1], coord[0]];
                 }
@@ -416,7 +510,7 @@ const calculateZoneArea = (coordinates: any[]): number => {
                 }
                 return null;
             })
-            .filter((coord: any): coord is [number, number] => coord !== null);
+            .filter((coord): coord is [number, number] => coord !== null);
 
         if (turfCoords.length < 3) return 0;
 
@@ -436,7 +530,7 @@ const calculateZoneArea = (coordinates: any[]): number => {
 
 const calculatePlantingPoints = (
     zoneArea: number,
-    crop: any,
+    crop: ReturnType<typeof getCropByValue>,
     customRowSpacing?: number,
     customPlantSpacing?: number
 ): number => {
@@ -484,9 +578,9 @@ const calculatePlantingPoints = (
 
 // คำนวณจำนวนจุดปลูกจากท่อย่อยที่มีอยู่จริง
 const calculatePlantingPointsFromPipes = (
-    pipes: any[],
+    pipes: Pipe[],
     zoneId: string,
-    crop: any,
+    crop: ReturnType<typeof getCropByValue>,
     customRowSpacing?: number,
     customPlantSpacing?: number
 ): number => {
@@ -548,7 +642,7 @@ const calculatePlantingPointsFromPipes = (
 
 const calculateYieldAndPrice = (
     zoneArea: number,
-    crop: any
+    crop: ReturnType<typeof getCropByValue>
 ): { estimatedYield: number; estimatedPrice: number } => {
     if (!zoneArea || !crop) {
         return { estimatedYield: 0, estimatedPrice: 0 };
@@ -561,7 +655,7 @@ const calculateYieldAndPrice = (
     return { estimatedYield, estimatedPrice };
 };
 
-const calculateWaterRequirement = (plantingPoints: number, crop: any): number => {
+const calculateWaterRequirement = (plantingPoints: number, crop: ReturnType<typeof getCropByValue>): number => {
     if (!plantingPoints || !crop || !crop.waterRequirement) {
         return 0;
     }
@@ -572,7 +666,7 @@ const calculateWaterRequirement = (plantingPoints: number, crop: any): number =>
     return Math.round(totalWaterRequirement);
 };
 
-const calculatePipeLength = (coordinates: any[]): number => {
+const calculatePipeLength = (coordinates: CoordinateInput[]): number => {
     if (!coordinates || coordinates.length < 2) return 0;
 
     try {
@@ -581,12 +675,12 @@ const calculatePipeLength = (coordinates: any[]): number => {
             const point1 = coordinates[i];
             const point2 = coordinates[i + 1];
 
-            let lat1, lng1, lat2, lng2;
+            let lat1: number, lng1: number, lat2: number, lng2: number;
 
             if (Array.isArray(point1) && Array.isArray(point2)) {
-                [lat1, lng1] = point1;
-                [lat2, lng2] = point2;
-            } else if (point1.lat && point1.lng && point2.lat && point2.lng) {
+                [lat1, lng1] = point1 as CoordinateArray;
+                [lat2, lng2] = point2 as CoordinateArray;
+            } else if ('lat' in point1 && 'lng' in point1 && 'lat' in point2 && 'lng' in point2) {
                 lat1 = point1.lat;
                 lng1 = point1.lng;
                 lat2 = point2.lat;
@@ -608,7 +702,7 @@ const calculatePipeLength = (coordinates: any[]): number => {
     }
 };
 
-const calculatePipeStats = (pipes: any[], pipeType: string) => {
+const calculatePipeStats = (pipes: Pipe[], pipeType: string): PipeStats => {
     const typePipes = pipes.filter(
         (pipe) =>
             pipe.type === pipeType &&
@@ -636,7 +730,7 @@ const calculatePipeStats = (pipes: any[], pipeType: string) => {
     };
 };
 
-const isPipeInZone = (pipe: any, zone: any): boolean => {
+const isPipeInZone = (pipe: Pipe, zone: Zone): boolean => {
     if (!pipe.coordinates || !Array.isArray(pipe.coordinates) || pipe.coordinates.length < 2) {
         return false;
     }
@@ -647,16 +741,16 @@ const isPipeInZone = (pipe: any, zone: any): boolean => {
 
     try {
         const zoneCoords = zone.coordinates
-            .map((coord: any) => {
+            .map((coord: CoordinateInput) => {
                 if (Array.isArray(coord) && coord.length === 2) {
-                    return [coord[1], coord[0]];
+                    return [coord[1], coord[0]] as [number, number];
                 }
-                if (coord && typeof coord.lat === 'number' && typeof coord.lng === 'number') {
-                    return [coord.lng, coord.lat];
+                if ('lat' in coord && 'lng' in coord && typeof coord.lat === 'number' && typeof coord.lng === 'number') {
+                    return [coord.lng, coord.lat] as [number, number];
                 }
                 return null;
             })
-            .filter((coord: any): coord is [number, number] => coord !== null);
+            .filter((coord): coord is [number, number] => coord !== null);
 
         if (zoneCoords.length < 3) return false;
 
@@ -669,10 +763,10 @@ const isPipeInZone = (pipe: any, zone: any): boolean => {
         const zonePolygon = turf.polygon([zoneCoords]);
 
         for (const coord of pipe.coordinates) {
-            let lat, lng;
+            let lat: number, lng: number;
             if (Array.isArray(coord) && coord.length === 2) {
-                [lat, lng] = coord;
-            } else if (coord && typeof coord.lat === 'number' && typeof coord.lng === 'number') {
+                [lat, lng] = coord as unknown as CoordinateArray;
+            } else if ('lat' in coord && 'lng' in coord && typeof coord.lat === 'number' && typeof coord.lng === 'number') { 
                 lat = coord.lat;
                 lng = coord.lng;
             } else {
@@ -693,7 +787,7 @@ const isPipeInZone = (pipe: any, zone: any): boolean => {
     }
 };
 
-const identifyPipeType = (pipe: any): string => {
+const identifyPipeType = (pipe: Pipe): string => {
     if (pipe.type) {
         return pipe.type;
     }
@@ -732,7 +826,7 @@ const identifyPipeType = (pipe: any): string => {
     return 'lateral';
 };
 
-const calculateZonePipeStats = (pipes: any[], zoneId: string, zones: any[]) => {
+const calculateZonePipeStats = (pipes: Pipe[], zoneId: string, zones: Zone[]): ZonePipeStats => {
     const currentZone = zones.find((zone) => zone.id.toString() === zoneId);
     if (!currentZone) {
         return {
@@ -786,7 +880,7 @@ const calculateZonePipeStats = (pipes: any[], zoneId: string, zones: any[]) => {
     console.log(`🟢 Submain pipes (สีเขียว): ${submainPipes.length}`);
     console.log(`🟣 Lateral pipes (สีส้ม/ม่วง): ${lateralPipes.length}`);
 
-    const calculateTypeStats = (typePipes: any[]) => {
+    const calculateTypeStats = (typePipes: Pipe[]): PipeStats => {
         if (typePipes.length === 0) return { count: 0, totalLength: 0, longestLength: 0 };
         const lengths = typePipes.map((pipe) => calculatePipeLength(pipe.coordinates));
         return {
@@ -805,7 +899,7 @@ const calculateZonePipeStats = (pipes: any[], zoneId: string, zones: any[]) => {
     const totalAllLength =
         mainStats.totalLength + submainStats.totalLength + lateralStats.totalLength;
 
-    const result = {
+    const result: ZonePipeStats = {
         main: mainStats,
         submain: submainStats,
         lateral: lateralStats,
@@ -841,11 +935,10 @@ const normalizeIrrigationType = (type: string): string => {
     return typeMapping[normalizedType] || normalizedType;
 };
 
-export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
+export default function FieldCropSummary() {
     const { t } = useLanguage();
-    const [summaryData, setSummaryData] = useState<any>(null);
-    const [dataSource, setDataSource] = useState<string>('');
-    const [calculatedZoneSummaries, setCalculatedZoneSummaries] = useState<Record<string, any>>({});
+    const [summaryData, setSummaryData] = useState<FieldCropSummaryProps | null>(null);
+    const [calculatedZoneSummaries, setCalculatedZoneSummaries] = useState<Record<string, ZoneSummary>>({});
 
     // Enhanced state for Google Maps and image capture
     const [mapImageCaptured, setMapImageCaptured] = useState<boolean>(false);
@@ -866,21 +959,17 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                 ) {
                     console.log('📥 Using data from localStorage');
                     console.log('✅ Loaded data from localStorage:', parsedData);
-                    setDataSource('localStorage');
                     setSummaryData(parsedData);
                 } else {
                     console.warn('📥 Invalid or empty localStorage data structure');
-                    setDataSource('none');
                     setSummaryData(null);
                 }
             } catch (error) {
                 console.error('Error parsing saved data:', error);
-                setDataSource('error');
                 setSummaryData(null);
             }
         } else {
             console.warn('📥 No data found in localStorage');
-            setDataSource('none');
             setSummaryData(null);
         }
     }, []);
@@ -975,21 +1064,17 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
     const {
         mainField,
         fieldAreaSize = 0,
-        selectedCrops = [],
         zones = [],
         zoneAssignments = {},
-        zoneSummaries = {},
         pipes = [],
         equipmentIcons = [],
         irrigationPoints = [],
         irrigationLines = [],
         irrigationAssignments = {},
-        irrigationSettings = {},
         rowSpacing = {},
         plantSpacing = {},
         mapCenter = [14.5995, 120.9842],
         mapZoom = 18,
-        mapType = 'satellite',
     } = summaryData || {};
 
     useEffect(() => {
@@ -998,9 +1083,9 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
             console.log('🔧 Available pipes for zone calculation:', pipes);
             console.log('🎯 Available zones:', zones);
 
-            const newZoneSummaries: Record<string, any> = {};
+            const newZoneSummaries: Record<string, ZoneSummary> = {};
 
-            zones.forEach((zone: any) => {
+            zones.forEach((zone: Zone) => {
                 const zoneId = zone.id.toString();
                 const assignedCropValue = zoneAssignments[zoneId];
 
@@ -1160,24 +1245,24 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
     const actualIrrigationPoints = Array.isArray(irrigationPoints) ? irrigationPoints : [];
     const actualIrrigationLines = Array.isArray(irrigationLines) ? irrigationLines : [];
 
-    const calculateMapBounds = () => {
+    const calculateMapBounds = (): { center: [number, number]; zoom: number } => {
         if (mainField && mainField.coordinates && mainField.coordinates.length > 0) {
             try {
                 const coords = mainField.coordinates
-                    .map((c: any) => {
+                    .map((c: CoordinateInput) => {
                         if (
                             Array.isArray(c) &&
                             typeof c[0] === 'number' &&
                             typeof c[1] === 'number'
                         ) {
-                            return [c[1], c[0]];
+                            return [c[1], c[0]] as [number, number];
                         }
-                        if (c && typeof c.lat === 'number' && typeof c.lng === 'number') {
-                            return [c.lng, c.lat];
+                        if ('lat' in c && 'lng' in c && typeof c.lat === 'number' && typeof c.lng === 'number') {
+                            return [c.lng, c.lat] as [number, number];
                         }
                         return null;
                     })
-                    .filter((c: any): c is [number, number] => c !== null);
+                    .filter((c): c is [number, number] => c !== null);
 
                 if (coords.length < 3) {
                     throw new Error('Not enough valid coordinates for main field.');
@@ -1214,7 +1299,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                         return [];
                     }
                     return zone.coordinates
-                        .map((c: any) => {
+                        .map((c: CoordinateInput) => {
                             if (
                                 Array.isArray(c) &&
                                 typeof c[0] === 'number' &&
@@ -1222,7 +1307,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                             ) {
                                 return c as [number, number];
                             }
-                            if (c && typeof c.lat === 'number' && typeof c.lng === 'number') {
+                            if ('lat' in c && 'lng' in c && typeof c.lat === 'number' && typeof c.lng === 'number') {
                                 return [c.lat, c.lng] as [number, number];
                             }
                             return null;
@@ -1296,28 +1381,12 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
     const valveCount = uniqueEquipment.filter((e) => e.type === 'ballvalve').length;
     const solenoidCount = uniqueEquipment.filter((e) => e.type === 'solenoid').length;
 
-    const totalEstimatedYield = Object.values(calculatedZoneSummaries).reduce(
-        (sum: number, summary: any) => sum + (summary.estimatedYield || 0),
-        0
-    );
-    const totalEstimatedIncome = Object.values(calculatedZoneSummaries).reduce(
-        (sum: number, summary: any) => sum + (summary.estimatedPrice || 0),
-        0
-    );
-    const totalPlantingPoints = Object.values(calculatedZoneSummaries).reduce(
-        (sum: number, summary: any) => sum + (summary.totalPlantingPoints || 0),
-        0
-    );
-    const totalWaterRequirementPerIrrigation = Object.values(calculatedZoneSummaries).reduce(
-        (sum: number, summary: any) => sum + (summary.waterRequirementPerIrrigation || 0),
-        0
-    );
+    const totalEstimatedYield = Object.values(calculatedZoneSummaries).reduce((sum: number, summary: ZoneSummary) => sum + (summary.estimatedYield || 0), 0);
+    const totalEstimatedIncome = Object.values(calculatedZoneSummaries).reduce((sum: number, summary: ZoneSummary) => sum + (summary.estimatedPrice || 0), 0);
+    const totalPlantingPoints = Object.values(calculatedZoneSummaries).reduce((sum: number, summary: ZoneSummary) => sum + (summary.totalPlantingPoints || 0), 0);
+    const totalWaterRequirementPerIrrigation = Object.values(calculatedZoneSummaries).reduce((sum: number, summary: ZoneSummary) => sum + (summary.waterRequirementPerIrrigation || 0), 0);
 
     const areaInRai = fieldAreaSize / 1600;
-
-    const selectedCropObjects = (selectedCrops || [])
-        .map((cropValue) => getCropByValue(cropValue))
-        .filter(Boolean);
 
     if (!summaryData) {
         return (
@@ -1524,7 +1593,7 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                             style={{ minHeight: 300, height: '400px' }}
                                         >
                                             <GoogleMapsDisplay
-                                                center={optimalCenter}
+                                                center={optimalCenter as [number, number]}
                                                 zoom={optimalZoom}
                                                 mainField={mainField}
                                                 zones={actualZones}
@@ -1828,12 +1897,10 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                     <div className="text-xs text-cyan-200 print:text-cyan-700">
                                                         {t('Active Zones:')}{' '}
                                                         {
-                                                            Object.keys(
+                                                            Object.values(
                                                                 calculatedZoneSummaries
                                                             ).filter(
-                                                                (id) =>
-                                                                    calculatedZoneSummaries[id]
-                                                                        .cropValue
+                                                                (summary: ZoneSummary) => summary.cropValue
                                                             ).length
                                                         }{' '}
                                                         {t('zones')}
@@ -1866,8 +1933,8 @@ export default function FieldCropSummary(props: FieldCropSummaryProps = {}) {
                                                 </div>
                                                 <div className="max-h-24 space-y-1 overflow-y-auto">
                                                     {Object.values(calculatedZoneSummaries)
-                                                        .filter((summary: any) => summary.cropValue)
-                                                        .map((summary: any) => (
+                                                        .filter((summary: ZoneSummary) => summary.cropValue)
+                                                        .map((summary: ZoneSummary) => (
                                                             <div
                                                                 key={summary.zoneId}
                                                                 className="flex justify-between text-xs"
