@@ -1,6 +1,6 @@
+// resources\js\pages\hooks\useCalculations.ts
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// resources\js\pages\hooks\useCalculations.ts - Enhanced for field-crop and greenhouse support
 import { useMemo, useState, useEffect } from 'react';
 import { IrrigationInput, CalculationResults } from '../types/interfaces';
 import {
@@ -82,29 +82,44 @@ const calculateSprinklerPressure = (sprinkler: any, defaultPressure: number, pro
             return defaultPressure;
         }
 
-        // Adjust pressure calculation based on project mode
-        let workingPressureFactor = 0.7; // Default for horticulture
+        let workingPressureFactor = 0.7;
         if (projectMode === 'garden') {
-            workingPressureFactor = 0.6; // Garden sprinklers typically work at lower pressure
+            workingPressureFactor = 0.6;
         } else if (projectMode === 'field-crop') {
-            workingPressureFactor = 0.8; // Field crops need higher pressure for coverage
+            workingPressureFactor = 0.8;
         } else if (projectMode === 'greenhouse') {
-            workingPressureFactor = 0.65; // Greenhouse needs controlled pressure
+            workingPressureFactor = 0.65;
         }
 
         const avgPressureBar = (minPressure + maxPressure) / 2;
         const workingPressureBar = avgPressureBar * workingPressureFactor;
-        return workingPressureBar * 10.2;
+        return workingPressureBar * 10.197;
     } catch (error) {
         console.error('Error calculating pressure from sprinkler:', error);
         return defaultPressure;
     }
 };
 
-const calculateSprinklerBasedFlow = (sprinkler: any, input: IrrigationInput) => {
-    const totalWaterPerMinute =
-        (input.totalTrees * input.waterPerTreeLiters) / (input.irrigationTimeMinutes / 60);
-    const totalSprinklers = Math.ceil(input.totalTrees * input.sprinklersPerTree);
+const calculateSprinklerBasedFlow = (sprinkler: any, input: IrrigationInput, projectMode?: string) => {
+    let totalWaterPerMinute: number;
+    let totalSprinklers: number;
+    
+    if (projectMode === 'field-crop') {
+        totalWaterPerMinute = input.totalTrees * input.waterPerTreeLiters;
+        totalSprinklers = input.totalTrees;
+    } else if (projectMode === 'greenhouse') {
+        const waterPerSprinklerPerMinute = input.waterPerTreeLiters / (input.irrigationTimeMinutes || 30);
+        totalWaterPerMinute = input.totalTrees * waterPerSprinklerPerMinute;
+        totalSprinklers = input.totalTrees;
+    } else if (projectMode === 'garden') {
+        const waterPerSprinklerPerMinute = input.waterPerTreeLiters / (input.irrigationTimeMinutes || 30);
+        totalWaterPerMinute = input.totalTrees * waterPerSprinklerPerMinute;
+        totalSprinklers = input.totalTrees;
+    } else {
+        const totalWaterPerIrrigation = input.totalTrees * input.waterPerTreeLiters * (input.sprinklersPerTree || 1);
+        totalWaterPerMinute = totalWaterPerIrrigation / (input.irrigationTimeMinutes || 30);
+        totalSprinklers = Math.ceil(input.totalTrees * (input.sprinklersPerTree || 1));
+    }
 
     if (!sprinkler) {
         return {
@@ -115,7 +130,7 @@ const calculateSprinklerBasedFlow = (sprinkler: any, input: IrrigationInput) => 
 
     try {
         let sprinklerFlowLPM;
-        const flowData = sprinkler.waterVolumeLitersPerMinute || sprinkler.waterVolumeLitersPerMinute;
+        const flowData = sprinkler.waterVolumeLitersPerMinute || sprinkler.waterVolumeLPM;
 
         if (Array.isArray(flowData)) {
             const avgFlow = (flowData[0] + flowData[1]) / 2;
@@ -134,28 +149,33 @@ const calculateSprinklerBasedFlow = (sprinkler: any, input: IrrigationInput) => 
             throw new Error('Invalid sprinkler flow rate');
         }
 
+        if (projectMode === 'greenhouse') {
+            return {
+                totalFlowLPM: totalWaterPerMinute,
+                sprinklerFlowLPM: formatNumber(totalWaterPerMinute / totalSprinklers, 1),
+                sprinklersUsed: totalSprinklers,
+            };
+        }
+
         const expectedFlowPerSprinkler = totalWaterPerMinute / totalSprinklers;
 
         if (sprinklerFlowLPM > expectedFlowPerSprinkler * 3) {
-            throw new Error('Sprinkler flow too high');
+            return {
+                totalFlowLPM: totalWaterPerMinute,
+                sprinklerFlowLPM: expectedFlowPerSprinkler,
+                sprinklersUsed: totalSprinklers,
+            };
         }
 
         if (sprinklerFlowLPM < expectedFlowPerSprinkler / 3) {
-            throw new Error('Sprinkler flow too low');
+            return {
+                totalFlowLPM: totalWaterPerMinute,
+                sprinklerFlowLPM: expectedFlowPerSprinkler,
+                sprinklersUsed: totalSprinklers,
+            };
         }
 
-        // Adjust effective flow based on project mode
-        // let flowAdjustment = 1.2; // Default
-        // if (projectMode === 'field-crop') {
-        //     flowAdjustment = 1.1; // More conservative for field crops
-        // } else if (projectMode === 'greenhouse') {
-        //     flowAdjustment = 1.15; // Moderate for greenhouse
-        // }
-
-        const effectiveFlowPerSprinkler = Math.min(
-            sprinklerFlowLPM,
-            expectedFlowPerSprinkler * 1.2
-        );
+        const effectiveFlowPerSprinkler = Math.min(sprinklerFlowLPM, expectedFlowPerSprinkler * 1.2);
         const totalFlowLPM = effectiveFlowPerSprinkler * totalSprinklers;
 
         return {
@@ -164,6 +184,7 @@ const calculateSprinklerBasedFlow = (sprinkler: any, input: IrrigationInput) => 
             sprinklersUsed: totalSprinklers,
         };
     } catch (error) {
+        console.error('Error calculating sprinkler flow:', error);
         return {
             totalFlowLPM: totalWaterPerMinute,
             sprinklerFlowLPM: totalWaterPerMinute / totalSprinklers,
@@ -173,31 +194,39 @@ const calculateSprinklerBasedFlow = (sprinkler: any, input: IrrigationInput) => 
 };
 
 const calculateFlowRequirements = (input: IrrigationInput, selectedSprinkler: any, projectMode?: string) => {
-    const sprinklerFlow = calculateSprinklerBasedFlow(selectedSprinkler, input);
+    const sprinklerFlow = calculateSprinklerBasedFlow(selectedSprinkler, input, projectMode);
 
-    const totalSprinklers = sprinklerFlow.sprinklersUsed || Math.ceil(input.totalTrees * input.sprinklersPerTree);
+    let totalSprinklers: number;
+    let flowPerSprinklerLPM: number;
 
-    const flowPerSprinklerLPM =
-        sprinklerFlow.sprinklerFlowLPM || sprinklerFlow.totalFlowLPM / totalSprinklers;
+    if (projectMode === 'field-crop' || projectMode === 'greenhouse' || projectMode === 'garden') {
+        totalSprinklers = sprinklerFlow.sprinklersUsed || input.totalTrees;
+        flowPerSprinklerLPM = sprinklerFlow.sprinklerFlowLPM || sprinklerFlow.totalFlowLPM / totalSprinklers;
+    } else {
+        totalSprinklers = sprinklerFlow.sprinklersUsed || Math.ceil(input.totalTrees * (input.sprinklersPerTree || 1));
+        flowPerSprinklerLPM = sprinklerFlow.sprinklerFlowLPM || sprinklerFlow.totalFlowLPM / totalSprinklers;
+    }
 
-    // Adjust branch flow calculation based on project mode
-    let maxSprinklersPerBranch = Math.min(input.sprinklersPerLongestBranch, 20);
+    let maxSprinklersPerBranch: number;
     if (projectMode === 'field-crop') {
-        maxSprinklersPerBranch = Math.min(input.sprinklersPerLongestBranch, 25); // Field crops can handle more
+        maxSprinklersPerBranch = Math.min(input.sprinklersPerLongestBranch || input.sprinklersPerBranch, 25);
     } else if (projectMode === 'greenhouse') {
-        maxSprinklersPerBranch = Math.min(input.sprinklersPerLongestBranch, 15); // Greenhouse more controlled
+        maxSprinklersPerBranch = Math.min(input.sprinklersPerLongestBranch || input.sprinklersPerBranch, 15);
     } else if (projectMode === 'garden') {
-        maxSprinklersPerBranch = Math.min(input.sprinklersPerLongestBranch, 12); // Garden smaller scale
+        maxSprinklersPerBranch = Math.min(input.sprinklersPerLongestBranch || input.sprinklersPerBranch, 12);
+    } else {
+        maxSprinklersPerBranch = Math.min(input.sprinklersPerLongestBranch || input.sprinklersPerBranch, 20);
     }
 
     const branchFlowLPM = flowPerSprinklerLPM * maxSprinklersPerBranch;
 
-    // Adjust secondary flow calculation
-    let maxBranchesPerSecondary = Math.min(input.branchesPerLongestSecondary, 10);
+    let maxBranchesPerSecondary: number;
     if (projectMode === 'field-crop') {
-        maxBranchesPerSecondary = Math.min(input.branchesPerLongestSecondary, 12);
+        maxBranchesPerSecondary = Math.min(input.branchesPerLongestSecondary || input.branchesPerSecondary, 12);
     } else if (projectMode === 'greenhouse') {
-        maxBranchesPerSecondary = Math.min(input.branchesPerLongestSecondary, 8);
+        maxBranchesPerSecondary = Math.min(input.branchesPerLongestSecondary || input.branchesPerSecondary, 8);
+    } else {
+        maxBranchesPerSecondary = Math.min(input.branchesPerLongestSecondary || input.branchesPerSecondary, 10);
     }
 
     const secondaryFlowLPM = input.longestSecondaryPipeM > 0 
@@ -212,7 +241,7 @@ const calculateFlowRequirements = (input: IrrigationInput, selectedSprinkler: an
         totalFlowLPM: sprinklerFlow.totalFlowLPM,
         totalSprinklers,
         sprinklersPerZone: formatNumber(totalSprinklers / input.numberOfZones, 1),
-        flowPerSprinklerLPM: flowPerSprinklerLPM,
+        flowPerSprinklerLPM: formatNumber(flowPerSprinklerLPM, 2),
         branchFlowLPM: formatNumber(branchFlowLPM, 1),
         secondaryFlowLPM: formatNumber(secondaryFlowLPM, 1),
         mainFlowLPM: formatNumber(mainFlowLPM, 1),
@@ -376,7 +405,7 @@ const calculateProjectSummary = (
     );
 
     let operationMode = 'sequential';
-    let selectedGroupFlowLPM = 0;
+    let selectedGroupFlowLPM = maxHeadZone.totalFlowLPM;
     let selectedGroupHeadM = maxHeadZone.totalHead;
     let criticalGroup: ZoneOperationGroup | undefined;
 
@@ -438,20 +467,18 @@ const calculateSystemComplexity = (input: IrrigationInput, projectMode?: string)
     else if (input.longestSecondaryPipeM > 0) complexityScore += 3;
     else if (input.longestMainPipeM > 0) complexityScore += 2;
 
-    // Adjust complexity based on project mode
     if (projectMode === 'field-crop') {
-        if (input.farmSizeRai > 50 || input.totalTrees > 5000) complexityScore += 4;
-        else if (input.farmSizeRai > 20 || input.totalTrees > 2000) complexityScore += 3;
-        else if (input.farmSizeRai > 10 || input.totalTrees > 1000) complexityScore += 2;
+        if (input.farmSizeRai > 50 || input.totalTrees > 2000) complexityScore += 4;
+        else if (input.farmSizeRai > 20 || input.totalTrees > 1000) complexityScore += 3;
+        else if (input.farmSizeRai > 10 || input.totalTrees > 500) complexityScore += 2;
     } else if (projectMode === 'greenhouse') {
-        if (input.farmSizeRai > 5 || input.totalTrees > 2000) complexityScore += 3;
-        else if (input.farmSizeRai > 2 || input.totalTrees > 1000) complexityScore += 2;
-        else if (input.farmSizeRai > 1 || input.totalTrees > 500) complexityScore += 1;
+        if (input.farmSizeRai > 5000 || input.totalTrees > 2000) complexityScore += 3;
+        else if (input.farmSizeRai > 2000 || input.totalTrees > 1000) complexityScore += 2;
+        else if (input.farmSizeRai > 1000 || input.totalTrees > 500) complexityScore += 1;
     } else if (projectMode === 'garden') {
-        if (input.farmSizeRai > 2 || input.totalTrees > 200) complexityScore += 2;
-        else if (input.farmSizeRai > 1 || input.totalTrees > 100) complexityScore += 1;
+        if (input.farmSizeRai > 800 || input.totalTrees > 200) complexityScore += 2;
+        else if (input.farmSizeRai > 400 || input.totalTrees > 100) complexityScore += 1;
     } else {
-        // Horticulture (default)
         if (input.farmSizeRai > 30 || input.totalTrees > 3000) complexityScore += 3;
         else if (input.farmSizeRai > 15 || input.totalTrees > 1500) complexityScore += 2;
         else if (input.farmSizeRai > 5 || input.totalTrees > 500) complexityScore += 1;
@@ -459,8 +486,7 @@ const calculateSystemComplexity = (input: IrrigationInput, projectMode?: string)
 
     const totalPipeLength = input.totalBranchPipeM + input.totalSecondaryPipeM + input.totalMainPipeM;
     
-    // Adjust pipe length complexity by project mode
-    let pipeLengthThresholds = [5000, 2000, 800]; // Default for horticulture
+    let pipeLengthThresholds = [5000, 2000, 800];
     if (projectMode === 'field-crop') {
         pipeLengthThresholds = [8000, 3000, 1200];
     } else if (projectMode === 'greenhouse') {
@@ -490,27 +516,26 @@ const autoSelectBestPipe = (
 ): any => {
     if (!analyzedPipes || analyzedPipes.length === 0) return null;
 
-    // Adjust velocity and pressure criteria based on project mode
     let velocityMin = 0.3;
     let velocityMax = 3.5;
     let minPressure = 6;
     let minScore = 25;
 
     if (projectMode === 'field-crop') {
-        velocityMin = 0.4; // Field crops need higher minimum velocity
-        velocityMax = 4.0; // Can handle higher velocity
-        minPressure = 8; // Higher pressure requirement
-        minScore = 30; // Higher quality requirement
+        velocityMin = 0.4;
+        velocityMax = 4.0;
+        minPressure = 8;
+        minScore = 30;
     } else if (projectMode === 'greenhouse') {
-        velocityMin = 0.2; // Greenhouse allows lower velocity for precision
-        velocityMax = 3.0; // More controlled velocity
-        minPressure = 6; // Standard pressure
-        minScore = 35; // Higher quality for controlled environment
+        velocityMin = 0.2;
+        velocityMax = 3.0;
+        minPressure = 6;
+        minScore = 35;
     } else if (projectMode === 'garden') {
-        velocityMin = 0.3; // Standard garden requirements
-        velocityMax = 3.2; 
-        minPressure = 4; // Lower pressure ok for garden
-        minScore = 20; // More flexible quality
+        velocityMin = 0.3;
+        velocityMax = 3.2;
+        minPressure = 4;
+        minScore = 20;
     }
 
     const suitablePipes = analyzedPipes.filter((pipe) => {
@@ -537,12 +562,11 @@ const autoSelectBestPipe = (
 
         if (Math.abs(a.score - b.score) > 5) return b.score - a.score;
 
-        // Adjust optimal velocity based on project mode
-        let optimalVelocity = 1.4; // Default
+        let optimalVelocity = 1.4;
         if (projectMode === 'field-crop') {
-            optimalVelocity = 1.6; // Higher for field crops
+            optimalVelocity = 1.6;
         } else if (projectMode === 'greenhouse') {
-            optimalVelocity = 1.2; // Lower for greenhouse
+            optimalVelocity = 1.2;
         }
 
         const aVelScore = Math.abs(optimalVelocity - a.velocity);
@@ -581,15 +605,14 @@ const autoSelectBestPump = (
         if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
         if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
 
-        // Adjust oversize penalty based on project mode
         let flowWeight = 1;
         let headWeight = 1;
         
         if (projectMode === 'field-crop') {
-            flowWeight = 1.2; // More flow capacity preferred for field crops
+            flowWeight = 1.2;
             headWeight = 0.8;
         } else if (projectMode === 'greenhouse') {
-            flowWeight = 0.8; // Precise flow control preferred
+            flowWeight = 0.8;
             headWeight = 1.2;
         }
 
@@ -850,7 +873,6 @@ export const useCalculations = (
         if (!sprinklerData.length || !pumpData.length || !pipeData.length) return null;
         if (!input) return null;
 
-        // Detect project mode from zone data
         const projectMode = allZoneData && allZoneData.length > 0 
             ? allZoneData[0].projectMode 
             : undefined;
