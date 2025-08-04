@@ -38,7 +38,7 @@ import {
     getGreenhouseData,
     migrateLegacyGreenhouseData,
     GreenhousePlanningData,
-    PlotStats,
+    EnhancedPlotStats,
     PIXELS_PER_METER,
 } from '../utils/greenHouseData';
 
@@ -321,7 +321,7 @@ export default function Product() {
 
     // แก้ใน product.tsx ประมาณบรรทัด 191-220
 const createGreenhouseZoneInput = (
-    plot: PlotStats,
+    plot: EnhancedPlotStats,
     greenhouseData: GreenhousePlanningData,
     totalZones: number
 ): IrrigationInput => {
