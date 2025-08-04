@@ -2,6 +2,7 @@ import { horticultureTranslations } from './horticulture';
 import { homeGardenTranslations } from './homegarden';
 import { fieldCropTranslations } from './fieldcrop';
 import { greenhouseTranslations } from './greenhouse';
+import { cropTranslations } from './cropts';
 import { productTranslations } from './product';
 import { footnavTranslations } from './footnav';
 import { homepageTranslations } from './homepage';
@@ -18,6 +19,7 @@ export const translations = {
         ...homepageTranslations.en,
         ...equipmentTranslations.en,
         ...aiTranslations.en,
+        ...cropTranslations.en,
     },
     th: {
         ...horticultureTranslations.th,
@@ -29,5 +31,6 @@ export const translations = {
         ...homepageTranslations.th,
         ...equipmentTranslations.th,
         ...aiTranslations.th,
+        ...cropTranslations.th,
     },
 };

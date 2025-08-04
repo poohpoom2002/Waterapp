@@ -35,7 +35,7 @@ interface Obstacle {
 
 // --- Google Maps Configuration ---
 const getGoogleMapsConfig = () => ({
-    apiKey: import.meta.env.VITE_Maps_API_KEY || '',
+            apiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
     libraries: ['drawing', 'geometry', 'places'] as const,
 });
 
