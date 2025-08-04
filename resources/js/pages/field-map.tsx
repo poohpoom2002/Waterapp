@@ -2727,7 +2727,6 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
     const handleRowSpacingConfirm = useCallback(
         (cropValue: string) => {
             const tempValue = tempRowSpacing[cropValue];
-            const crop = getTranslatedCropByValue(cropValue, language);
             
             if (tempValue && !isNaN(parseFloat(tempValue))) {
                 const numValue = parseFloat(tempValue);
@@ -2755,7 +2754,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 handleError(t('Please enter a valid row spacing value'));
             }
         },
-        [tempRowSpacing, setRowSpacing, setEditingRowSpacingForCrop, setTempRowSpacing, handleError, t, language]
+        [tempRowSpacing, setRowSpacing, setEditingRowSpacingForCrop, setTempRowSpacing, handleError, t]
     );
 
     const handleRowSpacingCancel = useCallback(
@@ -2773,7 +2772,6 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
     const handlePlantSpacingConfirm = useCallback(
         (cropValue: string) => {
             const tempValue = tempPlantSpacing[cropValue];
-            const crop = getTranslatedCropByValue(cropValue, language);
             
             if (tempValue && !isNaN(parseFloat(tempValue))) {
                 const numValue = parseFloat(tempValue);
@@ -2808,7 +2806,6 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             setTempPlantSpacing,
             handleError,
             t,
-            language,
         ]
     );
 
