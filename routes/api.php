@@ -14,17 +14,26 @@ use App\Http\Controllers\ProfilePhotoController;
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
+|
+| Here is where you can register API routes for your application. These
+| routes are loaded by the RouteServiceProvider and all of them will
+| be assigned to the "api" middleware group. Make something great!
+|
 */
 
-// User info endpoint
+// User info endpoint for API (works with both sanctum and web auth)
 Route::middleware(['auth:sanctum,web'])->get('/user', function (Request $request) {
     return $request->user();
 });
 
 // ==================================================
-// 🤖 AI CHAT ROUTES
+// 🤖 CHAIYO AI ROUTES (Simple Version)
 // ==================================================
+
+// Main AI Chat Endpoint
 Route::post('/ai-chat', [AiChatController::class, 'handleChat']);
+
+// AI Management & Info Routes
 Route::prefix('ai')->group(function () {
     Route::get('/stats', [AiChatController::class, 'getStats']);
     Route::get('/popular-questions', [AiChatController::class, 'getPopularQuestions']);
@@ -32,33 +41,33 @@ Route::prefix('ai')->group(function () {
     Route::post('/test', [AiChatController::class, 'test']);
 });
 
-// Legacy compatibility
+// Legacy compatibility routes
 Route::get('/ai-training-stats', [AiChatController::class, 'getStats']);
 
 // ==================================================
-// 🛠️ EQUIPMENT MANAGEMENT ROUTES (รวมแล้ว)
+// 🛠️ EQUIPMENT & PRODUCT ROUTES (รวมแล้ว)
 // ==================================================
+
+// Equipment validation - วางไว้ก่อน apiResource
+Route::get('/equipments/validate-product-code', [EquipmentController::class, 'validateProductCode']);
+Route::get('/equipments/pump-equipments', [EquipmentController::class, 'getPumpEquipments']);
+Route::get('/equipments/stats', [EquipmentController::class, 'getStats']);
 
 // Equipment Categories
 Route::apiResource('equipment-categories', EquipmentCategoryController::class);
 
-// Equipment Management (รวม PumpAccessory + ImageUpload)
+// Equipment Management (รวม PumpAccessory + ImageUpload แล้ว)
+Route::apiResource('equipments', EquipmentController::class);
+
+// Equipment additional routes
 Route::prefix('equipments')->group(function () {
-    // Validation - ต้องอยู่ก่อน apiResource
-    Route::get('validate-product-code', [EquipmentController::class, 'validateProductCode']);
-    Route::get('pump-equipments', [EquipmentController::class, 'getPumpEquipments']);
-    Route::get('stats', [EquipmentController::class, 'getStats']);
-    
-    // Search & Filter
     Route::post('search', [EquipmentController::class, 'search']);
     Route::get('by-category/{categoryName}', [EquipmentController::class, 'getByCategory']);
     Route::get('by-category-id/{id}', [EquipmentController::class, 'getByCategoryId']);
-    
-    // Bulk Operations
     Route::post('bulk-update', [EquipmentController::class, 'bulkUpdate']);
     Route::post('bulk-delete', [EquipmentController::class, 'bulkDelete']);
     
-    // Pump Accessories (รวมใน EquipmentController แล้ว)
+    // 🔧 Pump Accessories (รวมใน EquipmentController แล้ว)
     Route::get('pump-accessories', [EquipmentController::class, 'getPumpAccessories']);
     Route::post('pump-accessories', [EquipmentController::class, 'storePumpAccessory']);
     Route::get('pump-accessories/{pumpAccessory}', [EquipmentController::class, 'showPumpAccessory']);
@@ -69,7 +78,7 @@ Route::prefix('equipments')->group(function () {
     Route::post('accessories/bulk-delete', [EquipmentController::class, 'bulkDeleteAccessories']);
     Route::get('accessories/stats', [EquipmentController::class, 'getAccessoryStats']);
     
-    // Image Upload (รวมใน EquipmentController แล้ว)
+    // 📸 Image Management (รวมใน EquipmentController แล้ว)
     Route::post('upload-image', [EquipmentController::class, 'uploadImage']);
     Route::post('upload-multiple-images', [EquipmentController::class, 'uploadMultipleImages']);
     Route::delete('delete-image', [EquipmentController::class, 'deleteImage']);
@@ -78,34 +87,59 @@ Route::prefix('equipments')->group(function () {
     Route::get('check-storage', [EquipmentController::class, 'checkStorageInfo']);
 });
 
-// Equipment CRUD (ต้องอยู่หลัง prefix routes)
-Route::apiResource('equipments', EquipmentController::class);
+// ==================================================
+// 📸 IMAGE MANAGEMENT ROUTES (Backward Compatibility)
+// ==================================================
+// เก็บ backward compatibility สำหรับ frontend ที่อาจใช้ /api/images/*
+Route::prefix('images')->group(function () {
+    Route::post('upload', [EquipmentController::class, 'uploadImage']);
+    Route::post('upload-multiple', [EquipmentController::class, 'uploadMultipleImages']);
+    Route::delete('delete', [EquipmentController::class, 'deleteImage']);
+    Route::get('info', [EquipmentController::class, 'getImageInfo']);
+    Route::get('/', [EquipmentController::class, 'listImages']);
+    Route::get('check-storage', [EquipmentController::class, 'checkStorageInfo']);
+});
 
-// Quick access routes
+// ==================================================
+// 🔧 PUMP ACCESSORIES ROUTES (Backward Compatibility)
+// ==================================================
+// เก็บ backward compatibility สำหรับ frontend ที่อาจใช้ /api/pump-accessories
+Route::prefix('pump-accessories')->group(function () {
+    Route::get('/', [EquipmentController::class, 'getPumpAccessories']);
+    Route::post('/', [EquipmentController::class, 'storePumpAccessory']);
+    Route::get('{pumpAccessory}', [EquipmentController::class, 'showPumpAccessory']);
+    Route::put('{pumpAccessory}', [EquipmentController::class, 'updatePumpAccessory']);
+    Route::delete('{pumpAccessory}', [EquipmentController::class, 'destroyPumpAccessory']);
+    Route::post('sort-order', [EquipmentController::class, 'updateAccessoriesSortOrder']);
+    Route::post('bulk-delete', [EquipmentController::class, 'bulkDeleteAccessories']);
+    Route::get('stats', [EquipmentController::class, 'getAccessoryStats']);
+});
+
+// Sprinkler specific routes
+Route::get('/sprinklers-data', [SprinklerController::class, 'index']); // เปลี่ยนชื่อเพื่อไม่ conflict
+Route::post('/calculate-pipe-layout', [SprinklerController::class, 'calculatePipeLayout']);
+
+// Quick equipment access routes
 Route::get('/sprinklers', fn() => app(EquipmentController::class)->getByCategory('sprinkler'));
 Route::get('/pumps', fn() => app(EquipmentController::class)->getByCategory('pump'));
 Route::get('/pipes', fn() => app(EquipmentController::class)->getByCategory('pipe'));
-
-// Sprinkler specific routes
-Route::get('/sprinklers', [SprinklerController::class, 'index']); 
-Route::post('/calculate-pipe-layout', [SprinklerController::class, 'calculatePipeLayout']);
 
 // ==================================================
 // 🌱 FARM PLANNING & MANAGEMENT ROUTES
 // ==================================================
 
-// Public Farm & Planner API Routes
+// Public Farm & Planner API Routes (No authentication required)
 Route::post('/generate-planting-points', [FarmController::class, 'generatePlantingPoints']);
 Route::post('/generate-pipe-layout', [FarmController::class, 'generatePipeLayout']); 
 Route::get('/plant-types', [FarmController::class, 'getPlantTypes']);
 Route::post('/get-elevation', [FarmController::class, 'getElevation']);
 
-// Plant points management
+// Plant points management (No authentication required for now)
 Route::post('/plant-points/add', [FarmController::class, 'addPlantPoint']);
 Route::post('/plant-points/delete', [FarmController::class, 'deletePlantPoint']);
 Route::post('/plant-points/move', [FarmController::class, 'movePlantPoint']);
 
-// Field Management API Routes (requires auth)
+// Field Management API Routes - Use web authentication (same as Inertia)
 Route::middleware(['web', 'auth'])->group(function () {
     Route::get('/fields', [FarmController::class, 'getFields']);
     Route::get('/fields/{fieldId}', [FarmController::class, 'getField']);
@@ -113,7 +147,7 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::put('/fields/{fieldId}', [FarmController::class, 'updateField']);
     Route::delete('/fields/{fieldId}', [FarmController::class, 'deleteField']);
 
-    // Folder Management
+    // Folder Management API Routes
     Route::get('/folders', [FarmController::class, 'getFolders']);
     Route::post('/folders', [FarmController::class, 'createFolder']);
     Route::put('/folders/{folderId}', [FarmController::class, 'updateFolder']);
@@ -127,6 +161,7 @@ Route::middleware(['web', 'auth'])->group(function () {
 // ==================================================
 // 🏡 HOME GARDEN ROUTES
 // ==================================================
+
 Route::prefix('home-garden')->group(function () {
     Route::post('generate-sprinkler-layout', [HomeGardenController::class, 'generateSprinklerLayout']);
     Route::post('generate-pipe-layout', [HomeGardenController::class, 'generatePipeLayout']);
@@ -135,6 +170,8 @@ Route::prefix('home-garden')->group(function () {
 // ==================================================
 // 📸 PROFILE PHOTO ROUTES
 // ==================================================
+
+// Profile Photo Routes - Use web authentication
 Route::middleware(['web', 'auth'])->group(function () {
     Route::post('/profile-photo/upload', [ProfilePhotoController::class, 'upload']);
     Route::delete('/profile-photo/delete', [ProfilePhotoController::class, 'delete']);
@@ -166,7 +203,7 @@ Route::get('/info', function () {
         'app_name' => config('app.name'),
         'version' => '2.0.0',
         'api_version' => 'v2',
-        'type' => 'Complete Waterapp + Simple Chaiyo AI',
+        'type' => 'Complete Waterapp + Simple Chaiyo AI (Merged Controllers)',
         'features' => [
             'farm_planning' => true,
             'home_garden' => true,
@@ -181,18 +218,25 @@ Route::get('/info', function () {
         ],
         'endpoints' => [
             'ai_chat' => '/api/ai-chat',
-            'equipment' => '/api/equipments',
+            'equipment' => '/api/equipments (รวม PumpAccessory + ImageUpload)',
             'farm_planning' => '/api/generate-pipe-layout',
             'field_management' => '/api/fields',
-            'image_upload' => '/api/equipments/upload-image',
+            'image_upload' => '/api/equipments/upload-image หรือ /api/images/upload',
+            'pump_accessories' => '/api/equipments/pump-accessories หรือ /api/pump-accessories',
             'health_check' => '/api/health'
+        ],
+        'backward_compatibility' => [
+            '/api/images/* => /api/equipments/*',
+            '/api/pump-accessories => /api/equipments/pump-accessories',
+            'All old endpoints still work!'
         ]
     ]);
 });
 
 // ==================================================
-// 🐛 DEBUG ROUTES (Development only)
+// 🐛 DEBUG ROUTES (Only in development)
 // ==================================================
+
 if (app()->environment('local')) {
     Route::prefix('debug')->group(function () {
         
@@ -260,12 +304,13 @@ if (app()->environment('local')) {
             }
         });
 
-        // Test auth status
+        // Test auth status (compatible with Inertia)
         Route::get('/auth-test', function () {
             try {
                 $user = auth()->user();
                 $guards = [];
                 
+                // Test different guards
                 foreach (['web', 'sanctum'] as $guard) {
                     try {
                         $guardUser = auth($guard)->user();
@@ -345,7 +390,8 @@ if (app()->environment('local')) {
             $endpointsToTest = [
                 'GET /api/equipments' => '/api/equipments',
                 'GET /api/equipment-categories' => '/api/equipment-categories', 
-                'GET /api/equipments/list-images' => '/api/equipments/list-images',
+                'GET /api/images' => '/api/images',
+                'GET /api/pump-accessories' => '/api/pump-accessories',
                 'GET /api/ai/health' => '/api/ai/health',
                 'GET /api/health' => '/api/health',
                 'GET /api/info' => '/api/info'
@@ -382,8 +428,10 @@ if (app()->environment('local')) {
 }
 
 // ==================================================
-// ⚠️ ERROR HANDLING & FALLBACK
+// ⚠️ ERROR HANDLING & FALLBACK ROUTES
 // ==================================================
+
+// Catch-all route for undefined API endpoints
 Route::fallback(function () {
     return response()->json([
         'error' => 'API endpoint not found',
@@ -395,7 +443,8 @@ Route::fallback(function () {
             'GET /api/fields' => 'Field management (requires auth)',
             'POST /api/generate-pipe-layout' => 'Farm pipe layout generation',
             'POST /api/home-garden/generate-pipe-layout' => 'Home garden layout',
-            'POST /api/equipments/upload-image' => 'Image upload (รวมใน EquipmentController)',
+            'POST /api/images/upload' => 'Image upload (backward compatibility)',
+            'GET /api/pump-accessories' => 'Pump accessories (backward compatibility)',
             'GET /api/sprinklers' => 'Sprinkler equipment',
             'GET /api/health' => 'System health check',
             'GET /api/info' => 'API information',
@@ -406,16 +455,17 @@ Route::fallback(function () {
             '/api/folders',
             '/api/profile-photo'
         ],
-        'merged_controllers' => [
-            'EquipmentController now includes:',
-            '- PumpAccessoryController methods',
-            '- ImageUploadController methods',
-            '- All equipment-related functionality'
+        'merged_functionality' => [
+            'EquipmentController now includes PumpAccessory + ImageUpload',
+            'All old routes still work for backward compatibility',
+            'New routes are under /api/equipments/* for better organization'
         ],
         'documentation' => [
             'ai_endpoints' => '/api/ai/*',
-            'equipment_endpoints' => '/api/equipments/* (รวมแล้ว)',
+            'equipment_endpoints' => '/api/equipments/* (primary) + backward compatibility',
             'farm_endpoints' => '/api/fields, /api/generate-*',
+            'image_endpoints' => '/api/images/* (compat) or /api/equipments/*',
+            'pump_accessories' => '/api/pump-accessories (compat) or /api/equipments/pump-accessories',
             'debug_endpoints' => '/api/debug/* (local only)'
         ]
     ], 404);

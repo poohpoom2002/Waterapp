@@ -1,6 +1,6 @@
+// resources\js\pages\utils\calculations.ts
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// resources\js\pages\utils\calculations.ts
 export const calculatePipeRolls = (totalLength: number, rollLength: number): number => {
     return Math.ceil(totalLength / rollLength);
 };
@@ -346,6 +346,23 @@ export const calculateZoneFlowRate = (
     return {
         flowLPM: flowLPM,
         totalDaily: totalDaily,
+    };
+};
+
+export const calculateFieldCropZoneFlowRate = (
+    sprinklerCount: number,
+    waterPerSprinklerLPM: number = 6.0, 
+    irrigationTimeMinutes: number = 30
+): {
+    flowLPM: number;
+    totalWaterPerIrrigation: number;
+} => {
+    const flowLPM = sprinklerCount * waterPerSprinklerLPM;
+    const totalWaterPerIrrigation = flowLPM * (irrigationTimeMinutes / 60);
+
+    return {
+        flowLPM: flowLPM,
+        totalWaterPerIrrigation: totalWaterPerIrrigation,
     };
 };
 
@@ -811,7 +828,6 @@ export const normalizeEquipmentData = (
     return normalized;
 };
 
-// Field-crop and greenhouse specific utility functions
 export const convertAreaUnits = {
     sqmToRai: (sqm: number): number => formatNumber(sqm / 1600, 3),
     raiToSqm: (rai: number): number => formatNumber(rai * 1600, 1),
