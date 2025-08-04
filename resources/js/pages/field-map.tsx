@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Navbar from '../components/Navbar';
 import { Head, Link, router } from '@inertiajs/react';
 import { Wrapper, Status } from '@googlemaps/react-wrapper';
@@ -838,9 +838,11 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         }
     }, [isEditMode, targetStep, crops, irrigation]);
 
-    const selectedCropObjects = selectedCrops
-        .map((cropValue) => getTranslatedCropByValue(cropValue, language))
-        .filter(Boolean) as TranslatedCrop[];
+    const selectedCropObjects = useMemo(() => {
+        return selectedCrops
+            .map((cropValue) => getTranslatedCropByValue(cropValue, language))
+            .filter(Boolean) as TranslatedCrop[];
+    }, [selectedCrops, language]);
 
     // Initialize crop spacing from cropData
     useEffect(() => {
@@ -848,27 +850,28 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             const newRowSpacing: Record<string, number> = {};
             const newPlantSpacing: Record<string, number> = {};
             
+            let hasNewRowSpacing = false;
+            let hasNewPlantSpacing = false;
+            
             selectedCropObjects.forEach((crop) => {
                 if (rowSpacing[crop.value] === undefined) {
                     newRowSpacing[crop.value] = crop.rowSpacing;
+                    hasNewRowSpacing = true;
                 }
                 if (plantSpacing[crop.value] === undefined) {
                     newPlantSpacing[crop.value] = crop.plantSpacing;
+                    hasNewPlantSpacing = true;
                 }
             });
-
-
             
-            if (Object.keys(newRowSpacing).length > 0) {
+            if (hasNewRowSpacing) {
                 setRowSpacing(prev => ({ ...prev, ...newRowSpacing }));
             }
-            if (Object.keys(newPlantSpacing).length > 0) {
+            if (hasNewPlantSpacing) {
                 setPlantSpacing(prev => ({ ...prev, ...newPlantSpacing }));
             }
-            
-
         }
-    }, [selectedCropObjects, setRowSpacing, setPlantSpacing]);
+    }, [selectedCropObjects]);
 
     // Clean up spacing data when crops are removed
     useEffect(() => {
@@ -913,13 +916,11 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             });
             return filtered;
         });
-    }, [selectedCropObjects, setRowSpacing, setPlantSpacing, setTempRowSpacing, setTempPlantSpacing]);
+    }, [selectedCropObjects]);
 
     // Helper function to get crop spacing info with fallback
     const getCropSpacingInfo = useCallback((cropValue: string) => {
         const crop = getTranslatedCropByValue(cropValue, language);
-        
-
         
         return {
             defaultRowSpacing: crop?.rowSpacing || 50,
@@ -951,16 +952,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         setEditingPlantSpacingForCrop(null);
         
 
-    }, [
-        selectedCropObjects,
-        setRowSpacing,
-        setPlantSpacing,
-        setTempRowSpacing,
-        setTempPlantSpacing,
-        setEditingRowSpacingForCrop,
-        setEditingPlantSpacingForCrop,
-        t
-    ]);
+    }, [selectedCropObjects, t]);
 
     const handleError = useCallback((errorMessage: string) => {
         setError(errorMessage);
@@ -3263,7 +3255,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
     }, [
         map,
         zones.length,
-        Object.keys(zoneAssignments).length,
+        zoneAssignments,
         isEditMode,
         isRestoring,
         hasRestoredOnce,
