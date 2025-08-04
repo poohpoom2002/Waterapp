@@ -136,7 +136,7 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
     }, [map, mapType]);
 
     // Drawing controls
-    const startDrawing = (type: 'polygon') => {
+    const startDrawing = () => {
         if (!drawingManager) return;
         const mode = google.maps.drawing.OverlayType.POLYGON;
         drawingManager.setDrawingMode(mode);
@@ -158,7 +158,7 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                     <div className="flex flex-col space-y-1">
                         <div className="text-xs font-semibold text-white">ขั้นตอนที่ 1: วาดขอบเขตแปลง</div>
                         <button
-                            onClick={() => startDrawing('polygon')}
+                            onClick={startDrawing}
                             disabled={currentDrawingMode !== null}
                             className={`rounded border border-white px-2 py-1 text-xs transition-colors ${
                                 currentDrawingMode === google.maps.drawing.OverlayType.POLYGON
@@ -184,19 +184,16 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
 };
 
 // --- Main Component: Step1_FieldArea ---
-interface Step1FieldAreaProps {
-    crops?: string;
-}
 
-export default function Step1_FieldArea({ crops }: Step1FieldAreaProps) {
+export default function Step1_FieldArea() {
     // State Management Hooks
     const mapState = useMapState();
     const stepWizard = useStepWizard();
     const fieldZoneState = useFieldZoneState();
 
     // Destructure state for easier access
-    const { mapCenter, setMapCenter, mapZoom, setMapZoom, mapType, setMapType, searchQuery, setSearchQuery, searchResults, setSearchResults, isSearching, setIsSearching, showDropdown, setShowDropdown, blurTimeoutRef } = mapState;
-    const { setCurrentStep, setStepCompleted, drawingStage, setDrawingStage } = stepWizard;
+    const { mapCenter, setMapCenter, mapZoom, setMapZoom, mapType, searchQuery, setSearchQuery, searchResults, setSearchResults, setIsSearching, showDropdown, setShowDropdown } = mapState;
+    const { setCurrentStep, setStepCompleted, setDrawingStage } = stepWizard;
     const { selectedCrops, setSelectedCrops, mainField, setMainField, fieldAreaSize, setFieldAreaSize } = fieldZoneState;
 
     const [error, setError] = useState<string | null>(null);
