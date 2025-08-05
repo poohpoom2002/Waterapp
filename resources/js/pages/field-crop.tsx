@@ -62,7 +62,7 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
         if (selectedCategory === 'all') {
             crops = getTranslatedCrops(language);
         } else {
-            crops = getCropsByCategory(selectedCategory as any, language);
+            crops = getCropsByCategory(selectedCategory as 'cereal' | 'root' | 'legume' | 'industrial' | 'oilseed', language);
         }
 
         // Apply search filter
