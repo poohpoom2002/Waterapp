@@ -1,5 +1,5 @@
 <?php
-// database/seeders/EquipmentSeeder.php
+
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
@@ -13,84 +13,12 @@ class EquipmentSeeder extends Seeder
 {
     public function run()
     {
-        // 1. สร้าง Categories
+        // สร้าง Categories
         $sprinklerCategory = EquipmentCategory::firstOrCreate(
             ['name' => 'sprinkler'],
             [
                 'display_name' => 'สปริงเกอร์แบบหมุน/ยิงไกล',
                 'description' => 'หัวสปริงเกอร์สำหรับรดน้ำ',
-                'icon' => '💧'
-            ]
-        );
-
-        $popUpSprinklerCategory = EquipmentCategory::firstOrCreate(
-            ['name' => 'pop_up_sprinkler'],
-            [
-                'display_name' => 'หัว Pop‑Up ยก–หดได้',
-                'description' => 'หัวสปริงเกอร์ชนิด Pop-up ยก-หดได้',
-                'icon' => '💧'
-            ]
-        );
-
-        $miniSprinklerCategory = EquipmentCategory::firstOrCreate(
-            ['name' => 'mini_sprinkler'],
-            [
-                'display_name' => 'มินิสปริงเกอร์',
-                'description' => 'มินิสปริงเกอร์สำหรับรดน้ำ',
-                'icon' => '💧'
-            ]
-        );
-
-        $singleSideSprinklerCategory = EquipmentCategory::firstOrCreate(
-            ['name' => 'single_side_sprinkler'],
-            [
-                'display_name' => 'หัวฉีดด้านเดียวปรับมุม',
-                'description' => 'หัวฉีดน้ำด้านเดียว สามารถปรับมุมได้',
-                'icon' => '💧'
-            ]
-        );
-
-        $butterflySprinklerCategory = EquipmentCategory::firstOrCreate(
-            ['name' => 'butterfly_sprinkler'],
-            [
-                'display_name' => 'หัวฉีดผีเสื้อ',
-                'description' => 'หัวสปริงเกอร์แบบหัวฉีดผีเสื้อ',
-                'icon' => '💧'
-            ]
-        );
-
-        $mistNozzleCategory = EquipmentCategory::firstOrCreate(
-            ['name' => 'mist_nozzle'],
-            [
-                'display_name' => 'หัวพ่นหมอก',
-                'description' => 'หัวพ่นหมอกสำหรับสร้างความชื้น',
-                'icon' => '💧'
-            ]
-        );
-
-        $impactSprinklerCategory = EquipmentCategory::firstOrCreate(
-            ['name' => 'impact_sprinkler'],
-            [
-                'display_name' => 'สปริงเกอร์ชนิดกระแทก',
-                'description' => 'สปริงเกอร์ชนิดกระแทกสำหรับรดน้ำระยะไกล',
-                'icon' => '💧'
-            ]
-        );
-
-        $gearDriveNozzleCategory = EquipmentCategory::firstOrCreate(
-            ['name' => 'gear_drive_nozzle'],
-            [
-                'display_name' => 'หัวฉีดเกียร์ไดร์ฟ ปรับแรงและมุม',
-                'description' => 'หัวฉีดแบบเกียร์ไดร์ฟ สามารถปรับแรงและมุมได้',
-                'icon' => '💧'
-            ]
-        );
-
-        $dripSprayTapeCategory = EquipmentCategory::firstOrCreate(
-            ['name' => 'drip_spray_tape'],
-            [
-                'display_name' => 'เทปน้ำหยดหรือสเปรย์ แบบม้วน',
-                'description' => 'เทปน้ำหยดหรือสเปรย์สำหรับรดน้ำพืชแถวยาว',
                 'icon' => '💧'
             ]
         );
@@ -113,28 +41,36 @@ class EquipmentSeeder extends Seeder
             ]
         );
 
-        // 2. สร้าง Attributes สำหรับ Sprinkler และประเภทที่เกี่ยวข้อง
-        $allSprinklerCategories = [
-            $sprinklerCategory,
-            $popUpSprinklerCategory,
-            $miniSprinklerCategory,
-            $singleSideSprinklerCategory,
-            $butterflySprinklerCategory,
-            $mistNozzleCategory,
-            $impactSprinklerCategory,
-            $gearDriveNozzleCategory,
-            $dripSprayTapeCategory,
-        ];
-
-        $sprinklerAttrs = [
+        $pumpEquipmentCategory = EquipmentCategory::firstOrCreate(
+            ['name' => 'pump_equipment'],
             [
-                'attribute_name' => 'name',
-                'display_name' => 'ชื่อสินค้า',
-                'data_type' => 'string',
-                'unit' => '',
-                'is_required' => true,
-                'sort_order' => 0
-            ],
+                'display_name' => 'อุปกรณ์ปั๊ม',
+                'description' => 'อุปกรณ์เสริมสำหรับปั๊มน้ำ',
+                'icon' => '⚙️'
+            ]
+        );
+
+        // สร้าง Attributes สำหรับ Sprinkler
+        $this->createSprinklerAttributes($sprinklerCategory);
+        
+        // สร้าง Attributes สำหรับ Pump
+        $this->createPumpAttributes($pumpCategory);
+        
+        // สร้าง Attributes สำหรับ Pipe
+        $this->createPipeAttributes($pipeCategory);
+
+        // สร้างข้อมูลสินค้า
+        $this->createSprinklerData($sprinklerCategory);
+        $this->createPumpData($pumpCategory);
+        $this->createPipeData($pipeCategory);
+        $this->createPumpEquipmentData($pumpEquipmentCategory);
+
+        echo "Equipment seeding completed successfully!\n";
+    }
+
+    private function createSprinklerAttributes($sprinklerCategory)
+    {
+        $sprinklerAttrs = [
             [
                 'attribute_name' => 'size_mm',
                 'display_name' => 'ขนาด',
@@ -152,10 +88,10 @@ class EquipmentSeeder extends Seeder
                 'sort_order' => 2
             ],
             [
-                'attribute_name' => 'waterVolumeLitersPerHour',
+                'attribute_name' => 'waterVolumeLitersPerMinute',
                 'display_name' => 'อัตราการไหล',
                 'data_type' => 'array',
-                'unit' => 'ลิตร/ชั่วโมง',
+                'unit' => 'ลิตร/นาที',
                 'is_required' => false,
                 'sort_order' => 3
             ],
@@ -177,19 +113,19 @@ class EquipmentSeeder extends Seeder
             ]
         ];
         
-        foreach ($allSprinklerCategories as $category) {
-            foreach ($sprinklerAttrs as $attr) {
-                EquipmentAttribute::firstOrCreate(
-                    [
-                        'category_id' => $category->id,
-                        'attribute_name' => $attr['attribute_name']
-                    ],
-                    array_merge($attr, ['category_id' => $category->id])
-                );
-            }
+        foreach ($sprinklerAttrs as $attr) {
+            EquipmentAttribute::firstOrCreate(
+                [
+                    'category_id' => $sprinklerCategory->id,
+                    'attribute_name' => $attr['attribute_name']
+                ],
+                array_merge($attr, ['category_id' => $sprinklerCategory->id])
+            );
         }
+    }
 
-        // 3. สร้าง Attributes สำหรับ Pump
+    private function createPumpAttributes($pumpCategory)
+    {
         $pumpAttrs = [
             [
                 'attribute_name' => 'powerHP',
@@ -298,8 +234,10 @@ class EquipmentSeeder extends Seeder
                 array_merge($attr, ['category_id' => $pumpCategory->id])
             );
         }
+    }
 
-        // 4. สร้าง Attributes สำหรับ Pipe
+    private function createPipeAttributes($pipeCategory)
+    {
         $pipeAttrs = [
             [
                 'attribute_name' => 'pipeType',
@@ -352,38 +290,24 @@ class EquipmentSeeder extends Seeder
                 array_merge($attr, ['category_id' => $pipeCategory->id])
             );
         }
-
-        // 5. สร้างตัวอย่างข้อมูลสำหรับแต่ละ Category
-        $this->createSprinklerData($sprinklerCategory);
-        $this->createPopUpSprinklerData($popUpSprinklerCategory);
-        $this->createMiniSprinklerData($miniSprinklerCategory);
-        $this->createSingleSideSprinklerData($singleSideSprinklerCategory);
-        $this->createButterflySprinklerData($butterflySprinklerCategory);
-        $this->createMistNozzleData($mistNozzleCategory);
-        $this->createImpactSprinklerData($impactSprinklerCategory);
-        $this->createGearDriveNozzleData($gearDriveNozzleCategory);
-        $this->createDripSprayTapeData($dripSprayTapeCategory);
-        $this->createPumpData($pumpCategory);
-        $this->createPipeData($pipeCategory);
-
-        echo "Equipment seeding completed successfully!\n";
     }
 
-    // สปริงเกอร์แบบหมุน/ยิงไกล - 15 ตัว
     private function createSprinklerData($category)
     {
-        $sprinklerData = [
+        $data = [
+            // ข้อมูลเดิม 4 รายการ
             [
                 'product_code' => 'SP-ROT-001',
                 'name' => 'สปริงเกอร์แบบหมุน 360° ขนาด 1"',
                 'brand' => 'Aqua-Tech',
-                'image' => '/images/sprinkler/sp-rot-001.jpg',
+                'image' => '',
                 'price' => 280.00,
+                'stock' => 50,
+                'description' => 'สปริงเกอร์แบบหมุนรอบ 360 องศา เหมาะสำหรับพื้นที่ขนาดกลาง',
                 'attributes' => [
-                    'name' => 'สปริงเกอร์แบบหมุน 360° ขนาด 1"',
                     'size_mm' => 25,
                     'size_inch' => 1,
-                    'waterVolumeLitersPerHour' => [200, 1200],
+                    'waterVolumeLitersPerMinute' => [3.33, 20],
                     'radiusMeters' => [8, 15],
                     'pressureBar' => [1.5, 4]
                 ]
@@ -392,13 +316,14 @@ class EquipmentSeeder extends Seeder
                 'product_code' => '1-ECO-100',
                 'name' => 'มินิสปริงเกอร์ 1/2"',
                 'brand' => 'ไชโย',
-                'image' => '/images/sprinkler/1-ECO-100.jpg',
+                'image' => '',
                 'price' => 1.00,
+                'stock' => 1000,
+                'description' => 'มินิสปริงเกอร์ขนาดเล็ก เหมาะสำหรับแปลงผัก',
                 'attributes' => [
-                    'name' => 'มินิสปริงเกอร์ 1/2"',
                     'size_mm' => 20,
                     'size_inch' => 0.5,
-                    'waterVolumeLitersPerHour' => [60, 120],
+                    'waterVolumeLitersPerMinute' => [1, 2],
                     'radiusMeters' => [0.5, 1.5],
                     'pressureBar' => [0.5, 2]
                 ]
@@ -409,11 +334,12 @@ class EquipmentSeeder extends Seeder
                 'brand' => 'ไชโย',
                 'image' => 'https://f.btwcdn.com/store-50036/product/8d4c61e4-6cde-b0bc-09ed-624fd55b4468.png',
                 'price' => 9.00,
+                'stock' => 200,
+                'description' => 'สปริงเกอร์ใบหมุน 2 ชั้น กระจายน้ำสม่ำเสมอ',
                 'attributes' => [
-                    'name' => 'สปริงเกอร์ ใบหมุน2ชั้น เกลียวใน 3/4x1/2"',
                     'size_mm' => 32,
                     'size_inch' => 1,
-                    'waterVolumeLitersPerHour' => [100, 900],
+                    'waterVolumeLitersPerMinute' => [1.67, 15],
                     'radiusMeters' => [4, 5],
                     'pressureBar' => [0.5, 3]
                 ]
@@ -422,199 +348,214 @@ class EquipmentSeeder extends Seeder
                 'product_code' => '1-ECO-150',
                 'name' => 'มินิสปริงเกอร์ 3/4"',
                 'brand' => 'แชมป์',
-                'image' => '/images/sprinkler/1-ECO-150.jpg',
+                'image' => '',
                 'price' => 2.00,
+                'stock' => 500,
+                'description' => 'มินิสปริงเกอร์ขนาดกลาง เหมาะสำหรับสวนผลไม้',
                 'attributes' => [
-                    'name' => 'มินิสปริงเกอร์ 3/4"',
                     'size_mm' => 25,
                     'size_inch' => 0.75,
-                    'waterVolumeLitersPerHour' => [120, 240],
+                    'waterVolumeLitersPerMinute' => [2, 4],
                     'radiusMeters' => [0.5, 1.5],
                     'pressureBar' => [0.5, 2]
                 ]
             ],
+            // เพิ่มข้อมูลใหม่ 11 รายการ
             [
                 'product_code' => 'SP-ROT-002',
-                'name' => 'สปริงเกอร์หมุนโลหะ 1.25"',
-                'brand' => 'AquaMax',
-                'image' => '/images/sprinkler/sp-rot-002.jpg',
+                'name' => 'สปริงเกอร์แบบหมุน 180° ขนาด 2"',
+                'brand' => 'Aqua-Tech',
+                'image' => '',
                 'price' => 450.00,
+                'stock' => 30,
+                'description' => 'สปริงเกอร์แบบหมุนครึ่งวง เหมาะสำหรับพื้นที่ขนาดใหญ่',
                 'attributes' => [
-                    'name' => 'สปริงเกอร์หมุนโลหะ 1.25"',
-                    'size_mm' => 32,
-                    'size_inch' => 1.25,
-                    'waterVolumeLitersPerHour' => [400, 1800],
-                    'radiusMeters' => [10, 18],
-                    'pressureBar' => [2, 5]
+                    'size_mm' => 50,
+                    'size_inch' => 2,
+                    'waterVolumeLitersPerMinute' => [10, 40],
+                    'radiusMeters' => [15, 25],
+                    'pressureBar' => [2, 6]
                 ]
             ],
             [
-                'product_code' => 'SP-360-003',
-                'name' => 'สปริงเกอร์ 360° ปรับความแรง ขนาด 2"',
-                'brand' => 'WaterPro',
-                'image' => '/images/sprinkler/sp-360-003.jpg',
-                'price' => 750.00,
+                'product_code' => 'SP-IMP-001',
+                'name' => 'สปริงเกอร์อิมแพ็ค 1.5"',
+                'brand' => 'Rain-Bird',
+                'image' => '',
+                'price' => 380.00,
+                'stock' => 25,
+                'description' => 'สปริงเกอร์แบบอิมแพ็ค ทนทาน มอเตอร์หมุนแรง',
                 'attributes' => [
-                    'name' => 'สปริงเกอร์ 360° ปรับความแรง ขนาด 2"',
-                    'size_mm' => 50,
-                    'size_inch' => 2,
-                    'waterVolumeLitersPerHour' => [800, 3000],
-                    'radiusMeters' => [15, 25],
+                    'size_mm' => 40,
+                    'size_inch' => 1.5,
+                    'waterVolumeLitersPerMinute' => [8, 35],
+                    'radiusMeters' => [12, 20],
+                    'pressureBar' => [1.8, 5]
+                ]
+            ],
+            [
+                'product_code' => 'SP-MICRO-001',
+                'name' => 'ไมโครสปริงเกอร์ 5mm',
+                'brand' => 'Netafim',
+                'image' => '',
+                'price' => 12.00,
+                'stock' => 800,
+                'description' => 'ไมโครสปริงเกอร์ประหยัดน้ำ เหมาะสำหรับเรือนกระจก',
+                'attributes' => [
+                    'size_mm' => 5,
+                    'size_inch' => 0.2,
+                    'waterVolumeLitersPerMinute' => [0.5, 1.5],
+                    'radiusMeters' => [0.3, 0.8],
+                    'pressureBar' => [0.3, 1.5]
+                ]
+            ],
+            [
+                'product_code' => 'SP-GUN-001',
+                'name' => 'สปริงเกอร์ปืนยิงไกล 3"',
+                'brand' => 'Nelson',
+                'image' => '',
+                'price' => 1250.00,
+                'stock' => 8,
+                'description' => 'สปริงเกอร์แบบปืนยิงไกล สำหรับพื้นที่กว้างใหญ่',
+                'attributes' => [
+                    'size_mm' => 75,
+                    'size_inch' => 3,
+                    'waterVolumeLitersPerMinute' => [30, 80],
+                    'radiusMeters' => [25, 45],
+                    'pressureBar' => [3, 8]
+                ]
+            ],
+            [
+                'product_code' => 'SP-POP-001',
+                'name' => 'สปริงเกอร์ป็อปอัพ 4"',
+                'brand' => 'Hunter',
+                'image' => '',
+                'price' => 850.00,
+                'stock' => 15,
+                'description' => 'สปริงเกอร์แบบป็อปอัพ หดเก็บได้ เหมาะสำหรับสนามกอล์ฟ',
+                'attributes' => [
+                    'size_mm' => 100,
+                    'size_inch' => 4,
+                    'waterVolumeLitersPerMinute' => [20, 60],
+                    'radiusMeters' => [18, 30],
                     'pressureBar' => [2.5, 6]
                 ]
             ],
             [
-                'product_code' => 'ROT-MINI-004',
-                'name' => 'สปริงเกอร์มินิ 180° ขนาด 3/8"',
-                'brand' => 'GreenTech',
-                'image' => '/images/sprinkler/rot-mini-004.jpg',
-                'price' => 85.00,
+                'product_code' => 'SP-GEAR-001',
+                'name' => 'สปริงเกอร์เกียร์ดอฟ 6"',
+                'brand' => 'Toro',
+                'image' => '',
+                'price' => 1800.00,
+                'stock' => 5,
+                'description' => 'สปริงเกอร์แบบเกียร์ดอฟ ทนทาน เหมาะสำหรับงานหนัก',
                 'attributes' => [
-                    'name' => 'สปริงเกอร์มินิ 180° ขนาด 3/8"',
-                    'size_mm' => 10,
-                    'size_inch' => 0.375,
-                    'waterVolumeLitersPerHour' => [40, 90],
-                    'radiusMeters' => [1, 3],
-                    'pressureBar' => [0.8, 2.5]
+                    'size_mm' => 150,
+                    'size_inch' => 6,
+                    'waterVolumeLitersPerMinute' => [50, 120],
+                    'radiusMeters' => [30, 50],
+                    'pressureBar' => [4, 10]
                 ]
             ],
             [
-                'product_code' => 'SP-HEAVY-005',
-                'name' => 'สปริงเกอร์หนักหมุนช้า 1.5"',
-                'brand' => 'PowerSpray',
-                'image' => '/images/sprinkler/sp-heavy-005.jpg',
-                'price' => 620.00,
+                'product_code' => 'SP-MIST-001',
+                'name' => 'สปริงเกอร์มิสเตอร์ 1/4"',
+                'brand' => 'Fogco',
+                'image' => '',
+                'price' => 65.00,
+                'stock' => 300,
+                'description' => 'สปริงเกอร์แบบมิสต์ สำหรับระบบพ่นหมอก',
                 'attributes' => [
-                    'name' => 'สปริงเกอร์หนักหมุนช้า 1.5"',
-                    'size_mm' => 38,
-                    'size_inch' => 1.5,
-                    'waterVolumeLitersPerHour' => [600, 2400],
-                    'radiusMeters' => [12, 20],
-                    'pressureBar' => [2, 4.5]
-                ]
-            ],
-            [
-                'product_code' => 'AGRI-SPR-006',
-                'name' => 'สปริงเกอร์เกษตร หัวทองเหลือง 1"',
-                'brand' => 'FarmTech',
-                'image' => '/images/sprinkler/agri-spr-006.jpg',
-                'price' => 320.00,
-                'attributes' => [
-                    'name' => 'สปริงเกอร์เกษตร หัวทองเหลือง 1"',
-                    'size_mm' => 25,
-                    'size_inch' => 1,
-                    'waterVolumeLitersPerHour' => [250, 1400],
-                    'radiusMeters' => [9, 16],
-                    'pressureBar' => [1.8, 4.2]
-                ]
-            ],
-            [
-                'product_code' => 'SP-TURBO-007',
-                'name' => 'สปริงเกอร์เทอร์โบ หมุนเร็ว 3/4"',
-                'brand' => 'TurboSpray',
-                'image' => '/images/sprinkler/sp-turbo-007.jpg',
-                'price' => 180.00,
-                'attributes' => [
-                    'name' => 'สปริงเกอร์เทอร์โบ หมุนเร็ว 3/4"',
-                    'size_mm' => 20,
-                    'size_inch' => 0.75,
-                    'waterVolumeLitersPerHour' => [150, 800],
-                    'radiusMeters' => [6, 12],
-                    'pressureBar' => [1.5, 3.5]
-                ]
-            ],
-            [
-                'product_code' => 'SP-LONG-008',
-                'name' => 'สปริงเกอร์ระยะไกล 2.5"',
-                'brand' => 'LongRange',
-                'image' => '/images/sprinkler/sp-long-008.jpg',
-                'price' => 1250.00,
-                'attributes' => [
-                    'name' => 'สปริงเกอร์ระยะไกล 2.5"',
-                    'size_mm' => 63,
-                    'size_inch' => 2.5,
-                    'waterVolumeLitersPerHour' => [1200, 4500],
-                    'radiusMeters' => [20, 35],
-                    'pressureBar' => [3, 7]
-                ]
-            ],
-            [
-                'product_code' => 'ECO-ROT-009',
-                'name' => 'สปริงเกอร์ประหยัดน้ำ 1/2"',
-                'brand' => 'EcoWater',
-                'image' => '/images/sprinkler/eco-rot-009.jpg',
-                'price' => 95.00,
-                'attributes' => [
-                    'name' => 'สปริงเกอร์ประหยัดน้ำ 1/2"',
-                    'size_mm' => 15,
-                    'size_inch' => 0.5,
-                    'waterVolumeLitersPerHour' => [80, 200],
-                    'radiusMeters' => [3, 6],
-                    'pressureBar' => [1, 2.8]
-                ]
-            ],
-            [
-                'product_code' => 'SP-DUAL-010',
-                'name' => 'สปริงเกอร์หัวคู่ 1"x3/4"',
-                'brand' => 'DualSpray',
-                'image' => '/images/sprinkler/sp-dual-010.jpg',
-                'price' => 380.00,
-                'attributes' => [
-                    'name' => 'สปริงเกอร์หัวคู่ 1"x3/4"',
-                    'size_mm' => 25,
-                    'size_inch' => 1,
-                    'waterVolumeLitersPerHour' => [300, 1600],
-                    'radiusMeters' => [8, 14],
-                    'pressureBar' => [1.5, 4]
-                ]
-            ],
-            [
-                'product_code' => 'SP-MINI-011',
-                'name' => 'มินิสปริงเกอร์พลาสติก 1/4"',
-                'brand' => 'MiniSpray',
-                'image' => '/images/sprinkler/sp-mini-011.jpg',
-                'price' => 25.00,
-                'attributes' => [
-                    'name' => 'มินิสปริงเกอร์พลาสติก 1/4"',
                     'size_mm' => 6,
                     'size_inch' => 0.25,
-                    'waterVolumeLitersPerHour' => [20, 50],
-                    'radiusMeters' => [0.8, 2],
+                    'waterVolumeLitersPerMinute' => [0.2, 0.8],
+                    'radiusMeters' => [0.2, 0.5],
+                    'pressureBar' => [5, 15]
+                ]
+            ],
+            [
+                'product_code' => 'SP-BOOM-001',
+                'name' => 'สปริงเกอร์บูม 8"',
+                'brand' => 'Valley',
+                'image' => '',
+                'price' => 3200.00,
+                'stock' => 3,
+                'description' => 'สปริงเกอร์แบบบูม สำหรับระบบชลประทานขนาดใหญ่',
+                'attributes' => [
+                    'size_mm' => 200,
+                    'size_inch' => 8,
+                    'waterVolumeLitersPerMinute' => [100, 200],
+                    'radiusMeters' => [40, 60],
+                    'pressureBar' => [5, 12]
+                ]
+            ],
+            [
+                'product_code' => 'SP-DRIP-001',
+                'name' => 'สปริงเกอร์ดริป 8mm',
+                'brand' => 'Jain',
+                'image' => '',
+                'price' => 8.50,
+                'stock' => 600,
+                'description' => 'สปริงเกอร์แบบดริป ประหยัดน้ำสุดๆ',
+                'attributes' => [
+                    'size_mm' => 8,
+                    'size_inch' => 0.3,
+                    'waterVolumeLitersPerMinute' => [0.8, 2.5],
+                    'radiusMeters' => [0.4, 1],
                     'pressureBar' => [0.5, 2]
                 ]
             ],
             [
-                'product_code' => 'SP-PREMIUM-012',
-                'name' => 'สปริงเกอร์พรีเมี่ยม สแตนเลส 1.25"',
-                'brand' => 'Premium',
-                'image' => '/images/sprinkler/sp-premium-012.jpg',
-                'price' => 890.00,
+                'product_code' => 'SP-WOBBLER-001',
+                'name' => 'สปริงเกอร์วอบเบลอร์ 1/2"',
+                'brand' => 'Senninger',
+                'image' => '',
+                'price' => 35.00,
+                'stock' => 400,
+                'description' => 'สปริงเกอร์แบบสั่น กระจายน้ำสม่ำเสมอ',
                 'attributes' => [
-                    'name' => 'สปริงเกอร์พรีเมี่ยม สแตนเลส 1.25"',
-                    'size_mm' => 32,
-                    'size_inch' => 1.25,
-                    'waterVolumeLitersPerHour' => [500, 2200],
-                    'radiusMeters' => [12, 22],
-                    'pressureBar' => [2.2, 5.5]
+                    'size_mm' => 12,
+                    'size_inch' => 0.5,
+                    'waterVolumeLitersPerMinute' => [1.5, 5],
+                    'radiusMeters' => [1, 3],
+                    'pressureBar' => [0.8, 3]
+                ]
+            ],
+            [
+                'product_code' => 'SP-MULTI-001',
+                'name' => 'สปริงเกอร์หลายหัว 2.5"',
+                'brand' => 'Komet',
+                'image' => '',
+                'price' => 980.00,
+                'stock' => 12,
+                'description' => 'สปริงเกอร์หลายหัวฉีด ปรับทิศทางได้',
+                'attributes' => [
+                    'size_mm' => 65,
+                    'size_inch' => 2.5,
+                    'waterVolumeLitersPerMinute' => [25, 70],
+                    'radiusMeters' => [20, 35],
+                    'pressureBar' => [2.8, 7]
                 ]
             ]
         ];
 
-        foreach ($sprinklerData as $data) {
-            $this->createEquipmentWithAttributes($category, $data);
+        foreach ($data as $item) {
+            $this->createEquipmentWithAttributes($category, $item);
         }
     }
 
-    // ปั๊มน้ำ - 15 ตัว
     private function createPumpData($category)
     {
         $pumpData = [
+            // ข้อมูลเดิม 3 รายการ
             [
                 'product_code' => '1-CPM130',
                 'name' => 'ปั๊มน้ำ CPM130',
                 'brand' => 'ไชโย',
                 'image' => 'https://f.btwcdn.com/store-50036/product/42f86283-ba80-6f71-0a37-624e6dd42c83.png',
                 'price' => 1820.00,
+                'stock' => 15,
+                'description' => 'ปั๊มน้ำหอยโข่ง 0.5 HP เหมาะสำหรับงานทั่วไป',
                 'attributes' => [
                     'powerHP' => 0.5,
                     'powerKW' => 0.37,
@@ -634,8 +575,10 @@ class EquipmentSeeder extends Seeder
                 'product_code' => '1-CPM075',
                 'name' => 'ปั๊มน้ำ CPM075',
                 'brand' => 'ไชโย',
-                'image' => '/images/pump/1-CPM075.jpg',
+                'image' => '',
                 'price' => 1250.00,
+                'stock' => 20,
+                'description' => 'ปั๊มน้ำหอยโข่ง 0.25 HP ประหยัดไฟ',
                 'attributes' => [
                     'powerHP' => 0.25,
                     'powerKW' => 0.18,
@@ -655,8 +598,10 @@ class EquipmentSeeder extends Seeder
                 'product_code' => 'MIT-SSP-255S',
                 'name' => 'ปั๊มจุ่ม Mitsubishi SSP-255S',
                 'brand' => 'Mitsubishi',
-                'image' => '/images/pump/MIT-SSP-255S.jpg',
+                'image' => '',
                 'price' => 2800.00,
+                'stock' => 8,
+                'description' => 'ปั๊มจุ่มคุณภาพสูง เหมาะสำหรับบ่อน้ำลึก',
                 'attributes' => [
                     'powerHP' => 0.33,
                     'powerKW' => 0.255,
@@ -672,287 +617,279 @@ class EquipmentSeeder extends Seeder
                     'weight_kg' => 5.5
                 ]
             ],
+            // เพิ่มข้อมูลใหม่ 12 รายการ
             [
-                'product_code' => 'PUMP-001',
-                'name' => 'ปั๊มน้ำ 1HP 3เฟส',
-                'brand' => 'PowerPump',
-                'image' => '/images/pump/pump-001.jpg',
-                'price' => 3200.00,
+                'product_code' => '1-CPM200',
+                'name' => 'ปั๊มน้ำ CPM200',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 2850.00,
+                'stock' => 12,
+                'description' => 'ปั๊มน้ำหอยโข่ง 1 HP แรงสูง ทนทาน',
                 'attributes' => [
                     'powerHP' => 1,
                     'powerKW' => 0.75,
-                    'phase' => 3,
-                    'inlet_size_inch' => 1.5,
-                    'outlet_size_inch' => 1.25,
-                    'flow_rate_lpm' => [40, 180],
+                    'phase' => 1,
+                    'inlet_size_inch' => 1.25,
+                    'outlet_size_inch' => 1,
+                    'flow_rate_lpm' => [30, 120],
                     'head_m' => [35, 20],
                     'max_head_m' => 35,
-                    'max_flow_rate_lpm' => 180,
+                    'max_flow_rate_lpm' => 120,
                     'suction_depth_m' => 9,
-                    'dimensions_cm' => '22 x 35 x 28',
-                    'weight_kg' => 18.5
+                    'dimensions_cm' => '20 x 35 x 25',
+                    'weight_kg' => 18.2
                 ]
             ],
             [
-                'product_code' => 'PUMP-002',
-                'name' => 'ปั๊มน้ำ 2HP เหล็กหล่อ',
-                'brand' => 'HeavyDuty',
-                'image' => '/images/pump/pump-002.jpg',
-                'price' => 4850.00,
-                'attributes' => [
-                    'powerHP' => 2,
-                    'powerKW' => 1.5,
-                    'phase' => 3,
-                    'inlet_size_inch' => 2,
-                    'outlet_size_inch' => 1.5,
-                    'flow_rate_lpm' => [80, 350],
-                    'head_m' => [45, 25],
-                    'max_head_m' => 45,
-                    'max_flow_rate_lpm' => 350,
-                    'suction_depth_m' => 10,
-                    'dimensions_cm' => '28 x 42 x 35',
-                    'weight_kg' => 32.0
-                ]
-            ],
-            [
-                'product_code' => 'SUBMERSIBLE-001',
-                'name' => 'ปั๊มจุ่มสแตนเลส 0.75HP',
-                'brand' => 'AquaDeep',
-                'image' => '/images/pump/submersible-001.jpg',
-                'price' => 3650.00,
+                'product_code' => 'GRUNDFOS-JP5',
+                'name' => 'ปั๊มเจ็ท Grundfos JP-5',
+                'brand' => 'Grundfos',
+                'image' => '',
+                'price' => 4200.00,
+                'stock' => 6,
+                'description' => 'ปั๊มเจ็ทคุณภาพยุโรป ประสิทธิภาพสูง',
                 'attributes' => [
                     'powerHP' => 0.75,
                     'powerKW' => 0.55,
                     'phase' => 1,
-                    'inlet_size_inch' => null,
+                    'inlet_size_inch' => 1,
                     'outlet_size_inch' => 1,
-                    'flow_rate_lpm' => [30, 120],
-                    'head_m' => [25, 10],
-                    'max_head_m' => 28,
-                    'max_flow_rate_lpm' => 130,
-                    'suction_depth_m' => null,
-                    'dimensions_cm' => '18 x 18 x 45',
-                    'weight_kg' => 12.8
+                    'flow_rate_lpm' => [25, 95],
+                    'head_m' => [40, 25],
+                    'max_head_m' => 42,
+                    'max_flow_rate_lpm' => 100,
+                    'suction_depth_m' => 25,
+                    'dimensions_cm' => '22 x 40 x 28',
+                    'weight_kg' => 15.8
                 ]
             ],
             [
-                'product_code' => 'BOOSTER-001',
-                'name' => 'ปั๊มเพิ่มแรงดัน 0.8HP',
-                'brand' => 'PressureMax',
-                'image' => '/images/pump/booster-001.jpg',
-                'price' => 2980.00,
+                'product_code' => 'PEDROLLO-PKM60',
+                'name' => 'ปั๊มหอยโข่ง Pedrollo PKm60',
+                'brand' => 'Pedrollo',
+                'image' => '',
+                'price' => 3150.00,
+                'stock' => 10,
+                'description' => 'ปั๊มหอยโข่งอิตาลี คุณภาพระดับมืออาชีพ',
+                'attributes' => [
+                    'powerHP' => 0.6,
+                    'powerKW' => 0.45,
+                    'phase' => 1,
+                    'inlet_size_inch' => 1,
+                    'outlet_size_inch' => 1,
+                    'flow_rate_lpm' => [22, 85],
+                    'head_m' => [30, 18],
+                    'max_head_m' => 32,
+                    'max_flow_rate_lpm' => 88,
+                    'suction_depth_m' => 8,
+                    'dimensions_cm' => '19 x 32 x 24',
+                    'weight_kg' => 14.2
+                ]
+            ],
+            [
+                'product_code' => 'HITACHI-DT-P300GX',
+                'name' => 'ปั๊มจุ่ม Hitachi DT-P300GX',
+                'brand' => 'Hitachi',
+                'image' => '',
+                'price' => 5800.00,
+                'stock' => 4,
+                'description' => 'ปั๊มจุ่มญี่ปุ่น ระบบอัตโนมัติ มอเตอร์ทนทาน',
+                'attributes' => [
+                    'powerHP' => 0.4,
+                    'powerKW' => 0.3,
+                    'phase' => 1,
+                    'inlet_size_inch' => null,
+                    'outlet_size_inch' => 1,
+                    'flow_rate_lpm' => [15, 80],
+                    'head_m' => [12, 3],
+                    'max_head_m' => 13,
+                    'max_flow_rate_lpm' => 85,
+                    'suction_depth_m' => null,
+                    'dimensions_cm' => '14 x 14 x 28',
+                    'weight_kg' => 4.8
+                ]
+            ],
+            [
+                'product_code' => 'STANLEY-SXUP1100XBE',
+                'name' => 'ปั๊มน้ำบ้าน Stanley 1100W',
+                'brand' => 'Stanley',
+                'image' => '',
+                'price' => 2650.00,
+                'stock' => 18,
+                'description' => 'ปั๊มน้ำบ้าน ระบบแรงดันคงที่ อัตโนมัติ',
+                'attributes' => [
+                    'powerHP' => 1.5,
+                    'powerKW' => 1.1,
+                    'phase' => 1,
+                    'inlet_size_inch' => 1,
+                    'outlet_size_inch' => 1,
+                    'flow_rate_lpm' => [35, 150],
+                    'head_m' => [45, 25],
+                    'max_head_m' => 48,
+                    'max_flow_rate_lpm' => 155,
+                    'suction_depth_m' => 9,
+                    'dimensions_cm' => '25 x 42 x 30',
+                    'weight_kg' => 22.5
+                ]
+            ],
+            [
+                'product_code' => 'LEO-XKJ800I',
+                'name' => 'ปั๊มเจ็ท Leo XKJ-800I',
+                'brand' => 'Leo',
+                'image' => '',
+                'price' => 1950.00,
+                'stock' => 14,
+                'description' => 'ปั๊มเจ็ทไต้หวัน พร้อมเจ็ทฟิตติ้ง ราคาประหยัด',
                 'attributes' => [
                     'powerHP' => 0.8,
                     'powerKW' => 0.6,
                     'phase' => 1,
                     'inlet_size_inch' => 1,
                     'outlet_size_inch' => 1,
-                    'flow_rate_lpm' => [25, 95],
-                    'head_m' => [38, 20],
+                    'flow_rate_lpm' => [28, 105],
+                    'head_m' => [38, 22],
                     'max_head_m' => 40,
-                    'max_flow_rate_lpm' => 100,
-                    'suction_depth_m' => 8,
-                    'dimensions_cm' => '20 x 32 x 25',
-                    'weight_kg' => 15.2
-                ]
-            ],
-            [
-                'product_code' => 'PUMP-MINI-001',
-                'name' => 'ปั๊มน้ำมินิ 0.3HP',
-                'brand' => 'MiniFlow',
-                'image' => '/images/pump/pump-mini-001.jpg',
-                'price' => 890.00,
-                'attributes' => [
-                    'powerHP' => 0.3,
-                    'powerKW' => 0.22,
-                    'phase' => 1,
-                    'inlet_size_inch' => 0.75,
-                    'outlet_size_inch' => 0.75,
-                    'flow_rate_lpm' => [15, 60],
-                    'head_m' => [22, 12],
-                    'max_head_m' => 22,
-                    'max_flow_rate_lpm' => 60,
-                    'suction_depth_m' => 7,
-                    'dimensions_cm' => '14 x 22 x 18',
-                    'weight_kg' => 6.8
-                ]
-            ],
-            [
-                'product_code' => 'INDUSTRIAL-001',
-                'name' => 'ปั๊มอุตสาหกรรม 5HP',
-                'brand' => 'Industrial',
-                'image' => '/images/pump/industrial-001.jpg',
-                'price' => 12500.00,
-                'attributes' => [
-                    'powerHP' => 5,
-                    'powerKW' => 3.7,
-                    'phase' => 3,
-                    'inlet_size_inch' => 3,
-                    'outlet_size_inch' => 2.5,
-                    'flow_rate_lpm' => [200, 800],
-                    'head_m' => [65, 35],
-                    'max_head_m' => 70,
-                    'max_flow_rate_lpm' => 850,
-                    'suction_depth_m' => 12,
-                    'dimensions_cm' => '45 x 65 x 52',
-                    'weight_kg' => 85.0
-                ]
-            ],
-            [
-                'product_code' => 'SOLAR-PUMP-001',
-                'name' => 'ปั๊มพลังงานแสงอาทิตย์ 1HP',
-                'brand' => 'SolarTech',
-                'image' => '/images/pump/solar-pump-001.jpg',
-                'price' => 8500.00,
-                'attributes' => [
-                    'powerHP' => 1,
-                    'powerKW' => 0.75,
-                    'phase' => null,
-                    'inlet_size_inch' => 1.25,
-                    'outlet_size_inch' => 1,
-                    'flow_rate_lpm' => [35, 150],
-                    'head_m' => [30, 18],
-                    'max_head_m' => 32,
-                    'max_flow_rate_lpm' => 160,
-                    'suction_depth_m' => 25,
-                    'dimensions_cm' => '20 x 35 x 28',
+                    'max_flow_rate_lpm' => 110,
+                    'suction_depth_m' => 20,
+                    'dimensions_cm' => '23 x 38 x 26',
                     'weight_kg' => 16.5
                 ]
             ],
             [
-                'product_code' => 'JET-PUMP-001',
-                'name' => 'ปั๊มเจ็ท 1.5HP ถังสะสม',
-                'brand' => 'JetMax',
-                'image' => '/images/pump/jet-pump-001.jpg',
-                'price' => 4200.00,
+                'product_code' => 'FRANKLIN-3HP-380V',
+                'name' => 'ปั๊มจุ่ม Franklin 3HP 380V',
+                'brand' => 'Franklin',
+                'image' => '',
+                'price' => 15800.00,
+                'stock' => 2,
+                'description' => 'ปั๊มจุ่มอเมริกัน 3 เฟส สำหรับงานหนัก บ่อลึก',
                 'attributes' => [
-                    'powerHP' => 1.5,
-                    'powerKW' => 1.1,
-                    'phase' => 1,
-                    'inlet_size_inch' => 1.25,
-                    'outlet_size_inch' => 1,
-                    'flow_rate_lpm' => [50, 220],
-                    'head_m' => [42, 28],
-                    'max_head_m' => 45,
-                    'max_flow_rate_lpm' => 230,
-                    'suction_depth_m' => 20,
-                    'dimensions_cm' => '35 x 45 x 65',
+                    'powerHP' => 3,
+                    'powerKW' => 2.2,
+                    'phase' => 3,
+                    'inlet_size_inch' => null,
+                    'outlet_size_inch' => 2,
+                    'flow_rate_lpm' => [80, 300],
+                    'head_m' => [60, 20],
+                    'max_head_m' => 65,
+                    'max_flow_rate_lpm' => 320,
+                    'suction_depth_m' => null,
+                    'dimensions_cm' => '18 x 18 x 65',
                     'weight_kg' => 28.5
                 ]
             ],
             [
-                'product_code' => 'CENTRIFUGAL-001',
-                'name' => 'ปั๊มเหวี่ยงออกจากศูนย์กล 3HP',
-                'brand' => 'CentriMax',
-                'image' => '/images/pump/centrifugal-001.jpg',
-                'price' => 7800.00,
+                'product_code' => 'MITSUBISHI-EP-315R',
+                'name' => 'ปั๊มหอยโข่ง Mitsubishi EP-315R',
+                'brand' => 'Mitsubishi',
+                'image' => '',
+                'price' => 8200.00,
+                'stock' => 3,
+                'description' => 'ปั๊มหอยโข่งญี่ปุ่น มอเตอร์ประสิทธิภาพสูง',
                 'attributes' => [
-                    'powerHP' => 3,
-                    'powerKW' => 2.2,
-                    'phase' => 3,
-                    'inlet_size_inch' => 2.5,
-                    'outlet_size_inch' => 2,
-                    'flow_rate_lpm' => [120, 500],
-                    'head_m' => [55, 30],
-                    'max_head_m' => 58,
-                    'max_flow_rate_lpm' => 520,
-                    'suction_depth_m' => 10,
-                    'dimensions_cm' => '38 x 52 x 42',
-                    'weight_kg' => 55.0
-                ]
-            ],
-            [
-                'product_code' => 'MULTI-STAGE-001',
-                'name' => 'ปั๊มหลายชั้น 2.5HP',
-                'brand' => 'MultiFlow',
-                'image' => '/images/pump/multi-stage-001.jpg',
-                'price' => 6850.00,
-                'attributes' => [
-                    'powerHP' => 2.5,
-                    'powerKW' => 1.85,
-                    'phase' => 3,
+                    'powerHP' => 2,
+                    'powerKW' => 1.5,
+                    'phase' => 1,
                     'inlet_size_inch' => 1.5,
                     'outlet_size_inch' => 1.25,
-                    'flow_rate_lpm' => [60, 280],
-                    'head_m' => [85, 45],
-                    'max_head_m' => 90,
-                    'max_flow_rate_lpm' => 300,
+                    'flow_rate_lpm' => [50, 180],
+                    'head_m' => [50, 30],
+                    'max_head_m' => 55,
+                    'max_flow_rate_lpm' => 190,
                     'suction_depth_m' => 9,
-                    'dimensions_cm' => '25 x 48 x 35',
-                    'weight_kg' => 42.0
+                    'dimensions_cm' => '28 x 45 x 32',
+                    'weight_kg' => 32.8
                 ]
             ],
             [
-                'product_code' => 'DEEP-WELL-001',
-                'name' => 'ปั๊มบาดาลน้ำลึก 4"',
-                'brand' => 'DeepWater',
-                'image' => '/images/pump/deep-well-001.jpg',
-                'price' => 9500.00,
+                'product_code' => 'DAVEY-XF191',
+                'name' => 'ปั๊มอัตโนมัติ Davey XF191',
+                'brand' => 'Davey',
+                'image' => '',
+                'price' => 6500.00,
+                'stock' => 7,
+                'description' => 'ปั๊มอัตโนมัติออสเตรเลีย ระบบ VSD ประหยัดไฟ',
                 'attributes' => [
-                    'powerHP' => 1.5,
-                    'powerKW' => 1.1,
-                    'phase' => 3,
-                    'inlet_size_inch' => null,
-                    'outlet_size_inch' => 1.25,
-                    'flow_rate_lpm' => [40, 180],
-                    'head_m' => [120, 60],
-                    'max_head_m' => 130,
-                    'max_flow_rate_lpm' => 200,
-                    'suction_depth_m' => null,
-                    'dimensions_cm' => '10 x 10 x 85',
-                    'weight_kg' => 18.5
+                    'powerHP' => 1.25,
+                    'powerKW' => 0.9,
+                    'phase' => 1,
+                    'inlet_size_inch' => 1,
+                    'outlet_size_inch' => 1,
+                    'flow_rate_lpm' => [40, 140],
+                    'head_m' => [42, 28],
+                    'max_head_m' => 45,
+                    'max_flow_rate_lpm' => 145,
+                    'suction_depth_m' => 9,
+                    'dimensions_cm' => '26 x 38 x 28',
+                    'weight_kg' => 19.5
                 ]
             ],
             [
-                'product_code' => 'VARIABLE-SPEED-001',
-                'name' => 'ปั๊มปรับความเร็วได้ 3HP',
-                'brand' => 'VariFlow',
-                'image' => '/images/pump/variable-speed-001.jpg',
-                'price' => 15800.00,
+                'product_code' => 'EBARA-JEM120',
+                'name' => 'ปั๊มเจ็ท Ebara JEM120',
+                'brand' => 'Ebara',
+                'image' => '',
+                'price' => 7200.00,
+                'stock' => 5,
+                'description' => 'ปั๊มเจ็ทญี่ปุ่น สแตนเลสทั้งตัว ป้องกันสนิม',
                 'attributes' => [
-                    'powerHP' => 3,
-                    'powerKW' => 2.2,
-                    'phase' => 3,
-                    'inlet_size_inch' => 2,
+                    'powerHP' => 1.2,
+                    'powerKW' => 0.9,
+                    'phase' => 1,
+                    'inlet_size_inch' => 1.25,
+                    'outlet_size_inch' => 1,
+                    'flow_rate_lpm' => [42, 125],
+                    'head_m' => [45, 28],
+                    'max_head_m' => 48,
+                    'max_flow_rate_lpm' => 130,
+                    'suction_depth_m' => 30,
+                    'dimensions_cm' => '24 x 40 x 28',
+                    'weight_kg' => 21.2
+                ]
+            ],
+            [
+                'product_code' => 'HAYWARD-BOOSTER-1HP',
+                'name' => 'ปั๊มเพิ่มแรงดัน Hayward 1HP',
+                'brand' => 'Hayward',
+                'image' => '',
+                'price' => 4850.00,
+                'stock' => 9,
+                'description' => 'ปั๊มเพิ่มแรงดันสำหรับระบบ RO และ สระว่ายน้ำ',
+                'attributes' => [
+                    'powerHP' => 1,
+                    'powerKW' => 0.75,
+                    'phase' => 1,
+                    'inlet_size_inch' => 1.5,
                     'outlet_size_inch' => 1.5,
-                    'flow_rate_lpm' => [50, 450],
-                    'head_m' => [60, 25],
-                    'max_head_m' => 65,
-                    'max_flow_rate_lpm' => 480,
-                    'suction_depth_m' => 10,
-                    'dimensions_cm' => '35 x 55 x 45',
-                    'weight_kg' => 68.0
+                    'flow_rate_lpm' => [60, 200],
+                    'head_m' => [25, 15],
+                    'max_head_m' => 28,
+                    'max_flow_rate_lpm' => 210,
+                    'suction_depth_m' => 8,
+                    'dimensions_cm' => '30 x 25 x 20',
+                    'weight_kg' => 16.8
                 ]
             ]
         ];
 
         foreach ($pumpData as $data) {
-            $equipment = Equipment::firstOrCreate(
-                ['product_code' => $data['product_code']],
-                [
-                    'category_id' => $category->id,
-                    'name' => $data['name'],
-                    'brand' => $data['brand'],
-                    'image' => $data['image'],
-                    'price' => $data['price'],
-                    'is_active' => true
-                ]
-            );
-
-            $this->createAttributeValues($equipment, $category, $data['attributes']);
+            $this->createEquipmentWithAttributes($category, $data);
         }
     }
 
-    // ท่อ - 15 ตัว
     private function createPipeData($category)
     {
         $pipeData = [
+            // ข้อมูลเดิม 3 รายการ
             [
                 'product_code' => '398-20-5PE100(PN16)',
                 'name' => 'ท่อ HDPE PE100 PN16 ขนาด 20mm',
                 'brand' => 'ไชโย',
                 'image' => 'https://f.btwcdn.com/store-50036/product/7f312be9-9371-ddbd-aaff-640bf17172a6.jpg',
                 'price' => 850.00,
+                'stock' => 5,
+                'description' => 'ท่อ HDPE คุณภาพสูง ทนทาน ใช้กับระบบแรงดันสูง',
                 'attributes' => [
                     'pipeType' => 'HDPE PE 100',
                     'pn' => 16,
@@ -965,8 +902,10 @@ class EquipmentSeeder extends Seeder
                 'product_code' => '398-25-1PE100(PN16)',
                 'name' => 'ท่อ HDPE PE100 PN16 ขนาด 25mm',
                 'brand' => 'ไชโย',
-                'image' => '/images/pipe/398-25-1PE100(PN16).jpg',
+                'image' => '',
                 'price' => 2500.00,
+                'stock' => 3,
+                'description' => 'ท่อ HDPE PE100 ขนาด 25mm ความยาว 100 เมตร',
                 'attributes' => [
                     'pipeType' => 'HDPE PE 100',
                     'pn' => 16,
@@ -979,8 +918,10 @@ class EquipmentSeeder extends Seeder
                 'product_code' => 'PVC-SCG-1-8.5',
                 'name' => 'ท่อ PVC สีฟ้า SCG 1" ชั้น 8.5',
                 'brand' => 'SCG',
-                'image' => '/images/pipe/PVC-SCG-1-8.5.jpg',
+                'image' => '',
                 'price' => 80.00,
+                'stock' => 100,
+                'description' => 'ท่อ PVC สีฟ้า SCG คุณภาพดี ความยาว 4 เมตร',
                 'attributes' => [
                     'pipeType' => 'PVC',
                     'pn' => 8.5,
@@ -989,26 +930,31 @@ class EquipmentSeeder extends Seeder
                     'lengthM' => 4
                 ]
             ],
+            // เพิ่มข้อมูลใหม่ 12 รายการ
             [
-                'product_code' => 'HDPE-32-PN10',
-                'name' => 'ท่อ HDPE PE80 PN10 ขนาด 32mm',
-                'brand' => 'Thai Pipe',
-                'image' => '/images/pipe/hdpe-32-pn10.jpg',
-                'price' => 1250.00,
+                'product_code' => '398-32-1PE100(PN16)',
+                'name' => 'ท่อ HDPE PE100 PN16 ขนาด 32mm',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 3200.00,
+                'stock' => 4,
+                'description' => 'ท่อ HDPE PE100 ขนาด 32mm ความยาว 100 เมตร ทนแรงดัน',
                 'attributes' => [
-                    'pipeType' => 'HDPE PE 80',
-                    'pn' => 10,
+                    'pipeType' => 'HDPE PE 100',
+                    'pn' => 16,
                     'sizeMM' => 32,
                     'sizeInch' => null,
                     'lengthM' => 100
                 ]
             ],
             [
-                'product_code' => 'PVC-1.5-13.5',
-                'name' => 'ท่อ PVC สีฟ้า 1.5" ชั้น 13.5',
+                'product_code' => 'PVC-SCG-1.5-13.5',
+                'name' => 'ท่อ PVC สีฟ้า SCG 1.5" ชั้น 13.5',
                 'brand' => 'SCG',
-                'image' => '/images/pipe/pvc-1.5-13.5.jpg',
-                'price' => 185.00,
+                'image' => '',
+                'price' => 150.00,
+                'stock' => 60,
+                'description' => 'ท่อ PVC สีฟ้า SCG 1.5 นิ้ว ทนแรงดันสูง',
                 'attributes' => [
                     'pipeType' => 'PVC',
                     'pn' => 13.5,
@@ -1018,39 +964,29 @@ class EquipmentSeeder extends Seeder
                 ]
             ],
             [
-                'product_code' => 'HDPE-40-PN16',
-                'name' => 'ท่อ HDPE PE100 PN16 ขนาด 40mm',
-                'brand' => 'ไชโย',
-                'image' => '/images/pipe/hdpe-40-pn16.jpg',
-                'price' => 3800.00,
+                'product_code' => 'PPR-THAI-PIPE-20MM',
+                'name' => 'ท่อ PPR ไทยไปป์ 20mm PN20',
+                'brand' => 'Thai Pipe',
+                'image' => '',
+                'price' => 65.00,
+                'stock' => 120,
+                'description' => 'ท่อ PPR สีเขียว ทนความร้อน เหมาะสำหรับน้ำร้อน',
                 'attributes' => [
-                    'pipeType' => 'HDPE PE 100',
-                    'pn' => 16,
-                    'sizeMM' => 40,
+                    'pipeType' => 'PPR',
+                    'pn' => 20,
+                    'sizeMM' => 20,
                     'sizeInch' => null,
-                    'lengthM' => 100
-                ]
-            ],
-            [
-                'product_code' => 'PVC-2-17',
-                'name' => 'ท่อ PVC สีฟ้า 2" ชั้น 17',
-                'brand' => 'SCG',
-                'image' => '/images/pipe/pvc-2-17.jpg',
-                'price' => 280.00,
-                'attributes' => [
-                    'pipeType' => 'PVC',
-                    'pn' => 17,
-                    'sizeMM' => 50,
-                    'sizeInch' => '2"',
                     'lengthM' => 4
                 ]
             ],
             [
-                'product_code' => 'PPR-25-PN20',
-                'name' => 'ท่อ PPR PN20 ขนาด 25mm',
-                'brand' => 'Wavin',
-                'image' => '/images/pipe/ppr-25-pn20.jpg',
+                'product_code' => 'PPR-THAI-PIPE-25MM',
+                'name' => 'ท่อ PPR ไทยไปป์ 25mm PN20',
+                'brand' => 'Thai Pipe',
+                'image' => '',
                 'price' => 95.00,
+                'stock' => 80,
+                'description' => 'ท่อ PPR สีเขียว 25mm ทนความร้อนสูง',
                 'attributes' => [
                     'pipeType' => 'PPR',
                     'pn' => 20,
@@ -1060,99 +996,145 @@ class EquipmentSeeder extends Seeder
                 ]
             ],
             [
-                'product_code' => 'HDPE-50-PN10',
-                'name' => 'ท่อ HDPE PE80 PN10 ขนาด 50mm',
-                'brand' => 'Thai Pipe',
-                'image' => '/images/pipe/hdpe-50-pn10.jpg',
-                'price' => 2850.00,
+                'product_code' => 'LDPE-16MM-PN4',
+                'name' => 'ท่อ LDPE 16mm PN4 สีดำ',
+                'brand' => 'Netafim',
+                'image' => '',
+                'price' => 1200.00,
+                'stock' => 8,
+                'description' => 'ท่อ LDPE สำหรับระบบดริป ทนรังสี UV',
                 'attributes' => [
-                    'pipeType' => 'HDPE PE 80',
-                    'pn' => 10,
-                    'sizeMM' => 50,
+                    'pipeType' => 'LDPE',
+                    'pn' => 4,
+                    'sizeMM' => 16,
                     'sizeInch' => null,
-                    'lengthM' => 50
+                    'lengthM' => 100
                 ]
             ],
             [
-                'product_code' => 'PVC-0.5-5',
-                'name' => 'ท่อ PVC น้ำเย็น 1/2" ชั้น 5',
+                'product_code' => 'PVC-SCG-2-13.5',
+                'name' => 'ท่อ PVC สีฟ้า SCG 2" ชั้น 13.5',
                 'brand' => 'SCG',
-                'image' => '/images/pipe/pvc-0.5-5.jpg',
-                'price' => 28.00,
+                'image' => '',
+                'price' => 220.00,
+                'stock' => 45,
+                'description' => 'ท่อ PVC สีฟ้า SCG 2 นิ้ว สำหรับระบบแรงดันสูง',
                 'attributes' => [
                     'pipeType' => 'PVC',
-                    'pn' => 5,
-                    'sizeMM' => 15,
-                    'sizeInch' => '1/2"',
+                    'pn' => 13.5,
+                    'sizeMM' => 50,
+                    'sizeInch' => '2"',
                     'lengthM' => 4
                 ]
             ],
             [
-                'product_code' => 'PPR-32-PN25',
-                'name' => 'ท่อ PPR PN25 ขนาด 32mm',
-                'brand' => 'Wavin',
-                'image' => '/images/pipe/ppr-32-pn25.jpg',
+                'product_code' => '398-50-1PE100(PN16)',
+                'name' => 'ท่อ HDPE PE100 PN16 ขนาด 50mm',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 6800.00,
+                'stock' => 2,
+                'description' => 'ท่อ HDPE PE100 ขนาด 50mm ระบบแรงดันสูง',
+                'attributes' => [
+                    'pipeType' => 'HDPE PE 100',
+                    'pn' => 16,
+                    'sizeMM' => 50,
+                    'sizeInch' => null,
+                    'lengthM' => 100
+                ]
+            ],
+            [
+                'product_code' => 'GALVANIZED-STEEL-1INCH',
+                'name' => 'ท่อเหล็กชุบสังกะสี 1"',
+                'brand' => 'Panasonic',
+                'image' => '',
+                'price' => 180.00,
+                'stock' => 40,
+                'description' => 'ท่อเหล็กชุบสังกะสี 1 นิ้ว ทนทาน ป้องกันสนิม',
+                'attributes' => [
+                    'pipeType' => 'Galvanized Steel',
+                    'pn' => 16,
+                    'sizeMM' => 25,
+                    'sizeInch' => '1"',
+                    'lengthM' => 6
+                ]
+            ],
+            [
+                'product_code' => 'PPR-THAI-PIPE-32MM',
+                'name' => 'ท่อ PPR ไทยไปป์ 32mm PN20',
+                'brand' => 'Thai Pipe',
+                'image' => '',
                 'price' => 145.00,
+                'stock' => 55,
+                'description' => 'ท่อ PPR สีเขียว 32mm ระบบน้ำร้อน-เย็น',
                 'attributes' => [
                     'pipeType' => 'PPR',
-                    'pn' => 25,
+                    'pn' => 20,
                     'sizeMM' => 32,
                     'sizeInch' => null,
                     'lengthM' => 4
                 ]
             ],
             [
-                'product_code' => 'HDPE-63-PN16',
-                'name' => 'ท่อ HDPE PE100 PN16 ขนาด 63mm',
-                'brand' => 'ไชโย',
-                'image' => '/images/pipe/hdpe-63-pn16.jpg',
-                'price' => 6500.00,
+                'product_code' => 'COPPER-TUBE-22MM',
+                'name' => 'ท่อทองแดง 22mm Type L',
+                'brand' => 'KWG',
+                'image' => '',
+                'price' => 420.00,
+                'stock' => 25,
+                'description' => 'ท่อทองแดงคุณภาพสูง ทนกรดและด่าง',
                 'attributes' => [
-                    'pipeType' => 'HDPE PE 100',
-                    'pn' => 16,
-                    'sizeMM' => 63,
+                    'pipeType' => 'Copper',
+                    'pn' => 25,
+                    'sizeMM' => 22,
                     'sizeInch' => null,
-                    'lengthM' => 100
+                    'lengthM' => 3
                 ]
             ],
             [
-                'product_code' => 'PVC-3-17',
-                'name' => 'ท่อ PVC สีฟ้า 3" ชั้น 17',
+                'product_code' => 'PEX-16MM-PN10',
+                'name' => 'ท่อ PEX 16mm PN10 สีแดง',
+                'brand' => 'Rehau',
+                'image' => '',
+                'price' => 85.00,
+                'stock' => 150,
+                'description' => 'ท่อ PEX สำหรับระบบน้ำร้อน ยืดหยุ่นสูง',
+                'attributes' => [
+                    'pipeType' => 'PEX',
+                    'pn' => 10,
+                    'sizeMM' => 16,
+                    'sizeInch' => null,
+                    'lengthM' => 50
+                ]
+            ],
+            [
+                'product_code' => 'PVC-SCG-3-8.5',
+                'name' => 'ท่อ PVC สีฟ้า SCG 3" ชั้น 8.5',
                 'brand' => 'SCG',
-                'image' => '/images/pipe/pvc-3-17.jpg',
-                'price' => 485.00,
+                'image' => '',
+                'price' => 380.00,
+                'stock' => 20,
+                'description' => 'ท่อ PVC สีฟ้า SCG 3 นิ้ว สำหรับระบบขนาดใหญ่',
                 'attributes' => [
                     'pipeType' => 'PVC',
-                    'pn' => 17,
+                    'pn' => 8.5,
                     'sizeMM' => 75,
                     'sizeInch' => '3"',
                     'lengthM' => 4
                 ]
             ],
             [
-                'product_code' => 'PE-FLEX-20',
-                'name' => 'ท่อ PE ยืดหยุ่น 20mm ม้วน',
-                'brand' => 'FlexPipe',
-                'image' => '/images/pipe/pe-flex-20.jpg',
-                'price' => 380.00,
+                'product_code' => 'MULTILAYER-20MM-PN16',
+                'name' => 'ท่อ Multilayer 20mm PN16',
+                'brand' => 'Uponor',
+                'image' => '',
+                'price' => 125.00,
+                'stock' => 90,
+                'description' => 'ท่อหลายชั้น PEX-AL-PEX ทนทาน ไม่ขยายตัว',
                 'attributes' => [
-                    'pipeType' => 'PE Flexible',
-                    'pn' => 6,
+                    'pipeType' => 'PEX-AL-PEX',
+                    'pn' => 16,
                     'sizeMM' => 20,
-                    'sizeInch' => null,
-                    'lengthM' => 50
-                ]
-            ],
-            [
-                'product_code' => 'HDPE-90-PN10',
-                'name' => 'ท่อ HDPE PE80 PN10 ขนาด 90mm',
-                'brand' => 'Thai Pipe',
-                'image' => '/images/pipe/hdpe-90-pn10.jpg',
-                'price' => 8900.00,
-                'attributes' => [
-                    'pipeType' => 'HDPE PE 80',
-                    'pn' => 10,
-                    'sizeMM' => 90,
                     'sizeInch' => null,
                     'lengthM' => 50
                 ]
@@ -1164,180 +1146,146 @@ class EquipmentSeeder extends Seeder
         }
     }
 
-    // เก็บ method เดิมๆ สำหรับหมวดอื่น
-    private function createPopUpSprinklerData($category)
+    private function createPumpEquipmentData($category)
     {
-        $sprinklerPopUpData = [
+        $data = [
             [
-                'product_code' => 'RB-1804',
-                'name' => 'สปริงเกอร์ Pop-up 4" Rain Bird 1800 Series',
-                'brand' => 'Rain Bird',
-                'image' => '/images/sprinkler/RB-1804.jpg',
+                'product_code' => 'FV-001',
+                'name' => 'Foot Valve 1"',
+                'brand' => 'Standard',
+                'image' => '',
                 'price' => 150.00,
-                'attributes' => [
-                    'name' => 'สปริงเกอร์ Pop-up 4" 1800 Series',
-                    'size_mm' => null,
-                    'size_inch' => 0.5,
-                    'waterVolumeLitersPerHour' => [250, 750],
-                    'radiusMeters' => [3, 5],
-                    'pressureBar' => [1, 2.1]
-                ]
+                'stock' => 50,
+                'description' => 'วาล์วเท้าขนาด 1 นิ้ว วัสดุ PVC ป้องกันน้ำไหลกลับ'
+            ],
+            [
+                'product_code' => 'CV-001',
+                'name' => 'Check Valve 1"',
+                'brand' => 'Standard',
+                'image' => '',
+                'price' => 200.00,
+                'stock' => 40,
+                'description' => 'วาล์วกันกลับขนาด 1 นิ้ว วัสดุทองเหลือง ทนทานสูง'
+            ],
+            [
+                'product_code' => 'PG-001',
+                'name' => 'Pressure Gauge 2"',
+                'brand' => 'Standard',
+                'image' => '',
+                'price' => 100.00,
+                'stock' => 30,
+                'description' => 'เกจวัดแรงดัน 2 นิ้ว ช่วง 0-10 บาร์ มาตรฐานสากล'
+            ],
+            [
+                'product_code' => 'PS-001',
+                'name' => 'Pressure Switch',
+                'brand' => 'Standard',
+                'image' => '',
+                'price' => 350.00,
+                'stock' => 25,
+                'description' => 'สวิตช์ควบคุมแรงดัน ปิด-เปิดอัตโนมัติ ปรับระดับแรงดันได้'
+            ],
+            [
+                'product_code' => 'CM-001',
+                'name' => 'Control Box',
+                'brand' => 'Standard',
+                'image' => '',
+                'price' => 800.00,
+                'stock' => 15,
+                'description' => 'กล่องควบคุมปั๊มน้ำพร้อมรีเลย์ และระบบป้องกัน'
+            ],
+            [
+                'product_code' => 'FT-001',
+                'name' => 'Float Switch',
+                'brand' => 'Standard',
+                'image' => '',
+                'price' => 250.00,
+                'stock' => 35,
+                'description' => 'สวิตช์ลูกลอย สำหรับควบคุมระดับน้ำอัตโนมัติ'
+            ],
+            [
+                'product_code' => 'PR-001',
+                'name' => 'Pressure Reducing Valve 1"',
+                'brand' => 'Standard',
+                'image' => '',
+                'price' => 450.00,
+                'stock' => 20,
+                'description' => 'วาล์วลดแรงดัน 1 นิ้ว ปรับแรงดันเอาท์พุทได้'
+            ],
+            [
+                'product_code' => 'ST-001',
+                'name' => 'Suction Strainer 1"',
+                'brand' => 'Standard',
+                'image' => '',
+                'price' => 120.00,
+                'stock' => 45,
+                'description' => 'ตะแกรงกรองขนาด 1 นิ้ว กรองสิ่งสกปรกในน้ำ'
+            ],
+            [
+                'product_code' => 'CS-001',
+                'name' => 'Cable Submersible 3x1.5',
+                'brand' => 'Standard',
+                'image' => '',
+                'price' => 85.00,
+                'stock' => 100,
+                'description' => 'สายไฟปั๊มจุ่ม 3 เส้น 1.5 ตรมม. ทนน้ำ ยาว 1 เมตร'
+            ],
+            [
+                'product_code' => 'JF-001',
+                'name' => 'Jet Fitting 1"',
+                'brand' => 'Standard',
+                'image' => '',
+                'price' => 180.00,
+                'stock' => 30,
+                'description' => 'อุปกรณ์เจ็ท 1 นิ้ว สำหรับปั๊มแบบเจ็ท เพิ่มประสิทธิภาพ'
+            ],
+            [
+                'product_code' => 'TK-001',
+                'name' => 'Tank Tee 1"',
+                'brand' => 'Standard',
+                'image' => '',
+                'price' => 95.00,
+                'stock' => 60,
+                'description' => 'ข้อต่อแท้งค์ 1 นิ้ว สำหรับต่อถังเก็บน้ำ'
+            ],
+            [
+                'product_code' => 'VB-001',
+                'name' => 'Vibration Pad',
+                'brand' => 'Standard',
+                'image' => '',
+                'price' => 75.00,
+                'stock' => 40,
+                'description' => 'แผ่นรองปั๊ม ลดการสั่นสะเทือน ยาง EPDM คุณภาพสูง'
+            ],
+            [
+                'product_code' => 'TC-001',
+                'name' => 'Thermal Cutout',
+                'brand' => 'Standard',
+                'image' => '',
+                'price' => 320.00,
+                'stock' => 25,
+                'description' => 'อุปกรณ์ป้องกันความร้อนเกิน ตัดไฟอัตโนมัติเมื่อร้อนเกิน'
             ]
         ];
 
-        foreach ($sprinklerPopUpData as $data) {
-            $this->createEquipmentWithAttributes($category, $data);
+        foreach ($data as $item) {
+            // สร้างโดยไม่มี attributes
+            Equipment::firstOrCreate(
+                ['product_code' => $item['product_code']],
+                [
+                    'category_id' => $category->id,
+                    'name' => $item['name'],
+                    'brand' => $item['brand'],
+                    'image' => $item['image'],
+                    'price' => $item['price'],
+                    'stock' => $item['stock'],
+                    'description' => $item['description'],
+                    'is_active' => true
+                ]
+            );
         }
     }
 
-    private function createMiniSprinklerData($category)
-    {
-        $data = [
-            'product_code' => 'MINI-SPR-001',
-            'name' => 'มินิสปริงเกอร์ขาตั้ง ขนาด 1/2"',
-            'brand' => 'Garden Pro',
-            'image' => '/images/sprinkler/mini-spr-001.jpg',
-            'price' => 45.00,
-            'attributes' => [
-                'name' => 'มินิสปริงเกอร์ขาตั้ง ขนาด 1/2"',
-                'size_mm' => 15,
-                'size_inch' => 0.5,
-                'waterVolumeLitersPerHour' => [30, 80],
-                'radiusMeters' => [0.8, 2.5],
-                'pressureBar' => [0.8, 2.5]
-            ]
-        ];
-
-        $this->createEquipmentWithAttributes($category, $data);
-    }
-
-    private function createSingleSideSprinklerData($category)
-    {
-        $data = [
-            'product_code' => 'SS-ADJ-001',
-            'name' => 'หัวฉีดปรับมุมด้านเดียว 180° ขนาด 3/4"',
-            'brand' => 'Flex-Spray',
-            'image' => '/images/sprinkler/ss-adj-001.jpg',
-            'price' => 125.00,
-            'attributes' => [
-                'name' => 'หัวฉีดปรับมุมด้านเดียว 180° ขนาด 3/4"',
-                'size_mm' => 20,
-                'size_inch' => 0.75,
-                'waterVolumeLitersPerHour' => [150, 450],
-                'radiusMeters' => [3, 8],
-                'pressureBar' => [1, 3]
-            ]
-        ];
-
-        $this->createEquipmentWithAttributes($category, $data);
-    }
-
-    private function createButterflySprinklerData($category)
-    {
-        $data = [
-            'product_code' => 'BF-SPR-001',
-            'name' => 'หัวฉีดผีเสื้อ 4 ทิศทาง ขนาด 1/2"',
-            'brand' => 'Butterfly',
-            'image' => '/images/sprinkler/bf-spr-001.jpg',
-            'price' => 85.00,
-            'attributes' => [
-                'name' => 'หัวฉีดผีเสื้อ 4 ทิศทาง ขนาด 1/2"',
-                'size_mm' => 15,
-                'size_inch' => 0.5,
-                'waterVolumeLitersPerHour' => [100, 300],
-                'radiusMeters' => [2, 5],
-                'pressureBar' => [0.8, 2.5]
-            ]
-        ];
-
-        $this->createEquipmentWithAttributes($category, $data);
-    }
-
-    private function createMistNozzleData($category)
-    {
-        $data = [
-            'product_code' => 'MIST-001',
-            'name' => 'หัวพ่นหมอกความดันสูง 10/24',
-            'brand' => 'MistCool',
-            'image' => '/images/sprinkler/mist-001.jpg',
-            'price' => 25.00,
-            'attributes' => [
-                'name' => 'หัวพ่นหมอกความดันสูง 10/24',
-                'size_mm' => 3,
-                'size_inch' => 0.1,
-                'waterVolumeLitersPerHour' => [8, 15],
-                'radiusMeters' => [0.5, 1.2],
-                'pressureBar' => [5, 15]
-            ]
-        ];
-
-        $this->createEquipmentWithAttributes($category, $data);
-    }
-
-    private function createImpactSprinklerData($category)
-    {
-        $data = [
-            'product_code' => 'IMP-SPR-001',
-            'name' => 'สปริงเกอร์กระแทกโลหะ ขนาด 1" ระยะไกล',
-            'brand' => 'Impact Pro',
-            'image' => '/images/sprinkler/imp-spr-001.jpg',
-            'price' => 450.00,
-            'attributes' => [
-                'name' => 'สปริงเกอร์กระแทกโลหะ ขนาด 1" ระยะไกล',
-                'size_mm' => 25,
-                'size_inch' => 1,
-                'waterVolumeLitersPerHour' => [500, 2000],
-                'radiusMeters' => [12, 25],
-                'pressureBar' => [2, 5]
-            ]
-        ];
-
-        $this->createEquipmentWithAttributes($category, $data);
-    }
-
-    private function createGearDriveNozzleData($category)
-    {
-        $data = [
-            'product_code' => 'GD-001',
-            'name' => 'หัวฉีดเกียร์ไดร์ฟ ปรับแรงดันและมุม',
-            'brand' => 'Gear-Tech',
-            'image' => '/images/sprinkler/gd-001.jpg',
-            'price' => 320.00,
-            'attributes' => [
-                'name' => 'หัวฉีดเกียร์ไดร์ฟ ปรับแรงดันและมุม',
-                'size_mm' => 20,
-                'size_inch' => 0.75,
-                'waterVolumeLitersPerHour' => [180, 800],
-                'radiusMeters' => [5, 12],
-                'pressureBar' => [1.2, 4]
-            ]
-        ];
-
-        $this->createEquipmentWithAttributes($category, $data);
-    }
-
-    private function createDripSprayTapeData($category)
-    {
-        $data = [
-            'product_code' => 'DRIP-TAPE-001',
-            'name' => 'เทปน้ำหยด 16mm ระยะรู 30cm ม้วน 500m',
-            'brand' => 'Drip-Line',
-            'image' => '/images/sprinkler/drip-tape-001.jpg',
-            'price' => 850.00,
-            'attributes' => [
-                'name' => 'เทปน้ำหยด 16mm ระยะรู 30cm ม้วน 500m',
-                'size_mm' => 16,
-                'size_inch' => 0.63,
-                'waterVolumeLitersPerHour' => [1, 4],
-                'radiusMeters' => [0.2, 0.5],
-                'pressureBar' => [0.5, 1.5]
-            ]
-        ];
-
-        $this->createEquipmentWithAttributes($category, $data);
-    }
-
-    // Helper method สำหรับสร้าง Equipment และ Attributes
     private function createEquipmentWithAttributes($category, $data)
     {
         $equipment = Equipment::firstOrCreate(
@@ -1348,11 +1296,14 @@ class EquipmentSeeder extends Seeder
                 'brand' => $data['brand'],
                 'image' => $data['image'],
                 'price' => $data['price'],
+                'stock' => $data['stock'] ?? null,
+                'description' => $data['description'] ?? null,
                 'is_active' => true
             ]
         );
 
-        if (isset($data['attributes'])) {
+        // สร้าง attributes เฉพาะกรณีที่มีและไม่ใช่ pump_equipment
+        if (isset($data['attributes']) && $category->name !== 'pump_equipment') {
             $this->createAttributeValues($equipment, $category, $data['attributes']);
         }
     }

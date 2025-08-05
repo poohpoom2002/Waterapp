@@ -3,7 +3,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Navbar from '../../components/Navbar';
 import { Head, Link, router } from '@inertiajs/react';
 import { Wrapper, Status } from '@googlemaps/react-wrapper';
-import * as turf from '@turf/turf';
 import { getCropByValue, type Crop } from '@/pages/utils/cropData';
 import { ZONE_COLORS, OBSTACLE_TYPES } from '@/pages/utils/fieldMapConstants';
 import { useMapState, useStepWizard, useFieldZoneState } from '@/pages/hooks/useFieldMapState';
@@ -35,7 +34,7 @@ interface Obstacle {
 
 // --- Google Maps Configuration ---
 const getGoogleMapsConfig = () => ({
-    apiKey: import.meta.env.VITE_Maps_API_KEY || '',
+            apiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
     libraries: ['drawing', 'geometry', 'places'] as const,
 });
 
@@ -173,7 +172,7 @@ export default function Step2_ZonesObstacles() {
 
     const { mapCenter, setMapCenter, mapZoom, setMapZoom, mapType } = mapState;
     const { setCurrentStep, setStepCompleted } = stepWizard;
-    const { selectedCrops, mainField, setMainField, zones, setZones, obstacles, setObstacles, zoneAssignments, setZoneAssignments } = fieldZoneState;
+    const { selectedCrops, setMainField, zones, setZones, obstacles, setObstacles, zoneAssignments, setZoneAssignments } = fieldZoneState;
 
     const [map, setMap] = useState<google.maps.Map | null>(null);
     const [error, setError] = useState<string | null>(null);

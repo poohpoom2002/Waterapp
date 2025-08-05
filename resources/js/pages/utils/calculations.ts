@@ -1,6 +1,6 @@
+// resources\js\pages\utils\calculations.ts
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// resources\js\pages\utils\calculations.ts
 export const calculatePipeRolls = (totalLength: number, rollLength: number): number => {
     return Math.ceil(totalLength / rollLength);
 };
@@ -336,20 +336,33 @@ export const calculateZoneFlowRate = (
     waterPerSprinkler: number = 360,
     irrigationTimeMinutes: number = 30
 ): {
-    flowLPH: number;
     flowLPM: number;
     totalDaily: number;
 } => {
-    const flowLPH = sprinklerCount * waterPerSprinkler;
+    const flowLPM = sprinklerCount * waterPerSprinkler;
 
-    const flowLPM = flowLPH / 60;
-
-    const totalDaily = flowLPH * (irrigationTimeMinutes / 60);
+    const totalDaily = flowLPM * (irrigationTimeMinutes / 60);
 
     return {
-        flowLPH: formatNumber(flowLPH, 1),
-        flowLPM: formatNumber(flowLPM, 1),
-        totalDaily: formatNumber(totalDaily, 1),
+        flowLPM: flowLPM,
+        totalDaily: totalDaily,
+    };
+};
+
+export const calculateFieldCropZoneFlowRate = (
+    sprinklerCount: number,
+    waterPerSprinklerLPM: number = 6.0, 
+    irrigationTimeMinutes: number = 30
+): {
+    flowLPM: number;
+    totalWaterPerIrrigation: number;
+} => {
+    const flowLPM = sprinklerCount * waterPerSprinklerLPM;
+    const totalWaterPerIrrigation = flowLPM * (irrigationTimeMinutes / 60);
+
+    return {
+        flowLPM: flowLPM,
+        totalWaterPerIrrigation: totalWaterPerIrrigation,
     };
 };
 
@@ -511,7 +524,7 @@ export const evaluatePipeOverall = (
 };
 
 export const evaluateSprinklerOverall = (sprinkler: any, targetFlow: number) => {
-    const flowRange = parseRangeValue(sprinkler.waterVolumeLitersPerHour);
+    const flowRange = parseRangeValue(sprinkler.waterVolumeLitersPerMinute);
     const radiusRange = parseRangeValue(sprinkler.radiusMeters);
     const pressureRange = parseRangeValue(sprinkler.pressureBar);
 
@@ -701,7 +714,7 @@ export const validateEquipmentData = (
     switch (categoryType) {
         case 'sprinkler':
             return !!(
-                equipment.waterVolumeLitersPerHour &&
+                equipment.waterVolumeLitersPerMinute &&
                 equipment.radiusMeters &&
                 equipment.pressureBar
             );
@@ -758,9 +771,9 @@ export const normalizeEquipmentData = (
 
     switch (categoryType) {
         case 'sprinkler':
-            if (normalized.waterVolumeLitersPerHour) {
-                normalized.waterVolumeLitersPerHour = parseRangeValue(
-                    normalized.waterVolumeLitersPerHour
+            if (normalized.waterVolumeLitersPerMinute) {
+                normalized.waterVolumeLitersPerMinute = parseRangeValue(
+                    normalized.waterVolumeLitersPerMinute
                 );
             }
             if (normalized.radiusMeters) {
@@ -815,7 +828,6 @@ export const normalizeEquipmentData = (
     return normalized;
 };
 
-// Field-crop and greenhouse specific utility functions
 export const convertAreaUnits = {
     sqmToRai: (sqm: number): number => formatNumber(sqm / 1600, 3),
     raiToSqm: (rai: number): number => formatNumber(rai * 1600, 1),
