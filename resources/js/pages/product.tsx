@@ -1,7 +1,6 @@
+// resources/js/pages/product.tsx
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// resources/js/pages/product.tsx - Enhanced Image Loading
-
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useMemo } from 'react';
 import { IrrigationInput, QuotationData, QuotationDataCustomer } from './types/interfaces';
@@ -28,7 +27,6 @@ import {
 import { loadGardenData, GardenPlannerData, GardenZone } from '../utils/homeGardenData';
 import { calculateGardenStatistics, GardenStatistics } from '../utils/gardenStatistics';
 
-// ADD: Import field crop data utilities
 import {
     getEnhancedFieldCropData,
     migrateToEnhancedFieldCropData,
@@ -36,12 +34,11 @@ import {
     calculateEnhancedFieldStats,
 } from '../utils/fieldCropData';
 
-// ADD: Import greenhouse data utilities
 import {
     getGreenhouseData,
     migrateLegacyGreenhouseData,
     GreenhousePlanningData,
-    PlotStats,
+    EnhancedPlotStats,
     PIXELS_PER_METER,
 } from '../utils/greenHouseData';
 
@@ -58,7 +55,6 @@ import QuotationDocument from './components/QuotationDocument';
 
 import { router } from '@inertiajs/react';
 
-// UPDATE: Add greenhouse to ProjectMode
 type ProjectMode = 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
 
 interface ZoneOperationGroup {
@@ -68,16 +64,9 @@ interface ZoneOperationGroup {
     label: string;
 }
 
-// Enhanced image loading and management functions
 const getStoredProjectImage = (projectMode: ProjectMode): string | null => {
-    // Priority order for image keys
-    const imageKeys = [
-        'projectMapImage', // Primary key - universal
-        `${projectMode}PlanImage`, // Project-specific key
-        'mapCaptureImage', // Backup key
-    ];
+    const imageKeys = ['projectMapImage', `${projectMode}PlanImage`, 'mapCaptureImage'];
 
-    // Add mode-specific fallback keys
     if (projectMode === 'field-crop') {
         imageKeys.push('fieldCropPlanImage');
     } else if (projectMode === 'garden') {
@@ -88,13 +77,11 @@ const getStoredProjectImage = (projectMode: ProjectMode): string | null => {
         imageKeys.push('horticulturePlanImage');
     }
 
-    // Try each key in order
     for (const key of imageKeys) {
         const image = localStorage.getItem(key);
         if (image && image.startsWith('data:image/')) {
             console.log(`✅ Found project image with key: ${key}`);
-            
-            // Verify image metadata if available
+
             try {
                 const metadata = localStorage.getItem('projectMapMetadata');
                 if (metadata) {
@@ -104,7 +91,7 @@ const getStoredProjectImage = (projectMode: ProjectMode): string | null => {
             } catch (error) {
                 console.warn('⚠️ Could not parse image metadata:', error);
             }
-            
+
             return image;
         }
     }
@@ -117,39 +104,36 @@ const validateImageData = (imageData: string): boolean => {
     if (!imageData || !imageData.startsWith('data:image/')) {
         return false;
     }
-    
-    // Check if image data is not corrupted (minimum size check)
+
     if (imageData.length < 1000) {
         console.warn('⚠️ Image data appears to be too small');
         return false;
     }
-    
+
     return true;
 };
 
-// Enhanced image cleanup function
 const cleanupOldImages = (): void => {
     const imageKeys = [
         'projectMapImage',
-        'fieldCropPlanImage', 
+        'fieldCropPlanImage',
         'gardenPlanImage',
         'homeGardenPlanImage',
         'greenhousePlanImage',
         'horticulturePlanImage',
-        'mapCaptureImage'
+        'mapCaptureImage',
     ];
-    
+
     let cleanedCount = 0;
-    imageKeys.forEach(key => {
+    imageKeys.forEach((key) => {
         const image = localStorage.getItem(key);
         if (image && image.startsWith('blob:')) {
-            // Clean up old blob URLs
             URL.revokeObjectURL(image);
             localStorage.removeItem(key);
             cleanedCount++;
         }
     });
-    
+
     if (cleanedCount > 0) {
         console.log(`🧹 Cleaned up ${cleanedCount} old image references`);
     }
@@ -160,10 +144,8 @@ export default function Product() {
     const [gardenData, setGardenData] = useState<GardenPlannerData | null>(null);
     const [gardenStats, setGardenStats] = useState<GardenStatistics | null>(null);
 
-    // ADD: Field crop data state
     const [fieldCropData, setFieldCropData] = useState<FieldCropData | null>(null);
 
-    // ADD: Greenhouse data state
     const [greenhouseData, setGreenhouseData] = useState<GreenhousePlanningData | null>(null);
 
     const [projectData, setProjectData] = useState<HorticultureProjectData | null>(null);
@@ -189,7 +171,6 @@ export default function Product() {
     const [selectedPump, setSelectedPump] = useState<any>(null);
     const [showPumpOption, setShowPumpOption] = useState(true);
 
-    // Enhanced project image state with loading status
     const [projectImage, setProjectImage] = useState<string | null>(null);
     const [imageLoading, setImageLoading] = useState<boolean>(false);
     const [imageLoadError, setImageLoadError] = useState<string | null>(null);
@@ -200,40 +181,39 @@ export default function Product() {
         if (file) {
             setImageLoading(true);
             setImageLoadError(null);
-            
+
             const reader = new FileReader();
             reader.onload = (event) => {
                 const imageData = event.target?.result as string;
                 if (validateImageData(imageData)) {
                     setProjectImage(imageData);
-                    
-                    // Save the uploaded image to localStorage with multiple keys
+
                     const saveKeys = [
                         'projectMapImage',
                         `${projectMode}PlanImage`,
-                        'userUploadedImage'
+                        'userUploadedImage',
                     ];
-                    
-                    saveKeys.forEach(key => {
+
+                    saveKeys.forEach((key) => {
                         try {
                             localStorage.setItem(key, imageData);
                         } catch (error) {
                             console.warn(`Failed to save uploaded image with key ${key}:`, error);
                         }
                     });
-                    
+
                     console.log('✅ User uploaded image saved successfully');
                 } else {
                     setImageLoadError('Invalid image format');
                 }
                 setImageLoading(false);
             };
-            
+
             reader.onerror = () => {
                 setImageLoadError('Failed to read image file');
                 setImageLoading(false);
             };
-            
+
             reader.readAsDataURL(file);
         }
     };
@@ -242,25 +222,23 @@ export default function Product() {
         if (projectImage && projectImage.startsWith('blob:')) {
             URL.revokeObjectURL(projectImage);
         }
-        
-        // Clear from localStorage
+
         const keysToRemove = [
             'projectMapImage',
             `${projectMode}PlanImage`,
             'userUploadedImage',
-            'mapCaptureImage'
+            'mapCaptureImage',
         ];
-        
-        keysToRemove.forEach(key => {
+
+        keysToRemove.forEach((key) => {
             localStorage.removeItem(key);
         });
-        
+
         setProjectImage(null);
         setImageLoadError(null);
         console.log('🗑️ Project image deleted');
     };
 
-    // Enhanced cleanup on unmount
     useEffect(() => {
         return () => {
             if (projectImage && projectImage.startsWith('blob:')) {
@@ -270,7 +248,6 @@ export default function Product() {
         };
     }, [projectImage]);
 
-    // Load project mode from URL parameters
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         const mode = urlParams.get('mode') as ProjectMode;
@@ -279,49 +256,41 @@ export default function Product() {
         }
     }, []);
 
-    // Enhanced project image loading with better error handling and validation
     useEffect(() => {
         if (!projectMode) return;
-        
+
         setImageLoading(true);
         setImageLoadError(null);
-        
-        // Clean up old images first
         cleanupOldImages();
-        
-        // Try to load image for current project mode
         const image = getStoredProjectImage(projectMode);
-        
+
         if (image && validateImageData(image)) {
             setProjectImage(image);
             console.log(`✅ Successfully loaded project image for ${projectMode} mode`);
         } else {
             console.log(`ℹ️ No valid project image found for ${projectMode} mode`);
             setProjectImage(null);
-            
-            // Set appropriate message based on project mode
             const modeNames = {
                 'field-crop': 'Field Crop Summary',
-                'garden': 'Garden Planner',
-                'greenhouse': 'Greenhouse Planner', 
-                'horticulture': 'Horticulture Planner'
+                garden: 'Garden Planner',
+                greenhouse: 'Greenhouse Planner',
+                horticulture: 'Horticulture Planner',
             };
-            
-            setImageLoadError(`No map image found. Please capture one from ${modeNames[projectMode]} page.`);
+
+            setImageLoadError(
+                `No map image found. Please capture one from ${modeNames[projectMode]} page.`
+            );
         }
-        
+
         setImageLoading(false);
     }, [projectMode]);
 
-    // Enhanced image verification on mode change
     useEffect(() => {
         if (projectImage && projectMode) {
             const isValid = validateImageData(projectImage);
             if (!isValid) {
                 console.warn('⚠️ Current project image is invalid, attempting to reload...');
                 setProjectImage(null);
-                
-                // Try to reload valid image
                 const validImage = getStoredProjectImage(projectMode);
                 if (validImage && validateImageData(validImage)) {
                     setProjectImage(validImage);
@@ -350,122 +319,124 @@ export default function Product() {
         return zone?.name || zoneId;
     };
 
-    // UPDATED: Create greenhouse zone input using enhanced data
-    const createGreenhouseZoneInput = (
-        plot: PlotStats,
-        greenhouseData: GreenhousePlanningData,
-        totalZones: number
-    ): IrrigationInput => {
-        const areaInRai = plot.area / 1600;
+    // แก้ใน product.tsx ประมาณบรรทัด 191-220
+const createGreenhouseZoneInput = (
+    plot: EnhancedPlotStats,
+    greenhouseData: GreenhousePlanningData,
+    totalZones: number
+): IrrigationInput => {
+    const areaInSqm = plot.area;
+    const crop = getCropByValue(plot.cropType || '');
+    const totalSprinklers = plot.equipmentCount.sprinklers || plot.production.totalPlants;
+    
+    const waterPerSprinkler = plot.production.waterRequirementPerIrrigation / Math.max(totalSprinklers, 1);
+    
+    const longestBranch = plot.pipeStats.drip.longest || plot.pipeStats.sub.longest || 30;
+    const totalBranchLength = plot.pipeStats.drip.totalLength || plot.pipeStats.sub.totalLength || 100;
+    const longestSubmain = plot.pipeStats.main.longest || 0;
+    const totalSubmainLength = plot.pipeStats.main.totalLength || 0;
 
-        // Get crop data for this plot
-        const crop = getCropByValue(plot.cropType || '');
+    return {
+        farmSizeRai: areaInSqm,
+        totalTrees: totalSprinklers,
+        waterPerTreeLiters: formatNumber(waterPerSprinkler, 3),
+        numberOfZones: totalZones,
+        sprinklersPerTree: 1,
+        irrigationTimeMinutes: 30,
+        staticHeadM: 0,
+        pressureHeadM: 20,
+        pipeAgeYears: 0,
 
-        // Use enhanced production data from plot
-        const totalTrees = plot.production.totalPlants;
-        const waterPerTree = plot.production.waterRequirementPerIrrigation / Math.max(totalTrees, 1);
+        sprinklersPerBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
+        branchesPerSecondary: 1,
+        simultaneousZones: 1,
 
-        // Use enhanced pipe stats from the plot
-        const longestBranch = plot.pipeStats.drip.longest || plot.pipeStats.sub.longest || 30;
-        const totalBranchLength = plot.pipeStats.drip.totalLength || plot.pipeStats.sub.totalLength || 100;
-        const longestSubmain = plot.pipeStats.main.longest || 0;
-        const totalSubmainLength = plot.pipeStats.main.totalLength || 0;
+        sprinklersPerLongestBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
+        branchesPerLongestSecondary: 1,
+        secondariesPerLongestMain: 1,
 
-        return {
-            farmSizeRai: formatNumber(areaInRai, 3),
-            totalTrees: totalTrees,
-            waterPerTreeLiters: formatNumber(waterPerTree, 3),
-            numberOfZones: totalZones,
-            sprinklersPerTree: 1,
-            irrigationTimeMinutes: 30,
-            staticHeadM: 0,
-            pressureHeadM: 20,
-            pipeAgeYears: 0,
-
-            sprinklersPerBranch: Math.max(1, Math.ceil(totalTrees / 5)),
-            branchesPerSecondary: 1,
-            simultaneousZones: 1,
-
-            sprinklersPerLongestBranch: Math.max(1, Math.ceil(totalTrees / 5)),
-            branchesPerLongestSecondary: 1,
-            secondariesPerLongestMain: 1,
-
-            longestBranchPipeM: formatNumber(longestBranch, 3),
-            totalBranchPipeM: formatNumber(totalBranchLength, 3),
-            longestSecondaryPipeM: formatNumber(longestSubmain, 3),
-            totalSecondaryPipeM: formatNumber(totalSubmainLength, 3),
-            longestMainPipeM: 0,
-            totalMainPipeM: 0,
-        };
+        longestBranchPipeM: formatNumber(longestBranch, 3),
+        totalBranchPipeM: formatNumber(totalBranchLength, 3),
+        longestSecondaryPipeM: formatNumber(longestSubmain, 3),
+        totalSecondaryPipeM: formatNumber(totalSubmainLength, 3),
+        longestMainPipeM: 0,
+        totalMainPipeM: 0,
     };
+};
 
-    // UPDATED: Create single greenhouse input using enhanced data
-    const createSingleGreenhouseInput = (
-        greenhouseData: GreenhousePlanningData
-    ): IrrigationInput => {
-        const areaInRai = greenhouseData.summary.totalPlotArea / 1600;
-        const totalTrees = greenhouseData.summary.overallProduction.totalPlants;
-        const waterPerTree = greenhouseData.summary.overallProduction.waterRequirementPerIrrigation / Math.max(totalTrees, 1);
+const createSingleGreenhouseInput = (greenhouseData: GreenhousePlanningData): IrrigationInput => {
+    const areaInSqm = greenhouseData.summary.totalPlotArea;
+    const totalSprinklers = greenhouseData.summary.overallEquipmentCount.sprinklers || 
+                            greenhouseData.summary.overallProduction.totalPlants;
+    
+    const waterPerSprinkler = greenhouseData.summary.overallProduction.waterRequirementPerIrrigation /
+                             Math.max(totalSprinklers, 1);
 
-        return {
-            farmSizeRai: formatNumber(areaInRai, 3),
-            totalTrees: totalTrees,
-            waterPerTreeLiters: formatNumber(waterPerTree, 3),
-            numberOfZones: 1,
-            sprinklersPerTree: 1,
-            irrigationTimeMinutes: 30,
-            staticHeadM: 0,
-            pressureHeadM: 20,
-            pipeAgeYears: 0,
+    return {
+        farmSizeRai: areaInSqm,
+        totalTrees: totalSprinklers,
+        waterPerTreeLiters: formatNumber(waterPerSprinkler, 3),
+        numberOfZones: 1,
+        sprinklersPerTree: 1,
+        irrigationTimeMinutes: 30,
+        staticHeadM: 0,
+        pressureHeadM: 20,
+        pipeAgeYears: 0,
 
-            sprinklersPerBranch: Math.max(1, Math.ceil(totalTrees / 5)),
-            branchesPerSecondary: 1,
-            simultaneousZones: 1,
+        sprinklersPerBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
+        branchesPerSecondary: 1,
+        simultaneousZones: 1,
 
-            sprinklersPerLongestBranch: Math.max(1, Math.ceil(totalTrees / 5)),
-            branchesPerLongestSecondary: 1,
-            secondariesPerLongestMain: 1,
+        sprinklersPerLongestBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
+        branchesPerLongestSecondary: 1,
+        secondariesPerLongestMain: 1,
 
-            longestBranchPipeM: formatNumber(
-                greenhouseData.summary.overallPipeStats.drip.longest || 
-                greenhouseData.summary.overallPipeStats.sub.longest || 30,
-                3
-            ),
-            totalBranchPipeM: formatNumber(
-                greenhouseData.summary.overallPipeStats.drip.totalLength || 
-                greenhouseData.summary.overallPipeStats.sub.totalLength || 100,
-                3
-            ),
-            longestSecondaryPipeM: formatNumber(
-                greenhouseData.summary.overallPipeStats.main.longest || 0,
-                3
-            ),
-            totalSecondaryPipeM: formatNumber(
-                greenhouseData.summary.overallPipeStats.main.totalLength || 0,
-                3
-            ),
-            longestMainPipeM: 0,
-            totalMainPipeM: 0,
-        };
+        longestBranchPipeM: formatNumber(
+            greenhouseData.summary.overallPipeStats.drip.longest ||
+                greenhouseData.summary.overallPipeStats.sub.longest ||
+                30,
+            3
+        ),
+        totalBranchPipeM: formatNumber(
+            greenhouseData.summary.overallPipeStats.drip.totalLength ||
+                greenhouseData.summary.overallPipeStats.sub.totalLength ||
+                100,
+            3
+        ),
+        longestSecondaryPipeM: formatNumber(
+            greenhouseData.summary.overallPipeStats.main.longest || 0,
+            3
+        ),
+        totalSecondaryPipeM: formatNumber(
+            greenhouseData.summary.overallPipeStats.main.totalLength || 0,
+            3
+        ),
+        longestMainPipeM: 0,
+        totalMainPipeM: 0,
     };
+};
 
-    // UPDATED: Create field crop zone input using enhanced data
     const createFieldCropZoneInput = (
         zone: FieldCropData['zones']['info'][0],
         fieldData: FieldCropData,
         totalZones: number
     ): IrrigationInput => {
         const areaInRai = zone.area / 1600;
-
-        // Get crop data for this zone
         const assignedCropValue = fieldData.crops.zoneAssignments[zone.id];
         const crop = assignedCropValue ? getCropByValue(assignedCropValue) : null;
 
-        // Use enhanced zone data
-        const totalTrees = zone.totalPlantingPoints;
-        const waterPerTree = zone.totalWaterRequirementPerDay / Math.max(totalTrees, 1);
+        const totalSprinklers =
+            zone.sprinklerCount || Math.max(1, Math.ceil(zone.totalPlantingPoints / 10));
 
-        // Use enhanced pipe stats from zone
+        let waterPerSprinklerLPM = 2.0;
+        if (crop && crop.waterRequirement) {
+            waterPerSprinklerLPM = crop.waterRequirement;
+        } else if (zone.totalWaterRequirementPerDay > 0 && totalSprinklers > 0) {
+            const avgIrrigationTimeHours = 0.5;
+            waterPerSprinklerLPM =
+                zone.totalWaterRequirementPerDay / totalSprinklers / (avgIrrigationTimeHours * 60);
+        }
+
         const zonePipeStats = zone.pipeStats;
         const longestBranch = zonePipeStats.lateral.longest || 30;
         const totalBranchLength = zonePipeStats.lateral.totalLength || 100;
@@ -476,8 +447,8 @@ export default function Product() {
 
         return {
             farmSizeRai: formatNumber(areaInRai, 3),
-            totalTrees: totalTrees,
-            waterPerTreeLiters: formatNumber(waterPerTree, 3),
+            totalTrees: totalSprinklers,
+            waterPerTreeLiters: formatNumber(waterPerSprinklerLPM, 3),
             numberOfZones: totalZones,
             sprinklersPerTree: 1,
             irrigationTimeMinutes: 30,
@@ -485,11 +456,11 @@ export default function Product() {
             pressureHeadM: 20,
             pipeAgeYears: 0,
 
-            sprinklersPerBranch: Math.max(1, Math.ceil(totalTrees / 5)),
+            sprinklersPerBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
             branchesPerSecondary: 1,
             simultaneousZones: 1,
 
-            sprinklersPerLongestBranch: Math.max(1, Math.ceil(totalTrees / 5)),
+            sprinklersPerLongestBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
             branchesPerLongestSecondary: 1,
             secondariesPerLongestMain: 1,
 
@@ -502,16 +473,27 @@ export default function Product() {
         };
     };
 
-    // UPDATED: Create single field crop input using enhanced data
     const createSingleFieldCropInput = (fieldData: FieldCropData): IrrigationInput => {
         const areaInRai = fieldData.area.size / 1600;
-        const totalTrees = fieldData.summary.totalPlantingPoints;
-        const waterPerTree = fieldData.summary.totalWaterRequirementPerDay / Math.max(totalTrees, 1);
+
+        const totalSprinklers =
+            fieldData.irrigation.totalCount ||
+            fieldData.summary.totalPlantingPoints ||
+            Math.max(1, Math.ceil(fieldData.summary.totalPlantingPoints / 10));
+
+        let waterPerSprinklerLPM = 2.0;
+        if (fieldData.summary.totalWaterRequirementPerDay > 0 && totalSprinklers > 0) {
+            const avgIrrigationTimeHours = 0.5;
+            waterPerSprinklerLPM =
+                fieldData.summary.totalWaterRequirementPerDay /
+                totalSprinklers /
+                (avgIrrigationTimeHours * 60);
+        }
 
         return {
             farmSizeRai: formatNumber(areaInRai, 3),
-            totalTrees: totalTrees,
-            waterPerTreeLiters: formatNumber(waterPerTree, 3),
+            totalTrees: totalSprinklers,
+            waterPerTreeLiters: formatNumber(waterPerSprinklerLPM, 3),
             numberOfZones: 1,
             sprinklersPerTree: 1,
             irrigationTimeMinutes: 30,
@@ -519,11 +501,11 @@ export default function Product() {
             pressureHeadM: 20,
             pipeAgeYears: 0,
 
-            sprinklersPerBranch: Math.max(1, Math.ceil(totalTrees / 5)),
+            sprinklersPerBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
             branchesPerSecondary: 1,
             simultaneousZones: 1,
 
-            sprinklersPerLongestBranch: Math.max(1, Math.ceil(totalTrees / 5)),
+            sprinklersPerLongestBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
             branchesPerLongestSecondary: 1,
             secondariesPerLongestMain: 1,
 
@@ -540,7 +522,6 @@ export default function Product() {
         const zoneCalcData: ZoneCalculationData[] = [];
         let allZoneIds: string[] = [];
 
-        // Get zone IDs based on project mode
         if (projectMode === 'garden' && gardenStats) {
             allZoneIds = gardenStats.zones.map((z) => z.zoneId);
         } else if (projectMode === 'field-crop' && fieldCropData) {
@@ -574,6 +555,7 @@ export default function Product() {
                     zoneId,
                     input: adjustedInput,
                     sprinkler: zoneSprinkler,
+                    projectMode,
                 });
             }
         });
@@ -808,7 +790,6 @@ export default function Product() {
         let simultaneousZonesForCalc = 1;
         let allZoneIds: string[] = [];
 
-        // Get zone IDs based on project mode
         if (projectMode === 'garden' && gardenStats) {
             allZoneIds = gardenStats.zones.map((z) => z.zoneId);
         } else if (projectMode === 'field-crop' && fieldCropData) {
@@ -850,7 +831,6 @@ export default function Product() {
 
         let allZoneIds: string[] = [];
 
-        // Get zone IDs based on project mode
         if (projectMode === 'garden' && gardenStats) {
             allZoneIds = gardenStats.zones.map((z) => z.zoneId);
         } else if (projectMode === 'field-crop' && fieldCropData) {
@@ -921,8 +901,7 @@ export default function Product() {
         } else if (!mode && storedType === 'home-garden') {
             mode = 'garden';
         }
-        
-        // UPDATED: Handle greenhouse mode with enhanced data
+
         if (mode === 'greenhouse') {
             setProjectMode('greenhouse');
 
@@ -941,7 +920,6 @@ export default function Product() {
                 } = {};
 
                 if (data.summary.plotStats.length > 1) {
-                    // Multiple plots
                     data.summary.plotStats.forEach((plot) => {
                         initialZoneInputs[plot.plotId] = createGreenhouseZoneInput(
                             plot,
@@ -960,7 +938,6 @@ export default function Product() {
                     setActiveZoneId(data.summary.plotStats[0].plotId);
                     handleZoneOperationModeChange('sequential');
                 } else if (data.summary.plotStats.length === 1) {
-                    // Single plot
                     const plot = data.summary.plotStats[0];
                     const singleInput = createGreenhouseZoneInput(plot, data, 1);
                     setZoneInputs({ [plot.plotId]: singleInput });
@@ -969,7 +946,6 @@ export default function Product() {
                     });
                     setActiveZoneId(plot.plotId);
                 } else {
-                    // No plots - treat as single area
                     const singleInput = createSingleGreenhouseInput(data);
                     setZoneInputs({ 'main-area': singleInput });
                     setSelectedPipes({
@@ -981,9 +957,7 @@ export default function Product() {
                 console.warn('⚠️ No greenhouse data found');
                 router.visit('/greenhouse-crop');
             }
-        } 
-        // UPDATED: Handle field-crop mode with enhanced data
-        else if (mode === 'field-crop') {
+        } else if (mode === 'field-crop') {
             setProjectMode('field-crop');
 
             let fieldData = getEnhancedFieldCropData();
@@ -1001,7 +975,6 @@ export default function Product() {
                 } = {};
 
                 if (fieldData.zones.info.length > 1) {
-                    // Multiple zones
                     fieldData.zones.info.forEach((zone) => {
                         initialZoneInputs[zone.id] = createFieldCropZoneInput(
                             zone,
@@ -1020,7 +993,6 @@ export default function Product() {
                     setActiveZoneId(fieldData.zones.info[0].id);
                     handleZoneOperationModeChange('sequential');
                 } else if (fieldData.zones.info.length === 1) {
-                    // Single zone
                     const zone = fieldData.zones.info[0];
                     const singleInput = createFieldCropZoneInput(zone, fieldData, 1);
                     setZoneInputs({ [zone.id]: singleInput });
@@ -1029,7 +1001,6 @@ export default function Product() {
                     });
                     setActiveZoneId(zone.id);
                 } else {
-                    // No zones - treat as single area
                     const singleInput = createSingleFieldCropInput(fieldData);
                     setZoneInputs({ 'main-area': singleInput });
                     setSelectedPipes({
@@ -1220,7 +1191,6 @@ export default function Product() {
         };
     };
 
-    // UPDATED: Get zones data for different project modes
     const getZonesData = () => {
         if (projectMode === 'garden' && gardenStats) {
             return gardenStats.zones.map((z) => ({
@@ -1241,7 +1211,8 @@ export default function Product() {
                     id: z.id,
                     name: z.name,
                     area: z.area,
-                    plantCount: z.totalPlantingPoints,
+                    plantCount:
+                        z.sprinklerCount || Math.max(1, Math.ceil(z.totalPlantingPoints / 10)),
                     totalWaterNeed: z.totalWaterRequirementPerDay,
                     plantData: crop
                         ? {
@@ -1293,7 +1264,6 @@ export default function Product() {
         return zone?.name || zoneId;
     };
 
-    // UPDATED: Get active zone for different project modes
     const getActiveZone = () => {
         if (projectMode === 'garden' && gardenStats) {
             const zone = gardenStats.zones.find((z) => z.zoneId === activeZoneId);
@@ -1480,7 +1450,9 @@ export default function Product() {
                                     {imageLoading && (
                                         <div className="flex items-center gap-2">
                                             <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-blue-400"></div>
-                                            <span className="text-xs text-blue-400">Loading...</span>
+                                            <span className="text-xs text-blue-400">
+                                                Loading...
+                                            </span>
                                         </div>
                                     )}
                                 </div>
@@ -1508,8 +1480,8 @@ export default function Product() {
                                                         ? t('โรงเรือน')
                                                         : t('พืชสวน')
                                             } Project`}
-                                            className="aspect-video max-h-[500px] w-full cursor-pointer rounded-lg object-contain transition-transform hover:scale-105"
-                                            style={{ maxHeight: '500px', minHeight: '300px' }}
+                                            className="aspect-video max-h-[280px] w-full cursor-pointer rounded-lg object-contain transition-transform hover:scale-105"
+                                            style={{ maxHeight: '280px', minHeight: '280px' }}
                                             onClick={() => setShowImageModal(true)}
                                             onError={() => {
                                                 console.warn('Failed to load project image');
@@ -1518,7 +1490,7 @@ export default function Product() {
                                             }}
                                         />
                                         <div className="absolute right-2 top-2 flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-                                            <label className="cursor-pointer rounded-full bg-blue-600 p-2 text-sm hover:bg-blue-700">
+                                            <label className="h-6 w-6 cursor-pointer rounded-full bg-blue-600 text-xs hover:bg-blue-700">
                                                 📷
                                                 <input
                                                     type="file"
@@ -1529,34 +1501,13 @@ export default function Product() {
                                             </label>
                                             <button
                                                 onClick={handleImageDelete}
-                                                className="rounded-full bg-red-600 p-2 text-sm hover:bg-red-700"
+                                                className="h-6 w-6 rounded-full bg-red-600 text-xs hover:bg-red-700"
                                                 title="Delete image"
                                             >
                                                 ×
                                             </button>
                                         </div>
-                                        {/* Enhanced project mode indicator */}
-                                        <div className="absolute left-2 top-2">
-                                            <div
-                                                className={`rounded-lg px-2 py-1 text-xs font-medium ${
-                                                    projectMode === 'garden'
-                                                        ? 'bg-green-600 text-white'
-                                                        : projectMode === 'field-crop'
-                                                          ? 'bg-yellow-600 text-white'
-                                                          : projectMode === 'greenhouse'
-                                                            ? 'bg-purple-600 text-white'
-                                                            : 'bg-orange-600 text-white'
-                                                }`}
-                                            >
-                                                {projectMode === 'garden'
-                                                    ? '🏡 สวนบ้าน'
-                                                    : projectMode === 'field-crop'
-                                                      ? '🌾 พืชไร่'
-                                                      : projectMode === 'greenhouse'
-                                                        ? '🏠 โรงเรือน'
-                                                        : '🌱 พืชสวน'}
-                                            </div>
-                                        </div>
+                                        
                                     </div>
                                 ) : (
                                     <div className="rounded-lg border-2 border-dashed border-gray-600">
@@ -1595,300 +1546,248 @@ export default function Product() {
                                     </div>
                                 )}
                             </div>
+                            {zones.length > 1 && (
+                                <div className="mb-4 mt-4 flex flex-wrap gap-2">
+                                    {zones.map((zone) => {
+                                        const isActive = activeZoneId === zone.id;
+                                        const hasSprinkler = !!zoneSprinklers[zone.id];
+
+                                        return (
+                                            <button
+                                                key={zone.id}
+                                                onClick={() => setActiveZoneId(zone.id)}
+                                                className={`relative rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                                                    isActive
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <span>{zone.name}</span>
+                                                    {hasSprinkler && (
+                                                        <span className="text-xs text-green-400">
+                                                            ✓
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                            {zones.length > 1 && (
+                                <div className="mb-6 rounded-lg bg-gray-800 p-4">
+                                    <div className="mb-4 rounded bg-blue-900 p-3">
+                                        <h4 className="mb-2 text-sm font-medium text-blue-300">
+                                            🎯 {t('เลือกรูปแบบการเปิดโซน:')}
+                                        </h4>
+                                        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                                            <label className="flex cursor-pointer items-center gap-2 rounded bg-blue-800 p-1 hover:bg-blue-700">
+                                                <input
+                                                    type="radio"
+                                                    name="zoneOperation"
+                                                    value="sequential"
+                                                    checked={zoneOperationMode === 'sequential'}
+                                                    onChange={() =>
+                                                        handleZoneOperationModeChange('sequential')
+                                                    }
+                                                    className="rounded"
+                                                />
+                                                <div>
+                                                    <p className="text-xs font-medium">
+                                                        {t('เปิดทีละโซน')}
+                                                    </p>
+                                                </div>
+                                            </label>
+                                            <label className="flex cursor-pointer items-center gap-2 rounded bg-blue-800 p-1 hover:bg-blue-700">
+                                                <input
+                                                    type="radio"
+                                                    name="zoneOperation"
+                                                    value="simultaneous"
+                                                    checked={zoneOperationMode === 'simultaneous'}
+                                                    onChange={() =>
+                                                        handleZoneOperationModeChange(
+                                                            'simultaneous'
+                                                        )
+                                                    }
+                                                    className="rounded"
+                                                />
+                                                <div>
+                                                    <p className="text-xs font-medium">
+                                                        {t('เปิดพร้อมกันทุกโซน')}
+                                                    </p>
+                                                </div>
+                                            </label>
+                                            <label className="flex cursor-pointer items-center gap-2 rounded bg-blue-800 p-1 hover:bg-blue-700">
+                                                <input
+                                                    type="radio"
+                                                    name="zoneOperation"
+                                                    value="custom"
+                                                    checked={zoneOperationMode === 'custom'}
+                                                    onChange={() =>
+                                                        handleZoneOperationModeChange('custom')
+                                                    }
+                                                    className="rounded"
+                                                />
+                                                <div>
+                                                    <p className="text-xs font-medium">
+                                                        {t('กำหนดเอง')}
+                                                    </p>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    {zoneOperationMode === 'custom' && (
+                                        <div className="mt-4 rounded bg-purple-900 p-3">
+                                            <div className="mb-3 flex items-center justify-between">
+                                                <h4 className="text-sm font-medium text-purple-300">
+                                                    📋 {t('จัดการกลุ่มการเปิดโซน:')}
+                                                </h4>
+                                                <button
+                                                    onClick={addOperationGroup}
+                                                    className="rounded bg-purple-600 px-3 py-1 text-xs hover:bg-purple-700"
+                                                >
+                                                    + {t('เพิ่มกลุ่ม')}
+                                                </button>
+                                            </div>
+                                            <div className="space-y-2">
+                                                {zoneOperationGroups.map((group) => (
+                                                    <div
+                                                        key={group.id}
+                                                        className="rounded bg-purple-800 p-2"
+                                                    >
+                                                        <div className="mb-2 flex items-center justify-between">
+                                                            <p className="text-sm font-medium text-purple-200">
+                                                                {group.label} ({t('ลำดับที่')}{' '}
+                                                                {group.order})
+                                                                {group.zones.length === 0 && (
+                                                                    <span className="ml-2 text-red-300">
+                                                                        ({t('ไม่มีโซน')})
+                                                                    </span>
+                                                                )}
+                                                            </p>
+                                                            {zoneOperationGroups.length > 1 && (
+                                                                <button
+                                                                    onClick={() =>
+                                                                        removeOperationGroup(
+                                                                            group.id
+                                                                        )
+                                                                    }
+                                                                    className="text-xs text-red-400 hover:text-red-300"
+                                                                >
+                                                                    {t('ลบ')}
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                                                            {zones.map((zone) => (
+                                                                <label
+                                                                    key={zone.id}
+                                                                    className="flex cursor-pointer items-center gap-1 text-xs"
+                                                                >
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={group.zones.includes(
+                                                                            zone.id
+                                                                        )}
+                                                                        onChange={(e) => {
+                                                                            if (e.target.checked) {
+                                                                                const otherGroups =
+                                                                                    zoneOperationGroups.filter(
+                                                                                        (g) =>
+                                                                                            g.id !==
+                                                                                            group.id
+                                                                                    );
+                                                                                otherGroups.forEach(
+                                                                                    (g) => {
+                                                                                        updateOperationGroup(
+                                                                                            g.id,
+                                                                                            g.zones.filter(
+                                                                                                (
+                                                                                                    z
+                                                                                                ) =>
+                                                                                                    z !==
+                                                                                                    zone.id
+                                                                                            )
+                                                                                        );
+                                                                                    }
+                                                                                );
+                                                                                updateOperationGroup(
+                                                                                    group.id,
+                                                                                    [
+                                                                                        ...group.zones,
+                                                                                        zone.id,
+                                                                                    ]
+                                                                                );
+                                                                            } else {
+                                                                                updateOperationGroup(
+                                                                                    group.id,
+                                                                                    group.zones.filter(
+                                                                                        (z) =>
+                                                                                            z !==
+                                                                                            zone.id
+                                                                                    )
+                                                                                );
+                                                                            }
+                                                                        }}
+                                                                        className="rounded"
+                                                                    />
+                                                                    <span>{zone.name}</span>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="mt-2 text-xs text-purple-200">
+                                                💡 {t('โซนที่อยู่ในกลุ่มเดียวกันจะเปิดพร้อมกัน')}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {(projectMode === 'garden' ||
+                                        projectMode === 'field-crop' ||
+                                        projectMode === 'greenhouse') && (
+                                        <div className="mb-6 rounded-lg bg-gray-800 p-4">
+                                            <h3 className="mb-3 text-lg font-semibold text-purple-400">
+                                                ⚡ {t('ตัวเลือกปั๊มน้ำ')}
+                                            </h3>
+                                            <div className="flex items-center gap-4">
+                                                <label className="flex items-center gap-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={showPumpOption}
+                                                        onChange={(e) =>
+                                                            setShowPumpOption(e.target.checked)
+                                                        }
+                                                        className="rounded"
+                                                    />
+                                                    <span className="text-sm font-medium">
+                                                        {t('ต้องการใช้ปั๊มน้ำในระบบ')}
+                                                    </span>
+                                                </label>
+                                                {!showPumpOption && (
+                                                    <p className="text-sm text-gray-400">
+                                                        ({t('ใช้แรงดันจากระบบประปาบ้าน')})
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
 
                     <div className="space-y-6 lg:col-span-8">
-                        {zones.length > 1 && (
-                            <div className="mb-6 rounded-lg bg-gray-800 p-4">
-                                <h3 className="mb-3 text-lg font-semibold text-yellow-400">
-                                    🏗️ {t('การเปิดโซนสำหรับการทำงาน')}
-                                </h3>
-
-                                <div className="mb-4 rounded bg-blue-900 p-3">
-                                    <h4 className="mb-2 text-sm font-medium text-blue-300">
-                                        🎯 {t('เลือกรูปแบบการเปิดโซน:')}
-                                    </h4>
-                                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                                        <label className="flex cursor-pointer items-center gap-2 rounded bg-blue-800 p-3 hover:bg-blue-700">
-                                            <input
-                                                type="radio"
-                                                name="zoneOperation"
-                                                value="sequential"
-                                                checked={zoneOperationMode === 'sequential'}
-                                                onChange={() =>
-                                                    handleZoneOperationModeChange('sequential')
-                                                }
-                                                className="rounded"
-                                            />
-                                            <div>
-                                                <p className="font-medium">{t('เปิดทีละโซน')}</p>
-                                                <p className="text-xs text-blue-200">
-                                                    {t('ปั๊มขนาดเล็ก ประหยัดพลังงาน')}
-                                                </p>
-                                            </div>
-                                        </label>
-                                        <label className="flex cursor-pointer items-center gap-2 rounded bg-blue-800 p-3 hover:bg-blue-700">
-                                            <input
-                                                type="radio"
-                                                name="zoneOperation"
-                                                value="simultaneous"
-                                                checked={zoneOperationMode === 'simultaneous'}
-                                                onChange={() =>
-                                                    handleZoneOperationModeChange('simultaneous')
-                                                }
-                                                className="rounded"
-                                            />
-                                            <div>
-                                                <p className="font-medium">{t('เปิดพร้อมกันทุกโซน')}</p>
-                                                <p className="text-xs text-blue-200">
-                                                    {t('ปั๊มขนาดใหญ่ รดน้ำเร็ว')}
-                                                </p>
-                                            </div>
-                                        </label>
-                                        <label className="flex cursor-pointer items-center gap-2 rounded bg-blue-800 p-3 hover:bg-blue-700">
-                                            <input
-                                                type="radio"
-                                                name="zoneOperation"
-                                                value="custom"
-                                                checked={zoneOperationMode === 'custom'}
-                                                onChange={() =>
-                                                    handleZoneOperationModeChange('custom')
-                                                }
-                                                className="rounded"
-                                            />
-                                            <div>
-                                                <p className="font-medium">{t('กำหนดเอง')}</p>
-                                                <p className="text-xs text-blue-200">
-                                                    {t('จัดกลุ่มโซนตามต้องการ')}
-                                                </p>
-                                            </div>
-                                        </label>
-                                    </div>
-                                </div>
-
-                                {zoneOperationMode === 'custom' && (
-                                    <div className="mt-4 rounded bg-purple-900 p-3">
-                                        <div className="mb-3 flex items-center justify-between">
-                                            <h4 className="text-sm font-medium text-purple-300">
-                                                📋 {t('จัดการกลุ่มการเปิดโซน:')}
-                                            </h4>
-                                            <button
-                                                onClick={addOperationGroup}
-                                                className="rounded bg-purple-600 px-3 py-1 text-xs hover:bg-purple-700"
-                                            >
-                                                + {t('เพิ่มกลุ่ม')}
-                                            </button>
-                                        </div>
-                                        <div className="space-y-2">
-                                            {zoneOperationGroups.map((group) => (
-                                                <div
-                                                    key={group.id}
-                                                    className="rounded bg-purple-800 p-2"
-                                                >
-                                                    <div className="mb-2 flex items-center justify-between">
-                                                        <p className="text-sm font-medium text-purple-200">
-                                                            {group.label} ({t('ลำดับที่')} {group.order})
-                                                            {group.zones.length === 0 && (
-                                                                <span className="ml-2 text-red-300">
-                                                                    ({t('ไม่มีโซน')})
-                                                                </span>
-                                                            )}
-                                                        </p>
-                                                        {zoneOperationGroups.length > 1 && (
-                                                            <button
-                                                                onClick={() =>
-                                                                    removeOperationGroup(group.id)
-                                                                }
-                                                                className="text-xs text-red-400 hover:text-red-300"
-                                                            >
-                                                                {t('ลบ')}
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                    <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-                                                        {zones.map((zone) => (
-                                                            <label
-                                                                key={zone.id}
-                                                                className="flex cursor-pointer items-center gap-1 text-xs"
-                                                            >
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={group.zones.includes(
-                                                                        zone.id
-                                                                    )}
-                                                                    onChange={(e) => {
-                                                                        if (e.target.checked) {
-                                                                            const otherGroups =
-                                                                                zoneOperationGroups.filter(
-                                                                                    (g) =>
-                                                                                        g.id !==
-                                                                                        group.id
-                                                                                );
-                                                                            otherGroups.forEach(
-                                                                                (g) => {
-                                                                                    updateOperationGroup(
-                                                                                        g.id,
-                                                                                        g.zones.filter(
-                                                                                            (z) =>
-                                                                                                z !==
-                                                                                                zone.id
-                                                                                        )
-                                                                                    );
-                                                                                }
-                                                                            );
-                                                                            updateOperationGroup(
-                                                                                group.id,
-                                                                                [
-                                                                                    ...group.zones,
-                                                                                    zone.id,
-                                                                                ]
-                                                                            );
-                                                                        } else {
-                                                                            updateOperationGroup(
-                                                                                group.id,
-                                                                                group.zones.filter(
-                                                                                    (z) =>
-                                                                                        z !==
-                                                                                        zone.id
-                                                                                )
-                                                                            );
-                                                                        }
-                                                                    }}
-                                                                    className="rounded"
-                                                                />
-                                                                <span>{zone.name}</span>
-                                                            </label>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className="mt-2 text-xs text-purple-200">
-                                            💡 {t('โซนที่อยู่ในกลุ่มเดียวกันจะเปิดพร้อมกัน')}
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="mt-4 rounded bg-yellow-800 p-3">
-                                    <h4 className="mb-2 text-sm font-medium text-yellow-300">
-                                        📊 {t('สรุปการเปิดโซน:')}
-                                    </h4>
-                                    <div className="space-y-1 text-xs text-yellow-200">
-                                        {zoneOperationGroups.map((group) => (
-                                            <p key={group.id}>
-                                                • {t('ลำดับที่')} {group.order}:{' '}
-                                                {group.zones
-                                                    .map((zoneId) => getZoneName(zoneId))
-                                                    .join(', ')}
-                                                {group.zones.length > 1 &&
-                                                    ` (${t('เปิดพร้อมกัน')})`}
-                                            </p>
-                                        ))}
-                                    </div>
-                                    <p className="mt-2 text-xs text-yellow-300">
-                                        ⚡ {t('ปั๊มจะคำนวณจากกลุ่มที่ต้องการ Head สูงสุด')}
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-
-                        {zones.length > 1 && (
-                            <div className="mb-6 flex flex-wrap gap-2">
-                                {zones.map((zone) => {
-                                    const isActive = activeZoneId === zone.id;
-                                    const hasSprinkler = !!zoneSprinklers[zone.id];
-
-                                    return (
-                                        <button
-                                            key={zone.id}
-                                            onClick={() => setActiveZoneId(zone.id)}
-                                            className={`relative rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                                                isActive
-                                                    ? 'bg-blue-600 text-white'
-                                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                            }`}
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                <span>{zone.name}</span>
-                                                {hasSprinkler && (
-                                                    <span className="text-xs text-green-400">
-                                                        ✓
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="text-xs opacity-75">
-                                                {zone.area >= 1600 ? (
-                                                    <p>{(zone.area / 1600).toFixed(1)} ไร่</p>
-                                                ) : (
-                                                    <p>{zone.area.toFixed(2)} ตร.ม.</p>
-                                                )}
-                                                {zone.plantCount}
-                                                {projectMode === 'garden'
-                                                    ? 'หัวฉีด'
-                                                    : projectMode === 'field-crop'
-                                                      ? 'ต้น'
-                                                      : projectMode === 'greenhouse'
-                                                        ? 'ต้น'
-                                                        : 'ต้น'}
-                                            </div>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        )}
-
-                        {(projectMode === 'garden' ||
-                            projectMode === 'field-crop' ||
-                            projectMode === 'greenhouse') && (
-                            <div className="mb-6 rounded-lg bg-gray-800 p-4">
-                                <h3 className="mb-3 text-lg font-semibold text-purple-400">
-                                    ⚡ {t('ตัวเลือกปั๊มน้ำ')}
-                                </h3>
-                                <div className="flex items-center gap-4">
-                                    <label className="flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            checked={showPumpOption}
-                                            onChange={(e) => setShowPumpOption(e.target.checked)}
-                                            className="rounded"
-                                        />
-                                        <span className="text-sm font-medium">
-                                            {t('ต้องการใช้ปั๊มน้ำในระบบ')}
-                                        </span>
-                                    </label>
-                                    {!showPumpOption && (
-                                        <p className="text-sm text-gray-400">
-                                            ({t('ใช้แรงดันจากระบบประปาบ้าน')})
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
                         <InputForm
                             input={currentInput}
                             onInputChange={handleInputChange}
                             selectedSprinkler={currentSprinkler}
                             activeZone={activeZone}
-                            projectMode={projectMode === 'greenhouse' ? undefined : projectMode}
+                            projectMode={projectMode}
                         />
-
-                        <div className="rounded-lg bg-yellow-800 p-4">
-                            <div className="flex items-center gap-2 text-yellow-200">
-                                <span className="text-2xl">⚡</span>
-                                <div>
-                                    <p className="font-medium">{t('เลือกสปริงเกอร์ก่อน')}</p>
-                                    <p className="text-sm">{t('ระบบจะเลือกอุปกรณ์อื่นให้อัตโนมัติ')}</p>
-                                    {zones.length > 1 && (
-                                        <p className="mt-1 text-xs text-yellow-300">
-                                            💡 {t('เลือกสปริงเกอร์สำหรับโซน')}
-                                            {zones.find((z) => z.id === activeZoneId)?.name}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
 
                         <SprinklerSelector
                             selectedSprinkler={currentSprinkler}

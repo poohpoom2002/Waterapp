@@ -2,8 +2,9 @@
 // routes\web.php
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use App\Http\Controllers\ProfileController; // เก็บไว้ถ้าใช้
-use App\Http\Controllers\SuperUserController; // เก็บไว้ถ้าใช้
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SuperUserController;
+use App\Http\Controllers\FarmController; // เพิ่มบรรทัดนี้
 
 /*
 |--------------------------------------------------------------------------
@@ -319,9 +320,9 @@ Route::get('/fields-api', function () {
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('dashboard', function () {
-        return Inertia::render('dashboard');
-    })->name('dashboard');
+    // Route::get('dashboard', function () {
+    //     return Inertia::render('dashboard');
+    // })->name('dashboard');
 
     // Horticulture Irrigation System Routes (ระบบชลประทานสวนผลไม้)
     Route::prefix('horticulture')->name('horticulture.')->group(function () {
@@ -547,9 +548,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
   
     // Super User Routes
     Route::prefix('super')->name('super.')->group(function () {
-        Route::get('/dashboard', function () {
-            return Inertia::render('SuperUserDashboard');
-        })->name('dashboard');
+        // Route::get('/dashboard', function () {
+        //     return Inertia::render('SuperUserDashboard');
+        // })->name('dashboard');
         Route::get('/users', [SuperUserController::class, 'getUsers'])->name('users');
         Route::post('/users', [SuperUserController::class, 'createUser'])->name('create-user');
         Route::put('/users/{userId}', [SuperUserController::class, 'updateUser'])->name('update-user');

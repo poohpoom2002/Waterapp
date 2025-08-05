@@ -3,7 +3,10 @@ export interface Crop {
     value: string;
     name: string;
     nameEn: string;
+    nameTh: string;
     description: string;
+    descriptionEn: string;
+    descriptionTh: string;
     icon: string;
     category: string;
 }
@@ -11,6 +14,7 @@ export interface Crop {
 export interface Category {
     name: string;
     nameEn: string;
+    nameTh: string;
     icon: string;
 }
 
@@ -19,9 +23,12 @@ export const greenhouseCrops: Crop[] = [
     // Vegetables
     {
         value: 'tomato',
-        name: 'Tomato',
+        name: 'Tomato', // Default fallback
         nameEn: 'Tomato',
-        description: 'Versatile fruit-vegetable suitable for greenhouse cultivation',
+        nameTh: 'มะเขือเทศ',
+        description: 'Versatile fruit-vegetable suitable for greenhouse cultivation', // Default fallback
+        descriptionEn: 'Versatile fruit-vegetable suitable for greenhouse cultivation',
+        descriptionTh: 'ผักผลไม้อเนกประสงค์ที่เหมาะสำหรับการปลูกในโรงเรือน',
         icon: '🍅',
         category: 'vegetables',
     },
@@ -29,7 +36,10 @@ export const greenhouseCrops: Crop[] = [
         value: 'bell-pepper',
         name: 'Bell Pepper',
         nameEn: 'Bell Pepper',
+        nameTh: 'พริกหวาน',
         description: 'Colorful sweet pepper rich in vitamins',
+        descriptionEn: 'Colorful sweet pepper rich in vitamins',
+        descriptionTh: 'พริกหวานหลากสีที่อุดมไปด้วยวิตามิน',
         icon: '🫑',
         category: 'vegetables',
     },
@@ -37,7 +47,10 @@ export const greenhouseCrops: Crop[] = [
         value: 'cucumber',
         name: 'Cucumber',
         nameEn: 'Cucumber',
+        nameTh: 'แตงกวา',
         description: 'Fresh, crisp vegetable suitable for greenhouse growing',
+        descriptionEn: 'Fresh, crisp vegetable suitable for greenhouse growing',
+        descriptionTh: 'ผักสดกรอบที่เหมาะสำหรับการปลูกในโรงเรือน',
         icon: '🥒',
         category: 'vegetables',
     },
@@ -45,7 +58,10 @@ export const greenhouseCrops: Crop[] = [
         value: 'melon',
         name: 'Melon',
         nameEn: 'Melon',
+        nameTh: 'แตงไทย',
         description: 'Sweet fruit with tender flesh, grows well in greenhouses',
+        descriptionEn: 'Sweet fruit with tender flesh, grows well in greenhouses',
+        descriptionTh: 'ผลไม้หวานเนื้อนุ่ม เจริญเติบโตได้ดีในโรงเรือน',
         icon: '🍈',
         category: 'vegetables',
     },
@@ -53,7 +69,10 @@ export const greenhouseCrops: Crop[] = [
         value: 'lettuce',
         name: 'Lettuce',
         nameEn: 'Lettuce',
+        nameTh: 'ผักสลัด',
         description: 'Various salad greens such as red oak and green oak varieties',
+        descriptionEn: 'Various salad greens such as red oak and green oak varieties',
+        descriptionTh: 'ผักใบเขียวสำหรับสลัดหลายพันธุ์ เช่น เรดโอ๊ค และกรีนโอ๊ค',
         icon: '🥬',
         category: 'vegetables',
     },
@@ -61,7 +80,10 @@ export const greenhouseCrops: Crop[] = [
         value: 'kale',
         name: 'Kale',
         nameEn: 'Kale',
+        nameTh: 'เคล',
         description: 'Dark green leafy vegetable rich in nutrients',
+        descriptionEn: 'Dark green leafy vegetable rich in nutrients',
+        descriptionTh: 'ผักใบเขียวเข้มที่อุดมไปด้วยสารอาหาร',
         icon: '🥬',
         category: 'vegetables',
     },
@@ -69,7 +91,10 @@ export const greenhouseCrops: Crop[] = [
         value: 'pak-choi',
         name: 'Pak Choi',
         nameEn: 'Pak Choi',
+        nameTh: 'ผักกวางตุ้ง',
         description: 'Chinese green leafy vegetable with fast growth',
+        descriptionEn: 'Chinese green leafy vegetable with fast growth',
+        descriptionTh: 'ผักใบเขียวจีนที่เจริญเติบโตเร็ว',
         icon: '🥬',
         category: 'vegetables',
     },
@@ -77,7 +102,10 @@ export const greenhouseCrops: Crop[] = [
         value: 'chinese-kale',
         name: 'Chinese Kale',
         nameEn: 'Chinese Kale',
+        nameTh: 'คะน้า',
         description: 'Thai green leafy vegetable with fast growth',
+        descriptionEn: 'Thai green leafy vegetable with fast growth',
+        descriptionTh: 'ผักใบเขียวไทยที่เจริญเติบโตเร็ว',
         icon: '🥬',
         category: 'vegetables',
     },
@@ -85,7 +113,10 @@ export const greenhouseCrops: Crop[] = [
         value: 'cabbage',
         name: 'Cabbage',
         nameEn: 'Cabbage',
+        nameTh: 'กะหล่ำปลี',
         description: 'Compact head vegetable suitable for greenhouse cultivation',
+        descriptionEn: 'Compact head vegetable suitable for greenhouse cultivation',
+        descriptionTh: 'ผักหัวกะทัดรัดที่เหมาะสำหรับการปลูกในโรงเรือน',
         icon: '🥬',
         category: 'vegetables',
     },
@@ -93,7 +124,10 @@ export const greenhouseCrops: Crop[] = [
         value: 'cauliflower',
         name: 'Cauliflower',
         nameEn: 'Cauliflower',
+        nameTh: 'กะหล่ำดอก',
         description: 'White flowering vegetable rich in vitamins',
+        descriptionEn: 'White flowering vegetable rich in vitamins',
+        descriptionTh: 'ผักดอกสีขาวที่อุดมไปด้วยวิตามิน',
         icon: '🥦',
         category: 'vegetables',
     },
@@ -101,7 +135,10 @@ export const greenhouseCrops: Crop[] = [
         value: 'broccoli',
         name: 'Broccoli',
         nameEn: 'Broccoli',
+        nameTh: 'บร็อกโคลี',
         description: 'Green flowering vegetable rich in nutrients',
+        descriptionEn: 'Green flowering vegetable rich in nutrients',
+        descriptionTh: 'ผักดอกสีเขียวที่อุดมไปด้วยสารอาหาร',
         icon: '🥦',
         category: 'vegetables',
     },
@@ -110,7 +147,10 @@ export const greenhouseCrops: Crop[] = [
         value: 'strawberry',
         name: 'Strawberry',
         nameEn: 'Strawberry',
+        nameTh: 'สตรอเบอร์รี่',
         description: 'Sweet, juicy fruit suitable for greenhouse cultivation',
+        descriptionEn: 'Sweet, juicy fruit suitable for greenhouse cultivation',
+        descriptionTh: 'ผลไม้หวานฉ่ำน้ำที่เหมาะสำหรับการปลูกในโรงเรือน',
         icon: '🍓',
         category: 'fruits',
     },
@@ -118,7 +158,10 @@ export const greenhouseCrops: Crop[] = [
         value: 'seedless-grape',
         name: 'Seedless Grape',
         nameEn: 'Seedless Grape',
+        nameTh: 'องุ่นไร้เมล็ด',
         description: 'Sweet seedless grapes of premium quality',
+        descriptionEn: 'Sweet seedless grapes of premium quality',
+        descriptionTh: 'องุ่นไร้เมล็ดหวานคุณภาพพรีเมียม',
         icon: '🍇',
         category: 'fruits',
     },
@@ -126,7 +169,10 @@ export const greenhouseCrops: Crop[] = [
         value: 'cantaloupe',
         name: 'Cantaloupe',
         nameEn: 'Cantaloupe',
+        nameTh: 'แคนตาลูป',
         description: 'Orange-fleshed melon, sweet and aromatic',
+        descriptionEn: 'Orange-fleshed melon, sweet and aromatic',
+        descriptionTh: 'เมลอนเนื้อสีส้ม หวานและหอม',
         icon: '🍈',
         category: 'fruits',
     },
@@ -134,35 +180,74 @@ export const greenhouseCrops: Crop[] = [
         value: 'japanese-melon',
         name: 'Japanese Melon',
         nameEn: 'Japanese Melon',
+        nameTh: 'เมลอนญี่ปุ่น',
         description: 'Premium melon with tender flesh and intense sweetness',
+        descriptionEn: 'Premium melon with tender flesh and intense sweetness',
+        descriptionTh: 'เมลอนพรีเมียมเนื้อนุ่มและหวานเข้มข้น',
         icon: '🍈',
         category: 'fruits',
     },
 ];
 
-// For greenhouse only - other sections removed
-
 // Categories definition (greenhouse only)
 export const categories: Record<string, Category> = {
-    vegetables: { name: 'Vegetables', nameEn: 'Vegetables', icon: '🥬' },
-    fruits: { name: 'Fruits', nameEn: 'Fruits', icon: '🍓' },
+    vegetables: { 
+        name: 'Vegetables', // Default fallback
+        nameEn: 'Vegetables', 
+        nameTh: 'ผัก', 
+        icon: '🥬' 
+    },
+    fruits: { 
+        name: 'Fruits', // Default fallback
+        nameEn: 'Fruits', 
+        nameTh: 'ผลไม้', 
+        icon: '🍓' 
+    },
 };
 
-// Helper functions (greenhouse only)
+// Helper functions
 export const getCropByValue = (value: string): Crop | undefined => {
     return greenhouseCrops.find((crop) => crop.value === value);
 };
 
-export const searchCrops = (searchTerm: string): Crop[] => {
+export const searchCrops = (searchTerm: string, language: 'en' | 'th' = 'th'): Crop[] => {
     const term = searchTerm.toLowerCase();
-    return greenhouseCrops.filter(
-        (crop) =>
-            crop.name.toLowerCase().includes(term) ||
-            crop.nameEn.toLowerCase().includes(term) ||
-            crop.description.toLowerCase().includes(term)
-    );
+    return greenhouseCrops.filter((crop) => {
+        if (language === 'th') {
+            return (
+                crop.nameTh.toLowerCase().includes(term) ||
+                crop.nameEn.toLowerCase().includes(term) ||
+                crop.descriptionTh.toLowerCase().includes(term) ||
+                crop.descriptionEn.toLowerCase().includes(term)
+            );
+        } else {
+            return (
+                crop.nameEn.toLowerCase().includes(term) ||
+                crop.nameTh.toLowerCase().includes(term) ||
+                crop.descriptionEn.toLowerCase().includes(term) ||
+                crop.descriptionTh.toLowerCase().includes(term)
+            );
+        }
+    });
 };
 
 export const getCropsByCategory = (category: string): Crop[] => {
     return greenhouseCrops.filter((crop) => crop.category === category);
+};
+
+// Helper function to get localized crop name
+export const getCropName = (crop: Crop, language: 'en' | 'th' = 'th'): string => {
+    return language === 'th' ? crop.nameTh : crop.nameEn;
+};
+
+// Helper function to get localized crop description
+export const getCropDescription = (crop: Crop, language: 'en' | 'th' = 'th'): string => {
+    return language === 'th' ? crop.descriptionTh : crop.descriptionEn;
+};
+
+// Helper function to get localized category name
+export const getCategoryName = (categoryKey: string, language: 'en' | 'th' = 'th'): string => {
+    const category = categories[categoryKey];
+    if (!category) return categoryKey;
+    return language === 'th' ? category.nameTh : category.nameEn;
 };

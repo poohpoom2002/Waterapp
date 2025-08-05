@@ -15,6 +15,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Http;
+use Exception; // เพิ่ม Exception
+use Illuminate\Support\Facades\Log; // เพิ่ม Log
+use Illuminate\Support\Facades\DB; // เพิ่ม DB
 
 class FarmController extends Controller
 {
@@ -971,24 +974,27 @@ class FarmController extends Controller
                 ->get();
 
             $formattedFields = $fields->map(function ($field) {
+                // แก้ไข: เพิ่มการตรวจสอบค่า null ก่อนเข้าถึง property
+                $plantTypeData = $field->plantType ? [
+                    'id' => $field->plantType->id,
+                    'name' => $field->plantType->name,
+                    'type' => $field->plantType->type,
+                    'plant_spacing' => $field->plantType->plant_spacing,
+                    'row_spacing' => $field->plantType->row_spacing,
+                    'water_needed' => $field->plantType->water_needed
+                ] : null; // ถ้าไม่มี plantType ให้เป็น null
+
                 return [
                     'id' => $field->id,
                     'name' => $field->name,
                     'customerName' => $field->customer_name,
-                    'userName' => $field->user ? $field->user->name : 'Unknown',
+                    'userName' => $field->user ? $field->user->name : 'Unknown User', // แก้ไข: ตรวจสอบ user ก่อน
                     'category' => $field->category ?? 'horticulture',
                     'status' => $field->status,
                     'isCompleted' => $field->is_completed,
                     'folderId' => $field->folder_id,
                     'area' => $field->area_coordinates,
-                    'plantType' => [
-                        'id' => $field->plantType->id,
-                        'name' => $field->plantType->name,
-                        'type' => $field->plantType->type,
-                        'plant_spacing' => $field->plantType->plant_spacing,
-                        'row_spacing' => $field->plantType->row_spacing,
-                        'water_needed' => $field->plantType->water_needed
-                    ],
+                    'plantType' => $plantTypeData, // แก้ไข: ใช้ข้อมูลที่ตรวจสอบแล้ว
                     'totalPlants' => $field->total_plants,
                     'totalArea' => (float) $field->total_area,
                     'total_water_need' => (float) $field->total_water_need,
@@ -1007,14 +1013,14 @@ class FarmController extends Controller
                 'fields' => $formattedFields
             ]);
 
-        } catch (\Exception $e) {
-            \Log::error('Error fetching fields:', [
+        } catch (Exception $e) {
+            Log::error('Error fetching fields:', [
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
 
             return response()->json([
-                'error' => $e->getMessage()
+                'error' => 'An error occurred while fetching fields: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -1047,27 +1053,28 @@ class FarmController extends Controller
                 ], 422);
             }
 
+            // แก้ไข: ตรวจสอบ plantType ก่อน
             if (!$field->plantType) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Field plant type data is missing'
-                ], 422);
-            }
-
-            $formattedField = [
-                'id' => $field->id,
-                'field_name' => $field->name,
-                'customer_name' => $field->customer_name,
-                'user_name' => $field->user ? $field->user->name : 'Unknown',
-                'area_coordinates' => $field->area_coordinates,
-                'plantType' => [
+                // ส่งค่า default หรือ null แทนที่จะทำให้เกิด error
+                 $plantTypeData = null;
+            } else {
+                $plantTypeData = [
                     'id' => $field->plantType->id,
                     'name' => $field->plantType->name,
                     'type' => $field->plantType->type,
                     'plant_spacing' => $field->plantType->plant_spacing,
                     'row_spacing' => $field->plantType->row_spacing,
                     'water_needed' => $field->plantType->water_needed,
-                ],
+                ];
+            }
+
+            $formattedField = [
+                'id' => $field->id,
+                'field_name' => $field->name,
+                'customer_name' => $field->customer_name,
+                'user_name' => $field->user ? $field->user->name : 'Unknown User', // แก้ไข: ตรวจสอบ user
+                'area_coordinates' => $field->area_coordinates,
+                'plantType' => $plantTypeData, // แก้ไข: ใช้ข้อมูลที่ตรวจสอบแล้ว
                 'total_plants' => $field->total_plants,
                 'total_area' => $field->total_area,
                 'total_water_need' => $field->total_water_need,
@@ -1091,9 +1098,9 @@ class FarmController extends Controller
                 'planting_points' => $field->plantingPoints->map(function ($point) {
                     return [
                         'point_id' => $point->point_id,
-                        'lat' => $point->lat,
-                        'lng' => $point->lng,
-                        'zone_id' => $point->zone_id,
+                        'lat' => $point->latitude, // แก้ไข: ใช้ latitude, longitude จาก model
+                        'lng' => $point->longitude,
+                        'zone_id' => $point->field_zone_id,
                     ];
                 })->toArray(),
                 'pipes' => $field->pipes->map(function ($pipe) {
@@ -1101,15 +1108,15 @@ class FarmController extends Controller
                         'id' => $pipe->id,
                         'type' => $pipe->type,
                         'direction' => $pipe->direction,
-                        'start_lat' => $pipe->start_lat,
-                        'start_lng' => $pipe->start_lng,
-                        'end_lat' => $pipe->end_lat,
-                        'end_lng' => $pipe->end_lng,
+                        'start_lat' => $pipe->start_latitude,
+                        'start_lng' => $pipe->start_longitude,
+                        'end_lat' => $pipe->end_latitude,
+                        'end_lng' => $pipe->end_longitude,
                         'length' => $pipe->length,
                         'plants_served' => $pipe->plants_served,
                         'water_flow' => $pipe->water_flow,
                         'pipe_diameter' => $pipe->pipe_diameter,
-                        'zone_id' => $pipe->zone_id,
+                        'zone_id' => $pipe->field_zone_id,
                         'row_index' => $pipe->row_index,
                         'col_index' => $pipe->col_index,
                     ];
@@ -1122,8 +1129,8 @@ class FarmController extends Controller
                 'success' => true,
                 'field' => $formattedField
             ]);
-        } catch (\Exception $e) {
-            \Log::error('Error fetching field:', [
+        } catch (Exception $e) {
+            Log::error('Error fetching field:', [
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
@@ -1853,16 +1860,17 @@ class FarmController extends Controller
                 ]);
             }
 
-            \Log::info('Fetching folders for user', [
+            Log::info('Fetching folders for user', [
                 'user_id' => $user->id,
                 'user_email' => $user->email
             ]);
 
             $folders = Folder::where('user_id', $user->id)
+                ->withCount('fields') // แก้ไข: ใช้ withCount เพื่อประสิทธิภาพที่ดีกว่า
                 ->orderBy('name')
                 ->get();
 
-            \Log::info('Found existing folders', [
+            Log::info('Found existing folders', [
                 'count' => $folders->count(),
                 'folders' => $folders->pluck('name')->toArray()
             ]);
@@ -1885,19 +1893,20 @@ class FarmController extends Controller
 
             $foldersCreated = 0;
             foreach ($systemFolders as $systemFolder) {
-                $exists = $folders->where('name', $systemFolder['name'])->first();
+                // แก้ไข: ตรวจสอบด้วย type แทน name เพื่อความแม่นยำ
+                $exists = $folders->where('type', $systemFolder['type'])->first();
                 if (!$exists) {
                     try {
                         Folder::create(array_merge($systemFolder, [
                             'user_id' => $user->id,
                         ]));
                         $foldersCreated++;
-                        \Log::info('Created system folder', [
+                        Log::info('Created system folder', [
                             'folder_name' => $systemFolder['name'],
                             'user_id' => $user->id
                         ]);
-                    } catch (\Exception $e) {
-                        \Log::error('Failed to create system folder', [
+                    } catch (Exception $e) {
+                        Log::error('Failed to create system folder', [
                             'folder_name' => $systemFolder['name'],
                             'error' => $e->getMessage()
                         ]);
@@ -1908,11 +1917,12 @@ class FarmController extends Controller
             // Refresh the folders list if we created any new folders
             if ($foldersCreated > 0) {
                 $folders = Folder::where('user_id', $user->id)
+                    ->withCount('fields')
                     ->orderBy('name')
                     ->get();
             }
 
-            \Log::info('Returning folders', [
+            Log::info('Returning folders', [
                 'final_count' => $folders->count(),
                 'created_new' => $foldersCreated
             ]);
@@ -1927,15 +1937,15 @@ class FarmController extends Controller
                         'color' => $folder->color ?? '#6366f1',
                         'icon' => $folder->icon ?? '📁',
                         'parent_id' => $folder->parent_id,
-                        'field_count' => $folder->fields()->count(),
+                        'field_count' => $folder->fields_count, // แก้ไข: ใช้ fields_count จาก withCount
                         'created_at' => $folder->created_at,
                         'updated_at' => $folder->updated_at,
                     ];
                 })
             ]);
 
-        } catch (\Exception $e) {
-            \Log::error('Error fetching folders', [
+        } catch (Exception $e) {
+            Log::error('Error fetching folders', [
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'user_id' => auth()->id() ?? 'not_authenticated'

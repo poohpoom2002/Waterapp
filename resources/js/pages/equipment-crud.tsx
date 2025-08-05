@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// resources\js\pages\equipment-crud.tsx
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     Plus,
     Edit2,
@@ -32,6 +31,10 @@ import {
     ChevronLeft,
     ChevronFirst,
     ChevronLast,
+    Loader2,
+    RefreshCw,
+    ImageIcon,
+    Camera,
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -52,6 +55,11 @@ const showAlert = {
                 text: text,
                 confirmButtonText: 'ตกลง',
                 confirmButtonColor: '#10b981',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true,
             });
         } else {
             alert(`${title}${text ? '\n' + text : ''}`);
@@ -120,12 +128,6 @@ const showAlert = {
 };
 
 const apiRequest = async (url: string, options: RequestInit = {}) => {
-    console.log('🔄 API Request:', {
-        url: `/api${url}`,
-        method: options.method || 'GET',
-        headers: options.headers,
-    });
-
     const response = await fetch(`/api${url}`, {
         headers: {
             'Content-Type': 'application/json',
@@ -135,63 +137,40 @@ const apiRequest = async (url: string, options: RequestInit = {}) => {
         ...options,
     });
 
-    console.log('📡 API Response:', {
-        url: `/api${url}`,
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-    });
-
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error('❌ API Error:', {
-            url: `/api${url}`,
-            status: response.status,
-            errorData,
-        });
         throw new Error(errorData.message || `API Error: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log('✅ API Success:', {
-        url: `/api${url}`,
-        dataType: Array.isArray(data) ? 'array' : typeof data,
-        count: Array.isArray(data) ? data.length : 'N/A',
-        sample: Array.isArray(data) && data.length > 0 ? data[0] : data,
-    });
-
     return data;
 };
 
 const getAllEquipments = async (params?: any): Promise<Equipment[]> => {
     try {
-        console.log('🎯 getAllEquipments called with params:', params);
-
         const queryString = params ? '?' + new URLSearchParams(params).toString() : '';
         const fullUrl = `/equipments${queryString}`;
-
-        console.log('📝 Making request to:', fullUrl);
-
         const data = await apiRequest(fullUrl);
-
-        console.log('🔍 Raw API response analysis:', {
-            isArray: Array.isArray(data),
-            length: Array.isArray(data) ? data.length : 'N/A',
-            type: typeof data,
-            keys: typeof data === 'object' && data !== null ? Object.keys(data) : 'N/A',
-        });
-
-        if (Array.isArray(data)) {
-            console.log('✅ Returning array of equipments:', data.length);
-            return data;
-        } else {
-            console.warn('⚠️ Expected array but got:', typeof data, data);
-            return [];
-        }
+        return Array.isArray(data) ? data : [];
     } catch (error) {
-        console.error('💥 getAllEquipments error:', error);
         return [];
     }
+};
+
+const useDebounce = (value: string, delay: number) => {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [value, delay]);
+
+    return debouncedValue;
 };
 
 interface EquipmentCategory {
@@ -229,6 +208,7 @@ interface Equipment {
     brand?: string;
     image?: string;
     price: number;
+    stock?: number;
     description?: string;
     is_active: boolean;
     category?: EquipmentCategory;
@@ -237,6 +217,7 @@ interface Equipment {
     formatted_attributes?: any[];
     pumpAccessories?: PumpAccessory[];
     pumpAccessory?: PumpAccessory[];
+    pump_accessories?: PumpAccessory[];
     created_at?: string;
     updated_at?: string;
 }
@@ -244,14 +225,17 @@ interface Equipment {
 interface PumpAccessory {
     id?: number;
     pump_id?: number;
-    accessory_type: 'foot_valve' | 'check_valve' | 'ball_valve' | 'pressure_gauge' | 'other';
+    equipment_id?: number | null;
+    product_code?: string;
     name: string;
     image?: string;
     size?: string;
-    specifications?: any;
     price: number;
+    stock?: number;
+    quantity: number;
     is_included: boolean;
     sort_order: number;
+    description?: string;
 }
 
 interface FilterOptions {
@@ -392,6 +376,28 @@ const api = {
             return {};
         }
     },
+
+    validateProductCode: async (productCode: string, excludeId?: number): Promise<boolean> => {
+        try {
+            if (!productCode || productCode.trim() === '' || productCode === '-') {
+                return true;
+            }
+
+            const params = new URLSearchParams();
+            params.append('product_code', productCode);
+            if (excludeId) {
+                params.append('exclude_id', excludeId.toString());
+            }
+
+            const response = await apiRequest(
+                `/equipments/validate-product-code?${params.toString()}`
+            );
+            return response.is_valid;
+        } catch (error) {
+            console.error('Product code validation error:', error);
+            return false;
+        }
+    },
 };
 
 const Pagination: React.FC<{
@@ -507,6 +513,8 @@ const CategoryForm: React.FC<{
 
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
+    const { t } = useLanguage();
+
     const validateForm = () => {
         const newErrors: { [key: string]: string } = {};
 
@@ -575,7 +583,6 @@ const CategoryForm: React.FC<{
             ...formData,
             attributes: processedAttributes,
         };
-        console.log('📤 Sending category data:', dataToSend);
         onSave(dataToSend as Partial<EquipmentCategory>);
     };
 
@@ -585,7 +592,6 @@ const CategoryForm: React.FC<{
             attributes: prev.attributes.filter((_, i) => i !== index),
         }));
     };
-    const { t } = useLanguage();
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black bg-opacity-50 p-4">
@@ -599,7 +605,7 @@ const CategoryForm: React.FC<{
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                             <div>
                                 <label className="mb-2 block text-sm font-medium">
-                                    {t('ชื่อระบบ (ภาษาอังกฤษ)')} *
+                                    {t('ชื่อหมวดหมู่ (ภาษาอังกฤษ)')} *
                                 </label>
                                 <input
                                     type="text"
@@ -623,7 +629,7 @@ const CategoryForm: React.FC<{
 
                             <div>
                                 <label className="mb-2 block text-sm font-medium">
-                                    {t('ชื่อแสดง')} *
+                                    {t('ชื่อหมวดหมู่ (ภาษาไทย)')} *
                                 </label>
                                 <input
                                     type="text"
@@ -649,46 +655,18 @@ const CategoryForm: React.FC<{
                                     </div>
                                 )}
                             </div>
-
-                            <div>
-                                <label className="mb-2 block text-sm font-medium">
-                                    {t('ไอคอน')}
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formData.icon}
-                                    onChange={(e) =>
-                                        setFormData((prev) => ({ ...prev, icon: e.target.value }))
-                                    }
-                                    className="w-full rounded-lg border border-gray-600 bg-gray-700 p-3 focus:ring-2 focus:ring-blue-500"
-                                    placeholder={t('emoji หรือ icon class')}
-                                />
-                            </div>
-
-                            <div className="md:col-span-2">
-                                <label className="mb-2 block text-sm font-medium">
-                                    {t('คำอธิบาย')}
-                                </label>
-                                <textarea
-                                    value={formData.description}
-                                    onChange={(e) =>
-                                        setFormData((prev) => ({
-                                            ...prev,
-                                            description: e.target.value,
-                                        }))
-                                    }
-                                    rows={3}
-                                    className="w-full rounded-lg border border-gray-600 bg-gray-700 p-3 focus:ring-2 focus:ring-blue-500"
-                                    placeholder={t('คำอธิบายหมวดหมู่')}
-                                />
-                            </div>
                         </div>
 
                         <div className="border-t border-gray-600 pt-6">
-                            <h3 className="mb-4 text-lg font-semibold">{t('คุณสมบัติเฉพาะ')}</h3>
+                            <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
+                                {t('คุณสมบัติเฉพาะ')}
+                                <p className="text-xs text-gray-400">
+                                    (เพิ่มเติมจาก รหัสสินค้า, ชื่อสินค้า, ราคา, จำนวนสินค้า(stock))
+                                </p>
+                            </h3>
 
                             <div className="mb-4 rounded-lg bg-gray-700 p-4">
-                                <h4 className="mb-3 font-medium">{t('เพิ่มคุณสมบัติใหม่')}</h4>
+                                <h4 className="mb-3 font-medium">{t('เพิ่มคุณสมบัติเพิ่มเติม')}</h4>
                                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3 lg:grid-cols-5">
                                     <input
                                         type="text"
@@ -830,54 +808,328 @@ const CategoryForm: React.FC<{
     );
 };
 
+// Searchable Dropdown Component
+const SearchableDropdown: React.FC<{
+    options: Equipment[];
+    value: number | null;
+    onChange: (value: number | null) => void;
+    placeholder: string;
+    loading?: boolean;
+}> = ({ options, value, onChange, placeholder, loading = false }) => {
+    const { t } = useLanguage();
+    const [isOpen, setIsOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const selectedOption = options.find((opt) => opt.id === value);
+
+    const filteredOptions = options.filter((option) => {
+        const searchLower = searchTerm.toLowerCase();
+        return (
+            option.name.toLowerCase().includes(searchLower) ||
+            (option.description && option.description.toLowerCase().includes(searchLower)) ||
+            (option.product_code && option.product_code.toLowerCase().includes(searchLower))
+        );
+    });
+
+    const handleSelect = (optionId: number | null) => {
+        onChange(optionId);
+        setIsOpen(false);
+        setSearchTerm('');
+    };
+
+    return (
+        <div className="relative">
+            <button
+                type="button"
+                onClick={() => setIsOpen(!isOpen)}
+                className="flex w-full items-center justify-between rounded border border-gray-600 bg-gray-600 p-2 text-left text-white focus:ring-2 focus:ring-blue-500"
+                disabled={loading}
+            >
+                <span className="truncate">
+                    {loading
+                        ? t('กำลังโหลด...')
+                        : selectedOption
+                          ? selectedOption.name
+                          : placeholder}
+                </span>
+                <ChevronDown
+                    className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                />
+            </button>
+
+            {isOpen && (
+                <div className="absolute z-10 mt-1 max-h-60 w-full overflow-hidden rounded border border-gray-600 bg-gray-700 shadow-lg">
+                    <div className="border-b border-gray-600 p-2">
+                        <input
+                            type="text"
+                            placeholder={t('ค้นหาอุปกรณ์...')}
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full rounded border border-gray-600 bg-gray-600 p-2 text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500"
+                            autoFocus
+                        />
+                    </div>
+
+                    <div className="max-h-48 overflow-y-auto">
+                        <button
+                            type="button"
+                            onClick={() => handleSelect(null)}
+                            className="w-full border-b border-gray-600 p-2 text-left text-gray-400 hover:bg-gray-600"
+                        >
+                            {t('ไม่เลือก')}
+                        </button>
+
+                        {filteredOptions.length === 0 ? (
+                            <div className="p-3 text-center text-gray-400">{t('ไม่พบอุปกรณ์')}</div>
+                        ) : (
+                            filteredOptions.map((option) => (
+                                <button
+                                    key={option.id}
+                                    type="button"
+                                    onClick={() => handleSelect(option.id)}
+                                    className={`w-full border-b border-gray-600 p-2 text-left hover:bg-gray-600 ${
+                                        value === option.id
+                                            ? 'bg-blue-600 text-white'
+                                            : 'text-gray-200'
+                                    }`}
+                                >
+                                    <div className="font-medium">{option.name}</div>
+                                    {option.product_code && (
+                                        <div className="text-xs text-gray-400">
+                                            รหัส: {option.product_code}
+                                        </div>
+                                    )}
+                                    {option.description && (
+                                        <div className="truncate text-xs text-gray-400">
+                                            {option.description}
+                                        </div>
+                                    )}
+                                    <div className="text-xs text-green-400">
+                                        ฿{option.price.toLocaleString()}
+                                    </div>
+                                </button>
+                            ))
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 const PumpAccessoryForm: React.FC<{
     accessories: PumpAccessory[];
     onChange: (accessories: PumpAccessory[]) => void;
     onImageClick?: (src: string, alt: string) => void;
 }> = ({ accessories, onChange, onImageClick }) => {
     const { t } = useLanguage();
-    const accessoryTypes = [
-        { value: 'foot_valve', label: 'Foot Valve' },
-        { value: 'check_valve', label: 'Check Valve' },
-        { value: 'ball_valve', label: 'Ball Valve' },
-        { value: 'pressure_gauge', label: 'Pressure Gauge' },
-        { value: 'other', label: t('อื่นๆ') },
-    ];
 
-    const [imageUploading, setImageUploading] = useState<{ [key: number]: boolean }>({});
+    const [availableEquipments, setAvailableEquipments] = useState<Equipment[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [equipmentDetails, setEquipmentDetails] = useState<{ [key: number]: Equipment }>({});
+
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
+    const totalPages = Math.ceil(accessories.length / itemsPerPage);
+    const paginatedAccessories = accessories.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
+
+    useEffect(() => {
+        const loadAvailableEquipments = async () => {
+            setLoading(true);
+            try {
+                const response = await apiRequest('/equipments');
+
+                const pumpEquipments = response.filter((eq: Equipment) => {
+                    const categoryMatches = [
+                        eq.category?.name === 'pump_equipment',
+                        eq.category?.display_name === 'อุปกรณ์ปั๊ม',
+                    ];
+
+                    return categoryMatches.some((match) => match === true);
+                });
+
+                setAvailableEquipments(pumpEquipments);
+
+                if (pumpEquipments.length === 0) {
+                    try {
+                        const pumpResponse = await apiRequest('/equipments/pump-equipments');
+                        if (pumpResponse && pumpResponse.length > 0) {
+                            setAvailableEquipments(pumpResponse);
+                        }
+                    } catch (pumpError) {
+                        console.error('Pump equipments API failed:', pumpError);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load equipments:', error);
+                showAlert.error(t('เกิดข้อผิดพลาด'), t('ไม่สามารถโหลดรายการอุปกรณ์ได้'));
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadAvailableEquipments();
+    }, [t]);
+
+    const fetchEquipmentDetails = async (equipmentId: number) => {
+        if (equipmentDetails[equipmentId]) {
+            return equipmentDetails[equipmentId];
+        }
+
+        try {
+            const response = await apiRequest(`/equipments/${equipmentId}`);
+
+            setEquipmentDetails((prev) => ({
+                ...prev,
+                [equipmentId]: response,
+            }));
+
+            return response;
+        } catch (error) {
+            console.error(`Failed to fetch equipment ${equipmentId} details:`, error);
+            return null;
+        }
+    };
+
+    const updateAccessory = async (index: number, field: keyof PumpAccessory, value: any) => {
+        const actualIndex = (currentPage - 1) * itemsPerPage + index;
+        const updated = [...accessories];
+
+        if (field === 'equipment_id') {
+            if (value) {
+                let selectedEquipment = availableEquipments.find((eq) => eq.id === value);
+
+                if (!selectedEquipment?.description || selectedEquipment.description === '') {
+                    const fullDetails = await fetchEquipmentDetails(value);
+                    if (fullDetails) {
+                        selectedEquipment = {
+                            ...selectedEquipment,
+                            ...fullDetails,
+                            description:
+                                fullDetails.description || selectedEquipment?.description || '',
+                        };
+                    }
+                }
+
+                if (selectedEquipment) {
+                    updated[actualIndex] = {
+                        ...updated[actualIndex],
+                        equipment_id: value,
+                        name: selectedEquipment.name || '',
+                        image: selectedEquipment.image || '',
+                        price: selectedEquipment.price || 0,
+                        stock: selectedEquipment.stock || 0,
+                        product_code:
+                            selectedEquipment.product_code || selectedEquipment.productCode || '',
+                        description: selectedEquipment.description || '',
+                    };
+                } else {
+                    console.warn(`Equipment with ID ${value} not found`);
+                }
+            } else {
+                updated[actualIndex] = {
+                    ...updated[actualIndex],
+                    equipment_id: null,
+                    name: '',
+                    image: '',
+                    price: 0,
+                    stock: 0,
+                    product_code: '',
+                    description: '',
+                };
+            }
+        } else {
+            (updated[actualIndex] as any)[field] = value;
+        }
+
+        onChange(updated);
+    };
 
     const addAccessory = () => {
         const newAccessory: PumpAccessory = {
-            accessory_type: 'other',
+            equipment_id: null,
+            product_code: '',
             name: '',
             image: '',
             size: '',
-            specifications: {},
             price: 0,
+            stock: 0,
+            quantity: 1,
             is_included: true,
-            sort_order: accessories.length,
+            description: '',
+            sort_order: 0,
         };
-        onChange([...accessories, newAccessory]);
+
+        const updatedExistingAccessories = accessories.map((acc) => ({
+            ...acc,
+            sort_order: acc.sort_order + 1,
+        }));
+
+        const updatedAccessories = [newAccessory, ...updatedExistingAccessories];
+        onChange(updatedAccessories);
+        setCurrentPage(1);
     };
 
-    const updateAccessory = (index: number, field: keyof PumpAccessory, value: any) => {
-        const updated = [...accessories];
-        (updated[index] as any)[field] = value;
-        onChange(updated);
+    const addBulkAccessories = async () => {
+        const count = parseInt(prompt(t('กรอกจำนวน (1-20):')) || '5');
+        if (isNaN(count) || count < 1 || count > 20) {
+            showAlert.warning(t('จำนวนไม่ถูกต้อง'), t('กรุณากรอกจำนวน 1-20'));
+            return;
+        }
+
+        const newAccessories: PumpAccessory[] = [];
+        for (let i = 0; i < count; i++) {
+            newAccessories.push({
+                equipment_id: null,
+                product_code: '',
+                name: '',
+                image: '',
+                size: '',
+                price: 0,
+                stock: 0,
+                quantity: 1,
+                is_included: true,
+                description: '',
+                sort_order: i,
+            });
+        }
+
+        const updatedExistingAccessories = accessories.map((acc) => ({
+            ...acc,
+            sort_order: acc.sort_order + count,
+        }));
+
+        const updatedAccessories = [...newAccessories, ...updatedExistingAccessories];
+        onChange(updatedAccessories);
+        setCurrentPage(1);
     };
 
     const removeAccessory = (index: number) => {
-        const updated = accessories.filter((_, i) => i !== index);
+        const actualIndex = (currentPage - 1) * itemsPerPage + index;
+        const updated = accessories.filter((_, i) => i !== actualIndex);
         updated.forEach((acc, i) => {
             acc.sort_order = i;
         });
         onChange(updated);
+
+        const newTotalPages = Math.ceil(updated.length / itemsPerPage);
+        if (currentPage > newTotalPages && newTotalPages > 0) {
+            setCurrentPage(newTotalPages);
+        }
     };
 
     const moveAccessory = (fromIndex: number, toIndex: number) => {
+        const actualFromIndex = (currentPage - 1) * itemsPerPage + fromIndex;
+        const actualToIndex = (currentPage - 1) * itemsPerPage + toIndex;
+
+        if (actualToIndex < 0 || actualToIndex >= accessories.length) return;
+
         const updated = [...accessories];
-        const [movedItem] = updated.splice(fromIndex, 1);
-        updated.splice(toIndex, 0, movedItem);
+        const [movedItem] = updated.splice(actualFromIndex, 1);
+        updated.splice(actualToIndex, 0, movedItem);
 
         updated.forEach((acc, i) => {
             acc.sort_order = i;
@@ -885,36 +1137,14 @@ const PumpAccessoryForm: React.FC<{
         onChange(updated);
     };
 
-    const updateSpecification = (accessoryIndex: number, specKey: string, specValue: string) => {
-        const updated = [...accessories];
-        if (!updated[accessoryIndex].specifications) {
-            updated[accessoryIndex].specifications = {};
-        }
-        updated[accessoryIndex].specifications[specKey] = specValue;
-        onChange(updated);
-    };
-
-    const removeSpecification = (accessoryIndex: number, specKey: string) => {
-        const updated = [...accessories];
-        if (updated[accessoryIndex].specifications) {
-            delete updated[accessoryIndex].specifications[specKey];
-        }
-        onChange(updated);
-    };
-
-    const handleImageUpload = async (file: File, accessoryIndex: number) => {
-        if (!file) return;
-
-        setImageUploading((prev) => ({ ...prev, [accessoryIndex]: true }));
-        try {
-            const result = await api.uploadImage(file);
-            updateAccessory(accessoryIndex, 'image', result.url);
-            showAlert.success(t('อัปโหลดสำเร็จ'), t('รูปภาพได้รับการอัปโหลดเรียบร้อยแล้ว'));
-        } catch (error) {
-            console.error('Failed to upload image:', error);
-            showAlert.error(t('เกิดข้อผิดพลาด'), t('ไม่สามารถอัปโหลดรูปภาพได้'));
-        } finally {
-            setImageUploading((prev) => ({ ...prev, [accessoryIndex]: false }));
+    const clearAllAccessories = async () => {
+        const result = await showAlert.confirm(
+            t('ยืนยันการลบ'),
+            t('คุณต้องการลบอุปกรณ์ทั้งหมดหรือไม่?')
+        );
+        if (result.isConfirmed) {
+            onChange([]);
+            setCurrentPage(1);
         }
     };
 
@@ -924,17 +1154,46 @@ const PumpAccessoryForm: React.FC<{
                 <h4 className="text-lg font-semibold text-orange-400">
                     {t('อุปกรณ์ประกอบปั๊ม')} ({accessories.length} {t('รายการ')})
                 </h4>
-                <button
-                    type="button"
-                    onClick={addAccessory}
-                    className="flex items-center rounded bg-green-600 px-3 py-2 text-white transition-colors hover:bg-green-700"
-                >
-                    <Plus className="mr-1 h-4 w-4" />
-                    {t('เพิ่มอุปกรณ์')}
-                </button>
+                <div className="flex gap-2">
+                    {accessories.length > 0 && (
+                        <>
+                            <button
+                                type="button"
+                                onClick={clearAllAccessories}
+                                className="flex items-center rounded bg-red-600 px-3 py-2 text-white transition-colors hover:bg-red-700"
+                            >
+                                <Trash2 className="mr-1 h-4 w-4" />
+                                {t('ลบทั้งหมด')}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={addBulkAccessories}
+                                className="flex items-center rounded bg-blue-600 px-3 py-2 text-white transition-colors hover:bg-blue-700"
+                            >
+                                <Plus className="mr-1 h-4 w-4" />
+                                {t('เพิ่มหลายรายการ')}
+                            </button>
+                        </>
+                    )}
+                    <button
+                        type="button"
+                        onClick={addAccessory}
+                        className="flex items-center rounded bg-green-600 px-3 py-2 text-white transition-colors hover:bg-green-700"
+                    >
+                        <Plus className="mr-1 h-4 w-4" />
+                        {t('เพิ่มอุปกรณ์')}
+                    </button>
+                </div>
             </div>
 
-            {accessories.length === 0 && (
+            {loading && (
+                <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-blue-400" />
+                    <span className="ml-2 text-gray-400">{t('กำลังโหลดอุปกรณ์...')}</span>
+                </div>
+            )}
+
+            {accessories.length === 0 ? (
                 <div className="rounded-lg border border-gray-600 bg-gray-700 p-6 text-center">
                     <Wrench className="mx-auto h-12 w-12 text-gray-500" />
                     <p className="mt-2 text-gray-400">{t('ยังไม่มีอุปกรณ์ประกอบ')}</p>
@@ -942,257 +1201,342 @@ const PumpAccessoryForm: React.FC<{
                         {t('คลิก "เพิ่มอุปกรณ์" เพื่อเริ่มต้น')}
                     </p>
                 </div>
-            )}
-
-            <div className="space-y-4">
-                {accessories.map((accessory, index) => (
-                    <div key={index} className="rounded-lg border border-gray-600 bg-gray-700 p-4">
-                        <div className="mb-4 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <span className="rounded bg-orange-600 px-2 py-1 text-xs text-white">
-                                    #{index + 1}
-                                </span>
-                                <span className="text-sm text-gray-400">
-                                    Order: {accessory.sort_order + 1}
-                                </span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                                <button
-                                    type="button"
-                                    onClick={() => index > 0 && moveAccessory(index, index - 1)}
-                                    disabled={index === 0}
-                                    className="rounded p-1 text-gray-400 transition-colors hover:text-white disabled:opacity-50"
-                                    title={t('ย้ายขึ้น')}
-                                >
-                                    <ChevronDown className="h-4 w-4 rotate-180" />
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        index < accessories.length - 1 &&
-                                        moveAccessory(index, index + 1)
-                                    }
-                                    disabled={index === accessories.length - 1}
-                                    className="rounded p-1 text-gray-400 transition-colors hover:text-white disabled:opacity-50"
-                                    title={t('ย้ายลง')}
-                                >
-                                    <ChevronDown className="h-4 w-4" />
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => removeAccessory(index)}
-                                    className="rounded p-1 text-red-400 transition-colors hover:text-red-300"
-                                    title={t('ลบ')}
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                            <div>
-                                <label className="mb-1 block text-sm font-medium">
-                                    {t('ประเภท')} *
-                                </label>
-                                <select
-                                    value={accessory.accessory_type}
-                                    onChange={(e) =>
-                                        updateAccessory(index, 'accessory_type', e.target.value)
-                                    }
-                                    className="w-full rounded border border-gray-600 bg-gray-600 p-2 text-white focus:ring-2 focus:ring-blue-500"
-                                    required
-                                >
-                                    {accessoryTypes.map((type) => (
-                                        <option key={type.value} value={type.value}>
-                                            {type.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="mb-1 block text-sm font-medium">
-                                    {t('ชื่อ')} *
-                                </label>
-                                <input
-                                    type="text"
-                                    value={accessory.name}
-                                    onChange={(e) => updateAccessory(index, 'name', e.target.value)}
-                                    className="w-full rounded border border-gray-600 bg-gray-600 p-2 text-white focus:ring-2 focus:ring-blue-500"
-                                    placeholder={t('ชื่ออุปกรณ์')}
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="mb-1 block text-sm font-medium">
-                                    {t('ขนาด/คำอธิบาย')}
-                                </label>
-                                <input
-                                    type="text"
-                                    value={accessory.size || ''}
-                                    onChange={(e) => updateAccessory(index, 'size', e.target.value)}
-                                    className="w-full rounded border border-gray-600 bg-gray-600 p-2 text-white focus:ring-2 focus:ring-blue-500"
-                                    placeholder={t('เช่น 1/2", 25mm')}
-                                />
-                            </div>
-
-                            <div>
-                                <label className="mb-1 block text-sm font-medium">
-                                    {t('ราคา')} *
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={accessory.price}
-                                    onChange={(e) =>
-                                        updateAccessory(
-                                            index,
-                                            'price',
-                                            parseFloat(e.target.value) || 0
-                                        )
-                                    }
-                                    className="w-full rounded border border-gray-600 bg-gray-600 p-2 text-white focus:ring-2 focus:ring-blue-500"
-                                    required
-                                />
-                            </div>
-
-                            <div className="flex items-center">
-                                <label className="flex cursor-pointer items-center">
-                                    <input
-                                        type="checkbox"
-                                        checked={accessory.is_included}
-                                        onChange={(e) =>
-                                            updateAccessory(index, 'is_included', e.target.checked)
-                                        }
-                                        className="mr-2 h-4 w-4"
-                                    />
-                                    <span className="text-sm">{t('รวมในชุด')}</span>
-                                </label>
-                            </div>
-
-                            <div>
-                                <label className="mb-1 block text-sm font-medium">
-                                    {t('ลำดับ')}
-                                </label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    value={accessory.sort_order + 1}
-                                    onChange={(e) =>
-                                        updateAccessory(
-                                            index,
-                                            'sort_order',
-                                            parseInt(e.target.value) || 0
-                                        )
-                                    }
-                                    className="w-full rounded border border-gray-600 bg-gray-600 p-2 text-white focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="mt-4">
-                            <label className="mb-2 block text-sm font-medium">{t('รูปภาพ')}</label>
-                            <div className="flex items-center gap-4">
-                                {accessory.image && (
-                                    <img
-                                        src={accessory.image}
-                                        alt="Accessory"
-                                        className="h-20 w-20 cursor-pointer rounded-lg border border-gray-600 object-cover transition-opacity hover:border-blue-400 hover:opacity-80"
-                                        onError={(e) => {
-                                            const target = e.target as HTMLImageElement;
-                                            target.style.display = 'none';
-                                        }}
-                                        onClick={() =>
-                                            onImageClick &&
-                                            onImageClick(accessory.image!, accessory.name)
-                                        }
-                                        title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
-                                    />
-                                )}
-                                <div className="flex-1">
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={(e) => {
-                                            const file = e.target.files?.[0];
-                                            if (file) handleImageUpload(file, index);
-                                        }}
-                                        className="mt-2 w-full text-sm text-gray-300"
-                                        disabled={imageUploading[index]}
-                                    />
-                                    {imageUploading[index] && (
-                                        <div className="mt-1 text-xs text-blue-400">
-                                            กำลังอัปโหลด...
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="mt-4">
-                            <label className="mb-2 block text-sm font-medium">
-                                {t('ข้อมูลจำเพาะ')}
-                            </label>
-                            <div className="space-y-2">
-                                {accessory.specifications &&
-                                    Object.entries(accessory.specifications).map(
-                                        ([key, value], specIndex) => (
-                                            <div
-                                                key={specIndex}
-                                                className="flex items-center gap-2"
-                                            >
-                                                <input
-                                                    type="text"
-                                                    value={key}
-                                                    onChange={(e) => {
-                                                        const newKey = e.target.value;
-                                                        removeSpecification(index, key as string);
-                                                        updateSpecification(
-                                                            index,
-                                                            newKey,
-                                                            value as string
-                                                        );
-                                                    }}
-                                                    placeholder={t('คีย์')}
-                                                    className="flex-1 rounded border border-gray-600 bg-gray-600 p-2 text-white focus:ring-2 focus:ring-blue-500"
-                                                />
-                                                <span className="text-gray-400">:</span>
-                                                <input
-                                                    type="text"
-                                                    value={value as string}
-                                                    onChange={(e) =>
-                                                        updateSpecification(
-                                                            index,
-                                                            key,
-                                                            e.target.value
-                                                        )
-                                                    }
-                                                    className="flex-1 rounded border border-gray-600 bg-gray-600 p-2 text-white focus:ring-2 focus:ring-blue-500"
-                                                    placeholder={t('ค่า')}
-                                                />
+            ) : (
+                <>
+                    <div className="space-y-4">
+                        {paginatedAccessories.map((accessory, index) => (
+                            <div
+                                key={index}
+                                className="rounded-lg border border-gray-600 bg-gray-700 p-1"
+                            >
+                                <div className="grid grid-cols-12 items-center gap-4">
+                                    {/* Control buttons */}
+                                    <div className="col-span-1 flex flex-col items-center gap-2">
+                                        <span className="rounded bg-orange-600 px-2 py-1 text-xs text-white">
+                                            #{(currentPage - 1) * itemsPerPage + index + 1}
+                                        </span>
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-1">
                                                 <button
                                                     type="button"
-                                                    onClick={() => removeSpecification(index, key)}
-                                                    className="rounded p-2 text-red-400 transition-colors hover:text-red-300"
+                                                    onClick={() =>
+                                                        index > 0 && moveAccessory(index, index - 1)
+                                                    }
+                                                    disabled={index === 0}
+                                                    className="rounded p-1 text-gray-400 transition-colors hover:text-white disabled:opacity-50"
+                                                    title={t('ย้ายขึ้น')}
                                                 >
-                                                    <X className="h-4 w-4" />
+                                                    <ChevronDown className="h-6 w-6 rotate-180" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        index < paginatedAccessories.length - 1 &&
+                                                        moveAccessory(index, index + 1)
+                                                    }
+                                                    disabled={
+                                                        index === paginatedAccessories.length - 1
+                                                    }
+                                                    className="rounded p-1 text-gray-400 transition-colors hover:text-white disabled:opacity-50"
+                                                    title={t('ย้ายลง')}
+                                                >
+                                                    <ChevronDown className="h-6 w-6" />
                                                 </button>
                                             </div>
-                                        )
-                                    )}
-                                <button
-                                    type="button"
-                                    onClick={() => updateSpecification(index, '', '')}
-                                    className="text-sm text-blue-400 transition-colors hover:text-blue-300"
-                                >
-                                    + {t('เพิ่มข้อมูลจำเพาะ')}
-                                </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeAccessory(index)}
+                                                className="rounded p-1 text-red-400 transition-colors hover:text-red-300"
+                                                title={t('ลบ')}
+                                            >
+                                                ลบ
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Image display */}
+                                    <div className="col-span-1">
+                                        <div className="flex items-center justify-start">
+                                            {accessory.image ? (
+                                                <img
+                                                    src={accessory.image}
+                                                    alt={accessory.name || 'อุปกรณ์'}
+                                                    className="h-14 w-14 cursor-pointer rounded-lg border border-gray-600 object-cover transition-opacity hover:border-orange-400 hover:opacity-80"
+                                                    onError={(e) => {
+                                                        const target = e.target as HTMLImageElement;
+                                                        target.style.display = 'none';
+                                                        const parent = target.parentElement;
+                                                        if (parent) {
+                                                            const placeholder =
+                                                                parent.querySelector(
+                                                                    '.image-placeholder'
+                                                                ) as HTMLElement;
+                                                            if (placeholder)
+                                                                placeholder.style.display = 'flex';
+                                                        }
+                                                    }}
+                                                    onClick={() =>
+                                                        onImageClick &&
+                                                        onImageClick(
+                                                            accessory.image!,
+                                                            accessory.name || 'อุปกรณ์'
+                                                        )
+                                                    }
+                                                    title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
+                                                />
+                                            ) : null}
+                                            <div
+                                                className={`image-placeholder flex h-14 w-14 items-center justify-center rounded-lg border border-gray-600 bg-gray-600 ${
+                                                    accessory.image ? 'hidden' : 'flex'
+                                                }`}
+                                            >
+                                                <ImageIcon className="h-8 w-8 text-gray-400" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Equipment selector */}
+                                    <div className="col-span-4">
+                                        <label className="mb-1 block text-sm font-medium text-gray-300">
+                                            {t('เลือกอุปกรณ์')} *
+                                        </label>
+                                        <SearchableDropdown
+                                            options={availableEquipments}
+                                            value={accessory.equipment_id || null}
+                                            onChange={(value) =>
+                                                updateAccessory(index, 'equipment_id', value)
+                                            }
+                                            placeholder={t('เลือกอุปกรณ์จากรายการ')}
+                                            loading={loading}
+                                        />
+                                    </div>
+
+                                    {/* Equipment details - readonly display */}
+                                    <div className="col-span-4">
+                                        <label className="mb-1 block text-sm font-medium text-gray-300">
+                                            {t('รายละเอียด')}
+                                        </label>
+                                        <div className="rounded text-sm text-gray-300">
+                                            {accessory.description && (
+                                                <div className="text-sm text-gray-400">
+                                                    {accessory.description}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Quantity input */}
+                                    <div className="col-span-1">
+                                        <label className="mb-1 block text-sm font-medium text-gray-300">
+                                            {t('จำนวน')} *
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={accessory.quantity || 1}
+                                            onChange={(e) =>
+                                                updateAccessory(
+                                                    index,
+                                                    'quantity',
+                                                    parseInt(e.target.value) || 1
+                                                )
+                                            }
+                                            className="w-full rounded border border-gray-600 bg-gray-600 p-2 text-white focus:ring-2 focus:ring-orange-500"
+                                            required
+                                        />
+                                    </div>
+
+                                    {/* Include checkbox */}
+                                    <div className="col-span-1 flex items-center justify-center">
+                                        <label className="flex cursor-pointer flex-col items-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={
+                                                    accessory.is_included !== undefined
+                                                        ? accessory.is_included
+                                                        : true
+                                                }
+                                                onChange={(e) =>
+                                                    updateAccessory(
+                                                        index,
+                                                        'is_included',
+                                                        e.target.checked
+                                                    )
+                                                }
+                                                className="mb-1 h-4 w-4"
+                                            />
+                                            <span className="text-center text-xs">
+                                                {accessory.is_included
+                                                    ? t('รวมในชุด')
+                                                    : t('ซื้อเพิ่ม')}
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        ))}
                     </div>
-                ))}
+
+                    {totalPages > 1 && (
+                        <div className="flex items-center justify-center gap-2">
+                            <button
+                                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                                className="rounded border border-gray-600 bg-gray-700 px-3 py-1 text-white hover:bg-gray-600 disabled:opacity-50"
+                            >
+                                <ChevronLeft className="h-4 w-4" />
+                            </button>
+                            <span className="text-sm text-gray-400">
+                                หน้า {currentPage} จาก {totalPages}
+                            </span>
+                            <button
+                                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                disabled={currentPage === totalPages}
+                                className="rounded border border-gray-600 bg-gray-700 px-3 py-1 text-white hover:bg-gray-600 disabled:opacity-50"
+                            >
+                                <ChevronRight className="h-4 w-4" />
+                            </button>
+                        </div>
+                    )}
+                </>
+            )}
+        </div>
+    );
+};
+
+// Enhanced Image Upload Component
+const ImageUpload: React.FC<{
+    currentImage?: string;
+    onImageChange: (imageUrl: string) => void;
+    onImageClick?: (src: string, alt: string) => void;
+    loading?: boolean;
+}> = ({ currentImage, onImageChange, onImageClick, loading = false }) => {
+    const { t } = useLanguage();
+    const [dragActive, setDragActive] = useState(false);
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+    const handleFiles = async (files: FileList) => {
+        if (files.length === 0) return;
+
+        const file = files[0];
+        if (!file.type.startsWith('image/')) {
+            showAlert.error(t('ไฟล์ไม่ถูกต้อง'), t('กรุณาเลือกไฟล์รูปภาพ'));
+            return;
+        }
+
+        try {
+            const result = await api.uploadImage(file);
+            onImageChange(result.url);
+            showAlert.success(t('อัปโหลดสำเร็จ'), t('รูปภาพได้รับการอัปโหลดเรียบร้อยแล้ว'));
+        } catch (error) {
+            console.error('Failed to upload image:', error);
+            showAlert.error(t('เกิดข้อผิดพลาด'), t('ไม่สามารถอัปโหลดรูปภาพได้'));
+        }
+    };
+
+    const handleDrag = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === 'dragenter' || e.type === 'dragover') {
+            setDragActive(true);
+        } else if (e.type === 'dragleave') {
+            setDragActive(false);
+        }
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            handleFiles(e.dataTransfer.files);
+        }
+    };
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            handleFiles(e.target.files);
+        }
+    };
+
+    return (
+        <div className="space-y-3">
+            <label className="block text-sm font-medium text-gray-300">{t('รูปภาพ')}</label>
+
+            {/* Current Image Display */}
+            {currentImage && (
+                <div className="flex items-center gap-3">
+                    <img
+                        src={currentImage}
+                        alt="Product"
+                        className="h-20 w-20 cursor-pointer rounded-lg border border-gray-600 object-cover shadow-sm transition-all hover:border-blue-400 hover:opacity-80 hover:shadow-lg"
+                        onClick={() => onImageClick && onImageClick(currentImage, t('สินค้า'))}
+                        title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
+                        onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent) {
+                                const placeholder = parent.querySelector(
+                                    '.error-placeholder'
+                                ) as HTMLElement;
+                                if (placeholder) placeholder.style.display = 'flex';
+                            }
+                        }}
+                    />
+                    <div className="error-placeholder hidden h-20 w-20 items-center justify-center rounded-lg border border-red-500 bg-red-900/20">
+                        <AlertCircle className="h-8 w-8 text-red-400" />
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => onImageChange('')}
+                        className="rounded bg-red-600 px-3 py-1 text-white transition-colors hover:bg-red-700"
+                        title={t('ลบรูปภาพ')}
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                </div>
+            )}
+
+            {/* Upload Area */}
+            <div
+                className={`relative rounded-lg border-2 border-dashed p-6 text-center transition-all ${
+                    dragActive
+                        ? 'border-blue-400 bg-blue-900/20'
+                        : 'border-gray-600 bg-gray-700 hover:border-gray-500 hover:bg-gray-600'
+                } ${loading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}`}
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+            >
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    disabled={loading}
+                />
+
+                {loading ? (
+                    <div className="flex flex-col items-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+                        <p className="mt-2 text-sm text-blue-400">{t('กำลังอัปโหลด...')}</p>
+                    </div>
+                ) : (
+                    <div className="flex flex-col items-center">
+                        <Camera className="h-8 w-8 text-gray-400" />
+                        <p className="mt-2 text-sm text-gray-400">
+                            {t('คลิกหรือลากไฟล์รูปภาพมาที่นี่')}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500">
+                            {t('รองรับ JPG, PNG, GIF (ขนาดไม่เกิน 5MB)')}
+                        </p>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -1212,6 +1556,7 @@ const EquipmentForm: React.FC<{
         brand: equipment?.brand || '',
         image: equipment?.image || '',
         price: equipment?.price || 0,
+        stock: equipment?.stock || 0,
         description: equipment?.description || '',
         is_active: equipment?.is_active !== undefined ? equipment.is_active : true,
         attributes: {},
@@ -1226,9 +1571,6 @@ const EquipmentForm: React.FC<{
 
     useEffect(() => {
         if (equipment) {
-            console.log('=== POPULATING INITIAL DATA ===');
-            console.log('Equipment received:', equipment);
-
             let initialAttributes = {};
 
             if (equipment.attributes_raw && typeof equipment.attributes_raw === 'object') {
@@ -1255,6 +1597,7 @@ const EquipmentForm: React.FC<{
                             'brand',
                             'image',
                             'price',
+                            'stock',
                             'description',
                             'is_active',
                             'category',
@@ -1280,14 +1623,17 @@ const EquipmentForm: React.FC<{
                 brand: equipment.brand,
                 image: equipment.image,
                 price: equipment.price,
+                stock: equipment.stock,
                 description: equipment.description,
                 is_active: equipment.is_active,
                 attributes: initialAttributes,
             });
 
-            console.log('Final attributes set:', initialAttributes);
-
-            const pumpAccessories = equipment.pumpAccessories || equipment.pumpAccessory || [];
+            const pumpAccessories =
+                equipment.pumpAccessories ||
+                equipment.pumpAccessory ||
+                equipment.pump_accessories ||
+                [];
             setAccessories(Array.isArray(pumpAccessories) ? pumpAccessories : []);
         } else {
             setFormData({
@@ -1297,6 +1643,7 @@ const EquipmentForm: React.FC<{
                 brand: '',
                 image: '',
                 price: 0,
+                stock: 0,
                 description: '',
                 is_active: true,
                 attributes: {},
@@ -1306,16 +1653,31 @@ const EquipmentForm: React.FC<{
     }, [equipment, categories]);
 
     useEffect(() => {
-        console.log('=== CATEGORY CHANGE ===');
-        console.log('Current category_id:', formData.category_id);
-        console.log('Is editing?', !!equipment);
-
         if (formData.category_id && formData.category_id !== 0) {
             setLoading(true);
             apiRequest(`/equipment-categories/${formData.category_id}`)
                 .then((response) => {
-                    console.log('Loaded category with attributes:', response);
-                    setAttributes(response.attributes || []);
+                    const filteredAttributes =
+                        response.attributes?.filter((attr: EquipmentAttribute) => {
+                            if (
+                                [
+                                    'sprinkler',
+                                    'pop_up_sprinkler',
+                                    'mini_sprinkler',
+                                    'single_side_sprinkler',
+                                    'butterfly_sprinkler',
+                                    'mist_nozzle',
+                                    'impact_sprinkler',
+                                    'gear_drive_nozzle',
+                                    'drip_spray_tape',
+                                ].includes(response.name)
+                            ) {
+                                return attr.attribute_name !== 'name';
+                            }
+                            return true;
+                        }) || [];
+
+                    setAttributes(filteredAttributes);
 
                     if (
                         !equipment ||
@@ -1323,7 +1685,6 @@ const EquipmentForm: React.FC<{
                             (equipment.category_id || equipment.categoryId) !==
                                 formData.category_id)
                     ) {
-                        console.log('Resetting attributes for new category');
                         setFormData((prev) => ({
                             ...prev,
                             attributes: {},
@@ -1332,18 +1693,21 @@ const EquipmentForm: React.FC<{
                     }
                 })
                 .catch((error) => {
-                    console.error('Failed to load category attributes:', error);
                     setAttributes([]);
                 })
                 .finally(() => setLoading(false));
         }
     }, [equipment, formData.category_id]);
 
-    const validateForm = () => {
+    const validateForm = async () => {
         const newErrors: any = {};
 
-        if (!formData.product_code?.trim()) {
-            newErrors.product_code = t('กรุณากรอกรหัสสินค้า');
+        const productCode = formData.product_code?.trim() || '';
+        if (productCode && productCode !== '-') {
+            const isValidProductCode = await api.validateProductCode(productCode, equipment?.id);
+            if (!isValidProductCode) {
+                newErrors.product_code = t('รหัสสินค้านี้ถูกเพิ่มไปแล้ว');
+            }
         }
 
         if (!formData.name?.trim()) {
@@ -1354,7 +1718,6 @@ const EquipmentForm: React.FC<{
             newErrors.price = t('กรุณากรอกราคาที่ถูกต้อง');
         }
 
-        // Attribute validation
         attributes.forEach((attr) => {
             if (attr.is_required) {
                 const value = formData.attributes?.[attr.attribute_name];
@@ -1369,36 +1732,19 @@ const EquipmentForm: React.FC<{
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleImageUpload = async (file: File) => {
-        if (!file) return;
-
-        setImageUploading(true);
-        try {
-            const result = await api.uploadImage(file);
-            setFormData((prev) => ({
-                ...prev,
-                image: result.url,
-            }));
-            showAlert.success(t('อัปโหลดสำเร็จ'), t('รูปภาพได้รับการอัปโหลดเรียบร้อยแล้ว'));
-        } catch (error) {
-            console.error('Failed to upload image:', error);
-            showAlert.error(t('เกิดข้อผิดพลาด'), t('ไม่สามารถอัปโหลดรูปภาพได้'));
-        } finally {
-            setImageUploading(false);
-        }
+    const handleImageChange = (imageUrl: string) => {
+        setFormData((prev) => ({
+            ...prev,
+            image: imageUrl,
+        }));
     };
 
     const handleAttributeChange = (attributeName: string, value: any) => {
-        console.log('=== handleAttributeChange ===');
-        console.log('Attribute name:', attributeName);
-        console.log('New value:', value);
-
         setFormData((prev) => {
             const newAttributes = {
                 ...prev.attributes,
                 [attributeName]: value,
             };
-            console.log('Updated attributes:', newAttributes);
 
             return {
                 ...prev,
@@ -1416,7 +1762,8 @@ const EquipmentForm: React.FC<{
     };
 
     const handleSubmit = async () => {
-        if (!validateForm()) {
+        const isFormValid = await validateForm();
+        if (!isFormValid) {
             showAlert.error(t('ข้อมูลไม่ถูกต้อง'), t('กรุณาตรวจสอบข้อมูลที่กรอกใหม่อีกครั้ง'));
             return;
         }
@@ -1431,44 +1778,53 @@ const EquipmentForm: React.FC<{
             }
         });
 
-        const processedAccessories = accessories.map((acc, index) => {
-            let specifications = acc.specifications;
+        const processedAccessories = accessories
+            .filter((acc) => {
+                const hasEquipmentId = acc.equipment_id && acc.equipment_id > 0;
+                const hasManualData =
+                    acc.name && acc.name.trim() !== '' && acc.price && acc.price > 0;
 
-            if (!specifications || (Array.isArray(specifications) && specifications.length === 0)) {
-                specifications = {};
-            }
-            if (typeof specifications === 'string') {
-                try {
-                    specifications = JSON.parse(specifications);
-                } catch {
-                    specifications = {};
+                return hasEquipmentId || hasManualData;
+            })
+            .map((acc, index) => {
+                const processedAcc: any = {
+                    quantity: Number(acc.quantity) || 1,
+                    is_included: Boolean(acc.is_included !== undefined ? acc.is_included : true),
+                    sort_order: Number(acc.sort_order !== undefined ? acc.sort_order : index),
+                };
+
+                if (acc.equipment_id && acc.equipment_id > 0) {
+                    processedAcc.equipment_id = Number(acc.equipment_id);
+                    processedAcc.name = acc.name || '';
+                    processedAcc.price = Number(acc.price) || 0;
+                    processedAcc.product_code = acc.product_code || '';
+                    processedAcc.image = acc.image || '';
+                    processedAcc.size = acc.size || '';
+                    processedAcc.stock = acc.stock ? Number(acc.stock) : 0;
+                    processedAcc.description = acc.description || '';
+                } else {
+                    processedAcc.equipment_id = null;
+                    processedAcc.product_code = acc.product_code || '';
+                    processedAcc.name = acc.name || '';
+                    processedAcc.image = acc.image || '';
+                    processedAcc.size = acc.size || '';
+                    processedAcc.price = Number(acc.price) || 0;
+                    processedAcc.stock = acc.stock ? Number(acc.stock) : 0;
+                    processedAcc.description = acc.description || '';
                 }
-            }
 
-            return {
-                accessory_type: acc.accessory_type || 'other',
-                name: acc.name || '',
-                image: acc.image || '',
-                size: acc.size || '',
-                specifications: specifications,
-                price: Number(acc.price) || 0,
-                is_included: Boolean(acc.is_included !== undefined ? acc.is_included : true),
-                sort_order: Number(acc.sort_order !== undefined ? acc.sort_order : index),
-            };
-        });
+                return processedAcc;
+            });
 
         const submitData = {
             ...formData,
+            stock: formData.stock ? Number(formData.stock) : null,
             attributes: attributesData,
             pump_accessories: processedAccessories,
         };
 
-        console.log('=== SUBMIT DATA DEBUG ===');
-        console.log('Full submit data:', JSON.stringify(submitData, null, 2));
-        console.log('Processed accessories:', processedAccessories);
-
         try {
-            await onSave(submitData);
+            await onSave(submitData as Partial<Equipment>);
             showAlert.success(
                 equipment ? t('แก้ไขสำเร็จ') : t('เพิ่มสำเร็จ'),
                 `${formData.name} ${t('ได้รับการ')} ${equipment ? t('แก้ไข') : t('เพิ่ม')} ${t('เรียบร้อยแล้ว')}`
@@ -1478,10 +1834,20 @@ const EquipmentForm: React.FC<{
 
             if (error.response && error.response.data) {
                 console.error('Server response:', error.response.data);
+
+                if (error.response.data.debug) {
+                    console.log('Server debug info:', error.response.data.debug);
+                }
+
                 if (error.response.data.errors) {
                     setValidationErrors(error.response.data.errors);
                 }
-                showAlert.error(t('เกิดข้อผิดพลาด'), JSON.stringify(error.response.data, null, 2));
+
+                const errorMessage = error.response.data.errors
+                    ? Object.values(error.response.data.errors).flat().join('\n')
+                    : error.response.data.message || t('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+
+                showAlert.error(t('เกิดข้อผิดพลาด'), errorMessage);
             } else {
                 showAlert.error(t('เกิดข้อผิดพลาด'), t('ไม่สามารถบันทึกข้อมูลได้'));
             }
@@ -1490,231 +1856,224 @@ const EquipmentForm: React.FC<{
         }
     };
 
-    // แทนที่ส่วน renderAttributeInput function ใน EquipmentForm
-const renderAttributeInput = (attr: EquipmentAttribute) => {
-    const currentValue = formData.attributes?.[attr.attribute_name];
-    const hasError = validationErrors[`attributes.${attr.attribute_name}`];
+    const renderAttributeInput = (attr: EquipmentAttribute) => {
+        const currentValue = formData.attributes?.[attr.attribute_name];
+        const hasError = validationErrors[`attributes.${attr.attribute_name}`];
 
-    console.log(`=== Rendering ${attr.attribute_name} ===`);
-    console.log('Attribute:', attr);
-    console.log('Current value:', currentValue);
+        const baseInputClass = `w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white ${
+            hasError ? 'border-red-500' : 'border-gray-600'
+        }`;
 
-    const baseInputClass = `w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white ${
-        hasError ? 'border-red-500' : 'border-gray-600'
-    }`;
+        let input;
 
-    let input;
-
-    switch (attr.data_type) {
-        case 'string':
-            input = (
-                <input
-                    type="text"
-                    value={currentValue || ''}
-                    onChange={(e) => handleAttributeChange(attr.attribute_name, e.target.value)}
-                    className={baseInputClass}
-                    required={attr.is_required}
-                    placeholder={attr.display_name}
-                />
-            );
-            break;
-
-        case 'number':
-            input = (
-                <input
-                    type="number"
-                    step="0.01"
-                    value={currentValue !== undefined ? currentValue : ''}
-                    onChange={(e) => {
-                        const value = e.target.value;
-                        // ถ้าเป็น string ว่างให้เก็บเป็น undefined
-                        if (value === '') {
-                            handleAttributeChange(attr.attribute_name, undefined);
-                        } else {
-                            // เก็บค่าเป็น string ระหว่างพิมพ์ แล้วค่อย convert เป็น number เมื่อ blur
-                            const numValue = parseFloat(value);
-                            handleAttributeChange(attr.attribute_name, isNaN(numValue) ? value : numValue);
-                        }
-                    }}
-                    onBlur={(e) => {
-                        // เมื่อเสร็จสิ้นการพิมพ์ ให้ convert เป็น number
-                        const value = e.target.value;
-                        if (value !== '') {
-                            const numValue = parseFloat(value);
-                            if (!isNaN(numValue)) {
-                                handleAttributeChange(attr.attribute_name, numValue);
-                            }
-                        }
-                    }}
-                    className={baseInputClass}
-                    required={attr.is_required}
-                    placeholder={attr.display_name}
-                />
-            );
-            break;
-
-        case 'boolean':
-            input = (
-                <div className="flex items-center">
-                    <input
-                        type="checkbox"
-                        checked={Boolean(currentValue)}
-                        onChange={(e) =>
-                            handleAttributeChange(attr.attribute_name, e.target.checked)
-                        }
-                        className="h-4 w-4 rounded border-gray-600 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="ml-2 text-sm">Enable {attr.display_name}</span>
-                </div>
-            );
-            break;
-
-        case 'array':
-            input = (
-                <div>
+        switch (attr.data_type) {
+            case 'string':
+                input = (
                     <input
                         type="text"
-                        value={
-                            Array.isArray(currentValue)
-                                ? currentValue.join(', ')
-                                : currentValue || ''
-                        }
+                        value={currentValue || ''}
+                        onChange={(e) => handleAttributeChange(attr.attribute_name, e.target.value)}
+                        className={baseInputClass}
+                        required={attr.is_required}
+                        placeholder={attr.display_name}
+                    />
+                );
+                break;
+
+            case 'number':
+                input = (
+                    <input
+                        type="number"
+                        step="0.01"
+                        value={currentValue !== undefined ? currentValue : ''}
                         onChange={(e) => {
                             const value = e.target.value;
-                            
-                            // ถ้าเป็นค่าว่างให้เก็บเป็น string ว่าง
                             if (value === '') {
-                                handleAttributeChange(attr.attribute_name, '');
-                                return;
-                            }
-                            
-                            // ถ้ามีเครื่องหมาย comma ให้แยกเป็น array
-                            if (value.includes(',')) {
-                                const arrayValue = value.split(',').map((v) => {
-                                    const trimmed = v.trim();
-                                    // ถ้าเป็นตัวเลขให้ convert แต่ถ้ากำลังพิมพ์ทศนิยมให้เก็บเป็น string ไว้ก่อน
-                                    if (trimmed.endsWith('.') || trimmed.match(/^\d+\.\d*$/)) {
-                                        return trimmed; // เก็บเป็น string ไว้ก่อนถ้ากำลังพิมพ์ทศนิยม
-                                    }
-                                    const num = parseFloat(trimmed);
-                                    return isNaN(num) ? trimmed : num;
-                                });
-                                handleAttributeChange(attr.attribute_name, arrayValue);
-                            } 
-                            // ถ้ามีเครื่องหมาย dash (สำหรับช่วง) และไม่ใช่ลบ
-                            else if (value.includes('-') && !value.startsWith('-')) {
-                                const parts = value.split('-');
-                                
-                                // ถ้ามี 2 ส่วนและทั้งคู่เป็นตัวเลขที่สมบูรณ์
-                                if (parts.length === 2) {
-                                    const num1 = parts[0].trim();
-                                    const num2 = parts[1].trim();
-                                    
-                                    // ตรวจสอบว่าทั้งคู่เป็นตัวเลขที่สมบูรณ์หรือไม่
-                                    if (!num1.endsWith('.') && !num2.endsWith('.') && 
-                                        !isNaN(parseFloat(num1)) && !isNaN(parseFloat(num2))) {
-                                        handleAttributeChange(attr.attribute_name, [parseFloat(num1), parseFloat(num2)]);
-                                    } else {
-                                        // ถ้ายังพิมพ์ไม่เสร็จให้เก็บเป็น string ไว้ก่อน
-                                        handleAttributeChange(attr.attribute_name, value);
-                                    }
-                                } else {
-                                    handleAttributeChange(attr.attribute_name, value);
-                                }
-                            } 
-                            // กรณีอื่นๆ ให้เก็บเป็น string ไว้ก่อน
-                            else {
-                                handleAttributeChange(attr.attribute_name, value);
+                                handleAttributeChange(attr.attribute_name, undefined);
+                            } else {
+                                const numValue = parseFloat(value);
+                                handleAttributeChange(
+                                    attr.attribute_name,
+                                    isNaN(numValue) ? value : numValue
+                                );
                             }
                         }}
                         onBlur={(e) => {
-                            // เมื่อเสร็จสิ้นการพิมพ์ ให้ทำการ parse ขั้นสุดท้าย
-                            const value = e.target.value.trim();
-                            if (value === '') {
-                                handleAttributeChange(attr.attribute_name, '');
-                                return;
-                            }
-                            
-                            // ลองแปลงเป็นตัวเลขถ้าเป็นได้
-                            if (value.includes(',')) {
-                                const arrayValue = value.split(',').map((v) => {
-                                    const trimmed = v.trim();
-                                    const num = parseFloat(trimmed);
-                                    return isNaN(num) ? trimmed : num;
-                                });
-                                handleAttributeChange(attr.attribute_name, arrayValue);
-                            } else if (value.includes('-') && !value.startsWith('-')) {
-                                const parts = value.split('-').map((v) => parseFloat(v.trim())).filter((v) => !isNaN(v));
-                                if (parts.length === 2) {
-                                    handleAttributeChange(attr.attribute_name, parts);
+                            const value = e.target.value;
+                            if (value !== '') {
+                                const numValue = parseFloat(value);
+                                if (!isNaN(numValue)) {
+                                    handleAttributeChange(attr.attribute_name, numValue);
                                 }
                             }
                         }}
                         className={baseInputClass}
                         required={attr.is_required}
-                        placeholder={t(
-                            'Enter values separated by comma or dash (e.g., 10.5, 20.7 or 10.5-20.7)'
-                        )}
+                        placeholder={attr.display_name}
                     />
-                    <div className="mt-1 text-xs text-gray-400">
-                        {t('ใช้เครื่องหมาย (,) หรือ dash (-) เพื่อแยกค่า ตัวอย่าง 5, 20')}
+                );
+                break;
+
+            case 'boolean':
+                input = (
+                    <div className="flex items-center">
+                        <input
+                            type="checkbox"
+                            checked={Boolean(currentValue)}
+                            onChange={(e) =>
+                                handleAttributeChange(attr.attribute_name, e.target.checked)
+                            }
+                            className="h-4 w-4 rounded border-gray-600 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="ml-2 text-sm">Enable {attr.display_name}</span>
                     </div>
-                </div>
-            );
-            break;
+                );
+                break;
 
-        case 'json':
-            input = (
-                <textarea
-                    value={
-                        typeof currentValue === 'object'
-                            ? JSON.stringify(currentValue, null, 2)
-                            : currentValue || '{}'
-                    }
-                    onChange={(e) => {
-                        try {
-                            const jsonValue = JSON.parse(e.target.value);
-                            handleAttributeChange(attr.attribute_name, jsonValue);
-                        } catch {
-                            handleAttributeChange(attr.attribute_name, e.target.value);
+            case 'array':
+                input = (
+                    <div>
+                        <input
+                            type="text"
+                            value={
+                                Array.isArray(currentValue)
+                                    ? currentValue.join(', ')
+                                    : currentValue || ''
+                            }
+                            onChange={(e) => {
+                                const value = e.target.value;
+
+                                if (value === '') {
+                                    handleAttributeChange(attr.attribute_name, '');
+                                    return;
+                                }
+
+                                if (value.includes(',')) {
+                                    const arrayValue = value.split(',').map((v) => {
+                                        const trimmed = v.trim();
+                                        if (trimmed.endsWith('.') || trimmed.match(/^\d+\.\d*$/)) {
+                                            return trimmed;
+                                        }
+                                        const num = parseFloat(trimmed);
+                                        return isNaN(num) ? trimmed : num;
+                                    });
+                                    handleAttributeChange(attr.attribute_name, arrayValue);
+                                } else if (value.includes('-') && !value.startsWith('-')) {
+                                    const parts = value.split('-');
+
+                                    if (parts.length === 2) {
+                                        const num1 = parts[0].trim();
+                                        const num2 = parts[1].trim();
+
+                                        if (
+                                            !num1.endsWith('.') &&
+                                            !num2.endsWith('.') &&
+                                            !isNaN(parseFloat(num1)) &&
+                                            !isNaN(parseFloat(num2))
+                                        ) {
+                                            handleAttributeChange(attr.attribute_name, [
+                                                parseFloat(num1),
+                                                parseFloat(num2),
+                                            ]);
+                                        } else {
+                                            handleAttributeChange(attr.attribute_name, value);
+                                        }
+                                    } else {
+                                        handleAttributeChange(attr.attribute_name, value);
+                                    }
+                                } else {
+                                    handleAttributeChange(attr.attribute_name, value);
+                                }
+                            }}
+                            onBlur={(e) => {
+                                const value = e.target.value.trim();
+                                if (value === '') {
+                                    handleAttributeChange(attr.attribute_name, '');
+                                    return;
+                                }
+
+                                if (value.includes(',')) {
+                                    const arrayValue = value.split(',').map((v) => {
+                                        const trimmed = v.trim();
+                                        const num = parseFloat(trimmed);
+                                        return isNaN(num) ? trimmed : num;
+                                    });
+                                    handleAttributeChange(attr.attribute_name, arrayValue);
+                                } else if (value.includes('-') && !value.startsWith('-')) {
+                                    const parts = value
+                                        .split('-')
+                                        .map((v) => parseFloat(v.trim()))
+                                        .filter((v) => !isNaN(v));
+                                    if (parts.length === 2) {
+                                        handleAttributeChange(attr.attribute_name, parts);
+                                    }
+                                }
+                            }}
+                            className={baseInputClass}
+                            required={attr.is_required}
+                            placeholder={t(
+                                'Enter values separated by comma or dash (e.g., 10.5, 20.7 or 10.5-20.7)'
+                            )}
+                        />
+                        <div className="mt-1 text-xs text-gray-400">
+                            {t('ใช้เครื่องหมาย (,) หรือ dash (-) เพื่อแยกค่า ตัวอย่าง 5, 20')}
+                        </div>
+                    </div>
+                );
+                break;
+
+            case 'json':
+                input = (
+                    <textarea
+                        value={
+                            typeof currentValue === 'object'
+                                ? JSON.stringify(currentValue, null, 2)
+                                : currentValue || '{}'
                         }
-                    }}
-                    rows={3}
-                    className={baseInputClass}
-                    required={attr.is_required}
-                    placeholder={t('{"key": "value"}')}
-                />
-            );
-            break;
+                        onChange={(e) => {
+                            try {
+                                const jsonValue = JSON.parse(e.target.value);
+                                handleAttributeChange(attr.attribute_name, jsonValue);
+                            } catch {
+                                handleAttributeChange(attr.attribute_name, e.target.value);
+                            }
+                        }}
+                        rows={3}
+                        className={baseInputClass}
+                        required={attr.is_required}
+                        placeholder={t('{"key": "value"}')}
+                    />
+                );
+                break;
 
-        default:
-            input = (
-                <input
-                    type="text"
-                    value={currentValue || ''}
-                    onChange={(e) => handleAttributeChange(attr.attribute_name, e.target.value)}
-                    className={baseInputClass}
-                    required={attr.is_required}
-                    placeholder={attr.display_name}
-                />
-            );
-    }
+            default:
+                input = (
+                    <input
+                        type="text"
+                        value={currentValue || ''}
+                        onChange={(e) => handleAttributeChange(attr.attribute_name, e.target.value)}
+                        className={baseInputClass}
+                        required={attr.is_required}
+                        placeholder={attr.display_name}
+                    />
+                );
+        }
 
-    return (
-        <div key={attr.id}>
-            <label className="mb-2 block text-sm font-medium">
-                {attr.display_name} {attr.unit && `(${attr.unit})`}
-                {attr.is_required && <span className="text-red-400"> *</span>}
-            </label>
-            {input}
-            {hasError && (
-                <div className="mt-1 text-xs text-red-400">
-                    {Array.isArray(hasError) ? hasError.join(', ') : hasError}
-                </div>
-            )}
-        </div>
-    );
-};
+        return (
+            <div key={attr.id}>
+                <label className="mb-2 block text-sm font-medium">
+                    {attr.display_name} {attr.unit && `(${attr.unit})`}
+                    {attr.is_required && <span className="text-red-400"> *</span>}
+                </label>
+                {input}
+                {hasError && (
+                    <div className="mt-1 text-xs text-red-400">
+                        {Array.isArray(hasError) ? hasError.join(', ') : hasError}
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     const selectedCategory = categories.find((c) => c.id === formData.category_id);
     const isPump = selectedCategory?.name === 'pump';
@@ -1760,7 +2119,7 @@ const renderAttributeInput = (attr: EquipmentAttribute) => {
 
                             <div>
                                 <label className="mb-2 block text-sm font-medium">
-                                    {t('รหัสสินค้า')} *
+                                    {t('รหัสสินค้า')}
                                 </label>
                                 <input
                                     type="text"
@@ -1782,7 +2141,7 @@ const renderAttributeInput = (attr: EquipmentAttribute) => {
                                             ? 'border-red-500'
                                             : 'border-gray-600'
                                     }`}
-                                    required
+                                    placeholder={t('รหัสสินค้า หรือปล่อยว่าง')}
                                 />
                                 {validationErrors.product_code && (
                                     <div className="mt-1 text-xs text-red-400">
@@ -1882,61 +2241,51 @@ const renderAttributeInput = (attr: EquipmentAttribute) => {
                                 )}
                             </div>
 
-                            <div className="flex items-center">
-                                <label className="flex cursor-pointer items-center">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.is_active || false}
-                                        onChange={(e) =>
-                                            setFormData((prev) => ({
-                                                ...prev,
-                                                is_active: e.target.checked,
-                                            }))
-                                        }
-                                        className="mr-2 h-4 w-4"
-                                    />
-                                    <span className="text-sm">{t('เปิดใช้งาน')}</span>
+                            <div>
+                                <label className="mb-2 block text-sm font-medium">
+                                    {t('Stock')}
                                 </label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    value={formData.stock || ''}
+                                    onChange={(e) =>
+                                        setFormData((prev) => ({
+                                            ...prev,
+                                            stock: e.target.value ? parseInt(e.target.value) : 0,
+                                        }))
+                                    }
+                                    className="w-full rounded-lg border border-gray-600 bg-gray-700 p-3 text-white focus:ring-2 focus:ring-blue-500"
+                                    placeholder={t('จำนวนในสต็อก')}
+                                />
                             </div>
 
-                            <div className="md:col-span-3">
-                                <label className="mb-2 block text-sm font-medium">
-                                    {t('รูปภาพ')}
-                                </label>
-                                <div className="flex items-center gap-4">
-                                    {formData.image && (
-                                        <img
-                                            src={formData.image}
-                                            alt="Product"
-                                            className="h-20 w-20 cursor-pointer rounded-lg border border-gray-600 object-cover transition-opacity hover:border-blue-400 hover:opacity-80"
-                                            onClick={() =>
-                                                onImageClick &&
-                                                onImageClick(formData.image!, t('สินค้า'))
-                                            }
-                                            title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
-                                        />
-                                    )}
-                                    <div className="flex-1">
+                            <div className="md:col-span-1">
+                                <ImageUpload
+                                    currentImage={formData.image}
+                                    onImageChange={handleImageChange}
+                                    onImageClick={onImageClick}
+                                    loading={imageUploading}
+                                />
+                                <div className="mt-4 flex items-center">
+                                    <label className="flex cursor-pointer items-center">
                                         <input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={(e) => {
-                                                const file = e.target.files?.[0];
-                                                if (file) handleImageUpload(file);
-                                            }}
-                                            className="w-full rounded-lg border border-gray-600 bg-gray-700 p-3 text-white focus:ring-2 focus:ring-blue-500"
-                                            disabled={imageUploading}
+                                            type="checkbox"
+                                            checked={formData.is_active || false}
+                                            onChange={(e) =>
+                                                setFormData((prev) => ({
+                                                    ...prev,
+                                                    is_active: e.target.checked,
+                                                }))
+                                            }
+                                            className="mr-2 h-4 w-4"
                                         />
-                                        {imageUploading && (
-                                            <div className="mt-1 text-xs text-blue-400">
-                                                {t('กำลังอัปโหลด...')}
-                                            </div>
-                                        )}
-                                    </div>
+                                        <span className="text-sm">{t('เปิดใช้งานอุปกรณ์')}</span>
+                                    </label>
                                 </div>
                             </div>
 
-                            <div className="md:col-span-3">
+                            <div className="md:col-span-2">
                                 <label className="mb-2 block text-sm font-medium">
                                     {t('คำอธิบาย')}
                                 </label>
@@ -2020,9 +2369,11 @@ const EquipmentDetailModal: React.FC<{
     onClose: () => void;
     onEdit: () => void;
     onImageClick?: (src: string, alt: string) => void;
-}> = ({ equipment, onClose, onEdit, onImageClick }) => {
-    console.log('Equipment in detail modal:', equipment);
+    updatedAccessories?: PumpAccessory[];
+}> = ({ equipment, onClose, onEdit, onImageClick, updatedAccessories }) => {
     const { t } = useLanguage();
+    const [showAccessoriesModal, setShowAccessoriesModal] = useState(false);
+
     const formatAttributeValue = (value: any, attribute?: any) => {
         if (value === null || value === undefined || value === '') {
             return '-';
@@ -2104,6 +2455,7 @@ const EquipmentDetailModal: React.FC<{
             'brand',
             'image',
             'price',
+            'stock',
             'description',
             'is_active',
             'category',
@@ -2140,15 +2492,13 @@ const EquipmentDetailModal: React.FC<{
 
     const getThaiDisplayName = (attributeName: string) => {
         const thaiDisplayMap: { [key: string]: string } = {
-            // สปริงเกอร์
             flow_rate: 'อัตราการไหล',
             pressure: 'ความดัน',
             radius: 'รัศมีการพ่น',
-            waterVolumeLitersPerHour: 'อัตราการไหล',
+            waterVolumeLitersPerMinute: 'อัตราการไหล',
             pressureBar: 'ความดัน',
             radiusMeters: 'รัศมีการพ่น',
 
-            // ปั๊มน้ำ
             power_hp: 'กำลัง',
             powerHP: 'กำลัง',
             powerKW: 'กำลัง',
@@ -2162,7 +2512,6 @@ const EquipmentDetailModal: React.FC<{
             suction_depth_m: 'ความลึกดูด',
             weight_kg: 'น้ำหนัก',
 
-            // ท่อ
             size_mm: 'ขนาด',
             size_inch: 'ขนาด',
             sizeMM: 'ขนาด',
@@ -2171,12 +2520,10 @@ const EquipmentDetailModal: React.FC<{
             dimensions_cm: 'ขนาด',
             material: 'วัสดุ',
 
-            // ไฟฟ้า
             voltage: 'แรงดันไฟฟ้า',
             current: 'กระแสไฟฟ้า',
             frequency: 'ความถี่',
 
-            // ทั่วไป
             brand: 'แบรนด์',
             model: 'รุ่น',
             color: 'สี',
@@ -2215,10 +2562,9 @@ const EquipmentDetailModal: React.FC<{
             .replace(/Width/gi, t('ความกว้าง'))
             .replace(/Length/gi, t('ความยาว'))
             .replace(/Water Volume/gi, t('อัตราการไหล'))
-            .replace(/Liters Per Hour/gi, t('ลิตรต่อชั่วโมง'))
+            .replace(/Liters Per Minute/gi, t('ลิตรต่อนาที'))
             .replace(/Meters/gi, t('เมตร'))
-            .replace(/Bar/gi, t('บาร์'))
-            .replace(/HP/gi, t('แรงม้า'));
+            .replace(/Bar/gi, t('บาร์'));
 
         return translatedReadable || attributeName;
     };
@@ -2236,7 +2582,7 @@ const EquipmentDetailModal: React.FC<{
             max_flow_rate_lpm: t('LPM'),
             suction_depth_m: t('เมตร'),
             weight_kg: t('กก.'),
-            waterVolumeLitersPerHour: t('L/H'),
+            waterVolumeLitersPerMinute: t('L/min'),
             radiusMeters: t('เมตร'),
             pressureBar: t('บาร์'),
             size_mm: t('มม.'),
@@ -2250,7 +2596,231 @@ const EquipmentDetailModal: React.FC<{
     };
 
     const attributes = getAllAttributes();
-    const pumpAccessories = equipment.pumpAccessories || equipment.pumpAccessory || [];
+    const pumpAccessories =
+        updatedAccessories || equipment.pumpAccessories || equipment.pumpAccessory || [];
+
+    const PumpAccessoriesModal: React.FC<{
+        accessories: PumpAccessory[];
+        onClose: () => void;
+        onImageClick?: (src: string, alt: string) => void;
+    }> = ({ accessories, onClose, onImageClick }) => {
+        const { t } = useLanguage();
+        const [currentPage, setCurrentPage] = useState(1);
+        const [searchTerm, setSearchTerm] = useState('');
+        const [filterType, setFilterType] = useState<'all' | 'included' | 'optional'>('all');
+
+        const itemsPerPage = 10;
+
+        const filteredAccessories = accessories.filter((accessory) => {
+            const matchesSearch =
+                searchTerm === '' ||
+                (accessory.name &&
+                    accessory.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (accessory.product_code &&
+                    accessory.product_code.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (accessory.description &&
+                    accessory.description.toLowerCase().includes(searchTerm.toLowerCase()));
+
+            const matchesFilter =
+                filterType === 'all' ||
+                (filterType === 'included' && accessory.is_included) ||
+                (filterType === 'optional' && !accessory.is_included);
+
+            return matchesSearch && matchesFilter;
+        });
+
+        const totalPages = Math.ceil(filteredAccessories.length / itemsPerPage);
+        const paginatedAccessories = filteredAccessories.slice(
+            (currentPage - 1) * itemsPerPage,
+            currentPage * itemsPerPage
+        );
+
+        useEffect(() => {
+            setCurrentPage(1);
+        }, [searchTerm, filterType]);
+
+        return (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center overflow-hidden bg-black bg-opacity-50 p-4">
+                <div className="flex h-[90vh] w-full max-w-6xl flex-col rounded-lg bg-gray-800 text-white shadow-2xl">
+                    <div className="flex items-center justify-between border-b border-gray-600 p-6">
+                        <div className="flex items-center gap-4">
+                            <Wrench className="h-6 w-6 text-orange-400" />
+                            <h2 className="text-2xl font-bold text-orange-400">
+                                {t('อุปกรณ์ประกอบปั๊ม')} ({accessories.length} {t('รายการ')})
+                            </h2>
+                        </div>
+                        <button
+                            onClick={onClose}
+                            className="p-2 text-gray-400 transition-colors hover:text-white"
+                        >
+                            <X className="h-6 w-6" />
+                        </button>
+                    </div>
+
+                    <div className="border-b border-gray-600 p-4">
+                        <div className="flex flex-col gap-4 md:flex-row">
+                            <div className="flex flex-1 items-center gap-2">
+                                <Search className="h-5 w-5 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder={t('ค้นหาอุปกรณ์...')}
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="flex-1 rounded-lg border border-gray-600 bg-gray-700 p-2 text-white placeholder-gray-400 focus:ring-2 focus:ring-orange-500"
+                                />
+                            </div>
+                            <select
+                                value={filterType}
+                                onChange={(e) => setFilterType(e.target.value as any)}
+                                className="rounded-lg border border-gray-600 bg-gray-700 p-2 text-white focus:ring-2 focus:ring-orange-500"
+                            >
+                                <option value="all">{t('ทั้งหมด')}</option>
+                                <option value="included">{t('รวมในชุด')}</option>
+                                <option value="optional">{t('ต้องซื้อเพิ่ม')}</option>
+                            </select>
+                        </div>
+
+                        <div className="mt-2 text-sm text-gray-400">
+                            {t('แสดง')} {filteredAccessories.length} {t('จากทั้งหมด')}{' '}
+                            {accessories.length} {t('รายการ')}
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-6">
+                        {filteredAccessories.length === 0 ? (
+                            <div className="flex h-full items-center justify-center">
+                                <div className="text-center">
+                                    <Wrench className="mx-auto h-16 w-16 text-gray-500" />
+                                    <p className="mt-4 text-gray-400">
+                                        {t('ไม่พบอุปกรณ์ที่ค้นหา')}
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                {paginatedAccessories.map((accessory, index) => (
+                                    <div
+                                        key={accessory.id || index}
+                                        className="rounded-lg border border-gray-600 bg-gray-700 p-1 transition-colors hover:border-orange-400"
+                                    >
+                                        <div className="grid grid-cols-12 items-center gap-4">
+                                            <div className="col-span-1">
+                                                {accessory.image ? (
+                                                    <img
+                                                        src={accessory.image}
+                                                        alt={accessory.name || 'อุปกรณ์'}
+                                                        className="h-12 w-12 cursor-pointer rounded-lg border border-gray-600 object-cover transition-opacity hover:border-orange-400 hover:opacity-80"
+                                                        onClick={() =>
+                                                            onImageClick &&
+                                                            onImageClick(
+                                                                accessory.image!,
+                                                                accessory.name ||
+                                                                    'อุปกรณ์ ' + (index + 1)
+                                                            )
+                                                        }
+                                                        title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
+                                                        onError={(e) => {
+                                                            const target =
+                                                                e.target as HTMLImageElement;
+                                                            target.style.display = 'none';
+                                                            const parent = target.parentElement;
+                                                            if (parent) {
+                                                                const placeholder =
+                                                                    parent.querySelector(
+                                                                        '.image-placeholder'
+                                                                    ) as HTMLElement;
+                                                                if (placeholder)
+                                                                    placeholder.style.display =
+                                                                        'flex';
+                                                            }
+                                                        }}
+                                                    />
+                                                ) : null}
+                                                <div
+                                                    className={`image-placeholder flex h-12 w-12 items-center justify-center rounded-lg border border-gray-600 bg-gray-600 ${accessory.image ? 'hidden' : 'flex'}`}
+                                                >
+                                                    <Wrench className="h-6 w-6 text-gray-400" />
+                                                </div>
+                                            </div>
+
+                                            <div className="col-span-3">
+                                                <div className="flex-1">
+                                                    <h4 className="text-sm font-semibold text-white">
+                                                        {accessory.name || 'ไม่มีชื่อ'}
+                                                    </h4>
+                                                    {accessory.product_code && (
+                                                        <p className="text-sm text-gray-400">
+                                                            {t('รหัส')}: {accessory.product_code}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="col-span-5">
+                                                <div className="flex-1">
+                                                    <h4 className="text-sm text-gray-400">
+                                                        รายละเอียด
+                                                    </h4>
+                                                    <p className="text-sm text-gray-200">
+                                                        {accessory.description || '-'}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="col-span-1">
+                                                <span className="text-sm text-gray-400">
+                                                    {t('จำนวน')}
+                                                </span>
+                                                <p className="font-semibold text-blue-400">
+                                                    {accessory.quantity || 1} {t('ชิ้น')}
+                                                </p>
+                                            </div>
+
+                                            <div className="col-span-1">
+                                                <span className="text-sm text-gray-400">
+                                                    {t('ราคา')}
+                                                </span>
+                                                <p className="font-semibold text-green-400">
+                                                    {accessory.price && accessory.price > 0
+                                                        ? `฿${accessory.price.toLocaleString()}`
+                                                        : '-'}
+                                                </p>
+                                            </div>
+
+                                            <div className="col-span-1 flex items-center justify-end">
+                                                <span
+                                                    className={`rounded-full px-3 py-1 text-xs font-medium ${
+                                                        accessory.is_included
+                                                            ? 'bg-green-900 text-green-300'
+                                                            : 'bg-yellow-900 text-yellow-300'
+                                                    }`}
+                                                >
+                                                    {accessory.is_included
+                                                        ? t('รวมในชุด')
+                                                        : t('ต้องซื้อเพิ่ม')}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {totalPages > 1 && (
+                        <div className="border-t border-gray-600 p-4">
+                            <Pagination
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                onPageChange={setCurrentPage}
+                                totalItems={filteredAccessories.length}
+                                itemsPerPage={itemsPerPage}
+                            />
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black bg-opacity-50 p-4">
@@ -2285,7 +2855,13 @@ const EquipmentDetailModal: React.FC<{
                                     onError={(e) => {
                                         const target = e.target as HTMLImageElement;
                                         target.style.display = 'none';
-                                        target.nextElementSibling?.classList.remove('hidden');
+                                        const parent = target.parentElement;
+                                        if (parent) {
+                                            const placeholder = parent.querySelector(
+                                                '.image-placeholder'
+                                            ) as HTMLElement;
+                                            if (placeholder) placeholder.style.display = 'flex';
+                                        }
                                     }}
                                     onClick={() =>
                                         onImageClick &&
@@ -2294,13 +2870,14 @@ const EquipmentDetailModal: React.FC<{
                                     title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
                                 />
                             ) : null}
-
                             <div
-                                className={`flex h-64 w-full items-center justify-center rounded-lg border border-gray-600 bg-gray-700 ${equipment.image ? 'hidden' : ''}`}
+                                className={`image-placeholder flex h-64 w-full items-center justify-center rounded-lg border border-gray-600 bg-gray-700 ${equipment.image ? 'hidden' : 'flex'}`}
                             >
-                                <Package className="h-16 w-16 text-gray-500" />
+                                <div className="text-center">
+                                    <ImageIcon className="mx-auto h-16 w-16 text-gray-500" />
+                                    <p className="mt-2 text-sm text-gray-500">{t('ไม่มีรูปภาพ')}</p>
+                                </div>
                             </div>
-
                             <div className="mt-4">
                                 <span
                                     className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${
@@ -2321,14 +2898,9 @@ const EquipmentDetailModal: React.FC<{
                                     )}
                                 </span>
                             </div>
-
                             <div className="mt-4 space-y-2 rounded-lg bg-gray-700 p-4">
                                 <h4 className="font-semibold text-blue-400">{t('ข้อมูลสรุป')}</h4>
                                 <div className="text-sm">
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-400">{t('หมวดหมู่:')}</span>
-                                        <span>{equipment.category?.display_name}</span>
-                                    </div>
                                     <div className="flex justify-between">
                                         <span className="text-gray-400">{t('คุณสมบัติ:')}</span>
                                         <span>
@@ -2339,6 +2911,14 @@ const EquipmentDetailModal: React.FC<{
                                             {t('รายการ')}
                                         </span>
                                     </div>
+                                    {equipment.stock && (
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-400">{t('Stock:')}</span>
+                                            <span className="font-medium text-blue-400">
+                                                {equipment.stock.toLocaleString()} {t('ชิ้น')}
+                                            </span>
+                                        </div>
+                                    )}
                                     {pumpAccessories.length > 0 && (
                                         <div className="flex justify-between">
                                             <span className="text-gray-400">
@@ -2351,179 +2931,119 @@ const EquipmentDetailModal: React.FC<{
                                     )}
                                 </div>
                             </div>
+
                             {pumpAccessories.length > 0 && (
                                 <div>
-                                    <h3 className="mb-3 mt-6 flex items-center overflow-hidden text-lg font-semibold text-orange-400">
-                                        <Wrench className="mr-2 h-5 w-5" />
-                                        {t('อุปกรณ์ประกอบ')} ({pumpAccessories.length} {t('รายการ')}
-                                        )
+                                    <h3 className="mb-3 mt-6 flex items-center justify-between overflow-hidden text-lg font-semibold text-orange-400">
+                                        <div className="flex items-center">
+                                            <Wrench className="mr-2 h-5 w-5" />
+                                            {t('อุปกรณ์ประกอบ')}
+                                        </div>
+                                        <button
+                                            onClick={() => setShowAccessoriesModal(true)}
+                                            className="flex items-center rounded-lg bg-orange-600 px-3 py-2 text-sm text-white transition-colors hover:bg-orange-700"
+                                        >
+                                            <Eye className="mr-1 h-4 w-4" />
+                                            {t('ดูรายการ')}
+                                        </button>
                                     </h3>
-                                    <div className="space-y-3">
-                                        {pumpAccessories
-                                            .sort(
-                                                (a, b) => (a.sort_order || 0) - (b.sort_order || 0)
-                                            )
-                                            .map((accessory, index) => (
-                                                <div
-                                                    key={accessory.id || index}
-                                                    className="rounded-lg bg-gray-700 p-4"
-                                                >
-                                                    <div className="mb-2 flex items-start justify-between">
-                                                        <div className="flex gap-4">
-                                                            <div className="flex-shrink-0">
-                                                                {accessory.image ? (
-                                                                    <img
-                                                                        src={accessory.image}
-                                                                        alt={accessory.name}
-                                                                        className="h-16 w-16 cursor-pointer rounded-lg border border-gray-600 object-cover transition-opacity hover:border-blue-400 hover:opacity-80"
-                                                                        onError={(e) => {
-                                                                            const target =
-                                                                                e.target as HTMLImageElement;
-                                                                            target.style.display =
-                                                                                'none';
-                                                                            target.nextElementSibling?.classList.remove(
-                                                                                'hidden'
-                                                                            );
-                                                                        }}
-                                                                        onClick={() =>
-                                                                            onImageClick &&
-                                                                            onImageClick(
-                                                                                accessory.image!,
-                                                                                accessory.name
-                                                                            )
-                                                                        }
-                                                                        title={t(
-                                                                            'คลิกเพื่อดูรูปขนาดใหญ่'
-                                                                        )}
-                                                                    />
-                                                                ) : null}
-                                                                {/* Fallback for no image */}
-                                                                <div
-                                                                    className={`flex h-16 w-16 items-center justify-center rounded-lg border border-gray-600 bg-gray-600 ${accessory.image ? 'hidden' : ''}`}
-                                                                >
-                                                                    <Wrench className="h-6 w-6 text-gray-400" />
-                                                                </div>
-                                                            </div>
 
-                                                            {/* ข้อมูลอุปกรณ์ */}
-                                                            <div className="flex-1">
-                                                                <h4 className="font-medium">
-                                                                    {accessory.name}
-                                                                </h4>
-                                                                <p className="text-sm capitalize text-gray-400">
-                                                                    {accessory.accessory_type?.replace(
-                                                                        '_',
-                                                                        ' '
-                                                                    )}
-                                                                    {accessory.size &&
-                                                                        ` - ${accessory.size}`}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* ราคาและสถานะ */}
-                                                        <div className="text-right">
-                                                            <p className="font-medium text-green-400">
-                                                                ฿
-                                                                {Number(
-                                                                    accessory.price || 0
-                                                                ).toLocaleString()}
-                                                            </p>
-                                                            <span
-                                                                className={`rounded px-2 py-1 text-xs ${
-                                                                    accessory.is_included
-                                                                        ? 'bg-green-900 text-green-300'
-                                                                        : 'bg-yellow-900 text-yellow-300'
-                                                                }`}
-                                                            >
-                                                                {accessory.is_included
-                                                                    ? t('รวมในชุด')
-                                                                    : t('แยกขาย')}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* ข้อมูลจำเพาะ */}
-                                                    {accessory.specifications &&
-                                                        typeof accessory.specifications ===
-                                                            'object' && (
-                                                            <div className="mt-3">
-                                                                <label className="text-xs text-gray-400">
-                                                                    {t('ข้อมูลจำเพาะ:')}
-                                                                </label>
-                                                                <div className="mt-1 grid grid-cols-2 gap-2 text-sm">
-                                                                    {Object.entries(
-                                                                        accessory.specifications
-                                                                    ).map(([key, value]) => (
-                                                                        <div
-                                                                            key={key}
-                                                                            className="flex justify-between"
-                                                                        >
-                                                                            <span className="text-gray-400">
-                                                                                {key}:
-                                                                            </span>
-                                                                            <span>
-                                                                                {String(value)}
-                                                                            </span>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                </div>
-                                            ))}
+                                    <div className="rounded-lg bg-gray-700 p-4">
+                                        <div className="grid grid-cols-2 gap-4 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-400">
+                                                    {t('รายการ:')}
+                                                </span>
+                                                <span className="font-medium text-orange-400">
+                                                    {pumpAccessories.length} {t('รายการ')}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-400">
+                                                    {t('จำนวนรวม:')}
+                                                </span>
+                                                <span className="font-medium text-orange-400">
+                                                    {pumpAccessories.reduce(
+                                                        (sum, acc) => sum + (acc.quantity || 1),
+                                                        0
+                                                    )}{' '}
+                                                    {t('ชิ้น')}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-400">
+                                                    {t('รวมในชุด:')}
+                                                </span>
+                                                <span className="font-medium text-green-400">
+                                                    {
+                                                        pumpAccessories.filter(
+                                                            (acc) => acc.is_included
+                                                        ).length
+                                                    }{' '}
+                                                    {t('รายการ')}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-400">
+                                                    {t('ต้องซื้อเพิ่ม:')}
+                                                </span>
+                                                <span className="font-medium text-yellow-400">
+                                                    {
+                                                        pumpAccessories.filter(
+                                                            (acc) => !acc.is_included
+                                                        ).length
+                                                    }{' '}
+                                                    {t('รายการ')}
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             )}
+
+                            {showAccessoriesModal && (
+                                <PumpAccessoriesModal
+                                    accessories={pumpAccessories}
+                                    onClose={() => setShowAccessoriesModal(false)}
+                                    onImageClick={onImageClick}
+                                />
+                            )}
                         </div>
 
-                        {/* Details */}
                         <div className="space-y-6 lg:col-span-2">
-                            {/* Basic Information */}
-                            <div>
+                            <div className="rounded-lg bg-gray-700 p-4">
                                 <h3 className="mb-3 text-lg font-semibold text-blue-400">
                                     {t('ข้อมูลพื้นฐาน')}
                                 </h3>
-                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                    <div>
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                                    <div className="col-span-1">
                                         <label className="text-sm text-gray-400">
                                             {t('รหัสสินค้า')}
                                         </label>
                                         <p className="font-medium">
-                                            {equipment.product_code || equipment.productCode}
+                                            {equipment.product_code || equipment.productCode || '-'}
                                         </p>
                                     </div>
-                                    <div>
+                                    <div className="col-span-2">
                                         <label className="text-sm text-gray-400">
                                             {t('ชื่อสินค้า')}
                                         </label>
-                                        <p className="font-medium">{equipment.name}</p>
+                                        <p className="font-medium">{equipment.name || '-'}</p>
                                     </div>
-                                    <div>
+                                    <div className="col-span-1">
                                         <label className="text-sm text-gray-400">
                                             {t('แบรนด์')}
                                         </label>
                                         <p className="font-medium">{equipment.brand || '-'}</p>
                                     </div>
-                                    <div>
+                                    <div className="col-span-2">
                                         <label className="text-sm text-gray-400">{t('ราคา')}</label>
-                                        <p className="font-medium text-green-400">
-                                            ฿{equipment.price.toLocaleString()}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <label className="text-sm text-gray-400">
-                                            {t('วันที่เพิ่ม')}
-                                        </label>
                                         <p className="font-medium">
-                                            {equipment.created_at
-                                                ? new Date(equipment.created_at).toLocaleDateString(
-                                                      'th-TH'
-                                                  )
-                                                : '-'}
+                                            {equipment.price.toLocaleString() || '-'} บาท
                                         </p>
                                     </div>
-                                    <div>
+
+                                    <div className="col-span-1">
                                         <label className="text-sm text-gray-400">
                                             {t('แก้ไขล่าสุด')}
                                         </label>
@@ -2535,21 +3055,28 @@ const EquipmentDetailModal: React.FC<{
                                                 : '-'}
                                         </p>
                                     </div>
+                                    <div className="col-span-2">
+                                        <label className="text-sm text-gray-400">
+                                            {t('วันที่เพิ่ม')}
+                                        </label>
+                                        <p className="font-medium">
+                                            {equipment.created_at
+                                                ? new Date(equipment.created_at).toLocaleDateString(
+                                                      'th-TH'
+                                                  )
+                                                : '-'}
+                                        </p>
+                                    </div>
                                 </div>
 
-                                {equipment.description && (
-                                    <div className="mt-4">
-                                        <label className="text-sm text-gray-400">
-                                            {t('คำอธิบาย')}
-                                        </label>
-                                        <p className="mt-1">{equipment.description}</p>
-                                    </div>
-                                )}
+                                <div className="mt-4">
+                                    <label className="text-sm text-gray-400">{t('คำอธิบาย')}</label>
+                                    <p className="mt-1">{equipment.description || '-'}</p>
+                                </div>
                             </div>
 
-                            {/* Attributes */}
                             {attributes.length > 0 && (
-                                <div>
+                                <div className="rounded-lg bg-gray-700 p-4">
                                     <h3 className="mb-3 text-lg font-semibold text-purple-400">
                                         {t('คุณสมบัติเฉพาะ')} (
                                         {attributes.length -
@@ -2561,41 +3088,26 @@ const EquipmentDetailModal: React.FC<{
                                         {attributes.map((attr, index) => (
                                             <div key={attr.attribute_name || index}>
                                                 {attr.formatted_value != 0 ? (
-                                                    <div className="rounded-lg bg-gray-700 p-4">
+                                                    <div className="rounded-lg bg-gray-600 p-2">
                                                         <div className="flex items-start justify-between">
                                                             <div className="flex-1">
                                                                 <label className="text-sm font-medium text-gray-300">
                                                                     {attr.display_name}
-                                                                    {attr.unit && (
-                                                                        <span className="ml-1 text-gray-500">
-                                                                            ({attr.unit})
-                                                                        </span>
-                                                                    )}
                                                                 </label>
-                                                                <p className="mt-1 font-medium text-white">
-                                                                    {attr.formatted_value ||
-                                                                        formatAttributeValue(
-                                                                            attr.value
-                                                                        )}
-                                                                </p>
                                                             </div>
 
-                                                            {/* Type indicator */}
-                                                            <span
-                                                                className={`ml-2 rounded px-2 py-1 text-xs ${
-                                                                    attr.data_type === 'array'
-                                                                        ? 'bg-blue-900 text-blue-300'
-                                                                        : attr.data_type ===
-                                                                            'number'
-                                                                          ? 'bg-green-900 text-green-300'
-                                                                          : attr.data_type ===
-                                                                              'boolean'
-                                                                            ? 'bg-yellow-900 text-yellow-300'
-                                                                            : 'bg-gray-600 text-gray-300'
-                                                                }`}
-                                                            >
-                                                                {attr.data_type}
-                                                            </span>
+                                                            <p className="mt-1 font-medium text-white">
+                                                                {attr.formatted_value ||
+                                                                    formatAttributeValue(
+                                                                        attr.value
+                                                                    )}
+                                                                {attr.unit && (
+                                                                    <span className="ml-1 text-gray-200">
+                                                                        {' '}
+                                                                        {attr.unit}
+                                                                    </span>
+                                                                )}
+                                                            </p>
                                                         </div>
                                                     </div>
                                                 ) : null}
@@ -2687,15 +3199,26 @@ const ImageModal: React.FC<{
                     <X className="h-4 w-4" />
                 </button>
 
-                {/* รูปภาพ */}
                 <img
                     src={imageSrc}
                     alt={imageAlt}
-                    className="max-h-full max-w-full rounded-lg shadow-2xl"
+                    className="max-h-[80vh] max-w-full rounded-lg shadow-2xl"
                     onClick={(e) => e.stopPropagation()}
+                    onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const parent = target.parentElement;
+                        if (parent) {
+                            const errorDiv = document.createElement('div');
+                            errorDiv.className =
+                                'flex h-64 w-64 items-center justify-center rounded-lg border border-red-500 bg-red-900/20';
+                            errorDiv.innerHTML =
+                                '<div class="text-center"><div class="h-16 w-16 mx-auto text-red-400">⚠️</div><p class="mt-2 text-red-400">ไม่สามารถโหลดรูปภาพ</p></div>';
+                            parent.appendChild(errorDiv);
+                        }
+                    }}
                 />
 
-                {/* ชื่อรูป */}
                 <div className="mt-2 text-center">
                     <p className="inline-block rounded bg-black bg-opacity-50 px-2 py-1 text-sm text-white">
                         {imageAlt}
@@ -2706,13 +3229,13 @@ const ImageModal: React.FC<{
     );
 };
 
-const EnhancedEquipmentCRUD: React.FC = () => {
+const EquipmentCRUD: React.FC = () => {
     const { t } = useLanguage();
     const [categories, setCategories] = useState<EquipmentCategory[]>([]);
     const [equipments, setEquipments] = useState<Equipment[]>([]);
     const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(10); // 10 รายการต่อหน้า
+    const [itemsPerPage] = useState(10);
 
     const [filters, setFilters] = useState<FilterOptions>({
         search: '',
@@ -2734,6 +3257,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
     const [saving, setSaving] = useState(false);
     const [selectedItems, setSelectedItems] = useState<number[]>([]);
     const [stats, setStats] = useState<any>({});
+    const [formAccessories, setFormAccessories] = useState<PumpAccessory[]>([]);
 
     const [imageModal, setImageModal] = useState({
         isOpen: false,
@@ -2741,14 +3265,13 @@ const EnhancedEquipmentCRUD: React.FC = () => {
         imageAlt: '',
     });
 
+    const debouncedSearch = useDebounce(filters.search, 300);
+
     useEffect(() => {
         if (typeof window !== 'undefined' && !window.Swal) {
             const script = document.createElement('script');
             script.src = 'https://cdn.jsdelivr.net/npm/sweetalert2@11';
             script.async = true;
-            script.onload = () => {
-                console.log('SweetAlert2 loaded successfully');
-            };
             script.onerror = () => {
                 console.warn('Failed to load SweetAlert2, falling back to native alerts');
             };
@@ -2775,33 +3298,16 @@ const EnhancedEquipmentCRUD: React.FC = () => {
     useEffect(() => {
         const loadData = async () => {
             try {
-                console.log('🚀 Starting to load all data...');
-
                 const [categoriesData, equipmentsData, statsData] = await Promise.all([
                     api.getCategories(),
                     getAllEquipments(),
                     api.getStats(),
                 ]);
 
-                console.log('📊 Data loading results:', {
-                    categories: {
-                        count: categoriesData.length,
-                        sample: categoriesData[0],
-                    },
-                    equipments: {
-                        count: equipmentsData.length,
-                        sample: equipmentsData[0],
-                    },
-                    stats: statsData,
-                });
-
                 setCategories(categoriesData);
                 setEquipments(equipmentsData);
                 setStats(statsData);
-
-                console.log('✅ Data loaded successfully');
             } catch (error) {
-                console.error('💥 Failed to load data:', error);
                 showAlert.error(t('เกิดข้อผิดพลาด'), t('ไม่สามารถโหลดข้อมูลได้'));
             } finally {
                 setLoading(false);
@@ -2822,9 +3328,9 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                 .map((field) => field?.toLowerCase());
 
             const matchesSearch =
-                filters.search === '' ||
+                debouncedSearch === '' ||
                 searchFields.some(
-                    (field) => field?.includes(filters.search.toLowerCase()) ?? false
+                    (field) => field?.includes(debouncedSearch.toLowerCase()) ?? false
                 );
 
             const catId = Number(equipment.category_id || equipment.categoryId);
@@ -2877,7 +3383,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
         });
 
         return result;
-    }, [equipments, filters, selectedCategoryId]);
+    }, [equipments, filters, selectedCategoryId, debouncedSearch]);
 
     const totalPages = Math.ceil(filteredAndSortedEquipments.length / itemsPerPage);
     const paginatedEquipments = filteredAndSortedEquipments.slice(
@@ -2892,14 +3398,11 @@ const EnhancedEquipmentCRUD: React.FC = () => {
     const handleSaveEquipment = async (equipmentData: Partial<Equipment>) => {
         setSaving(true);
         try {
-            console.log('Saving equipment:', equipmentData);
-
+            let savedEquipment;
             if (editingEquipment) {
-                await api.updateEquipment(editingEquipment.id, equipmentData);
-                console.log('Equipment updated');
+                savedEquipment = await api.updateEquipment(editingEquipment.id, equipmentData);
             } else {
-                await api.createEquipment(equipmentData);
-                console.log('Equipment created');
+                savedEquipment = await api.createEquipment(equipmentData);
             }
 
             const [equipmentsData, statsData] = await Promise.all([
@@ -2908,6 +3411,10 @@ const EnhancedEquipmentCRUD: React.FC = () => {
             ]);
             setEquipments(equipmentsData);
             setStats(statsData);
+
+            if (equipmentData.pump_accessories) {
+                setFormAccessories(equipmentData.pump_accessories as PumpAccessory[]);
+            }
 
             setShowEquipmentForm(false);
             setEditingEquipment(undefined);
@@ -3021,7 +3528,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                 setSelectedItems([]);
                 showAlert.success(
                     t('ลบสำเร็จ'),
-                    `${t('ลบสินค้า')} ${selectedItems.length} ${t('รายการ')} ${t('ได้รับการลบเรียบร้อยแล้ว')}`
+                    `${t('ลบสินค้า')} ${selectedItems.length} ${t('รายการ')} ${t('เรียบร้อยแล้ว')}`
                 );
             } catch (error) {
                 console.error('Failed to bulk delete:', error);
@@ -3044,7 +3551,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
             setSelectedItems([]);
             showAlert.success(
                 t('อัปเดตสำเร็จ'),
-                `${t('อัปเดตสถานะสินค้า')} ${selectedItems.length} ${t('รายการ')} ${t('ได้รับการอัปเดตเรียบร้อยแล้ว')}`
+                `${t('อัปเดตสถานะสินค้า')} ${selectedItems.length} ${t('รายการ')} ${t('เรียบร้อยแล้ว')}`
             );
         } catch (error) {
             console.error('Failed to bulk update:', error);
@@ -3064,11 +3571,22 @@ const EnhancedEquipmentCRUD: React.FC = () => {
         );
     };
 
+    const handleViewEquipment = (equipment: Equipment) => {
+        const equipmentWithUpdatedAccessories = {
+            ...equipment,
+            pumpAccessories:
+                formAccessories.length > 0 ? formAccessories : equipment.pumpAccessories,
+        };
+
+        setSelectedEquipment(equipmentWithUpdatedAccessories);
+        setShowEquipmentDetail(true);
+    };
+
     if (loading) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-gray-800">
                 <div className="text-center">
-                    <div className="inline-block h-8 w-8 animate-spin rounded-full border-b-2 border-white"></div>
+                    <Loader2 className="mx-auto h-8 w-8 animate-spin text-white" />
                     <div className="mt-4 text-lg text-gray-50">{t('กำลังโหลด...')}</div>
                 </div>
             </div>
@@ -3102,6 +3620,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                     onClick={() => {
                                         setEditingEquipment(undefined);
                                         setShowEquipmentForm(true);
+                                        setFormAccessories([]);
                                     }}
                                     disabled={saving}
                                     className="flex items-center rounded-lg bg-blue-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-blue-700 disabled:opacity-50"
@@ -3239,19 +3758,8 @@ const EnhancedEquipmentCRUD: React.FC = () => {
 
                             <div className="flex items-center justify-between text-sm text-gray-300">
                                 <div>
-                                    {t('แสดง')} {paginatedEquipments.length} {t('จาก')}
-                                    {filteredAndSortedEquipments.length} {t('รายการทั้งหมด')}
-                                    {equipments.length} {t('รายการ')}
-                                    {selectedCategoryId && (
-                                        <span className="ml-2 text-blue-300">
-                                            ({t('หมวดหมู่:')}{' '}
-                                            {
-                                                categories.find((c) => c.id === selectedCategoryId)
-                                                    ?.display_name
-                                            }
-                                            )
-                                        </span>
-                                    )}
+                                    {t('แสดง')} {paginatedEquipments.length} {t('จากทั้งหมด')}{' '}
+                                    {filteredAndSortedEquipments.length} {t('รายการ')}
                                 </div>
 
                                 {viewMode === 'table' && (
@@ -3270,98 +3778,6 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                     </label>
                                 )}
                             </div>
-                        </div>
-                    </div>
-
-                    <div className="border-b border-gray-600 p-6">
-                        <h3 className="mb-4 flex items-center text-lg font-semibold text-gray-50">
-                            <Tag className="mr-2 h-5 w-5" />
-                            {t('หมวดหมู่สินค้า')}
-                        </h3>
-                        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
-                            <div
-                                className={`cursor-pointer rounded-lg border-2 p-4 shadow-lg transition-all hover:scale-105 ${
-                                    selectedCategoryId === null
-                                        ? 'border-purple-500 bg-purple-900 shadow-purple-500/20'
-                                        : 'border-gray-500 bg-gray-600 hover:border-gray-400 hover:bg-gray-500'
-                                }`}
-                                onClick={() => setSelectedCategoryId(null)}
-                            >
-                                <div className="text-center">
-                                    <div className="mb-2 flex justify-center text-2xl">
-                                        <Package className="h-8 w-8 text-purple-400" />
-                                    </div>
-                                    <div className="mb-1 text-sm font-medium text-white">
-                                        {t('ทุกหมวดหมู่')}
-                                    </div>
-                                    <div className="mb-2 text-xs text-gray-300">
-                                        {equipments.length} {t('รายการ')}
-                                    </div>
-                                    <div className="flex justify-center gap-1">
-                                        <div className="h-6 w-6"></div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {categories.map((category) => {
-                                const categoryEquipments = equipments.filter(
-                                    (e) => Number(e.category_id) === Number(category.id)
-                                );
-                                const isSelected = selectedCategoryId === category.id;
-
-                                return (
-                                    <div
-                                        key={category.id}
-                                        className={`cursor-pointer rounded-lg border-2 p-4 shadow-lg transition-all hover:scale-105 ${
-                                            isSelected
-                                                ? 'border-blue-500 bg-blue-900 shadow-blue-500/20'
-                                                : 'border-gray-500 bg-gray-600 hover:border-gray-400 hover:bg-gray-500'
-                                        }`}
-                                        onClick={() => {
-                                            const next = isSelected ? null : category.id;
-                                            setSelectedCategoryId(next);
-                                        }}
-                                    >
-                                        <div className="text-center">
-                                            <div className="mb-2 text-2xl">
-                                                {category.icon || '📦'}
-                                            </div>
-                                            <div className="mb-1 text-sm font-medium text-white">
-                                                {category.name}
-                                            </div>
-                                            <div className="mb-1 text-xs font-light text-white">
-                                                ({category.display_name})
-                                            </div>
-                                            <div className="mb-2 text-xs text-gray-300">
-                                                {categoryEquipments.length} {t('รายการ')}
-                                            </div>
-                                            <div className="flex justify-center gap-1">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setEditingCategory(category);
-                                                        setShowCategoryForm(true);
-                                                    }}
-                                                    className="rounded p-1 text-blue-400 transition-colors hover:bg-blue-800 hover:text-blue-300"
-                                                    title={t('แก้ไข')}
-                                                >
-                                                    <Edit2 className="h-3 w-3" />
-                                                </button>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleDeleteCategory(category);
-                                                    }}
-                                                    className="rounded p-1 text-red-400 transition-colors hover:bg-red-800 hover:text-red-300"
-                                                    title={t('ลบ')}
-                                                >
-                                                    <Trash2 className="h-3 w-3" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
                         </div>
                     </div>
 
@@ -3391,10 +3807,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                             <div
                                                 key={equipment.id}
                                                 className="group cursor-pointer rounded-lg border border-gray-600 bg-gray-800 p-4 transition-all hover:border-blue-400 hover:shadow-xl hover:shadow-blue-500/20"
-                                                onClick={() => {
-                                                    setSelectedEquipment(equipment);
-                                                    setShowEquipmentDetail(true);
-                                                }}
+                                                onClick={() => handleViewEquipment(equipment)}
                                             >
                                                 <div className="mb-3 flex items-start justify-between">
                                                     <div className="min-w-0 flex-1">
@@ -3417,6 +3830,11 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                                 e.stopPropagation();
                                                                 setEditingEquipment(equipment);
                                                                 setShowEquipmentForm(true);
+                                                                setFormAccessories(
+                                                                    equipment.pumpAccessories ||
+                                                                        equipment.pumpAccessory ||
+                                                                        []
+                                                                );
                                                             }}
                                                             className="rounded p-1 text-blue-400 transition-colors hover:bg-blue-900"
                                                             title={t('แก้ไข')}
@@ -3442,9 +3860,19 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                         alt={equipment.name}
                                                         className="mb-3 h-24 w-full cursor-pointer rounded object-cover shadow-lg transition-transform hover:opacity-80 group-hover:scale-105"
                                                         onError={(e) => {
-                                                            (
-                                                                e.target as HTMLImageElement
-                                                            ).style.display = 'none';
+                                                            const target =
+                                                                e.target as HTMLImageElement;
+                                                            target.style.display = 'none';
+                                                            const parent = target.parentElement;
+                                                            if (parent) {
+                                                                const placeholder =
+                                                                    parent.querySelector(
+                                                                        '.image-placeholder'
+                                                                    ) as HTMLElement;
+                                                                if (placeholder)
+                                                                    placeholder.style.display =
+                                                                        'flex';
+                                                            }
                                                         }}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
@@ -3455,11 +3883,12 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                         }}
                                                         title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
                                                     />
-                                                ) : (
-                                                    <div className="mb-3 flex h-24 w-full items-center justify-center rounded bg-gray-700 shadow-inner">
-                                                        <Package className="h-8 w-8 text-gray-500" />
-                                                    </div>
-                                                )}
+                                                ) : null}
+                                                <div
+                                                    className={`image-placeholder mb-3 flex h-24 w-full items-center justify-center rounded bg-gray-700 shadow-inner ${equipment.image ? 'hidden' : 'flex'}`}
+                                                >
+                                                    <Package className="h-8 w-8 text-gray-500" />
+                                                </div>
 
                                                 <div className="space-y-1 text-xs">
                                                     <div className="flex justify-between">
@@ -3496,6 +3925,16 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                             }
                                                         </span>
                                                     </div>
+                                                    {equipment.stock && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-gray-400">
+                                                                {t('Stock:')}
+                                                            </span>
+                                                            <span className="font-semibold text-blue-400">
+                                                                {equipment.stock.toLocaleString()}
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 {equipment.description && (
@@ -3609,7 +4048,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                         ) : (
                             <>
                                 <div className="overflow-x-auto rounded-lg shadow-lg">
-                                    <table className="w-full text-left text-sm text-gray-300">
+                                    <table className="w-full text-left text-xs text-gray-300">
                                         <thead className="bg-gray-600 text-xs uppercase text-gray-400">
                                             <tr>
                                                 <th className="px-6 py-3">
@@ -3624,15 +4063,34 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                         className="h-4 w-4"
                                                     />
                                                 </th>
-                                                <th className="px-6 py-3">{t('รูปภาพ')}</th>
-                                                <th className="px-6 py-3">{t('รหัสสินค้า')}</th>
+                                                <th className="px-6 py-3 text-center">
+                                                    {t('รูปภาพ')}
+                                                </th>
+                                                <th className="px-6 py-3 text-center">
+                                                    {t('รหัสสินค้า')}
+                                                </th>
                                                 <th className="px-6 py-3">{t('ชื่อสินค้า')}</th>
-                                                <th className="px-6 py-3">{t('แบรนด์')}</th>
-                                                <th className="px-6 py-3">{t('หมวดหมู่')}</th>
-                                                <th className="px-6 py-3">{t('ราคา')}</th>
-                                                <th className="px-6 py-3">{t('สถานะ')}</th>
-                                                <th className="px-6 py-3">{t('คุณสมบัติ')}</th>
-                                                <th className="px-6 py-3">{t('จัดการ')}</th>
+                                                <th className="px-6 py-3 text-center">
+                                                    {t('แบรนด์')}
+                                                </th>
+                                                <th className="px-6 py-3 text-center">
+                                                    {t('หมวดหมู่')}
+                                                </th>
+                                                <th className="px-6 py-3 text-center">
+                                                    {t('ราคา')}
+                                                </th>
+                                                <th className="px-6 py-3 text-center">
+                                                    {t('Stock')}
+                                                </th>
+                                                <th className="px-6 py-3 text-center">
+                                                    {t('สถานะ')}
+                                                </th>
+                                                <th className="px-6 py-3 text-center">
+                                                    {t('คุณสมบัติ')}
+                                                </th>
+                                                <th className="px-6 py-3 text-center">
+                                                    {t('จัดการ')}
+                                                </th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -3644,13 +4102,10 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                             ? 'bg-blue-900'
                                                             : 'bg-gray-700'
                                                     }`}
-                                                    onClick={() => {
-                                                        setSelectedEquipment(equipment);
-                                                        setShowEquipmentDetail(true);
-                                                    }}
+                                                    onClick={() => handleViewEquipment(equipment)}
                                                 >
                                                     <td
-                                                        className="px-6 py-4"
+                                                        className="px-3 text-center"
                                                         onClick={(e) => e.stopPropagation()}
                                                     >
                                                         <input
@@ -3664,12 +4119,12 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                             className="h-4 w-4"
                                                         />
                                                     </td>
-                                                    <td className="px-6 py-4">
+                                                    <td className="px-3 text-center">
                                                         {equipment.image ? (
                                                             <img
                                                                 src={equipment.image}
                                                                 alt={equipment.name}
-                                                                className="h-12 w-12 cursor-pointer rounded border border-gray-600 object-cover shadow-sm transition-opacity hover:border-blue-400 hover:opacity-80"
+                                                                className="h-10 w-10 cursor-pointer rounded border border-gray-600 object-cover shadow-sm transition-opacity hover:border-blue-400 hover:opacity-80"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     openImageModal(
@@ -3678,38 +4133,65 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                                     );
                                                                 }}
                                                                 title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
+                                                                onError={(e) => {
+                                                                    const target =
+                                                                        e.target as HTMLImageElement;
+                                                                    target.style.display = 'none';
+                                                                    const parent =
+                                                                        target.parentElement;
+                                                                    if (parent) {
+                                                                        const placeholder =
+                                                                            parent.querySelector(
+                                                                                '.image-placeholder'
+                                                                            ) as HTMLElement;
+                                                                        if (placeholder)
+                                                                            placeholder.style.display =
+                                                                                'flex';
+                                                                    }
+                                                                }}
                                                             />
-                                                        ) : (
-                                                            <div className="flex h-12 w-12 items-center justify-center rounded border border-gray-500 bg-gray-600 shadow-sm">
-                                                                <Package className="h-6 w-6 text-gray-400" />
-                                                            </div>
-                                                        )}
+                                                        ) : null}
+                                                        <div
+                                                            className={`image-placeholder flex h-10 w-10 items-center justify-center rounded border border-gray-500 bg-gray-600 shadow-sm ${equipment.image ? 'hidden' : 'flex'}`}
+                                                        >
+                                                            <ImageIcon className="h-5 w-5 text-gray-400" />
+                                                        </div>
                                                     </td>
-                                                    <td className="px-6 py-4 font-medium text-white">
+                                                    <td className="px-3 text-center font-medium text-white">
                                                         {equipment.product_code ||
-                                                            equipment.productCode}
+                                                            equipment.productCode ||
+                                                            '-'}
                                                     </td>
-                                                    <td className="max-w-xs truncate px-6 py-4">
+                                                    <td className="max-w-xs truncate px-3">
                                                         {equipment.name}
                                                     </td>
-                                                    <td className="px-6 py-4">
+                                                    <td className="px-3 text-center">
                                                         {equipment.brand || '-'}
                                                     </td>
-                                                    <td className="px-6 py-4">
+                                                    <td className="px-3 text-center">
                                                         <span className="rounded bg-gray-600 px-2 py-1 text-xs shadow-sm">
                                                             {
                                                                 categories.find(
                                                                     (c) =>
                                                                         c.id ===
                                                                         equipment.category_id
-                                                                )?.display_name
+                                                                )?.name
                                                             }
                                                         </span>
                                                     </td>
-                                                    <td className="px-6 py-4 font-semibold text-green-400">
+                                                    <td className="px-3 text-center font-semibold text-green-400">
                                                         ฿{equipment.price.toLocaleString()}
                                                     </td>
-                                                    <td className="px-6 py-4">
+                                                    <td className="px-3 text-center">
+                                                        {equipment.stock ? (
+                                                            <span className="font-semibold text-blue-400">
+                                                                {equipment.stock.toLocaleString()}
+                                                            </span>
+                                                        ) : (
+                                                            '-'
+                                                        )}
+                                                    </td>
+                                                    <td className="px-3 text-center">
                                                         <span
                                                             className={`flex w-fit items-center rounded-full px-2 py-1 text-xs shadow-sm ${
                                                                 equipment.is_active
@@ -3730,7 +4212,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                             )}
                                                         </span>
                                                     </td>
-                                                    <td className="px-6 py-4">
+                                                    <td className="px-3 text-center">
                                                         <div className="flex items-center gap-2">
                                                             {equipment.attributes &&
                                                                 Object.keys(equipment.attributes)
@@ -3762,15 +4244,14 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                         </div>
                                                     </td>
                                                     <td
-                                                        className="px-6 py-4"
+                                                        className="px-6 py-4 text-center"
                                                         onClick={(e) => e.stopPropagation()}
                                                     >
                                                         <div className="flex gap-2">
                                                             <button
-                                                                onClick={() => {
-                                                                    setSelectedEquipment(equipment);
-                                                                    setShowEquipmentDetail(true);
-                                                                }}
+                                                                onClick={() =>
+                                                                    handleViewEquipment(equipment)
+                                                                }
                                                                 className="rounded p-2 text-blue-400 shadow-sm transition-colors hover:bg-blue-900"
                                                                 title={t('ดูรายละเอียด')}
                                                             >
@@ -3780,6 +4261,11 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                                                                 onClick={() => {
                                                                     setEditingEquipment(equipment);
                                                                     setShowEquipmentForm(true);
+                                                                    setFormAccessories(
+                                                                        equipment.pumpAccessories ||
+                                                                            equipment.pumpAccessory ||
+                                                                            []
+                                                                    );
                                                                 }}
                                                                 className="rounded p-2 text-green-400 shadow-sm transition-colors hover:bg-green-900"
                                                                 title={t('แก้ไข')}
@@ -3835,6 +4321,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                     onCancel={() => {
                         setShowEquipmentForm(false);
                         setEditingEquipment(undefined);
+                        setFormAccessories([]);
                     }}
                     onImageClick={openImageModal}
                 />
@@ -3843,6 +4330,7 @@ const EnhancedEquipmentCRUD: React.FC = () => {
             {showEquipmentDetail && selectedEquipment && (
                 <EquipmentDetailModal
                     equipment={selectedEquipment}
+                    updatedAccessories={formAccessories.length > 0 ? formAccessories : undefined}
                     onClose={() => {
                         setShowEquipmentDetail(false);
                         setSelectedEquipment(undefined);
@@ -3850,6 +4338,11 @@ const EnhancedEquipmentCRUD: React.FC = () => {
                     onEdit={() => {
                         setEditingEquipment(selectedEquipment);
                         setShowEquipmentForm(true);
+                        setFormAccessories(
+                            selectedEquipment.pumpAccessories ||
+                                selectedEquipment.pumpAccessory ||
+                                []
+                        );
                         setShowEquipmentDetail(false);
                         setSelectedEquipment(undefined);
                     }}
@@ -3868,4 +4361,4 @@ const EnhancedEquipmentCRUD: React.FC = () => {
     );
 };
 
-export default EnhancedEquipmentCRUD;
+export default EquipmentCRUD;

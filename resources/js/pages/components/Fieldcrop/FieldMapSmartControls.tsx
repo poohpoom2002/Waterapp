@@ -8,6 +8,7 @@ interface FieldMapSmartControlsProps {
     pipeSnapEnabled: boolean;
     setPipeSnapEnabled: (enabled: boolean) => void;
     drawingStage: string;
+    t: (key: string) => string;
 }
 
 const FieldMapSmartControls: React.FC<FieldMapSmartControlsProps> = ({
@@ -18,6 +19,7 @@ const FieldMapSmartControls: React.FC<FieldMapSmartControlsProps> = ({
     pipeSnapEnabled,
     setPipeSnapEnabled,
     drawingStage,
+    t,
 }) => {
     return (
         <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-3">

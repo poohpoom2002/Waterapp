@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import Navbar from '../../components/Navbar';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface AreaInputMethodProps {
     crops?: string;
 }
 
 export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
+    const { t } = useLanguage();
     const [selectedCrops, setSelectedCrops] = useState<string[]>([]);
     const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
 
@@ -27,9 +29,7 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
             window.location.href = `/greenhouse-planner?crops=${selectedCrops.join(',')}&method=draw`;
         } else if (selectedMethod === 'import') {
             // Navigate to file import page (not yet created)
-            alert(
-                'File import feature is under development. Please select "Draw Area Yourself" first.'
-            );
+            alert(t('ฟีเจอร์นำเข้าไฟล์กำลังพัฒนา กรุณาเลือก "วาดพื้นที่เอง" ก่อน'));
             // window.location.href = `/greenhouse-import?crops=${selectedCrops.join(',')}&method=import`;
         }
     };
@@ -82,24 +82,24 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                         d="M10 19l-7-7m0 0l7-7m-7 7h18"
                                     />
                                 </svg>
-                                Back
+                                {t('กลับ')}
                             </button>
 
                             {/* Progress Indicator */}
                             <div className="flex items-center space-x-2 text-sm text-gray-400">
-                                <span className="text-green-400">Select Crops</span>
+                                <span className="text-green-400">{t('เลือกพืช')}</span>
                                 <span>→</span>
-                                <span className="font-medium text-blue-400">Planning Method</span>
+                                <span className="font-medium text-blue-400">{t('เลือกวิธีการวางแผน')}</span>
                                 <span>→</span>
-                                <span>Design Area</span>
+                                <span>{t('ออกแบบพื้นที่')}</span>
                                 <span>→</span>
-                                <span>Water System</span>
+                                <span>{t('ระบบน้ำ')}</span>
                             </div>
                         </div>
 
-                        <h1 className="mb-2 text-3xl font-bold">📐 Choose Area Planning Method</h1>
+                        <h1 className="mb-2 text-3xl font-bold">📐 {t('เลือกวิธีการวางแผนพื้นที่')}</h1>
                         <p className="text-gray-400">
-                            Select the method you want to use to define your greenhouse area
+                            {t('เลือกวิธีการที่คุณต้องการใช้ในการกำหนดพื้นที่โรงเรือน')}
                         </p>
                     </div>
 
@@ -107,7 +107,7 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                     {selectedCrops.length > 0 && (
                         <div className="mb-8 rounded-lg bg-gray-800 p-4">
                             <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                Selected Crops ({selectedCrops.length} types)
+                                {t('พืชที่เลือก')} ({selectedCrops.length} {t('ชนิด')})
                             </h3>
                             <div className="flex flex-wrap gap-2">
                                 {selectedCrops.map((crop, index) => (
@@ -135,9 +135,9 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                         >
                             <div className="text-center">
                                 <div className="mb-4 text-6xl">✏️</div>
-                                <h3 className="mb-3 text-xl font-bold text-white">Draw Area Yourself</h3>
+                                <h3 className="mb-3 text-xl font-bold text-white">{t('วาดพื้นที่เอง')}</h3>
                                 <p className="mb-4 text-gray-400">
-                                    Use the drawing tools in the system to define the shape and size of your greenhouse
+                                    {t('ใช้เครื่องมือวาดในระบบเพื่อกำหนดรูปร่างและขนาดโรงเรือน')}
                                 </p>
 
                                 <div className="space-y-2 text-left">
@@ -153,7 +153,7 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                                 clipRule="evenodd"
                                             />
                                         </svg>
-                                        Simple and fast
+                                        {t('ง่ายและรวดเร็ว')}
                                     </div>
                                     <div className="flex items-center text-sm text-gray-300">
                                         <svg
@@ -167,7 +167,7 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                                 clipRule="evenodd"
                                             />
                                         </svg>
-                                        Perfect for beginners
+                                        {t('เหมาะสำหรับผู้เริ่มต้น')}
                                     </div>
                                     <div className="flex items-center text-sm text-gray-300">
                                         <svg
@@ -181,7 +181,7 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                                 clipRule="evenodd"
                                             />
                                         </svg>
-                                        No file preparation needed
+                                        {t('ไม่ต้องเตรียมไฟล์')}
                                     </div>
                                     <div className="flex items-center text-sm text-gray-300">
                                         <svg
@@ -195,14 +195,14 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                                 clipRule="evenodd"
                                             />
                                         </svg>
-                                        Templates available
+                                        {t('มีเทมเพลตให้เลือก')}
                                     </div>
                                 </div>
 
                                 {selectedMethod === 'draw' && (
                                     <div className="mt-4">
                                         <span className="inline-flex items-center rounded-full bg-blue-500 px-3 py-1 text-sm font-medium text-white">
-                                            ✓ Selected
+                                            ✓ {t('เลือกแล้ว')}
                                         </span>
                                     </div>
                                 )}
@@ -220,9 +220,9 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                         >
                             <div className="text-center">
                                 <div className="mb-4 text-6xl">📁</div>
-                                <h3 className="mb-3 text-xl font-bold text-white">Import Blueprint File</h3>
+                                <h3 className="mb-3 text-xl font-bold text-white">{t('นำเข้าไฟล์แบบแปลน')}</h3>
                                 <p className="mb-4 text-gray-400">
-                                    Upload an existing blueprint file to trace and customize
+                                    {t('อัปโหลดไฟล์แบบแปลนที่มีอยู่แล้วเพื่อวาดทับและปรับแต่ง')}
                                 </p>
 
                                 <div className="space-y-2 text-left">
@@ -238,7 +238,7 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                                 clipRule="evenodd"
                                             />
                                         </svg>
-                                        Supports AutoCAD files (DWG, DXF)
+                                        {t('รองรับไฟล์ AutoCAD (DWG, DXF)')}
                                     </div>
                                     <div className="flex items-center text-sm text-gray-300">
                                         <svg
@@ -252,7 +252,7 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                                 clipRule="evenodd"
                                             />
                                         </svg>
-                                        Supports image files (PNG, JPG)
+                                        {t('รองรับไฟล์รูปภาพ (PNG, JPG)')}
                                     </div>
                                     <div className="flex items-center text-sm text-gray-300">
                                         <svg
@@ -266,7 +266,7 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                                 clipRule="evenodd"
                                             />
                                         </svg>
-                                        Supports PDF files
+                                        {t('รองรับไฟล์ PDF')}
                                     </div>
                                     <div className="flex items-center text-sm text-gray-300">
                                         <svg
@@ -280,14 +280,14 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                                 clipRule="evenodd"
                                             />
                                         </svg>
-                                        Requires blueprint knowledge
+                                        {t('ต้องมีความรู้ด้านแบบแปลน')}
                                     </div>
                                 </div>
 
                                 {selectedMethod === 'import' && (
                                     <div className="mt-4">
                                         <span className="inline-flex items-center rounded-full bg-orange-500 px-3 py-1 text-sm font-medium text-white">
-                                            ✓ Selected
+                                            ✓ {t('เลือกแล้ว')}
                                         </span>
                                     </div>
                                 )}
@@ -301,12 +301,10 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                             <div className="text-2xl">💡</div>
                             <div>
                                 <h4 className="mb-2 font-semibold text-blue-300">
-                                    Recommendation for Beginners
+                                    {t('คำแนะนำสำหรับผู้เริ่มต้น')}
                                 </h4>
                                 <p className="text-blue-100">
-                                    If you're a beginner or don't have blueprint files, we recommend choosing{' '}
-                                    <strong>"Draw Area Yourself"</strong>
-                                    {' '}as it's easier and includes standard greenhouse templates
+                                    {t('หากคุณเป็นผู้เริ่มต้นหรือไม่มีไฟล์แบบแปลน แนะนำให้เลือก "วาดพื้นที่เอง" เพราะจะง่ายกว่าและมีเทมเพลตโรงเรือนมาตรฐานให้เลือกใช้')}
                                 </p>
                             </div>
                         </div>
@@ -318,7 +316,7 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                             onClick={handleBack}
                             className="rounded-lg bg-gray-600 px-6 py-3 font-medium text-white transition-colors hover:bg-gray-700"
                         >
-                            ← Back to Crop Selection
+                            ← {t('กลับไปเลือกพืช')}
                         </button>
 
                         <button
@@ -326,9 +324,9 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                             disabled={!selectedMethod}
                             className="rounded-lg bg-blue-600 px-6 py-3 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:opacity-50"
                         >
-                            {selectedMethod === 'draw' && 'Start Drawing Area →'}
-                            {selectedMethod === 'import' && 'Import File →'}
-                            {!selectedMethod && 'Select Method →'}
+                            {selectedMethod === 'draw' && t('เริ่มวาดพื้นที่ →')}
+                            {selectedMethod === 'import' && t('นำเข้าไฟล์ →')}
+                            {!selectedMethod && t('เลือกวิธีการ →')}
                         </button>
                     </div>
 
@@ -336,8 +334,8 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                     {selectedMethod && (
                         <div className="mt-8 rounded-lg bg-gray-800 p-6">
                             <h4 className="mb-4 text-lg font-semibold text-white">
-                                {selectedMethod === 'draw' && '🎨 Area Drawing Preview'}
-                                {selectedMethod === 'import' && '📋 File Import Steps'}
+                                {selectedMethod === 'draw' && '🎨 ' + t('ตัวอย่างการวาดพื้นที่')}
+                                {selectedMethod === 'import' && '📋 ' + t('ขั้นตอนการนำเข้าไฟล์')}
                             </h4>
 
                             {selectedMethod === 'draw' && (
@@ -346,25 +344,25 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                         <div className="mr-3 flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
                                             1
                                         </div>
-                                        <span>Choose greenhouse template or draw freely</span>
+                                        <span>{t('เลือกเทมเพลตโรงเรือนหรือวาดแบบอิสระ')}</span>
                                     </div>
                                     <div className="flex items-center">
                                         <div className="mr-3 flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
                                             2
                                         </div>
-                                        <span>Define greenhouse size and shape</span>
+                                        <span>{t('กำหนดขนาดและรูปร่างโรงเรือน')}</span>
                                     </div>
                                     <div className="flex items-center">
                                         <div className="mr-3 flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
                                             3
                                         </div>
-                                        <span>Add growing beds and walkways</span>
+                                        <span>{t('เพิ่มแปลงปลูกและพื้นที่เดิน')}</span>
                                     </div>
                                     <div className="flex items-center">
                                         <div className="mr-3 flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
                                             4
                                         </div>
-                                        <span>Confirm and proceed to next step</span>
+                                        <span>{t('ยืนยันและไปขั้นตอนถัดไป')}</span>
                                     </div>
                                 </div>
                             )}
@@ -375,25 +373,25 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
                                         <div className="mr-3 flex h-6 w-6 items-center justify-center rounded-full bg-orange-600 text-xs font-bold text-white">
                                             1
                                         </div>
-                                        <span>Upload blueprint file (DWG, DXF, PDF, or image)</span>
+                                        <span>{t('อัปโหลดไฟล์แบบแปลน (DWG, DXF, PDF, หรือรูปภาพ)')}</span>
                                     </div>
                                     <div className="flex items-center">
                                         <div className="mr-3 flex h-6 w-6 items-center justify-center rounded-full bg-orange-600 text-xs font-bold text-white">
                                             2
                                         </div>
-                                        <span>Adjust size and position correctly</span>
+                                        <span>{t('ปรับขนาดและตำแหน่งให้ถูกต้อง')}</span>
                                     </div>
                                     <div className="flex items-center">
                                         <div className="mr-3 flex h-6 w-6 items-center justify-center rounded-full bg-orange-600 text-xs font-bold text-white">
                                             3
                                         </div>
-                                        <span>Trace greenhouse area and growing beds</span>
+                                        <span>{t('วาดทับพื้นที่โรงเรือนและแปลงปลูก')}</span>
                                     </div>
                                     <div className="flex items-center">
                                         <div className="mr-3 flex h-6 w-6 items-center justify-center rounded-full bg-orange-600 text-xs font-bold text-white">
                                             4
                                         </div>
-                                        <span>Confirm and proceed to next step</span>
+                                        <span>{t('ยืนยันและไปขั้นตอนถัดไป')}</span>
                                     </div>
                                 </div>
                             )}

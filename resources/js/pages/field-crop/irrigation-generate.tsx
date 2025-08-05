@@ -1,20 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Navbar from '../../components/Navbar';
 import { Head, Link, router } from '@inertiajs/react';
 import { Wrapper, Status } from '@googlemaps/react-wrapper';
-import { getCropByValue } from '@/pages/utils/cropData';
-import { PIPE_TYPES, EQUIPMENT_TYPES, ZONE_COLORS } from '@/pages/utils/fieldMapConstants';
+import { PIPE_TYPES, EQUIPMENT_TYPES } from '@/pages/utils/fieldMapConstants';
 import { useMapState, useStepWizard, useFieldZoneState, usePipeSystemState, useEquipmentState, useIrrigationState } from '@/pages/hooks/useFieldMapState';
 import ErrorBoundary from '@/pages/components/ErrorBoundary';
 import ErrorMessage from '@/pages/components/ErrorMessage';
 import LoadingSpinner from '@/pages/components/LoadingSpinner';
 
 // --- Interfaces ---
-interface Coordinate { lat: number; lng: number; }
-interface Zone { id: string | number; coordinates: Coordinate[]; color: string; name: string; polygon?: google.maps.Polygon; }
-interface Pipe { id: string | number; coordinates: Coordinate[]; type: string; name: string; zoneId?: string | number; }
-interface Equipment { id: string; type: string; lat: number; lng: number; name: string; }
 interface IrrigationPoint { id: string | number; lat: number; lng: number; type: string; radius: number; zoneId: string | number; marker?: google.maps.Marker; circle?: google.maps.Circle; }
 
 // --- Google Maps Configuration ---
@@ -68,9 +63,9 @@ export default function Step4_IrrigationSystem() {
 
     const { mapCenter, setMapCenter, mapZoom, setMapZoom, mapType } = mapState;
     const { setCurrentStep, setStepCompleted } = stepWizard;
-    const { zones, setZones, zoneAssignments, setZoneAssignments } = fieldZoneState;
+    const { zones, setZones, setZoneAssignments } = fieldZoneState;
     const { pipes, setPipes } = pipeSystemState;
-    const { equipmentIcons, setEquipmentIcons } = equipmentState;
+    const { setEquipmentIcons } = equipmentState;
     const { irrigationPoints, setIrrigationPoints, irrigationAssignments, setIrrigationAssignments, irrigationRadius, setIrrigationRadius, sprinklerOverlap, setSprinklerOverlap } = irrigationState;
 
     const [map, setMap] = useState<google.maps.Map | null>(null);
@@ -98,7 +93,9 @@ export default function Step4_IrrigationSystem() {
                 setIrrigationRadius(data.irrigationRadius || {});
                 setSprinklerOverlap(data.sprinklerOverlap || {});
 
-            } catch (e) { router.visit('/step1-field-area'); }
+            } catch {
+                router.visit('/step1-field-area');
+            }
         } else {
             router.visit('/step1-field-area');
         }

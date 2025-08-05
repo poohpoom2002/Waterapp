@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// resources\js\pages\components\SprinklerSelector.tsx
+// resources\js\pages\components\SprinklerSelector.tsx - Fixed units and properties
 import React, { useState } from 'react';
 import { CalculationResults } from '../types/interfaces';
 import { Zone } from '../../utils/horticultureUtils';
@@ -27,6 +27,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
     const [showImageModal, setShowImageModal] = useState(false);
     const [modalImage, setModalImage] = useState({ src: '', alt: '' });
     const { t } = useLanguage();
+    
     const openImageModal = (src: string, alt: string) => {
         setModalImage({ src, alt });
         setShowImageModal(true);
@@ -108,7 +109,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                     <p>
                         {t('อัตราการไหล')} {projectMode === 'garden' ? t('ต่อหัวฉีด') : t('ต่อหัว')}:{' '}
                         <span className="font-bold text-blue-300">
-                            {results.waterPerSprinklerLPH.toFixed(1)} {t('ลิตร/ชั่วโมง')}
+                            {results.waterPerSprinklerLPM.toFixed(1)} {t('LPM')}
                         </span>
                     </p>
                     <p>
@@ -137,7 +138,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 </option>
                 {sortedSprinklers.map((sprinkler) => (
                     <option key={sprinkler.id} value={sprinkler.id}>
-                        {sprinkler.name} - {sprinkler.price} {t('บาท')} | {sprinkler.brand_name || '-'}
+                        {sprinkler.name} - {sprinkler.price} {t('บาท')} | {sprinkler.brand || sprinkler.brand_name || '-'}
                     </option>
                 ))}
             </select>
@@ -187,7 +188,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                             </p>
                             <p>
                                 <strong>{t('อัตราการไหล:')}</strong>{' '}
-                                {formatRangeValue(selectedSprinkler.waterVolumeLitersPerHour)} {t('L/H')}
+                                {formatRangeValue(selectedSprinkler.waterVolumeLitersPerMinute)} {t('LPM')}
                             </p>
                             <p>
                                 <strong>{t('รัศมี:')}</strong>{' '}
@@ -201,10 +202,10 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
 
                         <div className="col-span-4">
                             <p>
-                                <strong>{t('แบรนด์:')}</strong> {selectedSprinkler.brand || '-'}
+                                <strong>{t('แบรนด์:')}</strong> {selectedSprinkler.brand || selectedSprinkler.brand_name || '-'}
                             </p>
                             <p>
-                                <strong>{t('ราคาต่อหัว:')}</strong> {selectedSprinkler.price} {t('บาท')}
+                                <strong>{t('ราคาต่อหัว:')}</strong> {selectedSprinkler.price?.toLocaleString()} {t('บาท')}
                             </p>
                             <p>
                                 <strong>{t('จำนวนที่ต้องใช้:')}</strong> {results.totalSprinklers} {t('หัว')}
@@ -232,7 +233,48 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         </div>
                     )}
 
-                    
+                    <div className="mt-3 rounded bg-blue-900 p-2">
+                        <h5 className="text-xs font-medium text-blue-300">
+                            📊 {t('ข้อมูลเพิ่มเติม:')}
+                        </h5>
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                            <p>
+                                {t('Flow เฉลี่ย:')} {' '}
+                                <span className="font-bold text-blue-200">
+                                    {getAverageValue(selectedSprinkler.waterVolumeLitersPerMinute).toFixed(1)} LPM
+                                </span>
+                            </p>
+                            <p>
+                                {t('รัศมีเฉลี่ย:')} {' '}
+                                <span className="font-bold text-blue-200">
+                                    {getAverageValue(selectedSprinkler.radiusMeters).toFixed(1)} m
+                                </span>
+                            </p>
+                            <p>
+                                {t('แรงดันเฉลี่ย:')} {' '}
+                                <span className="font-bold text-blue-200">
+                                    {getAverageValue(selectedSprinkler.pressureBar).toFixed(1)} bar
+                                </span>
+                            </p>
+                        </div>
+                        <div className="mt-1 text-xs">
+                            <p>
+                                {t('พื้นที่ครอบคลุม:')} {' '}
+                                <span className="font-bold text-yellow-300">
+                                    {(
+                                        Math.PI *
+                                        Math.pow(getAverageValue(selectedSprinkler.radiusMeters), 2)
+                                    ).toFixed(1)} ตร.ม./หัว
+                                </span>
+                            </p>
+                            <p>
+                                {t('ราคาต่อ LPM:')} {' '}
+                                <span className="font-bold text-green-300">
+                                    {(selectedSprinkler.price / getAverageValue(selectedSprinkler.waterVolumeLitersPerMinute)).toFixed(2)} บาท/LPM
+                                </span>
+                            </p>
+                        </div>
+                    </div>
 
                     {projectMode === 'garden' && (
                         <div className="mt-3 rounded bg-green-900 p-2">
@@ -280,7 +322,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                                 <div>
                                     <p>{t('พืชที่ปลูก:')} {activeZone.plantData?.name || 'ไม่ระบุ'}</p>
                                     <p>
-                                        {t('น้ำต่อต้น:')} {activeZone.plantData?.waterNeed || 0} {t('ลิตร/วัน')}
+                                        {t('น้ำต่อต้น:')} {activeZone.plantData?.waterNeed || 0} {t('ลิตร/ครั้ง')}
                                     </p>
                                 </div>
                             </div>
