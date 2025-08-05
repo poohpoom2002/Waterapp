@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // resources/js/components/homegarden/GoogleMapSummary.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Wrapper, Status } from '@googlemaps/react-wrapper';
@@ -604,8 +605,7 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
     );
 };
 
-const renderSummaryMap = (status: Status): React.ReactElement => {
-    const { t } = useLanguage();
+const renderSummaryMap = (status: Status, t: any): React.ReactElement => {
     switch (status) {
         case Status.LOADING:
             return <SummaryLoadingComponent t={t} />;
@@ -635,10 +635,10 @@ const GoogleMapSummary: React.FC<GoogleMapSummaryProps> = (props) => {
     }
 
     return (
-        <SummaryErrorBoundary t={t}>
+        <SummaryErrorBoundary t={t}>    
             <Wrapper
                 apiKey={config.apiKey}
-                render={renderSummaryMap}
+                render={(status) => renderSummaryMap(status, t)}
                 libraries={config.libraries as any}
                 version="weekly"
             >

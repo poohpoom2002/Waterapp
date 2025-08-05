@@ -232,3 +232,53 @@ export interface QuotationDataCustomer {
 }
 
 export type PipeType = 'branch' | 'secondary' | 'main';
+
+// Field-crop and greenhouse specific interfaces
+export interface FieldCropZone {
+    id: string;
+    name: string;
+    area: number; // square meters
+    areaInRai: number;
+    coordinates: any[];
+    cropType?: string;
+    totalPlantingPoints: number;
+    sprinklerCount: number;
+    totalWaterRequirementPerIrrigation: number;
+    plantData?: {
+        name: string;
+        waterNeed: number;
+        category?: string;
+    };
+}
+
+export interface GreenhousePlot {
+    plotId: string;
+    plotName: string;
+    area: number; // square meters
+    cropType?: string;
+    totalPlants: number;
+    waterRequirementPerIrrigation: number;
+    plantData?: {
+        name: string;
+        waterNeed: number;
+        category?: string;
+    };
+}
+
+export interface ZoneInputMapping {
+    [zoneId: string]: IrrigationInput;
+}
+
+export interface ZoneSprinklerMapping {
+    [zoneId: string]: any;
+}
+
+export type ProjectMode = 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
+
+export interface ProjectModeConfig {
+    mode: ProjectMode;
+    usesPump: boolean;
+    supportsMultiZone: boolean;
+    areaUnit: 'rai' | 'sqm';
+    itemName: string; // 'ต้นไม้' | 'หัวฉีด' etc.
+}

@@ -21,7 +21,8 @@ export const cropTypes: Crop[] = [
         value: 'rice',
         name: 'Rice',
         icon: '🌾',
-        description: "Thailand's main crop, grown in paddy fields. Requires a lot of water, especially during tillering and booting stages.",
+        description:
+            "Thailand's main crop, grown in paddy fields. Requires a lot of water, especially during tillering and booting stages.",
         category: 'cereal',
         irrigationNeeds: 'high',
         growthPeriod: 120, // Most varieties have a harvest period of about 120 days
@@ -49,7 +50,8 @@ export const cropTypes: Crop[] = [
         value: 'sorghum',
         name: 'Sorghum',
         icon: '🌾',
-        description: 'A drought-tolerant cereal crop suitable for arid areas, used for animal and human consumption.',
+        description:
+            'A drought-tolerant cereal crop suitable for arid areas, used for animal and human consumption.',
         category: 'cereal',
         irrigationNeeds: 'low',
         growthPeriod: 110,
@@ -65,7 +67,8 @@ export const cropTypes: Crop[] = [
         value: 'cassava',
         name: 'Cassava',
         icon: '🍠',
-        description: 'A major economic root crop, very drought-tolerant, used in starch and energy industries.',
+        description:
+            'A major economic root crop, very drought-tolerant, used in starch and energy industries.',
         category: 'root',
         irrigationNeeds: 'low',
         growthPeriod: 300, // Harvest time is 8-12 months
@@ -79,7 +82,8 @@ export const cropTypes: Crop[] = [
         value: 'sweet_potato',
         name: 'Sweet Potato',
         icon: '🍠',
-        description: 'A highly nutritious root crop with both domestic and international market demand.',
+        description:
+            'A highly nutritious root crop with both domestic and international market demand.',
         category: 'root',
         irrigationNeeds: 'medium',
         growthPeriod: 110,
@@ -95,7 +99,8 @@ export const cropTypes: Crop[] = [
         value: 'soybean',
         name: 'Soybean',
         icon: '🫘',
-        description: 'A high-protein, soil-improving crop that requires care during flowering and podding.',
+        description:
+            'A high-protein, soil-improving crop that requires care during flowering and podding.',
         category: 'legume',
         irrigationNeeds: 'medium',
         growthPeriod: 95,
@@ -123,7 +128,8 @@ export const cropTypes: Crop[] = [
         value: 'peanut',
         name: 'Peanut',
         icon: '🥜',
-        description: 'An oil and protein crop grown in loamy soil, requiring consistent water during pod formation.',
+        description:
+            'An oil and protein crop grown in loamy soil, requiring consistent water during pod formation.',
         category: 'legume',
         irrigationNeeds: 'medium',
         growthPeriod: 100,
@@ -169,7 +175,8 @@ export const cropTypes: Crop[] = [
         value: 'oil_palm',
         name: 'Oil Palm',
         icon: '🌴',
-        description: 'The oilseed crop with the highest yield per rai. Begins to bear fruit 3 years after planting.',
+        description:
+            'The oilseed crop with the highest yield per rai. Begins to bear fruit 3 years after planting.',
         category: 'oilseed',
         irrigationNeeds: 'high',
         growthPeriod: 1095, // ~3 years before first harvest
@@ -183,7 +190,8 @@ export const cropTypes: Crop[] = [
         value: 'sunflower',
         name: 'Sunflower',
         icon: '🌻',
-        description: 'A short-lived, drought-tolerant oilseed crop grown for supplemental income and tourism.',
+        description:
+            'A short-lived, drought-tolerant oilseed crop grown for supplemental income and tourism.',
         category: 'oilseed',
         irrigationNeeds: 'low',
         growthPeriod: 90,

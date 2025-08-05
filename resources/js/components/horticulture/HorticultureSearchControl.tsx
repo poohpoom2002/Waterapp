@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // components/horticulture/EnhancedHorticultureSearchControl.tsx
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {

@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('fields', function (Blueprint $table) {
-            $table->unsignedBigInteger('folder_id')->nullable()->after('user_id');
+            $table->unsignedBigInteger('folder_id')->nullable();
             $table->foreign('folder_id')->references('id')->on('folders')->onDelete('set null');
             $table->index('folder_id');
         });

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 // resources/js/pages/home-garden-summary.tsx
 import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import { router } from '@inertiajs/react';
@@ -11,16 +12,13 @@ import {
     GardenPlannerData,
     GardenStatistics,
     ZONE_TYPES,
-    SPRINKLER_TYPES,
     loadGardenData,
     calculateStatistics,
     formatArea,
     formatDistance,
     validateGardenData,
     clipCircleToPolygon,
-    isCornerSprinkler,
     canvasToGPS,
-    calculateDistance,
 } from '../utils/homeGardenData';
 interface HomeGardenSummaryProps {
     data?: GardenPlannerData;
@@ -45,7 +43,7 @@ class SummaryErrorBoundary extends React.Component<
     { children: React.ReactNode; t: (key: string) => string },
     { hasError: boolean; error?: Error }
 > {
-    constructor(props: any) {
+    constructor(props: { children: React.ReactNode; t: (key: string) => string }) {
         super(props);
         this.state = { hasError: false };
     }
@@ -391,6 +389,301 @@ const CanvasRenderer: React.FC<{
         [dimensionLines, transformPoint, transform, baseTransform]
     );
 
+    const drawElements = useCallback(
+        (ctx: CanvasRenderingContext2D, scale: number) => {
+            try {
+                gardenData.gardenZones?.forEach((zone) => {
+                    if (!zone.canvasCoordinates || zone.canvasCoordinates.length < 3) return;
+
+                    const zoneType = ZONE_TYPES.find((z) => z.id === zone.type);
+                    ctx.fillStyle = zoneType?.color + '33' || '#66666633';
+                    ctx.strokeStyle = zoneType?.color || '#666666';
+                    ctx.lineWidth =
+                        (zone.parentZoneId ? 3 : 2) *
+                        Math.max(0.5, transform.scale / baseTransform.scale);
+
+                    if (zone.type === 'forbidden' || zone.parentZoneId) {
+                        ctx.setLineDash([
+                            5 * Math.max(0.5, transform.scale / baseTransform.scale),
+                            5 * Math.max(0.5, transform.scale / baseTransform.scale),
+                        ]);
+                    }
+
+                    ctx.beginPath();
+                    const firstPoint = transformPoint(zone.canvasCoordinates[0]);
+                    ctx.moveTo(firstPoint.x, firstPoint.y);
+                    zone.canvasCoordinates.forEach((coord) => {
+                        const point = transformPoint(coord);
+                        ctx.lineTo(point.x, point.y);
+                    });
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    const centerX =
+                        zone.canvasCoordinates.reduce((sum, c) => sum + c.x, 0) /
+                        zone.canvasCoordinates.length;
+                    const centerY =
+                        zone.canvasCoordinates.reduce((sum, c) => sum + c.y, 0) /
+                        zone.canvasCoordinates.length;
+                    const centerPoint = transformPoint({ x: centerX, y: centerY });
+
+                    ctx.fillStyle = '#fff';
+                    ctx.font = `bold ${12 * Math.max(0.8, transform.scale / baseTransform.scale)}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(zone.name, centerPoint.x, centerPoint.y);
+
+                    try {
+                        const area =
+                            gardenData.canvasData && zone.canvasCoordinates
+                                ? zone.canvasCoordinates.reduce((sum, coord, i) => {
+                                      const nextCoord =
+                                          zone.canvasCoordinates![
+                                              (i + 1) % zone.canvasCoordinates!.length
+                                          ];
+                                      return sum + (coord.x * nextCoord.y - nextCoord.x * coord.y);
+                                  }, 0) /
+                                  2 /
+                                  (scale * scale)
+                                : 0;
+                        ctx.font = `${10 * Math.max(0.8, transform.scale / baseTransform.scale)}px Arial`;
+                        ctx.fillStyle = '#ddd';
+                        ctx.fillText(
+                            formatArea(Math.abs(area)),
+                            centerPoint.x,
+                            centerPoint.y +
+                                15 * Math.max(0.8, transform.scale / baseTransform.scale)
+                        );
+                    } catch (error) {
+                        console.error('Error drawing zone area:', error);
+                    }
+                });
+
+                gardenData.pipes?.forEach((pipe) => {
+                    if (!pipe.canvasStart || !pipe.canvasEnd) return;
+
+                    const startPoint = transformPoint(pipe.canvasStart);
+                    const endPoint = transformPoint(pipe.canvasEnd);
+
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.strokeStyle = '#8B5CF6';
+                    ctx.lineWidth = 3 * Math.max(0.5, transform.scale / baseTransform.scale);
+
+                    ctx.beginPath();
+                    ctx.moveTo(startPoint.x, startPoint.y);
+                    ctx.lineTo(endPoint.x, endPoint.y);
+                    ctx.stroke();
+                });
+
+                gardenData.sprinklers?.forEach((sprinkler) => {
+                    if (!sprinkler.canvasPosition) return;
+                    const zone = gardenData.gardenZones?.find((z) => z.id === sprinkler.zoneId);
+                    const sprinklerPoint = transformPoint(sprinkler.canvasPosition);
+
+                    if (zone && zone.canvasCoordinates && zone.canvasCoordinates.length >= 3) {
+                        if (zone.type === 'forbidden') {
+                            return;
+                        }
+
+                        try {
+                            const clipResult = clipCircleToPolygon(
+                                sprinkler.canvasPosition,
+                                sprinkler.type.radius,
+                                zone.canvasCoordinates,
+                                scale
+                            );
+
+                            const radiusPixels =
+                                (sprinkler.type.radius * scale * transform.scale) /
+                                baseTransform.scale;
+
+                            if (clipResult === 'FULL_CIRCLE') {
+                                ctx.fillStyle = sprinkler.type.color + '33';
+                                ctx.strokeStyle = sprinkler.type.color + '99';
+                                ctx.lineWidth =
+                                    2 * Math.max(0.5, transform.scale / baseTransform.scale);
+                                ctx.beginPath();
+                                ctx.arc(
+                                    sprinklerPoint.x,
+                                    sprinklerPoint.y,
+                                    radiusPixels,
+                                    0,
+                                    Math.PI * 2
+                                );
+                                ctx.fill();
+                                ctx.stroke();
+                            } else if (clipResult === 'MASKED_CIRCLE') {
+                                ctx.save();
+                                ctx.beginPath();
+                                const firstZonePoint = transformPoint(zone.canvasCoordinates[0]);
+                                ctx.moveTo(firstZonePoint.x, firstZonePoint.y);
+                                for (let i = 1; i < zone.canvasCoordinates.length; i++) {
+                                    const zonePoint = transformPoint(zone.canvasCoordinates[i]);
+                                    ctx.lineTo(zonePoint.x, zonePoint.y);
+                                }
+                                ctx.closePath();
+                                ctx.clip();
+
+                                ctx.fillStyle = sprinkler.type.color + '33';
+                                ctx.beginPath();
+                                ctx.arc(
+                                    sprinklerPoint.x,
+                                    sprinklerPoint.y,
+                                    radiusPixels,
+                                    0,
+                                    Math.PI * 2
+                                );
+                                ctx.fill();
+                                ctx.restore();
+
+                                ctx.strokeStyle = sprinkler.type.color + '66';
+                                ctx.lineWidth =
+                                    1 * Math.max(0.5, transform.scale / baseTransform.scale);
+                                ctx.setLineDash([
+                                    3 * Math.max(0.5, transform.scale / baseTransform.scale),
+                                    3 * Math.max(0.5, transform.scale / baseTransform.scale),
+                                ]);
+                                ctx.beginPath();
+                                ctx.arc(
+                                    sprinklerPoint.x,
+                                    sprinklerPoint.y,
+                                    radiusPixels,
+                                    0,
+                                    Math.PI * 2
+                                );
+                                ctx.stroke();
+                                ctx.setLineDash([]);
+                            } else if (Array.isArray(clipResult) && clipResult.length >= 3) {
+                                const canvasResult = clipResult as CanvasCoordinate[];
+                                ctx.fillStyle = sprinkler.type.color + '33';
+                                ctx.strokeStyle = sprinkler.type.color + '99';
+                                ctx.lineWidth =
+                                    2 * Math.max(0.5, transform.scale / baseTransform.scale);
+                                ctx.beginPath();
+                                const firstClipPoint = transformPoint(canvasResult[0]);
+                                ctx.moveTo(firstClipPoint.x, firstClipPoint.y);
+                                canvasResult.forEach((point) => {
+                                    const clipPoint = transformPoint(point);
+                                    ctx.lineTo(clipPoint.x, clipPoint.y);
+                                });
+                                ctx.closePath();
+                                ctx.fill();
+                                ctx.stroke();
+                            }
+                        } catch (error) {
+                            console.error('Error drawing sprinkler radius:', error);
+
+                            const radiusPixels =
+                                (sprinkler.type.radius * scale * transform.scale) /
+                                baseTransform.scale;
+                            ctx.fillStyle = sprinkler.type.color + '26';
+                            ctx.strokeStyle = sprinkler.type.color + '80';
+                            ctx.lineWidth =
+                                1 * Math.max(0.5, transform.scale / baseTransform.scale);
+                            ctx.beginPath();
+                            ctx.arc(
+                                sprinklerPoint.x,
+                                sprinklerPoint.y,
+                                radiusPixels,
+                                0,
+                                Math.PI * 2
+                            );
+                            ctx.fill();
+                            ctx.stroke();
+                        }
+                    } else if (sprinkler.zoneId === 'virtual_zone') {
+                        const radiusPixels =
+                            (sprinkler.type.radius * scale * transform.scale) / baseTransform.scale;
+
+                        ctx.fillStyle = sprinkler.type.color + '26';
+                        ctx.strokeStyle = sprinkler.type.color + '80';
+                        ctx.lineWidth = 1 * Math.max(0.5, transform.scale / baseTransform.scale);
+                        ctx.setLineDash([
+                            8 * Math.max(0.5, transform.scale / baseTransform.scale),
+                            4 * Math.max(0.5, transform.scale / baseTransform.scale),
+                        ]);
+                        ctx.beginPath();
+                        ctx.arc(sprinklerPoint.x, sprinklerPoint.y, radiusPixels, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                    }
+                });
+
+                gardenData.sprinklers?.forEach((sprinkler) => {
+                    if (!sprinkler.canvasPosition) return;
+
+                    const sprinklerPoint = transformPoint(sprinkler.canvasPosition);
+
+                    ctx.save();
+
+                    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                    ctx.shadowBlur = 3 * Math.max(0.5, transform.scale / baseTransform.scale);
+                    ctx.shadowOffsetX = 1 * Math.max(0.5, transform.scale / baseTransform.scale);
+                    ctx.shadowOffsetY = 1 * Math.max(0.5, transform.scale / baseTransform.scale);
+
+                    ctx.fillStyle = sprinkler.type.color;
+                    ctx.font = `bold ${8 * Math.max(0.8, transform.scale / baseTransform.scale)}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+
+                    if (sprinkler.orientation) {
+                        ctx.translate(sprinklerPoint.x, sprinklerPoint.y);
+                        ctx.rotate((sprinkler.orientation * Math.PI) / 180);
+                        ctx.fillText(sprinkler.type.icon, 0, 0);
+                        ctx.restore();
+                    } else {
+                        ctx.fillText(sprinkler.type.icon, sprinklerPoint.x, sprinklerPoint.y);
+                        ctx.restore();
+                    }
+                });
+
+                if (gardenData.waterSource?.canvasPosition) {
+                    const waterSourcePoint = transformPoint(gardenData.waterSource.canvasPosition);
+
+                    ctx.save();
+
+                    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+                    ctx.shadowBlur = 8 * Math.max(0.5, transform.scale / baseTransform.scale);
+                    ctx.shadowOffsetX = 2 * Math.max(0.5, transform.scale / baseTransform.scale);
+                    ctx.shadowOffsetY = 2 * Math.max(0.5, transform.scale / baseTransform.scale);
+
+                    ctx.fillStyle = gardenData.waterSource.type === 'pump' ? '#EF4444' : '#3B82F6';
+                    ctx.beginPath();
+                    ctx.arc(
+                        waterSourcePoint.x,
+                        waterSourcePoint.y,
+                        8 * Math.max(0.5, transform.scale / baseTransform.scale),
+                        0,
+                        Math.PI * 2
+                    );
+                    ctx.fill();
+
+                    ctx.shadowColor = 'transparent';
+                    ctx.fillStyle = '#fff';
+                    ctx.font = `bold ${10 * Math.max(0.8, transform.scale / baseTransform.scale)}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(
+                        gardenData.waterSource.type === 'pump' ? '⚡' : '🚰',
+                        waterSourcePoint.x,
+                        waterSourcePoint.y
+                    );
+
+                    ctx.restore();
+                }
+
+                drawDimensionLines(ctx);
+            } catch (error) {
+                console.error('Error drawing canvas elements:', error);
+            }
+        },
+        [gardenData, transform, transformPoint, drawDimensionLines, baseTransform]
+    );
+
     const draw = useCallback(() => {
         const canvas = activeCanvasRef.current;
         if (!canvas) return;
@@ -445,321 +738,10 @@ const CanvasRenderer: React.FC<{
             } else {
                 drawElements(ctx, scale);
             }
-
-            function drawElements(ctx: CanvasRenderingContext2D, scale: number) {
-                try {
-                    gardenData.gardenZones?.forEach((zone) => {
-                        if (!zone.canvasCoordinates || zone.canvasCoordinates.length < 3) return;
-
-                        const zoneType = ZONE_TYPES.find((z) => z.id === zone.type);
-                        ctx.fillStyle = zoneType?.color + '33' || '#66666633';
-                        ctx.strokeStyle = zoneType?.color || '#666666';
-                        ctx.lineWidth =
-                            (zone.parentZoneId ? 3 : 2) *
-                            Math.max(0.5, transform.scale / baseTransform.scale);
-
-                        if (zone.type === 'forbidden' || zone.parentZoneId) {
-                            ctx.setLineDash([
-                                5 * Math.max(0.5, transform.scale / baseTransform.scale),
-                                5 * Math.max(0.5, transform.scale / baseTransform.scale),
-                            ]);
-                        }
-
-                        ctx.beginPath();
-                        const firstPoint = transformPoint(zone.canvasCoordinates[0]);
-                        ctx.moveTo(firstPoint.x, firstPoint.y);
-                        zone.canvasCoordinates.forEach((coord) => {
-                            const point = transformPoint(coord);
-                            ctx.lineTo(point.x, point.y);
-                        });
-                        ctx.closePath();
-                        ctx.fill();
-                        ctx.stroke();
-                        ctx.setLineDash([]);
-
-                        const centerX =
-                            zone.canvasCoordinates.reduce((sum, c) => sum + c.x, 0) /
-                            zone.canvasCoordinates.length;
-                        const centerY =
-                            zone.canvasCoordinates.reduce((sum, c) => sum + c.y, 0) /
-                            zone.canvasCoordinates.length;
-                        const centerPoint = transformPoint({ x: centerX, y: centerY });
-
-                        ctx.fillStyle = '#fff';
-                        ctx.font = `bold ${12 * Math.max(0.8, transform.scale / baseTransform.scale)}px Arial`;
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
-                        ctx.fillText(zone.name, centerPoint.x, centerPoint.y);
-
-                        try {
-                            const area =
-                                gardenData.canvasData && zone.canvasCoordinates
-                                    ? zone.canvasCoordinates.reduce((sum, coord, i) => {
-                                          const nextCoord =
-                                              zone.canvasCoordinates![
-                                                  (i + 1) % zone.canvasCoordinates!.length
-                                              ];
-                                          return (
-                                              sum + (coord.x * nextCoord.y - nextCoord.x * coord.y)
-                                          );
-                                      }, 0) /
-                                      2 /
-                                      (scale * scale)
-                                    : 0;
-                            ctx.font = `${10 * Math.max(0.8, transform.scale / baseTransform.scale)}px Arial`;
-                            ctx.fillStyle = '#ddd';
-                            ctx.fillText(
-                                formatArea(Math.abs(area)),
-                                centerPoint.x,
-                                centerPoint.y +
-                                    15 * Math.max(0.8, transform.scale / baseTransform.scale)
-                            );
-                        } catch (error) {
-                            console.error('Error drawing zone area:', error);
-                        }
-                    });
-
-                    gardenData.pipes?.forEach((pipe) => {
-                        if (!pipe.canvasStart || !pipe.canvasEnd) return;
-
-                        const startPoint = transformPoint(pipe.canvasStart);
-                        const endPoint = transformPoint(pipe.canvasEnd);
-
-                        ctx.lineCap = 'round';
-                        ctx.lineJoin = 'round';
-                        ctx.strokeStyle = '#8B5CF6';
-                        ctx.lineWidth = 3 * Math.max(0.5, transform.scale / baseTransform.scale);
-
-                        ctx.beginPath();
-                        ctx.moveTo(startPoint.x, startPoint.y);
-                        ctx.lineTo(endPoint.x, endPoint.y);
-                        ctx.stroke();
-                    });
-
-                    gardenData.sprinklers?.forEach((sprinkler) => {
-                        if (!sprinkler.canvasPosition) return;
-                        const zone = gardenData.gardenZones?.find((z) => z.id === sprinkler.zoneId);
-                        const sprinklerPoint = transformPoint(sprinkler.canvasPosition);
-
-                        if (zone && zone.canvasCoordinates && zone.canvasCoordinates.length >= 3) {
-                            if (zone.type === 'forbidden') {
-                                return;
-                            }
-
-                            try {
-                                const clipResult = clipCircleToPolygon(
-                                    sprinkler.canvasPosition,
-                                    sprinkler.type.radius,
-                                    zone.canvasCoordinates,
-                                    scale
-                                );
-
-                                const radiusPixels =
-                                    (sprinkler.type.radius * scale * transform.scale) /
-                                    baseTransform.scale;
-
-                                if (clipResult === 'FULL_CIRCLE') {
-                                    ctx.fillStyle = sprinkler.type.color + '33';
-                                    ctx.strokeStyle = sprinkler.type.color + '99';
-                                    ctx.lineWidth =
-                                        2 * Math.max(0.5, transform.scale / baseTransform.scale);
-                                    ctx.beginPath();
-                                    ctx.arc(
-                                        sprinklerPoint.x,
-                                        sprinklerPoint.y,
-                                        radiusPixels,
-                                        0,
-                                        Math.PI * 2
-                                    );
-                                    ctx.fill();
-                                    ctx.stroke();
-                                } else if (clipResult === 'MASKED_CIRCLE') {
-                                    ctx.save();
-                                    ctx.beginPath();
-                                    const firstZonePoint = transformPoint(
-                                        zone.canvasCoordinates[0]
-                                    );
-                                    ctx.moveTo(firstZonePoint.x, firstZonePoint.y);
-                                    for (let i = 1; i < zone.canvasCoordinates.length; i++) {
-                                        const zonePoint = transformPoint(zone.canvasCoordinates[i]);
-                                        ctx.lineTo(zonePoint.x, zonePoint.y);
-                                    }
-                                    ctx.closePath();
-                                    ctx.clip();
-
-                                    ctx.fillStyle = sprinkler.type.color + '33';
-                                    ctx.beginPath();
-                                    ctx.arc(
-                                        sprinklerPoint.x,
-                                        sprinklerPoint.y,
-                                        radiusPixels,
-                                        0,
-                                        Math.PI * 2
-                                    );
-                                    ctx.fill();
-                                    ctx.restore();
-
-                                    ctx.strokeStyle = sprinkler.type.color + '66';
-                                    ctx.lineWidth =
-                                        1 * Math.max(0.5, transform.scale / baseTransform.scale);
-                                    ctx.setLineDash([
-                                        3 * Math.max(0.5, transform.scale / baseTransform.scale),
-                                        3 * Math.max(0.5, transform.scale / baseTransform.scale),
-                                    ]);
-                                    ctx.beginPath();
-                                    ctx.arc(
-                                        sprinklerPoint.x,
-                                        sprinklerPoint.y,
-                                        radiusPixels,
-                                        0,
-                                        Math.PI * 2
-                                    );
-                                    ctx.stroke();
-                                    ctx.setLineDash([]);
-                                } else if (Array.isArray(clipResult) && clipResult.length >= 3) {
-                                    const canvasResult = clipResult as CanvasCoordinate[];
-                                    ctx.fillStyle = sprinkler.type.color + '33';
-                                    ctx.strokeStyle = sprinkler.type.color + '99';
-                                    ctx.lineWidth =
-                                        2 * Math.max(0.5, transform.scale / baseTransform.scale);
-                                    ctx.beginPath();
-                                    const firstClipPoint = transformPoint(canvasResult[0]);
-                                    ctx.moveTo(firstClipPoint.x, firstClipPoint.y);
-                                    canvasResult.forEach((point) => {
-                                        const clipPoint = transformPoint(point);
-                                        ctx.lineTo(clipPoint.x, clipPoint.y);
-                                    });
-                                    ctx.closePath();
-                                    ctx.fill();
-                                    ctx.stroke();
-                                }
-                            } catch (error) {
-                                console.error('Error drawing sprinkler radius:', error);
-
-                                const radiusPixels =
-                                    (sprinkler.type.radius * scale * transform.scale) /
-                                    baseTransform.scale;
-                                ctx.fillStyle = sprinkler.type.color + '26';
-                                ctx.strokeStyle = sprinkler.type.color + '80';
-                                ctx.lineWidth =
-                                    1 * Math.max(0.5, transform.scale / baseTransform.scale);
-                                ctx.beginPath();
-                                ctx.arc(
-                                    sprinklerPoint.x,
-                                    sprinklerPoint.y,
-                                    radiusPixels,
-                                    0,
-                                    Math.PI * 2
-                                );
-                                ctx.fill();
-                                ctx.stroke();
-                            }
-                        } else if (sprinkler.zoneId === 'virtual_zone') {
-                            const radiusPixels =
-                                (sprinkler.type.radius * scale * transform.scale) /
-                                baseTransform.scale;
-
-                            ctx.fillStyle = sprinkler.type.color + '26';
-                            ctx.strokeStyle = sprinkler.type.color + '80';
-                            ctx.lineWidth =
-                                1 * Math.max(0.5, transform.scale / baseTransform.scale);
-                            ctx.setLineDash([
-                                8 * Math.max(0.5, transform.scale / baseTransform.scale),
-                                4 * Math.max(0.5, transform.scale / baseTransform.scale),
-                            ]);
-                            ctx.beginPath();
-                            ctx.arc(
-                                sprinklerPoint.x,
-                                sprinklerPoint.y,
-                                radiusPixels,
-                                0,
-                                Math.PI * 2
-                            );
-                            ctx.fill();
-                            ctx.stroke();
-                            ctx.setLineDash([]);
-                        }
-                    });
-
-                    gardenData.sprinklers?.forEach((sprinkler) => {
-                        if (!sprinkler.canvasPosition) return;
-
-                        const sprinklerPoint = transformPoint(sprinkler.canvasPosition);
-
-                        ctx.save();
-
-                        ctx.shadowColor = 'rgba(0,0,0,0.8)';
-                        ctx.shadowBlur = 3 * Math.max(0.5, transform.scale / baseTransform.scale);
-                        ctx.shadowOffsetX =
-                            1 * Math.max(0.5, transform.scale / baseTransform.scale);
-                        ctx.shadowOffsetY =
-                            1 * Math.max(0.5, transform.scale / baseTransform.scale);
-
-                        ctx.fillStyle = sprinkler.type.color;
-                        ctx.font = `bold ${8 * Math.max(0.8, transform.scale / baseTransform.scale)}px Arial`;
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
-
-                        if (sprinkler.orientation) {
-                            ctx.translate(sprinklerPoint.x, sprinklerPoint.y);
-                            ctx.rotate((sprinkler.orientation * Math.PI) / 180);
-                            ctx.fillText(sprinkler.type.icon, 0, 0);
-                            ctx.restore();
-                        } else {
-                            ctx.fillText(sprinkler.type.icon, sprinklerPoint.x, sprinklerPoint.y);
-                            ctx.restore();
-                        }
-                    });
-
-                    if (gardenData.waterSource?.canvasPosition) {
-                        const waterSourcePoint = transformPoint(
-                            gardenData.waterSource.canvasPosition
-                        );
-
-                        ctx.save();
-
-                        ctx.shadowColor = 'rgba(0,0,0,0.6)';
-                        ctx.shadowBlur = 8 * Math.max(0.5, transform.scale / baseTransform.scale);
-                        ctx.shadowOffsetX =
-                            2 * Math.max(0.5, transform.scale / baseTransform.scale);
-                        ctx.shadowOffsetY =
-                            2 * Math.max(0.5, transform.scale / baseTransform.scale);
-
-                        ctx.fillStyle =
-                            gardenData.waterSource.type === 'pump' ? '#EF4444' : '#3B82F6';
-                        ctx.beginPath();
-                        ctx.arc(
-                            waterSourcePoint.x,
-                            waterSourcePoint.y,
-                            8 * Math.max(0.5, transform.scale / baseTransform.scale),
-                            0,
-                            Math.PI * 2
-                        );
-                        ctx.fill();
-
-                        ctx.shadowColor = 'transparent';
-                        ctx.fillStyle = '#fff';
-                        ctx.font = `bold ${10 * Math.max(0.8, transform.scale / baseTransform.scale)}px Arial`;
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
-                        ctx.fillText(
-                            gardenData.waterSource.type === 'pump' ? '⚡' : '🚰',
-                            waterSourcePoint.x,
-                            waterSourcePoint.y
-                        );
-
-                        ctx.restore();
-                    }
-
-                    drawDimensionLines(ctx);
-                } catch (error) {
-                    console.error('Error drawing canvas elements:', error);
-                }
-            }
         } catch (error) {
             console.error('Error in canvas draw function:', error);
         }
-    }, [gardenData, activeCanvasRef, transform, transformPoint, drawDimensionLines, baseTransform]);
+    }, [gardenData, activeCanvasRef, transform, transformPoint, drawElements]);
 
     useEffect(() => {
         const updateCanvasSize = () => {
@@ -778,7 +760,7 @@ const CanvasRenderer: React.FC<{
         return () => {
             window.removeEventListener('resize', updateCanvasSize);
         };
-    }, []);
+    }, [containerRef]);
 
     useEffect(() => {
         draw();
@@ -814,7 +796,7 @@ const CanvasRenderer: React.FC<{
             window.removeEventListener('mousemove', handleGlobalMouseMove);
             window.removeEventListener('mouseup', handleGlobalMouseUp);
         };
-    }, [isDragging, lastMousePos]);
+    }, [isDragging, lastMousePos, setViewport, setLastMousePos]);
 
     return (
         <div
@@ -859,7 +841,6 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
     const [gardenData, setGardenData] = useState<GardenPlannerData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isSavingImage, setIsSavingImage] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const [isCreatingImage, setIsCreatingImage] = useState(false);
