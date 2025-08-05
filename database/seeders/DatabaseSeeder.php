@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $this->call([
+            UserSeeder::class,
             PlantTypeSeeder::class,
             SprinklerSeeder::class,
             EquipmentSeeder::class,

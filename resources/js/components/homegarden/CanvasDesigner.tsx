@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // resources/js/components/homegarden/CanvasDesigner.tsx
 import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import {
@@ -1277,17 +1279,13 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
 
                 ctx.restore();
             }
-        } catch (error) {
-            console.error('Error during canvas drawing:', error);
+        } catch {
+            console.error('Error during canvas drawing');
         }
     }, [
         canvasSize,
-        viewport,
         gardenZones,
         sprinklers,
-        waterSource,
-        pipes,
-        currentPolygon,
         enhancedMode,
         hoveredSnapPoint,
         scalePoints,
@@ -1312,8 +1310,8 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             if (!canvas) return;
 
             const rect = canvas.getBoundingClientRect();
-            let x = e.clientX - rect.left;
-            let y = e.clientY - rect.top;
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
 
             if (isPanning && panStart && lastPanPosition) {
                 const deltaX = x - panStart.x;
@@ -1352,14 +1350,16 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 let previewShape: CanvasCoordinate[] | null = null;
 
                 switch (currentZoneTool) {
-                    case 'rectangle':
+                    case 'rectangle': {
                         previewShape = createRectangleZone(enhancedDrawing.startPoint, worldPos);
                         break;
-                    case 'circle':
+                    }
+                    case 'circle': {
                         const radius = calculateDistance(enhancedDrawing.startPoint, worldPos);
                         previewShape = createCircleZone(enhancedDrawing.startPoint, radius);
                         break;
-                    case 'polygon':
+                    }
+                    case 'polygon': {
                         const polyRadius = calculateDistance(enhancedDrawing.startPoint, worldPos);
                         previewShape = createRegularPolygon(
                             enhancedDrawing.startPoint,
@@ -1367,6 +1367,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                             6
                         );
                         break;
+                    }
                 }
 
                 setEnhancedDrawing((prev) => ({ ...prev, previewShape }));
@@ -1428,8 +1429,8 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             if (!canvas) return;
 
             const rect = canvas.getBoundingClientRect();
-            let x = e.clientX - rect.left;
-            let y = e.clientY - rect.top;
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
 
             const isMainClick =
                 editMode === 'view' ||
@@ -1541,13 +1542,14 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                             let finalPoints: CanvasCoordinate[] = [];
 
                             switch (currentZoneTool) {
-                                case 'rectangle':
+                                case 'rectangle': {
                                     finalPoints = createRectangleZone(
                                         enhancedDrawing.startPoint!,
                                         worldPos
                                     );
                                     break;
-                                case 'circle':
+                                }
+                                case 'circle': {
                                     const radius = calculateDistance(
                                         enhancedDrawing.startPoint!,
                                         worldPos
@@ -1557,7 +1559,8 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                         radius
                                     );
                                     break;
-                                case 'polygon':
+                                }
+                                case 'polygon': {
                                     const polyRadius = calculateDistance(
                                         enhancedDrawing.startPoint!,
                                         worldPos
@@ -1568,6 +1571,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                         6
                                     );
                                     break;
+                                }
                             }
 
                             finalizeEnhancedZone(finalPoints);
@@ -1630,35 +1634,39 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         },
         [
             editMode,
+            dimensionMode,
+            isSettingScale,
+            pipeEditMode,
+            screenToWorld,
             enhancedMode,
             snapToGrid,
             snapToVertex,
+            checkDimensionLineClick,
+            waterSource,
+            viewport.panX,
+            viewport.panY,
+            viewport.zoom,
             findNearestSnapPoint,
-            screenToWorld,
-            dimensionMode,
             tempDimensionPoints,
-            addDimensionLine,
-            isSettingScale,
+            removeDimensionLine,
             scalePoints,
+            pipes,
+            distanceToLine,
+            onPipeClick,
             currentZoneTool,
-            enhancedDrawing,
+            enhancedDrawing.isDrawing,
+            enhancedDrawing.startPoint,
+            finalizeEnhancedZone,
             createRectangleZone,
             createCircleZone,
             createRegularPolygon,
-            finalizeEnhancedZone,
-            currentPolygon,
-            isDrawing,
-            waterSource,
             sprinklers,
-            viewport,
-            pipes,
-            distanceToLine,
-            pipeEditMode,
-            onPipeClick,
+            onSprinklerClick,
+            isDrawing,
+            currentPolygon,
             onSprinklerPlaced,
             onWaterSourcePlaced,
             onMainPipePoint,
-            onSprinklerClick,
         ]
     );
 

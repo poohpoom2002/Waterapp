@@ -1,7 +1,9 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // resources\js\pages\components\PumpSelector.tsx
 import React, { useState } from 'react';
 import { CalculationResults, IrrigationInput } from '../types/interfaces';
-
+import { useLanguage } from '@/contexts/LanguageContext';
 interface PumpSelectorProps {
     results: CalculationResults;
     selectedPump?: any;
@@ -32,7 +34,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 }) => {
     const [showImageModal, setShowImageModal] = useState(false);
     const [modalImage, setModalImage] = useState({ src: '', alt: '' });
-
+    const { t } = useLanguage();
     const openImageModal = (src: string, alt: string) => {
         setModalImage({ src, alt });
         setShowImageModal(true);
@@ -52,7 +54,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 flow: results.projectSummary.selectedGroupFlowLPM,
                 head: results.projectSummary.selectedGroupHeadM,
                 mode: results.projectSummary.operationMode,
-                sourceInfo: 'คำนวณจากระบบ Project Summary',
+                sourceInfo: t('คำนวณจากระบบ Project Summary'),
             };
         }
 
@@ -61,7 +63,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 flow: requiredFlow,
                 head: requiredHead,
                 mode: 'single',
-                sourceInfo: 'โซนเดียว',
+                sourceInfo: t('โซนเดียว'),
             };
         }
 
@@ -96,7 +98,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                     : simultaneousZonesCount === 1
                       ? 'sequential'
                       : 'custom',
-            sourceInfo: `${simultaneousZonesCount} โซนพร้อมกัน (Fallback calculation)`,
+            sourceInfo: `${simultaneousZonesCount} ${t('โซนพร้อมกัน')} (${t('Fallback calculation')})`,
         };
     };
 
@@ -120,20 +122,20 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
         const isAutoSelected = pump.id === autoSelectedPump?.id;
 
         if (isAutoSelected) {
-            if (pump.isRecommended) return '🤖⭐ เลือกอัตโนมัติ (แนะนำ)';
-            if (pump.isGoodChoice) return '🤖✅ เลือกอัตโนมัติ (ดี)';
-            if (pump.isUsable) return '🤖⚡ เลือกอัตโนมัติ (ใช้ได้)';
-            return '🤖⚠️ เลือกอัตโนมัติ (ตัวดีที่สุดที่มี)';
+            if (pump.isRecommended) return t('🤖⭐ เลือกอัตโนมัติ (แนะนำ)');
+            if (pump.isGoodChoice) return t('🤖✅ เลือกอัตโนมัติ (ดี)');
+            if (pump.isUsable) return t('🤖⚡ เลือกอัตโนมัติ (ใช้ได้)');
+            return t('🤖⚠️ เลือกอัตโนมัติ (ตัวดีที่สุดที่มี)');
         } else {
-            return '👤 เลือกเอง';
+            return t('👤 เลือกเอง');
         }
     };
 
     const getPumpGrouping = (pump: any) => {
-        if (pump.isRecommended) return 'แนะนำ';
-        if (pump.isGoodChoice) return 'ตัวเลือกดี';
-        if (pump.isUsable) return 'ใช้ได้';
-        return 'อื่นๆ';
+        if (pump.isRecommended) return t('แนะนำ');
+        if (pump.isGoodChoice) return t('ตัวเลือกดี');
+        if (pump.isUsable) return t('ใช้ได้');
+        return t('อื่นๆ');
     };
 
     const formatRangeValue = (value: any) => {
@@ -154,14 +156,14 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                         (e.target as HTMLImageElement).style.display = 'none';
                     }}
                     onClick={() => openImageModal(imageUrl, pump.name || 'ปั๊มน้ำ')}
-                    title="คลิกเพื่อดูรูปขนาดใหญ่"
+                    title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
                 />
             );
         }
 
         return (
             <div className="flex h-[60px] w-[85px] items-center justify-center rounded border border-gray-600 bg-gray-500 text-xs text-gray-300">
-                🚰 ปั๊ม
+                🚰 {t('ปั๊ม')}
             </div>
         );
     };
@@ -179,7 +181,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                         (e.target as HTMLImageElement).style.display = 'none';
                     }}
                     onClick={() => openImageModal(imageUrl, accessory.name)}
-                    title="คลิกเพื่อดูรูปขนาดใหญ่"
+                    title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
                 />
             );
         }
@@ -203,48 +205,45 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
     return (
         <div className="rounded-lg bg-gray-700 p-6">
-            <h3 className="mb-4 text-lg font-semibold text-red-400">
-                ปั๊มน้ำ
-                <span className="ml-2 text-sm font-normal text-gray-400">
-                    (🤖 เลือกอัตโนมัติ + ปรับแต่งได้)
-                </span>
+            <h3 className="mb-4 text-2xl font-bold text-red-500">
+                {t('ปั๊มน้ำ')}
             </h3>
 
             <div className="mb-4 rounded bg-gray-600 p-3">
-                <h4 className="mb-2 text-sm font-medium text-red-300">⚡ ความต้องการ:</h4>
+                <h4 className="mb-2 text-sm font-medium text-red-300">⚡ {t('ความต้องการ:')}</h4>
                 <div className="text-xs text-gray-300">
                     <p>
-                        อัตราการไหล:{' '}
+                        {t('อัตราการไหล:')} {' '}
                         <span className="font-bold text-blue-300">
                             {results.projectSummary
                                 ? results.projectSummary.selectedGroupFlowLPM.toFixed(1)
                                 : requiredFlow.toFixed(1)}{' '}
-                            LPM
+                            {t('LPM')}
                         </span>
                     </p>
                     <p>
-                        Head รวม:{' '}
+                        {t('Head รวม:')} {' '}
                         <span className="font-bold text-yellow-300">
                             {results.projectSummary
                                 ? results.projectSummary.selectedGroupHeadM.toFixed(1)
                                 : requiredHead.toFixed(1)}{' '}
-                            เมตร
+                            {t('เมตร')}
                         </span>
                     </p>
                 </div>
                 {results.projectSummary && (
                     <div className="mt-2 text-xs text-purple-200">
                         <p>
-                            🎯 รูปแบบการเปิด:{' '}
+                            🎯 {t('รูปแบบการเปิด:')} {' '}
                             {results.projectSummary.operationMode === 'simultaneous'
-                                ? 'เปิดพร้อมกันทุกโซน'
+                                ? t('เปิดพร้อมกันทุกโซน')
                                 : results.projectSummary.operationMode === 'custom'
-                                  ? 'เปิดแบบกำหนดเอง'
-                                  : 'เปิดทีละโซน'}
+                                  ? t('เปิดแบบกำหนดเอง')
+                                  : t('เปิดทีละโซน')}
                         </p>
-                        <p>💧 คำนวณจากโซน: {results.projectSummary.criticalZone}</p>
+                        <p>💧 {t('คำนวณจากโซน:')} {results.projectSummary.criticalZone}</p>
                         {results.projectSummary.criticalGroup && (
-                            <p>🔗 กลุ่มที่คำนวณ: {results.projectSummary.criticalGroup.label}</p>
+                            <p>🔗 {t('กลุ่มที่คำนวณ:')} {results.projectSummary.criticalGroup.label}</p>
                         )}
                     </div>
                 )}
@@ -254,16 +253,13 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                     simultaneousZonesCount > 1 &&
                     !results.projectSummary && (
                         <div className="mt-2 text-xs text-purple-200">
-                            <p>🔄 คำนวณสำหรับ {simultaneousZonesCount} โซนที่เปิดพร้อมกัน</p>
-                            <p>💧 อัตราการไหลรวม: {actualRequiredFlow.toFixed(1)} LPM (Fallback)</p>
+                            <p>🔄 {t('คำนวณสำหรับ')} {simultaneousZonesCount} {t('โซนที่เปิดพร้อมกัน')}</p>
+                            <p>💧 {t('อัตราการไหลรวม:')} {actualRequiredFlow.toFixed(1)} {t('LPM')} ({t('Fallback')})</p>
                         </div>
                     )}
             </div>
 
             <div className="mb-4">
-                <label className="mb-2 block text-sm font-medium text-gray-300">
-                    เลือกปั๊มน้ำ:
-                </label>
                 <select
                     value={currentPump?.id || ''}
                     onChange={(e) => {
@@ -274,7 +270,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                     }}
                     className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                 >
-                    <option value="">-- ใช้การเลือกอัตโนมัติ --</option>
+                    <option value="">-- {t('ใช้การเลือกอัตโนมัติ')} --</option>
                     {sortedPumps.map((pump) => {
                         const group = getPumpGrouping(pump);
                         const isAuto = pump.id === autoSelectedPump?.id;
@@ -282,25 +278,22 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                             <option key={pump.id} value={pump.id}>
                                 {isAuto ? '🤖 ' : ''}
                                 {pump.name || pump.productCode} - {pump.powerHP}HP -{' '}
-                                {pump.price?.toLocaleString()} บาท | {group} | คะแนน: {pump.score}
+                                {pump.price?.toLocaleString()} {t('บาท')} | {group} | {t('คะแนน:')} {pump.score}
                                 {!pump.isFlowAdequate || !pump.isHeadAdequate
-                                    ? ' (ไม่เพียงพอ)'
+                                    ? ' ' + t('(ไม่เพียงพอ)')
                                     : ''}
                             </option>
                         );
                     })}
                 </select>
-                <p className="mt-1 text-xs text-gray-400">
-                    เว้นว่างไว้เพื่อใช้การเลือกอัตโนมัติ หรือเลือกปั๊มที่ต้องการ
-                </p>
             </div>
 
             {currentPump ? (
                 <div className="rounded bg-gray-600 p-3">
                     <div className="mb-3 flex items-center justify-between">
-                        <h4 className="font-medium text-white">ปั๊มที่เลือก</h4>
+                        <h4 className="font-medium text-white">{t('ปั๊มที่เลือก')}</h4>
                         <span className="text-sm font-bold text-green-300">
-                            คะแนน: {currentPump.score}/100
+                            {t('คะแนน:')} {currentPump.score}/100
                         </span>
                     </div>
 
@@ -315,53 +308,53 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
                         <div>
                             <p>
-                                <strong>รุ่น:</strong> {currentPump.productCode}
+                                <strong>{t('รุ่น:')}</strong> {currentPump.productCode}
                             </p>
                             <p>
-                                <strong>ชื่อ:</strong> {currentPump.name || currentPump.productCode}
+                                <strong>{t('ชื่อ:')}</strong> {currentPump.name || currentPump.productCode}
                             </p>
                             <p>
-                                <strong>กำลัง:</strong>{' '}
+                                <strong>{t('กำลัง:')}</strong>{' '}
                                 {currentPump.powerHP != null
                                     ? currentPump.powerHP
                                     : (currentPump.powerKW * 1.341).toFixed(1)}{' '}
-                                HP (
+                                {t('HP')} ({t('kW')})
                                 {currentPump.powerKW != null
                                     ? currentPump.powerKW
                                     : (currentPump.powerHP * 0.7457).toFixed(1)}{' '}
-                                kW)
+                                {t('kW')}
                             </p>
                             <p>
-                                <strong>เฟส:</strong> {currentPump.phase} เฟส
+                                <strong>{t('เฟส:')}</strong> {currentPump.phase} {t('เฟส')}
                             </p>
                             <p>
-                                <strong>ท่อเข้า/ออก:</strong> {currentPump.inlet_size_inch}"/
+                                <strong>{t('ท่อเข้า/ออก:')}</strong> {currentPump.inlet_size_inch}"/
                                 {currentPump.outlet_size_inch}"
                             </p>
                             {currentPump.brand && (
                                 <p>
-                                    <strong>แบรนด์:</strong> {currentPump.brand}
+                                    <strong>{t('แบรนด์:')}</strong> {currentPump.brand}
                                 </p>
                             )}
                         </div>
 
                         <div>
                             <p>
-                                <strong>Flow Max:</strong> {currentPump.maxFlow || 'N/A'} LPM
+                                <strong>{t('Flow Max:')}</strong> {currentPump.maxFlow || 'N/A'} {t('LPM')}
                             </p>
                             <p>
-                                <strong>Head Max:</strong> {currentPump.maxHead || 'N/A'} เมตร
+                                <strong>{t('Head Max:')}</strong> {currentPump.maxHead || 'N/A'} {t('เมตร')}
                             </p>
                             <p>
-                                <strong>S.D(ความลึกดูด):</strong>{' '}
-                                {currentPump.suction_depth_m || 'N/A'} เมตร
+                                <strong>{t('S.D(ความลึกดูด):')}</strong>{' '}
+                                {currentPump.suction_depth_m || 'N/A'} {t('เมตร')}
                             </p>
                             <p>
-                                <strong>ราคา:</strong> {currentPump.price?.toLocaleString()} บาท
+                                <strong>{t('ราคา:')}</strong> {currentPump.price?.toLocaleString()} {t('บาท')}
                             </p>
                             {currentPump.weight_kg && (
                                 <p>
-                                    <strong>น้ำหนัก:</strong> {currentPump.weight_kg} kg
+                                    <strong>{t('น้ำหนัก:')}</strong> {currentPump.weight_kg} {t('kg')}
                                 </p>
                             )}
                         </div>
@@ -369,11 +362,11 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
                     <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
                         <p>
-                            <strong>Flow:</strong>{' '}
+                            <strong>{t('Flow:')}</strong>{' '}
                             <span
                                 className={`font-bold ${currentPump.isFlowAdequate ? 'text-green-300' : 'text-red-300'}`}
                             >
-                                {currentPump.isFlowAdequate ? '✅ เพียงพอ' : '❌ ไม่เพียงพอ'}
+                                {currentPump.isFlowAdequate ? '✅ ' + t('เพียงพอ') : '❌ ' + t('ไม่เพียงพอ')}
                             </span>
                             <span className="ml-2 text-gray-400">
                                 ({currentPump.flowRatio.toFixed(1)}x)
@@ -381,11 +374,11 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                         </p>
 
                         <p>
-                            <strong>Head:</strong>{' '}
+                            <strong>{t('Head:')}</strong>{' '}
                             <span
                                 className={`font-bold ${currentPump.isHeadAdequate ? 'text-green-300' : 'text-red-300'}`}
                             >
-                                {currentPump.isHeadAdequate ? '✅ เพียงพอ' : '❌ ไม่เพียงพอ'}
+                                {currentPump.isHeadAdequate ? '✅ ' + t('เพียงพอ') : '❌ ' + t('ไม่เพียงพอ')}
                             </span>
                             <span className="ml-2 text-gray-400">
                                 ({currentPump.headRatio.toFixed(1)}x)
@@ -394,20 +387,20 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                     </div>
 
                     <div className="mt-3 rounded bg-gray-500 p-2">
-                        <h5 className="text-xs font-medium text-yellow-300">การวิเคราะห์:</h5>
+                            <h5 className="text-xs font-medium text-yellow-300">{t('การวิเคราะห์:')}</h5>
                         <div className="grid grid-cols-3 gap-2 text-xs">
                             <p>
-                                คะแนนรวม: <span className="font-bold">{currentPump.score}</span>/100
+                                {t('คะแนนรวม:')} <span className="font-bold">{currentPump.score}</span>/100
                             </p>
                             <p>
-                                กำลังประมาณ:{' '}
+                                {t('กำลังประมาณ:')} {' '}
                                 <span className="font-bold">
                                     {currentPump.estimatedHP.toFixed(1)}
                                 </span>{' '}
-                                HP
+                                {t('HP')}
                             </p>
                             <p>
-                                ประสิทธิภาพ/บาท:{' '}
+                                {t('ประสิทธิภาพ/บาท:')} {' '}
                                 <span className="font-bold">
                                     {currentPump.flowPerBaht.toFixed(3)}
                                 </span>
@@ -415,7 +408,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                         </div>
                         <div className="mt-1 text-xs">
                             <p>
-                                ความเหมาะสม:
+                                {t('ความเหมาะสม:')}
                                 <span
                                     className={`ml-1 font-bold ${
                                         currentPump.isRecommended
@@ -428,12 +421,12 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                                     }`}
                                 >
                                     {currentPump.isRecommended
-                                        ? '⭐ แนะนำ'
+                                        ? '⭐ ' + t('แนะนำ')
                                         : currentPump.isGoodChoice
-                                          ? '✅ ดี'
+                                          ? '✅ ' + t('ดี')
                                           : currentPump.isUsable
-                                            ? '⚡ ใช้ได้'
-                                            : '⚠️ ไม่เหมาะสม'}
+                                            ? '⚡ ' + t('ใช้ได้')
+                                            : '⚠️ ' + t('ไม่เหมาะสม')}
                                 </span>
                             </p>
                         </div>
@@ -442,99 +435,18 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                     {currentPump.description && (
                         <div className="mt-3 rounded bg-gray-800 p-2">
                             <p className="text-xs text-gray-300">
-                                <strong>รายละเอียด:</strong> {currentPump.description}
+                                <strong>{t('รายละเอียด:')}</strong> {currentPump.description}
                             </p>
                         </div>
                     )}
 
-                    <div className="mt-3 rounded bg-blue-900 p-2">
-                        <h5 className="text-xs font-medium text-blue-300">ช่วงการทำงาน:</h5>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div>
-                                <p>
-                                    อัตราการไหล: {formatRangeValue(currentPump.flow_rate_lpm)} LPM
-                                </p>
-                                <p>Head: {formatRangeValue(currentPump.head_m)} เมตร</p>
-                            </div>
-                            <div>
-                                <p>ขนาดท่อเข้า: {currentPump.inlet_size_inch}"</p>
-                                <p>ขนาดท่อออก: {currentPump.outlet_size_inch}"</p>
-                            </div>
-                        </div>
-                    </div>
 
-                    {selectedPump &&
-                        selectedPump.id !== autoSelectedPump?.id &&
-                        autoSelectedPump && (
-                            <div className="mt-3 rounded bg-yellow-900 p-2">
-                                <h5 className="text-xs font-medium text-yellow-300">
-                                    เปรียบเทียบกับการเลือกอัตโนมัติ:
-                                </h5>
-                                <div className="grid grid-cols-2 gap-2 text-xs">
-                                    <div>
-                                        <p className="text-gray-300">
-                                            อัตโนมัติ: {autoSelectedPump.productCode}
-                                        </p>
-                                        <p className="text-gray-300">
-                                            กำลัง: {autoSelectedPump.powerHP}HP
-                                        </p>
-                                        <p className="text-gray-300">
-                                            คะแนน: {autoSelectedPump.score}
-                                        </p>
-                                        <p className="text-gray-300">
-                                            ราคา: {autoSelectedPump.price?.toLocaleString()}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p className="text-white">
-                                            เลือกเอง: {selectedPump.productCode}
-                                        </p>
-                                        <p className="text-white">
-                                            กำลัง: {selectedPump.powerHP}HP
-                                        </p>
-                                        <p className="text-white">คะแนน: {selectedPump.score}</p>
-                                        <p className="text-white">
-                                            ราคา: {selectedPump.price?.toLocaleString()}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="mt-1 text-xs">
-                                    <p className="text-yellow-200">
-                                        ส่วนต่างคะแนน:
-                                        <span
-                                            className={`ml-1 font-bold ${selectedPump.score >= autoSelectedPump.score ? 'text-green-300' : 'text-red-300'}`}
-                                        >
-                                            {selectedPump.score >= autoSelectedPump.score
-                                                ? '+'
-                                                : ''}
-                                            {(selectedPump.score - autoSelectedPump.score).toFixed(
-                                                1
-                                            )}{' '}
-                                            คะแนน
-                                        </span>
-                                    </p>
-                                    <p className="text-yellow-200">
-                                        ส่วนต่างราคา:
-                                        <span
-                                            className={`ml-1 font-bold ${selectedPump.price <= autoSelectedPump.price ? 'text-green-300' : 'text-red-300'}`}
-                                        >
-                                            {selectedPump.price <= autoSelectedPump.price
-                                                ? '-'
-                                                : '+'}
-                                            {Math.abs(
-                                                selectedPump.price - autoSelectedPump.price
-                                            ).toLocaleString()}{' '}
-                                            บาท
-                                        </span>
-                                    </p>
-                                </div>
-                            </div>
-                        )}
+                    
 
                     {currentPump.pumpAccessories && currentPump.pumpAccessories.length > 0 && (
                         <div className="mt-3 rounded bg-purple-900 p-2">
                             <h5 className="mb-2 text-xs font-medium text-purple-300">
-                                🔧 อุปกรณ์ประกอบ ({currentPump.pumpAccessories.length} รายการ):
+                                🔧 {t('อุปกรณ์ประกอบ')} ({currentPump.pumpAccessories.length} {t('รายการ')}):
                             </h5>
                             <div className="space-y-2">
                                 {currentPump.pumpAccessories
@@ -585,19 +497,19 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                                                     className={`font-medium ${accessory.is_included ? 'text-green-300' : 'text-yellow-300'}`}
                                                 >
                                                     {accessory.is_included ? (
-                                                        <span>✅ รวมในชุด</span>
+                                                        <span>✅ {t('รวมในชุด')}</span>
                                                     ) : (
                                                         <span>
                                                             💰 +
                                                             {Number(
                                                                 accessory.price || 0
                                                             ).toLocaleString()}{' '}
-                                                            บาท
+                                                            {t('บาท')}
                                                         </span>
                                                     )}
                                                 </div>
                                                 {!accessory.is_included && (
-                                                    <div className="text-purple-200">(แยกขาย)</div>
+                                                    <div className="text-purple-200">({t('แยกขาย')})</div>
                                                 )}
                                             </div>
                                         </div>
@@ -607,7 +519,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                             {currentPump.pumpAccessories.some((acc: any) => !acc.is_included) && (
                                 <div className="mt-2 rounded bg-purple-800 p-2 text-xs">
                                     <div className="flex justify-between text-purple-200">
-                                        <span>ราคาอุปกรณ์เสริม:</span>
+                                        <span>{t('ราคาอุปกรณ์เสริม:')}</span>
                                         <span className="font-medium text-yellow-300">
                                             +
                                             {currentPump.pumpAccessories
@@ -618,7 +530,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                                                     0
                                                 )
                                                 .toLocaleString()}{' '}
-                                            บาท
+                                            {t('บาท')}
                                         </span>
                                     </div>
                                 </div>
@@ -629,30 +541,22 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                     {(!currentPump.isFlowAdequate || !currentPump.isHeadAdequate) && (
                         <div className="mt-3 rounded bg-red-900 p-2">
                             <p className="text-sm text-red-300">
-                                ⚠️ <strong>คำเตือน:</strong> ปั๊มนี้
+                                ⚠️ <strong>{t('คำเตือน:')}</strong> {t('ปั๊มนี้')}
                                 {!currentPump.isFlowAdequate && ' อัตราการไหลไม่เพียงพอ'}
                                 {!currentPump.isFlowAdequate &&
                                     !currentPump.isHeadAdequate &&
                                     ' และ'}
-                                {!currentPump.isHeadAdequate && ' ความสูงยกไม่เพียงพอ'}{' '}
-                                สำหรับระบบนี้
+                                {!currentPump.isHeadAdequate && ' ' + t('ความสูงยกไม่เพียงพอ')}{' '}
+                                {t('สำหรับระบบนี้')}
                             </p>
                         </div>
                     )}
 
-                    {(currentPump.flowRatio > 3 || currentPump.headRatio > 3) && (
-                        <div className="mt-3 rounded bg-yellow-900 p-2">
-                            <p className="text-sm text-yellow-300">
-                                💰 <strong>หมายเหตุ:</strong> ปั๊มนี้มีขนาดใหญ่เกินความต้องการ
-                                อาจสิ้นเปลืองพลังงาน ควรพิจารณาใช้ปั๊มขนาดเล็กกว่า
-                            </p>
-                        </div>
-                    )}
                 </div>
             ) : (
                 <div className="rounded bg-gray-600 p-4 text-center">
-                    <p className="text-gray-300">ไม่สามารถหาปั๊มที่เหมาะสมได้</p>
-                    <p className="mt-1 text-sm text-gray-400">อาจไม่มีปั๊มที่เหมาะสมในระบบ</p>
+                    <p className="text-gray-300">{t('ไม่สามารถหาปั๊มที่เหมาะสมได้')}</p>
+                    <p className="mt-1 text-sm text-gray-400">{t('อาจไม่มีปั๊มที่เหมาะสมในระบบ')}</p>
                 </div>
             )}
 
@@ -668,7 +572,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                         <button
                             onClick={closeImageModal}
                             className="absolute -right-2 -top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700"
-                            title="ปิด"
+                            title={t('ปิด')}
                         >
                             ✕
                         </button>

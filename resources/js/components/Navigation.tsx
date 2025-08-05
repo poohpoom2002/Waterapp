@@ -1,7 +1,7 @@
 // resources/js/components/Navigation.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, usePage } from '@inertiajs/react';
-import { cropTypes } from '@/utils/cropData';
+import { cropTypes } from '@/pages/utils/cropData';
 
 interface NavItem {
     name: string;

@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // resources\js\pages\utils\calculations.ts
 export const calculatePipeRolls = (totalLength: number, rollLength: number): number => {
     return Math.ceil(totalLength / rollLength);
@@ -404,8 +406,15 @@ export const parseRangeValue = (value: any): [number, number] | number => {
     return isNaN(numValue) ? 0 : numValue;
 };
 
-export const formatNumber = (value: number, decimals: number = 3): number => {
-    return Math.round(value * Math.pow(10, decimals)) / Math.pow(10, decimals);
+export const formatNumber = (
+    value: number | string | null | undefined,
+    decimals: number = 3
+): number => {
+    const numValue = Number(value);
+    if (isNaN(numValue)) {
+        return 0;
+    }
+    return Math.round(numValue * Math.pow(10, decimals)) / Math.pow(10, decimals);
 };
 
 export const evaluatePipeOverall = (
@@ -636,7 +645,7 @@ export const selectBestEquipmentByPrice = (
         (item) => item.isUsable && !item.isGoodChoice && !item.isRecommended
     );
 
-    let targetGroup =
+    const targetGroup =
         recommended.length > 0
             ? recommended
             : goodChoice.length > 0
@@ -763,29 +772,31 @@ export const normalizeEquipmentData = (
             break;
 
         case 'pump':
-            const numericFields = [
-                'powerHP',
-                'powerKW',
-                'phase',
-                'inlet_size_inch',
-                'outlet_size_inch',
-                'max_head_m',
-                'max_flow_rate_lpm',
-                'suction_depth_m',
-                'weight_kg',
-            ];
-            numericFields.forEach((field) => {
-                if (normalized[field] !== undefined) {
-                    normalized[field] = Number(normalized[field]) || 0;
-                }
-            });
+            {
+                const numericFields = [
+                    'powerHP',
+                    'powerKW',
+                    'phase',
+                    'inlet_size_inch',
+                    'outlet_size_inch',
+                    'max_head_m',
+                    'max_flow_rate_lpm',
+                    'suction_depth_m',
+                    'weight_kg',
+                ];
+                numericFields.forEach((field) => {
+                    if (normalized[field] !== undefined) {
+                        normalized[field] = Number(normalized[field]) || 0;
+                    }
+                });
 
-            const rangeFields = ['flow_rate_lpm', 'head_m'];
-            rangeFields.forEach((field) => {
-                if (normalized[field] !== undefined) {
-                    normalized[field] = parseRangeValue(normalized[field]);
-                }
-            });
+                const rangeFields = ['flow_rate_lpm', 'head_m'];
+                rangeFields.forEach((field) => {
+                    if (normalized[field] !== undefined) {
+                        normalized[field] = parseRangeValue(normalized[field]);
+                    }
+                });
+            }
             break;
 
         case 'pipe':
@@ -802,4 +813,63 @@ export const normalizeEquipmentData = (
     }
 
     return normalized;
+};
+
+// Field-crop and greenhouse specific utility functions
+export const convertAreaUnits = {
+    sqmToRai: (sqm: number): number => formatNumber(sqm / 1600, 3),
+    raiToSqm: (rai: number): number => formatNumber(rai * 1600, 1),
+    formatArea: (sqm: number): string => {
+        const rai = sqm / 1600;
+        if (rai >= 1) {
+            return `${formatNumber(rai, 2)} ไร่`;
+        }
+        return `${formatNumber(sqm, 0)} ตร.ม.`;
+    }
+};
+
+export const calculatePlantingDensity = (
+    areaSqm: number,
+    rowSpacingM: number,
+    plantSpacingM: number
+): number => {
+    if (!areaSqm || !rowSpacingM || !plantSpacingM) return 0;
+    const plantsPerSqm = (1 / rowSpacingM) * (1 / plantSpacingM);
+    return Math.floor(areaSqm * plantsPerSqm);
+};
+
+export const calculateWaterRequirementPerArea = (
+    plantCount: number,
+    waterPerPlantLiters: number
+): number => {
+    return formatNumber(plantCount * waterPerPlantLiters, 1);
+};
+
+export const calculateProductionEstimate = (
+    areaSqm: number,
+    yieldPerRai: number,
+    pricePerKg: number
+): { yield: number; income: number } => {
+    const areaRai = areaSqm / 1600;
+    const totalYield = Math.round(areaRai * yieldPerRai);
+    const totalIncome = Math.round(totalYield * pricePerKg);
+    return { yield: totalYield, income: totalIncome };
+};
+
+export const validateFieldCropInput = (input: any): boolean => {
+    return !!(
+        input &&
+        input.area > 0 &&
+        input.totalPlantingPoints > 0 &&
+        input.waterRequirement >= 0
+    );
+};
+
+export const validateGreenhouseInput = (input: any): boolean => {
+    return !!(
+        input &&
+        input.area > 0 &&
+        input.totalPlants > 0 &&
+        input.waterRequirement >= 0
+    );
 };

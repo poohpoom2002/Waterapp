@@ -2,11 +2,8 @@
 // routes\web.php
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use App\Http\Controllers\FarmController;
-use App\Http\Controllers\HomeGardenController;
-use App\Http\Controllers\ProfilePhotoController;
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\SuperUserController;
+use App\Http\Controllers\ProfileController; // เก็บไว้ถ้าใช้
+use App\Http\Controllers\SuperUserController; // เก็บไว้ถ้าใช้
 
 /*
 |--------------------------------------------------------------------------
@@ -25,6 +22,302 @@ Route::get('/', function () {
 
 Route::get('/profile', [ProfileController::class, 'show'])->middleware(['auth', 'verified'])->name('profile');
 
+// Test route to check if web routes are working
+Route::get('/test-web', function () {
+    return response()->json(['message' => 'Web route is working']);
+});
+
+// Folder Management Routes - Added to web routes to avoid API middleware issues
+Route::get('/folders-api', function () {
+    try {
+        $user = auth()->user();
+        
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required'
+            ], 401);
+        }
+
+        // Fetch real folders from database
+        $folders = \App\Models\Folder::where('user_id', $user->id)
+            ->orderBy('name')
+            ->get();
+
+        // Create default system folders if they don't exist
+        $systemFolders = [
+            ['name' => 'Finished', 'type' => 'finished', 'color' => '#10b981', 'icon' => '✅'],
+            ['name' => 'Unfinished', 'type' => 'unfinished', 'color' => '#f59e0b', 'icon' => '⏳'],
+        ];
+
+        foreach ($systemFolders as $systemFolder) {
+            $exists = $folders->where('name', $systemFolder['name'])->first();
+            if (!$exists) {
+                \App\Models\Folder::create(array_merge($systemFolder, [
+                    'user_id' => $user->id,
+                ]));
+            }
+        }
+
+        // Refresh the folders list
+        $folders = \App\Models\Folder::where('user_id', $user->id)
+            ->orderBy('name')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'folders' => $folders->map(function ($folder) {
+                // Calculate total field count including sub-folders recursively
+                $calculateTotalFieldCount = function($folder) use (&$calculateTotalFieldCount) {
+                    $directCount = $folder->fields()->count();
+                    
+                    // Get all sub-folders recursively
+                    $subFolders = \App\Models\Folder::where('parent_id', $folder->id)->get();
+                    $subFolderCount = 0;
+                    
+                    foreach ($subFolders as $subFolder) {
+                        $subFolderCount += $calculateTotalFieldCount($subFolder);
+                    }
+                    
+                    $totalCount = $directCount + $subFolderCount;
+                    
+                    // Debug logging
+                    \Log::info("Folder: {$folder->name}, Direct: {$directCount}, Sub-folders: {$subFolderCount}, Total: {$totalCount}");
+                    
+                    return $totalCount;
+                };
+                
+                $totalFieldCount = $calculateTotalFieldCount($folder);
+                
+                return [
+                    'id' => $folder->id,
+                    'name' => $folder->name,
+                    'type' => $folder->type,
+                    'color' => $folder->color ?? '#6366f1',
+                    'icon' => $folder->icon ?? '📁',
+                    'parent_id' => $folder->parent_id,
+                    'field_count' => $totalFieldCount,
+                    'created_at' => $folder->created_at,
+                    'updated_at' => $folder->updated_at,
+                ];
+            })
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Error fetching folders: ' . $e->getMessage()
+        ], 500);
+    }
+});
+
+Route::post('/folders-api', function (\Illuminate\Http\Request $request) {
+    try {
+        $user = auth()->user();
+        
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required'
+            ], 401);
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'type' => 'required|in:finished,unfinished,custom,customer,category',
+            'parent_id' => 'nullable|exists:folders,id',
+            'color' => 'nullable|string|max:7',
+            'icon' => 'nullable|string|max:10',
+        ]);
+
+        $folder = \App\Models\Folder::create(array_merge($validated, [
+            'user_id' => $user->id,
+        ]));
+
+        return response()->json([
+            'success' => true,
+            'folder' => [
+                'id' => $folder->id,
+                'name' => $folder->name,
+                'type' => $folder->type,
+                'color' => $folder->color ?? '#6366f1',
+                'icon' => $folder->icon ?? '📁',
+                'parent_id' => $folder->parent_id,
+                'field_count' => 0,
+                'created_at' => $folder->created_at,
+                'updated_at' => $folder->updated_at,
+            ]
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Error creating folder: ' . $e->getMessage()
+        ], 500);
+    }
+});
+
+// Delete folder route
+Route::delete('/folders-api/{folderId}', function ($folderId) {
+    try {
+        $user = auth()->user();
+        
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required'
+            ], 401);
+        }
+
+        // Check if folderId is numeric
+        if (!is_numeric($folderId)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid folder ID'
+            ], 400);
+        }
+
+        $folder = \App\Models\Folder::where('user_id', $user->id)
+            ->findOrFail($folderId);
+
+        // Check if it's a system folder (cannot be deleted)
+        if ($folder->isSystemFolder()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot delete system folders'
+            ], 400);
+        }
+
+        // Check if folder has fields
+        if ($folder->fields()->count() > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot delete folder that contains fields'
+            ], 400);
+        }
+
+        $folder->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Folder deleted successfully'
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Error deleting folder: ' . $e->getMessage()
+        ], 500);
+    }
+});
+
+// Alternative delete folder route using POST (for CSRF compatibility)
+Route::post('/folders-api/{folderId}/delete', function ($folderId) {
+    try {
+        $user = auth()->user();
+        
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required'
+            ], 401);
+        }
+
+        // Check if folderId is numeric
+        if (!is_numeric($folderId)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid folder ID'
+            ], 400);
+        }
+
+        $folder = \App\Models\Folder::where('user_id', $user->id)
+            ->findOrFail($folderId);
+
+        // Check if it's a system folder (cannot be deleted)
+        if ($folder->isSystemFolder()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot delete system folders'
+            ], 400);
+        }
+
+        // Check if folder has fields
+        if ($folder->fields()->count() > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot delete folder that contains fields'
+            ], 400);
+        }
+
+        $folder->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Folder deleted successfully'
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Error deleting folder: ' . $e->getMessage()
+        ], 500);
+    }
+});
+
+// Fields API Routes - Added to web routes to avoid FarmController issues
+Route::get('/fields-api', function () {
+    try {
+        $user = auth()->user();
+        
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required'
+            ], 401);
+        }
+
+        // Fetch real fields from database
+        $fields = \App\Models\Field::where('user_id', $user->id)
+            ->with('plantType')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'fields' => $fields->map(function ($field) {
+                return [
+                    'id' => $field->id,
+                    'name' => $field->name,
+                    'customerName' => $field->customer_name,
+                    'userName' => $field->user_name,
+                    'category' => $field->category,
+                    'folderId' => $field->folder_id,
+                    'status' => $field->status,
+                    'isCompleted' => $field->is_completed,
+                    'area' => json_decode($field->area_coordinates, true) ?? [],
+                    'plantType' => $field->plantType ? [
+                        'id' => $field->plantType->id,
+                        'name' => $field->plantType->name,
+                        'type' => $field->plantType->type,
+                        'plant_spacing' => $field->plantType->plant_spacing,
+                        'row_spacing' => $field->plantType->row_spacing,
+                        'water_needed' => $field->plantType->water_needed,
+                    ] : null,
+                    'totalPlants' => $field->total_plants,
+                    'totalArea' => $field->total_area,
+                    'total_water_need' => $field->total_water_need,
+                    'createdAt' => $field->created_at,
+                    'layers' => $field->layers ? json_decode($field->layers, true) : [],
+                ];
+            })
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Error fetching fields: ' . $e->getMessage()
+        ], 500);
+    }
+});
+
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {
         return Inertia::render('dashboard');
@@ -32,24 +325,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Horticulture Irrigation System Routes (ระบบชลประทานสวนผลไม้)
     Route::prefix('horticulture')->name('horticulture.')->group(function () {
-        // หน้าวางแผนระบบน้ำสวนผลไม้
         Route::get('planner', function () {
             return Inertia::render('HorticulturePlannerPage');
         })->name('planner');
         
-        // หน้าแสดงผลลัพธ์ระบบน้ำสวนผลไม้
         Route::get('results', function () {
             return Inertia::render('HorticultureResultsPage');
         })->name('results');
     });
+
     // Home Garden Irrigation System Routes (ระบบชลประทานบ้านสวน)
     Route::prefix('home-garden')->name('home-garden.')->group(function () {
-        // หน้าวางแผนระบบน้ำบ้านสวน
         Route::get('planner', function () {
             return Inertia::render('home-garden-planner');
         })->name('planner');
         
-        // หน้าแสดงผลลัพธ์ระบบน้ำบ้านสวน
         Route::get('summary', function () {
             return Inertia::render('home-garden-summary');
         })->name('summary');
@@ -62,7 +352,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('horticulture-results', function () {
         return redirect()->route('horticulture.results');
     });
-    // Legacy routes for backward compatibility
     Route::get('home-garden-planner', function () {
         return redirect()->route('home-garden.planner');
     });
@@ -255,7 +544,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Profile Photo Routes
     Route::post('/api/profile-photo/upload', [ProfilePhotoController::class, 'upload'])->name('profile-photo.upload');
     Route::delete('/api/profile-photo/delete', [ProfilePhotoController::class, 'delete'])->name('profile-photo.delete');
-
+  
     // Super User Routes
     Route::prefix('super')->name('super.')->group(function () {
         Route::get('/dashboard', function () {
