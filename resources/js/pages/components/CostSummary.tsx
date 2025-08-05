@@ -112,28 +112,13 @@ const CostSummary: React.FC<CostSummaryProps> = ({
     };
 
     const getAreaUnit = () => {
-        switch (projectMode) {
-            case 'garden':
-                return t('ตร.ม.');
-            case 'greenhouse':
-                return t('ตร.ม.');
-            default:
-                return t('ไร่');
-        }
+        // Fix: All project modes now consistently use rai
+        return t('ไร่');
     };
 
     const formatArea = (area: number) => {
-        switch (projectMode) {
-            case 'garden':
-            case 'greenhouse':
-                return area >= 1600
-                    ? `${(area / 1600).toFixed(1)} ไร่`
-                    : `${area.toFixed(2)} ตร.ม.`;
-            default:
-                return area >= 1600
-                    ? `${(area / 1600).toFixed(1)} ไร่`
-                    : `${area.toFixed(2)} ตร.ม.`;
-        }
+        // Fix: Since farmSizeRai is now consistently in rai for all modes
+        return `${area.toFixed(1)} ไร่`;
     };
 
     const getProjectIcon = () => {

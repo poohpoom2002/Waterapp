@@ -1,11 +1,12 @@
+// resources/js/pages/HorticulturePlannerPage.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// resources/js/pages/HorticulturePlannerPage.tsx
 import React, { useState, useEffect, useRef, useMemo, useCallback, useReducer } from 'react';
 
 import HorticultureMapComponent from '../components/horticulture/HorticultureMapComponent';
 import HorticultureDrawingManager from '../components/horticulture/HorticultureDrawingManager';
 import EnhancedHorticultureSearchControl from '../components/horticulture/HorticultureSearchControl';
+import DistanceMeasurementOverlay from '../components/horticulture/DistanceMeasurementOverlay';
 import { router } from '@inertiajs/react';
 import { useLanguage } from '../contexts/LanguageContext';
 import Navbar from '../components/Navbar';
@@ -54,8 +55,8 @@ import {
 const isPointInPolygon = (
     point: { lat: number; lng: number },
     polygon: { lat: number; lng: number }[]
-): boolean => {
-    if (!point || !polygon || polygon.length < 3) return false;
+    ): boolean => {
+        if (!point || !polygon || polygon.length < 3) return false;
 
     try {
         let inside = false;
@@ -68,9 +69,10 @@ const isPointInPolygon = (
             const intersect =
                 yi > point.lng !== yj > point.lng &&
                 point.lat < ((xj - xi) * (point.lng - yi)) / (yj - yi) + xi;
-            if (intersect) inside = !inside;
-        }
-        return inside;
+                                    if (intersect) inside = !inside;
+                    }
+                    
+                    return inside;
     } catch (error) {
         console.error('Error checking point in polygon:', error);
         return false;
@@ -272,7 +274,7 @@ const generateEnhancedBranchPipes = (
 
     const exactRowSpacing = plantData.rowSpacing;
     const numberOfBranches = Math.max(2, Math.floor(pipeLength / exactRowSpacing) + 1);
-
+    
     for (let i = 0; i < numberOfBranches; i++) {
         const distanceFromStart = exactRowSpacing * 0.5 + i * exactRowSpacing;
         if (distanceFromStart > pipeLength) break;
@@ -280,6 +282,7 @@ const generateEnhancedBranchPipes = (
         const position = interpolatePositionAlongPipe(subMainCoordinates, distanceFromStart);
 
         if (position) {
+            
             const segmentIndex = Math.max(
                 0,
                 Math.min(
@@ -295,7 +298,6 @@ const generateEnhancedBranchPipes = (
                 const multiplier = sideIndex === 0 ? -1 : 1;
                 const branchAngle = settings.defaultAngle;
                 const adjustedDirection = rotatePerpendicular(perpendicular, branchAngle - 90);
-
                 const optimalDistance = calculateOptimalDistanceToPolygonBoundary(
                     position,
                     adjustedDirection,
@@ -304,7 +306,7 @@ const generateEnhancedBranchPipes = (
                     plantData.plantSpacing
                 );
 
-                if (optimalDistance >= 15) {
+                if (optimalDistance >= 5) {
                     const endPosition = calculateBranchEndPosition(
                         position,
                         adjustedDirection,
@@ -315,29 +317,42 @@ const generateEnhancedBranchPipes = (
                     const startInTargetArea = isPointInPolygon(position, targetArea);
                     const endInTargetArea = isPointInPolygon(endPosition, targetArea);
 
-                    if (startInTargetArea && endInTargetArea) {
-                        const branchCoordinates = [position, endPosition];
-                        const plants = generateOptimalSpacingPlants(
-                            branchCoordinates,
-                            plantData,
-                            exclusions,
-                            targetArea
-                        );
+                    if (startInTargetArea || endInTargetArea) {
+                        const adjustedEndPosition = adjustEndPointBeforeExclusions(position, endPosition, exclusions);
+                        let branchCoordinates = [position, adjustedEndPosition];
+                        
+                        const adjustedEndInTargetArea = isPointInPolygon(adjustedEndPosition, targetArea);
+                        
+                        if (adjustedEndInTargetArea || startInTargetArea) {
+                            const plants = generateOptimalSpacingPlants(
+                                branchCoordinates,
+                                plantData,
+                                exclusions,
+                                targetArea
+                            );
 
-                        const branchPipe = {
-                            id: generateUniqueId('branch'),
-                            subMainPipeId: '',
-                            coordinates: branchCoordinates,
-                            length: calculatePipeLength(branchCoordinates),
-                            diameter: 25,
-                            plants,
-                            isEditable: true,
-                            sprinklerType: 'standard',
-                            angle: branchAngle,
-                            connectionPoint: distanceFromStart / pipeLength,
-                        };
+                            if (plants.length >= 0) {
+                                if (plants.length > 0) {
+                                    const lastPlant = plants[plants.length - 1];
+                                    branchCoordinates = [position, lastPlant.position];
+                                }
 
-                        branchPipes.push(branchPipe);
+                                const branchPipe = {
+                                    id: generateUniqueId('branch'),
+                                    subMainPipeId: '',
+                                    coordinates: branchCoordinates,
+                                    length: calculatePipeLength(branchCoordinates),
+                                    diameter: 25,
+                                    plants,
+                                    isEditable: true,
+                                    sprinklerType: 'standard',
+                                    angle: branchAngle,
+                                    connectionPoint: distanceFromStart / pipeLength,
+                                };
+
+                                branchPipes.push(branchPipe);
+                            }
+                        }
                     }
                 }
             });
@@ -408,7 +423,7 @@ const regenerateBranchPipesWithAngle = (
                     plantData.plantSpacing
                 );
 
-                if (optimalDistance >= 15) {
+                if (optimalDistance >= 5) {
                     const endPosition = calculateBranchEndPosition(
                         position,
                         adjustedDirection,
@@ -419,29 +434,42 @@ const regenerateBranchPipesWithAngle = (
                     const startInTargetArea = isPointInPolygon(position, targetArea);
                     const endInTargetArea = isPointInPolygon(endPosition, targetArea);
 
-                    if (startInTargetArea && endInTargetArea) {
-                        const branchCoordinates = [position, endPosition];
-                        const plants = generateOptimalSpacingPlants(
-                            branchCoordinates,
-                            plantData,
-                            exclusions,
-                            targetArea
-                        );
+                    if (startInTargetArea || endInTargetArea) {
+                        const adjustedEndPosition = adjustEndPointBeforeExclusions(position, endPosition, exclusions);
+                        let branchCoordinates = [position, adjustedEndPosition];
+                        
+                        const adjustedEndInTargetArea = isPointInPolygon(adjustedEndPosition, targetArea);
+                        
+                        if (adjustedEndInTargetArea || startInTargetArea) {
+                            const plants = generateOptimalSpacingPlants(
+                                branchCoordinates,
+                                plantData,
+                                exclusions,
+                                targetArea
+                            );
 
-                        const branchPipe: BranchPipe = {
-                            id: generateUniqueId('branch'),
-                            subMainPipeId: subMainPipe.id,
-                            coordinates: branchCoordinates,
-                            length: calculatePipeLength(branchCoordinates),
-                            diameter: 25,
-                            plants,
-                            isEditable: true,
-                            sprinklerType: 'standard',
-                            angle: newAngle,
-                            connectionPoint: distanceFromStart / pipeLength,
-                        };
+                            if (plants.length >= 0) {
+                                if (plants.length > 0) {
+                                    const lastPlant = plants[plants.length - 1];
+                                    branchCoordinates = [position, lastPlant.position];
+                                }
 
-                        newBranchPipes.push(branchPipe);
+                                const branchPipe: BranchPipe = {
+                                    id: generateUniqueId('branch'),
+                                    subMainPipeId: subMainPipe.id,
+                                    coordinates: branchCoordinates,
+                                    length: calculatePipeLength(branchCoordinates),
+                                    diameter: 25,
+                                    plants,
+                                    isEditable: true,
+                                    sprinklerType: 'standard',
+                                    angle: newAngle,
+                                    connectionPoint: distanceFromStart / pipeLength,
+                                };
+
+                                newBranchPipes.push(branchPipe);
+                            }
+                        }
                     }
                 }
             });
@@ -483,17 +511,19 @@ const calculateOptimalDistanceToPolygonBoundary = (
     direction: { lat: number; lng: number },
     multiplier: number,
     polygon: { lat: number; lng: number }[],
-    plantSpacing: number
+    plantSpacing: number,
 ): number => {
-    if (!polygon || polygon.length < 3) return 0;
+    if (!polygon || polygon.length < 3) {
+        return 0;
+    }
 
     try {
-        const maxTestDistance = 500;
+        const maxTestDistance = 300; 
         let low = 0;
         let high = maxTestDistance;
         let maxValidDistance = 0;
 
-        while (high - low > 0.1) {
+        while (high - low > 0.5) { 
             const mid = (low + high) / 2;
             const testPoint = calculateBranchEndPosition(startPoint, direction, multiplier, mid);
 
@@ -505,18 +535,24 @@ const calculateOptimalDistanceToPolygonBoundary = (
             }
         }
 
-        const startBufferFromSubMain = plantSpacing * 0.5;
+        const startBufferFromSubMain = Math.min(plantSpacing * 0.3, 2); 
         const availableLengthForPlants = maxValidDistance - startBufferFromSubMain;
 
-        if (availableLengthForPlants <= 0) return 0;
+        if (availableLengthForPlants <= 0) {
+            return 0;
+        }
 
         const numberOfPlantsOnBranch = Math.max(
-            1,
-            Math.floor(availableLengthForPlants / plantSpacing) + 1
+            0, 
+            Math.floor(availableLengthForPlants / plantSpacing)
         );
-        const optimalBranchLength =
-            startBufferFromSubMain + (numberOfPlantsOnBranch - 1) * plantSpacing;
-        return Math.min(optimalBranchLength, maxValidDistance);
+        
+        const optimalBranchLength = Math.min(
+            startBufferFromSubMain + numberOfPlantsOnBranch * plantSpacing,
+            maxValidDistance * 0.95 
+        );
+
+        return Math.max(optimalBranchLength, 5); 
     } catch (error) {
         console.error('Error calculating optimal distance to boundary:', error);
         return 0;
@@ -543,48 +579,267 @@ const generateOptimalSpacingPlants = (
     plantData: any,
     exclusionAreas: any[] = [],
     zoneCoordinates: { lat: number; lng: number }[]
-): any[] => {
-    if (!pipeCoordinates || pipeCoordinates.length < 2 || !plantData) return [];
+        ): any[] => {
+            if (!pipeCoordinates || pipeCoordinates.length < 2 || !plantData) {
+                return [];
+            }
 
-    try {
+            try {
+        
         const plants: any[] = [];
         const pipeLength = calculatePipeLength(pipeCoordinates);
         const exactSpacing = plantData.plantSpacing;
-        const startBuffer = exactSpacing * 0.5;
-        const availableLength = pipeLength - startBuffer;
-        const numberOfPlants = Math.max(1, Math.floor(availableLength / exactSpacing) + 1);
+        const startBuffer = exactSpacing * 0.5; 
+        const endBuffer = exactSpacing * 0.2;
+                        const availableLength = pipeLength - startBuffer - endBuffer;
+                const numberOfPlants = Math.max(0, Math.floor(availableLength / exactSpacing));
 
-        for (let i = 0; i < numberOfPlants; i++) {
+        const tempPlants: any[] = [];
+        
+        for (let i = 0; i <= numberOfPlants; i++) {
             const exactDistanceOnPipe = startBuffer + i * exactSpacing;
-            if (exactDistanceOnPipe > pipeLength) break;
+            if (exactDistanceOnPipe > pipeLength - endBuffer) break;
 
             const position = interpolatePositionAlongPipe(pipeCoordinates, exactDistanceOnPipe);
 
             if (position) {
+                
                 const inZone = isPointInPolygon(position, zoneCoordinates);
                 const inExclusion = exclusionAreas.some((exclusion) =>
-                    isPointInPolygon(position, exclusion.coordinates)
-                );
+                                                isPointInPolygon(position, exclusion.coordinates)
+                        );
 
-                if (inZone && !inExclusion) {
-                    plants.push({
-                        id: generateUniqueId('plant'),
-                        position,
-                        plantData,
-                        isSelected: false,
-                        isEditable: true,
-                        health: 'good',
-                    });
-                }
+                if (inZone && !inExclusion) {   
+                    const validBoundaryDistance = isValidDistanceFromBoundary(
+                        position, 
+                        zoneCoordinates, 
+                        plantData.plantSpacing, 
+                                                    0.05 
+                        );
+                        
+                        if (validBoundaryDistance) {
+                        tempPlants.push({
+                            id: generateUniqueId('plant'),
+                            position,
+                            plantData,
+                            isSelected: false,
+                            isEditable: true,
+                            health: 'good',
+                            distanceOnPipe: exactDistanceOnPipe,
+                                                        });
+                            }
+                        }
             }
         }
+        
+        if (tempPlants.length > 1) {
+            const lastPlant = tempPlants[tempPlants.length - 1];
+            const isLastPlantTooClose = !isValidDistanceFromBoundary(
+                lastPlant.position,
+                zoneCoordinates,
+                plantData.plantSpacing,
+                0.15
+            );
+            
+            if (isLastPlantTooClose) {
+                tempPlants.pop();
+            }
+                        }
+        
+        tempPlants.forEach(plant => {
+            plants.push({
+                id: plant.id,
+                position: plant.position,
+                plantData: plant.plantData,
+                isSelected: plant.isSelected,
+                isEditable: plant.isEditable,
+                health: plant.health,
+            });
+                        });
 
-        return plants;
+                return plants;
     } catch (error) {
         console.error('Error generating enhanced optimal spacing plants:', error);
         return [];
     }
 };
+
+const isValidDistanceFromBoundary = (
+    point: { lat: number; lng: number },
+    polygon: { lat: number; lng: number }[],
+    plantSpacing: number,
+    minPercentage: number = 0.4
+): boolean => {
+    if (!polygon || polygon.length < 3) return true;
+    
+    try {
+        let minDistance = Infinity;
+        
+        for (let i = 0; i < polygon.length; i++) {
+            const j = (i + 1) % polygon.length;
+            const edge1 = polygon[i];
+            const edge2 = polygon[j];
+            
+            const distance = distanceFromPointToLineSegment(point, edge1, edge2);
+            minDistance = Math.min(minDistance, distance);
+        }
+        
+        const requiredDistance = plantSpacing * minPercentage;
+        return minDistance >= requiredDistance;
+    } catch (error) {
+        console.error('Error checking boundary distance:', error);
+        return true;
+    }
+};
+
+const distanceFromPointToLineSegment = (
+    point: { lat: number; lng: number },
+    lineStart: { lat: number; lng: number },
+    lineEnd: { lat: number; lng: number }
+): number => {
+    // Vectors in a pseudo-Cartesian space for projection calculation
+    // This is an approximation, but the final distance will use Haversine.
+    const A = point.lat - lineStart.lat;
+    const B = point.lng - lineStart.lng;
+    const C = lineEnd.lat - lineStart.lat;
+    const D = lineEnd.lng - lineStart.lng;
+
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+    
+    if (lenSq === 0) { // lineStart and lineEnd are the same point
+        return calculateDistanceBetweenPoints(point, lineStart);
+    }
+    
+    const param = dot / lenSq;
+    
+    let closestPointOnSegment: { lat: number; lng: number };
+    
+    if (param < 0) {
+        closestPointOnSegment = lineStart;
+    } else if (param > 1) {
+        closestPointOnSegment = lineEnd;
+    } else {
+        closestPointOnSegment = {
+            lat: lineStart.lat + param * C,
+            lng: lineStart.lng + param * D,
+        };
+    }
+
+    // Use the accurate Haversine formula for the final distance calculation
+    return calculateDistanceBetweenPoints(point, closestPointOnSegment);
+};
+
+const adjustEndPointBeforeExclusions = (
+    start: { lat: number; lng: number },
+    end: { lat: number; lng: number },
+    exclusions: any[]
+): { lat: number; lng: number } => {
+    if (!exclusions || exclusions.length === 0) return end;
+    
+    try {
+        let shortestDistance = Infinity;
+        let bestEndPoint = end;
+        
+        for (const exclusion of exclusions) {
+            const intersectionPoint = findLinePolygonIntersection(start, end, exclusion.coordinates);
+            
+                    if (intersectionPoint) {
+            const distanceToIntersection = calculateDistanceBetweenPoints(start, intersectionPoint);
+                
+                if (distanceToIntersection < shortestDistance) {
+                    shortestDistance = distanceToIntersection;
+                    
+                    const lineDirection = {
+                        lat: end.lat - start.lat,
+                        lng: end.lng - start.lng
+                    };
+                    const lineLength = Math.sqrt(lineDirection.lat * lineDirection.lat + lineDirection.lng * lineDirection.lng);
+                    
+                    if (lineLength > 0) {
+                        const normalizedDirection = {
+                            lat: lineDirection.lat / lineLength,
+                            lng: lineDirection.lng / lineLength
+                        };
+                        
+                        const bufferMeters = 5;
+                        const safeDistanceMeters = Math.max(0, distanceToIntersection - bufferMeters);
+                        
+                        bestEndPoint = {
+                            lat: start.lat + normalizedDirection.lat * safeDistanceMeters / 111000,
+                            lng: start.lng + normalizedDirection.lng * safeDistanceMeters / (111000 * Math.cos((start.lat * Math.PI) / 180))
+                        };
+                    }
+                }
+            }
+        }
+        
+        return bestEndPoint;
+    } catch (error) {
+        console.error('Error adjusting end point before exclusions:', error);
+        return end;
+    }
+};
+
+const findLinePolygonIntersection = (
+    start: { lat: number; lng: number },
+    end: { lat: number; lng: number },
+    polygon: { lat: number; lng: number }[]
+): { lat: number; lng: number } | null => {
+    if (!polygon || polygon.length < 3) return null;
+    
+    if (isPointInPolygon(start, polygon)) {
+        return start;
+    }
+    
+    let closestIntersection: { lat: number; lng: number } | null = null;
+    let closestDistance = Infinity;
+    
+    for (let i = 0; i < polygon.length; i++) {
+        const j = (i + 1) % polygon.length;
+        const intersection = findLineIntersection(start, end, polygon[i], polygon[j]);
+        
+        if (intersection) {
+            const distance = calculateDistanceBetweenPoints(start, intersection);
+            if (distance < closestDistance && distance > 0.00001) { 
+                closestDistance = distance;
+                closestIntersection = intersection;
+            }
+        }
+    }
+    
+    return closestIntersection;
+};
+
+const findLineIntersection = (
+    lineStart: { lat: number; lng: number },
+    lineEnd: { lat: number; lng: number },
+    segmentStart: { lat: number; lng: number },
+    segmentEnd: { lat: number; lng: number }
+): { lat: number; lng: number } | null => {
+    const x1 = lineStart.lat, y1 = lineStart.lng;
+    const x2 = lineEnd.lat, y2 = lineEnd.lng;
+    const x3 = segmentStart.lat, y3 = segmentStart.lng;
+    const x4 = segmentEnd.lat, y4 = segmentEnd.lng;
+    
+    const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+    
+    if (Math.abs(denom) < 1e-10) return null; 
+    
+    const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+    const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
+    
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+        return {
+            lat: x1 + t * (x2 - x1),
+            lng: y1 + t * (y2 - y1)
+        };
+    }
+    
+    return null;
+};
+
+
 
 interface Coordinate {
     lat: number;
@@ -1936,6 +2191,7 @@ export default function EnhancedHorticulturePlannerPage() {
     const [isRetrying, setIsRetrying] = useState(false);
 
     const [mapCenter, setMapCenter] = useState<[number, number]>([12.609731, 102.050412]);
+    const [map, setMap] = useState<google.maps.Map | null>(null);
     const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
     const [selectedExclusionType, setSelectedExclusionType] =
         useState<keyof typeof EXCLUSION_COLORS>('building');
@@ -2076,6 +2332,67 @@ export default function EnhancedHorticulturePlannerPage() {
 
     const handleRedo = useCallback(() => {
         dispatchHistory({ type: 'REDO' });
+    }, []);
+
+    useEffect(() => {
+        const isEditingExisting = localStorage.getItem('isEditingExistingProject');
+        const savedData = localStorage.getItem('horticultureIrrigationData');
+
+        if (isEditingExisting === 'true' && savedData) {
+            try {
+                const projectData = JSON.parse(savedData);
+
+                const loadedState: ProjectState = {
+                    ...initialState,
+                    mainArea: projectData.mainArea || [],
+                    zones: projectData.zones || [],
+                    pump: projectData.pump || null,
+                    mainPipes: projectData.mainPipes || [],
+                    subMainPipes: projectData.subMainPipes || [],
+                    plants: projectData.plants || [],
+                    exclusionAreas: projectData.exclusionAreas || [],
+                    useZones: projectData.useZones || false,
+                    selectedPlantType: projectData.selectedPlantType || DEFAULT_PLANT_TYPES(t)[0],
+                    availablePlants: DEFAULT_PLANT_TYPES(t),
+                    branchPipeSettings: projectData.branchPipeSettings || {
+                        defaultAngle: 90,
+                        maxAngle: 180,
+                        minAngle: 0,
+                        angleStep: 1,
+                    },
+                };
+
+                dispatchHistory({ type: 'PUSH_STATE', state: loadedState });
+
+                if (projectData.mainArea && projectData.mainArea.length > 0) {
+                    setTimeout(() => {
+                        if (mapRef.current) {
+                            try {
+                                const bounds = new google.maps.LatLngBounds();
+
+                                projectData.mainArea.forEach((coord: any) => {
+                                    bounds.extend(new google.maps.LatLng(coord.lat, coord.lng));
+                                });
+
+                                mapRef.current.fitBounds(bounds, {
+                                    top: 50,
+                                    right: 50,
+                                    bottom: 50,
+                                    left: 50,
+                                });
+                            } catch (error) {
+                                console.warn('⚠️ Could not auto-zoom to area:', error);
+                            }
+                        }
+                    }, 1000);
+                }
+
+                localStorage.removeItem('isEditingExistingProject');
+            } catch (error) {
+                console.error('❌ Error loading project data:', error);
+                localStorage.removeItem('isEditingExistingProject');
+            }
+        }
     }, []);
 
     const tabs = [
@@ -3019,6 +3336,7 @@ export default function EnhancedHorticulturePlannerPage() {
 
     const handleMapLoad = useCallback((map: google.maps.Map) => {
         mapRef.current = map;
+        setMap(map);
 
         map.addListener('zoom_changed', () => {
             if (mapRef.current) {
@@ -3026,6 +3344,30 @@ export default function EnhancedHorticulturePlannerPage() {
             }
         });
     }, []);
+
+    const zoomToMainArea = useCallback(() => {
+        if (!mapRef.current || history.present.mainArea.length === 0) {
+            console.warn('❌ No map or main area to zoom to');
+            return;
+        }
+
+        try {
+            const bounds = new google.maps.LatLngBounds();
+
+            history.present.mainArea.forEach((coord) => {
+                bounds.extend(new google.maps.LatLng(coord.lat, coord.lng));
+            });
+
+            mapRef.current.fitBounds(bounds, {
+                top: 50,
+                right: 50,
+                bottom: 50,
+                left: 50,
+            });
+        } catch (error) {
+            console.error('❌ Error zooming to main area:', error);
+        }
+    }, [history.present.mainArea]);
 
     const handleDrawingComplete = useCallback(
         (coordinates: Coordinate[], shapeType: string) => {
@@ -3123,7 +3465,7 @@ export default function EnhancedHorticulturePlannerPage() {
                     } else {
                         const detectedZone = findZoneForPipe(coordinates, history.present.zones);
                         if (!detectedZone) {
-                            console.error('❌ Cannot create sub-main pipe: not in any zone');
+                            alert('กรุณาเลือกโซนก่อนวางปั๊ม');
                             return;
                         }
                         targetZone = detectedZone;
@@ -3146,7 +3488,7 @@ export default function EnhancedHorticulturePlannerPage() {
                     targetZone,
                     targetZone.plantData,
                     history.present.exclusionAreas,
-                    targetZone.coordinates,
+                    history.present.mainArea,
                     history.present.useZones,
                     history.present.branchPipeSettings
                 );
@@ -3229,7 +3571,14 @@ export default function EnhancedHorticulturePlannerPage() {
             const isPlantMode = editMode === 'plant';
 
             if (isPlantMode) {
+                if (!history.present.selectedPlantType) {
+                    console.error('❌ No plant type selected');
+                    alert('❌ ' + t('กรุณาเลือกชนิดพืชก่อนวางต้นไม้'));
+                    return;
+                }
+
                 if (history.present.mainArea.length === 0 && history.present.zones.length === 0) {
+                    console.error('❌ No main area or zones defined');
                     alert('❌ ' + t('กรุณากำหนดพื้นที่หลักหรือโซนก่อนวางต้นไม้'));
                     return;
                 }
@@ -3242,17 +3591,21 @@ export default function EnhancedHorticulturePlannerPage() {
                         clickPoint,
                         history.present.zones
                     );
+
                     if (containingZone) {
                         targetZoneId = containingZone.id;
                         canPlacePlant = true;
                     } else if (history.present.mainArea.length > 0) {
-                        canPlacePlant = isPointInPolygon(clickPoint, history.present.mainArea);
+                        const inMainArea = isPointInPolygon(clickPoint, history.present.mainArea);
+                        canPlacePlant = inMainArea;
                     }
                 } else if (history.present.mainArea.length > 0) {
-                    canPlacePlant = isPointInPolygon(clickPoint, history.present.mainArea);
+                    const inMainArea = isPointInPolygon(clickPoint, history.present.mainArea);
+                    canPlacePlant = inMainArea;
                 }
 
                 if (!canPlacePlant) {
+                    console.error('❌ Cannot place plant - outside valid area');
                     alert('❌ ' + t('กรุณาวางต้นไม้ภายในพื้นที่หลักหรือโซนที่กำหนด'));
                     return;
                 }
@@ -3268,11 +3621,13 @@ export default function EnhancedHorticulturePlannerPage() {
                 };
 
                 pushToHistory({ plants: [...history.present.plants, newPlant] });
+
                 return;
             }
 
             if (history.present.isEditModeEnabled && !editMode) {
-                return;
+                 alert('กรุณาเลือกโหมดแก้ไข');
+                 return;
             }
         },
         [
@@ -3322,21 +3677,7 @@ export default function EnhancedHorticulturePlannerPage() {
         });
 
         router.visit(`/horticulture/results?${params.toString()}`);
-    }, [
-        history.present.pump,
-        history.present.mainArea,
-        projectName,
-        customerName,
-        totalArea,
-        history.present.zones,
-        history.present.mainPipes,
-        history.present.subMainPipes,
-        history.present.exclusionAreas,
-        history.present.plants,
-        history.present.useZones,
-        history.present.branchPipeSettings,
-        t,
-    ]);
+    }, [history.present.pump, history.present.mainArea, history.present.zones, history.present.mainPipes, history.present.subMainPipes, history.present.exclusionAreas, history.present.plants, history.present.useZones, history.present.selectedPlantType, history.present.branchPipeSettings, projectName, customerName, totalArea, t]);
 
     const canSaveProject = history.present.pump && history.present.mainArea.length > 0;
 
@@ -3403,7 +3744,8 @@ export default function EnhancedHorticulturePlannerPage() {
     }
 
     const handleToggleAddPlantMode = () => {
-        setEditMode(editMode === 'plant' ? null : 'plant');
+        const newMode = editMode === 'plant' ? null : 'plant';
+        setEditMode(newMode);
     };
 
     return (
@@ -3456,13 +3798,46 @@ export default function EnhancedHorticulturePlannerPage() {
 
                         <div className="flex items-center space-x-2">
                             <button
-                                onClick={handleToggleAddPlantMode}
+                                onClick={zoomToMainArea}
+                                disabled={history.present.mainArea.length === 0}
+                                className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                                    history.present.mainArea.length === 0
+                                        ? 'bg-gray-600 text-white opacity-50 cursor-not-allowed'
+                                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                                }`}
+                                title={t('ซูมไปยังพื้นที่หลัก')}
+                                type="button"
+                            >
+                               🎯 {t('ซูม')}
+                            </button>
+                            <button
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+
+                                    if (history.present.subMainPipes.length === 0 && editMode !== 'plant') {
+                                        alert(t('กรุณาวางท่อเมนรองก่อนเพิ่มต้นไม้'));
+                                        return;
+                                    }
+
+                                    handleToggleAddPlantMode();
+                                }}
+                                disabled={history.present.subMainPipes.length === 0 && editMode !== 'plant'}
                                 className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                                     editMode === 'plant'
                                         ? 'bg-red-600 text-white hover:bg-red-700'
+                                        : history.present.subMainPipes.length === 0
+                                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
                                         : 'bg-green-600 text-white hover:bg-green-700'
                                 }`}
-                                title={editMode === 'plant' ? 'หยุดเพิ่มต้นไม้' : 'เพิ่มต้นไม้'}
+                                title={
+                                    editMode === 'plant' 
+                                        ? t('หยุดเพิ่มต้นไม้') 
+                                        : history.present.subMainPipes.length === 0
+                                        ? t('กรุณาวางท่อเมนรองก่อนเพิ่มต้นไม้')
+                                        : t('เพิ่มต้นไม้')
+                                }
+                                type="button"
                             >
                                 {editMode === 'plant' ? (
                                     <>
@@ -3519,8 +3894,8 @@ export default function EnhancedHorticulturePlannerPage() {
                                     disabled={history.past.length === 0}
                                     className={`rounded-l-lg p-2 transition-colors ${
                                         history.past.length === 0
-                                            ? 'cursor-not-allowed text-gray-400'
-                                            : 'text-gray-600 hover:bg-gray-100'
+                                            ? 'cursor-not-allowed text-gray-400 bg-gray-600'
+                                            : 'text-gray-100 bg-blue-600 hover:bg-blue-500'
                                     }`}
                                     title={t('ย้อนกลับ')}
                                 >
@@ -3532,8 +3907,8 @@ export default function EnhancedHorticulturePlannerPage() {
                                     disabled={history.future.length === 0}
                                     className={`rounded-r-lg border-l border-gray-200 p-2 transition-colors ${
                                         history.future.length === 0
-                                            ? 'cursor-not-allowed text-gray-400'
-                                            : 'text-gray-600 hover:bg-gray-100'
+                                            ? 'cursor-not-allowed text-gray-400 bg-gray-600'
+                                            : 'text-gray-100 bg-blue-600 hover:bg-blue-500'
                                     }`}
                                     title={t('ไปข้างหน้า')}
                                 >
@@ -3565,6 +3940,7 @@ export default function EnhancedHorticulturePlannerPage() {
                     </div>
                 </div>
             </header>
+
 
             <div className="flex h-[calc(91vh-64px)]">
                 <div
@@ -3628,12 +4004,9 @@ export default function EnhancedHorticulturePlannerPage() {
                                                 }`}
                                             >
                                                 {editMode === 'mainArea' ? (
-                                                    <>
-                                                        <FaTimes className="mr-2 inline" />
-                                                        {t('หยุดวาดพื้นที่')}
-                                                    </>
+                                                    <>{t('❌ หยุดวาดพื้นที่')}</>
                                                 ) : (
-                                                    <>🗺️ {t('วาดพื้นที่หลัก')}</>
+                                                    <>✏️ {t('วาดพื้นที่หลัก')}</>
                                                 )}
                                             </button>
 
@@ -3642,11 +4015,8 @@ export default function EnhancedHorticulturePlannerPage() {
                                                     <div className="flex items-center text-sm text-green-700">
                                                         <span className="mr-1">✅</span>
                                                         <span className="font-medium">
-                                                            {t('สร้างพื้นที่หลักแล้ว')}
+                                                            {t('สร้างพื้นที่หลักแล้ว')} : {formatArea(totalArea, t)}
                                                         </span>
-                                                    </div>
-                                                    <div className="mt-1 text-xs text-green-600">
-                                                        {t('ขนาด')}: {formatArea(totalArea, t)}
                                                     </div>
                                                 </div>
                                             )}
@@ -3694,12 +4064,9 @@ export default function EnhancedHorticulturePlannerPage() {
                                                     }`}
                                                 >
                                                     {editMode === 'exclusion' ? (
-                                                        <>
-                                                            <FaTimes className="mr-2 inline" />
-                                                            {t('หยุดวาด')}
-                                                        </>
+                                                        <>{t('❌ หยุดวาด')}</>
                                                     ) : (
-                                                        <>🚫 {t('วาดพื้นที่หลีกเลี่ยง')}</>
+                                                        <>✏️ {t('วาดพื้นที่หลีกเลี่ยง')}</>
                                                     )}
                                                 </button>
                                             </div>
@@ -3729,24 +4096,34 @@ export default function EnhancedHorticulturePlannerPage() {
                                         </div>
 
                                         <div className="rounded-lg border border-gray-200 bg-gray-900 p-4">
-                                            <h4 className="mb-3 font-medium text-white">
-                                                {t('โซนพื้นที่')}
-                                            </h4>
-
                                             <div className="mb-3">
-                                                <label className="flex items-center space-x-2">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={history.present.useZones}
-                                                        onChange={(e) =>
-                                                            pushToHistory({
-                                                                useZones: e.target.checked,
-                                                            })
-                                                        }
-                                                        className="h-4 w-4 rounded border-gray-300"
-                                                    />
+                                                <label className="flex items-center justify-between space-x-3 cursor-pointer select-none">
                                                     <span className="text-lg text-white">
                                                         {t('แบ่งเป็นหลายโซน')}
+                                                    </span>
+                                                    <span className="relative inline-block w-12 align-middle select-none transition duration-200 ease-in">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={history.present.useZones}
+                                                            onChange={(e) =>
+                                                                pushToHistory({
+                                                                    useZones: e.target.checked,
+                                                                })
+                                                            }
+                                                            className="peer absolute left-0 top-0 h-0 w-0 opacity-0"
+                                                        />
+                                                        <span
+                                                            className={`
+                                                                block h-6 w-12 rounded-full border border-gray-400 bg-gray-300 transition-colors duration-200
+                                                                peer-checked:bg-green-500
+                                                            `}
+                                                        ></span>
+                                                        <span
+                                                            className={`
+                                                                absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-md transition-transform duration-200
+                                                                peer-checked:translate-x-6
+                                                            `}
+                                                        ></span>
                                                     </span>
                                                 </label>
                                             </div>
@@ -3771,12 +4148,9 @@ export default function EnhancedHorticulturePlannerPage() {
                                                         }`}
                                                     >
                                                         {editMode === 'zone' ? (
-                                                            <>
-                                                                <FaTimes className="mr-2 inline" />
-                                                                {t('หยุดวาดโซน')}
-                                                            </>
+                                                            <>{t('❌ หยุดวาดโซน')}</>
                                                         ) : (
-                                                            <>🏞️ {t('วาดโซน')}</>
+                                                            <>✏️ {t('วาดโซน')}</>
                                                         )}
                                                     </button>
 
@@ -3983,10 +4357,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                             >
                                                 {history.present.pump ? (
                                                     editMode === 'pump' ? (
-                                                        <>
-                                                            <FaTimes className="mr-2 inline" />
-                                                            {t('หยุดวางปั๊ม')}
-                                                        </>
+                                                        <>{t('❌ หยุดวางปั๊ม')}</>
                                                     ) : (
                                                         <>
                                                             <FaEdit className="mr-2 inline" />
@@ -3994,10 +4365,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                         </>
                                                     )
                                                 ) : editMode === 'pump' ? (
-                                                    <>
-                                                        <FaTimes className="mr-2 inline" />
-                                                        {t('หยุดวางปั๊ม')}
-                                                    </>
+                                                    <>{t('❌ หยุดวางปั๊ม')}</>
                                                 ) : (
                                                     <>🚰 {t('วางปั๊มน้ำ')}</>
                                                 )}
@@ -4010,11 +4378,6 @@ export default function EnhancedHorticulturePlannerPage() {
                                                         <span className="font-medium">
                                                             {t('ปั๊มพร้อมใช้งาน')}
                                                         </span>
-                                                    </div>
-                                                    <div className="mt-1 text-xs text-blue-600">
-                                                        {t('ประเภท')}: {history.present.pump.type} |{' '}
-                                                        {t('กำลัง')}:{' '}
-                                                        {history.present.pump.capacity} {t('L/min')}
                                                     </div>
                                                 </div>
                                             )}
@@ -4143,10 +4506,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                     }`}
                                                 >
                                                     {editMode === 'mainPipe' ? (
-                                                        <>
-                                                            <FaTimes className="mr-2 inline" />
-                                                            {t('หยุดวางท่อเมน')}
-                                                        </>
+                                                        <>❌ {t('หยุดวางท่อเมน')}</>
                                                     ) : (
                                                         <>🔧 {t('วางท่อเมน')}</>
                                                     )}
@@ -4178,10 +4538,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                     }`}
                                                 >
                                                     {editMode === 'subMainPipe' ? (
-                                                        <>
-                                                            <FaTimes className="mr-2 inline" />
-                                                            {t('หยุดวางท่อเมนรอง')}
-                                                        </>
+                                                        <>❌ {t('หยุดวางท่อเมนรอง')}</>
                                                     ) : (
                                                         <>🔧 {t('วางท่อเมนรอง + ท่อย่อย')}</>
                                                     )}
@@ -4773,6 +5130,12 @@ export default function EnhancedHorticulturePlannerPage() {
                                 editMode={editMode}
                             />
 
+                            <DistanceMeasurementOverlay
+                                map={mapRef.current}
+                                isActive={editMode === 'mainArea' || editMode === 'zone' || editMode === 'exclusion' || editMode === 'mainPipe' || editMode === 'subMainPipe'}
+                                editMode={editMode}
+                            />
+
                             <EnhancedGoogleMapsOverlays
                                 map={mapRef.current}
                                 data={history.present}
@@ -4797,7 +5160,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                 t={t}
                             />
 
-                            <div className="absolute right-16 top-2 rounded-lg border border-gray-200 bg-gray-900 p-3 shadow-lg">
+                            <div className="absolute right-4 top-16 rounded-lg border border-gray-200 bg-gray-900 p-3 shadow-lg">
                                 <div className="mb-2 text-sm font-medium text-white">
                                     {t('สถานะปัจจุบัน')}
                                 </div>
@@ -5008,14 +5371,49 @@ const EnhancedGoogleMapsOverlays: React.FC<{
 
     useEffect(() => {
         if (!map) return;
+        const mapDiv = map.getDiv();
 
-        const clickListener = map.addListener('click', (event: google.maps.MapMouseEvent) => {
-            if (!event.latLng) return;
-            onMapClick(event);
+        const domClickHandler = (event: MouseEvent) => {
+            const bounds = map.getBounds();
+            if (!bounds) return;
+
+            const mapBounds = mapDiv.getBoundingClientRect();
+            const relativeX = (event.clientX - mapBounds.left) / mapBounds.width;
+            const relativeY = (event.clientY - mapBounds.top) / mapBounds.height;
+
+            const ne = bounds.getNorthEast();
+            const sw = bounds.getSouthWest();
+            const lng = sw.lng() + (ne.lng() - sw.lng()) * relativeX;
+            const lat = ne.lat() + (sw.lat() - ne.lat()) * relativeY;
+
+            const fakeMapEvent = {
+                latLng: new google.maps.LatLng(lat, lng),
+                domEvent: event,
+                pixel: new google.maps.Point(
+                    event.clientX - mapBounds.left,
+                    event.clientY - mapBounds.top
+                ),
+                stop: () => {},
+            } as unknown as google.maps.MapMouseEvent;
+
+            onMapClick(fakeMapEvent);
+        };
+
+        const googleClickListener = map.addListener('click', (event: google.maps.MapMouseEvent) => {
+            if (event.latLng) {
+                onMapClick(event);
+            }
         });
 
+        if (mapDiv) {
+            mapDiv.addEventListener('click', domClickHandler);
+        }
+
         return () => {
-            google.maps.event.removeListener(clickListener);
+            if (mapDiv) {
+                mapDiv.removeEventListener('click', domClickHandler);
+            }
+            google.maps.event.removeListener(googleClickListener);
         };
     }, [map, onMapClick, editMode]);
 
@@ -5327,20 +5725,20 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                         url:
                             'data:image/svg+xml;charset=UTF-8,' +
                             encodeURIComponent(`
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                ${isConnectionStart ? '<circle cx="12" cy="12" r="12" fill="none" stroke="#FFD700" stroke-width="3"/>' : ''}
-                                ${isSelected ? '<circle cx="12" cy="12" r="11" fill="none" stroke="#9333EA" stroke-width="2"/>' : ''}
-                                ${isCurrentlyDragging ? '<circle cx="12" cy="12" r="10" fill="none" stroke="#FF6B35" stroke-width="3"/>' : ''}
-                                ${isHighlightedForConnection ? '<circle cx="12" cy="12" r="11" fill="none" stroke="#FFD700" stroke-width="2"/>' : ''}
-                                <circle cx="12" cy="12" r="10" fill="#22C55E"/>
-                                <text x="12" y="16" text-anchor="middle" fill="white" font-size="12">🌱</text>
+                            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                ${isConnectionStart ? '<circle cx="16" cy="16" r="14" fill="none" stroke="#FFD700" stroke-width="3"/>' : ''}
+                                ${isSelected ? '<circle cx="16" cy="16" r="13" fill="none" stroke="#9333EA" stroke-width="2"/>' : ''}
+                                ${isCurrentlyDragging ? '<circle cx="16" cy="16" r="12" fill="none" stroke="#FF6B35" stroke-width="3"/>' : ''}
+                                ${isHighlightedForConnection ? '<circle cx="16" cy="16" r="13" fill="none" stroke="#FFD700" stroke-width="2"/>' : ''}
+                                <text x="16" y="22" text-anchor="middle" fill="white" font-size="16" font-weight="bold">🌳</text>
                             </svg>
                         `),
-                        scaledSize: new google.maps.Size(24, 24),
-                        anchor: new google.maps.Point(12, 12),
+                        scaledSize: new google.maps.Size(32, 32),
+                        anchor: new google.maps.Point(16, 16),
                     },
-                    title: plant.plantData.name,
+                    title: `${plant.plantData.name} (${plant.id})`,
                     draggable: data.isEditModeEnabled,
+                    zIndex: 1000,
                 });
 
                 overlaysRef.current.markers.set(plant.id, plantMarker);
@@ -5466,28 +5864,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
         (window as any).segmentedPipeDeletion = (branchPipeId: string) => {
             onSegmentedPipeDeletion(branchPipeId);
         };
-    }, [
-        map,
-        data,
-        highlightedPipes,
-        isCreatingConnection,
-        connectionStartPlant,
-        tempConnectionLine,
-        editMode,
-        onPlantEdit,
-        onConnectToPipe,
-        onConnectToPlant,
-        onSelectItem,
-        onPlantDragStart,
-        onPlantDragEnd,
-        onStartRealTimeBranchEdit,
-        onSegmentedPipeDeletion,
-        isDragging,
-        dragTarget,
-        handleZonePlantSelection,
-        handleCreatePlantConnection,
-        clearOverlays,
-    ]);
+    }, [map, data, highlightedPipes, isCreatingConnection, connectionStartPlant, tempConnectionLine, editMode, onPlantEdit, onConnectToPipe, onConnectToPlant, onSelectItem, onPlantDragStart, onPlantDragEnd, onStartRealTimeBranchEdit, onSegmentedPipeDeletion, isDragging, dragTarget, handleZonePlantSelection, handleCreatePlantConnection, clearOverlays, t]);
 
     useEffect(() => {
         return () => {

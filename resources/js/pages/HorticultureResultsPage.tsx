@@ -217,8 +217,7 @@ const GoogleMapsResultsOverlays: React.FC<{
                         'data:image/svg+xml;charset=UTF-8,' +
                         encodeURIComponent(`
                         <svg width="${16 * iconSize}" height="${16 * iconSize}" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="8" cy="8" r="8" fill="#22C55E"/>
-                            <text x="8" y="11" text-anchor="middle" fill="white" font-size="${10 * iconSize}">🌱</text>
+                            <text x="8" y="11" text-anchor="middle" fill="white" font-size="${16 * iconSize}">🌳</text>
                         </svg>
                     `),
                     scaledSize: new google.maps.Size(16 * iconSize, 16 * iconSize),
@@ -371,8 +370,17 @@ function EnhancedHorticultureResultsPageContent() {
     };
 
     const handleEditProject = () => {
+        // ตั้งค่า flag บอกว่ากำลังแก้ไขโครงการเดิม
+        localStorage.setItem('isEditingExistingProject', 'true');
+        
+        // ตรวจสอบว่าข้อมูลโครงการยังอยู่ใน localStorage หรือไม่
+        const existingData = localStorage.getItem('horticultureIrrigationData');
+        if (!existingData && projectData) {
+            // หากไม่มีข้อมูลใน localStorage แต่มี projectData ให้บันทึกกลับ
+            localStorage.setItem('horticultureIrrigationData', JSON.stringify(projectData));
+        }
+        
         router.visit('/horticulture/planner');
-        navigateToPlanner();
     };
 
     const handleMapLoad = useCallback((map: google.maps.Map) => {
@@ -543,6 +551,12 @@ function EnhancedHorticultureResultsPageContent() {
                                 className="rounded-lg bg-green-600 px-6 py-3 font-semibold transition-colors hover:bg-green-700"
                             >
                                 ➕ {t('โครงการใหม่')}
+                            </button>
+                            <button
+                                onClick={handleEditProject}
+                                className="rounded-lg bg-orange-600 px-6 py-3 font-semibold transition-colors hover:bg-orange-700"
+                            >
+                                ✏️ {t('แก้ไขโครงการ')}
                             </button>
                             <button
                                 onClick={handleExportMapToProduct}
@@ -778,14 +792,14 @@ function EnhancedHorticultureResultsPageContent() {
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <div
-                                            className="flex items-center justify-center rounded-full bg-green-600 text-xs text-white"
+                                            className="flex items-center justify-center"
                                             style={{
                                                 width: `18px`,
                                                 height: `18px`,
-                                                fontSize: `10px`,
+                                                fontSize: `18px`,
                                             }}
                                         >
-                                            🌱
+                                            🌳
                                         </div>
                                         <span>{t('ต้นไม้')}</span>
                                     </div>
