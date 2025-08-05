@@ -1,4 +1,4 @@
-// resources/js/utils/gardenStatistics.ts - Simple Garden Statistics Utils
+// resources/js/utils/gardenStatistics.ts
 import {
     GardenPlannerData,
     GardenZone,

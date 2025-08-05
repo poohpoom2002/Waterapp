@@ -8,6 +8,163 @@ interface Coordinate {
     lng: number;
 }
 
+interface DistanceMeasurementProps {
+    map: google.maps.Map | null | undefined;
+    isActive: boolean;
+    editMode: string | null;
+}
+
+// Component แสดงระยะทางระหว่างการวาด
+const DistanceMeasurement: React.FC<DistanceMeasurementProps> = ({
+    map,
+    isActive,
+    editMode,
+}) => {
+    const [startPoint, setStartPoint] = useState<Coordinate | null>(null);
+    const [currentDistance, setCurrentDistance] = useState<number>(0);
+    const [mousePosition, setMousePosition] = useState<Coordinate | null>(null);
+    const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+
+    // คำนวณระยะทางระหว่างสองจุด
+    const calculateDistance = (point1: Coordinate, point2: Coordinate): number => {
+        const R = 6371000; // รัศมีโลกเป็นเมตร
+        const dLat = (point2.lat - point1.lat) * Math.PI / 180;
+        const dLng = (point2.lng - point1.lng) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(point1.lat * Math.PI / 180) * Math.cos(point2.lat * Math.PI / 180) * 
+                Math.sin(dLng/2) * Math.sin(dLng/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    };
+
+    // ฟอร์แมตระยะทาง
+    const formatDistance = (meters: number): string => {
+        if (meters < 1000) {
+            return `${meters.toFixed(1)} ม.`;
+        } else {
+            return `${(meters / 1000).toFixed(2)} กม.`;
+        }
+    };
+
+    useEffect(() => {
+        if (!map || !isActive || !editMode) {
+            // ล้าง InfoWindow เมื่อไม่ active
+            if (infoWindowRef.current) {
+                infoWindowRef.current.close();
+                infoWindowRef.current = null;
+            }
+            setStartPoint(null);
+            setCurrentDistance(0);
+            setMousePosition(null);
+            return;
+        }
+
+        const listeners: google.maps.MapsEventListener[] = [];
+
+        // ฟังการคลิกแรกเพื่อเริ่มวัดระยะ - ใช้ DOM event listener แทน
+        const handleMapClick = (e: google.maps.MapMouseEvent) => {
+            if (e.latLng && !startPoint) {
+                const clickedPoint = {
+                    lat: e.latLng.lat(),
+                    lng: e.latLng.lng()
+                };
+                
+                // จุดแรก - เริ่มวัดระยะ
+                setStartPoint(clickedPoint);
+            }
+        };
+
+        // ใช้ Google Maps event listener แต่มี priority ก่อน
+        const clickListener = google.maps.event.addListener(map, 'click', handleMapClick);
+        listeners.push(clickListener);
+
+        // ฟังการ double click เพื่อจบการวัด
+        const dblClickListener = map.addListener('dblclick', (e: google.maps.MapMouseEvent) => {
+            if (startPoint) {
+                setStartPoint(null);
+                setCurrentDistance(0);
+                setMousePosition(null);
+                if (infoWindowRef.current) {
+                    infoWindowRef.current.close();
+                    infoWindowRef.current = null;
+                }
+            }
+        });
+        listeners.push(dblClickListener);
+
+        // ฟังการเคลื่อนไหวของเมาส์
+        const mouseMoveListener = google.maps.event.addListener(map, 'mousemove', (e: google.maps.MapMouseEvent) => {
+            if (startPoint && e.latLng) {
+                const currentPoint = {
+                    lat: e.latLng.lat(),
+                    lng: e.latLng.lng()
+                };
+                
+                const distance = calculateDistance(startPoint, currentPoint);
+                setCurrentDistance(distance);
+                setMousePosition(currentPoint);
+
+                // สร้างหรืออัพเดท InfoWindow
+                if (distance > 0) {
+                    const content = `
+                        <div style="
+                            background: rgba(0,0,0,0.85); 
+                            color: white; 
+                            padding: 8px 12px; 
+                            border-radius: 6px; 
+                            font-size: 14px; 
+                            font-weight: bold;
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                            border: 1px solid rgba(255,255,255,0.2);
+                            text-align: center;
+                            min-width: 60px;
+                        ">
+                            ${formatDistance(distance)}
+                            <div style="
+                                font-size: 10px; 
+                                color: rgba(255,255,255,0.8); 
+                                margin-top: 2px;
+                            ">ระยะทาง</div>
+                        </div>
+                    `;
+                    
+                    if (infoWindowRef.current) {
+                        // อัพเดท InfoWindow ที่มีอยู่
+                        infoWindowRef.current.setContent(content);
+                        infoWindowRef.current.setPosition(e.latLng);
+                    } else {
+                        // สร้าง InfoWindow ใหม่
+                        const infoWindow = new google.maps.InfoWindow({
+                            content,
+                            position: e.latLng,
+                            disableAutoPan: true,
+                            pixelOffset: new google.maps.Size(0, -10)
+                        });
+                        infoWindow.open(map);
+                        infoWindowRef.current = infoWindow;
+                    }
+                }
+            }
+        });
+        listeners.push(mouseMoveListener);
+
+        return () => {
+            listeners.forEach(listener => {
+                if (listener) {
+                    google.maps.event.removeListener(listener);
+                }
+            });
+            
+            if (infoWindowRef.current) {
+                infoWindowRef.current.close();
+                infoWindowRef.current = null;
+            }
+        };
+    }, [map, isActive, editMode, startPoint]);
+
+    return null;
+};
+
 interface HorticultureDrawingManagerProps {
     map?: google.maps.Map;
     editMode: string | null;
@@ -189,6 +346,9 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
 }) => {
     const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null);
     const [isDrawingEnabled, setIsDrawingEnabled] = useState(false);
+    
+    // ตรวจสอบว่าควรแสดงการวัดระยะหรือไม่
+    const shouldShowDistanceMeasurement = editMode === 'mainArea' || editMode === 'zone' || editMode === 'exclusion' || editMode === 'mainPipe' || editMode === 'subMainPipe';
 
     useEffect(() => {
         if (!map || !window.google?.maps?.drawing || isEditModeEnabled) {
@@ -233,7 +393,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                     const coordinates = extractCoordinatesFromShape(polygon);
                     if (coordinates.length > 0) {
                         onCreated(coordinates, 'polygon');
-                        console.log('✅ Polygon created with', coordinates.length, 'points');
                     }
                     polygon.setMap(null);
                 })
@@ -246,7 +405,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                         const coordinates = extractCoordinatesFromShape(rectangle);
                         if (coordinates.length > 0) {
                             onCreated(coordinates, 'rectangle');
-                            console.log('✅ Rectangle created with', coordinates.length, 'points');
                         }
                         rectangle.setMap(null);
                     }
@@ -258,7 +416,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                     const coordinates = extractCoordinatesFromShape(circle);
                     if (coordinates.length > 0) {
                         onCreated(coordinates, 'circle');
-                        console.log('✅ Circle created with', coordinates.length, 'points');
                     }
                     circle.setMap(null);
                 })
@@ -269,7 +426,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                     const coordinates = extractCoordinatesFromShape(polyline);
                     if (coordinates.length > 0) {
                         onCreated(coordinates, 'polyline');
-                        console.log('✅ Polyline created with', coordinates.length, 'points');
                     }
                     polyline.setMap(null);
                 })
