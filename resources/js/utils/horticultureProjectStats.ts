@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * horticultureProjectStats.ts
  * ไฟล์สำหรับส่งออกข้อมูลสถิติโครงการระบบน้ำสวนผลไม้
@@ -345,7 +346,6 @@ export const getDetailedBranchPipeStats = ():
             return null;
         }
 
-        // รวมข้อมูลจากทั้งสองฟังก์ชัน
         const detailedStats = longestBranchStats.map((longestStat) => {
             const subMainData = subMainBranchCount.find(
                 (subMain) => subMain.zoneId === longestStat.zoneId
@@ -368,8 +368,8 @@ export const getDetailedBranchPipeStats = ():
 };
 
 /**
- * ส่งออกข้อมูลท่อย่อยเป็น JSON string
- * @returns JSON string ของข้อมูลท่อย่อย หรือ null ถ้าไม่มีข้อมูล
+ * Export branch pipe stats as JSON string
+ * @returns JSON string of branch pipe stats or null if no data
  */
 export const exportBranchPipeStatsAsJSON = (): string | null => {
     const stats = getDetailedBranchPipeStats();
@@ -385,8 +385,8 @@ export const exportBranchPipeStatsAsJSON = (): string | null => {
 };
 
 /**
- * ส่งออกข้อมูลท่อย่อยเป็น CSV string
- * @returns CSV string ของข้อมูลท่อย่อย หรือ null ถ้าไม่มีข้อมูล
+ * Export branch pipe stats as CSV string
+ * @returns CSV string of branch pipe stats or null if no data
  */
 export const exportBranchPipeStatsAsCSV = (): string | null => {
     const stats = getDetailedBranchPipeStats();
@@ -401,7 +401,6 @@ export const exportBranchPipeStatsAsCSV = (): string | null => {
                 csv += `"${zone.zoneId}","${zone.zoneName}","${zone.longestBranchPipe.id}",${zone.longestBranchPipe.length.toFixed(2)},${zone.longestBranchPipe.plantCount},"${zone.longestBranchPipe.plantNames.join(', ')}","${subMain.id}",${subMain.length.toFixed(2)},${subMain.branchCount},${subMain.totalBranchLength.toFixed(2)}\n`;
             });
         } else {
-            // กรณีไม่มีท่อเมนรอง
             csv += `"${zone.zoneId}","${zone.zoneName}","${zone.longestBranchPipe.id}",${zone.longestBranchPipe.length.toFixed(2)},${zone.longestBranchPipe.plantCount},"${zone.longestBranchPipe.plantNames.join(', ')}","","","",""\n`;
         }
     });
@@ -410,8 +409,8 @@ export const exportBranchPipeStatsAsCSV = (): string | null => {
 };
 
 /**
- * ดาวน์โหลดข้อมูลท่อย่อยเป็นไฟล์ JSON
- * @param filename ชื่อไฟล์ (ไม่รวมนามสกุล)
+ * Download branch pipe stats as JSON file
+ * @param filename name of the file (without extension)
  */
 export const downloadBranchPipeStatsAsJSON = (filename: string = 'branch-pipe-stats'): void => {
     const jsonData = exportBranchPipeStatsAsJSON();
@@ -432,8 +431,8 @@ export const downloadBranchPipeStatsAsJSON = (filename: string = 'branch-pipe-st
 };
 
 /**
- * ดาวน์โหลดข้อมูลท่อย่อยเป็นไฟล์ CSV
- * @param filename ชื่อไฟล์ (ไม่รวมนามสกุล)
+ * Download branch pipe stats as CSV file
+ * @param filename name of the file (without extension)
  */
 export const downloadBranchPipeStatsAsCSV = (filename: string = 'branch-pipe-stats'): void => {
     const csvData = exportBranchPipeStatsAsCSV();
@@ -454,8 +453,8 @@ export const downloadBranchPipeStatsAsCSV = (filename: string = 'branch-pipe-sta
 };
 
 /**
- * แสดงข้อมูลท่อย่อยในรูปแบบที่อ่านง่าย
- * @returns สตริงข้อมูลท่อย่อยที่จัดรูปแบบแล้ว หรือ null ถ้าไม่มีข้อมูล
+ * Get formatted branch pipe stats
+ * @returns Formatted string of branch pipe stats or null if no data
  */
 export const getFormattedBranchPipeStats = (): string | null => {
     const stats = getDetailedBranchPipeStats();
@@ -491,8 +490,8 @@ export const getFormattedBranchPipeStats = (): string | null => {
 };
 
 /**
- * ส่งออกข้อมูลสถิติเป็น JSON string
- * @returns JSON string ของข้อมูลสถิติ หรือ null ถ้าไม่มีข้อมูล
+ * Export stats as JSON string
+ * @returns JSON string of stats or null if no data
  */
 export const exportStatsAsJSON = (): string | null => {
     const stats = getProjectStats();
@@ -508,8 +507,8 @@ export const exportStatsAsJSON = (): string | null => {
 };
 
 /**
- * ส่งออกข้อมูลสถิติเป็น CSV string
- * @returns CSV string ของข้อมูลสธิติ หรือ null ถ้าไม่มีข้อมูล
+ * Export stats as CSV string
+ * @returns CSV string of stats or null if no data
  */
 export const exportStatsAsCSV = (): string | null => {
     const stats = getProjectStats();
@@ -526,10 +525,10 @@ export const exportStatsAsCSV = (): string | null => {
 };
 
 /**
- * สร้างภาพแผนที่จาก HTML element
- * @param mapElement HTML element ของแผนที่
- * @param options ตัวเลือกการสร้างภาพ
- * @returns Promise<string | null> Data URL ของภาพ หรือ null ถ้าไม่สำเร็จ
+ * Create map image from HTML element
+ * @param mapElement HTML element of the map
+ * @param options options for creating the image
+ * @returns Promise<string | null> Data URL of the image or null if failed
  */
 export const createMapImage = async (
     mapElement: HTMLElement,
@@ -554,13 +553,9 @@ export const createMapImage = async (
 
     try {
         console.log('🖼️ เริ่มสร้างภาพแผนที่...');
-
-        // รอให้แผนที่โหลดเสร็จ
         await new Promise((resolve) => setTimeout(resolve, 2000));
-
         const html2canvas = await import('html2canvas');
         const html2canvasLib = html2canvas.default || html2canvas;
-
         const canvas = await html2canvasLib(mapElement, {
             useCORS: true,
             allowTaint: false,
@@ -571,11 +566,9 @@ export const createMapImage = async (
             height: mapElement.offsetHeight,
             onclone: (clonedDoc) => {
                 try {
-                    // ลบ controls ที่ไม่ต้องการออกจากภาพ
                     const controls = clonedDoc.querySelectorAll('.leaflet-control-container');
                     controls.forEach((el) => el.remove());
 
-                    // ปรับสีที่อาจมีปัญหา
                     const elements = clonedDoc.querySelectorAll('*');
                     elements.forEach((el: Element) => {
                         const htmlEl = el as HTMLElement;
@@ -598,7 +591,6 @@ export const createMapImage = async (
     } catch (error) {
         console.error('❌ เกิดข้อผิดพลาดในการสร้างภาพ:', error);
 
-        // สร้างภาพ fallback
         try {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
@@ -628,9 +620,9 @@ export const createMapImage = async (
 };
 
 /**
- * ดาวน์โหลดภาพ
- * @param dataUrl Data URL ของภาพ
- * @param filename ชื่อไฟล์ (รวมนามสกุล)
+ * Download image
+ * @param dataUrl Data URL of the image
+ * @param filename name of the file (including extension)
  */
 export const downloadImage = (
     dataUrl: string,
@@ -649,7 +641,6 @@ export const downloadImage = (
     } catch (error) {
         console.error('❌ เกิดข้อผิดพลาดในการดาวน์โหลดภาพ:', error);
         try {
-            // ลองเปิดในหน้าต่างใหม่แทน
             window.open(dataUrl);
         } catch (fallbackError) {
             console.error('❌ การดาวน์โหลด fallback ล้มเหลว:', fallbackError);
@@ -714,24 +705,17 @@ export const createPDFReport = async (
             return false;
         }
 
-        // ใช้ dynamic import สำหรับ jsPDF
         const jsPDFModule = await import('jspdf');
         const jsPDF = jsPDFModule.default;
 
         const doc = new jsPDF('p', 'mm', 'a4');
 
-        // เพิ่มฟอนต์ภาษาไทย (ถ้ามี)
-        // doc.addFont('path/to/thai-font.ttf', 'THSarabunNew', 'normal');
-        // doc.setFont('THSarabunNew');
-
         let yPosition = 20;
 
-        // หัวข้อ
         doc.setFontSize(20);
         doc.text('รายงานโครงการระบบน้ำสวนผลไม้', 105, yPosition, { align: 'center' });
         yPosition += 15;
 
-        // ข้อมูลโดยรวม
         doc.setFontSize(16);
         doc.text('ข้อมูลโดยรวม', 20, yPosition);
         yPosition += 10;
@@ -750,7 +734,6 @@ export const createPDFReport = async (
         );
         yPosition += 15;
 
-        // ระบบท่อ
         doc.setFontSize(16);
         doc.text('ระบบท่อ', 20, yPosition);
         yPosition += 10;
@@ -783,7 +766,6 @@ export const createPDFReport = async (
         );
         yPosition += 15;
 
-        // ข้อมูลโซน
         if (stats.zoneDetails.length > 1) {
             doc.setFontSize(16);
             doc.text('รายละเอียดแต่ละโซน', 20, yPosition);
@@ -811,7 +793,6 @@ export const createPDFReport = async (
             });
         }
 
-        // เพิ่มภาพแผนที่ (ถ้าต้องการ)
         if (includeMap && mapElement) {
             const mapImage = await createMapImage(mapElement, { scale: 1, quality: 0.8 });
             if (mapImage) {
@@ -819,14 +800,12 @@ export const createPDFReport = async (
                 doc.setFontSize(16);
                 doc.text('แผนผังโครงการ', 105, 20, { align: 'center' });
 
-                // ปรับขนาดภาพให้พอดีกับหน้า A4
                 const imgWidth = 170;
                 const imgHeight = 120;
                 doc.addImage(mapImage, 'JPEG', 20, 30, imgWidth, imgHeight);
             }
         }
 
-        // บันทึกไฟล์
         const projectData = loadProjectData();
         const filename = projectData?.projectName
             ? `${projectData.projectName.replace(/[^a-zA-Z0-9ก-ฮ]/g, '-')}-report.pdf`
@@ -842,8 +821,8 @@ export const createPDFReport = async (
 };
 
 /**
- * ดาวน์โหลดข้อมูลสถิติเป็นไฟล์ JSON
- * @param filename ชื่อไฟล์ (ไม่รวมนามสกุล)
+ * Download stats as JSON file
+ * @param filename name of the file (without extension)
  */
 export const downloadStatsAsJSON = (filename: string = 'horticulture-stats'): void => {
     const jsonData = exportStatsAsJSON();
@@ -864,8 +843,8 @@ export const downloadStatsAsJSON = (filename: string = 'horticulture-stats'): vo
 };
 
 /**
- * ดาวน์โหลดข้อมูลสถิติเป็นไฟล์ CSV
- * @param filename ชื่อไฟล์ (ไม่รวมนามสกุล)
+ * Download stats as CSV file
+ * @param filename name of the file (without extension)
  */
 export const downloadStatsAsCSV = (filename: string = 'horticulture-stats'): void => {
     const csvData = exportStatsAsCSV();
@@ -886,8 +865,8 @@ export const downloadStatsAsCSV = (filename: string = 'horticulture-stats'): voi
 };
 
 /**
- * แสดงข้อมูลสถิติในรูปแบบที่อ่านง่าย
- * @returns สตริงข้อมูลสถิติที่จัดรูปแบบแล้ว หรือ null ถ้าไม่มีข้อมูล
+ * Get formatted stats
+ * @returns Formatted string of stats or null if no data
  */
 export const getFormattedStats = (): string | null => {
     const stats = getProjectStats();
@@ -929,7 +908,7 @@ export const getFormattedStats = (): string | null => {
 };
 
 /**
- * Debug ข้อมูลสถิติ
+ * Debug stats
  */
 export const debugProjectStats = (): void => {
     console.group('🔍 Debug Project Statistics');
@@ -963,7 +942,6 @@ export const debugProjectStats = (): void => {
     console.groupEnd();
 };
 
-// ทำให้ฟังก์ชันเหล่านี้สามารถเรียกใช้จาก window ได้ (สำหรับ debugging)
 if (typeof window !== 'undefined') {
     (window as unknown as { horticultureStats: unknown }).horticultureStats = {
         getProjectStats,
@@ -981,7 +959,6 @@ if (typeof window !== 'undefined') {
         downloadImage,
         createAndDownloadMapImage,
         createPDFReport,
-        // ฟังก์ชันใหม่สำหรับท่อย่อย
         getLongestBranchPipeStats,
         getSubMainPipeBranchCount,
         getDetailedBranchPipeStats,
@@ -992,42 +969,8 @@ if (typeof window !== 'undefined') {
         getFormattedBranchPipeStats,
     };
 
-    console.log('🌱 Horticulture Project Stats API available at window.horticultureStats');
-    console.log('📷 Image functions: createMapImage, downloadImage, createAndDownloadMapImage');
-    console.log('📄 PDF function: createPDFReport');
-    console.log(
-        '🔧 Branch pipe functions: getLongestBranchPipeStats, getSubMainPipeBranchCount, getDetailedBranchPipeStats'
-    );
 }
 
-// ตัวอย่างการใช้งานฟังก์ชันใหม่
-/**
- * ตัวอย่างการใช้งานฟังก์ชันท่อย่อย:
- *
- * // 1. ดึงข้อมูลท่อย่อยที่ยาวที่สุดในแต่ละโซน
- * const longestBranchStats = getLongestBranchPipeStats();
- * console.log('ท่อย่อยที่ยาวที่สุด:', longestBranchStats);
- *
- * // 2. ดึงข้อมูลจำนวนท่อย่อยที่ออกจากท่อเมนรอง
- * const subMainBranchCount = getSubMainPipeBranchCount();
- * console.log('จำนวนท่อย่อยจากท่อเมนรอง:', subMainBranchCount);
- *
- * // 3. ดึงข้อมูลสถิติท่อย่อยแบบละเอียด
- * const detailedStats = getDetailedBranchPipeStats();
- * console.log('สถิติท่อย่อยแบบละเอียด:', detailedStats);
- *
- * // 4. Export เป็น JSON
- * downloadBranchPipeStatsAsJSON('my-project-branch-stats');
- *
- * // 5. Export เป็น CSV
- * downloadBranchPipeStatsAsCSV('my-project-branch-stats');
- *
- * // 6. แสดงข้อมูลในรูปแบบที่อ่านง่าย
- * const formattedStats = getFormattedBranchPipeStats();
- * console.log(formattedStats);
- */
-
-// Export default object สำหรับ import ทั้งหมด
 export default {
     getProjectStats,
     getProjectStatsFromData,
@@ -1045,7 +988,6 @@ export default {
     downloadImage,
     createAndDownloadMapImage,
     createPDFReport,
-    // ฟังก์ชันใหม่สำหรับท่อย่อย
     getLongestBranchPipeStats,
     getSubMainPipeBranchCount,
     getDetailedBranchPipeStats,
