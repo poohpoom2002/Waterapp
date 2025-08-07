@@ -116,6 +116,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->name('field-map');
 
+    // Field Crop Step Routes
+    Route::get('step1-field-area', function () {
+        return Inertia::render('field-crop/initial-area');
+    })->name('initial-area');
+
+    Route::get('step2-zones-obstacles', function () {
+        return Inertia::render('field-crop/zone-obstacle');
+    })->name('zone-obstacle');
+
+    Route::get('step3-pipe-system', function () {
+        return Inertia::render('field-crop/pipe-generate');
+    })->name('pipe-generate');
+
+    Route::get('step4-irrigation-system', function () {
+        return Inertia::render('field-crop/irrigation-generate');
+    })->name('irrigation-generate');
+
     // Greenhouse Crop Route
     Route::get('greenhouse-crop', function () {
         $cropType = request()->query('crop_type');
