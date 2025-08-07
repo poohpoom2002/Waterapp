@@ -194,6 +194,39 @@ export const usePipeSystemState = () => {
     const [snapVisualization, setSnapVisualization] = useState(true);
     const [gridEnabled, setGridEnabled] = useState(false);
     const [gridSize, setGridSize] = useState(DEFAULT_GRID_SIZE);
+    
+    // Pipe history for undo/redo functionality
+    const [pipeHistory, setPipeHistory] = useState<any[][]>([[]]);
+    const [pipeHistoryIndex, setPipeHistoryIndex] = useState(0);
+
+    const savePipesToHistory = (newPipesState: any[]) => {
+        const newHistory = pipeHistory.slice(0, pipeHistoryIndex + 1);
+        newHistory.push([...newPipesState]);
+        setPipeHistory(newHistory);
+        setPipeHistoryIndex(newHistory.length - 1);
+    };
+
+    const undoPipes = () => {
+        if (pipeHistoryIndex > 0) {
+            const newIndex = pipeHistoryIndex - 1;
+            const restoredPipes = pipeHistory[newIndex];
+            setPipes([...restoredPipes]);
+            setPipeHistoryIndex(newIndex);
+            return restoredPipes;
+        }
+        return null;
+    };
+
+    const redoPipes = () => {
+        if (pipeHistoryIndex < pipeHistory.length - 1) {
+            const newIndex = pipeHistoryIndex + 1;
+            const restoredPipes = pipeHistory[newIndex];
+            setPipes([...restoredPipes]);
+            setPipeHistoryIndex(newIndex);
+            return restoredPipes;
+        }
+        return null;
+    };
 
     return {
         currentPipeType,
@@ -220,6 +253,13 @@ export const usePipeSystemState = () => {
         setGridEnabled,
         gridSize,
         setGridSize,
+        pipeHistory,
+        setPipeHistory,
+        pipeHistoryIndex,
+        setPipeHistoryIndex,
+        savePipesToHistory,
+        undoPipes,
+        redoPipes,
     };
 };
 

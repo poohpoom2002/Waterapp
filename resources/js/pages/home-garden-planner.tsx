@@ -563,7 +563,7 @@ export default function HomeGardenPlanner() {
 
             const sprinklerType = { ...selectedSprinklerType, radius: manualSprinklerRadius };
 
-            let targetZone = gardenZones.find((zone) => {
+            const targetZone = gardenZones.find((zone) => {
                 if (zone.type === 'forbidden') return false;
                 return zone.canvasCoordinates && isPointInPolygon(position, zone.canvasCoordinates);
             });
@@ -1092,7 +1092,7 @@ export default function HomeGardenPlanner() {
 
                 const sprinklerType = { ...selectedSprinklerType, radius: manualSprinklerRadius };
 
-                let targetZone = gardenZones.find((zone) => {
+                const targetZone = gardenZones.find((zone) => {
                     if (zone.type === 'forbidden') return false;
                     return isPointInPolygon({ lat, lng }, zone.coordinates);
                 });

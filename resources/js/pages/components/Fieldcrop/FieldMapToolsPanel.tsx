@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
+import * as turf from '@turf/turf';
 import {
     ZONE_COLORS,
     OBSTACLE_TYPES,
@@ -14,6 +15,22 @@ import {
 } from '@/pages/utils/fieldMapConstants';
 import { getTranslatedCropByValue, type TranslatedCrop } from '@/pages/utils/cropData';
 import FieldMapCropSpacing from './FieldMapCropSpacing';
+
+// Import LateralPipe interface from field-map.tsx
+interface LateralPipe {
+    id: number;
+    coordinates: { lat: number; lng: number }[];
+    type: string;
+    name: string;
+    color: string;
+    zoneId: string | number;
+    polyline?: google.maps.Polyline;
+    parentPipeId?: any;
+    angle?: number;
+    side?: string;
+    connectionPoint?: number;
+    length?: number;
+}
 
 interface FieldMapToolsPanelProps {
     // Step management
@@ -42,6 +59,7 @@ interface FieldMapToolsPanelProps {
     selectedCrops: string[];
     zones: any[];
     pipes: any[];
+    setPipes: React.Dispatch<React.SetStateAction<any[]>>; // เพิ่มเพื่อใช้ในการอัปเดตท่อ
     obstacles: any[];
 
     // Settings
@@ -94,6 +112,34 @@ interface FieldMapToolsPanelProps {
     isGeneratingPipes: boolean;
     clearLateralPipes: () => void;
 
+    // NEW: Pipe branch angle settings
+    currentBranchAngle: number;
+    setCurrentBranchAngle: (angle: number) => void;
+    handleStartRealTimeBranchEdit?: (pipeId: string) => void;
+    branchPipeSettings: {
+        defaultAngle: number;
+        maxAngle: number;
+        minAngle: number;
+        angleStep: number;
+    };
+    setBranchPipeSettings: React.Dispatch<React.SetStateAction<{
+        defaultAngle: number;
+        maxAngle: number;
+        minAngle: number;
+        angleStep: number;
+    }>>;
+    realTimeEditing: {
+        activePipeId: any;
+        activeAngle: number;
+        isAdjusting: boolean;
+    };
+    setRealTimeEditing: React.Dispatch<React.SetStateAction<{
+        activePipeId: any;
+        activeAngle: number;
+        isAdjusting: boolean;
+    }>>;
+    regenerateLateralPipesWithAngle: (pipeId: any, newAngle: number, targetZone: any) => LateralPipe[];
+
     // Irrigation
     irrigationAssignments: any;
     setIrrigationAssignments: (assignments: any) => void;
@@ -101,8 +147,7 @@ interface FieldMapToolsPanelProps {
     irrigationLines: any[];
     irrigationRadius: any;
     setIrrigationRadius: (radius: any) => void;
-    sprinklerOverlap: any;
-    setSprinklerOverlap: (overlap: any) => void;
+    // ลบ sprinklerOverlap และ setSprinklerOverlap
     generateIrrigationForZone: (zone: any, type: string) => void;
     clearIrrigationForZone: (zoneId: string) => void;
     irrigationSettings: any;
@@ -147,6 +192,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
     selectedCrops,
     zones,
     pipes,
+    setPipes,
     obstacles,
     snapEnabled,
     setSnapEnabled,
@@ -184,14 +230,21 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
     generateLateralPipesForZone,
     isGeneratingPipes,
     clearLateralPipes,
+    currentBranchAngle,
+    setCurrentBranchAngle,
+    handleStartRealTimeBranchEdit,
+    branchPipeSettings,
+    setBranchPipeSettings,
+    realTimeEditing,
+    setRealTimeEditing,
+    regenerateLateralPipesWithAngle,
     irrigationAssignments,
     setIrrigationAssignments,
     irrigationPoints,
     irrigationLines,
     irrigationRadius,
     setIrrigationRadius,
-    sprinklerOverlap,
-    setSprinklerOverlap,
+    // ลบ sprinklerOverlap และ setSprinklerOverlap
     generateIrrigationForZone,
     clearIrrigationForZone,
     irrigationSettings,
@@ -221,6 +274,8 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
     t,
     language = 'en',
 }) => {
+    // State สำหรับการเรียงลำดับท่อย่อย
+    const [sortType, setSortType] = useState<'angle' | 'length' | 'name'>('angle');
     // Configuration for radius-based irrigation systems
     const irrigationRadiusConfig = {
         sprinkler: { min: 3, max: 15, step: 0.5, defaultValue: 8 },
@@ -603,11 +658,21 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                     <div className="text-xs text-gray-300">
                                                         <div className="flex justify-between">
                                                             <span>{t('Row Spacing')}:</span>
-                                                            <span className="text-white">{cropData.rowSpacing} cm</span>
+                                                            <span className="text-white">
+                                                                {rowSpacing[assignedCrop] || cropData.rowSpacing} cm
+                                                                {rowSpacing[assignedCrop] && rowSpacing[assignedCrop] !== cropData.rowSpacing && (
+                                                                    <span className="ml-1 text-green-400">(ปรับแล้ว)</span>
+                                                                )}
+                                                            </span>
                                                         </div>
                                                         <div className="flex justify-between">
                                                             <span>{t('Plant Spacing')}:</span>
-                                                            <span className="text-white">{cropData.plantSpacing} cm</span>
+                                                            <span className="text-white">
+                                                                {plantSpacing[assignedCrop] || cropData.plantSpacing} cm
+                                                                {plantSpacing[assignedCrop] && plantSpacing[assignedCrop] !== cropData.plantSpacing && (
+                                                                    <span className="ml-1 text-green-400">(ปรับแล้ว)</span>
+                                                                )}
+                                                            </span>
                                                         </div>
                                                         <div className="flex justify-between">
                                                             <span>{t('Water Needs')}:</span>
@@ -623,6 +688,17 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                             <span>{t('Growth Period')}:</span>
                                                             <span className="text-white">{cropData.growthPeriod} {t('days')}</span>
                                                         </div>
+                                                        {/* แสดงจำนวนต้นที่คำนวณจากระยะที่ปรับแล้ว */}
+                                                        {(rowSpacing[assignedCrop] || plantSpacing[assignedCrop]) && (
+                                                            <div className="mt-2 pt-2 border-t border-gray-600">
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-green-300">{t('Estimated Plants')}:</span>
+                                                                    <span className="text-white font-medium">
+                                                                        {calculatePlantsInZone(zone.id.toString()).toLocaleString()}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             )}
@@ -655,6 +731,41 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                     <span className="ml-1 text-white">{zones.length}</span>
                                 </div>
                             </div>
+                            
+                            {/* แสดงข้อมูลสรุปการปลูกที่ใช้ระยะที่ปรับแล้ว */}
+                            {Object.keys(zoneAssignments).length > 0 && (
+                                <div className="mt-3 pt-3 border-t border-gray-600">
+                                    <div className="text-xs text-gray-300 mb-2">🌱 {t('Planting Summary')}</div>
+                                    <div className="space-y-1 text-xs">
+                                        {Object.entries(zoneAssignments).map(([zoneId, cropValue]) => {
+                                            const zone = zones.find(z => z.id.toString() === zoneId);
+                                            const cropData = getTranslatedCropByValue(cropValue as string, language);
+                                            const currentRowSpacing = rowSpacing[cropValue as string] || cropData?.rowSpacing;
+                                            const currentPlantSpacing = plantSpacing[cropValue as string] || cropData?.plantSpacing;
+                                            const plantCount = calculatePlantsInZone(zoneId);
+                                            
+                                            return zone && cropData ? (
+                                                <div key={zoneId} className="flex justify-between items-center">
+                                                    <span className="text-gray-400">
+                                                        {t('Zone')} {zones.findIndex(z => z.id.toString() === zoneId) + 1}:
+                                                    </span>
+                                                    <div className="text-right">
+                                                        <div className="text-white font-medium">
+                                                            {plantCount.toLocaleString()} {t('plants')}
+                                                        </div>
+                                                        <div className="text-gray-400 text-xs">
+                                                            {currentRowSpacing}×{currentPlantSpacing} cm
+                                                            {(rowSpacing[cropValue as string] || plantSpacing[cropValue as string]) && (
+                                                                <span className="ml-1 text-green-400">(ปรับแล้ว)</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : null;
+                                        })}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -796,6 +907,220 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                             </div>
                         )}
                     </div>
+
+                    {/* NEW: Lateral Pipe Settings Section - แสดงเฉพาะเมื่อมีท่อย่อย */}
+                    {pipes.filter((p) => p.type === 'lateral').length > 0 && (
+                        <div className="rounded border border-white p-3 mt-4" style={{ backgroundColor: '#000005' }}>
+                            <h4 className="mb-3 text-sm font-semibold text-white">
+                                🎛️ {t('การตั้งค่าท่อย่อย')}
+                            </h4>
+                        
+                        <div className="space-y-3">
+                            <div>
+                                <label className="mb-1 block text-xs font-medium text-white">
+                                    {t('มุมเริ่มต้น')}: {currentBranchAngle}°
+                                </label>
+                                <div className="mb-2 text-xs text-gray-400">
+                                    💡 {t('ปรับมุมเริ่มต้นสำหรับท่อใหม่ที่จะสร้าง')}
+                                </div>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="180"
+                                    step="1"
+                                    value={currentBranchAngle}
+                                    onChange={(e) => {
+                                        const newAngle = parseInt(e.target.value);
+                                        setCurrentBranchAngle(newAngle);
+                                        
+                                        // อัปเดตมุมเริ่มต้นสำหรับท่อใหม่ที่จะสร้าง
+                                        setBranchPipeSettings(prev => ({
+                                            ...prev,
+                                            defaultAngle: newAngle
+                                        }));
+                                        
+                                        // เรียกใช้ฟังก์ชันอัปเดต Global Angle สำหรับท่อใหม่
+                                        if (typeof window !== 'undefined' && (window as any).updateGlobalBranchAngle) {
+                                            (window as any).updateGlobalBranchAngle(newAngle);
+                                        }
+                                    }}
+                                    className="w-full accent-blue-600"
+                                />
+                                <div className="flex justify-between text-xs text-white">
+                                    <span>0°</span>
+                                    <span>90°</span>
+                                    <span>180°</span>
+                                </div>
+                            </div>
+                            
+                            {/* แสดงรายการท่อย่อยเรียงตามมุม */}
+                            {pipes.filter(p => p.type === 'lateral').length > 0 && (
+                                <div className="rounded-lg border border-green-200 p-3" style={{ backgroundColor: '#000005' }}>
+                                    <div className="mb-2 text-xs font-medium text-white">
+                                        🎯 {t('รายการท่อย่อย (แสดงข้อมูล)')}
+                                    </div>
+                                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                                        {pipes.filter(p => p.type === 'lateral')
+                                            .sort((a, b) => {
+                                                switch (sortType) {
+                                                    case 'angle':
+                                                        return (a.angle || a.currentAngle || 90) - (b.angle || b.currentAngle || 90);
+                                                    case 'length':
+                                                        return (b.length || 0) - (a.length || 0);
+                                                    case 'name':
+                                                        return a.name.localeCompare(b.name);
+                                                    default:
+                                                        return 0;
+                                                }
+                                            })
+                                            .map((pipe) => (
+                                            <div key={pipe.id} className="rounded p-2 text-xs text-white" 
+                                                 style={{ backgroundColor: '#000010' }}>
+                                                <div className="font-medium">{pipe.name}</div>
+                                                <div className="flex justify-between">
+                                                    <span>{t('มุม')}: {pipe.angle || pipe.currentAngle || 90}°</span>
+                                                    <span>{t('ความยาว')}: {pipe.length?.toFixed(1) || 0} {t('ม.')}</span>
+                                                </div>
+                                                <div className="text-gray-400">
+                                                    {t('ฝั่ง')}: {pipe.side === 'left' ? t('ซ้าย') : t('ขวา')}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="mt-2 flex gap-1">
+                                        <button
+                                            onClick={() => {
+                                                setSortType('angle');
+                                                // เรียงตามมุมจากน้อยไปมาก
+                                                const sortedPipes = [...pipes.filter(p => p.type === 'lateral')]
+                                                    .sort((a, b) => (a.angle || a.currentAngle || 90) - (b.angle || b.currentAngle || 90));
+                                                setPipes(prev => [
+                                                    ...prev.filter(p => p.type !== 'lateral'),
+                                                    ...sortedPipes
+                                                ]);
+                                            }}
+                                            className={`flex-1 rounded border border-white px-2 py-1 text-xs text-white transition-colors ${
+                                                sortType === 'angle' ? 'bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'
+                                            }`}
+                                        >
+                                            ↕️ {t('เรียงมุม')}
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setSortType('length');
+                                                // เรียงตามความยาวจากมากไปน้อย
+                                                const sortedPipes = [...pipes.filter(p => p.type === 'lateral')]
+                                                    .sort((a, b) => (b.length || 0) - (a.length || 0));
+                                                setPipes(prev => [
+                                                    ...prev.filter(p => p.type !== 'lateral'),
+                                                    ...sortedPipes
+                                                ]);
+                                            }}
+                                            className={`flex-1 rounded border border-white px-2 py-1 text-xs text-white transition-colors ${
+                                                sortType === 'length' ? 'bg-green-700' : 'bg-green-600 hover:bg-green-700'
+                                            }`}
+                                        >
+                                            📏 {t('เรียงความยาว')}
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setSortType('name');
+                                                // เรียงตามชื่อ
+                                                const sortedPipes = [...pipes.filter(p => p.type === 'lateral')]
+                                                    .sort((a, b) => a.name.localeCompare(b.name));
+                                                setPipes(prev => [
+                                                    ...prev.filter(p => p.type !== 'lateral'),
+                                                    ...sortedPipes
+                                                ]);
+                                            }}
+                                            className={`flex-1 rounded border border-white px-2 py-1 text-xs text-white transition-colors ${
+                                                sortType === 'name' ? 'bg-purple-700' : 'bg-purple-600 hover:bg-purple-700'
+                                            }`}
+                                        >
+                                            📝 {t('เรียงชื่อ')}
+                                        </button>
+                                    </div>
+                                    <div className="mt-1 text-xs text-gray-400">
+                                        💡 {t('คลิกปุ่มเพื่อเรียงลำดับท่อย่อยตามมุม/ความยาว/ชื่อ')}
+                                    </div>
+                                    <div className="mt-2 flex gap-1">
+                                        <button
+                                            onClick={() => {
+                                                // แสดงข้อมูลสถิติเพิ่มเติม
+                                                const lateralPipes = pipes.filter(p => p.type === 'lateral');
+                                                const avgAngle = lateralPipes.length > 0 
+                                                    ? lateralPipes.reduce((sum, p) => sum + (p.angle || p.currentAngle || 90), 0) / lateralPipes.length
+                                                    : 0;
+                                                const totalLength = lateralPipes.reduce((sum, p) => sum + (p.length || 0), 0);
+                                                alert(`${t('สถิติท่อย่อย')}\n${t('จำนวนท่อ')}: ${lateralPipes.length} ${t('เส้น')}\n${t('มุมเฉลี่ย')}: ${avgAngle.toFixed(1)}°\n${t('ความยาวรวม')}: ${totalLength.toFixed(1)} ${t('ม.')}`);
+                                            }}
+                                            className="w-full rounded border border-white bg-yellow-600 px-2 py-1 text-xs text-white hover:bg-yellow-700 transition-colors"
+                                        >
+                                            📊 {t('ดูสถิติ')}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* ข้อมูลสถิติท่อย่อย */}
+                            {pipes.filter(p => p.type === 'lateral').length > 0 && (
+                                <div className="rounded border border-green-200 p-3 text-xs" style={{ backgroundColor: '#000005' }}>
+                                    <div className="font-medium text-white mb-2">📊 {t('สถิติท่อย่อย')}</div>
+                                    <div className="space-y-1 text-white">
+                                        <div className="flex justify-between">
+                                            <span>{t('จำนวนท่อย่อย')}:</span>
+                                            <span className="font-bold text-green-400">
+                                                {pipes.filter(p => p.type === 'lateral').length} {t('เส้น')}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>{t('ความยาวรวม')}:</span>
+                                            <span className="font-bold text-blue-400">
+                                                {pipes.filter(p => p.type === 'lateral')
+                                                     .reduce((sum, p) => sum + (p.length || 0), 0)
+                                                     .toFixed(1)} {t('ม.')}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>{t('มุมเฉลี่ย')}:</span>
+                                            <span className="font-bold text-purple-400">
+                                                {pipes.filter(p => p.type === 'lateral').length > 0 
+                                                    ? (pipes.filter(p => p.type === 'lateral')
+                                                           .reduce((sum, p) => sum + (p.currentAngle || 90), 0) / 
+                                                       pipes.filter(p => p.type === 'lateral').length).toFixed(1)
+                                                    : 0}°
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* ปุ่มรีเซ็ตมุมท่อย่อย */}
+                            {pipes.filter(p => p.type === 'lateral').length > 0 && (
+                                <button
+                                    onClick={() => {
+                                        if (confirm(t('รีเซ็ตมุมท่อย่อยทั้งหมดเป็น 90° หรือไม่?'))) {
+                                            setPipes(prev => prev.map(pipe => 
+                                                pipe.type === 'lateral' 
+                                                    ? { ...pipe, currentAngle: 90, angle: 90 }
+                                                    : pipe
+                                            ));
+                                            setCurrentBranchAngle(90);
+                                            setBranchPipeSettings(prev => ({
+                                                ...prev,
+                                                defaultAngle: 90
+                                            }));
+                                            setSortType('angle'); // รีเซ็ตการเรียงลำดับ
+                                        }
+                                    }}
+                                    className="w-full rounded border border-white bg-orange-600 px-3 py-2 text-xs text-white hover:bg-orange-700 transition-colors"
+                                >
+                                    🔄 {t('รีเซ็ตมุมท่อย่อย')}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                    )}
 
                     {pipes.length > 0 && (
                         <div
@@ -1078,27 +1403,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                                     </span>
                                                                 </div>
                                                             </div>
-                                                            <div className="flex items-center justify-between">
-                                                                <span className="text-xs text-gray-400">
-                                                                    {t('Overlap Coverage')}:
-                                                                </span>
-                                                                <label className="flex items-center space-x-2">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={sprinklerOverlap[zone.id] || false}
-                                                                        onChange={(e) =>
-                                                                            setSprinklerOverlap({
-                                                                                ...sprinklerOverlap,
-                                                                                [zone.id]: e.target.checked,
-                                                                            })
-                                                                        }
-                                                                        className="h-3 w-3 rounded border-gray-600 bg-gray-700 text-cyan-600 focus:ring-cyan-500"
-                                                                    />
-                                                                    <span className="text-xs text-white">
-                                                                        {sprinklerOverlap[zone.id] ? t('Enabled') : t('Disabled')}
-                                                                    </span>
-                                                                </label>
-                                                            </div>
+                                                            {/* ลบส่วน Overlap Coverage */}
                                                         </div>
                                                     ) : null}
 
