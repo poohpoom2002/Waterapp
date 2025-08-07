@@ -105,17 +105,23 @@ const calculateSprinklerBasedFlow = (sprinkler: any, input: IrrigationInput, pro
     let totalSprinklers: number;
     
     if (projectMode === 'field-crop') {
-        totalWaterPerMinute = input.totalTrees * input.waterPerTreeLiters;
+        // Fix: waterPerTreeLiters for field-crop should be flow rate (LPM)
+        // If it's per session, convert to per minute
+        const waterPerTreeLPM = input.waterPerTreeLiters / (input.irrigationTimeMinutes || 30);
+        totalWaterPerMinute = input.totalTrees * waterPerTreeLPM;
         totalSprinklers = input.totalTrees;
     } else if (projectMode === 'greenhouse') {
+        // Fix: Convert from per-session to per-minute flow rate
         const waterPerSprinklerPerMinute = input.waterPerTreeLiters / (input.irrigationTimeMinutes || 30);
         totalWaterPerMinute = input.totalTrees * waterPerSprinklerPerMinute;
         totalSprinklers = input.totalTrees;
     } else if (projectMode === 'garden') {
+        // Fix: Convert from per-session to per-minute flow rate
         const waterPerSprinklerPerMinute = input.waterPerTreeLiters / (input.irrigationTimeMinutes || 30);
         totalWaterPerMinute = input.totalTrees * waterPerSprinklerPerMinute;
         totalSprinklers = input.totalTrees;
     } else {
+        // Horticulture mode: waterPerTreeLiters is per irrigation session
         const totalWaterPerIrrigation = input.totalTrees * input.waterPerTreeLiters * (input.sprinklersPerTree || 1);
         totalWaterPerMinute = totalWaterPerIrrigation / (input.irrigationTimeMinutes || 30);
         totalSprinklers = Math.ceil(input.totalTrees * (input.sprinklersPerTree || 1));
@@ -123,7 +129,8 @@ const calculateSprinklerBasedFlow = (sprinkler: any, input: IrrigationInput, pro
 
     if (!sprinkler) {
         return {
-            totalFlowLPM: formatNumber(totalWaterPerMinute, 1),
+            totalFlowLPM: totalWaterPerMinute,
+            sprinklerFlowLPM: totalSprinklers > 0 ? totalWaterPerMinute / totalSprinklers : 0,
             sprinklersUsed: totalSprinklers,
         };
     }
@@ -184,10 +191,10 @@ const calculateSprinklerBasedFlow = (sprinkler: any, input: IrrigationInput, pro
             sprinklersUsed: totalSprinklers,
         };
     } catch (error) {
-        console.error('Error calculating sprinkler flow:', error);
+        console.error('Error in calculateSprinklerBasedFlow:', error);
         return {
             totalFlowLPM: totalWaterPerMinute,
-            sprinklerFlowLPM: totalWaterPerMinute / totalSprinklers,
+            sprinklerFlowLPM: totalSprinklers > 0 ? totalWaterPerMinute / totalSprinklers : 0,
             sprinklersUsed: totalSprinklers,
         };
     }

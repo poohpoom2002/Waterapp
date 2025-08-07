@@ -320,101 +320,111 @@ export default function Product() {
     };
 
     // แก้ใน product.tsx ประมาณบรรทัด 191-220
-const createGreenhouseZoneInput = (
-    plot: EnhancedPlotStats,
-    greenhouseData: GreenhousePlanningData,
-    totalZones: number
-): IrrigationInput => {
-    const areaInSqm = plot.area;
-    const crop = getCropByValue(plot.cropType || '');
-    const totalSprinklers = plot.equipmentCount.sprinklers || plot.production.totalPlants;
-    
-    const waterPerSprinkler = plot.production.waterRequirementPerIrrigation / Math.max(totalSprinklers, 1);
-    
-    const longestBranch = plot.pipeStats.drip.longest || plot.pipeStats.sub.longest || 30;
-    const totalBranchLength = plot.pipeStats.drip.totalLength || plot.pipeStats.sub.totalLength || 100;
-    const longestSubmain = plot.pipeStats.main.longest || 0;
-    const totalSubmainLength = plot.pipeStats.main.totalLength || 0;
+    const createGreenhouseZoneInput = (
+        plot: EnhancedPlotStats,
+        greenhouseData: GreenhousePlanningData,
+        totalZones: number
+    ): IrrigationInput => {
+        const areaInSqm = plot.area;
+        // Fix: Convert square meters to rai for consistency
+        const areaInRai = areaInSqm / 1600;
+        const crop = getCropByValue(plot.cropType || '');
+        const totalSprinklers = plot.equipmentCount.sprinklers || plot.production.totalPlants;
 
-    return {
-        farmSizeRai: areaInSqm,
-        totalTrees: totalSprinklers,
-        waterPerTreeLiters: formatNumber(waterPerSprinkler, 3),
-        numberOfZones: totalZones,
-        sprinklersPerTree: 1,
-        irrigationTimeMinutes: 30,
-        staticHeadM: 0,
-        pressureHeadM: 20,
-        pipeAgeYears: 0,
+        const waterPerSprinkler =
+            plot.production.waterRequirementPerIrrigation / Math.max(totalSprinklers, 1);
 
-        sprinklersPerBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
-        branchesPerSecondary: 1,
-        simultaneousZones: 1,
+        const longestBranch = plot.pipeStats.drip.longest || plot.pipeStats.sub.longest || 30;
+        const totalBranchLength =
+            plot.pipeStats.drip.totalLength || plot.pipeStats.sub.totalLength || 100;
+        const longestSubmain = plot.pipeStats.main.longest || 0;
+        const totalSubmainLength = plot.pipeStats.main.totalLength || 0;
 
-        sprinklersPerLongestBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
-        branchesPerLongestSecondary: 1,
-        secondariesPerLongestMain: 1,
+        return {
+            farmSizeRai: formatNumber(areaInRai, 3), // Fix: Now consistently in rai
+            totalTrees: totalSprinklers,
+            waterPerTreeLiters: formatNumber(waterPerSprinkler, 3),
+            numberOfZones: totalZones,
+            sprinklersPerTree: 1,
+            irrigationTimeMinutes: 30,
+            staticHeadM: 0,
+            pressureHeadM: 20,
+            pipeAgeYears: 0,
 
-        longestBranchPipeM: formatNumber(longestBranch, 3),
-        totalBranchPipeM: formatNumber(totalBranchLength, 3),
-        longestSecondaryPipeM: formatNumber(longestSubmain, 3),
-        totalSecondaryPipeM: formatNumber(totalSubmainLength, 3),
-        longestMainPipeM: 0,
-        totalMainPipeM: 0,
+            sprinklersPerBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
+            branchesPerSecondary: 1,
+            simultaneousZones: 1,
+
+            sprinklersPerLongestBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
+            branchesPerLongestSecondary: 1,
+            secondariesPerLongestMain: 1,
+
+            longestBranchPipeM: formatNumber(longestBranch, 3),
+            totalBranchPipeM: formatNumber(totalBranchLength, 3),
+            longestSecondaryPipeM: formatNumber(longestSubmain, 3),
+            totalSecondaryPipeM: formatNumber(totalSubmainLength, 3),
+            longestMainPipeM: 0,
+            totalMainPipeM: 0,
+        };
     };
-};
 
-const createSingleGreenhouseInput = (greenhouseData: GreenhousePlanningData): IrrigationInput => {
-    const areaInSqm = greenhouseData.summary.totalPlotArea;
-    const totalSprinklers = greenhouseData.summary.overallEquipmentCount.sprinklers || 
-                            greenhouseData.summary.overallProduction.totalPlants;
-    
-    const waterPerSprinkler = greenhouseData.summary.overallProduction.waterRequirementPerIrrigation /
-                             Math.max(totalSprinklers, 1);
+    const createSingleGreenhouseInput = (
+        greenhouseData: GreenhousePlanningData
+    ): IrrigationInput => {
+        const areaInSqm = greenhouseData.summary.totalPlotArea;
+        // Fix: Convert square meters to rai for consistency
+        const areaInRai = areaInSqm / 1600;
+        const totalSprinklers =
+            greenhouseData.summary.overallEquipmentCount.sprinklers ||
+            greenhouseData.summary.overallProduction.totalPlants;
 
-    return {
-        farmSizeRai: areaInSqm,
-        totalTrees: totalSprinklers,
-        waterPerTreeLiters: formatNumber(waterPerSprinkler, 3),
-        numberOfZones: 1,
-        sprinklersPerTree: 1,
-        irrigationTimeMinutes: 30,
-        staticHeadM: 0,
-        pressureHeadM: 20,
-        pipeAgeYears: 0,
+        const waterPerSprinkler =
+            greenhouseData.summary.overallProduction.waterRequirementPerIrrigation /
+            Math.max(totalSprinklers, 1);
 
-        sprinklersPerBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
-        branchesPerSecondary: 1,
-        simultaneousZones: 1,
+        return {
+            farmSizeRai: formatNumber(areaInRai, 3), // Fix: Now consistently in rai
+            totalTrees: totalSprinklers,
+            waterPerTreeLiters: formatNumber(waterPerSprinkler, 3),
+            numberOfZones: 1,
+            sprinklersPerTree: 1,
+            irrigationTimeMinutes: 30,
+            staticHeadM: 0,
+            pressureHeadM: 20,
+            pipeAgeYears: 0,
 
-        sprinklersPerLongestBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
-        branchesPerLongestSecondary: 1,
-        secondariesPerLongestMain: 1,
+            sprinklersPerBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
+            branchesPerSecondary: 1,
+            simultaneousZones: 1,
 
-        longestBranchPipeM: formatNumber(
-            greenhouseData.summary.overallPipeStats.drip.longest ||
-                greenhouseData.summary.overallPipeStats.sub.longest ||
-                30,
-            3
-        ),
-        totalBranchPipeM: formatNumber(
-            greenhouseData.summary.overallPipeStats.drip.totalLength ||
-                greenhouseData.summary.overallPipeStats.sub.totalLength ||
-                100,
-            3
-        ),
-        longestSecondaryPipeM: formatNumber(
-            greenhouseData.summary.overallPipeStats.main.longest || 0,
-            3
-        ),
-        totalSecondaryPipeM: formatNumber(
-            greenhouseData.summary.overallPipeStats.main.totalLength || 0,
-            3
-        ),
-        longestMainPipeM: 0,
-        totalMainPipeM: 0,
+            sprinklersPerLongestBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
+            branchesPerLongestSecondary: 1,
+            secondariesPerLongestMain: 1,
+
+            longestBranchPipeM: formatNumber(
+                greenhouseData.summary.overallPipeStats.drip.longest ||
+                    greenhouseData.summary.overallPipeStats.sub.longest ||
+                    30,
+                3
+            ),
+            totalBranchPipeM: formatNumber(
+                greenhouseData.summary.overallPipeStats.drip.totalLength ||
+                    greenhouseData.summary.overallPipeStats.sub.totalLength ||
+                    100,
+                3
+            ),
+            longestSecondaryPipeM: formatNumber(
+                greenhouseData.summary.overallPipeStats.main.longest || 0,
+                3
+            ),
+            totalSecondaryPipeM: formatNumber(
+                greenhouseData.summary.overallPipeStats.main.totalLength || 0,
+                3
+            ),
+            longestMainPipeM: 0,
+            totalMainPipeM: 0,
+        };
     };
-};
 
     const createFieldCropZoneInput = (
         zone: FieldCropData['zones']['info'][0],
@@ -1441,7 +1451,7 @@ const createSingleGreenhouseInput = (greenhouseData: GreenhousePlanningData): Ir
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
                     <div className="lg:col-span-4">
                         <div className="sticky top-6">
-                            <div className="rounded-lg bg-gray-800 p-4">
+                            <div className="rounded-lg bg-gray-800 p-4 overflow-auto max-h-[90vh]">
                                 <div className="mb-3 flex items-center justify-between">
                                     <h2 className="text-lg font-semibold text-blue-400">
                                         📐 {t('แผนผัง')}
@@ -1507,7 +1517,6 @@ const createSingleGreenhouseInput = (greenhouseData: GreenhousePlanningData): Ir
                                                 ×
                                             </button>
                                         </div>
-                                        
                                     </div>
                                 ) : (
                                     <div className="rounded-lg border-2 border-dashed border-gray-600">
@@ -1745,42 +1754,35 @@ const createSingleGreenhouseInput = (greenhouseData: GreenhousePlanningData): Ir
                                             </div>
                                         </div>
                                     )}
-
-                                    {(projectMode === 'garden' ||
-                                        projectMode === 'field-crop' ||
-                                        projectMode === 'greenhouse') && (
-                                        <div className="mb-6 rounded-lg bg-gray-800 p-4">
-                                            <h3 className="mb-3 text-lg font-semibold text-purple-400">
-                                                ⚡ {t('ตัวเลือกปั๊มน้ำ')}
-                                            </h3>
-                                            <div className="flex items-center gap-4">
-                                                <label className="flex items-center gap-2">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={showPumpOption}
-                                                        onChange={(e) =>
-                                                            setShowPumpOption(e.target.checked)
-                                                        }
-                                                        className="rounded"
-                                                    />
-                                                    <span className="text-sm font-medium">
-                                                        {t('ต้องการใช้ปั๊มน้ำในระบบ')}
-                                                    </span>
-                                                </label>
-                                                {!showPumpOption && (
-                                                    <p className="text-sm text-gray-400">
-                                                        ({t('ใช้แรงดันจากระบบประปาบ้าน')})
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
                             )}
                         </div>
                     </div>
 
                     <div className="space-y-6 lg:col-span-8">
+                        <div className="mb-6 rounded-lg bg-gray-800 p-4">
+                            <h3 className="mb-3 text-lg font-semibold text-purple-400">
+                                ⚡ {t('ตัวเลือกปั๊มน้ำ')}
+                            </h3>
+                            <div className="flex items-center gap-4">
+                                <label className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        checked={showPumpOption}
+                                        onChange={(e) => setShowPumpOption(e.target.checked)}
+                                        className="rounded"
+                                    />
+                                    <span className="text-sm font-medium">
+                                        {t('ต้องการใช้ปั๊มน้ำในระบบ')}
+                                    </span>
+                                </label>
+                                {!showPumpOption && (
+                                    <p className="text-sm text-gray-400">
+                                        ({t('ใช้แรงดันจากระบบประปาบ้าน')})
+                                    </p>
+                                )}
+                            </div>
+                        </div>
                         <InputForm
                             input={currentInput}
                             onInputChange={handleInputChange}

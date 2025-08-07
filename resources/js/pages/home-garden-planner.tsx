@@ -1,3 +1,6 @@
+/* eslint-disable prefer-const */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // resources/js/pages/home-garden-planner.tsx
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { router } from '@inertiajs/react';
