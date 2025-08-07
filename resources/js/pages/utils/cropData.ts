@@ -167,6 +167,20 @@ export const cropTypes: Crop[] = [
         price: 1.2, // Price at the factory (THB/kg or 1,200 THB/ton)
     },
     {
+        value: 'pineapple',
+        name: 'Pineapple',
+        icon: '🍍',
+        description: 'A tropical fruit crop with high economic value, suitable for both fresh consumption and processing.',
+        category: 'industrial',
+        irrigationNeeds: 'medium',
+        growthPeriod: 540, // 18 months from planting to first harvest
+        waterRequirement: 2.8, // Moderate water requirement
+        rowSpacing: 120,
+        plantSpacing: 60,
+        yield: 4000, // Average yield per rai
+        price: 8.5, // Price at the farm (subject to fluctuation)
+    },
+    {
         value: 'rubber',
         name: 'Rubber',
         icon: '🌳',

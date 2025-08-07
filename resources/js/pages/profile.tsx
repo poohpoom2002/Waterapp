@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState } from 'react';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { router } from '@inertiajs/react';
