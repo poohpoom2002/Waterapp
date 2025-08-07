@@ -35,8 +35,8 @@ const Footer: React.FC = () => {
                     </div>
 
                     {/* Company Info - Chaiyo */}
-                    <div className="space-y-4">
-                        <h3 className="mb-4 text-xl font-bold text-white">{t('บจก.ไชโยไปป์แอนด์ฟิตติ้ง')}</h3>
+                    <div className="space-y-4 min-w-0">
+                        <h3 className="mb-4 text-xl font-bold text-white whitespace-nowrap">{t('บจก.ไชโยไปป์แอนด์ฟิตติ้ง')}</h3>
                         <div className="space-y-3">
                             <div className="flex items-start space-x-3">
                                 <MapPin className="mt-1 h-5 w-5 flex-shrink-0 text-blue-400" />
