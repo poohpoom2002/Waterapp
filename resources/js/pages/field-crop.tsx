@@ -78,7 +78,7 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
     }, [selectedCrops.length]);
 
     const handleBackToPlanner = () => {
-        window.location.href = "/planner";
+        window.location.href = "/";
     };
 
     const getSelectedCropsText = () => {

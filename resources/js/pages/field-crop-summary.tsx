@@ -613,58 +613,69 @@ const calculatePlantingPointsFromPipes = (
 ): number => {
     if (!pipes || !crop) return 0;
 
-    // แปลงหน่วยจาก cm เป็น m
-    const rowSpacing = (customRowSpacing || crop.rowSpacing) / 100;
-    const plantSpacing = (customPlantSpacing || crop.plantSpacing) / 100;
+    try {
+        // แปลงหน่วยจาก cm เป็น m
+        const rowSpacing = (customRowSpacing || crop.rowSpacing) / 100;
+        const plantSpacing = (customPlantSpacing || crop.plantSpacing) / 100;
 
-    if (!rowSpacing || !plantSpacing) return 0;
+        if (!rowSpacing || !plantSpacing) return 0;
 
-    // หาท่อย่อยที่อยู่ในโซนนี้
-    const zonePipes = pipes.filter(pipe => 
-        pipe.type === 'lateral' && pipe.zoneId?.toString() === zoneId
-    );
+        // หาท่อย่อยที่อยู่ในโซนนี้
+        const zonePipes = pipes.filter(pipe => 
+            pipe.type === 'lateral' && pipe.zoneId?.toString() === zoneId
+        );
 
-    console.log(`🔧 Calculating planting points from pipes for zone ${zoneId}:`, {
-        totalPipes: zonePipes.length,
-        cropName: crop.name,
-        rowSpacing: `${rowSpacing} m`,
-        plantSpacing: `${plantSpacing} m`
-    });
+        console.log(`🔧 Calculating planting points from pipes for zone ${zoneId}:`, {
+            totalPipes: zonePipes.length,
+            cropName: crop.name,
+            rowSpacing: `${rowSpacing} m`,
+            plantSpacing: `${plantSpacing} m`
+        });
 
-    let totalPlantingPoints = 0;
+        let totalPlantingPoints = 0;
 
-    zonePipes.forEach((pipe, pipeIndex) => {
-        if (pipe.coordinates && pipe.coordinates.length >= 2) {
-            let pipeLength = 0;
-            
-            // คำนวณความยาวท่อย่อย
-            for (let i = 0; i < pipe.coordinates.length - 1; i++) {
-                const start = pipe.coordinates[i];
-                const end = pipe.coordinates[i + 1];
+        zonePipes.forEach((pipe, pipeIndex) => {
+            if (pipe.coordinates && pipe.coordinates.length >= 2) {
+                let pipeLength = 0;
                 
-                // คำนวณระยะทางระหว่างจุด (ใช้ Haversine formula หรือ Google Maps API)
-                const distance = google.maps.geometry.spherical.computeDistanceBetween(
-                    new google.maps.LatLng(start.lat, start.lng),
-                    new google.maps.LatLng(end.lat, end.lng)
-                );
-                pipeLength += distance;
+                // คำนวณความยาวท่อย่อย
+                for (let i = 0; i < pipe.coordinates.length - 1; i++) {
+                    const start = pipe.coordinates[i];
+                    const end = pipe.coordinates[i + 1];
+                    
+                    // ตรวจสอบว่าข้อมูลพิกัดถูกต้อง
+                    if (!start || !end || typeof start.lat !== 'number' || typeof start.lng !== 'number' || 
+                        typeof end.lat !== 'number' || typeof end.lng !== 'number') {
+                        console.warn(`⚠️ Invalid coordinates in pipe ${pipeIndex + 1}:`, { start, end });
+                        continue;
+                    }
+                    
+                    // คำนวณระยะทางระหว่างจุด (ใช้ turf.js แทน Google Maps API)
+                    const from = turf.point([start.lng, start.lat]);
+                    const to = turf.point([end.lng, end.lat]);
+                    const distance = turf.distance(from, to, 'kilometers') * 1000; // แปลงเป็นเมตร
+                    pipeLength += distance;
+                }
+
+                // คำนวณจำนวนจุดปลูกตามความยาวท่อย่อย
+                // ระยะห่างระหว่างจุดปลูก = plantSpacing
+                const plantingPointsInPipe = Math.floor(pipeLength / plantSpacing) + 1;
+                totalPlantingPoints += plantingPointsInPipe;
+
+                console.log(`📏 Pipe ${pipeIndex + 1}:`, {
+                    pipeLength: `${pipeLength.toFixed(2)} m`,
+                    plantingPoints: plantingPointsInPipe,
+                    spacing: `${plantSpacing} m`
+                });
             }
+        });
 
-            // คำนวณจำนวนจุดปลูกตามความยาวท่อย่อย
-            // ระยะห่างระหว่างจุดปลูก = plantSpacing
-            const plantingPointsInPipe = Math.floor(pipeLength / plantSpacing) + 1;
-            totalPlantingPoints += plantingPointsInPipe;
-
-            console.log(`📏 Pipe ${pipeIndex + 1}:`, {
-                pipeLength: `${pipeLength.toFixed(2)} m`,
-                plantingPoints: plantingPointsInPipe,
-                spacing: `${plantSpacing} m`
-            });
-        }
-    });
-
-    console.log(`🌱 Total planting points from pipes: ${totalPlantingPoints.toLocaleString()}`);
-    return totalPlantingPoints;
+        console.log(`🌱 Total planting points from pipes: ${totalPlantingPoints.toLocaleString()}`);
+        return totalPlantingPoints;
+    } catch (error) {
+        console.error(`❌ Error in calculatePlantingPointsFromPipes for zone ${zoneId}:`, error);
+        return 0;
+    }
 };
 
 const calculateYieldAndPrice = (
@@ -1036,6 +1047,17 @@ const calculateZoneIrrigationCounts = (
             }
         });
 
+        // Debug: ตรวจสอบการคำนวณในโซน
+        console.log(`🔍 Zone ${zone.name} irrigation calculation:`, {
+            zoneId: zone.id,
+            totalPointsInZone: sprinklerCount + miniSprinklerCount + microSprayCount + dripTapeCount,
+            sprinkler: sprinklerCount,
+            miniSprinkler: miniSprinklerCount,
+            microSpray: microSprayCount,
+            dripTape: dripTapeCount,
+            totalIrrigationPoints: irrigationPoints.length
+        });
+
         const total = sprinklerCount + miniSprinklerCount + microSprayCount + dripTapeCount;
 
         return {
@@ -1221,9 +1243,16 @@ export default function FieldCropSummary() {
 
                         // คำนวณจำนวนจุดปลูกจากท่อย่อยที่มีอยู่จริง (ถ้ามี)
                         // ถ้าไม่มีท่อย่อย ให้คำนวณจากพื้นที่โซน
-                        const totalPlantingPoints = pipes && pipes.length > 0
-                            ? calculatePlantingPointsFromPipes(pipes, zoneId, crop, effectiveRowSpacing, effectivePlantSpacing)
-                            : calculatePlantingPoints(zoneArea, crop, effectiveRowSpacing, effectivePlantSpacing);
+                        let totalPlantingPoints = 0;
+                        try {
+                            totalPlantingPoints = pipes && pipes.length > 0
+                                ? calculatePlantingPointsFromPipes(pipes, zoneId, crop, effectiveRowSpacing, effectivePlantSpacing)
+                                : calculatePlantingPoints(zoneArea, crop, effectiveRowSpacing, effectivePlantSpacing);
+                        } catch (error) {
+                            console.warn(`⚠️ Error calculating planting points for zone ${zoneId}:`, error);
+                            // Fallback to area-based calculation
+                            totalPlantingPoints = calculatePlantingPoints(zoneArea, crop, effectiveRowSpacing, effectivePlantSpacing);
+                        }
 
                         const { estimatedYield, estimatedPrice } = calculateYieldAndPrice(
                             zoneArea,
@@ -1479,25 +1508,46 @@ export default function FieldCropSummary() {
         return firstIndex === index;
     });
 
-    let filteredIrrigationPoints = uniqueIrrigationPoints;
-    if (uniqueIrrigationPoints.length > 200) {
-        filteredIrrigationPoints = uniqueIrrigationPoints.filter((_, index) => index % 3 === 0);
-    } else if (uniqueIrrigationPoints.length > 100) {
-        filteredIrrigationPoints = uniqueIrrigationPoints.filter((_, index) => index % 2 === 0);
-    }
+    // Debug: ตรวจสอบข้อมูลที่ได้รับ
+    console.log('📊 Data received in summary:', {
+        totalIrrigationPoints: actualIrrigationPoints.length,
+        uniqueIrrigationPoints: uniqueIrrigationPoints.length,
+        irrigationPointsByType: uniqueIrrigationPoints.reduce((acc: Record<string, number>, point: IrrigationPoint) => {
+            acc[point.type] = (acc[point.type] || 0) + 1;
+            return acc;
+        }, {}),
+        zones: actualZones.length,
+        pipes: actualPipes.length,
+        equipment: actualEquipmentIcons.length
+    });
 
-    const normalizedPoints = filteredIrrigationPoints.map((point) => ({
-        ...point,
-        normalizedType: normalizeIrrigationType(point.type),
-    }));
-    const sprinklerPoints = normalizedPoints.filter((p) => p.normalizedType === 'sprinkler').length;
-    const miniSprinklerPoints = normalizedPoints.filter(
-        (p) => p.normalizedType === 'mini_sprinkler'
-    ).length;
-    const microSprayPoints = normalizedPoints.filter(
-        (p) => p.normalizedType === 'micro_spray'
-    ).length;
-    const dripPoints = normalizedPoints.filter((p) => p.normalizedType === 'drip_tape').length;
+    // คำนวณจำนวน irrigation points รวมจากทุกโซน
+    const zoneIrrigationCounts = actualZones.map(zone => 
+        calculateZoneIrrigationCounts(zone, uniqueIrrigationPoints)
+    );
+    
+    const sprinklerPoints = zoneIrrigationCounts.reduce((sum, counts) => sum + counts.sprinkler, 0);
+    const miniSprinklerPoints = zoneIrrigationCounts.reduce((sum, counts) => sum + counts.miniSprinkler, 0);
+    const microSprayPoints = zoneIrrigationCounts.reduce((sum, counts) => sum + counts.microSpray, 0);
+    const dripPoints = zoneIrrigationCounts.reduce((sum, counts) => sum + counts.dripTape, 0);
+
+    // Debug: ตรวจสอบการคำนวณจำนวน irrigation points รวม
+    console.log('🔍 Total irrigation points calculation:', {
+        totalSprinklers: sprinklerPoints,
+        totalMiniSprinklers: miniSprinklerPoints,
+        totalMicroSprays: microSprayPoints,
+        totalDripTape: dripPoints,
+        totalPoints: sprinklerPoints + miniSprinklerPoints + microSprayPoints + dripPoints,
+        zoneCounts: zoneIrrigationCounts.map((counts, index) => ({
+            zoneIndex: index,
+            sprinkler: counts.sprinkler,
+            miniSprinkler: counts.miniSprinkler,
+            microSpray: counts.microSpray,
+            dripTape: counts.dripTape,
+            total: counts.total
+        }))
+    });
+
 
     const uniqueIrrigationLines = actualIrrigationLines.filter((line, index, array) => {
         if (!line || !line.id) return false;
@@ -1745,7 +1795,7 @@ export default function FieldCropSummary() {
                                                 zones={actualZones}
                                                 pipes={actualPipes}
                                                 equipment={uniqueEquipment}
-                                                irrigationPoints={filteredIrrigationPoints}
+                                                irrigationPoints={uniqueIrrigationPoints}
                                                 irrigationLines={uniqueIrrigationLines}
                                                 onMapReady={(map) => {
                                                     googleMapRef.current = map;
@@ -2207,6 +2257,17 @@ export default function FieldCropSummary() {
                                                     zone,
                                                     actualIrrigationPoints
                                                 );
+                                            
+                                            // Debug: ตรวจสอบการคำนวณในโซนแต่ละโซน
+                                            console.log(`🔍 Zone ${zone.name} irrigation counts:`, {
+                                                zoneId: zone.id,
+                                                zoneName: zone.name,
+                                                sprinkler: zoneIrrigationCounts.sprinkler,
+                                                miniSprinkler: zoneIrrigationCounts.miniSprinkler,
+                                                microSpray: zoneIrrigationCounts.microSpray,
+                                                dripTape: zoneIrrigationCounts.dripTape,
+                                                total: zoneIrrigationCounts.total
+                                            });
                                             return (
                                                 <div
                                                     key={zone.id}
@@ -2254,52 +2315,6 @@ export default function FieldCropSummary() {
                                                                     </div>
                                                                     <div className="text-xs text-gray-400 print:text-gray-600">
                                                                         {t('trees')}
-                                                                    </div>
-                                                                </div>
-                                                                <div className="rounded bg-gray-600 p-2 text-center print:bg-gray-100">
-                                                                    <div className="text-gray-400 print:text-gray-600">
-                                                                        Sprinklers
-                                                                    </div>
-                                                                    <div className="font-semibold text-cyan-400 print:text-black">
-                                                                        {zoneIrrigationCounts.total}
-                                                                    </div>
-                                                                    <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                        จุด
-                                                                    </div>
-                                                                </div>
-                                                                <div className="rounded bg-gray-600 p-2 text-center print:bg-gray-100">
-                                                                    <div className="text-gray-400 print:text-gray-600">
-                                                                        Crop
-                                                                    </div>
-                                                                    <div className="text-xs font-semibold text-white print:text-black">
-                                                                        {summary.cropName}
-                                                                    </div>
-                                                                    <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                        {summary.cropCategory}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div className="grid grid-cols-4 gap-2 text-xs">
-                                                                <div className="rounded bg-gray-600 p-2 text-center print:bg-gray-100">
-                                                                    <div className="text-gray-400 print:text-gray-600">
-                                                                        Area
-                                                                    </div>
-                                                                    <div className="font-semibold text-blue-400 print:text-black">
-                                                                        {summary.zoneAreaRai} ไร่
-                                                                    </div>
-                                                                    <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                        {summary.zoneArea} ตร.ม.
-                                                                    </div>
-                                                                </div>
-                                                                <div className="rounded bg-gray-600 p-2 text-center print:bg-gray-100">
-                                                                    <div className="text-gray-400 print:text-gray-600">
-                                                                        Plants
-                                                                    </div>
-                                                                    <div className="font-semibold text-green-400 print:text-black">
-                                                                        {summary.totalPlantingPoints.toLocaleString()}
-                                                                    </div>
-                                                                    <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                        ต้น
                                                                     </div>
                                                                 </div>
                                                                 <div className="rounded bg-gray-600 p-2 text-center print:bg-gray-100">
@@ -2400,8 +2415,20 @@ export default function FieldCropSummary() {
                                                                         {t('Irrigation Type:')}
                                                                     </div>
                                                                     <div className="text-sm font-semibold text-blue-100 print:text-blue-900">
-                                                                        {irrigationType ||
-                                                                            t('Not defined')}
+                                                                        {irrigationType ? (() => {
+                                                                            switch (irrigationType) {
+                                                                                case 'sprinkler':
+                                                                                    return t('Sprinkler');
+                                                                                case 'mini_sprinkler':
+                                                                                    return t('Mini Sprinkler');
+                                                                                case 'micro_spray':
+                                                                                    return t('Micro Spray');
+                                                                                case 'drip-tape':
+                                                                                    return t('Drip System');
+                                                                                default:
+                                                                                    return irrigationType;
+                                                                            }
+                                                                        })() : t('Not defined')}
                                                                     </div>
                                                                 </div>
 
