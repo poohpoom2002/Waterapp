@@ -105,8 +105,18 @@ const ModeSelection: React.FC<{
                         {modes.map((mode) => (
                             <div
                                 key={mode.id}
-                                onClick={() => onSelectMode(mode.id as any)}
-                                className={`cursor-pointer rounded-xl border-2 border-transparent bg-gray-800 p-6 transition-all hover:scale-105 hover:border-${mode.color}-500 hover:bg-gray-700`}
+                                onClick={() => {
+                                    if (mode.id === 'map') {
+                                        alert(
+                                            t('โหมด Google Map อยู่ในช่วงปรับปรุงชั่วคราว กรุณาเลือกโหมดอื่น')
+                                        );
+                                        return;
+                                    }
+                                    onSelectMode(mode.id as any);
+                                }}
+                                className={`cursor-pointer rounded-xl border-2 border-transparent bg-gray-800 p-6 transition-all hover:scale-105 hover:border-${mode.color}-500 hover:bg-gray-700 ${
+                                    mode.id === 'map' ? 'opacity-70' : ''
+                                }`}
                             >
                                 <div className="mb-4 text-center">
                                     <div className="mb-3 text-5xl">{mode.icon}</div>
@@ -115,6 +125,11 @@ const ModeSelection: React.FC<{
                                     </h3>
                                 </div>
                                 <p className="text-sm text-gray-300">{mode.desc}</p>
+                                {mode.id === 'map' && (
+                                    <div className="mt-3 inline-block rounded bg-amber-900/40 px-2 py-1 text-xs font-medium text-amber-300">
+                                        {t('อยู่ในช่วงปรับปรุง')}
+                                    </div>
+                                )}
                                 <ul className="mt-4 space-y-1 text-xs text-gray-400">
                                     {mode.features.map((feature, i) => (
                                         <li key={i}>✓ {feature}</li>
@@ -214,7 +229,7 @@ export default function HomeGardenPlanner() {
                 };
                 setImageData(imageDataWithScale);
             }
-            setCanvasData(savedData.canvasData || canvasData);
+            setCanvasData((prev) => savedData.canvasData || prev);
         }
     }, []);
 
@@ -282,7 +297,7 @@ export default function HomeGardenPlanner() {
     const handleCanvasZoneCreated = useCallback(
         (coordinates: CanvasCoordinate[]) => {
             const area = calculatePolygonArea(coordinates, currentScale);
-            if (area > 300) {
+            if (area > 1200) {
                 alert(
                     t('ขนาดพื้นที่เกินกำหนด!') +
                         '\n\n' +
@@ -291,7 +306,7 @@ export default function HomeGardenPlanner() {
                         formatArea(area) +
                         '\n\n' +
                         t('ขนาดสูงสุดที่อนุญาต:') +
-                        ' 300 ตร.ม.\n\n' +
+                        ' 1200 ตร.ม.\n\n' +
                         t('กรุณาวาดพื้นที่ให้มีขนาดเล็กลง')
                 );
                 return;
@@ -335,7 +350,7 @@ export default function HomeGardenPlanner() {
 
             setGardenZones((prev) => [...prev, newZone]);
         },
-        [selectedZoneType, gardenZones, findParentGrassZone, canvasData, currentScale]
+        [selectedZoneType, gardenZones, findParentGrassZone, canvasData, currentScale, t]
     );
 
     const handleZoneCreated = useCallback(
@@ -347,9 +362,9 @@ export default function HomeGardenPlanner() {
             }));
 
             const area = calculatePolygonArea(coordinates);
-            if (area > 300) {
+            if (area > 1200) {
                 alert(
-                    `❌ ขนาดพื้นที่เกินกำหนด!\n\nขนาดที่วาด: ${formatArea(area)}\nขนาดสูงสุดที่อนุญาต: 300 ตร.ม.\n\nกรุณาวาดพื้นที่ให้มีขนาดเล็กลง`
+                    `❌ ขนาดพื้นที่เกินกำหนด!\n\nขนาดที่วาด: ${formatArea(area)}\nขนาดสูงสุดที่อนุญาต: 1200 ตร.ม.\n\nกรุณาวาดพื้นที่ให้มีขนาดเล็กลง`
                 );
                 return;
             }
@@ -390,7 +405,7 @@ export default function HomeGardenPlanner() {
 
             setGardenZones((prev) => [...prev, newZone]);
         },
-        [selectedZoneType, gardenZones, findParentGrassZone]
+        [selectedZoneType, gardenZones, findParentGrassZone, t]
     );
 
     const handleZoneDeleted = useCallback((e: any) => {
@@ -487,6 +502,7 @@ export default function HomeGardenPlanner() {
             manualSprinklerRadius,
             canvasData,
             isPointInAvoidanceZone,
+            t,
         ]
     );
 
@@ -818,7 +834,7 @@ export default function HomeGardenPlanner() {
         } finally {
             setIsGeneratingPipes(false);
         }
-    }, [waterSource, sprinklers, gardenZones, designMode, canvasData, imageData]);
+    }, [waterSource, sprinklers, gardenZones, designMode, canvasData, imageData, t]);
 
     const clearPipes = useCallback(() => {
         setPipes([]);
@@ -1010,7 +1026,7 @@ export default function HomeGardenPlanner() {
             // For remove mode, we don't need to select sprinklers
             setSelectedSprinklersForPipe([]);
         }
-    }, [pipeEditMode]);
+    }, []);
 
     const updateZoneConfig = useCallback(
         (zoneId: string, sprinklerType: string, radius: number) => {
@@ -2269,60 +2285,33 @@ export default function HomeGardenPlanner() {
                     {/* <div className="lg:col-span-3"> */}
                     <div className="order-1 lg:order-2 lg:col-span-3">
                         <div className="relative h-[83vh] overflow-hidden rounded-xl border border-gray-600 shadow-2xl">
-                            {designMode === 'map' && (
-                                <GoogleMapDesigner
-                                    gardenZones={gardenZones}
-                                    sprinklers={sprinklers}
-                                    waterSource={waterSource}
-                                    pipes={pipes}
-                                    selectedZoneType={selectedZoneType}
-                                    editMode={editMode}
-                                    manualSprinklerType={manualSprinklerType}
-                                    manualSprinklerRadius={manualSprinklerRadius}
-                                    selectedSprinkler={selectedSprinkler}
-                                    selectedPipes={selectedPipes}
-                                    selectedSprinklersForPipe={selectedSprinklersForPipe}
-                                    mainPipeDrawing={[]}
-                                    onZoneCreated={handleZoneCreated}
-                                    onZoneDeleted={handleZoneDeleted}
-                                    onSprinklerPlaced={(position) => {
-                                        const { lat, lng } = position;
-                                        handleMapClick({ latlng: { lat, lng } });
-                                    }}
-                                    onWaterSourcePlaced={(position) => {
-                                        setWaterSource({
-                                            id: `source_${Date.now()}`,
-                                            position,
-                                            type: 'main',
-                                        });
-                                    }}
-                                    onMainPipeClick={() => {}}
-                                    onSprinklerClick={handleSprinklerClickForPipe}
-                                    onSprinklerDelete={(sprinklerId) => {
-                                        setSprinklers((prev) =>
-                                            prev.filter((s) => s.id !== sprinklerId)
-                                        );
-                                        if (selectedSprinkler === sprinklerId) {
-                                            setSelectedSprinkler(null);
-                                        }
-                                        setSelectedSprinklersForPipe((prev) =>
-                                            prev.filter((id) => id !== sprinklerId)
-                                        );
-                                    }}
-                                    onSprinklerDragged={(sprinklerId, position) => {
-                                        setSprinklers((prev) =>
-                                            prev.map((s) =>
-                                                s.id === sprinklerId ? { ...s, position } : s
-                                            )
-                                        );
-                                    }}
-                                    onWaterSourceDelete={() => setWaterSource(null)}
-                                    onPipeClick={handlePipeClick}
-                                    onMapClick={handleMapClick}
-                                    mapCenter={mapCenter}
-                                    pipeEditMode={pipeEditMode}
-                                />
-                            )}
+            {designMode === 'map' && (
+                <div className="flex h-full w-full items-center justify-center bg-gray-900">
+                    <div className="mx-4 max-w-lg rounded-xl border border-amber-600 bg-amber-900/30 p-6 text-center shadow-2xl">
+                        <div className="mb-2 text-4xl">🚧</div>
+                        <h2 className="mb-2 text-xl font-bold text-amber-300">
+                            {t('โหมด Google Map อยู่ในช่วงปรับปรุง')}
+                        </h2>
+                        <p className="mb-4 text-sm text-amber-200">
+                            {t('ขณะนี้ไม่สามารถใช้งานโหมดแผนที่ได้ชั่วคราว กรุณาเลือกโหมด วาดเอง หรือ รูปแบบแปลน เพื่อใช้งานต่อ')}
+                        </p>
+                        <div className="flex justify-center gap-2">
+                            <button
+                                onClick={() => setDesignMode('canvas')}
+                                className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                            >
+                                ✏️ {t('ไปที่โหมดวาดเอง')}
+                            </button>
+                            <button
+                                onClick={() => setDesignMode('image')}
+                                className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
+                            >
+                                🖼️ {t('ไปที่โหมดรูปแบบแปลน')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
                             {designMode === 'canvas' && (
                                 <div className="flex h-full w-full items-center justify-center bg-gray-900">

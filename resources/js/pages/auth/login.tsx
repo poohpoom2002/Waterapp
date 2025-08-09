@@ -263,8 +263,8 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                         </Button>
                     </div>
 
-                    {/* Register Link */}
-                    <div className="mt-6 text-center">
+                    {/* Register Link - Temporarily disabled */}
+                    {/* <div className="mt-6 text-center">
                         <p className="text-sm text-gray-600">
                             ยังไม่มีบัญชี?{' '}
                             <TextLink
@@ -275,7 +275,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                 สมัครสมาชิก
                             </TextLink>
                         </p>
-                    </div>
+                    </div> */}
                 </div>
 
                 {/* Footer Info */}

@@ -116,23 +116,117 @@ const isPointsClose = (point1: Coordinate, point2: Coordinate, threshold: number
     return distance <= threshold;
 };
 
-// ฟังก์ชันคำนวณข้อต่อท่อเมนหลักตามจำนวนจุด
-const calculateMainPipeConnectors = (coordinates: Coordinate[]): number => {
+// ฟังก์ชันตรวจสอบว่าจุดบนท่อเมนรองเป็นจุดเริ่มต้นหรือไม่
+const isPointAtSubMainPipeStart = (
+    point: Coordinate, 
+    subMainPipeCoordinates: Coordinate[], 
+    threshold: number = 5
+): boolean => {
+    if (subMainPipeCoordinates.length === 0) return false;
+    const startPoint = subMainPipeCoordinates[0];
+    const distance = calculateDistanceBetweenPoints(point, startPoint);
+    return distance <= threshold;
+};
+
+// ฟังก์ชันตรวจสอบว่าจุดอยู่ระหว่างท่อเมนรองหรือไม่ (ไม่ใช่จุดเริ่มต้น)
+const isPointOnSubMainPipeMidway = (
+    point: Coordinate, 
+    subMainPipeCoordinates: Coordinate[], 
+    threshold: number = 5
+): boolean => {
+    if (subMainPipeCoordinates.length < 2) return false;
+    
+    // ตรวจสอบว่าไม่ใช่จุดเริ่มต้น
+    if (isPointAtSubMainPipeStart(point, subMainPipeCoordinates, threshold)) {
+        return false;
+    }
+    
+    // ตรวจสอบระยะห่างจากแต่ละเส้นของท่อเมนรอง
+    for (let i = 0; i < subMainPipeCoordinates.length - 1; i++) {
+        const start = subMainPipeCoordinates[i];
+        const end = subMainPipeCoordinates[i + 1];
+        
+        const closestPoint = findClosestPointOnLineSegment(point, start, end);
+        const distance = calculateDistanceBetweenPoints(point, closestPoint);
+        
+        if (distance <= threshold) {
+            return true;
+        }
+    }
+    return false;
+};
+
+// ฟังก์ชันหาจุดที่ใกล้ที่สุดบนเส้นระหว่างสองจุด
+const findClosestPointOnLineSegment = (
+    point: Coordinate,
+    lineStart: Coordinate,
+    lineEnd: Coordinate
+): Coordinate => {
+    const A = point.lat - lineStart.lat;
+    const B = point.lng - lineStart.lng;
+    const C = lineEnd.lat - lineStart.lat;
+    const D = lineEnd.lng - lineStart.lng;
+
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+    
+    if (lenSq === 0) return lineStart;
+    
+    const param = dot / lenSq;
+    
+    if (param < 0) {
+        return lineStart;
+    } else if (param > 1) {
+        return lineEnd;
+    } else {
+        return {
+            lat: lineStart.lat + param * C,
+            lng: lineStart.lng + param * D
+        };
+    }
+};
+
+// ฟังก์ชันคำนวณข้อต่อท่อเมนหลักตามจำนวนจุดและการ snap กับท่อเมนรอง
+const calculateMainPipeConnectors = (
+    coordinates: Coordinate[], 
+    subMainPipes: any[] = []
+): number => {
     const pointCount = coordinates.length;
     
-    // ตามกฎ: ถ้าคลิก 2 จุด(เส้นตรง) ไม่ต้องใช้ 2 ทาง
-    // ถ้ามี3จุด ต้องใช้ 2 ทาง 1 ตัว
-    // ถ้ามี 4 จุด ใช้ 2 ทาง 2 ตัว
+    // คำนวณข้อต่อจากจำนวนจุดในการวาด (เหมือนเดิม)
+    let baseConnectors = 0;
     if (pointCount === 2) {
-        return 0; // เส้นตรง ไม่ต้องใช้ข้อต่อ
+        baseConnectors = 0; // เส้นตรง ไม่ต้องใช้ข้อต่อ
     } else if (pointCount === 3) {
-        return 1; // มี 3 จุด ใช้ 2 ทาง 1 ตัว
+        baseConnectors = 1; // มี 3 จุด ใช้ 2 ทาง 1 ตัว
     } else if (pointCount === 4) {
-        return 2; // มี 4 จุด ใช้ 2 ทาง 2 ตัว
+        baseConnectors = 2; // มี 4 จุด ใช้ 2 ทาง 2 ตัว
     } else if (pointCount > 4) {
-        return pointCount - 2; // สำหรับจุดที่มากกว่า 4 จุด
+        baseConnectors = pointCount - 2; // สำหรับจุดที่มากกว่า 4 จุด
     }
-    return 0;
+    
+    // ตรวจสอบการ snap ของปลายท่อเมนหลักกับท่อเมนรอง
+    let snapConnectors = 0;
+    if (coordinates.length > 0 && subMainPipes.length > 0) {
+        const mainPipeEnd = coordinates[coordinates.length - 1];
+        
+        for (const subMainPipe of subMainPipes) {
+            if (!subMainPipe.coordinates || subMainPipe.coordinates.length === 0) continue;
+            
+            // ตรวจสอบว่า snap เข้ากับจุดเริ่มต้นของท่อเมนรอง
+            if (isPointAtSubMainPipeStart(mainPipeEnd, subMainPipe.coordinates)) {
+                snapConnectors += 1; // เพิ่มข้อต่อ 2 ทาง 1 ตัว
+                break; // หยุดตรวจสอบเมื่อพบการ snap แล้ว
+            }
+            // ตรวจสอบว่า snap เข้ากับระหว่างท่อเมนรอง (ไม่ใช่จุดเริ่มต้น)
+            else if (isPointOnSubMainPipeMidway(mainPipeEnd, subMainPipe.coordinates)) {
+                snapConnectors += 2; // เพิ่มข้อต่อ 3 ทาง 1 ตัว (2 หน่วยสำหรับ 3 ทาง)
+                break; // หยุดตรวจสอบเมื่อพบการ snap แล้ว
+            }
+        }
+    }
+    
+    return baseConnectors + snapConnectors;
 };
 
 const calculatePipeConnectors = (projectData: HorticultureProjectData): PipeConnectorSummary => {
@@ -149,12 +243,33 @@ const calculatePipeConnectors = (projectData: HorticultureProjectData): PipeConn
         }
     };
 
-    // คำนวณข้อต่อท่อเมนหลักตามจำนวนจุดที่ใช้ในการวาด
+    // คำนวณข้อต่อท่อเมนหลักตามจำนวนจุดที่ใช้ในการวาดและการ snap กับท่อเมนรอง
     projectData.mainPipes.forEach(mainPipe => {
         if (mainPipe.coordinates.length === 0) return;
         
-        const connectorCount = calculateMainPipeConnectors(mainPipe.coordinates);
-        summary.details.mainPipes.twoWay += connectorCount;
+        const connectorCount = calculateMainPipeConnectors(mainPipe.coordinates, projectData.subMainPipes);
+        
+        // คำนวณข้อต่อพื้นฐานจากจำนวนจุดในการวาดท่อ
+        const baseConnectors = mainPipe.coordinates.length > 2 ? mainPipe.coordinates.length - 2 : 0;
+        
+        // คำนวณข้อต่อเพิ่มเติมจากการ snap กับท่อเมนรอง
+        const snapConnectors = connectorCount - baseConnectors;
+        
+        // จัดสรรข้อต่อแต่ละประเภท:
+        // - ข้อต่อพื้นฐาน: 2 ทาง
+        // - snap เข้ากับจุดเริ่มต้นท่อเมนรอง: เพิ่ม 2 ทาง 1 ตัว (+1 หน่วย)
+        // - snap เข้ากับระหว่างท่อเมนรอง: เพิ่ม 3 ทาง 1 ตัว (+1 หน่วยใน threeWay)
+        if (snapConnectors === 1) {
+            // snap กับจุดเริ่มต้น: เพิ่ม 2 ทาง
+            summary.details.mainPipes.twoWay += baseConnectors + 1;
+        } else if (snapConnectors === 2) {
+            // snap กับระหว่างท่อ: เพิ่ม 3 ทาง (snapConnectors = 2 หมายถึง 3 ทาง 1 ตัว)
+            summary.details.mainPipes.twoWay += baseConnectors;
+            summary.details.mainPipes.threeWay += 1;
+        } else {
+            // ไม่มีการ snap หรือกรณีปกติ
+            summary.details.mainPipes.twoWay += connectorCount;
+        }
     });
 
     
@@ -1690,7 +1805,7 @@ function EnhancedHorticultureResultsPageContent() {
                                 <h3 className="mb-4 text-xl font-semibold text-green-400">
                                     📊 {t('ข้อมูลโดยรวม')}
                                 </h3>
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
                                     <div className="rounded bg-gray-700 p-3">
                                         <div className="text-gray-400">
                                             {t('พื้นที่รวมทั้งหมด')}
@@ -1858,6 +1973,15 @@ function EnhancedHorticultureResultsPageContent() {
                                                             {zone.zoneName}
                                                         </h4>
                                                         <div className="flex items-center gap-2">
+                                                        <div className="p-2 text-xs">
+                                                        <span className="text-gray-400">
+                                                            {t('ระยะปลูก')}:
+                                                        </span>
+                                                        <span className="ml-2 text-white">
+                                                            {plantSpacing} × {rowSpacing}{' '}
+                                                            {t('เมตร')}
+                                                        </span>
+                                                    </div>
                                                             <span className="text-sm text-gray-400">
                                                                 🌱 {plantName}
                                                             </span>
@@ -1872,7 +1996,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                         </div>
                                                     </div>
 
-                                                    <div className="mb-3 grid grid-cols-2 gap-4 text-sm">
+                                                    <div className="mb-3 grid grid-cols-4 gap-4 text-sm">
                                                         <div>
                                                             <span className="text-gray-400">
                                                                 {t('พื้นที่โซน')}:
@@ -1910,19 +2034,10 @@ function EnhancedHorticultureResultsPageContent() {
                                                         </div>
                                                     </div>
 
-                                                    <div className="mb-3 rounded bg-gray-600/50 p-2 text-xs">
-                                                        <span className="text-gray-400">
-                                                            {t('ระยะปลูก')}:
-                                                        </span>
-                                                        <span className="ml-2 text-white">
-                                                            {plantSpacing} × {rowSpacing}{' '}
-                                                            {t('เมตร')}({t('ระหว่างต้น')} ×{' '}
-                                                            {t('ระหว่างแถว')})
-                                                        </span>
-                                                    </div>
+                                                    
 
                                                     <div className="space-y-2 text-xs">
-                                                        <div className="grid grid-cols-2 gap-2">
+                                                        <div className="grid grid-cols-3 gap-2">
                                                             <div className="rounded bg-blue-900/30 p-2">
                                                                 <div className="text-blue-300">
                                                                     {t('ท่อเมนในโซน')}
@@ -1960,21 +2075,24 @@ function EnhancedHorticultureResultsPageContent() {
                                                                     )}
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                        <div className="rounded bg-green-900/30 p-2">
-                                                            <div className="text-green-300">
-                                                                {t('ท่อย่อยในโซน')}
-                                                            </div>
-                                                            <div>
-                                                                {t('ยาวที่สุด')}:{' '}
-                                                                {formatDistance(
-                                                                    zone.branchPipesInZone.longest
-                                                                )}{' '}
-                                                                | {t('รวม')}:{' '}
-                                                                {formatDistance(
-                                                                    zone.branchPipesInZone
-                                                                        .totalLength
-                                                                )}
+                                                            <div className="rounded bg-yellow-900/30 p-2">
+                                                                <div className="text-yellow-300">
+                                                                    {t('ท่อย่อยในโซน')}
+                                                                </div>
+                                                                <div>
+                                                                    {t('ยาวที่สุด')}:{' '}
+                                                                    {formatDistance(
+                                                                        zone.branchPipesInZone
+                                                                            .longest
+                                                                    )}
+                                                                </div>
+                                                                <div>
+                                                                    {t('รวม')}:{' '}
+                                                                    {formatDistance(
+                                                                        zone.branchPipesInZone
+                                                                            .totalLength
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>

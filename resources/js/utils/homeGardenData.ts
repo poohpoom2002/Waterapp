@@ -813,7 +813,12 @@ export function generateSmartPipeNetwork(options: SmartPipeNetworkOptions): Pipe
     }
 
     try {
-        let pipes = createOptimizedBoundaryPipeNetwork(
+        let pipes: Pipe[] = [];
+        
+        // Create unified trunk system with single main line from water source
+        const sourcePos = isCanvasMode ? (waterSource.canvasPosition || waterSource.position) : waterSource.position;
+        
+        pipes = createUnifiedTrunkSystem(
             waterSource,
             sprinklers,
             gardenZones,
@@ -855,6 +860,9 @@ export function generateSmartPipeNetwork(options: SmartPipeNetworkOptions): Pipe
             });
             pipes = fallback;
         }
+
+        // Remove duplicate pipes to prevent redundant connections
+        pipes = removeDuplicatePipes(pipes, isCanvasMode ? 2.0 : 0.00002);
 
         return pipes;
     } catch (error) {
@@ -2774,23 +2782,204 @@ function createOptimizedBranchConnections(
     zoneId?: string
 ): Pipe[] {
     const pipes: Pipe[] = [];
+    const connectedSprinklers = new Set<string>();
     
-    zoneSprinklers.forEach((sprinkler, index) => {
+    // Group sprinklers by alignment (row/column)
+    const sprinklerGroups = groupSprinklersByAlignment(zoneSprinklers, isCanvasMode, scale);
+    
+    sprinklerGroups.forEach((group, groupIndex) => {
+        // Filter out already connected sprinklers
+        const unconnectedGroup = group.filter(sprinkler => 
+            !connectedSprinklers.has(sprinkler.id) && 
+            !isSprinklerConnected(sprinkler, pipes, isCanvasMode, 1.0)
+        );
+        
+        if (unconnectedGroup.length === 0) return;
+        
+        if (unconnectedGroup.length === 1) {
+            // Single sprinkler - connect directly to trunk
+            const sprinkler = unconnectedGroup[0];
+            const sprinklerPos = isCanvasMode ? (sprinkler.canvasPosition || sprinkler.position) : sprinkler.position;
+            if (!sprinklerPos) return;
+            
+            const closestTrunkPoint = findClosestPointOnAnyTrunk(trunkNetwork, sprinklerPos, isCanvasMode, scale);
+            if (!closestTrunkPoint) return;
+            
+            const branchPath = createShortestManhattanPath(closestTrunkPoint, sprinklerPos);
+            
+            for (let i = 0; i < branchPath.length - 1; i++) {
+                const pipe = createUniformPipe(
+                    `branch_${zoneId}_${sprinkler.id}_${i}`,
+                    branchPath[i],
+                    branchPath[i + 1],
+                    isCanvasMode,
+                    scale,
+                    canvasData,
+                    imageData,
+                    zoneId
+                );
+                pipes.push(pipe);
+            }
+            connectedSprinklers.add(sprinkler.id);
+        } else {
+            // Multiple sprinklers in same alignment - create connected line
+            const connectedPipes = createConnectedSprinklerLine(
+                unconnectedGroup,
+                trunkNetwork,
+                isCanvasMode,
+                scale,
+                canvasData,
+                imageData,
+                zoneId,
+                groupIndex
+            );
+            pipes.push(...connectedPipes);
+            
+            // Mark all sprinklers in this group as connected
+            unconnectedGroup.forEach(sprinkler => connectedSprinklers.add(sprinkler.id));
+        }
+    });
+    
+    return pipes;
+}
+
+function groupSprinklersByAlignment(
+    sprinklers: Sprinkler[],
+    isCanvasMode: boolean,
+    scale: number,
+    tolerance: number = 2.0 // meters tolerance for alignment
+): Sprinkler[][] {
+    const groups: Sprinkler[][] = [];
+    const processed = new Set<string>();
+    
+    sprinklers.forEach(sprinkler => {
+        if (processed.has(sprinkler.id)) return;
+        
         const sprinklerPos = isCanvasMode ? (sprinkler.canvasPosition || sprinkler.position) : sprinkler.position;
         if (!sprinklerPos) return;
         
-        // Find the closest point on any trunk
-        const closestTrunkPoint = findClosestPointOnAnyTrunk(trunkNetwork, sprinklerPos, isCanvasMode, scale);
-        if (!closestTrunkPoint) return;
+        const group = [sprinkler];
+        processed.add(sprinkler.id);
         
-        // Create Manhattan branch aligned with base edge direction
-        const branchPath = createShortestManhattanPath(closestTrunkPoint, sprinklerPos);
+        // Find other sprinklers aligned horizontally or vertically
+        sprinklers.forEach(otherSprinkler => {
+            if (processed.has(otherSprinkler.id)) return;
+            
+            const otherPos = isCanvasMode ? (otherSprinkler.canvasPosition || otherSprinkler.position) : otherSprinkler.position;
+            if (!otherPos) return;
+            
+            const distance = calculateDistance(sprinklerPos, otherPos, isCanvasMode ? scale : undefined);
+            if (distance > 50) return; // Skip if too far apart
+            
+            // Check if aligned horizontally or vertically
+            const isAligned = isAlignedSprinklers(sprinklerPos, otherPos, isCanvasMode, tolerance);
+            
+            if (isAligned) {
+                group.push(otherSprinkler);
+                processed.add(otherSprinkler.id);
+            }
+        });
         
-        for (let i = 0; i < branchPath.length - 1; i++) {
+        groups.push(group);
+    });
+    
+    return groups;
+}
+
+function isAlignedSprinklers(
+    pos1: Coordinate | CanvasCoordinate,
+    pos2: Coordinate | CanvasCoordinate,
+    isCanvasMode: boolean,
+    tolerance: number
+): boolean {
+    if (isCanvasMode) {
+        const p1 = pos1 as CanvasCoordinate;
+        const p2 = pos2 as CanvasCoordinate;
+        
+        // Check horizontal alignment (same Y)
+        const horizontalDiff = Math.abs(p1.y - p2.y);
+        // Check vertical alignment (same X)
+        const verticalDiff = Math.abs(p1.x - p2.x);
+        
+        return horizontalDiff <= tolerance || verticalDiff <= tolerance;
+    } else {
+        const p1 = pos1 as Coordinate;
+        const p2 = pos2 as Coordinate;
+        
+        // Convert to approximate meter differences
+        const latDiffMeters = Math.abs(p1.lat - p2.lat) * 111000;
+        const lngDiffMeters = Math.abs(p1.lng - p2.lng) * 111000 * Math.cos((p1.lat * Math.PI) / 180);
+        
+        return latDiffMeters <= tolerance || lngDiffMeters <= tolerance;
+    }
+}
+
+function createConnectedSprinklerLine(
+    sprinklers: Sprinkler[],
+    trunkNetwork: Pipe[],
+    isCanvasMode: boolean,
+    scale: number,
+    canvasData?: unknown,
+    imageData?: unknown,
+    zoneId?: string,
+    groupIndex?: number
+): Pipe[] {
+    const pipes: Pipe[] = [];
+    
+    if (sprinklers.length < 2) return pipes;
+    
+    // Sort sprinklers by position to create logical connection order
+    const sortedSprinklers = sortSprinklersForConnection(sprinklers, isCanvasMode);
+    
+    // Find connection point to trunk from the first sprinkler
+    const firstSprinklerPos = isCanvasMode 
+        ? (sortedSprinklers[0].canvasPosition || sortedSprinklers[0].position) 
+        : sortedSprinklers[0].position;
+    
+    if (!firstSprinklerPos) return pipes;
+    
+    const trunkConnectionPoint = findClosestPointOnAnyTrunk(trunkNetwork, firstSprinklerPos, isCanvasMode, scale);
+    if (!trunkConnectionPoint) return pipes;
+    
+    // Create main branch from trunk to first sprinkler
+    const mainBranchPath = createShortestManhattanPath(trunkConnectionPoint, firstSprinklerPos);
+    
+    for (let i = 0; i < mainBranchPath.length - 1; i++) {
+        const pipe = createUniformPipe(
+            `branch_main_${zoneId}_g${groupIndex}_${i}`,
+            mainBranchPath[i],
+            mainBranchPath[i + 1],
+            isCanvasMode,
+            scale,
+            canvasData,
+            imageData,
+            zoneId
+        );
+        pipes.push(pipe);
+    }
+    
+    // Connect sprinklers in sequence
+    for (let i = 0; i < sortedSprinklers.length - 1; i++) {
+        const currentSprinkler = sortedSprinklers[i];
+        const nextSprinkler = sortedSprinklers[i + 1];
+        
+        const currentPos = isCanvasMode 
+            ? (currentSprinkler.canvasPosition || currentSprinkler.position) 
+            : currentSprinkler.position;
+        const nextPos = isCanvasMode 
+            ? (nextSprinkler.canvasPosition || nextSprinkler.position) 
+            : nextSprinkler.position;
+            
+        if (!currentPos || !nextPos) continue;
+        
+        // Create direct connection between adjacent sprinklers
+        const connectionPath = createShortestManhattanPath(currentPos, nextPos);
+        
+        for (let j = 0; j < connectionPath.length - 1; j++) {
             const pipe = createUniformPipe(
-                `branch_${zoneId}_${sprinkler.id}_${i}`,
-                branchPath[i],
-                branchPath[i + 1],
+                `branch_conn_${zoneId}_${currentSprinkler.id}_${nextSprinkler.id}_${j}`,
+                connectionPath[j],
+                connectionPath[j + 1],
                 isCanvasMode,
                 scale,
                 canvasData,
@@ -2799,9 +2988,491 @@ function createOptimizedBranchConnections(
             );
             pipes.push(pipe);
         }
+    }
+    
+    return pipes;
+}
+
+function sortSprinklersForConnection(
+    sprinklers: Sprinkler[],
+    isCanvasMode: boolean
+): Sprinkler[] {
+    // Sort by position to create logical connection order (left-to-right, top-to-bottom)
+    return [...sprinklers].sort((a, b) => {
+        const posA = isCanvasMode ? (a.canvasPosition || a.position) : a.position;
+        const posB = isCanvasMode ? (b.canvasPosition || b.position) : b.position;
+        
+        if (!posA || !posB) return 0;
+        
+        if (isCanvasMode) {
+            const pA = posA as CanvasCoordinate;
+            const pB = posB as CanvasCoordinate;
+            
+            // Sort primarily by Y (top to bottom), then by X (left to right)
+            const yDiff = pA.y - pB.y;
+            if (Math.abs(yDiff) > 2) return yDiff;
+            return pA.x - pB.x;
+        } else {
+            const pA = posA as Coordinate;
+            const pB = posB as Coordinate;
+            
+            // Sort primarily by latitude (north to south), then by longitude (west to east)
+            const latDiff = pB.lat - pA.lat; // Higher latitude first (north to south)
+            if (Math.abs(latDiff) > 0.00002) return latDiff;
+            return pA.lng - pB.lng; // Lower longitude first (west to east)
+        }
+    });
+}
+
+// Helper function to prevent duplicate pipe connections
+function removeDuplicatePipes(pipes: Pipe[], tolerance: number = 1.0): Pipe[] {
+    const uniquePipes: Pipe[] = [];
+    const processedConnections = new Set<string>();
+    
+    pipes.forEach(pipe => {
+        // Create a connection signature based on start and end points
+        const start = pipe.canvasStart || pipe.start;
+        const end = pipe.canvasEnd || pipe.end;
+        
+        if (!start || !end) return;
+        
+        // Round coordinates to avoid minor floating point differences
+        const startKey = `${Math.round(getCoordValue(start, 'x') / tolerance)}:${Math.round(getCoordValue(start, 'y') / tolerance)}`;
+        const endKey = `${Math.round(getCoordValue(end, 'x') / tolerance)}:${Math.round(getCoordValue(end, 'y') / tolerance)}`;
+        
+        // Create bidirectional connection signature
+        const connection1 = `${startKey}-${endKey}`;
+        const connection2 = `${endKey}-${startKey}`;
+        
+        if (!processedConnections.has(connection1) && !processedConnections.has(connection2)) {
+            uniquePipes.push(pipe);
+            processedConnections.add(connection1);
+            processedConnections.add(connection2);
+        }
+    });
+    
+    return uniquePipes;
+}
+
+// Simplified zone network to reduce redundancy
+function createSimplifiedZoneNetwork(
+    sourcePos: Coordinate | CanvasCoordinate,
+    zoneCoords: (Coordinate | CanvasCoordinate)[],
+    zoneSprinklers: Sprinkler[],
+    isCanvasMode: boolean,
+    scale: number,
+    canvasData?: unknown,
+    imageData?: unknown,
+    zoneId?: string
+): Pipe[] {
+    const pipes: Pipe[] = [];
+    
+    if (zoneSprinklers.length === 0) return pipes;
+    
+    // Find optimal entry point to zone
+    const entryPoint = findOptimalEntryPoint(sourcePos, zoneCoords, isCanvasMode, scale);
+    if (!entryPoint) return pipes;
+    
+    // Create main trunk from source to zone
+    const mainTrunkPath = createShortestManhattanPath(sourcePos, entryPoint);
+    for (let i = 0; i < mainTrunkPath.length - 1; i++) {
+        const pipe = createUniformPipe(
+            `main_trunk_${zoneId}_${i}`,
+            mainTrunkPath[i],
+            mainTrunkPath[i + 1],
+            isCanvasMode,
+            scale,
+            canvasData,
+            imageData,
+            zoneId
+        );
+        pipes.push(pipe);
+    }
+    
+    // Group and connect sprinklers efficiently
+    const connectedSprinklers = new Set<string>();
+    const sprinklerGroups = groupSprinklersByAlignment(zoneSprinklers, isCanvasMode, scale);
+    
+    sprinklerGroups.forEach((group, groupIndex) => {
+        if (group.length === 1) {
+            // Single sprinkler - connect to closest trunk point
+            const sprinkler = group[0];
+            if (connectedSprinklers.has(sprinkler.id)) return;
+            
+            const sprinklerPos = isCanvasMode ? (sprinkler.canvasPosition || sprinkler.position) : sprinkler.position;
+            if (!sprinklerPos) return;
+            
+            // Connect to entry point or existing trunk
+            const connectionPoint = findClosestPointOnAnyTrunk(pipes, sprinklerPos, isCanvasMode, scale) || entryPoint;
+            const branchPath = createShortestManhattanPath(connectionPoint, sprinklerPos);
+            
+            for (let i = 0; i < branchPath.length - 1; i++) {
+                const pipe = createUniformPipe(
+                    `simple_branch_${zoneId}_${sprinkler.id}_${i}`,
+                    branchPath[i],
+                    branchPath[i + 1],
+                    isCanvasMode,
+                    scale,
+                    canvasData,
+                    imageData,
+                    zoneId
+                );
+                pipes.push(pipe);
+            }
+            
+            connectedSprinklers.add(sprinkler.id);
+        } else {
+            // Multiple aligned sprinklers - create efficient line
+            const sortedGroup = sortSprinklersForConnection(group, isCanvasMode);
+            
+            // Connect first sprinkler to trunk
+            const firstSprinkler = sortedGroup[0];
+            if (!connectedSprinklers.has(firstSprinkler.id)) {
+                const firstPos = isCanvasMode ? (firstSprinkler.canvasPosition || firstSprinkler.position) : firstSprinkler.position;
+                if (firstPos) {
+                    const connectionPoint = findClosestPointOnAnyTrunk(pipes, firstPos, isCanvasMode, scale) || entryPoint;
+                    const mainBranchPath = createShortestManhattanPath(connectionPoint, firstPos);
+                    
+                    for (let i = 0; i < mainBranchPath.length - 1; i++) {
+                        const pipe = createUniformPipe(
+                            `group_main_${zoneId}_g${groupIndex}_${i}`,
+                            mainBranchPath[i],
+                            mainBranchPath[i + 1],
+                            isCanvasMode,
+                            scale,
+                            canvasData,
+                            imageData,
+                            zoneId
+                        );
+                        pipes.push(pipe);
+                    }
+                    
+                    connectedSprinklers.add(firstSprinkler.id);
+                }
+            }
+            
+            // Connect remaining sprinklers in sequence
+            for (let i = 0; i < sortedGroup.length - 1; i++) {
+                const currentSprinkler = sortedGroup[i];
+                const nextSprinkler = sortedGroup[i + 1];
+                
+                if (connectedSprinklers.has(nextSprinkler.id)) continue;
+                
+                const currentPos = isCanvasMode ? (currentSprinkler.canvasPosition || currentSprinkler.position) : currentSprinkler.position;
+                const nextPos = isCanvasMode ? (nextSprinkler.canvasPosition || nextSprinkler.position) : nextSprinkler.position;
+                
+                if (!currentPos || !nextPos) continue;
+                
+                const connectionPath = createShortestManhattanPath(currentPos, nextPos);
+                
+                for (let j = 0; j < connectionPath.length - 1; j++) {
+                    const pipe = createUniformPipe(
+                        `group_link_${zoneId}_${currentSprinkler.id}_${nextSprinkler.id}_${j}`,
+                        connectionPath[j],
+                        connectionPath[j + 1],
+                        isCanvasMode,
+                        scale,
+                        canvasData,
+                        imageData,
+                        zoneId
+                    );
+                    pipes.push(pipe);
+                }
+                
+                connectedSprinklers.add(nextSprinkler.id);
+            }
+        }
     });
     
     return pipes;
+}
+
+// Create unified trunk system with single main line from water source
+function createUnifiedTrunkSystem(
+    waterSource: WaterSource,
+    sprinklers: Sprinkler[],
+    gardenZones: GardenZone[],
+    isCanvasMode: boolean,
+    scale: number,
+    canvasData?: unknown,
+    imageData?: unknown
+): Pipe[] {
+    const pipes: Pipe[] = [];
+    const sourcePos = isCanvasMode ? (waterSource.canvasPosition || waterSource.position) : waterSource.position;
+    
+    if (sprinklers.length === 0) return pipes;
+    
+    // Group sprinklers by zone
+    const sprinklersByZone = new Map<string, Sprinkler[]>();
+    sprinklers.forEach(sprinkler => {
+        if (!sprinklersByZone.has(sprinkler.zoneId)) {
+            sprinklersByZone.set(sprinkler.zoneId, []);
+        }
+        sprinklersByZone.get(sprinkler.zoneId)!.push(sprinkler);
+    });
+    
+    // Find all zone entry points
+    const zoneEntryPoints: Array<{
+        point: Coordinate | CanvasCoordinate;
+        zoneId: string;
+        zoneSprinklers: Sprinkler[];
+        zoneCoords: (Coordinate | CanvasCoordinate)[];
+    }> = [];
+    
+    sprinklersByZone.forEach((zoneSprinklers, zoneId) => {
+        const zone = gardenZones.find(z => z.id === zoneId);
+        if (!zone) return;
+        
+        const zoneCoords = isCanvasMode ? (zone.canvasCoordinates || zone.coordinates) : zone.coordinates;
+        if (!zoneCoords || zoneCoords.length < 3) return;
+        
+        const entryPoint = findOptimalEntryPoint(sourcePos, zoneCoords, isCanvasMode, scale);
+        if (entryPoint) {
+            zoneEntryPoints.push({
+                point: entryPoint,
+                zoneId,
+                zoneSprinklers,
+                zoneCoords
+            });
+        }
+    });
+    
+    if (zoneEntryPoints.length === 0) return pipes;
+    
+    // Create single main trunk line that connects all zones efficiently
+    const mainTrunk = createMainTrunkLine(sourcePos, zoneEntryPoints, isCanvasMode, scale, canvasData, imageData);
+    pipes.push(...mainTrunk);
+    
+    // Create zone-specific networks that branch from the main trunk
+    zoneEntryPoints.forEach(({ point, zoneId, zoneSprinklers, zoneCoords }) => {
+        const zonePipes = createZoneBranchNetwork(
+            mainTrunk,
+            point,
+            zoneCoords,
+            zoneSprinklers,
+            isCanvasMode,
+            scale,
+            canvasData,
+            imageData,
+            zoneId
+        );
+        pipes.push(...zonePipes);
+    });
+    
+    return pipes;
+}
+
+// Create main trunk line that connects water source to all zone entry points
+function createMainTrunkLine(
+    sourcePos: Coordinate | CanvasCoordinate,
+    zoneEntryPoints: Array<{ point: Coordinate | CanvasCoordinate; zoneId: string }>,
+    isCanvasMode: boolean,
+    scale: number,
+    canvasData?: unknown,
+    imageData?: unknown
+): Pipe[] {
+    const pipes: Pipe[] = [];
+    
+    if (zoneEntryPoints.length === 0) return pipes;
+    
+    // Create efficient main trunk path that visits all zone entry points
+    const trunkPath = createOptimalTrunkPath(sourcePos, zoneEntryPoints.map(z => z.point));
+    
+    // Convert path to pipes
+    for (let i = 0; i < trunkPath.length - 1; i++) {
+        const pipe = createUniformPipe(
+            `main_trunk_${i}`,
+            trunkPath[i],
+            trunkPath[i + 1],
+            isCanvasMode,
+            scale,
+            canvasData,
+            imageData,
+            'main'
+        );
+        pipes.push(pipe);
+    }
+    
+    return pipes;
+}
+
+// Create optimal trunk path that efficiently connects source to all entry points
+function createOptimalTrunkPath(
+    sourcePos: Coordinate | CanvasCoordinate,
+    entryPoints: (Coordinate | CanvasCoordinate)[]
+): (Coordinate | CanvasCoordinate)[] {
+    if (entryPoints.length === 0) return [sourcePos];
+    if (entryPoints.length === 1) return createShortestManhattanPath(sourcePos, entryPoints[0]);
+    
+    // For multiple zones, create a path that minimizes total distance
+    // Start from source, find nearest entry point, then create branching path
+    const path = [sourcePos];
+    const unvisited = [...entryPoints];
+    let currentPos = sourcePos;
+    
+    while (unvisited.length > 0) {
+        // Find nearest unvisited entry point
+        let nearestIndex = 0;
+        let nearestDistance = calculateDistance(currentPos, unvisited[0]);
+        
+        for (let i = 1; i < unvisited.length; i++) {
+            const distance = calculateDistance(currentPos, unvisited[i]);
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestIndex = i;
+            }
+        }
+        
+        // Create path to nearest entry point
+        const nearestPoint = unvisited[nearestIndex];
+        const segmentPath = createShortestManhattanPath(currentPos, nearestPoint);
+        
+        // Add path segments (skip first point to avoid duplication)
+        path.push(...segmentPath.slice(1));
+        
+        currentPos = nearestPoint;
+        unvisited.splice(nearestIndex, 1);
+    }
+    
+    return path;
+}
+
+// Create zone branch network that connects to main trunk
+function createZoneBranchNetwork(
+    mainTrunk: Pipe[],
+    zoneEntryPoint: Coordinate | CanvasCoordinate,
+    zoneCoords: (Coordinate | CanvasCoordinate)[],
+    zoneSprinklers: Sprinkler[],
+    isCanvasMode: boolean,
+    scale: number,
+    canvasData?: unknown,
+    imageData?: unknown,
+    zoneId?: string
+): Pipe[] {
+    const pipes: Pipe[] = [];
+    
+    if (zoneSprinklers.length === 0) return pipes;
+    
+    // Group sprinklers efficiently and connect them
+    const connectedSprinklers = new Set<string>();
+    const sprinklerGroups = groupSprinklersByAlignment(zoneSprinklers, isCanvasMode, scale);
+    
+    sprinklerGroups.forEach((group, groupIndex) => {
+        if (group.length === 1) {
+            // Single sprinkler - connect to zone entry point or existing trunk
+            const sprinkler = group[0];
+            if (connectedSprinklers.has(sprinkler.id)) return;
+            
+            const sprinklerPos = isCanvasMode ? (sprinkler.canvasPosition || sprinkler.position) : sprinkler.position;
+            if (!sprinklerPos) return;
+            
+            // Connect to zone entry point or closest point on existing network
+            const connectionPoint = findClosestPointOnAnyTrunk([...mainTrunk, ...pipes], sprinklerPos, isCanvasMode, scale) || zoneEntryPoint;
+            const branchPath = createShortestManhattanPath(connectionPoint, sprinklerPos);
+            
+            for (let i = 0; i < branchPath.length - 1; i++) {
+                const pipe = createUniformPipe(
+                    `zone_branch_${zoneId}_${sprinkler.id}_${i}`,
+                    branchPath[i],
+                    branchPath[i + 1],
+                    isCanvasMode,
+                    scale,
+                    canvasData,
+                    imageData,
+                    zoneId
+                );
+                pipes.push(pipe);
+            }
+            
+            connectedSprinklers.add(sprinkler.id);
+        } else {
+            // Multiple aligned sprinklers - create efficient line
+            const sortedGroup = sortSprinklersForConnection(group, isCanvasMode);
+            
+            // Connect first sprinkler to trunk/entry point
+            const firstSprinkler = sortedGroup[0];
+            if (!connectedSprinklers.has(firstSprinkler.id)) {
+                const firstPos = isCanvasMode ? (firstSprinkler.canvasPosition || firstSprinkler.position) : firstSprinkler.position;
+                if (firstPos) {
+                    const connectionPoint = findClosestPointOnAnyTrunk([...mainTrunk, ...pipes], firstPos, isCanvasMode, scale) || zoneEntryPoint;
+                    const mainBranchPath = createShortestManhattanPath(connectionPoint, firstPos);
+                    
+                    for (let i = 0; i < mainBranchPath.length - 1; i++) {
+                        const pipe = createUniformPipe(
+                            `zone_group_main_${zoneId}_g${groupIndex}_${i}`,
+                            mainBranchPath[i],
+                            mainBranchPath[i + 1],
+                            isCanvasMode,
+                            scale,
+                            canvasData,
+                            imageData,
+                            zoneId
+                        );
+                        pipes.push(pipe);
+                    }
+                    
+                    connectedSprinklers.add(firstSprinkler.id);
+                }
+            }
+            
+            // Connect remaining sprinklers in sequence
+            for (let i = 0; i < sortedGroup.length - 1; i++) {
+                const currentSprinkler = sortedGroup[i];
+                const nextSprinkler = sortedGroup[i + 1];
+                
+                if (connectedSprinklers.has(nextSprinkler.id)) continue;
+                
+                const currentPos = isCanvasMode ? (currentSprinkler.canvasPosition || currentSprinkler.position) : currentSprinkler.position;
+                const nextPos = isCanvasMode ? (nextSprinkler.canvasPosition || nextSprinkler.position) : nextSprinkler.position;
+                
+                if (!currentPos || !nextPos) continue;
+                
+                const connectionPath = createShortestManhattanPath(currentPos, nextPos);
+                
+                for (let j = 0; j < connectionPath.length - 1; j++) {
+                    const pipe = createUniformPipe(
+                        `zone_group_link_${zoneId}_${currentSprinkler.id}_${nextSprinkler.id}_${j}`,
+                        connectionPath[j],
+                        connectionPath[j + 1],
+                        isCanvasMode,
+                        scale,
+                        canvasData,
+                        imageData,
+                        zoneId
+                    );
+                    pipes.push(pipe);
+                }
+                
+                connectedSprinklers.add(nextSprinkler.id);
+            }
+        }
+    });
+    
+    return pipes;
+}
+
+// Helper function to check if sprinkler is already connected to pipe network
+function isSprinklerConnected(
+    sprinkler: Sprinkler,
+    pipes: Pipe[],
+    isCanvasMode: boolean,
+    tolerance: number = 1.0
+): boolean {
+    const sprinklerPos = isCanvasMode ? (sprinkler.canvasPosition || sprinkler.position) : sprinkler.position;
+    if (!sprinklerPos) return false;
+    
+    return pipes.some(pipe => {
+        const start = isCanvasMode ? (pipe.canvasStart || pipe.start) : pipe.start;
+        const end = isCanvasMode ? (pipe.canvasEnd || pipe.end) : pipe.end;
+        
+        if (!start || !end) return false;
+        
+        // Check if sprinkler position matches pipe start or end
+        const distToStart = calculateDistance(sprinklerPos, start, isCanvasMode ? undefined : undefined);
+        const distToEnd = calculateDistance(sprinklerPos, end, isCanvasMode ? undefined : undefined);
+        
+        return distToStart <= tolerance || distToEnd <= tolerance;
+    });
 }
 
 // New optimized boundary-following pipe network
