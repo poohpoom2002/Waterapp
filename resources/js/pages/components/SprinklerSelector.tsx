@@ -6,6 +6,7 @@ import { CalculationResults } from '../types/interfaces';
 import { Zone } from '../../utils/horticultureUtils';
 import { formatWaterFlow, formatRadius } from '../utils/calculations';
 import { useLanguage } from '@/contexts/LanguageContext';
+import SearchableDropdown from './SearchableDropdown';
 
 interface SprinklerSelectorProps {
     selectedSprinkler: any;
@@ -122,26 +123,29 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 </div>
             </div>
 
-            <select
+            <SearchableDropdown
                 value={selectedSprinkler?.id || ''}
-                onChange={(e) => {
+                onChange={(value) => {
                     const selected = analyzedSprinklers.find(
-                        (s) => s.id === parseInt(e.target.value)
+                        (s) => s.id === parseInt(value.toString())
                     );
                     onSprinklerChange(selected);
                 }}
-                className="mb-4 w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
-            >
-                <option value="">
-                    -- {t('เลือก')} {projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}
-                    {activeZone ? ` ${t('สำหรับ')} ${activeZone.name}` : ''} --
-                </option>
-                {sortedSprinklers.map((sprinkler) => (
-                    <option key={sprinkler.id} value={sprinkler.id}>
-                        {sprinkler.name} - {sprinkler.price} {t('บาท')} | {sprinkler.brand || sprinkler.brand_name || '-'}
-                    </option>
-                ))}
-            </select>
+                options={[
+                    { 
+                        value: '', 
+                        label: `-- ${t('เลือก')} ${projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}${activeZone ? ` ${t('สำหรับ')} ${activeZone.name}` : ''} --`
+                    },
+                    ...sortedSprinklers.map((sprinkler) => ({
+                        value: sprinkler.id,
+                        label: `${sprinkler.name} - ${sprinkler.price} ${t('บาท')} | ${sprinkler.brand || sprinkler.brand_name || '-'}`,
+                        searchableText: `${sprinkler.productCode || ''} ${sprinkler.name || ''} ${sprinkler.brand || sprinkler.brand_name || ''}`
+                    }))
+                ]}
+                placeholder={`-- ${t('เลือก')} ${projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}${activeZone ? ` ${t('สำหรับ')} ${activeZone.name}` : ''} --`}
+                searchPlaceholder={t('พิมพ์เพื่อค้นหา') + (projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')) + ' (ชื่อ, รหัสสินค้า, แบรนด์)...'}
+                className="mb-4 w-full"
+            />
 
             {selectedSprinkler && selectedAnalyzed && (
                 <div className="rounded bg-gray-600 p-3">

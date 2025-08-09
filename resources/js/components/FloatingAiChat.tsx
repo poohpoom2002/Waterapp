@@ -363,6 +363,39 @@ const FloatingAiChat = ({
                 <div
                     className="relative cursor-grab select-none overflow-hidden bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 p-3 text-white active:cursor-grabbing"
                     onMouseDown={handleMouseDown}
+                    onTouchStart={(e) => {
+                        e.preventDefault();
+                        if (e.touches.length === 1) {
+                            const touch = e.touches[0];
+                            const syntheticEvent = {
+                                clientX: touch.clientX,
+                                clientY: touch.clientY,
+                                button: 0,
+                                preventDefault: () => {},
+                            } as React.MouseEvent;
+                            handleMouseDown(syntheticEvent);
+                        }
+                    }}
+                    onTouchMove={(e) => {
+                        e.preventDefault();
+                        if (e.touches.length === 1) {
+                            const touch = e.touches[0];
+                            const syntheticEvent = {
+                                clientX: touch.clientX,
+                                clientY: touch.clientY,
+                                preventDefault: () => {},
+                            } as MouseEvent;
+                            handleMouseMove(syntheticEvent);
+                        }
+                    }}
+                    onTouchEnd={(e) => {
+                        e.preventDefault();
+                        handleMouseUp();
+                    }}
+                    onTouchCancel={(e) => {
+                        e.preventDefault();
+                        handleMouseUp();
+                    }}
                     style={{ touchAction: 'none' }}
                 >
                     {/* Floating Particles */}

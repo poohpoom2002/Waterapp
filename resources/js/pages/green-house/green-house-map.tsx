@@ -2321,6 +2321,39 @@ export default function GreenhouseMap() {
                             onMouseLeave={handleMouseLeave}
                             onDoubleClick={finishDrawing}
                             onContextMenu={(e) => e.preventDefault()}
+                            onTouchStart={(e) => {
+                                e.preventDefault();
+                                if (e.touches.length === 1) {
+                                    const touch = e.touches[0];
+                                    const syntheticEvent = {
+                                        clientX: touch.clientX,
+                                        clientY: touch.clientY,
+                                        button: 0,
+                                        preventDefault: () => {},
+                                    } as React.MouseEvent<HTMLCanvasElement>;
+                                    handleMouseDown(syntheticEvent);
+                                }
+                            }}
+                            onTouchMove={(e) => {
+                                e.preventDefault();
+                                if (e.touches.length === 1) {
+                                    const touch = e.touches[0];
+                                    const syntheticEvent = {
+                                        clientX: touch.clientX,
+                                        clientY: touch.clientY,
+                                        preventDefault: () => {},
+                                    } as React.MouseEvent<HTMLCanvasElement>;
+                                    handleMouseMove(syntheticEvent);
+                                }
+                            }}
+                            onTouchEnd={(e) => {
+                                e.preventDefault();
+                                handleMouseUp();
+                            }}
+                            onTouchCancel={(e) => {
+                                e.preventDefault();
+                                handleMouseUp();
+                            }}
                             className="block select-none bg-gray-900"
                             style={{
                                 width: '100%',

@@ -1586,7 +1586,7 @@ export default function Product() {
                             )}
                             {zones.length > 1 && (
                                 <div className="mb-6 rounded-lg bg-gray-800 p-4">
-                                    <div className="mb-4 rounded bg-blue-900 p-3">
+                                    <div className="rounded bg-blue-900 p-3">
                                         <h4 className="mb-2 text-sm font-medium text-blue-300">
                                             🎯 {t('เลือกรูปแบบการเปิดโซน:')}
                                         </h4>

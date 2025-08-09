@@ -113,6 +113,12 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
     const [showGrid, setShowGrid] = useState(false);
     const [gridSize, setGridSize] = useState(50);
 
+    // เพิ่ม state สำหรับการจัดการรูปภาพ
+    const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
+    const [isDraggingImage, setIsDraggingImage] = useState(false);
+    const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
+    const [imageAspectRatio, setImageAspectRatio] = useState(1);
+
     const [zoom, setZoom] = useState(1);
     const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
     const [isPanning, setIsPanning] = useState(false);
@@ -238,31 +244,6 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
             return Math.sqrt(dx * dx + dy * dy);
         },
         []
-    );
-
-    const handleWheel = useCallback(
-        (e: React.WheelEvent<HTMLDivElement>) => {
-            e.preventDefault();
-
-            if (!containerRef.current) return;
-
-            const rect = containerRef.current.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-
-            const delta = e.deltaY;
-            const zoomFactor = delta > 0 ? 0.9 : 1.1;
-            const newZoom = Math.max(0.1, Math.min(5, zoom * zoomFactor));
-
-            const zoomRatio = newZoom / zoom;
-            const newPanX = mouseX - (mouseX - panOffset.x) * zoomRatio;
-            const newPanY = mouseY - (mouseY - panOffset.y) * zoomRatio;
-
-            setZoom(newZoom);
-            setPanOffset({ x: newPanX, y: newPanY });
-            setLastPanOffset({ x: newPanX, y: newPanY });
-        },
-        [zoom, panOffset]
     );
 
     const getCanvasCoordinate = useCallback(
@@ -488,32 +469,122 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
     }, []);
 
     const handleFileChange = useCallback(
-        (e: React.ChangeEvent<HTMLInputElement>) => {
-            const file = e.target.files?.[0];
+        (event: React.ChangeEvent<HTMLInputElement>) => {
+            const file = event.target.files?.[0];
             if (!file) return;
 
-            const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-            if (!validTypes.includes(file.type)) {
-                return;
-            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const imageData = {
+                        url: e.target?.result as string,
+                        width: img.width,
+                        height: img.height,
+                        scale: 20,
+                        isScaleSet: false,
+                    };
 
-            const maxSize = 15 * 1024 * 1024;
-            if (file.size > maxSize) {
-                return;
-            }
-
-            setMeasurementMode(null);
-            setMeasurementLine({ start: null, end: null });
-            setRealDistance('');
-            setMeasurementHistory([]);
-
-            onImageUpload(file);
-
-            if (e.target) {
-                e.target.value = '';
-            }
+                    onImageUpload(file);
+                };
+                img.src = e.target?.result as string;
+            };
+            reader.readAsDataURL(file);
         },
         [onImageUpload]
+    );
+
+    // เพิ่ม useEffect เพื่อเรียกใช้ centerImage เมื่อ imageData เปลี่ยน
+    useEffect(() => {
+        if (imageData) {
+            setTimeout(() => {
+                centerImage();
+            }, 100);
+        }
+    }, [imageData]);
+
+    // เพิ่มฟังก์ชันสำหรับการจัดการรูปภาพ - แก้ไขให้รูปเต็มพื้นที่
+    const centerImage = useCallback(() => {
+        if (!containerRef.current || !imageData) return;
+
+        const container = containerRef.current.getBoundingClientRect();
+        const containerWidth = container.width;
+        const containerHeight = container.height;
+
+        const imageWidth = imageData?.width || 0;
+        const imageHeight = imageData?.height || 0;
+
+        // คำนวณอัตราส่วนของรูปภาพ
+        const aspectRatio = imageWidth / imageHeight;
+        setImageAspectRatio(aspectRatio);
+
+        // คำนวณขนาดให้เต็มพื้นที่
+        const containerAspectRatio = containerWidth / containerHeight;
+
+        let displayWidth, displayHeight;
+
+        if (aspectRatio > containerAspectRatio) {
+            // รูปภาพกว้างกว่า container ให้ปรับตามความกว้าง
+            displayWidth = containerWidth;
+            displayHeight = containerWidth / aspectRatio;
+        } else {
+            // รูปภาพสูงกว่า container ให้ปรับตามความสูง
+            displayHeight = containerHeight;
+            displayWidth = containerHeight * aspectRatio;
+        }
+
+        // คำนวณตำแหน่งกึ่งกลาง
+        const centerX = (containerWidth - displayWidth) / 2;
+        const centerY = (containerHeight - displayHeight) / 2;
+
+        setImagePosition({ x: centerX, y: centerY });
+        setPanOffset({ x: centerX, y: centerY });
+        setLastPanOffset({ x: centerX, y: centerY });
+
+        // ตั้งค่า zoom ให้เหมาะสมกับขนาดที่คำนวณ
+        const zoomX = displayWidth / imageWidth;
+        const zoomY = displayHeight / imageHeight;
+        const newZoom = Math.min(zoomX, zoomY);
+        setZoom(newZoom);
+    }, [imageData]);
+
+    // ปิดการลากรูปภาพในโหมดรูปแบบแปลน
+    const handleImageDragStart = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        // ไม่ทำการลากรูปภาพในโหมดรูปแบบแปลน
+    }, []);
+
+    const handleImageDragMove = useCallback((e: React.MouseEvent) => {
+        // ไม่ทำการลากรูปภาพในโหมดรูปแบบแปลน
+    }, []);
+
+    const handleImageDragEnd = useCallback(() => {
+        // ไม่ทำการลากรูปภาพในโหมดรูปแบบแปลน
+    }, []);
+
+    // ฟังก์ชันสำหรับการซูมที่รักษาอัตราส่วน
+    const handleZoom = useCallback(
+        (delta: number, mouseX: number, mouseY: number) => {
+            const zoomFactor = delta > 0 ? 0.9 : 1.1;
+            const newZoom = Math.max(0.1, Math.min(5, zoom * zoomFactor));
+
+            // คำนวณจุดศูนย์กลางของการซูม
+            const rect = containerRef.current?.getBoundingClientRect();
+            if (!rect) return;
+
+            const centerX = mouseX - rect.left;
+            const centerY = mouseY - rect.top;
+
+            // คำนวณการเปลี่ยนแปลงของ pan offset
+            const zoomRatio = newZoom / zoom;
+            const newPanX = centerX - (centerX - panOffset.x) * zoomRatio;
+            const newPanY = centerY - (centerY - panOffset.y) * zoomRatio;
+
+            setZoom(newZoom);
+            setPanOffset({ x: newPanX, y: newPanY });
+            setLastPanOffset({ x: newPanX, y: newPanY });
+        },
+        [zoom, panOffset]
     );
 
     const calculatePixelDistance = useCallback(
@@ -624,6 +695,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
 
             const point = getCanvasCoordinate(e.clientX, e.clientY);
 
+            // ปิดการ panning และการลากรูปภาพในโหมดรูปแบบแปลน
             if (
                 e.button === 0 &&
                 editMode !== 'draw' &&
@@ -637,9 +709,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                 !measurementMode &&
                 !pipeEditMode
             ) {
-                setIsPanning(true);
-                setPanStartPos({ x: e.clientX, y: e.clientY });
-                setLastPanOffset(panOffset);
+                // ไม่ทำการ panning หรือการลากรูปภาพในโหมดรูปแบบแปลน
                 return;
             }
 
@@ -867,6 +937,12 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
             const point = getCanvasCoordinate(e.clientX, e.clientY);
             setMousePos(point);
 
+            // จัดการการลากรูปภาพ
+            if (isDraggingImage) {
+                handleImageDragMove(e);
+                return;
+            }
+
             if (isPanning && panStartPos) {
                 const deltaX = e.clientX - panStartPos.x;
                 const deltaY = e.clientY - panStartPos.y;
@@ -941,7 +1017,12 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
         setDraggedItem(null);
         setIsPanning(false);
         setPanStartPos(null);
-    }, []);
+
+        // จัดการการลากรูปภาพ
+        if (isDraggingImage) {
+            handleImageDragEnd();
+        }
+    }, [isDraggingImage]);
 
     const handleRightClick = useCallback(
         (e: React.MouseEvent<HTMLDivElement>) => {
@@ -1103,17 +1184,6 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                 strokeWidth={2}
                                 clipPath={`url(#clip-${sprinkler.id})`}
                             />
-
-                            {/* Show zone boundary as dashed line */}
-                            <polygon
-                                points={zone.canvasCoordinates
-                                    .map((p) => `${p.x},${p.y}`)
-                                    .join(' ')}
-                                fill="none"
-                                stroke={isSelected ? '#FFD700' + '60' : sprinkler.type.color + '60'}
-                                strokeWidth={1}
-                                strokeDasharray="3,3"
-                            />
                         </g>
                     );
                 } else if (Array.isArray(clipResult) && clipResult.length >= 3) {
@@ -1130,20 +1200,8 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                         </g>
                     );
                 } else {
-                    // Show dashed circle for no coverage
-                    return (
-                        <g key={`radius-${sprinkler.id}`}>
-                            <circle
-                                cx={sprinkler.canvasPosition.x}
-                                cy={sprinkler.canvasPosition.y}
-                                r={radiusPixels}
-                                fill="none"
-                                stroke={isSelected ? '#FFD700' + '40' : sprinkler.type.color + '40'}
-                                strokeWidth={1}
-                                strokeDasharray="5,5"
-                            />
-                        </g>
-                    );
+                    // No coverage, don't show anything to ensure strict zone boundaries
+                    return null;
                 }
             } catch (error) {
                 console.error('Error rendering sprinkler radius:', error);
@@ -1219,6 +1277,23 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
         };
     }, []);
 
+    // ปิดการซูมในโหมดรูปแบบแปลน - เพิ่ม wheel event listener ที่ไม่ทำอะไร
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const wheelHandler = (e: WheelEvent) => {
+            e.preventDefault();
+            // ไม่ทำการซูมในโหมดรูปแบบแปลน
+        };
+
+        container.addEventListener('wheel', wheelHandler, { passive: false });
+
+        return () => {
+            container.removeEventListener('wheel', wheelHandler);
+        };
+    }, []);
+
     return (
         <div className="flex h-full flex-col items-center justify-center gap-4">
             {!imageData ? (
@@ -1257,28 +1332,10 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
 
                             {isScaleSet ? (
                                 <div className="space-y-3">
-                                    <div className="rounded-lg bg-green-900/30 p-3">
-                                        <div className="mb-2 text-sm font-medium text-green-400">
-                                            ✅ {t('ตั้งค่าขนาดแล้ว')}
-                                        </div>
-                                        <div className="space-y-1 text-xs text-green-200">
-                                            <div>
-                                                📐 {currentScale.toFixed(2)} {t('พิกเซล/เมตร')}
-                                            </div>
-                                            <div>
-                                                📏 {(100 / currentScale).toFixed(2)}{' '}
-                                                {t('ซม./พิกเซล')}
-                                            </div>
-                                            <div>
-                                                🔬 {(1 / currentScale).toFixed(4)} {t('ม./พิกเซล')}
-                                            </div>
-                                        </div>
-                                    </div>
-
                                     {measurementHistory.length > 0 && (
                                         <div className="rounded-lg bg-blue-900/30 p-3">
                                             <div className="mb-1 text-xs text-blue-300">
-                                                {t('ประวัติการวัด:')}
+                                                {t('วัดเทียบระยะแล้ว:')}
                                             </div>
                                             <div className="text-xs text-blue-200">
                                                 {measurementHistory[
@@ -1295,14 +1352,57 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                         </div>
                                     )}
 
-                                    <div className="space-y-2">
-                                        <button
-                                            onClick={resetScale}
-                                            className="w-full rounded bg-amber-600 px-3 py-2 text-sm text-white transition-colors hover:bg-amber-700"
-                                        >
-                                            📏 {t('วัดใหม่')}
-                                        </button>
-                                    </div>
+                                    {/* Grid Controls */}
+                                    {isScaleSet && (
+                                        <div className="rounded-lg bg-gray-700">
+                                            <div className="space-y-3">
+                                                <label className="flex items-center gap-2 text-sm text-white">
+                                                    <button
+                                                        type="button"
+                                                        aria-pressed={showGrid}
+                                                        onClick={() => setShowGrid(!showGrid)}
+                                                        className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none ${
+                                                            showGrid ? 'bg-blue-600' : 'bg-gray-400'
+                                                        }`}
+                                                    >
+                                                        <span
+                                                            className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                                                                showGrid
+                                                                    ? 'translate-x-5'
+                                                                    : 'translate-x-1'
+                                                            }`}
+                                                        />
+                                                    </button>
+                                                    {t('แสดงตาราง')}
+                                                </label>
+
+                                                {showGrid && (
+                                                    <div>
+                                                        <label className="mb-1 block text-xs text-gray-300">
+                                                            {t('ระยะห่างตาราง:')}{' '}
+                                                            {(gridSize / currentScale).toFixed(1)}{' '}
+                                                            {t('ม.')}
+                                                        </label>
+                                                        <input
+                                                            type="range"
+                                                            min="20"
+                                                            max="100"
+                                                            step="10"
+                                                            value={gridSize}
+                                                            onChange={(e) =>
+                                                                setGridSize(Number(e.target.value))
+                                                            }
+                                                            className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-600"
+                                                        />
+                                                        <div className="mt-1 flex justify-between text-xs text-gray-400">
+                                                            <span>{t('ใกล้')}</span>
+                                                            <span>{t('ไกล')}</span>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="space-y-3">
@@ -1431,7 +1531,9 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                 : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
                                         }`}
                                     >
-                                        📏 {dimensionMode ? t('กำลังวัดระยะ') : t('เพิ่มเส้นวัด')}
+                                        {dimensionMode
+                                            ? '❌ ' + t('ยกเลิกการวัด')
+                                            : '📏 ' + t('เพิ่มเส้นวัด')}
                                     </button>
 
                                     {dimensionLines.length > 0 && (
@@ -1455,18 +1557,15 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                 </div>
 
                                 {dimensionMode && (
-                                    <div className="mt-3 rounded-lg bg-yellow-900/30 p-3 text-sm text-yellow-200">
-                                        📐 {t('คลิกจุดที่ 1 และจุดที่ 2 เพื่อสร้างเส้นวัด')} (
-                                        {tempDimensionPoints.length}/{t('2')})
-                                        <br />
-                                        💡 {t('คลิกที่หัวฉีดเพื่อ snap ที่จุดศูนย์กลาง')}
+                                    <div className="mt-3 rounded-lg bg-yellow-900/30 text-sm text-yellow-200">
+                                        💡 {t('คลิกจุดที่ 1 และจุดที่ 2 เพื่อสร้างเส้นวัด')}
                                     </div>
                                 )}
                             </div>
                         )}
 
                         {/* Pipe Editing Tools */}
-                        {isScaleSet && (
+                        {isScaleSet && editMode === 'draw' && pipes.length > 0 && (
                             <div className="rounded-lg bg-gray-700 p-4">
                                 <h4 className="mb-3 text-lg font-semibold text-purple-400">
                                     🔧 {t('แก้ไขระบบท่อ')}
@@ -1532,148 +1631,6 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                             </div>
                         )}
 
-                        {/* Grid Controls */}
-                        {isScaleSet && (
-                            <div className="rounded-lg bg-gray-700 p-4">
-                                <h4 className="mb-3 text-lg font-semibold text-purple-400">
-                                    🔲 {t('ตาราง')}
-                                </h4>
-
-                                <div className="space-y-3">
-                                    <label className="flex items-center gap-2 text-sm text-white">
-                                        <input
-                                            type="checkbox"
-                                            checked={showGrid}
-                                            onChange={(e) => setShowGrid(e.target.checked)}
-                                            className="rounded"
-                                        />
-                                        {t('แสดงตาราง')}
-                                    </label>
-
-                                    {showGrid && (
-                                        <div>
-                                            <label className="mb-1 block text-xs text-gray-300">
-                                                {t('ระยะห่างตาราง:')}{' '}
-                                                {(gridSize / currentScale).toFixed(1)} {t('ม.')}
-                                            </label>
-                                            <input
-                                                type="range"
-                                                min="20"
-                                                max="100"
-                                                step="10"
-                                                value={gridSize}
-                                                onChange={(e) =>
-                                                    setGridSize(Number(e.target.value))
-                                                }
-                                                className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-600"
-                                            />
-                                            <div className="mt-1 flex justify-between text-xs text-gray-400">
-                                                <span>{t('ใกล้')}</span>
-                                                <span>{t('ไกล')}</span>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="rounded-lg bg-gray-700 p-4">
-                            <h4 className="mb-2 text-sm font-semibold text-gray-300">
-                                📊 {t('ข้อมูลรูปภาพ')}
-                            </h4>
-                            <div className="space-y-1 text-xs text-gray-400">
-                                <div>
-                                    📐 {t('ขนาด:')} {imageData.width} × {imageData.height} {t('px')}
-                                </div>
-                                <div className="text-yellow-300">
-                                    ⚖️ {t('Scale:')} {currentScale.toFixed(2)} {t('พิกเซล/เมตร')}
-                                </div>
-                                <div
-                                    className={`text-sm font-medium ${isScaleSet ? 'text-green-400' : 'text-red-400'}`}
-                                >
-                                    🔧 {t('สถานะ:')}{' '}
-                                    {isScaleSet
-                                        ? '✅' + t('ตั้งค่าแล้ว')
-                                        : '❌' + t('ยังไม่ตั้งค่า')}
-                                </div>
-                                {gardenZones.length > 0 && isScaleSet && (
-                                    <div className="text-blue-300">
-                                        🏡 {t('โซน')} : {gardenZones.length} {t('โซน')}
-                                    </div>
-                                )}
-                                {sprinklers.length > 0 && isScaleSet && (
-                                    <div className="text-green-300">
-                                        💧 {t('หัวฉีด:')} {sprinklers.length} {t('ตัว')}
-                                    </div>
-                                )}
-                                {pipes.length > 0 && isScaleSet && (
-                                    <div className="text-purple-300">
-                                        🔧 {t('ท่อ:')} {pipes.length} {t('เส้น')}
-                                    </div>
-                                )}
-                                {dimensionLines.length > 0 && (
-                                    <div className="text-yellow-300">
-                                        📏 {t('เส้นวัด:')} {dimensionLines.length} {t('เส้น')}
-                                    </div>
-                                )}
-                                {showGrid && (
-                                    <div className="text-purple-300">
-                                        🔲 {t('ตาราง:')} {(gridSize / currentScale).toFixed(1)}{' '}
-                                        {t('ม.')}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="mt-3 space-y-2 border-t border-gray-600 pt-3">
-                                <h5 className="text-xs font-medium text-gray-300">
-                                    🔍 {t('การซูมและแพน:')}
-                                </h5>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => {
-                                            setZoom(Math.max(0.1, zoom - 0.1));
-                                        }}
-                                        className="flex h-8 w-8 items-center justify-center rounded bg-gray-600 text-white hover:bg-gray-500"
-                                    >
-                                        -
-                                    </button>
-                                    <span className="min-w-[60px] text-center text-sm text-white">
-                                        {Math.round(zoom * 100)}%
-                                    </span>
-                                    <button
-                                        onClick={() => {
-                                            setZoom(Math.min(5, zoom + 0.1));
-                                        }}
-                                        className="flex h-8 w-8 items-center justify-center rounded bg-gray-600 text-white hover:bg-gray-500"
-                                    >
-                                        +
-                                    </button>
-                                </div>
-                                <div className="grid grid-cols-4 gap-1">
-                                    {[0.5, 1, 1.5, 2].map((zoomLevel) => (
-                                        <button
-                                            key={zoomLevel}
-                                            onClick={() => {
-                                                setZoom(zoomLevel);
-                                                setPanOffset({ x: 0, y: 0 });
-                                                setLastPanOffset({ x: 0, y: 0 });
-                                            }}
-                                            className={`rounded px-2 py-1 text-xs transition-colors ${
-                                                Math.abs(zoom - zoomLevel) < 0.01
-                                                    ? 'bg-blue-600 text-white'
-                                                    : 'bg-gray-600 text-white hover:bg-gray-500'
-                                            }`}
-                                        >
-                                            {zoomLevel * 100}%
-                                        </button>
-                                    ))}
-                                </div>
-                                <div className="mt-2 text-xs text-gray-400">
-                                    💡 {t('ล้อเมาส์: ซูม | คลิกลาก: แพน | Grid ช่วยวาดโซน')}
-                                </div>
-                            </div>
-                        </div>
-
                         {!isScaleSet && (
                             <div className="rounded-lg border-l-4 border-amber-400 bg-amber-800 p-4">
                                 <div className="flex items-start gap-3">
@@ -1691,23 +1648,6 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                 </div>
                             </div>
                         )}
-
-                        <div className="border-t border-gray-600 pt-4">
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept="image/jpeg,image/png"
-                                onChange={handleFileChange}
-                                className="hidden"
-                                id="image-change"
-                            />
-                            <label
-                                htmlFor="image-change"
-                                className="block w-full cursor-pointer rounded-lg bg-purple-600 px-4 py-3 text-center font-medium text-white transition-colors hover:bg-purple-700"
-                            >
-                                🖼️ {t('เปลี่ยนรูปภาพ')}
-                            </label>
-                        </div>
                     </div>
 
                     <div className="relative flex h-full w-full flex-1 items-center justify-center overflow-hidden rounded-lg border border-gray-600 bg-gray-900">
@@ -1763,8 +1703,40 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                             onMouseDown={handleMouseDown}
                             onMouseMove={handleMouseMove}
                             onMouseUp={handleMouseUp}
-                            onWheel={handleWheel}
                             onContextMenu={handleRightClick}
+                            onTouchStart={(e) => {
+                                e.preventDefault();
+                                if (e.touches.length === 1) {
+                                    const touch = e.touches[0];
+                                    const syntheticEvent = {
+                                        clientX: touch.clientX,
+                                        clientY: touch.clientY,
+                                        button: 0,
+                                        preventDefault: () => {},
+                                    } as React.MouseEvent<HTMLDivElement>;
+                                    handleMouseDown(syntheticEvent);
+                                }
+                            }}
+                            onTouchMove={(e) => {
+                                e.preventDefault();
+                                if (e.touches.length === 1) {
+                                    const touch = e.touches[0];
+                                    const syntheticEvent = {
+                                        clientX: touch.clientX,
+                                        clientY: touch.clientY,
+                                        preventDefault: () => {},
+                                    } as React.MouseEvent<HTMLDivElement>;
+                                    handleMouseMove(syntheticEvent);
+                                }
+                            }}
+                            onTouchEnd={(e) => {
+                                e.preventDefault();
+                                handleMouseUp();
+                            }}
+                            onTouchCancel={(e) => {
+                                e.preventDefault();
+                                handleMouseUp();
+                            }}
                         >
                             <div
                                 className="absolute"
@@ -1773,24 +1745,32 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                     transformOrigin: '0 0',
                                 }}
                             >
-                                <img
-                                    src={imageData.url}
-                                    alt="House plan"
-                                    className="block"
-                                    style={{
-                                        width: imageData.width * zoom,
-                                        height: imageData.height * zoom,
-                                    }}
-                                    draggable={false}
-                                />
+                                {imageData && (
+                                    <>
+                                        <img
+                                            src={imageData.url}
+                                            alt="House plan"
+                                            className="block"
+                                            style={{
+                                                width: imageData.width * zoom,
+                                                height: imageData.height * zoom,
+                                                objectFit: 'contain',
+                                                aspectRatio: imageAspectRatio,
+                                            }}
+                                            draggable={false}
+                                            onMouseDown={handleImageDragStart}
+                                            onMouseMove={handleImageDragMove}
+                                            onMouseUp={handleImageDragEnd}
+                                            onMouseLeave={handleImageDragEnd}
+                                        />
 
-                                <svg
-                                    className="absolute inset-0"
-                                    width={imageData.width * zoom}
-                                    height={imageData.height * zoom}
-                                    viewBox={`0 0 ${imageData.width} ${imageData.height}`}
-                                    style={{ pointerEvents: 'none' }}
-                                >
+                                        <svg
+                                            className="absolute inset-0"
+                                            width={imageData.width * zoom}
+                                            height={imageData.height * zoom}
+                                            viewBox={`0 0 ${imageData.width} ${imageData.height}`}
+                                            style={{ pointerEvents: 'none' }}
+                                        >
                                     {measurementMode === 'line' && measurementLine.start && (
                                         <g>
                                             <circle
@@ -2187,7 +2167,13 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                     const zoneType = ZONE_TYPES.find(
                                                         (z) => z.id === zone.type
                                                     );
-                                                    const points = zone.canvasCoordinates
+                                                    // คำนวณตำแหน่งโซนที่ขยายหรือซูมตามรูปภาพ
+                                                    const scaledCoordinates =
+                                                        zone.canvasCoordinates.map((coord) => ({
+                                                            x: coord.x,
+                                                            y: coord.y,
+                                                        }));
+                                                    const points = scaledCoordinates
                                                         .map((c) => `${c.x},${c.y}`)
                                                         .join(' ');
 
@@ -2209,18 +2195,16 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                             />
                                                             <text
                                                                 x={
-                                                                    zone.canvasCoordinates.reduce(
+                                                                    scaledCoordinates.reduce(
                                                                         (sum, c) => sum + c.x,
                                                                         0
-                                                                    ) /
-                                                                    zone.canvasCoordinates.length
+                                                                    ) / scaledCoordinates.length
                                                                 }
                                                                 y={
-                                                                    zone.canvasCoordinates.reduce(
+                                                                    scaledCoordinates.reduce(
                                                                         (sum, c) => sum + c.y,
                                                                         0
-                                                                    ) /
-                                                                    zone.canvasCoordinates.length
+                                                                    ) / scaledCoordinates.length
                                                                 }
                                                                 textAnchor="middle"
                                                                 fill="white"
@@ -2236,19 +2220,17 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                             {/* Show area */}
                                                             <text
                                                                 x={
-                                                                    zone.canvasCoordinates.reduce(
+                                                                    scaledCoordinates.reduce(
                                                                         (sum, c) => sum + c.x,
                                                                         0
-                                                                    ) /
-                                                                    zone.canvasCoordinates.length
+                                                                    ) / scaledCoordinates.length
                                                                 }
                                                                 y={
-                                                                    zone.canvasCoordinates.reduce(
+                                                                    scaledCoordinates.reduce(
                                                                         (sum, c) => sum + c.y,
                                                                         0
                                                                     ) /
-                                                                        zone.canvasCoordinates
-                                                                            .length +
+                                                                        scaledCoordinates.length +
                                                                     15
                                                                 }
                                                                 textAnchor="middle"
@@ -2371,8 +2353,10 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                         </>
                                     )}
                                 </svg>
+                                </>
+                            )}
 
-                                {isScaleSet && (
+                            {isScaleSet && (
                                     <>
                                         {sprinklers.map((sprinkler) => {
                                             if (!sprinkler.canvasPosition) return null;
@@ -2422,15 +2406,17 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
 
                                         {waterSource?.canvasPosition && (
                                             <div
-                                                className="absolute flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-blue-600 shadow-lg"
+                                                className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-blue-600 shadow-lg"
                                                 style={{
                                                     left: waterSource.canvasPosition.x * zoom,
                                                     top: waterSource.canvasPosition.y * zoom,
+                                                    width: 24 * zoom,
+                                                    height: 24 * zoom,
                                                     cursor:
                                                         editMode === 'drag-sprinkler'
                                                             ? 'move'
                                                             : 'default',
-                                                    transform: `translate(-50%, -50%) scale(${zoom})`,
+                                                    transform: `translate(-50%, -50%)`,
                                                     filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.6))',
                                                     pointerEvents:
                                                         editMode === 'drag-sprinkler' ||
@@ -2438,11 +2424,17 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                         dimensionMode
                                                             ? 'auto'
                                                             : 'none',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
                                                 }}
                                             >
-                                                <span className="text-[14px] font-bold text-white">
-                                                    {waterSource.type === 'pump' ? '⚡' : '🚰'}
-                                                </span>
+                                                <img
+                                                    src="/images/water-pump.png"
+                                                    alt="Water Pump"
+                                                    className="object-contain"
+                                                    style={{ width: 20 * zoom, height: 20 * zoom }}
+                                                />
                                             </div>
                                         )}
                                     </>
@@ -2536,14 +2528,6 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                         {t('พิกเซล')}
                                     </span>
                                 </div>
-                                <div>
-                                    • {t('จุดเริ่มต้น:')} ({measurementLine.start?.x.toFixed(0)},{' '}
-                                    {measurementLine.start?.y.toFixed(0)})
-                                </div>
-                                <div>
-                                    • {t('จุดสิ้นสุด:')} ({measurementLine.end?.x.toFixed(0)},{' '}
-                                    {measurementLine.end?.y.toFixed(0)})
-                                </div>
                             </div>
                         </div>
 
@@ -2568,39 +2552,6 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                 💡 {t('ตัวอย่าง: ประตู = 0.8, รถยนต์ = 4.5, ห้อง = 3.0')}
                             </div>
                         </div>
-
-                        {realDistance &&
-                            !isNaN(parseFloat(realDistance)) &&
-                            parseFloat(realDistance) > 0 &&
-                            measurementLine.pixelDistance && (
-                                <div className="mb-4 rounded-lg bg-green-900/30 p-3">
-                                    <div className="mb-1 text-sm text-green-300">
-                                        🧮 {t('ผลการคำนวณ:')}
-                                    </div>
-                                    <div className="space-y-1 text-sm text-green-200">
-                                        <div>
-                                            • {t('มาตราส่วน:')}{' '}
-                                            <span className="font-bold">
-                                                {(
-                                                    measurementLine.pixelDistance /
-                                                    parseFloat(realDistance)
-                                                ).toFixed(2)}{' '}
-                                                {t('พิกเซล/เมตร')}
-                                            </span>
-                                        </div>
-                                        <div>
-                                            • {t('ความละเอียด:')}{' '}
-                                            <span className="font-bold">
-                                                {(
-                                                    (parseFloat(realDistance) * 100) /
-                                                    measurementLine.pixelDistance
-                                                ).toFixed(2)}{' '}
-                                                {t('ซม./พิกเซล')}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
 
                         <div className="flex gap-3">
                             <button
@@ -2629,6 +2580,77 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                     </div>
                 </div>
             )}
+
+            {/* UI Instructions */}
+            {editMode === 'drag-sprinkler' && (
+                <div className="absolute bottom-4 left-4 rounded-lg border border-orange-500 bg-gray-800/90 p-4 text-sm text-white backdrop-blur">
+                    <div className="mb-2 flex items-center gap-2">
+                        <span className="text-orange-400">↔️</span>
+                        <span className="font-semibold">{t('โหมดย้ายหัวฉีด')}</span>
+                    </div>
+                    <div>🖱️ {t('ลากหัวฉีดเพื่อย้ายตำแหน่ง')}</div>
+                    <div>🖱️ {t('คลิกขวาเพื่อลบหัวฉีด')}</div>
+                    <div className="text-xs text-gray-300">
+                        🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนภาพ')}
+                    </div>
+                </div>
+            )}
+
+            {editMode === 'place' && (
+                <div className="absolute bottom-4 left-4 rounded-lg border border-green-500 bg-gray-800/90 p-4 text-sm text-white backdrop-blur">
+                    <div className="mb-2 flex items-center gap-2">
+                        <span className="text-green-400">💧</span>
+                        <span className="font-semibold">{t('โหมดวางหัวฉีด')}</span>
+                    </div>
+                    <div>🎯 {t('คลิกเพื่อวางหัวฉีด')}</div>
+                    <div className="mt-1 text-xs text-gray-300">
+                        {t('รัศมี:')} {manualSprinklerRadius}
+                        {t('ม.')} • 🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} •{' '}
+                        {t('ลากเพื่อเลื่อนภาพ')}
+                    </div>
+                </div>
+            )}
+
+            {editMode === 'edit' && (
+                <div className="absolute bottom-4 left-4 rounded-lg border border-yellow-500 bg-gray-800/90 p-4 text-sm text-white backdrop-blur">
+                    <div className="mb-2 flex items-center gap-2">
+                        <img 
+                            src="/images/water-pump.png" 
+                            alt="Water Pump" 
+                            className="w-4 h-4 object-contain"
+                        />
+                        <span className="font-semibold">{t('โหมดจัดการแหล่งน้ำ')}</span>
+                    </div>
+                    <div>🎯 {t('คลิกเพื่อวางแหล่งน้ำ')}</div>
+                    <div>🖱️ {t('คลิกขวาบนแหล่งน้ำเพื่อลบ')}</div>
+                    <div className="text-xs text-gray-300">
+                        🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนภาพ')}
+                    </div>
+                </div>
+            )}
+
+            {(pipeEditMode === 'add' || pipeEditMode === 'remove') && (
+                <div className="absolute bottom-12 left-4 rounded-lg border border-purple-500 bg-gray-800/90 p-4 text-sm text-white backdrop-blur">
+                    <div className="mb-2 flex items-center gap-2">
+                        <span className="text-purple-400">🔧</span>
+                        <span className="font-semibold">
+                            {pipeEditMode === 'add'
+                                ? t('เพิ่มท่อ')
+                                : t('ลบท่อ')}
+                        </span>
+                    </div>
+                    <div>
+                        {pipeEditMode === 'add'
+                            ? `🎯 ${t('เลือกหัวฉีด 2 ตัวเพื่อเชื่อมต่อ')} (${selectedSprinklersForPipe.length}/2)`
+                            : `🎯 ${t('เลือกหัวฉีด 2 ตัวเพื่อลบท่อ')} (${selectedSprinklersForPipe.length}/2)`}
+                    </div>
+                    <div className="text-xs text-gray-300">
+                        🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนภาพ')}
+                    </div>
+                </div>
+            )}
+
+            
         </div>
     );
 };

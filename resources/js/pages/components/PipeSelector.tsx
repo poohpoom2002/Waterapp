@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { CalculationResults, PipeType, IrrigationInput, AnalyzedPipe } from '../types/interfaces';
 import { calculatePipeRolls } from '../utils/calculations';
 import { useLanguage } from '@/contexts/LanguageContext';
+import SearchableDropdown from './SearchableDropdown';
 
 interface PipeSelectorProps {
     pipeType: PipeType;
@@ -153,34 +154,32 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
             </h3>
 
             <div className="mb-4">
-                
-                <select
+                <SearchableDropdown
                     value={currentPipe?.id || ''}
-                    onChange={(e) => {
+                    onChange={(value) => {
                         const selected = config.analyzedPipes.find(
-                            (p) => p.id === parseInt(e.target.value)
+                            (p) => p.id === parseInt(value.toString())
                         );
                         onPipeChange(selected || null);
                     }}
-                    className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
-                >
-                    <option value="">-- {t('ใช้การเลือกอัตโนมัติ')} --</option>
-                    {sortedPipes.map((pipe) => {
-                        const group = getPipeGrouping(pipe);
-                        const isAuto = pipe.id === config.autoSelectedPipe?.id;
-                        const rolls = calculateCurrentPipeRolls(pipe);
-                        const currentHeadLossPer100m = getHeadLossPer100m(pipe);
-                        return (
-                            <option key={pipe.id} value={pipe.id}>
-                                {isAuto ? '🤖 ' : ''}
-                                {pipe.name || pipe.productCode} - {pipe.sizeMM}mm -{' '}
-                                {pipe.price?.toLocaleString()} {t('บาท/ม้วน')} ({rolls} {t('ม้วน')}) | {group} |
-                                {t('คะแนน:')} {pipe.score} | {t('Loss:')} {currentHeadLossPer100m.toFixed(1)}
-                                m/100m
-                            </option>
-                        );
-                    })}
-                </select>
+                    options={[
+                        { value: '', label: `-- ${t('ใช้การเลือกอัตโนมัติ')} --` },
+                        ...sortedPipes.map((pipe) => {
+                            const group = getPipeGrouping(pipe);
+                            const isAuto = pipe.id === config.autoSelectedPipe?.id;
+                            const rolls = calculateCurrentPipeRolls(pipe);
+                            const currentHeadLossPer100m = getHeadLossPer100m(pipe);
+                            return {
+                                value: pipe.id,
+                                label: `${isAuto ? '🤖 ' : ''}${pipe.name || pipe.productCode} - ${pipe.sizeMM}mm - ${pipe.price?.toLocaleString()} ${t('บาท/ม้วน')}`,
+                                searchableText: `${pipe.productCode || ''} ${pipe.name || ''} ${pipe.brand || ''} ${pipe.sizeMM}mm ${pipe.pipeType || ''} ${group}`
+                            };
+                        })
+                    ]}
+                    placeholder={`-- ${t('ใช้การเลือกอัตโนมัติ')} --`}
+                    searchPlaceholder={t('พิมพ์เพื่อค้นหาท่อ (ชื่อ, รหัสสินค้า, ขนาด)...')}
+                    className="w-full"
+                />
             </div>
 
             {currentPipe ? (
@@ -227,7 +226,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
 
                         <div className="col-span-4">
                             <p>
-                                <strong>{t('รหัสสินค้า:')}</strong>{' '}
+                                <strong>{t('รหัส:')}</strong>{' '}
                                 {currentPipe?.productCode || currentPipe?.product_code}
                             </p>
                             <p>
