@@ -117,7 +117,13 @@ const CanvasRenderer: React.FC<{
         const isImageMode = gardenData.designMode === 'image';
         const imgW = gardenData.imageData?.width;
         const imgH = gardenData.imageData?.height;
-        if (isImageMode && typeof imgW === 'number' && typeof imgH === 'number' && imgW > 0 && imgH > 0) {
+        if (
+            isImageMode &&
+            typeof imgW === 'number' &&
+            typeof imgH === 'number' &&
+            imgW > 0 &&
+            imgH > 0
+        ) {
             return {
                 minX: 0,
                 maxX: imgW,
@@ -256,8 +262,6 @@ const CanvasRenderer: React.FC<{
         setIsDragging(false);
         setLastMousePos(null);
     }, []);
-
-
 
     const resetView = useCallback(() => {
         setViewport({ zoom: 1, panX: 0, panY: 0 });
@@ -504,9 +508,7 @@ const CanvasRenderer: React.FC<{
                                 scale
                             );
 
-                            const radiusPixels =
-                                (sprinkler.type.radius * scale * transform.scale) /
-                                baseTransform.scale;
+                            const radiusPixels = sprinkler.type.radius * scale * transform.scale;
 
                             if (clipResult === 'FULL_CIRCLE') {
                                 ctx.fillStyle = sprinkler.type.color + '33';
@@ -569,8 +571,7 @@ const CanvasRenderer: React.FC<{
                             // Don't show fallback circle to ensure strict zone boundaries
                         }
                     } else if (sprinkler.zoneId === 'virtual_zone') {
-                        const radiusPixels =
-                            (sprinkler.type.radius * scale * transform.scale) / baseTransform.scale;
+                        const radiusPixels = sprinkler.type.radius * scale * transform.scale;
 
                         ctx.fillStyle = sprinkler.type.color + '26';
                         ctx.strokeStyle = sprinkler.type.color + '80';

@@ -376,9 +376,29 @@ const DrawingManager: React.FC<{
                 drawingControl: editMode === 'draw',
                 drawingControlOptions: {
                     position: google.maps.ControlPosition.TOP_CENTER,
-                    drawingModes: [google.maps.drawing.OverlayType.POLYGON],
+                    drawingModes: [
+                        google.maps.drawing.OverlayType.POLYGON,
+                        google.maps.drawing.OverlayType.RECTANGLE,
+                        google.maps.drawing.OverlayType.CIRCLE,
+                    ],
                 },
                 polygonOptions: {
+                    fillColor: zoneType?.color || '#666666',
+                    fillOpacity: 0.3,
+                    strokeWeight: 2,
+                    editable: true,
+                    draggable: true,
+                    strokeColor: zoneType?.color || '#666666',
+                },
+                rectangleOptions: {
+                    fillColor: zoneType?.color || '#666666',
+                    fillOpacity: 0.3,
+                    strokeWeight: 2,
+                    editable: true,
+                    draggable: true,
+                    strokeColor: zoneType?.color || '#666666',
+                },
+                circleOptions: {
                     fillColor: zoneType?.color || '#666666',
                     fillOpacity: 0.3,
                     strokeWeight: 2,
@@ -390,6 +410,41 @@ const DrawingManager: React.FC<{
 
             drawingManager.setMap(map);
             drawingManagerRef.current = drawingManager;
+
+            // Helper function to convert rectangle to polygon coordinates
+            const rectangleToPolygon = (rectangle: google.maps.Rectangle): Coordinate[] => {
+                const bounds = rectangle.getBounds();
+                if (!bounds) return [];
+                
+                const ne = bounds.getNorthEast();
+                const sw = bounds.getSouthWest();
+                
+                return [
+                    { lat: ne.lat(), lng: sw.lng() }, // top-left
+                    { lat: ne.lat(), lng: ne.lng() }, // top-right
+                    { lat: sw.lat(), lng: ne.lng() }, // bottom-right
+                    { lat: sw.lat(), lng: sw.lng() }, // bottom-left
+                ];
+            };
+
+            // Helper function to convert circle to polygon coordinates
+            const circleToPolygon = (circle: google.maps.Circle): Coordinate[] => {
+                const center = circle.getCenter();
+                const radius = circle.getRadius();
+                if (!center || !radius) return [];
+                
+                const coordinates: Coordinate[] = [];
+                const numPoints = 32; // Number of points to approximate circle
+                
+                for (let i = 0; i < numPoints; i++) {
+                    const angle = (i * 2 * Math.PI) / numPoints;
+                    const lat = center.lat() + (radius / 111000) * Math.cos(angle);
+                    const lng = center.lng() + (radius / (111000 * Math.cos((center.lat() * Math.PI) / 180))) * Math.sin(angle);
+                    coordinates.push({ lat, lng });
+                }
+                
+                return coordinates;
+            };
 
             const polygonCompleteListener = drawingManager.addListener(
                 'polygoncomplete',
@@ -406,7 +461,33 @@ const DrawingManager: React.FC<{
                         onZoneCreated(coordinates);
                         polygon.setMap(null);
                     } catch (error) {
-                        console.error('Error creating zone:', error);
+                        console.error('Error creating zone from polygon:', error);
+                    }
+                }
+            );
+
+            const rectangleCompleteListener = drawingManager.addListener(
+                'rectanglecomplete',
+                (rectangle: google.maps.Rectangle) => {
+                    try {
+                        const coordinates = rectangleToPolygon(rectangle);
+                        onZoneCreated(coordinates);
+                        rectangle.setMap(null);
+                    } catch (error) {
+                        console.error('Error creating zone from rectangle:', error);
+                    }
+                }
+            );
+
+            const circleCompleteListener = drawingManager.addListener(
+                'circlecomplete',
+                (circle: google.maps.Circle) => {
+                    try {
+                        const coordinates = circleToPolygon(circle);
+                        onZoneCreated(coordinates);
+                        circle.setMap(null);
+                    } catch (error) {
+                        console.error('Error creating zone from circle:', error);
                     }
                 }
             );
@@ -427,6 +508,8 @@ const DrawingManager: React.FC<{
                     drawingManagerRef.current.setMap(null);
                 }
                 google.maps.event.removeListener(polygonCompleteListener);
+                google.maps.event.removeListener(rectangleCompleteListener);
+                google.maps.event.removeListener(circleCompleteListener);
                 google.maps.event.removeListener(clickListener);
             };
         } catch (error) {

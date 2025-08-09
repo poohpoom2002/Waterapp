@@ -269,9 +269,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
   
     // Super User Routes
     Route::prefix('super')->name('super.')->group(function () {
-        // Route::get('/dashboard', function () {
-        //     return Inertia::render('SuperUserDashboard');
-        // })->name('dashboard');
+        Route::get('/dashboard', function () {
+            return Inertia::render('SuperUserDashboard');
+        })->name('dashboard');
         Route::get('/users', [SuperUserController::class, 'getUsers'])->name('users');
         Route::post('/users', [SuperUserController::class, 'createUser'])->name('create-user');
         Route::put('/users/{userId}', [SuperUserController::class, 'updateUser'])->name('update-user');

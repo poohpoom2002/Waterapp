@@ -426,9 +426,9 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
         (coordinates: CanvasCoordinate[]) => {
             const area = calculatePolygonArea(coordinates, currentScale);
 
-            if (area > 300) {
+            if (area > 1200) {
                 alert(
-                    `❌ ${t('ขนาดพื้นที่เกินกำหนด!')}\n\n${t('ขนาดที่วาด:')} ${formatArea(area)}\n${t('ขนาดสูงสุดที่อนุญาต:')} 300 ${t('ตร.ม.')}\n\n${t('กรุณาวาดพื้นที่ให้มีขนาดเล็กลง')}`
+                    `❌ ${t('ขนาดพื้นที่เกินกำหนด!')}\n\n${t('ขนาดที่วาด:')} ${formatArea(area)}\n${t('ขนาดสูงสุดที่อนุญาต:')} 1200 ${t('ตร.ม.')}\n\n${t('กรุณาวาดพื้นที่ให้มีขนาดเล็กลง')}`
                 );
                 return;
             }

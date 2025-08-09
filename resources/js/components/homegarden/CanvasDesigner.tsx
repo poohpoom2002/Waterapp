@@ -507,9 +507,9 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             const scale = enhancedMode ? enhancedScale : canvasData.scale;
             const area = calculatePolygonArea(coordinates, scale);
 
-            if (area > 300) {
+            if (area > 1200) {
                 alert(
-                    `❌ ขนาดพื้นที่เกินกำหนด!\n\nขนาดที่วาด: ${formatArea(area)}\nขนาดสูงสุดที่อนุญาต: 300 ตร.ม.\n\nกรุณาวาดพื้นที่ให้มีขนาดเล็กลง`
+                    `❌ ขนาดพื้นที่เกินกำหนด!\n\nขนาดที่วาด: ${formatArea(area)}\nขนาดสูงสุดที่อนุญาต: 1200 ตร.ม.\n\nกรุณาวาดพื้นที่ให้มีขนาดเล็กลง`
                 );
                 return;
             }
@@ -1123,7 +1123,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
 
             ctx.restore();
         },
-        [waterSource, worldToScreen, viewport]
+        [waterSource, worldToScreen, viewport.zoom, imgPump]
     );
 
     const drawPipes = useCallback(
