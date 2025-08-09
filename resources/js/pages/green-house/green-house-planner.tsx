@@ -1251,12 +1251,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
         };
     }, [isMouseOverCanvas, zoom, pan]);
 
-    const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
-        if (isMouseOverCanvas) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    };
+
 
     const handleMouseEnter = () => {
         setIsMouseOverCanvas(true);
@@ -1625,9 +1620,47 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                             onMouseMove={handleMouseMove}
                             onMouseEnter={handleMouseEnter}
                             onMouseLeave={handleMouseLeave}
-                            onWheel={handleWheel}
                             onDoubleClick={finishDrawing}
                             onContextMenu={(e) => e.preventDefault()}
+                            onTouchStart={(e) => {
+                                e.preventDefault();
+                                if (e.touches.length === 1) {
+                                    const touch = e.touches[0];
+                                    const syntheticEvent = {
+                                        clientX: touch.clientX,
+                                        clientY: touch.clientY,
+                                        button: 0,
+                                        preventDefault: () => {},
+                                    } as React.MouseEvent<HTMLCanvasElement>;
+                                    handleMouseDown(syntheticEvent);
+                                }
+                            }}
+                            onTouchMove={(e) => {
+                                e.preventDefault();
+                                if (e.touches.length === 1) {
+                                    const touch = e.touches[0];
+                                    const syntheticEvent = {
+                                        clientX: touch.clientX,
+                                        clientY: touch.clientY,
+                                        preventDefault: () => {},
+                                    } as React.MouseEvent<HTMLCanvasElement>;
+                                    handleMouseMove(syntheticEvent);
+                                }
+                            }}
+                            onTouchEnd={(e) => {
+                                e.preventDefault();
+                                const syntheticEvent = {
+                                    preventDefault: () => {},
+                                } as React.MouseEvent<HTMLCanvasElement>;
+                                handleMouseUp(syntheticEvent);
+                            }}
+                            onTouchCancel={(e) => {
+                                e.preventDefault();
+                                const syntheticEvent = {
+                                    preventDefault: () => {},
+                                } as React.MouseEvent<HTMLCanvasElement>;
+                                handleMouseUp(syntheticEvent);
+                            }}
                             className="block select-none bg-gray-900"
                             style={{
                                 width: '100%',

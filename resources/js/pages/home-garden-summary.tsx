@@ -113,6 +113,24 @@ const CanvasRenderer: React.FC<{
     }, []);
 
     const canvasBounds = useMemo(() => {
+        // For Image mode, base the bounds on the full image dimensions to show the entire plan
+        const isImageMode = gardenData.designMode === 'image';
+        const imgW = gardenData.imageData?.width;
+        const imgH = gardenData.imageData?.height;
+        if (isImageMode && typeof imgW === 'number' && typeof imgH === 'number' && imgW > 0 && imgH > 0) {
+            return {
+                minX: 0,
+                maxX: imgW,
+                minY: 0,
+                maxY: imgH,
+                width: imgW,
+                height: imgH,
+                centerX: imgW / 2,
+                centerY: imgH / 2,
+            };
+        }
+
+        // Default (Canvas mode): use drawn zone extents
         const zonePoints: CanvasCoordinate[] = [];
 
         gardenData.gardenZones?.forEach((zone) => {
@@ -239,19 +257,7 @@ const CanvasRenderer: React.FC<{
         setLastMousePos(null);
     }, []);
 
-    const handleWheel = useCallback(
-        (e: React.WheelEvent<HTMLCanvasElement>) => {
-            e.preventDefault();
-            const rect = activeCanvasRef.current?.getBoundingClientRect();
-            if (!rect) return;
 
-            const centerX = e.clientX - rect.left;
-            const centerY = e.clientY - rect.top;
-
-            handleZoom(-e.deltaY, centerX, centerY);
-        },
-        [handleZoom, activeCanvasRef]
-    );
 
     const resetView = useCallback(() => {
         setViewport({ zoom: 1, panX: 0, panY: 0 });
@@ -388,6 +394,8 @@ const CanvasRenderer: React.FC<{
         },
         [dimensionLines, transformPoint, transform, baseTransform]
     );
+    const imgPump = new Image();
+    imgPump.src = '/images/water-pump.png';
 
     const drawElements = useCallback(
         (ctx: CanvasRenderingContext2D, scale: number) => {
@@ -470,7 +478,7 @@ const CanvasRenderer: React.FC<{
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
                     ctx.strokeStyle = '#8B5CF6';
-                    ctx.lineWidth = 3 * Math.max(0.5, transform.scale / baseTransform.scale);
+                    ctx.lineWidth = 8 * Math.max(0.5, transform.scale / baseTransform.scale);
 
                     ctx.beginPath();
                     ctx.moveTo(startPoint.x, startPoint.y);
@@ -538,24 +546,6 @@ const CanvasRenderer: React.FC<{
                                 );
                                 ctx.fill();
                                 ctx.restore();
-
-                                ctx.strokeStyle = sprinkler.type.color + '66';
-                                ctx.lineWidth =
-                                    1 * Math.max(0.5, transform.scale / baseTransform.scale);
-                                ctx.setLineDash([
-                                    3 * Math.max(0.5, transform.scale / baseTransform.scale),
-                                    3 * Math.max(0.5, transform.scale / baseTransform.scale),
-                                ]);
-                                ctx.beginPath();
-                                ctx.arc(
-                                    sprinklerPoint.x,
-                                    sprinklerPoint.y,
-                                    radiusPixels,
-                                    0,
-                                    Math.PI * 2
-                                );
-                                ctx.stroke();
-                                ctx.setLineDash([]);
                             } else if (Array.isArray(clipResult) && clipResult.length >= 3) {
                                 const canvasResult = clipResult as CanvasCoordinate[];
                                 ctx.fillStyle = sprinkler.type.color + '33';
@@ -573,26 +563,10 @@ const CanvasRenderer: React.FC<{
                                 ctx.fill();
                                 ctx.stroke();
                             }
+                            // If no coverage, don't show anything to ensure strict zone boundaries
                         } catch (error) {
                             console.error('Error drawing sprinkler radius:', error);
-
-                            const radiusPixels =
-                                (sprinkler.type.radius * scale * transform.scale) /
-                                baseTransform.scale;
-                            ctx.fillStyle = sprinkler.type.color + '26';
-                            ctx.strokeStyle = sprinkler.type.color + '80';
-                            ctx.lineWidth =
-                                1 * Math.max(0.5, transform.scale / baseTransform.scale);
-                            ctx.beginPath();
-                            ctx.arc(
-                                sprinklerPoint.x,
-                                sprinklerPoint.y,
-                                radiusPixels,
-                                0,
-                                Math.PI * 2
-                            );
-                            ctx.fill();
-                            ctx.stroke();
+                            // Don't show fallback circle to ensure strict zone boundaries
                         }
                     } else if (sprinkler.zoneId === 'virtual_zone') {
                         const radiusPixels =
@@ -646,12 +620,6 @@ const CanvasRenderer: React.FC<{
 
                     ctx.save();
 
-                    ctx.shadowColor = 'rgba(0,0,0,0.6)';
-                    ctx.shadowBlur = 8 * Math.max(0.5, transform.scale / baseTransform.scale);
-                    ctx.shadowOffsetX = 2 * Math.max(0.5, transform.scale / baseTransform.scale);
-                    ctx.shadowOffsetY = 2 * Math.max(0.5, transform.scale / baseTransform.scale);
-
-                    ctx.fillStyle = gardenData.waterSource.type === 'pump' ? '#EF4444' : '#3B82F6';
                     ctx.beginPath();
                     ctx.arc(
                         waterSourcePoint.x,
@@ -664,14 +632,22 @@ const CanvasRenderer: React.FC<{
 
                     ctx.shadowColor = 'transparent';
                     ctx.fillStyle = '#fff';
-                    ctx.font = `bold ${10 * Math.max(0.8, transform.scale / baseTransform.scale)}px Arial`;
+                    ctx.font = `bold ${24 * Math.max(0.8, transform.scale / baseTransform.scale)}px Arial`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(
-                        gardenData.waterSource.type === 'pump' ? '⚡' : '🚰',
-                        waterSourcePoint.x,
-                        waterSourcePoint.y
-                    );
+                    if (gardenData.waterSource.type === 'pump') {
+                        ctx.fillText('⚡', waterSourcePoint.x, waterSourcePoint.y);
+                    } else {
+                        // วาดรูปภาพปั๊มน้ำ
+                        const pumpSize = 24 * Math.max(0.8, transform.scale / baseTransform.scale);
+                        ctx.drawImage(
+                            imgPump,
+                            waterSourcePoint.x - pumpSize / 2,
+                            waterSourcePoint.y - pumpSize / 2,
+                            pumpSize,
+                            pumpSize
+                        );
+                    }
 
                     ctx.restore();
                 }
@@ -798,6 +774,29 @@ const CanvasRenderer: React.FC<{
         };
     }, [isDragging, lastMousePos, setViewport, setLastMousePos]);
 
+    // Add wheel event listener with passive: false to allow preventDefault
+    useEffect(() => {
+        const canvas = activeCanvasRef.current;
+        if (!canvas) return;
+
+        const wheelHandler = (e: WheelEvent) => {
+            e.preventDefault();
+            const rect = activeCanvasRef.current?.getBoundingClientRect();
+            if (!rect) return;
+
+            const centerX = e.clientX - rect.left;
+            const centerY = e.clientY - rect.top;
+
+            handleZoom(-e.deltaY, centerX, centerY);
+        };
+
+        canvas.addEventListener('wheel', wheelHandler, { passive: false });
+
+        return () => {
+            canvas.removeEventListener('wheel', wheelHandler);
+        };
+    }, [handleZoom]);
+
     return (
         <div
             ref={containerRef}
@@ -830,7 +829,39 @@ const CanvasRenderer: React.FC<{
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
-                onWheel={handleWheel}
+                onTouchStart={(e) => {
+                    e.preventDefault();
+                    if (e.touches.length === 1) {
+                        const touch = e.touches[0];
+                        const syntheticEvent = {
+                            clientX: touch.clientX,
+                            clientY: touch.clientY,
+                            button: 0,
+                            preventDefault: () => {},
+                        } as React.MouseEvent<HTMLCanvasElement>;
+                        handleMouseDown(syntheticEvent);
+                    }
+                }}
+                onTouchMove={(e) => {
+                    e.preventDefault();
+                    if (e.touches.length === 1) {
+                        const touch = e.touches[0];
+                        const syntheticEvent = {
+                            clientX: touch.clientX,
+                            clientY: touch.clientY,
+                            preventDefault: () => {},
+                        } as React.MouseEvent<HTMLCanvasElement>;
+                        handleMouseMove(syntheticEvent);
+                    }
+                }}
+                onTouchEnd={(e) => {
+                    e.preventDefault();
+                    handleMouseUp();
+                }}
+                onTouchCancel={(e) => {
+                    e.preventDefault();
+                    handleMouseUp();
+                }}
             />
         </div>
     );

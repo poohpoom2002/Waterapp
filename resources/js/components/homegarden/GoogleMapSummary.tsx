@@ -257,45 +257,87 @@ const ClippedSprinklerCoverage: React.FC<{
                 });
                 overlayRef.current.push(circle);
             } else if (result === 'MASKED_CIRCLE') {
-                const intersectionPolygon = createCircleZoneIntersection(
-                    center,
-                    radius,
-                    zoneCoordinates
-                );
+                // Create a more precise clipped circle using intersection points
+                const intersectionPoints: Coordinate[] = [];
+                const numCirclePoints = 128; // Increased precision
 
-                if (intersectionPolygon.length >= 3) {
-                    const polygon = new google.maps.Polygon({
-                        paths: intersectionPolygon.map((p) => ({ lat: p.lat, lng: p.lng })),
-                        fillColor: color,
-                        fillOpacity: 0.2,
-                        strokeColor: color,
-                        strokeOpacity: 0.6,
-                        strokeWeight: 2,
-                        map: map,
-                    });
-                    overlayRef.current.push(polygon);
+                // Add circle points that are inside the zone
+                for (let i = 0; i < numCirclePoints; i++) {
+                    const angle = (i * 2 * Math.PI) / numCirclePoints;
+                    const lat = center.lat + (radius / 111000) * Math.cos(angle);
+                    const lng =
+                        center.lng +
+                        (radius / (111000 * Math.cos((center.lat * Math.PI) / 180))) *
+                            Math.sin(angle);
+                    const circlePoint = { lat, lng };
 
-                    const zoneBoundary = new google.maps.Polygon({
-                        paths: zoneCoordinates.map((p) => ({ lat: p.lat, lng: p.lng })),
-                        fillOpacity: 0,
-                        strokeColor: color,
-                        strokeOpacity: 0.4,
-                        strokeWeight: 1,
-                        map: map,
-                    });
-                    overlayRef.current.push(zoneBoundary);
+                    if (isPointInPolygon(circlePoint, zoneCoordinates)) {
+                        intersectionPoints.push(circlePoint);
+                    }
+                }
+
+                // Add zone vertices that are within the circle radius
+                zoneCoordinates.forEach((vertex) => {
+                    const distance = Math.sqrt(
+                        Math.pow((vertex.lat - center.lat) * 111000, 2) +
+                            Math.pow(
+                                (vertex.lng - center.lng) *
+                                    111000 *
+                                    Math.cos((center.lat * Math.PI) / 180),
+                                2
+                            )
+                    );
+                    if (distance <= radius) {
+                        intersectionPoints.push(vertex);
+                    }
+                });
+
+                // Find intersection points between circle and zone boundaries
+                for (let i = 0; i < zoneCoordinates.length; i++) {
+                    const edgeStart = zoneCoordinates[i];
+                    const edgeEnd = zoneCoordinates[(i + 1) % zoneCoordinates.length];
+                    
+                    // Calculate intersection points between circle and line segment
+                    const intersections = getCircleLineIntersectionsGPS(center, radius, edgeStart, edgeEnd);
+                    intersectionPoints.push(...intersections);
+                }
+
+                if (intersectionPoints.length >= 3) {
+                    // Remove duplicate points
+                    const uniquePoints = removeDuplicatePointsGPS(intersectionPoints);
+                    
+                    if (uniquePoints.length >= 3) {
+                        // Sort points clockwise around the center
+                        const centroidLat =
+                            uniquePoints.reduce((sum, p) => sum + p.lat, 0) /
+                            uniquePoints.length;
+                        const centroidLng =
+                            uniquePoints.reduce((sum, p) => sum + p.lng, 0) /
+                            uniquePoints.length;
+
+                        uniquePoints.sort((a, b) => {
+                            const angleA = Math.atan2(a.lat - centroidLat, a.lng - centroidLng);
+                            const angleB = Math.atan2(b.lat - centroidLat, b.lng - centroidLng);
+                            return angleA - angleB;
+                        });
+
+                        const polygon = new google.maps.Polygon({
+                            paths: uniquePoints.map((p) => ({ lat: p.lat, lng: p.lng })),
+                            fillColor: color,
+                            fillOpacity: 0.2,
+                            strokeColor: color,
+                            strokeOpacity: 0.6,
+                            strokeWeight: 2,
+                            map: map,
+                        });
+                        overlayRef.current.push(polygon);
+                    } else {
+                        // No valid polygon, don't show anything
+                        return;
+                    }
                 } else {
-                    const circle = new google.maps.Circle({
-                        center: { lat: center.lat, lng: center.lng },
-                        radius: radius,
-                        fillColor: color,
-                        fillOpacity: 0.15,
-                        strokeColor: color,
-                        strokeOpacity: 0.5,
-                        strokeWeight: 1,
-                        map: map,
-                    });
-                    overlayRef.current.push(circle);
+                    // No intersection points, don't show anything
+                    return;
                 }
             } else if (Array.isArray(result) && result.length >= 3) {
                 const coordinates = result as Coordinate[];
@@ -310,36 +352,12 @@ const ClippedSprinklerCoverage: React.FC<{
                 });
                 overlayRef.current.push(polygon);
             } else {
-                const circle = new google.maps.Circle({
-                    center: { lat: center.lat, lng: center.lng },
-                    radius: radius,
-                    fillColor: color,
-                    fillOpacity: 0.1,
-                    strokeColor: color,
-                    strokeOpacity: 0.5,
-                    strokeWeight: 1,
-                    map: map,
-                });
-                overlayRef.current.push(circle);
+                // No coverage, don't show anything
+                return;
             }
         } catch (error) {
             console.error(`Error creating clipped sprinkler coverage for ${sprinklerId}:`, error);
-
-            try {
-                const circle = new google.maps.Circle({
-                    center: { lat: center.lat, lng: center.lng },
-                    radius: radius,
-                    fillColor: color,
-                    fillOpacity: 0.15,
-                    strokeColor: color,
-                    strokeOpacity: 0.5,
-                    strokeWeight: 1,
-                    map: map,
-                });
-                overlayRef.current.push(circle);
-            } catch (fallbackError) {
-                console.error('Error creating fallback circle:', fallbackError);
-            }
+            // Don't show fallback circle to ensure strict zone boundaries
         }
 
         return () => {
@@ -359,55 +377,80 @@ const ClippedSprinklerCoverage: React.FC<{
     return null;
 };
 
-const createCircleZoneIntersection = (
+// Helper function to find intersection points between circle and line segment in GPS coordinates
+function getCircleLineIntersectionsGPS(
     center: Coordinate,
     radius: number,
-    zoneCoordinates: Coordinate[]
-): Coordinate[] => {
-    const intersectionPoints: Coordinate[] = [];
-    const numCirclePoints = 64;
+    lineStart: Coordinate,
+    lineEnd: Coordinate
+): Coordinate[] {
+    const centerLat = (center.lat * Math.PI) / 180;
+    const metersPerDegreeLat =
+        111132.92 - 559.82 * Math.cos(2 * centerLat) + 1.175 * Math.cos(4 * centerLat);
+    const metersPerDegreeLng = 111412.84 * Math.cos(centerLat) - 93.5 * Math.cos(3 * centerLat);
 
-    for (let i = 0; i < numCirclePoints; i++) {
-        const angle = (i * 2 * Math.PI) / numCirclePoints;
-        const lat = center.lat + (radius / 111000) * Math.cos(angle);
-        const lng =
-            center.lng +
-            (radius / (111000 * Math.cos((center.lat * Math.PI) / 180))) * Math.sin(angle);
-        const circlePoint = { lat, lng };
+    const radiusInDegreesLat = radius / metersPerDegreeLat;
+    const radiusInDegreesLng = radius / metersPerDegreeLng;
 
-        if (isPointInPolygon(circlePoint, zoneCoordinates)) {
-            intersectionPoints.push(circlePoint);
-        }
+    const dx = lineEnd.lng - lineStart.lng;
+    const dy = lineEnd.lat - lineStart.lat;
+    const fx = lineStart.lng - center.lng;
+    const fy = lineStart.lat - center.lat;
+
+    // Use average radius for calculations
+    const avgRadius = (radiusInDegreesLat + radiusInDegreesLng) / 2;
+
+    const a = dx * dx + dy * dy;
+    const b = 2 * (fx * dx + fy * dy);
+    const c = fx * fx + fy * fy - avgRadius * avgRadius;
+
+    const discriminant = b * b - 4 * a * c;
+
+    if (discriminant < 0) {
+        return [];
     }
 
-    zoneCoordinates.forEach((vertex) => {
-        const distance = Math.sqrt(
-            Math.pow((vertex.lat - center.lat) * 111000, 2) +
-                Math.pow(
-                    (vertex.lng - center.lng) * 111000 * Math.cos((center.lat * Math.PI) / 180),
-                    2
-                )
-        );
-        if (distance <= radius) {
-            intersectionPoints.push(vertex);
-        }
-    });
+    const discriminantSqrt = Math.sqrt(discriminant);
+    const t1 = (-b - discriminantSqrt) / (2 * a);
+    const t2 = (-b + discriminantSqrt) / (2 * a);
 
-    if (intersectionPoints.length >= 3) {
-        const centroidLat =
-            intersectionPoints.reduce((sum, p) => sum + p.lat, 0) / intersectionPoints.length;
-        const centroidLng =
-            intersectionPoints.reduce((sum, p) => sum + p.lng, 0) / intersectionPoints.length;
+    const intersections: Coordinate[] = [];
 
-        intersectionPoints.sort((a, b) => {
-            const angleA = Math.atan2(a.lat - centroidLat, a.lng - centroidLng);
-            const angleB = Math.atan2(b.lat - centroidLat, b.lng - centroidLng);
-            return angleA - angleB;
+    if (t1 >= 0 && t1 <= 1) {
+        intersections.push({
+            lat: lineStart.lat + t1 * dy,
+            lng: lineStart.lng + t1 * dx,
         });
     }
 
-    return intersectionPoints;
-};
+    if (t2 >= 0 && t2 <= 1 && Math.abs(t2 - t1) > 0.0001) {
+        intersections.push({
+            lat: lineStart.lat + t2 * dy,
+            lng: lineStart.lng + t2 * dx,
+        });
+    }
+
+    return intersections;
+}
+
+// Helper function to remove duplicate points in GPS coordinates
+function removeDuplicatePointsGPS(points: Coordinate[]): Coordinate[] {
+    const uniquePoints: Coordinate[] = [];
+    const tolerance = 0.000001; // About 1 meter in degrees
+
+    for (const point of points) {
+        const isDuplicate = uniquePoints.some(
+            (existing) =>
+                Math.abs(existing.lat - point.lat) < tolerance &&
+                Math.abs(existing.lng - point.lng) < tolerance
+        );
+        if (!isDuplicate) {
+            uniquePoints.push(point);
+        }
+    }
+
+    return uniquePoints;
+}
 
 const isPointInPolygon = (point: Coordinate, polygon: Coordinate[]): boolean => {
     let inside = false;
@@ -461,15 +504,11 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
         []
     );
 
-    const createWaterSourceIcon = useCallback((type: 'main' | 'pump'): google.maps.Symbol => {
-        const color = type === 'pump' ? '#EF4444' : '#3B82F6';
+    const createWaterSourceIcon = useCallback((type: 'main' | 'pump'): google.maps.Icon => {
         return {
-            path: google.maps.SymbolPath.CIRCLE,
-            fillColor: color,
-            fillOpacity: 1,
-            strokeColor: '#FFFFFF',
-            strokeWeight: 3,
-            scale: 6,
+            url: '/images/water-pump.png',
+            scaledSize: new google.maps.Size(26, 26),
+            anchor: new google.maps.Point(13, 13),
         };
     }, []);
 

@@ -693,7 +693,12 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                     <div className="rounded-lg border border-white bg-purple-500/10 p-3">
                         <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-purple-300">
-                                🚰 {t('Step 3: Pipe System')}
+                                <img 
+                                    src="/images/water-pump.png" 
+                                    alt="Water Pump" 
+                                    className="inline w-4 h-4 object-contain mr-1"
+                                />
+                                {t('Step 3: Pipe System')}
                             </span>
                             <span className="text-xs">{pipes.length > 0 ? '✅' : '⏳'}</span>
                         </div>
