@@ -347,9 +347,9 @@ const CategoryCard = ({
         >
             <div className="mb-4 flex items-center">
                 <div className="mr-4 text-4xl">{category.icon}</div>
-                <div>
-                    <h3 className="text-xl font-bold text-white">{category.name}</h3>
-                    <p className="text-sm text-white/80">{category.description}</p>
+                <div className="flex-1 min-w-0">
+                    <h3 className="text-xl font-bold text-white break-words">{category.name}</h3>
+                    <p className="text-sm text-white/80 break-words">{category.description}</p>
                 </div>
             </div>
 

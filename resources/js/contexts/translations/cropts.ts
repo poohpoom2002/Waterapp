@@ -52,6 +52,10 @@ export const cropTranslations = {
             name: 'Sugarcane',
             description: 'The main crop for the sugar and ethanol industries.'
         },
+        pineapple: {
+            name: 'Pineapple',
+            description: 'A tropical fruit crop with high economic value, suitable for both fresh consumption and processing.'
+        },
         rubber: {
             name: 'Rubber',
             description: 'A long-term economic crop. Tapping can begin about 7 years after planting.'
@@ -110,6 +114,10 @@ export const cropTranslations = {
         sugarcane: {
             name: 'อ้อย',
             description: 'พืชหลักของอุตสาหกรรมน้ำตาลและเอทานอล'
+        },
+        pineapple: {
+            name: 'สับปะรด',
+            description: 'พืชผลที่มีคุณค่าทางเศรษฐกิจสูง เหมาะสำหรับการบริโภคตรงและการประกอบอาหาร'
         },
         rubber: {
             name: 'ยางพารา',

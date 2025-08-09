@@ -28,6 +28,7 @@ export const homepageTranslations = {
         environmental_monitoring: 'Environmental monitoring',
         large_scale_planning: 'Large-scale field planning',
         crop_rotation: 'Crop rotation support',
+        efficient_irrigation: 'Efficient irrigation systems',
         efficient_distribution: 'Efficient water distribution',
         weather_integration: 'Weather integration',
         yield_optimization: 'Yield optimization',
@@ -301,6 +302,10 @@ export const homepageTranslations = {
         add_field: 'Add Field',
         create_folder: 'Create Folder',
         manage_irrigation_fields: 'Manage Irrigation Fields',
+        
+        // Address translations
+        '15-23 ซ.พระยามนธาตุฯ แยก10 ถ.บางขุนเทียน แขวงคลองบางบอน เขตบางบอน กรุงเทพมหานคร 10150': '15-23 Phraya Manthat Alley 10, Bang Khun Thian Road, Khlong Bang Bon Subdistrict, Bang Bon District, Bangkok 10150',
+        '71/6 หมู่ 1 ตำบลคอกกระบือ อำเภอเมืองสมุทรสาคร จ.สมุทรสาคร 74000': '71/6 Moo 1, Khok Krabue Subdistrict, Mueang Samut Sakhon District, Samut Sakhon Province 74000',
     },
     th: {
         // Home page
@@ -308,6 +313,10 @@ export const homepageTranslations = {
         create_folder: 'สร้างโฟลเดอร์',
         manage_irrigation_fields: 'จัดการแปลงเกษตรและเครือข่ายท่อน้ำ',
         add_field: 'เพิ่มแปลง',
+        
+        // Address translations
+        '15-23 ซ.พระยามนธาตุฯ แยก10 ถ.บางขุนเทียน แขวงคลองบางบอน เขตบางบอน กรุงเทพมหานคร 10150': '15-23 ซ.พระยามนธาตุฯ แยก10 ถ.บางขุนเทียน แขวงคลองบางบอน เขตบางบอน กรุงเทพมหานคร 10150',
+        '71/6 หมู่ 1 ตำบลคอกกระบือ อำเภอเมืองสมุทรสาคร จ.สมุทรสาคร 74000': '71/6 หมู่ 1 ตำบลคอกกระบือ อำเภอเมืองสมุทรสาคร จ.สมุทรสาคร 74000',
         no_fields_yet: 'ยังไม่มีแปลง',
         start_first_field: 'เริ่มต้นด้วยการสร้างแปลงชลประทานแรกของคุณ',
         create_first_field: 'สร้างแปลงแรกของคุณ',
@@ -366,6 +375,7 @@ export const homepageTranslations = {
         environmental_monitoring: 'การติดตามสิ่งแวดล้อม',
         large_scale_planning: 'การวางแผนแปลงขนาดใหญ่',
         crop_rotation: 'การหมุนเวียนพืช',
+        efficient_irrigation: 'ระบบชลประทานที่มีประสิทธิภาพ',
         efficient_distribution: 'การกระจายน้ำที่มีประสิทธิภาพ',
         weather_integration: 'การรวมสภาพอากาศ',
         yield_optimization: 'การปรับแต่งผลผลิต',

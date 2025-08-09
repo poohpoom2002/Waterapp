@@ -382,6 +382,20 @@ export const fieldCropTranslations = {
         'Updated row spacing for {cropName}: {value}cm': 'Updated row spacing for {cropName}: {value}cm',
         'Updated plant spacing for {cropName}: {value}cm': 'Updated plant spacing for {cropName}: {value}cm',
         'Reset spacing to defaults for {count} crops': 'Reset spacing to defaults for {count} crops',
+
+        // เพิ่มใน translation files
+        "Pipe Connections": "Pipe Connections",
+        "Click another junction to connect, or draw a new pipe": "Click another junction to connect, or draw a new pipe",
+        "Click a junction point to start connecting pipes": "Click a junction point to start connecting pipes",
+        "Connecting from": "Connecting from",
+        "Cancel Connection": "Cancel Connection",
+        "Main pipe junctions": "Main pipe junctions",
+        "Submain pipe junctions": "Submain pipe junctions",
+        "Clear All Junctions": "Clear All Junctions",
+        "Connection Mode Active": "Connection Mode Active",
+        "From": "From",
+        "Connection Mode: Click another junction or draw a new pipe": "Connection Mode: Click another junction or draw a new pipe",
+        "Error connecting pipes": "Error connecting pipes"
     },
     th: {
         // Common
@@ -763,5 +777,19 @@ export const fieldCropTranslations = {
         'Updated row spacing for {cropName}: {value}cm': 'อัปเดตระยะห่างแถวสำหรับ {cropName}: {value} ซม.',
         'Updated plant spacing for {cropName}: {value}cm': 'อัปเดตระยะห่างต้นสำหรับ {cropName}: {value} ซม.',
         'Reset spacing to defaults for {count} crops': 'รีเซ็ตระยะห่างเป็นค่าเริ่มต้นสำหรับ {count} พืช',
+
+        // เพิ่มใน translation files
+        "Pipe Connections": "การเชื่อมต่อท่อ",
+        "Click another junction to connect, or draw a new pipe": "คลิกจุดเชื่อมอื่นเพื่อเชื่อมต่อ หรือวาดท่อใหม่",
+        "Click a junction point to start connecting pipes": "คลิกที่จุดเชื่อมเพื่อเริ่มเชื่อมต่อท่อ",
+        "Connecting from": "เชื่อมต่อจาก",
+        "Cancel Connection": "ยกเลิกการเชื่อมต่อ",
+        "Main pipe junctions": "จุดเชื่อมท่อหลัก",
+        "Submain pipe junctions": "จุดเชื่อมท่อย่อย",
+        "Clear All Junctions": "ลบจุดเชื่อมทั้งหมด",
+        "Connection Mode Active": "โหมดการเชื่อมต่อเปิดอยู่",
+        "From": "จาก",
+        "Connection Mode: Click another junction or draw a new pipe": "โหมดเชื่อมต่อ: คลิกจุดเชื่อมอื่นหรือวาดท่อใหม่",
+        "Error connecting pipes": "เกิดข้อผิดพลาดในการเชื่อมต่อท่อ"
     },
 };
