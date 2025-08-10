@@ -1009,7 +1009,7 @@ class EquipmentController extends Controller
                 'success' => true,
                 'message' => 'Image uploaded successfully',
                 'url' => $url,
-                'path' => $path,
+                'path' => $url,
                 'filename' => $filename,
                 'full_path' => $fullPath,
                 'file_exists' => file_exists($fullPath)
