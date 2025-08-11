@@ -984,6 +984,9 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                         }
                     });
 
+                    // Disabled: Main pipe drawing - redundant with auto-generated pipes
+                    // This prevents overlapping lines that confuse users
+                    /*
                     if (props.mainPipeDrawing.length > 0) {
                         try {
                             const polyline = new google.maps.Polyline({
@@ -1021,32 +1024,43 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                             console.error('Error rendering main pipe:', error);
                         }
                     }
+                    */
 
-                    props.pipes
+                    // Sort pipes to render selected pipes with higher z-index (on top)
+                    const sortedPipes = props.pipes
                         ?.filter((p) => p.type === 'pipe')
-                        .forEach((pipe) => {
-                            try {
-                                const isSelected = props.selectedPipes.has(pipe.id);
-                                const polyline = new google.maps.Polyline({
-                                    path: [
-                                        { lat: pipe.start.lat, lng: pipe.start.lng },
-                                        { lat: pipe.end.lat, lng: pipe.end.lng },
-                                    ],
-                                    strokeColor: isSelected ? '#FBBF24' : '#8B5CF6',
-                                    strokeWeight: isSelected ? 8 : 6,
-                                    strokeOpacity: 0.9,
-                                    map: props.map,
-                                    clickable: true,
-                                });
-
-                                polyline.addListener('click', () => {
-                                    props.onPipeClick(pipe.id);
-                                });
-                                overlaysRef.current.set(`pipe-${pipe.id}`, polyline);
-                            } catch (error) {
-                                console.error(`Error rendering pipe ${pipe.id}:`, error);
-                            }
+                        .sort((a, b) => {
+                            const aSelected = props.selectedPipes.has(a.id);
+                            const bSelected = props.selectedPipes.has(b.id);
+                            if (aSelected && !bSelected) return 1; // Draw selected pipes last
+                            if (!aSelected && bSelected) return -1; // Draw non-selected pipes first
+                            return 0; // Keep original order for pipes with same selection state
                         });
+
+                    sortedPipes?.forEach((pipe, index) => {
+                        try {
+                            const isSelected = props.selectedPipes.has(pipe.id);
+                            const polyline = new google.maps.Polyline({
+                                path: [
+                                    { lat: pipe.start.lat, lng: pipe.start.lng },
+                                    { lat: pipe.end.lat, lng: pipe.end.lng },
+                                ],
+                                strokeColor: isSelected ? '#FBBF24' : '#8B5CF6',
+                                strokeWeight: isSelected ? 8 : 6,
+                                strokeOpacity: 0.9,
+                                map: props.map,
+                                clickable: true,
+                                zIndex: isSelected ? 1000 + index : 100 + index, // Higher z-index for selected pipes
+                            });
+
+                            polyline.addListener('click', () => {
+                                props.onPipeClick(pipe.id);
+                            });
+                            overlaysRef.current.set(`pipe-${pipe.id}`, polyline);
+                        } catch (error) {
+                            console.error(`Error rendering pipe ${pipe.id}:`, error);
+                        }
+                    });
 
                     props.sprinklers?.forEach((sprinkler) => {
                         if (!sprinkler.position) return;

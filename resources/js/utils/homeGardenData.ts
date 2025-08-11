@@ -831,6 +831,7 @@ export function generateSmartPipeNetwork(options: SmartPipeNetworkOptions): Pipe
         // Fallback: if no pipes produced (e.g., no valid zones in map mode),
         // connect each sprinkler to the water source with a simple L-shaped path
         if (!pipes || pipes.length === 0) {
+
             const sourcePos = isCanvasMode
                 ? (waterSource.canvasPosition || waterSource.position)
                 : waterSource.position;
@@ -846,7 +847,7 @@ export function generateSmartPipeNetwork(options: SmartPipeNetworkOptions): Pipe
                 for (let i = 0; i < path.length - 1; i++) {
                     fallback.push(
                         createUniformPipe(
-                            `simple_${sprinkler.id}_${sIdx}_${i}`,
+                            `fallback_${sprinkler.id}_${sIdx}_${i}`,
                             path[i],
                             path[i + 1],
                             isCanvasMode,
@@ -859,10 +860,18 @@ export function generateSmartPipeNetwork(options: SmartPipeNetworkOptions): Pipe
                 }
             });
             pipes = fallback;
+        } else {
+            console.log(`Generated ${pipes.length} pipes using zone-based algorithm`);
         }
 
         // Remove duplicate pipes to prevent redundant connections
+        const originalPipeCount = pipes.length;
         pipes = removeDuplicatePipes(pipes, isCanvasMode ? 2.0 : 0.00002);
+        const finalPipeCount = pipes.length;
+        
+        if (originalPipeCount !== finalPipeCount) {
+            console.log(`Removed ${originalPipeCount - finalPipeCount} duplicate pipes. Final count: ${finalPipeCount}`);
+        }
 
         return pipes;
     } catch (error) {
@@ -1284,16 +1293,19 @@ export function calculateStatistics(data: GardenPlannerData): GardenStatistics {
             return sum;
         }, 0);
 
-    // Recompute total length from pipes that are actually connected to the current water source
-    const connected = computeConnectedPipeLengths({
-        pipes,
-        sprinklers,
-        waterSource: data.waterSource,
-        isCanvasMode,
-        scale,
-    });
-    const totalPipeLength = connected.total;
-    // Compute longest path from water source to any sprinkler following the pipe network
+    // คำนวณความยาวท่อรวมจากท่อทั้งหมด (ไม่ใช่เฉพาะท่อที่เชื่อมต่อ)
+    const totalPipeLength = pipes.reduce((sum, pipe) => {
+        const length = typeof pipe.length === 'number' && !isNaN(pipe.length)
+            ? Math.max(0, pipe.length)
+            : (pipe.canvasStart && pipe.canvasEnd && isCanvasMode)
+                ? calculateDistance(pipe.canvasStart, pipe.canvasEnd, scale)
+                : (pipe.start && pipe.end)
+                    ? calculateDistance(pipe.start, pipe.end)
+                    : 0;
+        return sum + length;
+    }, 0);
+
+    // คำนวณความยาวท่อที่ยาวที่สุดจากแหล่งน้ำไปหาหัวฉีด
     const longestPathFromSource = computeLongestPathFromSource({
         pipes,
         sprinklers,
@@ -1310,9 +1322,21 @@ export function calculateStatistics(data: GardenPlannerData): GardenStatistics {
                 : 0;
 
         const zoneSprinklers = sprinklers.filter((s) => s.zoneId === zone.id);
-        // Zone pipe length: only count connected pipes in that zone
-        const zonePipeLength = connected.byZone.get(zone.id) || 0;
-        // Longest path from pump to any sprinkler in this zone (following the pipe network)
+        
+        // คำนวณความยาวท่อในโซนนี้จากท่อทั้งหมด
+        const zonePipes = pipes.filter((p) => p.zoneId === zone.id);
+        const zonePipeLength = zonePipes.reduce((sum, pipe) => {
+            const length = typeof pipe.length === 'number' && !isNaN(pipe.length)
+                ? Math.max(0, pipe.length)
+                : (pipe.canvasStart && pipe.canvasEnd && isCanvasMode)
+                    ? calculateDistance(pipe.canvasStart, pipe.canvasEnd, scale)
+                    : (pipe.start && pipe.end)
+                        ? calculateDistance(pipe.start, pipe.end)
+                        : 0;
+            return sum + length;
+        }, 0);
+
+        // คำนวณความยาวท่อที่ยาวที่สุดจากแหล่งน้ำไปหาหัวฉีดในโซนนี้
         const zoneLongestPipe = computeLongestPathFromSource({
             pipes,
             sprinklers: zoneSprinklers,
@@ -1366,7 +1390,7 @@ interface PathComputeOptions {
  * Compute the longest shortest-path distance (meters) from the water source to any sprinkler,
  * following only existing pipes as edges. If no connected path exists, returns 0.
  */
-function computeLongestPathFromSource(options: PathComputeOptions): number {
+export function computeLongestPathFromSource(options: PathComputeOptions): number {
     const { pipes, sprinklers, waterSource, isCanvasMode } = options;
     const scale = options.scale;
     if (!waterSource || pipes.length === 0 || sprinklers.length === 0) return 0;
@@ -3024,7 +3048,7 @@ function sortSprinklersForConnection(
     });
 }
 
-// Helper function to prevent duplicate pipe connections
+// Enhanced function to prevent duplicate pipe connections with better overlap detection
 function removeDuplicatePipes(pipes: Pipe[], tolerance: number = 1.0): Pipe[] {
     const uniquePipes: Pipe[] = [];
     const processedConnections = new Set<string>();
@@ -3036,15 +3060,27 @@ function removeDuplicatePipes(pipes: Pipe[], tolerance: number = 1.0): Pipe[] {
         
         if (!start || !end) return;
         
+        // Use smaller tolerance for better precision in canvas mode
+        const actualTolerance = tolerance < 1.0 ? 0.00001 : 0.5;
+        
         // Round coordinates to avoid minor floating point differences
-        const startKey = `${Math.round(getCoordValue(start, 'x') / tolerance)}:${Math.round(getCoordValue(start, 'y') / tolerance)}`;
-        const endKey = `${Math.round(getCoordValue(end, 'x') / tolerance)}:${Math.round(getCoordValue(end, 'y') / tolerance)}`;
+        const startKey = `${Math.round(getCoordValue(start, 'x') / actualTolerance)}:${Math.round(getCoordValue(start, 'y') / actualTolerance)}`;
+        const endKey = `${Math.round(getCoordValue(end, 'x') / actualTolerance)}:${Math.round(getCoordValue(end, 'y') / actualTolerance)}`;
         
         // Create bidirectional connection signature
         const connection1 = `${startKey}-${endKey}`;
         const connection2 = `${endKey}-${startKey}`;
         
-        if (!processedConnections.has(connection1) && !processedConnections.has(connection2)) {
+        // Check for overlapping pipes with similar paths
+        let isOverlapping = false;
+        for (const existingPipe of uniquePipes) {
+            if (isPipeOverlapping(pipe, existingPipe, actualTolerance)) {
+                isOverlapping = true;
+                break;
+            }
+        }
+        
+        if (!processedConnections.has(connection1) && !processedConnections.has(connection2) && !isOverlapping) {
             uniquePipes.push(pipe);
             processedConnections.add(connection1);
             processedConnections.add(connection2);
@@ -3052,6 +3088,89 @@ function removeDuplicatePipes(pipes: Pipe[], tolerance: number = 1.0): Pipe[] {
     });
     
     return uniquePipes;
+}
+
+// Check if two pipes are overlapping (same path or one is contained within the other)
+function isPipeOverlapping(pipe1: Pipe, pipe2: Pipe, tolerance: number): boolean {
+    const start1 = pipe1.canvasStart || pipe1.start;
+    const end1 = pipe1.canvasEnd || pipe1.end;
+    const start2 = pipe2.canvasStart || pipe2.start;
+    const end2 = pipe2.canvasEnd || pipe2.end;
+    
+    if (!start1 || !end1 || !start2 || !end2) return false;
+    
+    // Check if pipes have the same start and end points (allowing for reverse direction)
+    const sameDirection = (
+        Math.abs(getCoordValue(start1, 'x') - getCoordValue(start2, 'x')) < tolerance &&
+        Math.abs(getCoordValue(start1, 'y') - getCoordValue(start2, 'y')) < tolerance &&
+        Math.abs(getCoordValue(end1, 'x') - getCoordValue(end2, 'x')) < tolerance &&
+        Math.abs(getCoordValue(end1, 'y') - getCoordValue(end2, 'y')) < tolerance
+    );
+    
+    const reverseDirection = (
+        Math.abs(getCoordValue(start1, 'x') - getCoordValue(end2, 'x')) < tolerance &&
+        Math.abs(getCoordValue(start1, 'y') - getCoordValue(end2, 'y')) < tolerance &&
+        Math.abs(getCoordValue(end1, 'x') - getCoordValue(start2, 'x')) < tolerance &&
+        Math.abs(getCoordValue(end1, 'y') - getCoordValue(start2, 'y')) < tolerance
+    );
+    
+    // Check if one pipe is a subset of another (start and end of pipe1 lie on pipe2)
+    const pipe1OnPipe2 = (
+        isPointOnLineSegment(start1, start2, end2, tolerance) &&
+        isPointOnLineSegment(end1, start2, end2, tolerance)
+    );
+    
+    const pipe2OnPipe1 = (
+        isPointOnLineSegment(start2, start1, end1, tolerance) &&
+        isPointOnLineSegment(end2, start1, end1, tolerance)
+    );
+    
+
+    
+    return sameDirection || reverseDirection || pipe1OnPipe2 || pipe2OnPipe1;
+}
+
+// Check if a point lies on a line segment within tolerance
+function isPointOnLineSegment(
+    point: Coordinate | CanvasCoordinate,
+    lineStart: Coordinate | CanvasCoordinate,
+    lineEnd: Coordinate | CanvasCoordinate,
+    tolerance: number
+): boolean {
+    const px = getCoordValue(point, 'x');
+    const py = getCoordValue(point, 'y');
+    const x1 = getCoordValue(lineStart, 'x');
+    const y1 = getCoordValue(lineStart, 'y');
+    const x2 = getCoordValue(lineEnd, 'x');
+    const y2 = getCoordValue(lineEnd, 'y');
+    
+    // Calculate distance from point to line
+    const A = px - x1;
+    const B = py - y1;
+    const C = x2 - x1;
+    const D = y2 - y1;
+    
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+    
+    if (lenSq === 0) {
+        // Line is a point
+        return Math.sqrt(A * A + B * B) < tolerance;
+    }
+    
+    const param = dot / lenSq;
+    
+    // Check if point is within the line segment
+    if (param < 0 || param > 1) return false;
+    
+    // Calculate closest point on line
+    const xx = x1 + param * C;
+    const yy = y1 + param * D;
+    
+    // Check distance
+    const dx = px - xx;
+    const dy = py - yy;
+    return Math.sqrt(dx * dx + dy * dy) < tolerance;
 }
 
 // Simplified zone network to reduce redundancy
@@ -3912,4 +4031,87 @@ function findRequiredBoundaryPoints(
     }
     
     return boundaryPoints;
+}
+
+/**
+ * คำนวณสถิติท่อแบบ real-time
+ */
+export function calculatePipeStatistics(
+    pipes: Pipe[],
+    sprinklers: Sprinkler[],
+    waterSource: WaterSource | null,
+    isCanvasMode: boolean,
+    scale: number
+): {
+    totalLength: number;
+    longestPath: number;
+    pipeCount: number;
+    zoneStats: Map<string, { length: number; longestPath: number; count: number }>;
+} {
+    // คำนวณความยาวท่อรวม
+    const totalLength = pipes.reduce((sum, pipe) => {
+        const length = typeof pipe.length === 'number' && !isNaN(pipe.length)
+            ? Math.max(0, pipe.length)
+            : (pipe.canvasStart && pipe.canvasEnd && isCanvasMode)
+                ? calculateDistance(pipe.canvasStart, pipe.canvasEnd, scale)
+                : (pipe.start && pipe.end)
+                    ? calculateDistance(pipe.start, pipe.end)
+                    : 0;
+        return sum + length;
+    }, 0);
+
+    // คำนวณความยาวท่อที่ยาวที่สุดจากแหล่งน้ำไปหาหัวฉีด
+    const longestPath = computeLongestPathFromSource({
+        pipes,
+        sprinklers,
+        waterSource,
+        isCanvasMode,
+        scale,
+    });
+
+    // คำนวณสถิติตามโซน
+    const zoneStats = new Map<string, { length: number; longestPath: number; count: number }>();
+    
+    // จัดกลุ่มท่อตามโซน
+    pipes.forEach(pipe => {
+        const zoneId = pipe.zoneId || 'unknown';
+        const length = typeof pipe.length === 'number' && !isNaN(pipe.length)
+            ? Math.max(0, pipe.length)
+            : (pipe.canvasStart && pipe.canvasEnd && isCanvasMode)
+                ? calculateDistance(pipe.canvasStart, pipe.canvasEnd, scale)
+                : (pipe.start && pipe.end)
+                    ? calculateDistance(pipe.start, pipe.end)
+                    : 0;
+
+        if (!zoneStats.has(zoneId)) {
+            zoneStats.set(zoneId, { length: 0, longestPath: 0, count: 0 });
+        }
+        
+        const stats = zoneStats.get(zoneId)!;
+        stats.length += length;
+        stats.count += 1;
+    });
+
+    // คำนวณความยาวท่อที่ยาวที่สุดในแต่ละโซน
+    zoneStats.forEach((stats, zoneId) => {
+        const zoneSprinklers = sprinklers.filter(s => s.zoneId === zoneId);
+        const zonePipes = pipes.filter(p => p.zoneId === zoneId);
+        
+        if (zoneSprinklers.length > 0 && zonePipes.length > 0) {
+            stats.longestPath = computeLongestPathFromSource({
+                pipes: zonePipes,
+                sprinklers: zoneSprinklers,
+                waterSource,
+                isCanvasMode,
+                scale,
+            });
+        }
+    });
+
+    return {
+        totalLength,
+        longestPath,
+        pipeCount: pipes.length,
+        zoneStats,
+    };
 }

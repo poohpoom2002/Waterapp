@@ -18,6 +18,7 @@ import {
     formatDistance,
     clipCircleToPolygon,
     canvasToGPS,
+    calculatePipeStatistics,
 } from '../../utils/homeGardenData';
 import { useLanguage } from '../../contexts/LanguageContext';
 interface ZoneDrawingTool {
@@ -1103,8 +1104,11 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         [selectedSprinkler, selectedSprinklersForPipe, hoveredItem, worldToScreen, viewport]
     );
 
-    const imgPump = new Image();
-    imgPump.src = '/images/water-pump.png';
+    const imgPump = useMemo(() => {
+        const img = new Image();
+        img.src = '/images/water-pump.png';
+        return img;
+    }, []);
 
     const drawWaterSource = useCallback(
         (ctx: CanvasRenderingContext2D) => {
@@ -1130,7 +1134,16 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         (ctx: CanvasRenderingContext2D) => {
             ctx.save();
 
-            for (const pipe of pipes) {
+            // Sort pipes to draw selected pipes last (on top)
+            const sortedPipes = [...pipes].sort((a, b) => {
+                const aSelected = selectedPipes.has(a.id);
+                const bSelected = selectedPipes.has(b.id);
+                if (aSelected && !bSelected) return 1; // Draw selected pipes last
+                if (!aSelected && bSelected) return -1; // Draw non-selected pipes first
+                return 0; // Keep original order for pipes with same selection state
+            });
+
+            for (const pipe of sortedPipes) {
                 if (!pipe.canvasStart || !pipe.canvasEnd) continue;
 
                 const startScreen = worldToScreen(pipe.canvasStart);
@@ -1145,6 +1158,15 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 ctx.moveTo(startScreen.x, startScreen.y);
                 ctx.lineTo(endScreen.x, endScreen.y);
                 ctx.stroke();
+
+                // Add subtle glow effect for selected pipes
+                if (isSelected) {
+                    ctx.shadowColor = '#FBBF24';
+                    ctx.shadowBlur = 4 / viewport.zoom;
+                    ctx.stroke();
+                    ctx.shadowColor = 'transparent';
+                    ctx.shadowBlur = 0;
+                }
             }
 
             ctx.restore();
