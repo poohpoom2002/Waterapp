@@ -263,6 +263,7 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                     fillOpacity: 0.3,
                     strokeColor: '#22C55E',
                     strokeWeight: 2,
+                    strokeOpacity: 1,
                     clickable: false,
                     editable: false,
                     zIndex: 1,
@@ -631,6 +632,13 @@ const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                     </div>
                 )}
 
+                {/* Step 4: Irrigation */}
+                {drawingStage === 'irrigation' && (
+                    <div className="flex flex-col space-y-1">
+                        <div className="text-xs font-semibold text-white">{t('Step 4: Irrigation')}</div>
+                    </div>
+                )}
+
                 {/* Equipment Placement Mode */}
                 {isPlacingEquipment && selectedEquipmentType && (
                     <div className="flex flex-col space-y-1">
@@ -694,6 +702,182 @@ const calculatePipeLength = (coordinates: Coordinate[]): number => {
         console.error('Error calculating pipe length:', error);
         return 0;
     }
+};
+
+// Helper removed (inline conversion used in closestPoint/segmentIntersection)
+
+// Distance helper removed (use closestPointOnSegmentLatLng for distance too)
+
+// (removed) minDistancePointToPolylineMeters — replaced by closestPointOnPolylineLatLng
+
+// Closest point on a segment to a point, returns lat/lng and distance
+const closestPointOnSegmentLatLng = (
+    p: Coordinate,
+    a: Coordinate,
+    b: Coordinate
+): { point: Coordinate; distance: number } => {
+    const origin = a; // local origin
+    const lat0 = (origin.lat * Math.PI) / 180;
+    const metersPerDegLat = 111320;
+    const metersPerDegLng = 111320 * Math.cos(lat0);
+
+    const toMeters = (pt: Coordinate) => ({
+        x: (pt.lng - origin.lng) * metersPerDegLng,
+        y: (pt.lat - origin.lat) * metersPerDegLat,
+    });
+
+    const P = toMeters(p);
+    const A = { x: 0, y: 0 };
+    const B = toMeters(b);
+    const APx = P.x - A.x;
+    const APy = P.y - A.y;
+    const ABx = B.x - A.x;
+    const ABy = B.y - A.y;
+    const ab2 = ABx * ABx + ABy * ABy;
+    const dot = APx * ABx + APy * ABy;
+    const t = ab2 === 0 ? 0 : Math.max(0, Math.min(1, dot / ab2));
+    const closestX = A.x + ABx * t;
+    const closestY = A.y + ABy * t;
+    const dx = P.x - closestX;
+    const dy = P.y - closestY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const point: Coordinate = {
+        lat: origin.lat + closestY / metersPerDegLat,
+        lng: origin.lng + closestX / metersPerDegLng,
+    };
+    return { point, distance };
+};
+
+// Closest point on a polyline to a point
+const closestPointOnPolylineLatLng = (
+    p: Coordinate,
+    polyline: Coordinate[]
+): { point: Coordinate; distance: number } | null => {
+    if (!polyline || polyline.length < 2) return null;
+    let best: { point: Coordinate; distance: number } | null = null;
+    for (let i = 1; i < polyline.length; i++) {
+        const res = closestPointOnSegmentLatLng(p, polyline[i - 1], polyline[i]);
+        if (!best || res.distance < best.distance) best = res;
+    }
+    return best;
+};
+
+// Segment intersection in lat/lng using local planar approximation; returns intersection point if segments intersect
+const segmentIntersectionLatLng = (
+    a: Coordinate,
+    b: Coordinate,
+    c: Coordinate,
+    d: Coordinate
+): Coordinate | null => {
+    const origin = a;
+    const lat0 = (origin.lat * Math.PI) / 180;
+    const metersPerDegLat = 111320;
+    const metersPerDegLng = 111320 * Math.cos(lat0);
+
+    const toMeters = (pt: Coordinate) => ({
+        x: (pt.lng - origin.lng) * metersPerDegLng,
+        y: (pt.lat - origin.lat) * metersPerDegLat,
+    });
+
+    const A = { x: 0, y: 0 };
+    const B = toMeters(b);
+    const C = toMeters(c);
+    const D = toMeters(d);
+
+    const denom = (A.x - B.x) * (C.y - D.y) - (A.y - B.y) * (C.x - D.x);
+    if (denom === 0) return null;
+
+    const t = ((A.x - C.x) * (C.y - D.y) - (A.y - C.y) * (C.x - D.x)) / denom;
+    const u = -((A.x - B.x) * (A.y - C.y) - (A.y - B.y) * (A.x - C.x)) / denom;
+
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+        const x = A.x + t * (B.x - A.x);
+        const y = A.y + t * (B.y - A.y);
+        return {
+            lat: origin.lat + y / metersPerDegLat,
+            lng: origin.lng + x / metersPerDegLng,
+        };
+    }
+    return null;
+};
+
+// Find true intersection between current pipe segments and any compatible target polyline
+// Returns intersection point, the current segment index (i) where (coords[i-1], coords[i]) intersects,
+// and the target pipe id + target segment index (j) where (t[j-1], t[j]) intersects
+const findIntersectionWithCompatiblePipes = (
+    currentType: 'main' | 'submain',
+    coords: Coordinate[],
+    allPipes: any[]
+): { point: Coordinate; segmentIndex: number; targetPipeId: any; targetSegmentIndex: number } | null => {
+    const targets = allPipes.filter((p) =>
+        (currentType === 'main' && p.type === 'submain') || (currentType === 'submain' && p.type === 'main')
+    );
+    if (coords.length < 2 || targets.length === 0) return null;
+    for (let i = 1; i < coords.length; i++) {
+        const a = coords[i - 1];
+        const b = coords[i];
+        for (const t of targets) {
+            const tCoords = t.coordinates || [];
+            for (let j = 1; j < tCoords.length; j++) {
+                const c = tCoords[j - 1];
+                const d = tCoords[j];
+                const inter = segmentIntersectionLatLng(a, b, c, d);
+                if (inter) return { point: inter, segmentIndex: i, targetPipeId: t.id, targetSegmentIndex: j };
+            }
+        }
+    }
+    return null;
+};
+
+
+// (removed) snapLastEndpointToNearestCompatiblePoint — replaced by moving target pipe endpoints toward newly drawn polyline
+
+// Move endpoints of compatible target pipes toward the given polyline if they are within threshold
+// Intended for: when drawing a submain, adjust main's start/end to the submain instead of moving the submain
+const moveCompatiblePipeEndpointsTowardPolyline = (
+    currentType: 'main' | 'submain',
+    coords: Coordinate[],
+    allPipes: any[],
+    thresholdMeters: number
+): any[] => {
+    if (!coords || coords.length < 2) return allPipes;
+    const targets = allPipes.filter(
+        (p) => p && p.coordinates && p.coordinates.length >= 2 && ((currentType === 'main' && p.type === 'submain') || (currentType === 'submain' && p.type === 'main'))
+    );
+    if (targets.length === 0) return allPipes;
+
+    const updated = allPipes.map((p) => {
+        if (!targets.includes(p)) return p;
+        const tCoords: Coordinate[] = [...p.coordinates];
+        let changed = false;
+
+        // Start endpoint
+        const startClosest = closestPointOnPolylineLatLng(tCoords[0], coords);
+        if (startClosest && startClosest.distance <= thresholdMeters) {
+            tCoords[0] = startClosest.point;
+            changed = true;
+        }
+        // End endpoint
+        const endClosest = closestPointOnPolylineLatLng(tCoords[tCoords.length - 1], coords);
+        if (endClosest && endClosest.distance <= thresholdMeters) {
+            tCoords[tCoords.length - 1] = endClosest.point;
+            changed = true;
+        }
+
+        if (changed) {
+            try {
+                if (p.polyline && typeof p.polyline.setPath === 'function') {
+                    p.polyline.setPath(tCoords as any);
+                }
+            } catch (e) {
+                console.warn('Failed to update target pipe polyline when moving endpoints toward polyline', e);
+            }
+            return { ...p, coordinates: tCoords };
+        }
+        return p;
+    });
+
+    return updated;
 };
 
 const interpolatePositionAlongPipe = (
@@ -760,6 +944,60 @@ const isPointInPolygon = (point: Coordinate, polygon: Coordinate[]): boolean => 
 
 export default function FieldMap({ crops, irrigation }: FieldMapProps) {
     const { t, language } = useLanguage();
+
+    // Irrigation overlay pooling and virtualization helpers
+    const irrigationMarkerPoolRef = useRef<google.maps.Marker[]>([]);
+    const irrigationCirclePoolRef = useRef<google.maps.Circle[]>([]);
+    // NOTE: kept for future throttled redraws; intentionally unused to avoid reflow cost
+    // const irrigationRenderRaf = useRef<number | null>(null);
+
+    const IRRIGATION_LOD = useRef({ markerMinZoom: 14, circleMinZoom: 16 });
+
+    const rentIrrigationMarker = useCallback((): google.maps.Marker => {
+        const pooled = irrigationMarkerPoolRef.current.pop();
+        if (pooled) return pooled;
+        return new google.maps.Marker({
+            clickable: false,
+            optimized: true,
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 4,
+                fillColor: '#0099ff',
+                fillOpacity: 1,
+                strokeColor: 'white',
+                strokeWeight: 1,
+            },
+        });
+    }, []);
+
+    const returnIrrigationMarker = useCallback((marker: google.maps.Marker) => {
+        try { marker.setMap(null); } catch (err) {
+            console.warn('Marker cleanup failed', err);
+        }
+        irrigationMarkerPoolRef.current.push(marker);
+    }, []);
+
+    const rentIrrigationCircle = useCallback((): google.maps.Circle => {
+        const pooled = irrigationCirclePoolRef.current.pop();
+        if (pooled) return pooled;
+        return new google.maps.Circle({
+            fillColor: '#0099ff',
+            fillOpacity: 0.1,
+            strokeColor: '#0099ff',
+            strokeWeight: 1,
+            strokeOpacity: 0.3,
+        });
+    }, []);
+
+    const returnIrrigationCircle = useCallback((circle: google.maps.Circle) => {
+        try { circle.setMap(null); } catch (err) {
+            console.warn('Circle cleanup failed', err);
+        }
+        irrigationCirclePoolRef.current.push(circle);
+    }, []);
+
+    // Keep latest irrigation points in a ref for map listeners
+    // const irrigationPointsRef = useRef<any[]>([]);
 
     // Custom hooks for state management
     const urlParams = new URLSearchParams(window.location.search);
@@ -1076,20 +1314,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         console.log('Selected connection point:', connectionPoint);
     }, [isConnectingMode, connectionPoints]);
 
-    // ฟังก์ชันเปิด/ปิดโหมดเชื่อมต่อ
-    const toggleConnectionMode = useCallback(() => {
-        setIsConnectingMode(prev => !prev);
-        setShowConnectionPoints(prev => !prev);
-        setSelectedConnectionPoint(null);
-
-        // อัปเดตการแสดงจุดเชื่อมต่อ
-        connectionPoints.forEach(cp => {
-            if (cp.marker) {
-                cp.marker.setVisible(!cp.isVisible);
-                cp.isVisible = !cp.isVisible;
-            }
-        });
-    }, [connectionPoints]);
+    // Connection mode UI removed
 
     // ฟังก์ชันหาจุดเชื่อมต่อที่ใกล้ที่สุด
     const findNearestConnectionPoint = useCallback(
@@ -1563,17 +1788,58 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 const equipmentConfig = EQUIPMENT_TYPES[selectedEquipmentType];
                 const equipmentId = Date.now().toString();
 
+                // Snap/placement rules for equipment
+                let newLat = lat;
+                let newLng = lng;
+                const SNAP_EQUIPMENT_THRESHOLD_METERS = 10;
+
+                // Helper to find nearest point on a set of polylines
+                const findNearestOnPipes = (
+                    target: { lat: number; lng: number },
+                    candidatePipes: Array<{ coordinates?: Coordinate[] }>
+                ): { point: Coordinate; distance: number } | null => {
+                    let best: { point: Coordinate; distance: number } | null = null;
+                    candidatePipes.forEach((p) => {
+                        if (p.coordinates && p.coordinates.length >= 2) {
+                            const res = closestPointOnPolylineLatLng(target, p.coordinates);
+                            if (res && (!best || res.distance < best.distance)) best = res;
+                        }
+                    });
+                    return best;
+                };
+
+                // 1) Pump: snap to nearest main pipe (if any and within threshold)
+                if (selectedEquipmentType === 'pump') {
+                    const mains = pipes.filter((p) => p.type === 'main');
+                    const nearest = findNearestOnPipes({ lat: newLat, lng: newLng }, mains);
+                    if (nearest && nearest.distance <= SNAP_EQUIPMENT_THRESHOLD_METERS) {
+                        newLat = nearest.point.lat;
+                        newLng = nearest.point.lng;
+                    }
+                }
+
+                // 2) Valves (solenoid / ballvalve): must be on any pipe; snap to nearest point or reject if too far
+                if (selectedEquipmentType === 'solenoid' || selectedEquipmentType === 'ballvalve') {
+                    const nearest = findNearestOnPipes({ lat: newLat, lng: newLng }, pipes as any);
+                    if (!nearest || nearest.distance > SNAP_EQUIPMENT_THRESHOLD_METERS) {
+                        handleError(t('Valves must be placed on pipes'));
+                        return;
+                    }
+                    newLat = nearest.point.lat;
+                    newLng = nearest.point.lng;
+                }
+
                 const newEquipment = {
                     id: equipmentId,
                     type: selectedEquipmentType,
-                    lat: lat,
-                    lng: lng,
+                    lat: newLat,
+                    lng: newLng,
                     name: `${equipmentConfig.name} ${equipmentIcons.filter((e) => e.type === selectedEquipmentType).length + 1}`,
                     config: equipmentConfig,
                 };
 
                 const marker = new google.maps.Marker({
-                    position: { lat, lng },
+                    position: { lat: newLat, lng: newLng },
                     map: map,
                     title: equipmentConfig.name,
                     icon: createEquipmentMarkerIcon(selectedEquipmentType, equipmentConfig),
@@ -1684,6 +1950,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                 fillOpacity: 0.2,
                                 strokeColor: '#22C55E',
                                 strokeWeight: 3,
+                                strokeOpacity: 1,
                                 clickable: false,
                                 editable: false,
                                 zIndex: 1,
@@ -1718,9 +1985,10 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                 fillOpacity: 0.3,
                                 strokeColor: currentZoneColor,
                                 strokeWeight: 2,
+                                strokeOpacity: 1,
                                 clickable: false,
                                 editable: false,
-                                zIndex: 1,
+                                zIndex: 2,
                             });
 
                             polygon.addListener('click', (e: google.maps.MapMouseEvent) => {
@@ -1771,9 +2039,10 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                 fillOpacity: 0.4,
                                 strokeColor: obstacleConfig.color,
                                 strokeWeight: 2,
+                                strokeOpacity: 1,
                                 clickable: false,
                                 editable: false,
-                                zIndex: 2,
+                                zIndex: 3,
                             });
 
                             setObstacles((prev) => [...prev, newObstacle]);
@@ -1786,7 +2055,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 } else if (type === 'polyline') {
                     const polyline = overlay as google.maps.Polyline;
                     const path = polyline.getPath();
-                    let coordinates = pathToCoordinates(path);
+                    const coordinates = pathToCoordinates(path);
 
                     if (drawingStage === 'pipes' && canDrawPipe) {
                         const pipeConfig = PIPE_TYPES[currentPipeType as keyof typeof PIPE_TYPES];
@@ -1796,30 +2065,42 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                             return;
                         }
 
-                        // *** เพิ่มระบบเชื่อมต่ออัตโนมัติ ***
+                        // Auto-snap behavior: prioritize moving main endpoints toward the newly drawn submain rather than moving submain endpoints
                         let connectedToPointId: string | undefined;
+                        // Store pending T-junction insertion into target pipe if we cross it
+                        let intersectionTargetUpdate: null | { targetPipeId: any; insertAt: number; point: Coordinate } = null;
+                        if (currentPipeType === 'main' || currentPipeType === 'submain') {
+                            const SNAP_THRESHOLD_METERS = 10; // snap distance
 
-                        // ตรวจสอบการเชื่อมต่อกับจุดเชื่อมต่อที่มีอยู่
-                        if (selectedConnectionPoint) {
-                            coordinates = connectPipeToPoint(coordinates, selectedConnectionPoint);
-                            connectedToPointId = selectedConnectionPoint.id;
-                            console.log('Pipe connected to selected point:', selectedConnectionPoint);
-                        } else if (isConnectingMode) {
-                            // ตรวจสอบการ snap อัตโนมัติ
-                            const firstPoint = coordinates[0];
-                            const lastPoint = coordinates[coordinates.length - 1];
+                            // 1) Hard intersection: if the drawn line crosses a compatible pipe, we will form a T by inserting a vertex on the main at the intersection
+                            const hardIntersection = findIntersectionWithCompatiblePipes(currentPipeType as 'main' | 'submain', coordinates, pipes);
+                            if (hardIntersection) {
+                                // Prepare to insert a vertex on the main at the intersection to form a T
+                                intersectionTargetUpdate = {
+                                    targetPipeId: hardIntersection.targetPipeId,
+                                    insertAt: hardIntersection.targetSegmentIndex,
+                                    point: hardIntersection.point,
+                                };
+                            }
 
-                            const nearestToFirst = findNearestConnectionPoint(firstPoint);
-                            const nearestToLast = findNearestConnectionPoint(lastPoint);
+                            // 2) Instead of moving the newly drawn submain endpoints toward main,
+                            //    move the main endpoints toward the newly drawn submain if close enough
+                            const updatedTargets = moveCompatiblePipeEndpointsTowardPolyline(
+                                currentPipeType as 'main' | 'submain',
+                                coordinates,
+                                pipes,
+                                SNAP_THRESHOLD_METERS
+                            );
+                            if (updatedTargets !== pipes) {
+                                // Persist the moved endpoints immediately so state is consistent
+                                setPipes(updatedTargets);
+                            }
 
-                            if (nearestToFirst) {
-                                coordinates = connectPipeToPoint(coordinates, nearestToFirst);
-                                connectedToPointId = nearestToFirst.id;
-                                console.log('Pipe auto-connected to point (start):', nearestToFirst);
-                            } else if (nearestToLast) {
-                                coordinates = connectPipeToPoint(coordinates, nearestToLast);
-                                connectedToPointId = nearestToLast.id;
-                                console.log('Pipe auto-connected to point (end):', nearestToLast);
+                            try {
+                                // Update the drawn polyline path to reflect snapping visually
+                                polyline.setPath(coordinates as any);
+                            } catch (e) {
+                                console.warn('Failed to update polyline path after snapping', e);
                             }
                         }
 
@@ -1837,7 +2118,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                             currentAngle: currentBranchAngle,
                             lateralPipes: [],
                             zoneId: selectedZone?.id || 'main-area',
-                            connectedToPoint: connectedToPointId, // เก็บ ID ของจุดที่เชื่อมต่อ
+                            connectedToPoint: connectedToPointId,
                         };
 
                         polyline.setOptions({
@@ -1879,24 +2160,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                             }
                         });
 
-                        // สร้างจุดเชื่อมต่อสำหรับท่อใหม่ (เฉพาะท่อหลัก/เมนย่อย)
-                        if (currentPipeType === 'main' || currentPipeType === 'submain') {
-                            const newConnectionPoints = createConnectionPointsForPipe(pipeId, coordinates);
-                            setConnectionPoints(prev => [...prev, ...newConnectionPoints]);
-                            
-                            // เก็บ IDs ของจุดเชื่อมต่อใน pipe object
-                            newPipe.connectionPoints = newConnectionPoints.map(cp => cp.id);
-
-                            setMapObjects((prev) => ({
-                                ...prev,
-                                connectionPoints: [
-                                    ...prev.connectionPoints,
-                                    ...newConnectionPoints.map(cp => cp.marker).filter(Boolean) as google.maps.Marker[]
-                                ]
-                            }));
-
-                            console.log('Created connection points for pipe:', pipeId, newConnectionPoints);
-                        }
+                        // Note: remove manual connection point creation for step 3
 
                         // ถ้าเป็นท่อประเภท lateral ให้สร้างท่อย่อยอัตโนมัติ
                         if (currentPipeType === 'lateral') {
@@ -1916,14 +2180,94 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                             // เพิ่มท่อย่อยทั้งหมดเข้าไปใน pipes array
                             const allNewPipes: any[] = [newPipe, ...lateralPipes];
                             setPipes((prev) => {
-                                const newPipes = [...prev, ...allNewPipes];
+                                // Apply pending T-junction insertion to existing pipes first
+                                let prevWithTJunction = intersectionTargetUpdate
+                                    ? prev.map((p) => {
+                                          if (
+                                              p.id === intersectionTargetUpdate!.targetPipeId &&
+                                              p.type === 'main' &&
+                                              Array.isArray(p.coordinates)
+                                          ) {
+                                              const tCoords: Coordinate[] = [...p.coordinates];
+                                              // Avoid duplicate insert if very close to an existing vertex
+                                              const prevPt = tCoords[intersectionTargetUpdate!.insertAt - 1];
+                                              const nextPt = tCoords[intersectionTargetUpdate!.insertAt];
+                                              const alreadyExists = tCoords.some(
+                                                  (pt) =>
+                                                      Math.abs(pt.lat - intersectionTargetUpdate!.point.lat) < 1e-10 &&
+                                                      Math.abs(pt.lng - intersectionTargetUpdate!.point.lng) < 1e-10
+                                              );
+                                              if (!alreadyExists && prevPt && nextPt) {
+                                                  tCoords.splice(intersectionTargetUpdate!.insertAt, 0, intersectionTargetUpdate!.point);
+                                                  // Update on-map polyline path if available
+                                                  try {
+                                                      if (p.polyline && typeof p.polyline.setPath === 'function') {
+                                                          p.polyline.setPath(tCoords as any);
+                                                      }
+                                                  } catch (e) {
+                                                      console.warn('Failed to update target pipe polyline for T-junction', e);
+                                                  }
+                                                  return { ...p, coordinates: tCoords };
+                                              }
+                                          }
+                                          return p;
+                                      })
+                                    : prev;
+
+                                // Also apply endpoint moves toward the newly drawn submain for current compatibility direction
+                                prevWithTJunction = moveCompatiblePipeEndpointsTowardPolyline(
+                                    currentPipeType as 'main' | 'submain',
+                                    coordinates,
+                                    prevWithTJunction,
+                                    10
+                                );
+                                const newPipes = [...prevWithTJunction, ...allNewPipes];
                                 // Save to pipe history
                                 savePipesToHistory(newPipes);
                                 return newPipes;
                             });
                         } else {
                             setPipes((prev) => {
-                                const newPipes = [...prev, newPipe];
+                                // Apply pending T-junction insertion to existing pipes first
+                                let prevWithTJunction = intersectionTargetUpdate
+                                    ? prev.map((p) => {
+                                          if (
+                                              p.id === intersectionTargetUpdate!.targetPipeId &&
+                                              p.type === 'main' &&
+                                              Array.isArray(p.coordinates)
+                                          ) {
+                                              const tCoords: Coordinate[] = [...p.coordinates];
+                                              const prevPt = tCoords[intersectionTargetUpdate!.insertAt - 1];
+                                              const nextPt = tCoords[intersectionTargetUpdate!.insertAt];
+                                              const alreadyExists = tCoords.some(
+                                                  (pt) =>
+                                                      Math.abs(pt.lat - intersectionTargetUpdate!.point.lat) < 1e-10 &&
+                                                      Math.abs(pt.lng - intersectionTargetUpdate!.point.lng) < 1e-10
+                                              );
+                                              if (!alreadyExists && prevPt && nextPt) {
+                                                  tCoords.splice(intersectionTargetUpdate!.insertAt, 0, intersectionTargetUpdate!.point);
+                                                  try {
+                                                      if (p.polyline && typeof p.polyline.setPath === 'function') {
+                                                          p.polyline.setPath(tCoords as any);
+                                                      }
+                                                  } catch (e) {
+                                                      console.warn('Failed to update target pipe polyline for T-junction', e);
+                                                  }
+                                                  return { ...p, coordinates: tCoords };
+                                              }
+                                          }
+                                          return p;
+                                      })
+                                    : prev;
+
+                                // Also apply endpoint moves toward the newly drawn submain for current compatibility direction
+                                prevWithTJunction = moveCompatiblePipeEndpointsTowardPolyline(
+                                    currentPipeType as 'main' | 'submain',
+                                    coordinates,
+                                    prevWithTJunction,
+                                    10
+                                );
+                                const newPipes = [...prevWithTJunction, newPipe];
                                 // Save to pipe history
                                 savePipesToHistory(newPipes);
                                 return newPipes;
@@ -1932,20 +2276,8 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
 
                         setMapObjects((prev) => ({ ...prev, pipes: [...prev.pipes, polyline] }));
 
-                        // รีเซ็ตสถานะการเชื่อมต่อ
+                        // Clear any leftover selection state
                         setSelectedConnectionPoint(null);
-                        connectionPoints.forEach(cp => {
-                            if (cp.marker) {
-                                cp.marker.setIcon({
-                                    path: google.maps.SymbolPath.CIRCLE,
-                                    scale: 8,
-                                    fillColor: cp.type === 'start' ? '#4CAF50' : '#FF5722',
-                                    fillOpacity: 0.9,
-                                    strokeColor: '#FFFFFF',
-                                    strokeWeight: 2,
-                                });
-                            }
-                        });
                     }
                 }
             } catch (error) {
@@ -2261,16 +2593,11 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 }
             });
 
-            // Remove current connection points from map
-            mapObjects.connectionPoints.forEach((marker) => {
-                if (marker && typeof marker.setMap === 'function') {
-                    marker.setMap(null);
-                }
-            });
+            // Connection points UI removed
 
             // Restore pipes and their polylines
             const newPolylines: google.maps.Polyline[] = [];
-            const newConnectionPoints: google.maps.Marker[] = [];
+            // connection points removed
 
             restoredPipes.forEach((pipe: any) => {
                 if (pipe.coordinates && pipe.coordinates.length >= 2) {
@@ -2315,15 +2642,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     newPolylines.push(polyline);
                     pipe.polyline = polyline;
 
-                    // Restore connection points for main/submain pipes
-                    if (pipe.type === 'main' || pipe.type === 'submain') {
-                        const connectionPoints = createConnectionPointsForPipe(pipe.id, pipe.coordinates);
-                        connectionPoints.forEach(cp => {
-                            if (cp.marker) {
-                                newConnectionPoints.push(cp.marker);
-                            }
-                        });
-                    }
+                    // Skip restoring connection point markers
                 }
             });
 
@@ -2332,19 +2651,17 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             setMapObjects((prev) => ({ 
                 ...prev, 
                 pipes: newPolylines,
-                connectionPoints: newConnectionPoints
+                connectionPoints: []
             }));
         }
     }, [
         pipeHistory,
         pipeHistoryIndex,
         mapObjects.pipes,
-        mapObjects.connectionPoints,
         map,
         setPipes,
         setPipeHistoryIndex,
         setMapObjects,
-        createConnectionPointsForPipe,
         t,
     ]);
 
@@ -2360,16 +2677,11 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 }
             });
 
-            // Remove current connection points from map
-            mapObjects.connectionPoints.forEach((marker) => {
-                if (marker && typeof marker.setMap === 'function') {
-                    marker.setMap(null);
-                }
-            });
+            // Connection points UI removed
 
             // Restore pipes and their polylines
             const newPolylines: google.maps.Polyline[] = [];
-            const newConnectionPoints: google.maps.Marker[] = [];
+            // connection points removed
 
             restoredPipes.forEach((pipe: any) => {
                 if (pipe.coordinates && pipe.coordinates.length >= 2) {
@@ -2414,15 +2726,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     newPolylines.push(polyline);
                     pipe.polyline = polyline;
 
-                    // Restore connection points for main/submain pipes
-                    if (pipe.type === 'main' || pipe.type === 'submain') {
-                        const connectionPoints = createConnectionPointsForPipe(pipe.id, pipe.coordinates);
-                        connectionPoints.forEach(cp => {
-                            if (cp.marker) {
-                                newConnectionPoints.push(cp.marker);
-                            }
-                        });
-                    }
+                    // Skip restoring connection point markers
                 }
             });
 
@@ -2431,19 +2735,17 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
             setMapObjects((prev) => ({ 
                 ...prev, 
                 pipes: newPolylines,
-                connectionPoints: newConnectionPoints
+                connectionPoints: []
             }));
         }
     }, [
         pipeHistory,
         pipeHistoryIndex,
         mapObjects.pipes,
-        mapObjects.connectionPoints,
         map,
         setPipes,
         setPipeHistoryIndex,
         setMapObjects,
-        createConnectionPointsForPipe,
         t,
     ]);
 
@@ -2955,7 +3257,15 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                             );
                             const perpHeading = heading + currentBranchAngle;
 
-                            const lateralSpacingMeters = 10;
+                            // Lateral row spacing derives from crop row spacing (cm -> m)
+                            const zoneIdStr = zone.id.toString();
+                            const assignedCropValue = zoneAssignments[zoneIdStr];
+                            let lateralSpacingMeters = 0.25; // default 25 cm
+                            if (assignedCropValue) {
+                                const crop = getCropByValue(assignedCropValue);
+                                const effectiveRowSpacingCm = (rowSpacing[assignedCropValue] ?? crop?.rowSpacing ?? 25);
+                                lateralSpacingMeters = Math.max(0.05, Math.min(5, effectiveRowSpacingCm / 100));
+                            }
                             const numLateralsInSegment = Math.floor(
                                 segmentDistance / lateralSpacingMeters
                             );
@@ -3231,7 +3541,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 );
             }
         },
-        [map, pipes, setPipes, setMapObjects, handleError, t, currentBranchAngle]
+        [map, pipes, setPipes, setMapObjects, handleError, t, currentBranchAngle, zoneAssignments, rowSpacing]
     );
 
     const generateLateralPipes = useCallback(() => {
@@ -3353,9 +3663,33 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 const newIrrigationCircles: google.maps.Circle[] = [];
                 const newIrrigationLines: any[] = [];
 
+                // Virtualization parameters
+                const currentZoom = map.getZoom() ?? 14;
+                const mapBounds = map.getBounds();
+                const allowMarkers = currentZoom >= IRRIGATION_LOD.current.markerMinZoom;
+                const allowCircles = currentZoom >= IRRIGATION_LOD.current.circleMinZoom;
+                const MAX_POINTS_PER_ZONE_BY_ZOOM: Record<number, number> = {
+                    10: 150, 11: 200, 12: 300, 13: 500, 14: 800, 15: 1200, 16: 2000, 17: 3500, 18: 6000
+                };
+                const maxPointsCap = MAX_POINTS_PER_ZONE_BY_ZOOM[Math.max(10, Math.min(18, currentZoom))] ?? 1000;
+
                 if (irrigationType === 'drip-tape') {
                     const settings = DEFAULT_IRRIGATION_SETTINGS['drip-tape'];
-                    const spacingMeters = dripSpacing[zoneId] || settings.defaultSpacing;
+                    // Determine spacing for drip tape based on existing state or crop recommendations
+                    let spacingMeters = dripSpacing[zoneId] ?? settings.defaultSpacing;
+                    // If not explicitly set for this zone, derive a recommended spacing from the crop data
+                    if (dripSpacing[zoneId] == null) {
+                        const cropValueForZone = zoneAssignments[zoneId];
+                        if (cropValueForZone) {
+                            const cropForZone = getCropByValue(cropValueForZone);
+                            const recommendedFromCrop = cropForZone
+                                ? Math.max(0.2, Math.min(0.5, cropForZone.plantSpacing / 100))
+                                : settings.defaultSpacing;
+                            spacingMeters = recommendedFromCrop;
+                        }
+                        // Persist the auto-derived spacing for this zone so UI stays in sync
+                        setDripSpacing((prev) => ({ ...prev, [zoneId]: spacingMeters }));
+                    }
                     let totalDripPoints = 0;
 
                     zoneLateralPipes.forEach((pipe) => {
@@ -3366,6 +3700,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                 scale: 4,
                             };
 
+                            // Batch-create lightweight polyline (icons used instead of full stroke)
                             const polyline = new google.maps.Polyline({
                                 path: pipe.coordinates,
                                 strokeColor: '#3b82f6',
@@ -3439,65 +3774,89 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                     if (zoneLateralPipes.length > 0) {
                         zoneLateralPipes.forEach((pipe, pipeIndex) => {
                             if (pipe.coordinates && pipe.coordinates.length >= 2) {
-                                const start = pipe.coordinates[0];
-                                const end = pipe.coordinates[pipe.coordinates.length - 1];
-                                const totalDistance =
-                                    google.maps.geometry.spherical.computeDistanceBetween(
-                                        new google.maps.LatLng(start.lat, start.lng),
-                                        new google.maps.LatLng(end.lat, end.lng)
+                                let createdCount = 0;
+                                // carryOver is the distance from the next spacing point carried from previous segment
+                                let carryOver = 0;
+
+                                for (let seg = 0; seg < pipe.coordinates.length - 1; seg++) {
+                                    const start = pipe.coordinates[seg];
+                                    const end = pipe.coordinates[seg + 1];
+                                    const segmentStart = new google.maps.LatLng(start.lat, start.lng);
+                                    const segmentEnd = new google.maps.LatLng(end.lat, end.lng);
+                                    const segmentLength = google.maps.geometry.spherical.computeDistanceBetween(
+                                        segmentStart,
+                                        segmentEnd
                                     );
-                                const numPoints = Math.max(
-                                    1,
-                                    Math.floor(totalDistance / spacingDistance)
-                                );
+                                    if (segmentLength <= 0) {
+                                        continue;
+                                    }
 
-                                for (let i = 0; i <= numPoints; i++) {
-                                    const ratio = numPoints > 0 ? i / numPoints : 0;
-                                    const lat = start.lat + (end.lat - start.lat) * ratio;
-                                    const lng = start.lng + (end.lng - start.lng) * ratio;
-                                    const point = new google.maps.LatLng(lat, lng);
+                                    // First segment starts at 0 to cover the beginning; subsequent start from spacingDistance - carryOver
+                                    let distanceFromSegmentStart = seg === 0 && carryOver === 0 ? 0 : Math.max(0, spacingDistance - carryOver);
 
-                                    if (
-                                        google.maps.geometry.poly.containsLocation(
-                                            point,
-                                            zone.polygon
-                                        )
-                                    ) {
-                                        const irrigationPoint = {
-                                            id: Date.now() + Math.random() + pipeIndex * 1000 + i,
-                                            lat,
-                                            lng,
-                                            type: irrigationType,
-                                            radius,
-                                            zoneId: zone.id,
-                                        };
-                                        const marker = new google.maps.Marker({
-                                            position: point,
-                                            map,
-                                            title: `${irrigationType} (R:${radius}m)`,
-                                            icon: {
-                                                path: google.maps.SymbolPath.CIRCLE,
-                                                scale: 4,
-                                                fillColor: '#0099ff',
-                                                fillOpacity: 1,
-                                                strokeColor: 'white',
-                                                strokeWeight: 1,
-                                            },
-                                        });
-                                        const circle = new google.maps.Circle({
-                                            center: point,
-                                            radius,
-                                            map,
-                                            fillColor: '#0099ff',
-                                            fillOpacity: 0.1,
-                                            strokeColor: '#0099ff',
-                                            strokeWeight: 1,
-                                            strokeOpacity: 0.3,
-                                        });
-                                        (irrigationPoint as any).marker = marker;
-                                        (irrigationPoint as any).circle = circle;
-                                        newIrrigationPoints.push(irrigationPoint);
-                                        newIrrigationCircles.push(circle);
+                                    while (distanceFromSegmentStart <= segmentLength + 1e-6) {
+                                        // Respect cap for large zones
+                                        if (createdCount >= maxPointsCap) {
+                                            break;
+                                        }
+
+                                        const ratio = distanceFromSegmentStart / segmentLength;
+                                        const pointLatLng = google.maps.geometry.spherical.interpolate(
+                                            segmentStart,
+                                            segmentEnd,
+                                            Math.min(1, Math.max(0, ratio))
+                                        );
+
+                                        if (google.maps.geometry.poly.containsLocation(pointLatLng, zone.polygon)) {
+                                            if (!mapBounds || mapBounds.contains(pointLatLng)) {
+                                                const irrigationPoint = {
+                                                    id: Date.now() + Math.random() + pipeIndex * 100000 + seg * 1000 + createdCount,
+                                                    lat: pointLatLng.lat(),
+                                                    lng: pointLatLng.lng(),
+                                                    type: irrigationType,
+                                                    radius,
+                                                    zoneId: zone.id,
+                                                };
+                                                let marker: google.maps.Marker | undefined;
+                                                let circle: google.maps.Circle | undefined;
+                                                if (allowMarkers) {
+                                                    marker = rentIrrigationMarker();
+                                                    marker.setPosition(pointLatLng);
+                                                    marker.setTitle(`${irrigationType} (R:${radius}m)`);
+                                                    marker.setMap(map);
+                                                }
+                                                if (allowCircles) {
+                                                    circle = rentIrrigationCircle();
+                                                    circle.setCenter(pointLatLng);
+                                                    circle.setRadius(radius);
+                                                    circle.setMap(map);
+                                                }
+                                                (irrigationPoint as any).marker = marker;
+                                                (irrigationPoint as any).circle = circle;
+                                                newIrrigationPoints.push(irrigationPoint);
+                                                if (circle) newIrrigationCircles.push(circle);
+                                                createdCount += 1;
+                                            }
+                                        }
+
+                                        // Move to next position on this segment
+                                        if (distanceFromSegmentStart === 0 && seg !== 0) {
+                                            // if we started at 0 due to carryOver adjustment, jump to spacing
+                                            distanceFromSegmentStart = spacingDistance;
+                                        } else {
+                                            distanceFromSegmentStart += spacingDistance;
+                                        }
+                                    }
+
+                                    // Calculate carryOver for next segment:
+                                    // distanceFromSegmentStart is now first position beyond this segment end
+                                    if (distanceFromSegmentStart > segmentLength) {
+                                        carryOver = distanceFromSegmentStart - segmentLength;
+                                        if (carryOver >= spacingDistance) {
+                                            carryOver = carryOver % spacingDistance;
+                                        }
+                                    } else {
+                                        carryOver = 0;
                                     }
                                 }
                             }
@@ -3514,12 +3873,16 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                             (radius / (111000 * Math.cos((sw.lat() * Math.PI) / 180))) *
                             spacingMultiplier;
 
+                        let createdCount = 0;
                         for (let lat = sw.lat(); lat <= ne.lat(); lat += latSpacing) {
                             for (let lng = sw.lng(); lng <= ne.lng(); lng += lngSpacing) {
                                 const point = new google.maps.LatLng(lat, lng);
                                 if (
                                     google.maps.geometry.poly.containsLocation(point, zone.polygon)
                                 ) {
+                                    if (mapBounds && !mapBounds.contains(point)) continue;
+                                    if (createdCount >= maxPointsCap) break;
+
                                     const irrigationPoint = {
                                         id: Date.now() + Math.random(),
                                         lat,
@@ -3528,39 +3891,32 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                         radius,
                                         zoneId: zone.id,
                                     };
-                                    const marker = new google.maps.Marker({
-                                        position: point,
-                                        map,
-                                        title: `${irrigationType} (R:${radius}m)`,
-                                        icon: {
-                                            path: google.maps.SymbolPath.CIRCLE,
-                                            scale: 4,
-                                            fillColor: '#0099ff',
-                                            fillOpacity: 1,
-                                            strokeColor: 'white',
-                                            strokeWeight: 1,
-                                        },
-                                    });
-                                    const circle = new google.maps.Circle({
-                                        center: point,
-                                        radius,
-                                        map,
-                                        fillColor: '#0099ff',
-                                        fillOpacity: 0.1,
-                                        strokeColor: '#0099ff',
-                                        strokeWeight: 1,
-                                        strokeOpacity: 0.3,
-                                    });
+                                    let marker: google.maps.Marker | undefined;
+                                    let circle: google.maps.Circle | undefined;
+                                    if (allowMarkers) {
+                                        marker = rentIrrigationMarker();
+                                        marker.setPosition(point);
+                                        marker.setTitle(`${irrigationType} (R:${radius}m)`);
+                                        marker.setMap(map);
+                                    }
+                                    if (allowCircles) {
+                                        circle = rentIrrigationCircle();
+                                        circle.setCenter(point);
+                                        circle.setRadius(radius);
+                                        circle.setMap(map);
+                                    }
                                     (irrigationPoint as any).marker = marker;
                                     (irrigationPoint as any).circle = circle;
                                     newIrrigationPoints.push(irrigationPoint);
-                                    newIrrigationCircles.push(circle);
+                                    if (circle) newIrrigationCircles.push(circle);
+                                    createdCount += 1;
                                 }
                             }
                         }
                     }
                 }
 
+                // Batch state updates
                 setIrrigationPoints((prev) => [...prev, ...newIrrigationPoints]);
                 setIrrigationLines((prev) => [...prev, ...newIrrigationLines]);
                 setMapObjects((prev) => ({
@@ -3632,8 +3988,8 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                 )
             ) {
                 zoneIrrigationPoints.forEach((point) => {
-                    if (point.marker) point.marker.setMap(null);
-                    if (point.circle) point.circle.setMap(null);
+                    if (point.marker) returnIrrigationMarker(point.marker);
+                    if (point.circle) returnIrrigationCircle(point.circle);
                 });
                 zoneIrrigationLines.forEach((line: any) => {
                     if (line.polyline) line.polyline.setMap(null);
@@ -3932,7 +4288,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         return true;
     }, []);
 
-    // ฟังก์ชันสร้างท่อย่อยใหม่ตามมุมที่กำหนด
+        // ฟังก์ชันสร้างท่อย่อยใหม่ตามมุมที่กำหนด
     const regenerateLateralPipesWithAngle = useCallback((pipeId: any, newAngle: number, targetZone: any): LateralPipe[] => {
         const targetPipe = pipes.find(p => p.id === pipeId);
         if (!targetPipe) {
@@ -3955,7 +4311,19 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         }
 
         const newLateralPipes: LateralPipe[] = [];
-        const spacing = 15;
+        // ปรับ spacing ท่อย่อยตามระยะห่างระหว่างแถวของการปลูก (row spacing)
+        // ใช้ค่าที่ผู้ใช้ปรับ (rowSpacing[assignedCrop]) ถ้ามี ไม่งั้นใช้ค่า default จาก crop (cm -> m)
+        let spacingMeters = 0.15; // ค่าเริ่มต้น 15 cm ในกรณีไม่มีข้อมูล crop
+        const zoneIdForTarget = targetZone?.id?.toString?.() ?? '';
+        if (zoneIdForTarget && zoneAssignments && zoneAssignments[zoneIdForTarget]) {
+            const cropValueForZone = zoneAssignments[zoneIdForTarget];
+            const cropForZone = getCropByValue(cropValueForZone);
+            const effectiveRowSpacingCm = (rowSpacing[cropValueForZone] ?? cropForZone?.rowSpacing ?? 15);
+            spacingMeters = effectiveRowSpacingCm / 100; // cm -> m
+        }
+        // Clamp spacing เพื่อความปลอดภัย (0.05m - 5m)
+        spacingMeters = Math.max(0.05, Math.min(5, spacingMeters));
+        const spacing = spacingMeters;
         const numberOfLaterals = Math.max(2, Math.floor(actualPipeLength / spacing));
 
         for (let i = 0; i < numberOfLaterals; i++) {
@@ -4020,7 +4388,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
         }
 
         return newLateralPipes;
-    }, [pipes, calculatePipeLength, interpolatePositionAlongPipe, calculateBranchDirection, isPointInPolygon, mainField, t, calculateOptimalDistanceToPolygonBoundary, calculateBranchEndPosition]);
+    }, [pipes, calculatePipeLength, interpolatePositionAlongPipe, calculateBranchDirection, isPointInPolygon, mainField, t, calculateOptimalDistanceToPolygonBoundary, calculateBranchEndPosition, zoneAssignments, rowSpacing]);
 
     // เพิ่มฟังก์ชัน handleStartRealTimeBranchEdit
     const handleStartRealTimeBranchEdit = useCallback((pipeId: string) => {
@@ -5021,81 +5389,7 @@ export default function FieldMap({ crops, irrigation }: FieldMapProps) {
                                 </div>
 
                                 {/* เพิ่มส่วนควบคุมการเชื่อมต่อท่อ */}
-                                {currentStep === 3 && (
-                                    <div
-                                        className="rounded border border-white p-2"
-                                        style={{ backgroundColor: '#000005' }}
-                                    >
-                                        <div className="mb-2 text-xs font-semibold text-white">
-                                            🔗 {t('Pipe Connection System')}
-                                        </div>
-                                        <div className="space-y-2">
-                                            <button
-                                                onClick={toggleConnectionMode}
-                                                className={`w-full rounded border border-white px-2 py-1 text-xs transition-colors ${
-                                                    isConnectingMode
-                                                        ? 'bg-blue-600 text-white'
-                                                        : 'text-white hover:bg-blue-600'
-                                                }`}
-                                                style={{
-                                                    backgroundColor: isConnectingMode ? undefined : '#000005',
-                                                }}
-                                            >
-                                                {isConnectingMode ? '🔗 ' + t('Connection Mode ON') : '🔗 ' + t('Toggle Connection Mode')}
-                                            </button>
-                                            
-                                            {isConnectingMode && (
-                                                <div className="rounded bg-blue-900/20 p-2 text-xs text-blue-200">
-                                                    {selectedConnectionPoint 
-                                                        ? `✅ ${t('Selected')}: ${selectedConnectionPoint.type === 'start' ? t('Start') : t('End')} - ${selectedConnectionPoint.pipeId}`
-                                                        : `👆 ${t('Click green/orange dots to select connection points')}`
-                                                    }
-                                                </div>
-                                            )}
-                                            
-                                            <div className="text-xs text-gray-300">
-                                                📊 {t('Connection Points')}: {connectionPoints.length}
-                                            </div>
-                                            
-                                            <button
-                                                onClick={() => setShowConnectionPoints(prev => !prev)}
-                                                className={`w-full rounded border border-white px-2 py-1 text-xs transition-colors ${
-                                                    showConnectionPoints
-                                                        ? 'bg-green-600 text-white'
-                                                        : 'text-white hover:bg-green-600'
-                                                }`}
-                                                style={{
-                                                    backgroundColor: showConnectionPoints ? undefined : '#000005',
-                                                }}
-                                            >
-                                                {showConnectionPoints ? '👁️ ' + t('Hide Connection Points') : '👁️ ' + t('Show Connection Points')}
-                                            </button>
-                                            
-                                            {showConnectionPoints && connectionPoints.length > 0 && (
-                                                <div className="rounded bg-green-900/20 p-2 text-xs text-green-200">
-                                                    <div className="mb-1 font-semibold">📍 {t('Visible Connection Points')}:</div>
-                                                    <div className="max-h-20 overflow-y-auto space-y-1">
-                                                        {connectionPoints.slice(0, 5).map((cp, index) => (
-                                                            <div key={cp.id} className="flex items-center justify-between">
-                                                                <span>
-                                                                    {cp.type === 'start' ? '🟢' : '🟠'} {t(cp.type)} - {cp.pipeId}
-                                                                </span>
-                                                                <span className="text-xs text-gray-400">
-                                                                    {index + 1}/{Math.min(5, connectionPoints.length)}
-                                                                </span>
-                                                            </div>
-                                                        ))}
-                                                        {connectionPoints.length > 5 && (
-                                                            <div className="text-xs text-gray-400 text-center">
-                                                                +{connectionPoints.length - 5} {t('more')}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
+                                {/* Connection UI removed per new auto-snap behavior */}
 
                                 {currentStep !== 4 && (
                                     <div
