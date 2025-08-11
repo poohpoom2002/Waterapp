@@ -383,6 +383,18 @@ export const fieldCropTranslations = {
         'Updated plant spacing for {cropName}: {value}cm': 'Updated plant spacing for {cropName}: {value}cm',
         'Reset spacing to defaults for {count} crops': 'Reset spacing to defaults for {count} crops',
 
+        // Fittings section
+        'Fittings (2-way / 3-way / 4-way)': 'Fittings (2-way / 3-way / 4-way)',
+        '2-way': '2-way',
+        '3-way': '3-way',
+        '4-way': '4-way',
+        Main: 'Main',
+        Submain: 'Submain',
+        Lateral: 'Lateral',
+        'Irrigation Points in Zone:': 'Irrigation Points in Zone:',
+        'Drip Tape': 'Drip Tape',
+        'Total Irrigation Points:': 'Total Irrigation Points:',
+
         // เพิ่มใน translation files
         "Pipe Connections": "Pipe Connections",
         "Click another junction to connect, or draw a new pipe": "Click another junction to connect, or draw a new pipe",
@@ -777,6 +789,18 @@ export const fieldCropTranslations = {
         'Updated row spacing for {cropName}: {value}cm': 'อัปเดตระยะห่างแถวสำหรับ {cropName}: {value} ซม.',
         'Updated plant spacing for {cropName}: {value}cm': 'อัปเดตระยะห่างต้นสำหรับ {cropName}: {value} ซม.',
         'Reset spacing to defaults for {count} crops': 'รีเซ็ตระยะห่างเป็นค่าเริ่มต้นสำหรับ {count} พืช',
+
+        // Fittings section
+        'Fittings (2-way / 3-way / 4-way)': 'ข้อต่อ (2 ทาง / 3 ทาง / 4 ทาง)',
+        '2-way': '2 ทาง',
+        '3-way': '3 ทาง',
+        '4-way': '4 ทาง',
+        Main: 'ท่อเมน',
+        Submain: 'ท่อเมนย่อย',
+        Lateral: 'ท่อย่อย',
+        'Irrigation Points in Zone:': 'จุดชลประทานในโซน:',
+        'Drip Tape': 'สายหยด',
+        'Total Irrigation Points:': 'จำนวนจุดชลประทานรวม:',
 
         // เพิ่มใน translation files
         "Pipe Connections": "การเชื่อมต่อท่อ",

@@ -21,6 +21,11 @@ export const greenhouseTranslations = {
         ปิด: 'Close',
         วันนี้: 'Today',
 
+        // === UNDO/REDO ===
+        เลิกทำ: 'Undo',
+        ทำซ้ำ: 'Redo',
+        'ทำซ้ำ: Ctrl+Y': 'Redo: Ctrl+Y',
+
         // === STATUS & LOADING ===
         'รายงานการออกแบบระบบน้ำพืชสวน': 'Horticulture Irrigation System Design Report',
         'กำลังโหลดข้อมูลโครงการ...': 'Loading project data...',
@@ -443,6 +448,11 @@ export const greenhouseTranslations = {
         ยืนยัน: 'ยืนยัน',
         ปิด: 'ปิด',
         วันนี้: 'วันนี้',
+
+        // === UNDO/REDO ===
+        เลิกทำ: 'เลิกทำ',
+        ทำซ้ำ: 'ทำซ้ำ',
+        'ทำซ้ำ: Ctrl+Y': 'ทำซ้ำ: Ctrl+Y',
 
         // === STATUS & LOADING ===
         'รายงานการออกแบบระบบน้ำพืชสวน': 'รายงานการออกแบบระบบน้ำพืชสวน',
