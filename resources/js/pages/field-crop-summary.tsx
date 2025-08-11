@@ -2,6 +2,14 @@ import { Head, Link, router } from '@inertiajs/react';
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
 import { useState, useEffect, useRef } from 'react';
 import * as turf from '@turf/turf';
+import type {
+    Feature as GeoFeature,
+    LineString as GeoLineString,
+    FeatureCollection,
+    Point,
+} from 'geojson';
+import lineIntersect from '@turf/line-intersect';
+import pointToLineDistance from '@turf/point-to-line-distance';
 import { getCropByValue } from '@/pages/utils/cropData';
 import {
     calculateEnhancedFieldStats,
@@ -205,6 +213,7 @@ const GoogleMapsDisplay = ({
                 fullscreenControl: true,
                 mapTypeControl: true,
                 zoomControl: true,
+                maxZoom: 22,
             });
 
             googleMapRef.current = map;
@@ -973,6 +982,453 @@ const normalizeIrrigationType = (type: string): string => {
     return typeMapping[normalizedType] || normalizedType;
 };
 
+// Calculate fittings (2-way, 3-way, 4-way) based on pipes and irrigation points
+interface FittingsBreakdown {
+    twoWay: number;
+    threeWay: number;
+    fourWay: number;
+    breakdown: {
+        main: { twoWay: number; threeWay: number; fourWay: number };
+        submain: { twoWay: number; threeWay: number; fourWay: number };
+        lateral: { twoWay: number; threeWay: number; fourWay: number };
+    };
+}
+
+const toLngLat = (coord: CoordinateInput): [number, number] | null => {
+    if (Array.isArray(coord) && coord.length === 2) {
+        return [coord[1], coord[0]]; // [lng, lat]
+    }
+    if (
+        (coord as Coordinate) &&
+        typeof (coord as Coordinate).lat === 'number' &&
+        typeof (coord as Coordinate).lng === 'number'
+    ) {
+        const c = coord as Coordinate;
+        return [c.lng, c.lat];
+    }
+    return null;
+};
+
+// Segment intersection in lat/lng using local planar approximation; returns intersection point if segments intersect
+const segmentIntersectionLatLng = (
+    a: { lat: number; lng: number },
+    b: { lat: number; lng: number },
+    c: { lat: number; lng: number },
+    d: { lat: number; lng: number }
+): { lat: number; lng: number } | null => {
+    const origin = a;
+    const lat0 = (origin.lat * Math.PI) / 180;
+    const metersPerDegLat = 111320;
+    const metersPerDegLng = 111320 * Math.cos(lat0);
+
+    const toMeters = (pt: { lat: number; lng: number }) => ({
+        x: (pt.lng - origin.lng) * metersPerDegLng,
+        y: (pt.lat - origin.lat) * metersPerDegLat,
+    });
+
+    const A = { x: 0, y: 0 };
+    const B = toMeters(b);
+    const C = toMeters(c);
+    const D = toMeters(d);
+
+    const denom = (A.x - B.x) * (C.y - D.y) - (A.y - B.y) * (C.x - D.x);
+    if (denom === 0) return null;
+
+    const t = ((A.x - C.x) * (C.y - D.y) - (A.y - C.y) * (C.x - D.x)) / denom;
+    const u = -((A.x - B.x) * (A.y - C.y) - (A.y - B.y) * (A.x - C.x)) / denom;
+
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+        const x = A.x + t * (B.x - A.x);
+        const y = A.y + t * (B.y - A.y);
+        return {
+            lat: origin.lat + y / metersPerDegLat,
+            lng: origin.lng + x / metersPerDegLng,
+        };
+    }
+    return null;
+};
+
+// Removed unused helper pointDistanceMeters (projection logic replaced usage)
+
+// Cluster intersections by distance ALONG the submain (station in meters)
+// intersections carry a 'crossing' flag indicating lateral crosses through the submain (both sides) vs a tee (one side)
+// We cluster by along-line distance and aggregate flags within each cluster
+const clusterIntersectionsByDistanceOnSubmain = (
+    subCoords: [number, number][],
+    intersections: { lng: number; lat: number; crossing: boolean }[],
+    thresholdMeters: number = 0.5
+): { hasCrossing: boolean; station: number }[] => {
+    if (!Array.isArray(subCoords) || subCoords.length < 2 || intersections.length === 0) {
+        return [];
+    }
+
+    // Local planar transform around the first submain coordinate
+    const originLng = subCoords[0][0];
+    const originLat = subCoords[0][1];
+    const lat0 = (originLat * Math.PI) / 180;
+    const metersPerDegLat = 111320;
+    const metersPerDegLng = 111320 * Math.cos(lat0);
+
+    const toMeters = (lng: number, lat: number) => ({
+        x: (lng - originLng) * metersPerDegLng,
+        y: (lat - originLat) * metersPerDegLat,
+    });
+
+    // Convert submain to meter coordinates and precompute cumulative segment lengths
+    const S = subCoords.map(([lng, lat]) => toMeters(lng, lat));
+    const segLen: number[] = [];
+    const cumLen: number[] = [0];
+    for (let i = 1; i < S.length; i++) {
+        const dx = S[i].x - S[i - 1].x;
+        const dy = S[i].y - S[i - 1].y;
+        const len = Math.hypot(dx, dy);
+        segLen.push(len);
+        cumLen.push(cumLen[i - 1] + len);
+    }
+
+    // Each intersection as {station, side}
+    type StationFlag = { station: number; crossing: boolean };
+    const stationFlags: StationFlag[] = [];
+
+    intersections.forEach(({ lng, lat, crossing }) => {
+        const P = toMeters(lng, lat);
+        let bestStation = 0;
+        let bestDist = Number.POSITIVE_INFINITY;
+        for (let i = 1; i < S.length; i++) {
+            const A = S[i - 1];
+            const B = S[i];
+            const ABx = B.x - A.x;
+            const ABy = B.y - A.y;
+            const APx = P.x - A.x;
+            const APy = P.y - A.y;
+            const denom = ABx * ABx + ABy * ABy;
+            if (denom === 0) continue;
+            let t = (APx * ABx + APy * ABy) / denom; // projection factor
+            t = Math.max(0, Math.min(1, t));
+            const projX = A.x + t * ABx;
+            const projY = A.y + t * ABy;
+            const dist = Math.hypot(P.x - projX, P.y - projY);
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestStation = cumLen[i - 1] + t * Math.hypot(ABx, ABy);
+            }
+        }
+        stationFlags.push({ station: bestStation, crossing });
+    });
+
+    // Sort by station, then cluster by along-line threshold, aggregating crossing flag
+    stationFlags.sort((a, b) => a.station - b.station);
+    const clusters: { hasCrossing: boolean; station: number }[] = [];
+    let curStart = Number.NEGATIVE_INFINITY;
+    let curHasCrossing = false;
+    let curStation = 0;
+    stationFlags.forEach(({ station, crossing }) => {
+        if (curStart === Number.NEGATIVE_INFINITY) {
+            curStart = station;
+            curHasCrossing = crossing;
+            curStation = station;
+            return;
+        }
+        const isWithinThreshold = station - curStart <= thresholdMeters;
+        const bothAreTees = !crossing && !curHasCrossing;
+        // Merge only tee-to-tee events that are very close; keep any crossing as its own cluster
+        if (isWithinThreshold && bothAreTees) {
+            return;
+        }
+        // Close previous cluster and start a new one
+        clusters.push({ hasCrossing: curHasCrossing, station: curStation });
+        curStart = station;
+        curHasCrossing = crossing;
+        curStation = station;
+    });
+    if (curStart !== Number.NEGATIVE_INFINITY) clusters.push({ hasCrossing: curHasCrossing, station: curStation });
+
+    return clusters;
+};
+
+const calculateFittingsCounts = (
+    pipes: Pipe[],
+    irrigationPoints: IrrigationPoint[]
+): FittingsBreakdown => {
+    const mainPipes = pipes.filter((p) => identifyPipeType(p) === 'main');
+    const submainPipes = pipes.filter((p) => identifyPipeType(p) === 'submain');
+    const lateralPipes = pipes.filter((p) => identifyPipeType(p) === 'lateral');
+
+    let twoWayMain = 0;
+    // Rule (updated): Main pipe has 2-way at each internal corner only (no endpoint 2-way)
+    mainPipes.forEach((pipe) => {
+        if (!pipe.coordinates || pipe.coordinates.length < 2) return;
+        const pointCount = pipe.coordinates.length;
+        const internalCorners = Math.max(0, pointCount - 2);
+        twoWayMain += internalCorners;
+    });
+
+    // Rule: Submain gets 3-way per lateral branch; if two laterals branch at the same crossing point on submain, use 4-way instead
+    // Intersection-based grouping between lateral lines and each submain line
+    const intersectionCountsPerSubmain: Record<string | number, Record<string, number>> = {};
+    let threeWaySubDirect = 0;
+    let fourWaySubDirect = 0;
+    let twoWaySubAdd = 0; // submain-derived 2-way per single-side cluster
+    // Count junctions at main–submain connection (adds to main 3-way or 2-way when at main endpoint)
+    let threeWayAtMain = 0;
+
+    submainPipes.forEach((sub) => {
+        const subCoords = (sub.coordinates || [])
+            .map((c) => toLngLat(c))
+            .filter((v): v is [number, number] => v !== null);
+        if (subCoords.length < 2) return;
+        const subLine = turf.lineString(subCoords);
+        const mapKey = sub.id;
+        if (!intersectionCountsPerSubmain[mapKey]) intersectionCountsPerSubmain[mapKey] = {};
+
+        // Detect connections to main (per submain). Each intersection/attachment contributes either 3-way (along main) or 2-way (at main endpoint)
+        try {
+            // counted flag not needed for final logic; we short-circuit per submain when matched
+            for (const main of mainPipes) {
+                const mainCoords = (main.coordinates || [])
+                    .map((c) => toLngLat(c))
+                    .filter((v): v is [number, number] => v !== null);
+                if (mainCoords.length < 2) continue;
+                const mainLine = turf.lineString(mainCoords);
+                const inter: FeatureCollection<Point> = lineIntersect(mainLine, subLine) as FeatureCollection<Point>;
+                const attachTol = 3.0; // meters (more tolerant to detect tee connection on main)
+
+                // Case 1: explicit intersections
+                if ((inter.features || []).length > 0) {
+                    // Count each intersection once (usually 1)
+                    for (const f of inter.features) {
+                        const coords = f.geometry?.coordinates as [number, number] | undefined;
+                        if (!coords) continue;
+                        // Any main–submain junction is a tee on the main → 3-way on main
+                        // Do not count as 2-way even if the junction is near a main endpoint
+                        threeWayAtMain += 1;
+                        break; // count first meaningful junction only per submain
+                    }
+                    break;
+                }
+
+                // Case 2: endpoint attachment of submain to main (no lineIntersect)
+                const end1 = subCoords[0];
+                const end2 = subCoords[subCoords.length - 1];
+                const p1 = turf.point(end1);
+                const p2 = turf.point(end2);
+                const d1 = pointToLineDistance(p1, mainLine as unknown as GeoFeature<GeoLineString>, { units: 'kilometers' }) * 1000;
+                const d2 = pointToLineDistance(p2, mainLine as unknown as GeoFeature<GeoLineString>, { units: 'kilometers' }) * 1000;
+                const attaches = Math.min(d1, d2) <= attachTol;
+                if (attaches) {
+                    // Attachment of submain onto main is a tee on the main → 3-way on main
+                    threeWayAtMain += 1;
+                    break;
+                }
+            }
+            // If nothing counted, no junction for this submain on any main
+        } catch {
+            // ignore intersection detection errors for main-submain connection
+        }
+
+        // Collect all intersections for this submain first
+        const subIntersections: { lng: number; lat: number; crossing: boolean }[] = [];
+
+        // Local planar helpers for side detection relative to this submain
+        const originLng = subCoords[0][0];
+        const originLat = subCoords[0][1];
+        const lat0 = (originLat * Math.PI) / 180;
+        const metersPerDegLat = 111320;
+        const metersPerDegLng = 111320 * Math.cos(lat0);
+        const toMetersLocal = (lng: number, lat: number) => ({
+            x: (lng - originLng) * metersPerDegLng,
+            y: (lat - originLat) * metersPerDegLat,
+        });
+        const S_local = subCoords.map(([lng, lat]) => toMetersLocal(lng, lat));
+        const nearestSegmentSide = (lng: number, lat: number): number => {
+            const P = toMetersLocal(lng, lat);
+            let bestDist = Number.POSITIVE_INFINITY;
+            let side = 0;
+            for (let i = 1; i < S_local.length; i++) {
+                const A = S_local[i - 1];
+                const B = S_local[i];
+                const ABx = B.x - A.x;
+                const ABy = B.y - A.y;
+                const APx = P.x - A.x;
+                const APy = P.y - A.y;
+                const denom = ABx * ABx + ABy * ABy;
+                if (denom === 0) continue;
+                let t = (APx * ABx + APy * ABy) / denom;
+                t = Math.max(0, Math.min(1, t));
+                const projX = A.x + t * ABx;
+                const projY = A.y + t * ABy;
+                const dist = Math.hypot(P.x - projX, P.y - projY);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    const crossZ = ABx * APy - ABy * APx;
+                    side = crossZ >= 0 ? 1 : -1;
+                }
+            }
+            return side;
+        };
+
+        lateralPipes.forEach((lat) => {
+            const latCoords = (lat.coordinates || [])
+                .map((c) => toLngLat(c))
+                .filter((v): v is [number, number] => v !== null);
+            if (latCoords.length < 2) return;
+            const latLine = turf.lineString(latCoords);
+            // Prefer turf lineIntersect; fall back to segment-by-segment intersections when unavailable
+            let intersections: [number, number][] = [];
+            try {
+                const inter: FeatureCollection<Point> = lineIntersect(subLine, latLine) as FeatureCollection<Point>;
+                if (inter.features && inter.features.length > 0) {
+                    intersections = inter.features
+                        .map((f) => {
+                            const coords = f.geometry?.coordinates;
+                            return Array.isArray(coords) && coords.length === 2
+                                ? (coords as [number, number])
+                                : undefined;
+                        })
+                        .filter((c): c is [number, number] => Array.isArray(c) && c.length === 2);
+                }
+            } catch {
+                // Manual intersection check between segments
+                const segs = (coords: [number, number][]) => coords;
+                const A = segs(subCoords);
+                const B = segs(latCoords);
+                for (let i = 1; i < A.length; i++) {
+                    for (let j = 1; j < B.length; j++) {
+                        const a1 = { lng: A[i - 1][0], lat: A[i - 1][1] };
+                        const a2 = { lng: A[i][0], lat: A[i][1] };
+                        const b1 = { lng: B[j - 1][0], lat: B[j - 1][1] };
+                        const b2 = { lng: B[j][0], lat: B[j][1] };
+                        const interPt = segmentIntersectionLatLng(
+                            { lat: a1.lat, lng: a1.lng },
+                            { lat: a2.lat, lng: a2.lng },
+                            { lat: b1.lat, lng: b1.lng },
+                            { lat: b2.lat, lng: b2.lng }
+                        );
+                        if (interPt) intersections.push([interPt.lng, interPt.lat]);
+                    }
+                }
+            }
+
+            // Determine if this lateral crosses through the submain (two sides) or tees (one side)
+            const end1 = latCoords[0];
+            const end2 = latCoords[latCoords.length - 1];
+            const interCount = intersections.length;
+            let isCrossing = false;
+            try {
+                const s1 = nearestSegmentSide(end1[0], end1[1]);
+                const s2 = nearestSegmentSide(end2[0], end2[1]);
+                // Crossing if: clearly two intersection points OR endpoints lie on opposite sides
+                // Do not suppress by an endpoint-attachment check; some drawings touch exactly at the line but still cross through
+                isCrossing = interCount >= 2 || s1 * s2 < 0;
+            } catch {
+                isCrossing = interCount >= 2;
+            }
+
+            // If classified as crossing but turf couldn't produce explicit intersection points
+            // (common when lines just touch the submain geometry), add a representative point
+            if (isCrossing && intersections.length === 0) {
+                const mid = latCoords[Math.floor(latCoords.length / 2)];
+                subIntersections.push({ lng: mid[0], lat: mid[1], crossing: true });
+            }
+
+            // Accumulate explicit intersection points; grouping will be applied after collecting all for this submain
+            intersections.forEach((coords) => subIntersections.push({ lng: coords[0], lat: coords[1], crossing: isCrossing }));
+
+            // Also treat lateral endpoints that are very close to submain as junctions (T)
+            try {
+                const attachThresholdMeters2 = 1.2; // tighter tolerance to avoid misclassifying crossings as tees
+                const endpoints: [number, number][] = [
+                    latCoords[0],
+                    latCoords[latCoords.length - 1],
+                ];
+                endpoints.forEach(([lng, lat]) => {
+                    const p = turf.point([lng, lat]);
+                    const distKm = pointToLineDistance(p, subLine as unknown as GeoFeature<GeoLineString>, { units: 'kilometers' });
+                    if (distKm * 1000 <= attachThresholdMeters2) {
+                        // endpoint touch: tee on one side, not crossing
+                        subIntersections.push({ lng, lat, crossing: false });
+                    }
+                });
+            } catch {
+                // ignore numerical robustness errors
+            }
+        });
+
+        // Group intersections by proximity in meters along/near the submain
+        // Use a small tolerance to avoid accidentally merging distinct crossings
+        const clusters = clusterIntersectionsByDistanceOnSubmain(subCoords, subIntersections, 0.2);
+        if (clusters.length > 0) {
+            try {
+                console.log('🔗 Submain junction clusters', {
+                    submainId: mapKey,
+                    clusterCount: clusters.length,
+                    clusters,
+                });
+            } catch (error) {
+                console.warn('Failed to log submain junction clusters', error);
+            }
+        }
+        // Apply final rules:
+        // - If cluster hasCrossing=true → 4-way (middle) or 3-way (end)
+        // - If hasCrossing=false → 2-way (single side)
+        clusters.forEach(({ hasCrossing }, idx) => {
+            const isEnd = idx === 0 || idx === clusters.length - 1;
+            if (hasCrossing) {
+                if (isEnd) threeWaySubDirect += 1; else fourWaySubDirect += 1;
+            } else {
+                twoWaySubAdd += 1;
+            }
+            const key = `cluster_${String(idx)}`;
+            intersectionCountsPerSubmain[mapKey][key] = hasCrossing ? 2 : 1;
+        });
+    });
+    // Use the direct side-aware totals
+    const threeWayMain = threeWayAtMain;
+    const threeWaySub = threeWaySubDirect;
+    const fourWaySub = fourWaySubDirect;
+
+    // Rule: Lateral has 3-way per sprinkler except the last sprinkler uses a 2-way
+    const sprinklerTypes = new Set(['sprinkler', 'mini_sprinkler', 'micro_spray']);
+    let threeWayLat = 0;
+    let twoWayLat = 0;
+    const sprinklerAttachThresholdMeters = 1.5;
+
+    lateralPipes.forEach((latPipe) => {
+        const coords = (latPipe.coordinates || [])
+            .map((c) => toLngLat(c))
+            .filter((v): v is [number, number] => v !== null);
+        if (coords.length < 2) return;
+        const line = turf.lineString(coords);
+
+        const sprinklersOnLateral = irrigationPoints.filter((pt) => {
+            const type = normalizeIrrigationType(pt.type);
+            if (!sprinklerTypes.has(type)) return false;
+            if (typeof pt.lat !== 'number' || typeof pt.lng !== 'number') return false;
+            const point = turf.point([pt.lng, pt.lat]);
+            const distKm = pointToLineDistance(point, line, { units: 'kilometers' });
+            return distKm * 1000 <= sprinklerAttachThresholdMeters;
+        }).length;
+
+        if (sprinklersOnLateral > 0) {
+            // tees for all sprinklers except the last one
+            threeWayLat += Math.max(0, sprinklersOnLateral - 1);
+            // last sprinkler uses a 2-way
+            twoWayLat += 1;
+        }
+    });
+
+    return {
+        twoWay: twoWayMain + twoWayLat + twoWaySubAdd,
+        threeWay: threeWayMain + threeWaySub + threeWayLat,
+        fourWay: fourWaySub,
+        breakdown: {
+            main: { twoWay: twoWayMain, threeWay: threeWayMain, fourWay: 0 },
+            submain: { twoWay: twoWaySubAdd, threeWay: threeWaySub, fourWay: fourWaySub },
+            lateral: { twoWay: twoWayLat, threeWay: threeWayLat, fourWay: 0 },
+        },
+    };
+};
+
 // Add the missing calculateZoneIrrigationCounts function
 const calculateZoneIrrigationCounts = (
     zone: Zone,
@@ -1564,6 +2020,9 @@ export default function FieldCropSummary() {
     const submainPipeStats = calculatePipeStats(actualPipes, 'submain');
     const lateralPipeStats = calculatePipeStats(actualPipes, 'lateral');
 
+    // Calculate fittings (2-way, 3-way, 4-way)
+    const fittings = calculateFittingsCounts(actualPipes, uniqueIrrigationPoints);
+
     const uniqueEquipment = actualEquipmentIcons.filter(
         (equipment, index, array) => array.findIndex((e) => e.id === equipment.id) === index
     );
@@ -2019,6 +2478,91 @@ export default function FieldCropSummary() {
                                             </div>
                                         </div>
                                     </div>
+                                    {/* Fittings section */}
+                                    <div className="mb-3">
+                                        <h3 className="mb-2 text-sm font-semibold text-rose-400 print:text-xs print:text-black">
+                                            🔩 {t('Fittings (2-way / 3-way / 4-way)')}
+                                        </h3>
+                                        {/* Totals */}
+                                        <div className="grid grid-cols-3 gap-1">
+                                            <div className="rounded bg-gray-700 p-1 text-center print:border print:bg-gray-50">
+                                                <div className="text-sm font-bold text-rose-400">
+                                                    {fittings.twoWay}
+                                                </div>
+                                                <div className="text-xs text-gray-400">{t('2-way')}</div>
+                                            </div>
+                                            <div className="rounded bg-gray-700 p-1 text-center print:border print:bg-gray-50">
+                                                <div className="text-sm font-bold text-rose-400">
+                                                    {fittings.threeWay}
+                                                </div>
+                                                <div className="text-xs text-gray-400">{t('3-way')}</div>
+                                            </div>
+                                            <div className="rounded bg-gray-700 p-1 text-center print:border print:bg-gray-50">
+                                                <div className="text-sm font-bold text-rose-400">
+                                                    {fittings.fourWay}
+                                                </div>
+                                                <div className="text-xs text-gray-400">{t('4-way')}</div>
+                                            </div>
+                                        </div>
+                                        {/* Breakdown by pipe type */}
+                                        <div className="mt-2 grid grid-cols-3 gap-1 text-xs">
+                                            <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
+                                                <div className="mb-1 font-semibold text-blue-300">{t('Main')}</div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-gray-300">{t('2-way')}</span>
+                                                    <span className="font-bold text-blue-300">{fittings.breakdown.main.twoWay}</span>
+                                                </div>
+                                                <div className="mt-1 flex items-center justify-between">
+                                                    <span className="text-gray-300">{t('3-way')}</span>
+                                                    <span className="font-bold text-blue-300">{fittings.breakdown.main.threeWay}</span>
+                                                </div>
+                                            </div>
+                                            <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
+                                                <div className="mb-1 font-semibold text-green-300">{t('Submain')}</div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-gray-300">{t('2-way')}</span>
+                                                    <span className="font-bold text-green-300">{fittings.breakdown.submain.twoWay}</span>
+                                                </div>
+                                                <div className="mt-1 flex items-center justify-between">
+                                                    <span className="text-gray-300">{t('3-way')}</span>
+                                                    <span className="font-bold text-green-300">{fittings.breakdown.submain.threeWay}</span>
+                                                </div>
+                                                <div className="mt-1 flex items-center justify-between">
+                                                    <span className="text-gray-300">{t('4-way')}</span>
+                                                    <span className="font-bold text-green-300">{fittings.breakdown.submain.fourWay}</span>
+                                                </div>
+                                            </div>
+                                            <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
+                                                <div className="mb-1 font-semibold text-purple-300">{t('Lateral')}</div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-gray-300">{t('2-way')}</span>
+                                                    <span className="font-bold text-purple-300">{fittings.breakdown.lateral.twoWay}</span>
+                                                </div>
+                                                <div className="mt-1 flex items-center justify-between">
+                                                    <span className="text-gray-300">{t('3-way')}</span>
+                                                    <span className="font-bold text-purple-300">{fittings.breakdown.lateral.threeWay}</span>
+                                                </div>
+                                                <div className="mt-1 flex items-center justify-between">
+                                                    <span className="text-gray-300">{t('4-way')}</span>
+                                                    <span className="font-bold text-purple-300">{fittings.breakdown.lateral.fourWay}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="mt-2 rounded bg-rose-900/30 p-2 text-xs text-rose-100 print:bg-rose-50 print:text-rose-800">
+                                            <div>{t('Rules:')}</div>
+                                            <ul className="ml-4 list-disc space-y-1">
+                                                <li>
+                                                    {t('Main: 2-way at each internal corner and at both endpoints.')}
+                                                </li>
+                                                <li>
+                                                    {t('Submain: 3-way per lateral branch; when two laterals branch at the same vertex, use one 4-way instead of two 3-way.')}
+                                                </li>
+                                                <li>
+                                                    {t('Lateral: 3-way at each sprinkler except the last sprinkler on each lateral uses a 2-way.')}
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
                                     <div>
                                         <h3 className="mb-2 text-sm font-semibold text-cyan-400 print:text-xs print:text-black">
                                             💧 {t('Irrigation System')}
@@ -2434,16 +2978,15 @@ export default function FieldCropSummary() {
 
                                                                 {/* เพิ่มส่วนแสดงจำนวนสปริงเกอร์แต่ละประเภท */}
                                                                 <div className="mb-3">
-                                                                    <div className="mb-2 text-xs font-medium text-blue-200 print:text-blue-700">
-                                                                        💧 Irrigation Points in
-                                                                        Zone:
-                                                                    </div>
+                                                <div className="mb-2 text-xs font-medium text-blue-200 print:text-blue-700">
+                                                    💧 {t('Irrigation Points in Zone:')}
+                                                </div>
                                                                     <div className="grid grid-cols-2 gap-2 text-xs">
                                                                         {zoneIrrigationCounts.sprinkler >
                                                                             0 && (
                                                                             <div className="rounded bg-blue-700/20 p-2 text-center print:bg-blue-50">
                                                                                 <div className="text-blue-200 print:text-blue-800">
-                                                                                    🟢 Sprinklers {zoneIrrigationCounts.sprinkler} อัน
+                                                                                    🟢 {t('Sprinklers')} {zoneIrrigationCounts.sprinkler} {t('units')}
                                                                                 </div>
                                                                             </div>
                                                                         )}
@@ -2451,7 +2994,7 @@ export default function FieldCropSummary() {
                                                                             0 && (
                                                                             <div className="rounded bg-blue-700/20 p-2 text-center print:bg-blue-50">
                                                                                 <div className="text-blue-200 print:text-blue-800">
-                                                                                    🟢 Mini Sprinklers {zoneIrrigationCounts.miniSprinkler} อัน
+                                                                                    🟢 {t('Mini Sprinklers')} {zoneIrrigationCounts.miniSprinkler} {t('units')}
                                                                                 </div>
                                                                             </div>
                                                                         )}
@@ -2459,7 +3002,7 @@ export default function FieldCropSummary() {
                                                                             0 && (
                                                                             <div className="rounded bg-blue-700/20 p-2 text-center print:bg-blue-50">
                                                                                 <div className="text-blue-200 print:text-blue-800">
-                                                                                    🟠 Micro Sprays {zoneIrrigationCounts.microSpray} อัน
+                                                                                    🟠 {t('Micro Sprays')} {zoneIrrigationCounts.microSpray} {t('units')}
                                                                                 </div>
                                                                             </div>
                                                                         )}
@@ -2467,7 +3010,7 @@ export default function FieldCropSummary() {
                                                                             0 && (
                                                                             <div className="rounded bg-blue-700/20 p-2 text-center print:bg-blue-50">
                                                                                 <div className="text-blue-200 print:text-blue-800">
-                                                                                    🟣 Drip Tape {zoneIrrigationCounts.dripTape} อัน
+                                                                                    🟣 {t('Drip Tape')} {zoneIrrigationCounts.dripTape} {t('units')}
                                                                                 </div>
                                                                             </div>
                                                                         )}

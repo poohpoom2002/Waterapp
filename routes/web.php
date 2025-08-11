@@ -5,6 +5,7 @@ use Inertia\Inertia;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SuperUserController;
 use App\Http\Controllers\FarmController; // เพิ่มบรรทัดนี้
+use App\Http\Controllers\ProfilePhotoController;
 
 /*
 |--------------------------------------------------------------------------
