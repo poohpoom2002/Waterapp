@@ -14,6 +14,7 @@ import {
     clipCircleToPolygon,
     calculatePolygonArea,
 } from '../../utils/homeGardenData';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 const getGoogleMapsConfig = () => {
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
@@ -375,9 +376,29 @@ const DrawingManager: React.FC<{
                 drawingControl: editMode === 'draw',
                 drawingControlOptions: {
                     position: google.maps.ControlPosition.TOP_CENTER,
-                    drawingModes: [google.maps.drawing.OverlayType.POLYGON],
+                    drawingModes: [
+                        google.maps.drawing.OverlayType.POLYGON,
+                        google.maps.drawing.OverlayType.RECTANGLE,
+                        google.maps.drawing.OverlayType.CIRCLE,
+                    ],
                 },
                 polygonOptions: {
+                    fillColor: zoneType?.color || '#666666',
+                    fillOpacity: 0.3,
+                    strokeWeight: 2,
+                    editable: true,
+                    draggable: true,
+                    strokeColor: zoneType?.color || '#666666',
+                },
+                rectangleOptions: {
+                    fillColor: zoneType?.color || '#666666',
+                    fillOpacity: 0.3,
+                    strokeWeight: 2,
+                    editable: true,
+                    draggable: true,
+                    strokeColor: zoneType?.color || '#666666',
+                },
+                circleOptions: {
                     fillColor: zoneType?.color || '#666666',
                     fillOpacity: 0.3,
                     strokeWeight: 2,
@@ -389,6 +410,41 @@ const DrawingManager: React.FC<{
 
             drawingManager.setMap(map);
             drawingManagerRef.current = drawingManager;
+
+            // Helper function to convert rectangle to polygon coordinates
+            const rectangleToPolygon = (rectangle: google.maps.Rectangle): Coordinate[] => {
+                const bounds = rectangle.getBounds();
+                if (!bounds) return [];
+                
+                const ne = bounds.getNorthEast();
+                const sw = bounds.getSouthWest();
+                
+                return [
+                    { lat: ne.lat(), lng: sw.lng() }, // top-left
+                    { lat: ne.lat(), lng: ne.lng() }, // top-right
+                    { lat: sw.lat(), lng: ne.lng() }, // bottom-right
+                    { lat: sw.lat(), lng: sw.lng() }, // bottom-left
+                ];
+            };
+
+            // Helper function to convert circle to polygon coordinates
+            const circleToPolygon = (circle: google.maps.Circle): Coordinate[] => {
+                const center = circle.getCenter();
+                const radius = circle.getRadius();
+                if (!center || !radius) return [];
+                
+                const coordinates: Coordinate[] = [];
+                const numPoints = 32; // Number of points to approximate circle
+                
+                for (let i = 0; i < numPoints; i++) {
+                    const angle = (i * 2 * Math.PI) / numPoints;
+                    const lat = center.lat() + (radius / 111000) * Math.cos(angle);
+                    const lng = center.lng() + (radius / (111000 * Math.cos((center.lat() * Math.PI) / 180))) * Math.sin(angle);
+                    coordinates.push({ lat, lng });
+                }
+                
+                return coordinates;
+            };
 
             const polygonCompleteListener = drawingManager.addListener(
                 'polygoncomplete',
@@ -405,7 +461,33 @@ const DrawingManager: React.FC<{
                         onZoneCreated(coordinates);
                         polygon.setMap(null);
                     } catch (error) {
-                        console.error('Error creating zone:', error);
+                        console.error('Error creating zone from polygon:', error);
+                    }
+                }
+            );
+
+            const rectangleCompleteListener = drawingManager.addListener(
+                'rectanglecomplete',
+                (rectangle: google.maps.Rectangle) => {
+                    try {
+                        const coordinates = rectangleToPolygon(rectangle);
+                        onZoneCreated(coordinates);
+                        rectangle.setMap(null);
+                    } catch (error) {
+                        console.error('Error creating zone from rectangle:', error);
+                    }
+                }
+            );
+
+            const circleCompleteListener = drawingManager.addListener(
+                'circlecomplete',
+                (circle: google.maps.Circle) => {
+                    try {
+                        const coordinates = circleToPolygon(circle);
+                        onZoneCreated(coordinates);
+                        circle.setMap(null);
+                    } catch (error) {
+                        console.error('Error creating zone from circle:', error);
                     }
                 }
             );
@@ -426,6 +508,8 @@ const DrawingManager: React.FC<{
                     drawingManagerRef.current.setMap(null);
                 }
                 google.maps.event.removeListener(polygonCompleteListener);
+                google.maps.event.removeListener(rectangleCompleteListener);
+                google.maps.event.removeListener(circleCompleteListener);
                 google.maps.event.removeListener(clickListener);
             };
         } catch (error) {
@@ -513,9 +597,11 @@ const ClippedSprinklerCoverage: React.FC<{
                 });
                 overlayRef.current.push(circle);
             } else if (result === 'MASKED_CIRCLE') {
+                // Create a more precise clipped circle using intersection points
                 const intersectionPoints: Coordinate[] = [];
-                const numCirclePoints = 64;
+                const numCirclePoints = 128; // Increased precision
 
+                // Add circle points that are inside the zone
                 for (let i = 0; i < numCirclePoints; i++) {
                     const angle = (i * 2 * Math.PI) / numCirclePoints;
                     const lat = center.lat + (radius / 111000) * Math.cos(angle);
@@ -530,6 +616,7 @@ const ClippedSprinklerCoverage: React.FC<{
                     }
                 }
 
+                // Add zone vertices that are within the circle radius
                 zoneCoordinates.forEach((vertex) => {
                     const distance = Math.sqrt(
                         Math.pow((vertex.lat - center.lat) * 111000, 2) +
@@ -545,44 +632,64 @@ const ClippedSprinklerCoverage: React.FC<{
                     }
                 });
 
+                // Find intersection points between circle and line segment
+                for (let i = 0; i < zoneCoordinates.length; i++) {
+                    const edgeStart = zoneCoordinates[i];
+                    const edgeEnd = zoneCoordinates[(i + 1) % zoneCoordinates.length];
+                    
+                    // Calculate intersection points between circle and line segment
+                    const intersections = getCircleLineIntersectionsGPS(center, radius, edgeStart, edgeEnd);
+                    intersectionPoints.push(...intersections);
+                }
+
                 if (intersectionPoints.length >= 3) {
-                    const centroidLat =
-                        intersectionPoints.reduce((sum, p) => sum + p.lat, 0) /
-                        intersectionPoints.length;
-                    const centroidLng =
-                        intersectionPoints.reduce((sum, p) => sum + p.lng, 0) /
-                        intersectionPoints.length;
+                    // Remove duplicate points
+                    const uniquePoints = removeDuplicatePointsGPS(intersectionPoints);
+                    
+                    if (uniquePoints.length >= 3) {
+                        // Sort points clockwise around the center
+                        const centroidLat =
+                            uniquePoints.reduce((sum, p) => sum + p.lat, 0) /
+                            uniquePoints.length;
+                        const centroidLng =
+                            uniquePoints.reduce((sum, p) => sum + p.lng, 0) /
+                            uniquePoints.length;
 
-                    intersectionPoints.sort((a, b) => {
-                        const angleA = Math.atan2(a.lat - centroidLat, a.lng - centroidLng);
-                        const angleB = Math.atan2(b.lat - centroidLat, b.lng - centroidLng);
-                        return angleA - angleB;
-                    });
+                        uniquePoints.sort((a, b) => {
+                            const angleA = Math.atan2(a.lat - centroidLat, a.lng - centroidLng);
+                            const angleB = Math.atan2(b.lat - centroidLat, b.lng - centroidLng);
+                            return angleA - angleB;
+                        });
 
-                    const polygon = new google.maps.Polygon({
-                        paths: intersectionPoints.map((p) => ({ lat: p.lat, lng: p.lng })),
-                        fillColor: selectedColor,
-                        fillOpacity: isSelected ? 0.3 : 0.2,
-                        strokeColor: selectedColor,
-                        strokeOpacity: isSelected ? 0.8 : 0.6,
-                        strokeWeight: 2,
-                        map: map,
-                        clickable: false,
-                    });
-                    overlayRef.current.push(polygon);
+                        const polygon = new google.maps.Polygon({
+                            paths: uniquePoints.map((p) => ({ lat: p.lat, lng: p.lng })),
+                            fillColor: selectedColor,
+                            fillOpacity: isSelected ? 0.3 : 0.2,
+                            strokeColor: selectedColor,
+                            strokeOpacity: isSelected ? 0.8 : 0.6,
+                            strokeWeight: 2,
+                            map: map,
+                            clickable: false,
+                        });
+                        overlayRef.current.push(polygon);
+                    } else {
+                        // Fallback to simple circle if not enough points
+                        const circle = new google.maps.Circle({
+                            center: { lat: center.lat, lng: center.lng },
+                            radius: radius,
+                            fillColor: selectedColor,
+                            fillOpacity: isSelected ? 0.15 : 0.1,
+                            strokeColor: selectedColor,
+                            strokeOpacity: isSelected ? 0.6 : 0.4,
+                            strokeWeight: 1,
+                            map: map,
+                            clickable: false,
+                        });
+                        overlayRef.current.push(circle);
+                    }
                 } else {
-                    const circle = new google.maps.Circle({
-                        center: { lat: center.lat, lng: center.lng },
-                        radius: radius,
-                        fillColor: selectedColor,
-                        fillOpacity: isSelected ? 0.15 : 0.1,
-                        strokeColor: selectedColor,
-                        strokeOpacity: isSelected ? 0.6 : 0.4,
-                        strokeWeight: 1,
-                        map: map,
-                        clickable: false,
-                    });
-                    overlayRef.current.push(circle);
+                    // No intersection points, don't show anything
+                    return;
                 }
             } else if (Array.isArray(result) && result.length >= 3) {
                 const coordinates = result as Coordinate[];
@@ -598,38 +705,12 @@ const ClippedSprinklerCoverage: React.FC<{
                 });
                 overlayRef.current.push(polygon);
             } else {
-                const circle = new google.maps.Circle({
-                    center: { lat: center.lat, lng: center.lng },
-                    radius: radius,
-                    fillColor: selectedColor,
-                    fillOpacity: isSelected ? 0.15 : 0.1,
-                    strokeColor: selectedColor,
-                    strokeOpacity: isSelected ? 0.6 : 0.4,
-                    strokeWeight: 1,
-                    map: map,
-                    clickable: false,
-                });
-                overlayRef.current.push(circle);
+                // No coverage, don't show anything
+                return;
             }
         } catch (error) {
             console.error(`Error creating clipped sprinkler coverage for ${sprinklerId}:`, error);
-
-            try {
-                const circle = new google.maps.Circle({
-                    center: { lat: center.lat, lng: center.lng },
-                    radius: radius,
-                    fillColor: isSelected ? '#FFD700' : color,
-                    fillOpacity: 0.15,
-                    strokeColor: isSelected ? '#FFD700' : color,
-                    strokeOpacity: 0.5,
-                    strokeWeight: 1,
-                    map: map,
-                    clickable: false,
-                });
-                overlayRef.current.push(circle);
-            } catch (fallbackError) {
-                console.error('Error creating fallback circle:', fallbackError);
-            }
+            // Don't show fallback circle to ensure strict zone boundaries
         }
 
         return () => {
@@ -649,9 +730,85 @@ const ClippedSprinklerCoverage: React.FC<{
     return null;
 };
 
+// Helper function to find intersection points between circle and line segment in GPS coordinates
+function getCircleLineIntersectionsGPS(
+    center: Coordinate,
+    radius: number,
+    lineStart: Coordinate,
+    lineEnd: Coordinate
+): Coordinate[] {
+    const centerLat = (center.lat * Math.PI) / 180;
+    const metersPerDegreeLat =
+        111132.92 - 559.82 * Math.cos(2 * centerLat) + 1.175 * Math.cos(4 * centerLat);
+    const metersPerDegreeLng = 111412.84 * Math.cos(centerLat) - 93.5 * Math.cos(3 * centerLat);
+
+    const radiusInDegreesLat = radius / metersPerDegreeLat;
+    const radiusInDegreesLng = radius / metersPerDegreeLng;
+
+    const dx = lineEnd.lng - lineStart.lng;
+    const dy = lineEnd.lat - lineStart.lat;
+    const fx = lineStart.lng - center.lng;
+    const fy = lineStart.lat - center.lat;
+
+    // Use average radius for calculations
+    const avgRadius = (radiusInDegreesLat + radiusInDegreesLng) / 2;
+
+    const a = dx * dx + dy * dy;
+    const b = 2 * (fx * dx + fy * dy);
+    const c = fx * fx + fy * fy - avgRadius * avgRadius;
+
+    const discriminant = b * b - 4 * a * c;
+
+    if (discriminant < 0) {
+        return [];
+    }
+
+    const discriminantSqrt = Math.sqrt(discriminant);
+    const t1 = (-b - discriminantSqrt) / (2 * a);
+    const t2 = (-b + discriminantSqrt) / (2 * a);
+
+    const intersections: Coordinate[] = [];
+
+    if (t1 >= 0 && t1 <= 1) {
+        intersections.push({
+            lat: lineStart.lat + t1 * dy,
+            lng: lineStart.lng + t1 * dx,
+        });
+    }
+
+    if (t2 >= 0 && t2 <= 1 && Math.abs(t2 - t1) > 0.0001) {
+        intersections.push({
+            lat: lineStart.lat + t2 * dy,
+            lng: lineStart.lng + t2 * dx,
+        });
+    }
+
+    return intersections;
+}
+
+// Helper function to remove duplicate points in GPS coordinates
+function removeDuplicatePointsGPS(points: Coordinate[]): Coordinate[] {
+    const uniquePoints: Coordinate[] = [];
+    const tolerance = 0.000001; // About 1 meter in degrees
+
+    for (const point of points) {
+        const isDuplicate = uniquePoints.some(
+            (existing) =>
+                Math.abs(existing.lat - point.lat) < tolerance &&
+                Math.abs(existing.lng - point.lng) < tolerance
+        );
+        if (!isDuplicate) {
+            uniquePoints.push(point);
+        }
+    }
+
+    return uniquePoints;
+}
+
 const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google.maps.Map }> = (
     props
 ) => {
+    const { t } = useLanguage();
     const overlaysRef = useRef<Map<string, google.maps.MVCObject>>(new Map());
     const [mapCenter, setMapCenter] = useState<[number, number]>(props.mapCenter);
     const [isDragging, setIsDragging] = useState(false);
@@ -777,15 +934,11 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
         []
     );
 
-    const createWaterSourceIcon = useCallback((type: 'main' | 'pump'): google.maps.Symbol => {
+    const createWaterSourceIcon = useCallback((type: 'main' | 'pump'): google.maps.Icon => {
         return {
-            path: google.maps.SymbolPath.CIRCLE,
-            fillColor: type === 'pump' ? '#EF4444' : '#3B82F6',
-            fillOpacity: 1,
-            strokeColor: '#FFFFFF',
-            strokeWeight: 3,
-            scale: 8,
-            labelOrigin: new google.maps.Point(0, 0),
+            url: '/images/water-pump.png',
+            scaledSize: new google.maps.Size(28, 28),
+            anchor: new google.maps.Point(14, 14),
         };
     }, []);
 
@@ -831,6 +984,9 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                         }
                     });
 
+                    // Disabled: Main pipe drawing - redundant with auto-generated pipes
+                    // This prevents overlapping lines that confuse users
+                    /*
                     if (props.mainPipeDrawing.length > 0) {
                         try {
                             const polyline = new google.maps.Polyline({
@@ -868,32 +1024,43 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                             console.error('Error rendering main pipe:', error);
                         }
                     }
+                    */
 
-                    props.pipes
+                    // Sort pipes to render selected pipes with higher z-index (on top)
+                    const sortedPipes = props.pipes
                         ?.filter((p) => p.type === 'pipe')
-                        .forEach((pipe) => {
-                            try {
-                                const isSelected = props.selectedPipes.has(pipe.id);
-                                const polyline = new google.maps.Polyline({
-                                    path: [
-                                        { lat: pipe.start.lat, lng: pipe.start.lng },
-                                        { lat: pipe.end.lat, lng: pipe.end.lng },
-                                    ],
-                                    strokeColor: isSelected ? '#FBBF24' : '#8B5CF6',
-                                    strokeWeight: isSelected ? 8 : 6,
-                                    strokeOpacity: 0.9,
-                                    map: props.map,
-                                    clickable: true,
-                                });
-
-                                polyline.addListener('click', () => {
-                                    props.onPipeClick(pipe.id);
-                                });
-                                overlaysRef.current.set(`pipe-${pipe.id}`, polyline);
-                            } catch (error) {
-                                console.error(`Error rendering pipe ${pipe.id}:`, error);
-                            }
+                        .sort((a, b) => {
+                            const aSelected = props.selectedPipes.has(a.id);
+                            const bSelected = props.selectedPipes.has(b.id);
+                            if (aSelected && !bSelected) return 1; // Draw selected pipes last
+                            if (!aSelected && bSelected) return -1; // Draw non-selected pipes first
+                            return 0; // Keep original order for pipes with same selection state
                         });
+
+                    sortedPipes?.forEach((pipe, index) => {
+                        try {
+                            const isSelected = props.selectedPipes.has(pipe.id);
+                            const polyline = new google.maps.Polyline({
+                                path: [
+                                    { lat: pipe.start.lat, lng: pipe.start.lng },
+                                    { lat: pipe.end.lat, lng: pipe.end.lng },
+                                ],
+                                strokeColor: isSelected ? '#FBBF24' : '#8B5CF6',
+                                strokeWeight: isSelected ? 8 : 6,
+                                strokeOpacity: 0.9,
+                                map: props.map,
+                                clickable: true,
+                                zIndex: isSelected ? 1000 + index : 100 + index, // Higher z-index for selected pipes
+                            });
+
+                            polyline.addListener('click', () => {
+                                props.onPipeClick(pipe.id);
+                            });
+                            overlaysRef.current.set(`pipe-${pipe.id}`, polyline);
+                        } catch (error) {
+                            console.error(`Error rendering pipe ${pipe.id}:`, error);
+                        }
+                    });
 
                     props.sprinklers?.forEach((sprinkler) => {
                         if (!sprinkler.position) return;
@@ -967,21 +1134,7 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                                     lat: props.waterSource.position.lat,
                                     lng: props.waterSource.position.lng,
                                 },
-                                icon: {
-                                    path: google.maps.SymbolPath.CIRCLE,
-                                    fillColor:
-                                        props.waterSource.type === 'pump' ? '#EF4444' : '#3B82F6',
-                                    fillOpacity: 1,
-                                    strokeColor: '#FFFFFF',
-                                    strokeWeight: 3,
-                                    scale: 8,
-                                    labelOrigin: new google.maps.Point(0, 0),
-                                },
-                                label: {
-                                    text: props.waterSource.type === 'pump' ? '⚡' : '🚰',
-                                    fontSize: '20px',
-                                    fontWeight: 'bold',
-                                },
+                                icon: createWaterSourceIcon(props.waterSource.type),
                                 title: `แหล่งน้ำ: ${props.waterSource.type === 'pump' ? 'ปั๊มน้ำ' : 'ท่อเมน'}`,
                                 draggable: false,
                                 map: props.map,
@@ -1080,6 +1233,77 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                         />
                     );
                 })}
+
+            {/* UI Instructions */}
+            {props.editMode === 'drag-sprinkler' && (
+                <div className="absolute bottom-4 left-4 rounded-lg border border-orange-500 bg-gray-800/90 p-4 text-sm text-white backdrop-blur">
+                    <div className="mb-2 flex items-center gap-2">
+                        <span className="text-orange-400">↔️</span>
+                        <span className="font-semibold">{t('โหมดย้ายหัวฉีด')}</span>
+                    </div>
+                    <div>🖱️ {t('ลากหัวฉีดเพื่อย้ายตำแหน่ง')}</div>
+                    <div>🖱️ {t('คลิกขวาเพื่อลบหัวฉีด')}</div>
+                    <div className="text-xs text-gray-300">
+                        🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนแผนที่')}
+                    </div>
+                </div>
+            )}
+
+            {props.editMode === 'place' && (
+                <div className="absolute bottom-4 left-4 rounded-lg border border-green-500 bg-gray-800/90 p-4 text-sm text-white backdrop-blur">
+                    <div className="mb-2 flex items-center gap-2">
+                        <span className="text-green-400">💧</span>
+                        <span className="font-semibold">{t('โหมดวางหัวฉีด')}</span>
+                    </div>
+                    <div>🎯 {t('คลิกเพื่อวางหัวฉีด')}</div>
+                    <div className="mt-1 text-xs text-gray-300">
+                        {t('รัศมี:')} {props.manualSprinklerRadius}
+                        {t('ม.')} • 🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} •{' '}
+                        {t('ลากเพื่อเลื่อนแผนที่')}
+                    </div>
+                </div>
+            )}
+
+            {props.editMode === 'edit' && (
+                <div className="absolute bottom-4 left-4 rounded-lg border border-yellow-500 bg-gray-800/90 p-4 text-sm text-white backdrop-blur">
+                    <div className="mb-2 flex items-center gap-2">
+                        <img 
+                            src="/images/water-pump.png" 
+                            alt="Water Pump" 
+                            className="w-4 h-4 object-contain"
+                        />
+                        <span className="font-semibold">{t('โหมดจัดการแหล่งน้ำ')}</span>
+                    </div>
+                    <div>🎯 {t('คลิกเพื่อวางแหล่งน้ำ')}</div>
+                    <div>🖱️ {t('คลิกขวาบนแหล่งน้ำเพื่อลบ')}</div>
+                    <div className="text-xs text-gray-300">
+                        🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนแผนที่')}
+                    </div>
+                </div>
+            )}
+
+            {(props.pipeEditMode === 'add' || props.pipeEditMode === 'remove') && (
+                <div className="absolute bottom-12 left-4 rounded-lg border border-purple-500 bg-gray-800/90 p-4 text-sm text-white backdrop-blur">
+                    <div className="mb-2 flex items-center gap-2">
+                        <span className="text-purple-400">🔧</span>
+                        <span className="font-semibold">
+                            {props.pipeEditMode === 'add'
+                                ? t('เพิ่มท่อ')
+                                : t('ลบท่อ')}
+                        </span>
+                    </div>
+                    <div>
+                        {props.pipeEditMode === 'add'
+                            ? `🎯 ${t('เลือกหัวฉีด 2 ตัวเพื่อเชื่อมต่อ')} (${props.selectedSprinklersForPipe.length}/2)`
+                            : `🎯 ${t('เลือกหัวฉีด 2 ตัวเพื่อลบท่อ')} (${props.selectedSprinklersForPipe.length}/2)`}
+                    </div>
+                    <div className="text-xs text-gray-300">
+                        🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนแผนที่')}
+                    </div>
+                </div>
+            )}
+
+            
         </>
     );
 };

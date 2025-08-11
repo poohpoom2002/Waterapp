@@ -18,6 +18,7 @@ import {
     formatDistance,
     clipCircleToPolygon,
     canvasToGPS,
+    calculatePipeStatistics,
 } from '../../utils/homeGardenData';
 import { useLanguage } from '../../contexts/LanguageContext';
 interface ZoneDrawingTool {
@@ -116,7 +117,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         scale: 20,
     });
 
-    const [enhancedMode, setEnhancedMode] = useState(false);
+    const [enhancedMode, setEnhancedMode] = useState(true);
     const [currentZoneTool, setCurrentZoneTool] = useState<string>('rectangle');
 
     const [enhancedDrawing, setEnhancedDrawing] = useState({
@@ -194,9 +195,40 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         },
     ];
 
-    const getEffectiveScale = useCallback(() => {
-        return (enhancedMode ? enhancedScale : canvasData.scale) * viewport.zoom;
-    }, [enhancedMode, enhancedScale, canvasData.scale, viewport.zoom]);
+    const pixelsToMeters = useCallback(
+        (pixels: number) => {
+            // ใช้ scale ที่ไม่รวม zoom เพื่อให้การวัดระยะทางถูกต้อง
+            const baseScale = enhancedMode ? enhancedScale : canvasData.scale;
+            return pixels / baseScale;
+        },
+        [enhancedMode, enhancedScale, canvasData.scale]
+    );
+
+    const formatEnhancedDistance = useCallback(
+        (pixels: number) => {
+            const meters = pixelsToMeters(pixels);
+            if (meters >= 1) {
+                return `${meters.toFixed(2)} ม.`;
+            } else {
+                return `${(meters * 100).toFixed(1)} ซม.`;
+            }
+        },
+        [pixelsToMeters]
+    );
+
+    const formatEnhancedArea = useCallback(
+        (pixels: number) => {
+            // ใช้ scale ที่ไม่รวม zoom เพื่อให้การวัดพื้นที่ถูกต้อง
+            const baseScale = enhancedMode ? enhancedScale : canvasData.scale;
+            const sqMeters = pixels / (baseScale * baseScale);
+            if (sqMeters >= 1) {
+                return `${sqMeters.toFixed(2)} ตร.ม.`;
+            } else {
+                return `${(sqMeters * 10000).toFixed(0)} ตร.ซม.`;
+            }
+        },
+        [enhancedMode, enhancedScale, canvasData.scale]
+    );
 
     const worldToScreen = useCallback(
         (worldPos: CanvasCoordinate): CanvasCoordinate => {
@@ -216,36 +248,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             };
         },
         [viewport]
-    );
-
-    const pixelsToMeters = useCallback(
-        (pixels: number) => pixels / getEffectiveScale(),
-        [getEffectiveScale]
-    );
-
-    const formatEnhancedDistance = useCallback(
-        (pixels: number) => {
-            const meters = pixelsToMeters(pixels);
-            if (meters >= 1) {
-                return `${meters.toFixed(2)} ม.`;
-            } else {
-                return `${(meters * 100).toFixed(1)} ซม.`;
-            }
-        },
-        [pixelsToMeters]
-    );
-
-    const formatEnhancedArea = useCallback(
-        (pixels: number) => {
-            const scale = getEffectiveScale();
-            const sqMeters = pixels / (scale * scale);
-            if (sqMeters >= 1) {
-                return `${sqMeters.toFixed(2)} ตร.ม.`;
-            } else {
-                return `${(sqMeters * 10000).toFixed(0)} ตร.ซม.`;
-            }
-        },
-        [getEffectiveScale]
     );
 
     const distanceToLine = useCallback(
@@ -506,9 +508,9 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             const scale = enhancedMode ? enhancedScale : canvasData.scale;
             const area = calculatePolygonArea(coordinates, scale);
 
-            if (area > 300) {
+            if (area > 1200) {
                 alert(
-                    `❌ ขนาดพื้นที่เกินกำหนด!\n\nขนาดที่วาด: ${formatArea(area)}\nขนาดสูงสุดที่อนุญาต: 300 ตร.ม.\n\nกรุณาวาดพื้นที่ให้มีขนาดเล็กลง`
+                    `❌ ขนาดพื้นที่เกินกำหนด!\n\nขนาดที่วาด: ${formatArea(area)}\nขนาดสูงสุดที่อนุญาต: 1200 ตร.ม.\n\nกรุณาวาดพื้นที่ให้มีขนาดเล็กลง`
                 );
                 return;
             }
@@ -618,7 +620,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         (ctx: CanvasRenderingContext2D) => {
             if (!showRuler || !enhancedMode) return;
 
-            const scale = getEffectiveScale();
+            const baseScale = enhancedMode ? enhancedScale : canvasData.scale;
 
             ctx.save();
             ctx.fillStyle = '#444';
@@ -632,7 +634,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             const startWorldX = -viewport.panX;
             const endWorldX = startWorldX + canvasSize.width / viewport.zoom;
             const stepMeters = 5;
-            const stepPixels = stepMeters * (enhancedMode ? enhancedScale : canvasData.scale);
+            const stepPixels = stepMeters * baseScale;
 
             for (
                 let worldX = Math.floor(startWorldX / stepPixels) * stepPixels;
@@ -647,7 +649,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                     ctx.stroke();
 
                     if (worldX % (stepPixels * 2) === 0) {
-                        const meters = worldX / (enhancedMode ? enhancedScale : canvasData.scale);
+                        const meters = worldX / baseScale;
                         ctx.fillText(`${meters.toFixed(0)}m`, screenX + 2, 20);
                     }
                 }
@@ -669,7 +671,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                     ctx.stroke();
 
                     if (worldY % (stepPixels * 2) === 0 && worldY > 0) {
-                        const meters = -worldY / (enhancedMode ? enhancedScale : canvasData.scale);
+                        const meters = -worldY / baseScale;
                         ctx.save();
                         ctx.translate(20, screenY - 2);
                         ctx.rotate(-Math.PI / 2);
@@ -686,7 +688,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             enhancedMode,
             canvasSize,
             viewport,
-            getEffectiveScale,
             enhancedScale,
             canvasData.scale,
         ]
@@ -1103,6 +1104,12 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         [selectedSprinkler, selectedSprinklersForPipe, hoveredItem, worldToScreen, viewport]
     );
 
+    const imgPump = useMemo(() => {
+        const img = new Image();
+        img.src = '/images/water-pump.png';
+        return img;
+    }, []);
+
     const drawWaterSource = useCallback(
         (ctx: CanvasRenderingContext2D) => {
             if (!waterSource || !waterSource.canvasPosition) return;
@@ -1111,32 +1118,32 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
 
             ctx.save();
             ctx.shadowColor = 'rgba(0,0,0,0.6)';
-            ctx.shadowBlur = 8 / viewport.zoom;
-            ctx.shadowOffsetX = 2 / viewport.zoom;
-            ctx.shadowOffsetY = 2 / viewport.zoom;
+            ctx.shadowBlur = 12 / viewport.zoom;
+            ctx.shadowOffsetX = 4 / viewport.zoom;
+            ctx.shadowOffsetY = 4 / viewport.zoom;
 
-            ctx.fillStyle = waterSource.type === 'pump' ? '#EF4444' : '#3B82F6';
-            ctx.beginPath();
-            ctx.arc(screenPos.x, screenPos.y, 8 / viewport.zoom, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.shadowColor = 'transparent';
-            ctx.fillStyle = '#fff';
-            ctx.font = `bold ${10 / viewport.zoom}px Arial`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(waterSource.type === 'pump' ? '⚡' : '🚰', screenPos.x, screenPos.y);
+            const size = 24 / viewport.zoom;
+            ctx.drawImage(imgPump, screenPos.x - size / 2, screenPos.y - size / 2, size, size);
 
             ctx.restore();
         },
-        [waterSource, worldToScreen, viewport]
+        [waterSource, worldToScreen, viewport.zoom, imgPump]
     );
 
     const drawPipes = useCallback(
         (ctx: CanvasRenderingContext2D) => {
             ctx.save();
 
-            for (const pipe of pipes) {
+            // Sort pipes to draw selected pipes last (on top)
+            const sortedPipes = [...pipes].sort((a, b) => {
+                const aSelected = selectedPipes.has(a.id);
+                const bSelected = selectedPipes.has(b.id);
+                if (aSelected && !bSelected) return 1; // Draw selected pipes last
+                if (!aSelected && bSelected) return -1; // Draw non-selected pipes first
+                return 0; // Keep original order for pipes with same selection state
+            });
+
+            for (const pipe of sortedPipes) {
                 if (!pipe.canvasStart || !pipe.canvasEnd) continue;
 
                 const startScreen = worldToScreen(pipe.canvasStart);
@@ -1151,6 +1158,15 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 ctx.moveTo(startScreen.x, startScreen.y);
                 ctx.lineTo(endScreen.x, endScreen.y);
                 ctx.stroke();
+
+                // Add subtle glow effect for selected pipes
+                if (isSelected) {
+                    ctx.shadowColor = '#FBBF24';
+                    ctx.shadowBlur = 4 / viewport.zoom;
+                    ctx.stroke();
+                    ctx.shadowColor = 'transparent';
+                    ctx.shadowBlur = 0;
+                }
             }
 
             ctx.restore();
@@ -1442,7 +1458,8 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                     editMode !== 'main-pipe' &&
                     editMode !== 'drag-sprinkler' &&
                     editMode !== 'connect-sprinklers' &&
-                    !pipeEditMode);
+                    !pipeEditMode &&
+                    pipeEditMode === 'view');
 
             if (isMainClick && e.button === 0) {
                 setIsPanning(true);
@@ -1499,6 +1516,21 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 return;
             }
 
+            // Check sprinkler clicks first in pipe edit mode
+            if (pipeEditMode && (editMode === 'connect-sprinklers' || pipeEditMode)) {
+                const clickedSprinkler = sprinklers.find((s) => {
+                    if (!s.canvasPosition) return false;
+                    const dist = calculateDistance(worldPos, s.canvasPosition);
+                    return dist < 18 / viewport.zoom;
+                });
+
+                if (clickedSprinkler) {
+                    onSprinklerClick(clickedSprinkler.id);
+                    return;
+                }
+            }
+
+            // Then check pipe clicks
             if (editMode === 'select-pipes' || pipeEditMode) {
                 for (const pipe of pipes) {
                     if (!pipe.canvasStart || !pipe.canvasEnd) continue;
@@ -1620,17 +1652,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 return;
             }
 
-            if (editMode === 'connect-sprinklers' || pipeEditMode) {
-                const clickedSprinkler = sprinklers.find((s) => {
-                    if (!s.canvasPosition) return false;
-                    const dist = calculateDistance(worldPos, s.canvasPosition);
-                    return dist < 18 / viewport.zoom;
-                });
 
-                if (clickedSprinkler) {
-                    onSprinklerClick(clickedSprinkler.id);
-                }
-            }
         },
         [
             editMode,
@@ -1750,7 +1772,19 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
 
     const handleWheel = useCallback(
         (e: React.WheelEvent<HTMLCanvasElement>) => {
-            e.preventDefault();
+            // Check if this is a touch-generated wheel event
+            if (e.nativeEvent && 'touches' in e.nativeEvent) {
+                // This is a touch-generated wheel event, ignore it
+                return;
+            }
+            
+            try {
+                e.preventDefault();
+            } catch (error) {
+                // Ignore preventDefault errors in passive event listeners
+                return;
+            }
+            
             const rect = canvasRef.current?.getBoundingClientRect();
             if (!rect) return;
 
@@ -1849,6 +1883,29 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             }
         };
     }, [draw, needsRedraw]);
+
+    // Add non-passive wheel event listener to handle preventDefault properly
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const handleWheelNonPassive = (e: WheelEvent) => {
+            e.preventDefault();
+            
+            const rect = canvas.getBoundingClientRect();
+            const centerX = e.clientX - rect.left;
+            const centerY = e.clientY - rect.top;
+
+            handleZoom(-e.deltaY, centerX, centerY);
+        };
+
+        // Add non-passive wheel event listener
+        canvas.addEventListener('wheel', handleWheelNonPassive, { passive: false });
+
+        return () => {
+            canvas.removeEventListener('wheel', handleWheelNonPassive);
+        };
+    }, [handleZoom]);
 
     useEffect(() => {
         setNeedsRedraw(true);
@@ -2050,12 +2107,92 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                             : isPanning
                               ? 'grabbing'
                               : 'default',
+                    touchAction: 'none',
                 }}
                 onMouseMove={handleMouseMove}
                 onMouseDown={handleMouseDown}
                 onMouseUp={handleMouseUp}
                 onContextMenu={handleRightClick}
-                onWheel={handleWheel}
+                onTouchStart={(e) => {
+                    e.preventDefault();
+                    if (e.touches.length === 1) {
+                        const touch = e.touches[0];
+                        const rect = canvasRef.current?.getBoundingClientRect();
+                        if (rect) {
+                            const x = touch.clientX - rect.left;
+                            const y = touch.clientY - rect.top;
+                            const syntheticEvent = {
+                                clientX: touch.clientX,
+                                clientY: touch.clientY,
+                                button: 0,
+                                preventDefault: () => {},
+                            } as React.MouseEvent<HTMLCanvasElement>;
+                            handleMouseDown(syntheticEvent);
+                        }
+                    } else if (e.touches.length === 2) {
+                        // Handle pinch-to-zoom
+                        const touch1 = e.touches[0];
+                        const touch2 = e.touches[1];
+                        const initialDistance = Math.sqrt(
+                            Math.pow(touch2.clientX - touch1.clientX, 2) +
+                            Math.pow(touch2.clientY - touch1.clientY, 2)
+                        );
+                        e.currentTarget.setAttribute('data-initial-distance', initialDistance.toString());
+                    }
+                }}
+                onTouchMove={(e) => {
+                    e.preventDefault();
+                    if (e.touches.length === 1) {
+                        const touch = e.touches[0];
+                        const rect = canvasRef.current?.getBoundingClientRect();
+                        if (rect) {
+                            const x = touch.clientX - rect.left;
+                            const y = touch.clientY - rect.top;
+                            const syntheticEvent = {
+                                clientX: touch.clientX,
+                                clientY: touch.clientY,
+                                preventDefault: () => {},
+                            } as React.MouseEvent<HTMLCanvasElement>;
+                            handleMouseMove(syntheticEvent);
+                        }
+                    } else if (e.touches.length === 2) {
+                        // Handle pinch-to-zoom
+                        const touch1 = e.touches[0];
+                        const touch2 = e.touches[1];
+                        const currentDistance = Math.sqrt(
+                            Math.pow(touch2.clientX - touch1.clientX, 2) +
+                            Math.pow(touch2.clientY - touch1.clientY, 2)
+                        );
+                        const initialDistance = parseFloat(e.currentTarget.getAttribute('data-initial-distance') || '0');
+                        
+                        if (initialDistance > 0) {
+                            const scale = currentDistance / initialDistance;
+                            const rect = canvasRef.current?.getBoundingClientRect();
+                            if (rect) {
+                                const centerX = rect.width / 2;
+                                const centerY = rect.height / 2;
+                                const deltaY = scale > 1 ? -50 : 50;
+                                handleZoom(deltaY, centerX, centerY);
+                            }
+                        }
+                    }
+                }}
+                onTouchEnd={(e) => {
+                    e.preventDefault();
+                    if (e.touches.length === 0) {
+                        handleMouseUp();
+                    }
+                    // Clear the initial distance for pinch-to-zoom
+                    e.currentTarget.removeAttribute('data-initial-distance');
+                }}
+                onTouchCancel={(e) => {
+                    e.preventDefault();
+                    handleMouseUp();
+                    // Clear the initial distance for pinch-to-zoom
+                    e.currentTarget.removeAttribute('data-initial-distance');
+                }}
+
+
             />
 
             {showSprinklerRadius && (
@@ -2145,34 +2282,13 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                     </div>
 
                     <div className="border-t border-gray-600 pt-3">
-                        <div className="mb-2 text-xs font-medium text-gray-300">
-                            👁️ {t('การแสดงผล:')}
-                        </div>
                         <div className="grid grid-cols-2 gap-2">
                             {[
                                 {
-                                    key: 'showMeasurements',
-                                    label: t('แสดงการวัด'),
-                                    state: showMeasurements,
-                                    setState: setShowMeasurements,
-                                },
-                                {
-                                    key: 'showDimensions',
-                                    label: t('แสดงเส้นวัด'),
-                                    state: showDimensions,
-                                    setState: setShowDimensions,
-                                },
-                                {
                                     key: 'snapToGrid',
-                                    label: t('ดึงไปตาราง'),
+                                    label: t('ดึงไปมุมตาราง'),
                                     state: snapToGrid,
                                     setState: setSnapToGrid,
-                                },
-                                {
-                                    key: 'snapToVertex',
-                                    label: t('ดึงไปจุดยอด'),
-                                    state: snapToVertex,
-                                    setState: setSnapToVertex,
                                 },
                             ].map((option) => (
                                 <label key={option.key} className="flex items-center gap-2 text-xs">
@@ -2322,8 +2438,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                             dimensionDirection === dir.id
                                                 ? 'border-2 border-yellow-400 bg-yellow-600 text-white'
                                                 : 'border-2 border-transparent bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                        }`}
-                                    >
+                                        }`}                                    >
                                         <div className="text-lg">{dir.icon}</div>
                                         <div className="mt-1">{dir.label}</div>
                                     </button>
@@ -2451,7 +2566,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                             {currentZoneTool === 'freehand' ? (
                                 <div>
                                     {enhancedDrawing.isDrawing
-                                        ? `${t('คลิกเพื่อเพิ่มจุด')} (${enhancedDrawing.currentPoints.length} {t('จุด')}) • ${t('คลิกขวาเพื่อจบ')}`
+                                        ? `${t('คลิกขวาเพื่อจบ')}`
                                         : `${t('คลิกเพื่อเริ่มวาดโซน')}`}
                                     {distanceCursor.show && (
                                         <div className="mt-1 text-green-400">
@@ -2555,7 +2670,11 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                     {editMode === 'edit' && (
                         <div className="absolute bottom-4 left-4 rounded-lg border border-yellow-500 bg-gray-800/90 p-4 text-sm text-white backdrop-blur">
                             <div className="mb-2 flex items-center gap-2">
-                                <span className="text-yellow-400">🚰</span>
+                                <img 
+                                    src="/images/water-pump.png" 
+                                    alt="Water Pump" 
+                                    className="w-4 h-4 object-contain"
+                                />
                                 <span className="font-semibold">{t('โหมดจัดการแหล่งน้ำ')}</span>
                             </div>
                             <div>🎯 {t('คลิกเพื่อวางแหล่งน้ำ')}</div>
@@ -2622,3 +2741,4 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
 };
 
 export default CanvasDesigner;
+

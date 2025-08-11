@@ -586,7 +586,13 @@ export default function Product() {
 
         const areaInRai = zoneStats.area / 1600;
 
-        const sprinklerCount = zoneStats.sprinklerCount || 10;
+        // Fix: Use a more reasonable default based on area instead of sprinklerCount
+        // Calculate sprinklers based on area: roughly 10-15 sprinklers per rai for home garden
+        const sprinklerCount = zoneStats.sprinklerCount > 0 
+            ? zoneStats.sprinklerCount 
+            : Math.max(5, Math.ceil(areaInRai * 12)); // 12 sprinklers per rai as default
+        
+
 
         const waterPerSprinkler = 50;
 
@@ -623,9 +629,14 @@ export default function Product() {
 
         const areaInRai = summary.totalArea / 1600;
 
+        // Fix: Use area-based calculation if no sprinklers are placed
+        const totalSprinklers = summary.totalSprinklers > 0 
+            ? summary.totalSprinklers 
+            : Math.max(5, Math.ceil(areaInRai * 12)); // 12 sprinklers per rai as default
+
         return {
             farmSizeRai: formatNumber(areaInRai, 3),
-            totalTrees: summary.totalSprinklers,
+            totalTrees: totalSprinklers,
             waterPerTreeLiters: formatNumber(50, 3),
             numberOfZones: 1,
             sprinklersPerTree: 1,
@@ -634,11 +645,11 @@ export default function Product() {
             pressureHeadM: 20,
             pipeAgeYears: 0,
 
-            sprinklersPerBranch: Math.max(1, Math.ceil(summary.totalSprinklers / 5)),
+            sprinklersPerBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
             branchesPerSecondary: 1,
             simultaneousZones: 1,
 
-            sprinklersPerLongestBranch: Math.max(1, Math.ceil(summary.totalSprinklers / 5)),
+            sprinklersPerLongestBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
             branchesPerLongestSecondary: 1,
             secondariesPerLongestMain: 1,
 
@@ -1586,7 +1597,7 @@ export default function Product() {
                             )}
                             {zones.length > 1 && (
                                 <div className="mb-6 rounded-lg bg-gray-800 p-4">
-                                    <div className="mb-4 rounded bg-blue-900 p-3">
+                                    <div className="rounded bg-blue-900 p-3">
                                         <h4 className="mb-2 text-sm font-medium text-blue-300">
                                             🎯 {t('เลือกรูปแบบการเปิดโซน:')}
                                         </h4>

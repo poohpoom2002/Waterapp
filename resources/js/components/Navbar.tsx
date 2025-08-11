@@ -32,11 +32,11 @@ const Navbar: React.FC = () => {
                     <div className="flex items-center">
                         <Link
                             href="/"
-                            className="flex items-center space-x-3 text-white transition-colors hover:text-blue-300"
+                            className="flex items-center space-x-3 text-white transition-colors hover:text-green-300"
                         >
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-700">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white">
                                 <img
-                                    src="https://f.btwcdn.com/store-50036/store/e4c1b5ae-cf8e-5017-536b-66ecd994018d.jpg"
+                                    src="/images/chaiyo-logo.png"
                                     alt="logo"
                                     className="rounded-lg"
                                 />
@@ -54,7 +54,7 @@ const Navbar: React.FC = () => {
                         {auth?.user?.is_super_user && (
                             <Link
                                 href="/super/dashboard"
-                                className="flex items-center gap-2 rounded-lg bg-yellow-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-yellow-700"
+                                className="flex items-center rounded-lg bg-yellow-600 px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-yellow-700"
                             >
                                 <span className="text-lg">👑</span>
                                 {t('Super Dashboard')}
@@ -71,19 +71,19 @@ const Navbar: React.FC = () => {
                             />
                             <button
                                 onClick={() => setShowFloatingAiChat(true)}
-                                className="rounded-lg bg-gradient-to-r from-green-500 to-blue-500 px-4 py-2 text-sm font-medium transition-all hover:from-green-600 hover:to-blue-600"
+                                className="rounded-lg bg-gradient-to-r text-white from-green-500 to-blue-500 px-4 py-2 text-sm font-medium transition-all hover:from-green-600 hover:to-blue-600"
                             >
                                 🤖 {t('AI ช่วยเหลือ')}
                             </button>
                             <button
                                 onClick={() => (window.location.href = '/equipment-crud')}
-                                className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium transition-colors hover:bg-gray-700"
+                                className="rounded-lg bg-gray-600 text-white px-4 py-2 text-sm font-medium transition-colors hover:bg-gray-700"
                             >
                                 ⚙️ {t('จัดการอุปกรณ์')}
                             </button>
                             <button
                                 onClick={scrollToFooter}
-                                className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium transition-colors hover:bg-gray-700"
+                                className="rounded-lg bg-gray-600 text-white px-4 py-2 text-sm font-medium transition-colors hover:bg-gray-700"
                             >
                                 {t('ติดต่อเรา')}
                             </button>

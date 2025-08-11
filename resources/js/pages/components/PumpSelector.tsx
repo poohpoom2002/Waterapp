@@ -4,6 +4,7 @@
 import React, { useState } from 'react';
 import { CalculationResults, IrrigationInput } from '../types/interfaces';
 import { useLanguage } from '@/contexts/LanguageContext';
+import SearchableDropdown from './SearchableDropdown';
 interface PumpSelectorProps {
     results: CalculationResults;
     selectedPump?: any;
@@ -163,7 +164,12 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
         return (
             <div className="flex h-[60px] w-[85px] items-center justify-center rounded border border-gray-600 bg-gray-500 text-xs text-gray-300">
-                🚰 {t('ปั๊ม')}
+                <img 
+                    src="/images/water-pump.png" 
+                    alt="Water Pump" 
+                    className="w-6 h-6 object-contain"
+                />
+                {t('ปั๊ม')}
             </div>
         );
     };
@@ -260,32 +266,30 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
             </div>
 
             <div className="mb-4">
-                <select
+                <SearchableDropdown
                     value={currentPump?.id || ''}
-                    onChange={(e) => {
+                    onChange={(value) => {
                         const selected = analyzedPumps.find(
-                            (p) => p.id === parseInt(e.target.value)
+                            (p) => p.id === parseInt(value.toString())
                         );
                         onPumpChange(selected || null);
                     }}
-                    className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
-                >
-                    <option value="">-- {t('ใช้การเลือกอัตโนมัติ')} --</option>
-                    {sortedPumps.map((pump) => {
-                        const group = getPumpGrouping(pump);
-                        const isAuto = pump.id === autoSelectedPump?.id;
-                        return (
-                            <option key={pump.id} value={pump.id}>
-                                {isAuto ? '🤖 ' : ''}
-                                {pump.name || pump.productCode} - {pump.powerHP}HP -{' '}
-                                {pump.price?.toLocaleString()} {t('บาท')} | {group} | {t('คะแนน:')} {pump.score}
-                                {!pump.isFlowAdequate || !pump.isHeadAdequate
-                                    ? ' ' + t('(ไม่เพียงพอ)')
-                                    : ''}
-                            </option>
-                        );
-                    })}
-                </select>
+                    options={[
+                        { value: '', label: `-- ${t('ใช้การเลือกอัตโนมัติ')} --` },
+                        ...sortedPumps.map((pump) => {
+                            const group = getPumpGrouping(pump);
+                            const isAuto = pump.id === autoSelectedPump?.id;
+                            return {
+                                value: pump.id,
+                                label: `${isAuto ? '🤖 ' : ''}${pump.name || pump.productCode} - ${pump.powerHP}HP - ${pump.price?.toLocaleString()} ${t('บาท')} | ${group} | ${t('คะแนน:')} ${pump.score}${!pump.isFlowAdequate || !pump.isHeadAdequate ? ' ' + t('(ไม่เพียงพอ)') : ''}`,
+                                searchableText: `${pump.productCode || ''} ${pump.name || ''} ${pump.brand || ''} ${pump.powerHP}HP ${group}`
+                            };
+                        })
+                    ]}
+                    placeholder={`-- ${t('ใช้การเลือกอัตโนมัติ')} --`}
+                    searchPlaceholder={t('พิมพ์เพื่อค้นหาปั๊ม (ชื่อ, รหัสสินค้า, แบรนด์)...')}
+                    className="w-full"
+                />
             </div>
 
             {currentPump ? (
