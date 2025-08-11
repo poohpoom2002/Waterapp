@@ -12,6 +12,18 @@ import {
     type PlotWaterCalculation
 } from '../components/Greenhouse/WaterCalculation';
 
+// Fittings breakdown interface (reused pattern from field-crop)
+interface FittingsBreakdown {
+    twoWay: number;
+    threeWay: number;
+    fourWay: number;
+    breakdown: {
+        main: { twoWay: number; threeWay: number; fourWay: number };
+        submain: { twoWay: number; threeWay: number; fourWay: number };
+        lateral: { twoWay: number; threeWay: number; fourWay: number };
+    };
+}
+
 interface Point {
     x: number;
     y: number;
@@ -959,6 +971,249 @@ export default function GreenhouseSummary() {
 
     const irrigationMetrics = calculateIrrigationMetrics();
 
+    // Geometry helpers for fittings on canvas space
+    const segmentIntersection = (a1: Point, a2: Point, b1: Point, b2: Point): Point | null => {
+        const dax = a2.x - a1.x;
+        const day = a2.y - a1.y;
+        const dbx = b2.x - b1.x;
+        const dby = b2.y - b1.y;
+        const denom = dax * dby - day * dbx;
+        if (denom === 0) return null;
+        const s = ((a1.x - b1.x) * dby - (a1.y - b1.y) * dbx) / denom;
+        const t = ((a1.x - b1.x) * day - (a1.y - b1.y) * dax) / denom;
+        if (s >= 0 && s <= 1 && t >= 0 && t <= 1) {
+            return { x: a1.x + s * dax, y: a1.y + s * day };
+        }
+        return null;
+    };
+
+    const stationAlongPolyline = (poly: Point[], p: Point): number => {
+        if (poly.length < 2) return 0;
+        let bestStation = 0;
+        let bestDist = Number.POSITIVE_INFINITY;
+        let acc = 0;
+        for (let i = 1; i < poly.length; i++) {
+            const a = poly[i - 1];
+            const b = poly[i];
+            const segLen = distanceBetweenPoints(a, b);
+            const res = closestPointOnLineSegment(p, a, b);
+            if (res.distance < bestDist) {
+                bestDist = res.distance;
+                bestStation = acc + res.t * segLen;
+            }
+            acc += segLen;
+        }
+        return bestStation;
+    };
+
+    // Removed corner-based 2-way counting for greenhouse main pipes
+
+    const sideOfPolyline = (poly: Point[], p: Point): number => {
+        // Determine side by the nearest segment cross product sign
+        if (poly.length < 2) return 0;
+        let bestDist = Number.POSITIVE_INFINITY;
+        let side = 0;
+        for (let i = 1; i < poly.length; i++) {
+            const a = poly[i - 1];
+            const b = poly[i];
+            const res = closestPointOnLineSegment(p, a, b);
+            if (res.distance < bestDist) {
+                bestDist = res.distance;
+                const abx = b.x - a.x;
+                const aby = b.y - a.y;
+                const apx = p.x - a.x;
+                const apy = p.y - a.y;
+                const cross = abx * apy - aby * apx;
+                side = cross >= 0 ? 1 : -1;
+            }
+        }
+        return side;
+    };
+
+    const clusterStations = (
+        stations: { station: number; crossing: boolean }[],
+        thresholdPx: number
+    ): { hasCrossing: boolean; station: number }[] => {
+        if (stations.length === 0) return [];
+        stations.sort((a, b) => a.station - b.station);
+        const clusters: { hasCrossing: boolean; station: number }[] = [];
+        let curStart = Number.NEGATIVE_INFINITY;
+        let curHasCrossing = false;
+        let curStation = 0;
+        for (const s of stations) {
+            if (curStart === Number.NEGATIVE_INFINITY) {
+                curStart = s.station;
+                curHasCrossing = s.crossing;
+                curStation = s.station;
+                continue;
+            }
+            const isWithin = s.station - curStart <= thresholdPx;
+            const bothTee = !s.crossing && !curHasCrossing;
+            if (isWithin && bothTee) {
+                continue;
+            }
+            clusters.push({ hasCrossing: curHasCrossing, station: curStation });
+            curStart = s.station;
+            curHasCrossing = s.crossing;
+            curStation = s.station;
+        }
+        if (curStart !== Number.NEGATIVE_INFINITY) {
+            clusters.push({ hasCrossing: curHasCrossing, station: curStation });
+        }
+        return clusters;
+    };
+
+    const calculateGreenhouseFittings = (elements: IrrigationElement[]): FittingsBreakdown => {
+        const mainPipes = elements.filter((e) => e.type === 'main-pipe');
+        const subPipes = elements.filter((e) => e.type === 'sub-pipe');
+        const dripLines = elements.filter((e) => e.type === 'drip-line');
+        const sprinklers = elements.filter((e) => e.type === 'sprinkler');
+
+        // Main 2-way: greenhouse counts only endpoint attachments (no corner-based 2-way)
+        const twoWayMain = 0;
+
+        let threeWayMain = 0; // junctions where sub connects to main
+        let twoWayMainFromEndpoint = 0; // when sub connects at main endpoint
+        const twoWaySub = 0; // greenhouse: tees on submain count as 3-way, so 2-way on submain is 0
+        let threeWaySub = 0;
+        let fourWaySub = 0;
+        // Lateral fittings are not reported in greenhouse summary
+
+        const attachTolPx = 12; // pixels
+        const clusterTolPx = 8; // pixels
+
+        // Count main–sub junctions on main: along-run → 3-way, at endpoint → 2-way
+        subPipes.forEach((sp) => {
+            const spts = sp.points;
+            for (const mp of mainPipes) {
+                // explicit intersections
+                let found = false;
+                for (let i = 1; i < spts.length && !found; i++) {
+                    const sa = spts[i - 1];
+                    const sb = spts[i];
+                    for (let j = 1; j < mp.points.length && !found; j++) {
+                        const ma = mp.points[j - 1];
+                        const mb = mp.points[j];
+                        const ip = segmentIntersection(sa, sb, ma, mb);
+                        if (ip) {
+                            const nearEnd =
+                                distanceBetweenPoints(ip, mp.points[0]) <= attachTolPx ||
+                                distanceBetweenPoints(ip, mp.points[mp.points.length - 1]) <= attachTolPx;
+                            if (nearEnd) twoWayMainFromEndpoint += 1; else threeWayMain += 1;
+                            found = true;
+                        }
+                    }
+                }
+                if (found) break;
+                // endpoint attachment proximity
+                const endA = spts[0];
+                const endB = spts[spts.length - 1];
+                let attaches = false;
+                let nearestAttachPoint: Point | null = null;
+                for (let j = 1; j < mp.points.length; j++) {
+                    const resA = closestPointOnLineSegment(endA, mp.points[j - 1], mp.points[j]);
+                    const resB = closestPointOnLineSegment(endB, mp.points[j - 1], mp.points[j]);
+                    const candidate = resA.distance <= resB.distance ? resA : resB;
+                    if (resA.distance <= attachTolPx || resB.distance <= attachTolPx) {
+                        attaches = true;
+                        nearestAttachPoint = candidate.point;
+                        break;
+                    }
+                }
+                if (attaches) {
+                    const nearEnd = nearestAttachPoint
+                        ? distanceBetweenPoints(nearestAttachPoint, mp.points[0]) <= attachTolPx ||
+                          distanceBetweenPoints(nearestAttachPoint, mp.points[mp.points.length - 1]) <= attachTolPx
+                        : true;
+                    if (nearEnd) twoWayMainFromEndpoint += 1; else threeWayMain += 1;
+                    break;
+                }
+
+                // Fallback: classify pass-through by endpoint sides relative to main
+                try {
+                    const s1 = sideOfPolyline(mp.points, spts[0]);
+                    const s2 = sideOfPolyline(mp.points, spts[spts.length - 1]);
+                    if (s1 * s2 < 0) {
+                        threeWayMain += 1;
+                        break;
+                    }
+                } catch {
+                    // ignore side classification errors
+                }
+            }
+        });
+
+        // Submain vs drip-lines intersections → 3-way/4-way/2-way via clustering
+        subPipes.forEach((sp) => {
+            const stations: { station: number; crossing: boolean }[] = [];
+            const sPoly = sp.points;
+            if (sPoly.length < 2) return;
+
+            dripLines.forEach((dl) => {
+                const dPoly = dl.points;
+                if (dPoly.length < 2) return;
+                const intersections: Point[] = [];
+                for (let i = 1; i < sPoly.length; i++) {
+                    for (let j = 1; j < dPoly.length; j++) {
+                        const ip = segmentIntersection(sPoly[i - 1], sPoly[i], dPoly[j - 1], dPoly[j]);
+                        if (ip) intersections.push(ip);
+                    }
+                }
+                // Determine crossing by endpoints on opposite sides w.r.t sub
+                const s1 = sideOfPolyline(sPoly, dPoly[0]);
+                const s2 = sideOfPolyline(sPoly, dPoly[dPoly.length - 1]);
+                const isCrossing = intersections.length >= 2 || s1 * s2 < 0;
+
+                if (isCrossing && intersections.length === 0) {
+                    // add mid representative point when touching
+                    const mid = dPoly[Math.floor(dPoly.length / 2)];
+                    stations.push({ station: stationAlongPolyline(sPoly, mid), crossing: true });
+                }
+                intersections.forEach((p) => {
+                    stations.push({ station: stationAlongPolyline(sPoly, p), crossing: isCrossing });
+                });
+            });
+
+            // Sprinklers attached to sub → treat each as a tee (3-way on sub)
+            sprinklers.forEach((spr) => {
+                const p = spr.points[0];
+                if (!p) return;
+                // consider attached if close to sub-pipe
+                for (let i = 1; i < sPoly.length; i++) {
+                    const res = closestPointOnLineSegment(p, sPoly[i - 1], sPoly[i]);
+                    if (res.distance <= attachTolPx) {
+                        stations.push({ station: stationAlongPolyline(sPoly, res.point), crossing: false });
+                        break;
+                    }
+                }
+            });
+
+            const clusters = clusterStations(stations, clusterTolPx);
+            clusters.forEach(({ hasCrossing }, idx) => {
+                const isEnd = idx === 0 || idx === clusters.length - 1;
+                if (hasCrossing) {
+                    if (isEnd) threeWaySub += 1; else fourWaySub += 1;
+                } else {
+                    // greenhouse rule update: non-crossing branches on submain are tees → 3-way
+                    threeWaySub += 1;
+                }
+            });
+        });
+
+        return {
+            twoWay: twoWayMain + twoWayMainFromEndpoint + twoWaySub,
+            threeWay: threeWayMain + threeWaySub,
+            fourWay: fourWaySub,
+            breakdown: {
+                main: { twoWay: twoWayMain + twoWayMainFromEndpoint, threeWay: threeWayMain, fourWay: 0 },
+                submain: { twoWay: twoWaySub, threeWay: threeWaySub, fourWay: fourWaySub },
+                lateral: { twoWay: 0, threeWay: 0, fourWay: 0 },
+            },
+        };
+    };
+
+    const fittings = calculateGreenhouseFittings(summaryData?.irrigationElements || []);
+
     // Helper function to draw component shapes (irrigation equipment)
     const drawComponentShape = (
         ctx: CanvasRenderingContext2D,
@@ -1854,6 +2109,53 @@ export default function GreenhouseSummary() {
                                 </h3>
 
                                 <div className="mb-3">
+                                    {/* Fittings section (2-way / 3-way / 4-way) */}
+                                    <h3 className="mb-2 text-sm font-semibold text-rose-400 print:text-sm print:text-black">
+                                        🔩 {t('Fittings (2-way / 3-way / 4-way)')}
+                                    </h3>
+                                    <div className="grid grid-cols-3 gap-1">
+                                        <div className="rounded bg-gray-700 p-2 text-center print:border print:bg-gray-50">
+                                            <div className="text-sm font-bold text-rose-400">{fittings.twoWay}</div>
+                                            <div className="text-xs text-gray-400">{t('2-way')}</div>
+                                        </div>
+                                        <div className="rounded bg-gray-700 p-2 text-center print:border print:bg-gray-50">
+                                            <div className="text-sm font-bold text-rose-400">{fittings.threeWay}</div>
+                                            <div className="text-xs text-gray-400">{t('3-way')}</div>
+                                        </div>
+                                        <div className="rounded bg-gray-700 p-2 text-center print:border print:bg-gray-50">
+                                            <div className="text-sm font-bold text-rose-400">{fittings.fourWay}</div>
+                                            <div className="text-xs text-gray-400">{t('4-way')}</div>
+                                        </div>
+                                    </div>
+                                    <div className="mt-2 grid grid-cols-2 gap-1 text-xs">
+                                        <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
+                                            <div className="mb-1 font-semibold text-blue-300">{t('Main')}</div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-gray-300">{t('2-way')}</span>
+                                                <span className="font-bold text-blue-300">{fittings.breakdown.main.twoWay}</span>
+                                            </div>
+                                            <div className="mt-1 flex items-center justify-between">
+                                                <span className="text-gray-300">{t('3-way')}</span>
+                                                <span className="font-bold text-blue-300">{fittings.breakdown.main.threeWay}</span>
+                                            </div>
+                                        </div>
+                                        <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
+                                            <div className="mb-1 font-semibold text-green-300">{t('Submain')}</div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-gray-300">{t('2-way')}</span>
+                                                <span className="font-bold text-green-300">{fittings.breakdown.submain.twoWay}</span>
+                                            </div>
+                                            <div className="mt-1 flex items-center justify-between">
+                                                <span className="text-gray-300">{t('3-way')}</span>
+                                                <span className="font-bold text-green-300">{fittings.breakdown.submain.threeWay}</span>
+                                            </div>
+                                            <div className="mt-1 flex items-center justify-between">
+                                                <span className="text-gray-300">{t('4-way')}</span>
+                                                <span className="font-bold text-green-300">{fittings.breakdown.submain.fourWay}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                                     <h3 className="mb-2 text-sm font-semibold text-orange-400 print:text-sm print:text-black">
                                         🔵 {t('ระบบท่อ')}
                                     </h3>
@@ -1910,8 +2212,6 @@ export default function GreenhouseSummary() {
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-
                                 <div className="mb-3">
                                     <h3 className="mb-2 text-sm font-semibold text-orange-400 print:text-sm print:text-black">
                                         💧 Irrigation Emitters
