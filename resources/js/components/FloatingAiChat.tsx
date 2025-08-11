@@ -2,6 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useLanguage } from '../contexts/LanguageContext'; // Import useLanguage hook
 
+// ==================== GEMINI API CONFIGURATION ====================
+const GEMINI_CONFIG = {
+    API_KEY: 'AIzaSyDVt3FE4zDPWsvJnl-zHe9ypheZPduRrmc', // ใส่ Gemini API key ของคุณที่นี่
+    API_URL: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent',
+};
+
 // Define proper types for the component
 interface ChatMessage {
     role: 'user' | 'assistant';
@@ -274,8 +280,7 @@ const FloatingAiChat = ({
         setShowSuggestions(!showSuggestions);
     };
 
-    const API_BASE_URL = '';
-
+    // ==================== GEMINI API INTEGRATION ====================
     const sendMessage = async (messageToSend = message) => {
         if (!messageToSend.trim() || isTyping) return;
 
@@ -286,24 +291,70 @@ const FloatingAiChat = ({
         setIsTyping(true);
 
         try {
-            const response = await fetch(`${API_BASE_URL}/api/ai-chat`, {
+            // สร้าง system prompt สำหรับระบบชลประทาน
+            const systemPrompt = `คุณคือ AI Chaiyo ผู้เชี่ยวชาญด้านระบบน้ำและชลประทานสำหรับพืชสวน คุณมีความรู้เกี่ยวกับ:
+            - การคำนวณปริมาณน้ำที่พืชต้องการ
+            - ระบบน้ำหยดและการชลประทานสมัยใหม่
+            - การจัดเวลาให้น้ำที่เหมาะสม
+            - การแก้ปัญหาระบบชลประทาน
+            - เทคโนโลยี IoT สำหรับการเกษตร
+            
+            ตอบเป็นภาษาไทยเสมอ ให้คำแนะนำที่ปฏิบัติได้จริง และเป็นมิตร`;
+
+            // สร้าง conversation history สำหรับ context
+            const conversationText = updatedHistory.map(msg => 
+                `${msg.role === 'user' ? 'ผู้ใช้' : 'AI'}: ${msg.content}`
+            ).join('\n\n');
+
+            const fullPrompt = `${systemPrompt}\n\nบทสนทนา:\n${conversationText}`;
+
+            const response = await fetch(`${GEMINI_CONFIG.API_URL}?key=${GEMINI_CONFIG.API_KEY}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    Accept: 'application/json',
                 },
                 body: JSON.stringify({
-                    message: messageToSend,
+                    contents: [{
+                        parts: [{
+                            text: fullPrompt
+                        }]
+                    }],
+                    generationConfig: {
+                        temperature: 0.7,
+                        topP: 0.8,
+                        topK: 40,
+                        maxOutputTokens: 1024,
+                    },
+                    safetySettings: [
+                        {
+                            category: "HARM_CATEGORY_HARASSMENT",
+                            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+                        },
+                        {
+                            category: "HARM_CATEGORY_HATE_SPEECH",
+                            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+                        }
+                    ]
                 }),
             });
 
-            const data = await response.json();
-            const aiReply: ChatMessage = { role: 'assistant', content: data.reply };
-            setChatHistory((prev) => [...prev, aiReply]);
-        } catch (error) {
-            console.error('AI Error:', error);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
 
-            const errorMessage = t('ขออภัยนะ ระบบ AI ขัดข้องชั่วคราว 🔧\n\nลองใหม่อีกครั้งได้เลย!');
+            const data = await response.json();
+            
+            // ดึงข้อความตอบกลับจาก Gemini API
+            const aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || 
+                           t('ขออภัยครับ ไม่สามารถประมวลผลคำถามได้ในขณะนี้');
+
+            const aiMessage: ChatMessage = { role: 'assistant', content: aiReply };
+            setChatHistory((prev) => [...prev, aiMessage]);
+            
+        } catch (error) {
+            console.error('Gemini API Error:', error);
+
+            const errorMessage = t('ขออภัยนะ ระบบ AI ขัดข้องชั่วคราว 🔧\n\nลองใหม่อีกครั้งได้เลย!\n\n📝 หมายเหตุ: ตรวจสอบ API Key และการเชื่อมต่ออินเทอร์เน็ต');
 
             setChatHistory((prev) => [...prev, { role: 'assistant', content: errorMessage }]);
         } finally {
@@ -363,6 +414,39 @@ const FloatingAiChat = ({
                 <div
                     className="relative cursor-grab select-none overflow-hidden bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 p-3 text-white active:cursor-grabbing"
                     onMouseDown={handleMouseDown}
+                    onTouchStart={(e) => {
+                        e.preventDefault();
+                        if (e.touches.length === 1) {
+                            const touch = e.touches[0];
+                            const syntheticEvent = {
+                                clientX: touch.clientX,
+                                clientY: touch.clientY,
+                                button: 0,
+                                preventDefault: () => {},
+                            } as React.MouseEvent;
+                            handleMouseDown(syntheticEvent);
+                        }
+                    }}
+                    onTouchMove={(e) => {
+                        e.preventDefault();
+                        if (e.touches.length === 1) {
+                            const touch = e.touches[0];
+                            const syntheticEvent = {
+                                clientX: touch.clientX,
+                                clientY: touch.clientY,
+                                preventDefault: () => {},
+                            } as MouseEvent;
+                            handleMouseMove(syntheticEvent);
+                        }
+                    }}
+                    onTouchEnd={(e) => {
+                        e.preventDefault();
+                        handleMouseUp();
+                    }}
+                    onTouchCancel={(e) => {
+                        e.preventDefault();
+                        handleMouseUp();
+                    }}
                     style={{ touchAction: 'none' }}
                 >
                     {/* Floating Particles */}
@@ -420,7 +504,7 @@ const FloatingAiChat = ({
                             {!isMinimized && (
                                 <div className="flex items-center space-x-1 rounded-full bg-white/20 px-2 py-0.5 backdrop-blur-sm">
                                     <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-400"></div>
-                                    <span className="text-xs font-medium">{t('Smart Mode')}</span>
+                                    <span className="text-xs font-medium">{t('Gemini Pro')}</span>
                                 </div>
                             )}
 
@@ -727,7 +811,7 @@ const FloatingAiChat = ({
                             <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
                                 <span className="text-[10px] flex items-center">
                                     🌿 {t('AI Chaiyo')} • 
-                                    <span className="ml-1 text-emerald-600 font-semibold">{t('Smart Irrigation')}</span>
+                                    <span className="ml-1 text-emerald-600 font-semibold">{t('Powered by Gemini')}</span>
                                 </span>
                                 <span className="flex items-center space-x-0.5 text-[10px]">
                                     <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400"></div>

@@ -4,7 +4,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 const Footer: React.FC = () => {
     const { t } = useLanguage();
     return (
-        <footer id="contact-footer" className="bg-gray-900 text-gray-300">
+        <footer id="contact-footer" className="bg-black text-gray-300">
             {/* Main Footer Content */}
             <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
                 <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">

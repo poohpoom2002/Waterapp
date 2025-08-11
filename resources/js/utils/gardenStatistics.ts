@@ -88,8 +88,17 @@ function calculateSummary(
             return sum;
         }, 0);
 
-    // คำนวณความยาวท่อรวม
-    const totalPipeLength = pipes.reduce((sum, pipe) => sum + pipe.length, 0);
+    // คำนวณความยาวท่อรวมจากท่อทั้งหมด
+    const totalPipeLength = pipes.reduce((sum, pipe) => {
+        const length = typeof pipe.length === 'number' && !isNaN(pipe.length)
+            ? Math.max(0, pipe.length)
+            : (pipe.canvasStart && pipe.canvasEnd)
+                ? calculateDistance(pipe.canvasStart, pipe.canvasEnd, scale)
+                : (pipe.start && pipe.end)
+                    ? calculateDistance(pipe.start, pipe.end)
+                    : 0;
+        return sum + length;
+    }, 0);
 
     // หาท่อที่ยาวที่สุดจากแหล่งน้ำไปหาหัวฉีด
     const longestPipeFromSource = findLongestPipeFromSource(sprinklers, waterSource, scale);
@@ -127,7 +136,7 @@ function calculateZoneStatistics(
             // หาหัวฉีดในโซนนี้
             const zoneSprinklers = sprinklers.filter((s) => s.zoneId === zone.id);
 
-            // หาประเภทหัวฉีดที่ใช้ในโซน - แก้ไขตรงนี้
+            // หาประเภทหัวฉีดที่ใช้ในโซน
             const sprinklerTypes = [...new Set(zoneSprinklers.map((s) => s.type.nameEN))];
 
             const sprinklerRadius =
@@ -136,9 +145,18 @@ function calculateZoneStatistics(
                       zoneSprinklers.length
                     : 0;
 
-            // หาท่อในโซนนี้
+            // หาท่อในโซนนี้และคำนวณความยาวรวม
             const zonePipes = pipes.filter((p) => p.zoneId === zone.id);
-            const totalPipeLength = zonePipes.reduce((sum, pipe) => sum + pipe.length, 0);
+            const totalPipeLength = zonePipes.reduce((sum, pipe) => {
+                const length = typeof pipe.length === 'number' && !isNaN(pipe.length)
+                    ? Math.max(0, pipe.length)
+                    : (pipe.canvasStart && pipe.canvasEnd)
+                        ? calculateDistance(pipe.canvasStart, pipe.canvasEnd, scale)
+                        : (pipe.start && pipe.end)
+                            ? calculateDistance(pipe.start, pipe.end)
+                            : 0;
+                return sum + length;
+            }, 0);
 
             // หาท่อที่ยาวที่สุดจากแหล่งน้ำไปหาหัวฉีดในโซนนี้
             const longestPipeFromSource = findLongestPipeFromSourceInZone(

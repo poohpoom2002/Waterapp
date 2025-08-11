@@ -812,7 +812,12 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
 
                     <div className="rounded bg-gray-600 p-4">
                         <h3 className="mb-2 font-medium text-purple-300">
-                            🚰 {t('น้ำต่อหัว')}{getEquipmentName()}
+                            <img 
+                                src="/images/water-pump.png" 
+                                alt="Water Pump" 
+                                className="inline w-4 h-4 object-contain mr-1"
+                            />
+                            {t('น้ำต่อหัว')}{getEquipmentName()}
                         </h3>
                         <p className="text-lg font-bold">
                             {results.waterPerSprinklerLPM.toFixed(1)} {t('ลิตร/นาที')}
