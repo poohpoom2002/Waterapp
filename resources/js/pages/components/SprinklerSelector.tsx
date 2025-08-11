@@ -94,7 +94,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
     return (
         <div className="rounded-lg bg-gray-700 p-6">
             <h3 className="mb-4 text-2xl font-bold text-green-400">
-                {t('เลือก')} {projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}
+                {t('เลือก')}{projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}
                 {activeZone && (
                     <span className="ml-2 text-sm font-normal text-gray-400">
                         - {activeZone.name}
@@ -138,8 +138,19 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                     },
                     ...sortedSprinklers.map((sprinkler) => ({
                         value: sprinkler.id,
-                        label: `${sprinkler.name} - ${sprinkler.price} ${t('บาท')} | ${sprinkler.brand || sprinkler.brand_name || '-'}`,
-                        searchableText: `${sprinkler.productCode || ''} ${sprinkler.name || ''} ${sprinkler.brand || sprinkler.brand_name || ''}`
+                        label: `${sprinkler.productCode || ''} - ${sprinkler.name} - ${sprinkler.price} ${t('บาท')} | ${sprinkler.brand || sprinkler.brand_name || '-'}`,
+                        searchableText: `${sprinkler.productCode || ''} ${sprinkler.name || ''} ${sprinkler.brand || sprinkler.brand_name || ''}`,
+                        image: sprinkler.image,
+                        productCode: sprinkler.productCode || (sprinkler as any).product_code,
+                        name: sprinkler.name,
+                        brand: sprinkler.brand || sprinkler.brand_name,
+                        price: sprinkler.price,
+                        unit: t('บาท'),
+                        score: sprinkler.score,
+                        isRecommended: sprinkler.isRecommended,
+                        isGoodChoice: sprinkler.isGoodChoice,
+                        isUsable: sprinkler.isUsable,
+                        isAutoSelected: false // Sprinklers don't have auto-selection in this context
                     }))
                 ]}
                 placeholder={`-- ${t('เลือก')} ${projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}${activeZone ? ` ${t('สำหรับ')} ${activeZone.name}` : ''} --`}

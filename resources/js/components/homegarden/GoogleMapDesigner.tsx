@@ -588,9 +588,9 @@ const ClippedSprinklerCoverage: React.FC<{
                     center: { lat: center.lat, lng: center.lng },
                     radius: radius,
                     fillColor: selectedColor,
-                    fillOpacity: isSelected ? 0.3 : 0.2,
+                    fillOpacity: isSelected ? 0.15 : 0.1,
                     strokeColor: selectedColor,
-                    strokeOpacity: isSelected ? 0.8 : 0.6,
+                    strokeOpacity: isSelected ? 1.0 : 0.8,
                     strokeWeight: 2,
                     map: map,
                     clickable: false,
@@ -1220,17 +1220,36 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                         props.selectedSprinklersForPipe.includes(sprinkler.id);
 
                     return (
-                        <ClippedSprinklerCoverage
-                            key={`${sprinkler.id}-coverage`}
-                            map={props.map}
-                            center={sprinkler.position}
-                            radius={sprinkler.type.radius}
-                            zoneCoordinates={zone.coordinates}
-                            color={sprinkler.type.color}
-                            isSelected={isSelected}
-                            sprinklerId={sprinkler.id}
-                            zoneType={zone.type}
-                        />
+                        <div key={`${sprinkler.id}-container`}>
+                            <ClippedSprinklerCoverage
+                                key={`${sprinkler.id}-coverage`}
+                                map={props.map}
+                                center={sprinkler.position}
+                                radius={sprinkler.type.radius}
+                                zoneCoordinates={zone.coordinates}
+                                color={sprinkler.type.color}
+                                isSelected={isSelected}
+                                sprinklerId={sprinkler.id}
+                                zoneType={zone.type}
+                            />
+                            {/* Clickable sprinkler marker for pipe editing */}
+                            {(props.pipeEditMode === 'add' || props.pipeEditMode === 'remove') && (
+                                <div
+                                    className="absolute cursor-pointer"
+                                    style={{
+                                        left: `${sprinkler.position.lng}%`,
+                                        top: `${sprinkler.position.lat}%`,
+                                        width: '20px',
+                                        height: '20px',
+                                        transform: 'translate(-50%, -50%)',
+                                        zIndex: 1000,
+                                    }}
+                                    onClick={() => props.onSprinklerClick(sprinkler.id)}
+                                >
+                                    <div className="w-full h-full bg-blue-500 rounded-full border-2 border-white shadow-lg"></div>
+                                </div>
+                            )}
+                        </div>
                     );
                 })}
 
