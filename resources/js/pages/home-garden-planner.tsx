@@ -44,6 +44,8 @@ import {
     addPipeFromSprinklerToPipe,
     removePipeById,
     findPipesBetweenSprinklers,
+    computeLongestPathFromSource,
+    calculatePipeStatistics,
 } from '../utils/homeGardenData';
 
 const ModeSelection: React.FC<{
@@ -846,7 +848,6 @@ export default function HomeGardenPlanner() {
 
     const handleSprinklerClickForPipe = useCallback(
         (sprinklerId: string) => {
-            console.log('Sprinkler clicked:', sprinklerId, 'pipeEditMode:', pipeEditMode);
             if (pipeEditMode === 'add') {
                 // Add mode - select sprinkler for connection
                 setSelectedSprinklersForPipe((prev) => {
@@ -855,7 +856,6 @@ export default function HomeGardenPlanner() {
                         : prev.length < 2 
                             ? [...prev, sprinklerId]
                             : [prev[0], sprinklerId];
-                    console.log('New sprinkler selection:', newSelection);
                     return newSelection;
                 });
                 // Don't change selectedSprinkler when in pipe edit mode
@@ -940,7 +940,6 @@ export default function HomeGardenPlanner() {
 
     const handlePipeClick = useCallback(
         (pipeId: string) => {
-            console.log('Pipe clicked:', pipeId, 'pipeEditMode:', pipeEditMode);
             if (pipeEditMode === 'view') {
                 // Normal selection mode
                 setSelectedPipes((prev) => {
@@ -958,15 +957,11 @@ export default function HomeGardenPlanner() {
                 setSelectedPipes(new Set());
                 setPipeEditMode('view');
             } else if (pipeEditMode === 'add') {
-                console.log('Add mode - selectedSprinklersForPipe:', selectedSprinklersForPipe);
                 // Add mode - if we have a sprinkler selected, create pipe connection immediately
                 if (selectedSprinklersForPipe.length === 1) {
                     const sprinklerId = selectedSprinklersForPipe[0];
                     const isCanvasMode = designMode === 'canvas' || designMode === 'image';
                     const scale = isCanvasMode ? canvasData?.scale || imageData?.scale || 20 : 20;
-                    
-                    console.log('Creating pipe connection from sprinkler', sprinklerId, 'to pipe', pipeId);
-                    
                     const newPipe = addPipeFromSprinklerToPipe(
                         sprinklerId,
                         pipeId,
@@ -979,16 +974,12 @@ export default function HomeGardenPlanner() {
                     );
 
                     if (newPipe) {
-                        console.log('Pipe created successfully:', newPipe);
                         setPipes((prev) => [...prev, newPipe]);
                         setSelectedSprinklersForPipe([]);
                         setSelectedPipes(new Set());
                         setPipeEditMode('view');
-                    } else {
-                        console.log('Failed to create pipe');
                     }
                 } else {
-                    console.log('No sprinkler selected, selecting pipe instead');
                     // If no sprinkler selected, just select the pipe
                     setSelectedPipes((prev) => {
                         const newSet = new Set(prev);
@@ -1193,8 +1184,22 @@ export default function HomeGardenPlanner() {
             sprinklers.reduce((acc, s) => ({ ...acc, [s.zoneId]: true }), {})
         ).length;
 
-        return { activeZones };
-    }, [sprinklers]);
+        // คำนวณสถิติท่อแบบ real-time
+        const pipeStats = calculatePipeStatistics(
+            pipes,
+            sprinklers,
+            waterSource,
+            designMode === 'canvas' || designMode === 'image',
+            canvasData?.scale || imageData?.scale || 20
+        );
+
+        return { 
+            activeZones,
+            totalPipeLength: pipeStats.totalLength,
+            longestPipe: pipeStats.longestPath,
+            pipeCount: pipeStats.pipeCount
+        };
+    }, [sprinklers, pipes, waterSource, designMode, canvasData, imageData]);
 
     const navigateToSummary = useCallback(() => {
         const data: GardenPlannerData = {
@@ -2164,17 +2169,14 @@ export default function HomeGardenPlanner() {
                                                             📊 {t('สถิติระบบท่อ (สีม่วง):')}
                                                         </div>
                                                         <div>
-                                                            {t('จำนวนท่อทั้งหมด:')} {pipes.length}{' '}
+                                                            {t('จำนวนท่อทั้งหมด:')} {statistics.pipeCount}{' '}
                                                             {t('เส้น')}
                                                         </div>
                                                         <div>
-                                                            {t('ความยาวรวม:')}
-                                                            {formatDistance(
-                                                                pipes.reduce(
-                                                                    (sum, p) => sum + p.length,
-                                                                    0
-                                                                )
-                                                            )}
+                                                            {t('ความยาวรวม:')} {formatDistance(statistics.totalPipeLength)}
+                                                        </div>
+                                                        <div>
+                                                            {t('ท่อที่ยาวที่สุด:')} {formatDistance(statistics.longestPipe)}
                                                         </div>
                                                     </div>
 

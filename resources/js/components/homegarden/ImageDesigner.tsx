@@ -16,6 +16,7 @@ import {
     formatDistance,
     clipCircleToPolygon,
     canvasToGPS,
+    calculatePipeStatistics,
 } from '../../utils/homeGardenData';
 import { useLanguage } from '../../contexts/LanguageContext';
 
@@ -112,6 +113,12 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
 
     const [showGrid, setShowGrid] = useState(false);
     const [gridSize, setGridSize] = useState(50);
+    const [enableGridSnap, setEnableGridSnap] = useState(false);
+
+    // Auto-enable grid snap when grid is shown
+    useEffect(() => {
+        setEnableGridSnap(showGrid);
+    }, [showGrid]);
 
     // เพิ่ม state สำหรับการจัดการรูปภาพ
     const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
@@ -251,12 +258,21 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
             if (!containerRef.current) return { x: 0, y: 0 };
 
             const rect = containerRef.current.getBoundingClientRect();
-            const x = (clientX - rect.left - panOffset.x) / zoom;
-            const y = (clientY - rect.top - panOffset.y) / zoom;
+            let x = (clientX - rect.left - panOffset.x) / zoom;
+            let y = (clientY - rect.top - panOffset.y) / zoom;
+
+            // Apply grid snapping if enabled and grid is visible
+            // Only snap when drawing zones or adding dimension lines
+            if (enableGridSnap && showGrid && (editMode === 'draw' || dimensionMode)) {
+                // Snap to fine grid (1/5 of main grid) for more precision
+                const fineGridSize = gridSize / 5;
+                x = Math.round(x / fineGridSize) * fineGridSize;
+                y = Math.round(y / fineGridSize) * fineGridSize;
+            }
 
             return { x, y };
         },
-        [zoom, panOffset]
+        [zoom, panOffset, enableGridSnap, showGrid, gridSize, editMode, dimensionMode]
     );
 
     const findSprinklerAtPosition = useCallback(
@@ -1374,6 +1390,11 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                         />
                                                     </button>
                                                     {t('แสดงตาราง')}
+                                                    {showGrid && enableGridSnap && (
+                                                        <span className="ml-2 text-xs bg-green-600 px-2 py-1 rounded-full">
+                                                            🧲 {t('จับตำแหน่ง')}
+                                                        </span>
+                                                    )}
                                                 </label>
 
                                                 {showGrid && (
@@ -1398,6 +1419,19 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                             <span>{t('ใกล้')}</span>
                                                             <span>{t('ไกล')}</span>
                                                         </div>
+                                                        {enableGridSnap && (editMode === 'draw' || dimensionMode) && (
+                                                            <div className="mt-2 rounded-lg bg-green-900/30 p-2 text-xs text-green-200">
+                                                                <div className="flex items-center gap-1">
+                                                                    🧲 <span className="font-medium">{t('โหมดจับตำแหน่ง')}</span>
+                                                                </div>
+                                                                <div className="mt-1 text-green-300/80">
+                                                                    {t('เมาส์จะเดินตามจุดตัดของตารางย่อย (ความละเอียดสูง)')}
+                                                                </div>
+                                                                <div className="mt-1 text-green-400/60 text-xs">
+                                                                    📏 {t('ระยะห่างตารางย่อย:')} {((gridSize / 5) / currentScale).toFixed(2)} {t('ม.')}
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
@@ -1584,7 +1618,25 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                             <div>
                                                 {t('ความยาวรวม:')}{' '}
                                                 {formatDistance(
-                                                    pipes.reduce((sum, p) => sum + p.length, 0)
+                                                    calculatePipeStatistics(
+                                                        pipes,
+                                                        sprinklers,
+                                                        waterSource,
+                                                        true,
+                                                        imageData?.scale || 20
+                                                    ).totalLength
+                                                )}
+                                            </div>
+                                            <div>
+                                                {t('ท่อที่ยาวที่สุด:')}{' '}
+                                                {formatDistance(
+                                                    calculatePipeStatistics(
+                                                        pipes,
+                                                        sprinklers,
+                                                        waterSource,
+                                                        true,
+                                                        imageData?.scale || 20
+                                                    ).longestPath
                                                 )}
                                             </div>
                                         </div>
@@ -2316,6 +2368,9 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                 </g>
                                             )}
 
+                                            {/* Disabled: Main pipe drawing - redundant with auto-generated pipes */}
+                                            {/* This prevents overlapping lines that confuse users */}
+                                            {/*
                                             {mainPipeDrawing.length >= 2 && (
                                                 <polyline
                                                     points={mainPipeDrawing
@@ -2326,25 +2381,51 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                     strokeWidth={8}
                                                 />
                                             )}
+                                            */}
 
-                                            {pipes.map((pipe) => {
-                                                if (!pipe.canvasStart || !pipe.canvasEnd)
-                                                    return null;
-                                                const isSelected = selectedPipes.has(pipe.id);
+                                            {/* Sort pipes to render selected pipes last (on top) */}
+                                            {[...pipes]
+                                                .sort((a, b) => {
+                                                    const aSelected = selectedPipes.has(a.id);
+                                                    const bSelected = selectedPipes.has(b.id);
+                                                    if (aSelected && !bSelected) return 1; // Draw selected pipes last
+                                                    if (!aSelected && bSelected) return -1; // Draw non-selected pipes first
+                                                    return 0; // Keep original order for pipes with same selection state
+                                                })
+                                                .map((pipe) => {
+                                                    if (!pipe.canvasStart || !pipe.canvasEnd)
+                                                        return null;
+                                                    const isSelected = selectedPipes.has(pipe.id);
 
-                                                return (
-                                                    <line
-                                                        key={pipe.id}
-                                                        x1={pipe.canvasStart.x}
-                                                        y1={pipe.canvasStart.y}
-                                                        x2={pipe.canvasEnd.x}
-                                                        y2={pipe.canvasEnd.y}
-                                                        stroke={isSelected ? '#FBBF24' : '#8B5CF6'}
-                                                        strokeWidth={isSelected ? 6 : 4}
-                                                        style={{ cursor: 'pointer' }}
-                                                    />
-                                                );
-                                            })}
+                                                    return (
+                                                        <g key={pipe.id}>
+                                                            <line
+                                                                x1={pipe.canvasStart.x}
+                                                                y1={pipe.canvasStart.y}
+                                                                x2={pipe.canvasEnd.x}
+                                                                y2={pipe.canvasEnd.y}
+                                                                stroke={isSelected ? '#FBBF24' : '#8B5CF6'}
+                                                                strokeWidth={isSelected ? 6 : 4}
+                                                                strokeLinecap="round"
+                                                                style={{ cursor: 'pointer' }}
+                                                            />
+                                                            {/* Add glow effect for selected pipes */}
+                                                            {isSelected && (
+                                                                <line
+                                                                    x1={pipe.canvasStart.x}
+                                                                    y1={pipe.canvasStart.y}
+                                                                    x2={pipe.canvasEnd.x}
+                                                                    y2={pipe.canvasEnd.y}
+                                                                    stroke="#FBBF24"
+                                                                    strokeWidth="10"
+                                                                    strokeLinecap="round"
+                                                                    strokeOpacity="0.3"
+                                                                    style={{ pointerEvents: 'none' }}
+                                                                />
+                                                            )}
+                                                        </g>
+                                                    );
+                                                })}
 
                                             {/* Render sprinkler radii */}
                                             {sprinklers.map((sprinkler) =>

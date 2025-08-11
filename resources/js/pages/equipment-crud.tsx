@@ -39,7 +39,6 @@ import {
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useLanguage } from '../contexts/LanguageContext';
-import { getImageUrl } from '@/utils/url';
 
 declare global {
     interface Window {
@@ -850,8 +849,8 @@ const SearchableDropdown: React.FC<{
                     {loading
                         ? t('กำลังโหลด...')
                         : selectedOption
-                        ? selectedOption.name
-                        : placeholder}
+                          ? selectedOption.name
+                          : placeholder}
                 </span>
                 <ChevronDown
                     className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
@@ -1233,7 +1232,7 @@ const PumpAccessoryForm: React.FC<{
                                         <div className="flex items-center justify-start">
                                             {accessory.image ? (
                                                 <img
-                                                    src={getImageUrl(accessory.image)} // <<-- 2. แก้ไข
+                                                    src={accessory.image}
                                                     alt={accessory.name || 'อุปกรณ์'}
                                                     className="h-14 w-14 cursor-pointer rounded-lg border border-gray-600 object-cover transition-opacity hover:border-orange-400 hover:opacity-80"
                                                     onError={(e) => {
@@ -1252,7 +1251,7 @@ const PumpAccessoryForm: React.FC<{
                                                     onClick={() =>
                                                         onImageClick &&
                                                         onImageClick(
-                                                            getImageUrl(accessory.image!), // <<-- 2. แก้ไข
+                                                            accessory.image!,
                                                             accessory.name || 'อุปกรณ์'
                                                         )
                                                     }
@@ -1394,7 +1393,7 @@ const ImageUpload: React.FC<{
 
         try {
             const result = await api.uploadImage(file);
-            onImageChange(result.path); // Use result.path for relative path
+            onImageChange(result.url);
             showAlert.success(t('อัปโหลดสำเร็จ'), t('รูปภาพได้รับการอัปโหลดเรียบร้อยแล้ว'));
         } catch (error) {
             console.error('Failed to upload image:', error);
@@ -1436,10 +1435,10 @@ const ImageUpload: React.FC<{
             {currentImage && (
                 <div className="flex items-center gap-3">
                     <img
-                        src={getImageUrl(currentImage)} // <<-- 2. แก้ไข
+                        src={currentImage}
                         alt="Product"
                         className="h-[150px] w-[220px] cursor-pointer rounded-lg border border-gray-600 object-cover shadow-sm transition-all hover:border-blue-400 hover:opacity-80 hover:shadow-lg"
-                        onClick={() => onImageClick && onImageClick(getImageUrl(currentImage), t('สินค้า'))} // <<-- 2. แก้ไข
+                        onClick={() => onImageClick && onImageClick(currentImage, t('สินค้า'))}
                         title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
                         onError={(e) => {
                             const target = e.target as HTMLImageElement;
@@ -2706,13 +2705,13 @@ const EquipmentDetailModal: React.FC<{
                                             <div className="col-span-1">
                                                 {accessory.image ? (
                                                     <img
-                                                        src={getImageUrl(accessory.image)} // <<-- 2. แก้ไข
+                                                        src={accessory.image}
                                                         alt={accessory.name || 'อุปกรณ์'}
                                                         className="h-12 w-12 cursor-pointer rounded-lg border border-gray-600 object-cover transition-opacity hover:border-orange-400 hover:opacity-80"
                                                         onClick={() =>
                                                             onImageClick &&
                                                             onImageClick(
-                                                                getImageUrl(accessory.image!), // <<-- 2. แก้ไข
+                                                                accessory.image!,
                                                                 accessory.name ||
                                                                     'อุปกรณ์ ' + (index + 1)
                                                             )
@@ -2848,7 +2847,7 @@ const EquipmentDetailModal: React.FC<{
                         <div className="lg:col-span-1">
                             {equipment.image ? (
                                 <img
-                                    src={getImageUrl(equipment.image)} // <<-- 2. แก้ไข
+                                    src={equipment.image}
                                     alt={equipment.name}
                                     className="h-64 w-full cursor-pointer rounded-lg border border-gray-600 object-cover transition-opacity hover:border-blue-400 hover:opacity-80"
                                     onError={(e) => {
@@ -2864,7 +2863,7 @@ const EquipmentDetailModal: React.FC<{
                                     }}
                                     onClick={() =>
                                         onImageClick &&
-                                        onImageClick(getImageUrl(equipment.image!), equipment.name) // <<-- 2. แก้ไข
+                                        onImageClick(equipment.image!, equipment.name)
                                     }
                                     title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
                                 />
@@ -3199,7 +3198,7 @@ const ImageModal: React.FC<{
                 </button>
 
                 <img
-                    src={getImageUrl(imageSrc)} // <<-- 2. แก้ไข
+                    src={imageSrc}
                     alt={imageAlt}
                     className="max-h-[80vh] max-w-full rounded-lg shadow-2xl"
                     onClick={(e) => e.stopPropagation()}
@@ -3855,7 +3854,7 @@ const EquipmentCRUD: React.FC = () => {
 
                                                 {equipment.image ? (
                                                     <img
-                                                        src={getImageUrl(equipment.image)} // <<-- 2. แก้ไข
+                                                        src={equipment.image}
                                                         alt={equipment.name}
                                                         className="mb-3 h-24 w-full cursor-pointer rounded object-cover shadow-lg transition-transform hover:opacity-80 group-hover:scale-105"
                                                         onError={(e) => {
@@ -3876,7 +3875,7 @@ const EquipmentCRUD: React.FC = () => {
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             openImageModal(
-                                                                getImageUrl(equipment.image!), // <<-- 2. แก้ไข
+                                                                equipment.image!,
                                                                 equipment.name
                                                             );
                                                         }}
@@ -4121,13 +4120,13 @@ const EquipmentCRUD: React.FC = () => {
                                                     <td className="px-3 text-center">
                                                         {equipment.image ? (
                                                             <img
-                                                                src={getImageUrl(equipment.image)} // <<-- 2. แก้ไข
+                                                                src={equipment.image}
                                                                 alt={equipment.name}
                                                                 className="h-10 w-10 cursor-pointer rounded border border-gray-600 object-cover shadow-sm transition-opacity hover:border-blue-400 hover:opacity-80"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     openImageModal(
-                                                                        getImageUrl(equipment.image!), // <<-- 2. แก้ไข
+                                                                        equipment.image!,
                                                                         equipment.name
                                                                     );
                                                                 }}

@@ -84,6 +84,8 @@ const CostSummary: React.FC<CostSummaryProps> = ({
     greenhouseData,
 }) => {
     const { t } = useLanguage();
+    
+
 
     const getItemName = () => {
         switch (projectMode) {
@@ -242,12 +244,15 @@ const CostSummary: React.FC<CostSummaryProps> = ({
 
         if (projectMode === 'garden' && gardenStats) {
             gardenStats.zones.forEach((zone) => {
-                const zoneSprinkler = zoneSprinklers[zone.zoneId];
-                const zonePipes = selectedPipes[zone.zoneId] || {};
-                const zoneInput = zoneInputs[zone.zoneId];
+                // Fix: Handle both single-zone ('main-area') and multi-zone (actual zone ID) cases
+                const effectiveZoneId = gardenStats.zones.length === 1 ? 'main-area' : zone.zoneId;
+                const zoneSprinkler = zoneSprinklers[effectiveZoneId];
+                const zonePipes = selectedPipes[effectiveZoneId] || {};
+                const zoneInput = zoneInputs[effectiveZoneId];
 
                 if (zoneSprinkler) {
-                    const sprinklerQuantity = zone.sprinklerCount;
+                    // Fix: Use zoneInput.totalTrees instead of zone.sprinklerCount for garden mode
+                    const sprinklerQuantity = zoneInput?.totalTrees || zone.sprinklerCount || 0;
                     const sprinklerCost = zoneSprinkler.price * sprinklerQuantity;
                     totalSprinklerCost += sprinklerCost;
 
@@ -266,7 +271,9 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 }
 
                 if (zoneInput) {
-                    processExtraPipe(zone.zoneId, zoneInput, zone.sprinklerCount);
+                    // Fix: Use zoneInput.totalTrees for extra pipe calculation too
+                    const sprinklerCount = zoneInput?.totalTrees || zone.sprinklerCount || 0;
+                    processExtraPipe(effectiveZoneId, zoneInput, sprinklerCount);
 
                     const branchPipe = zonePipes.branch || results.autoSelectedBranchPipe;
                     if (branchPipe && zoneInput.totalBranchPipeM > 0) {
@@ -820,12 +827,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
     };
 
     const projectSummary = getProjectSummary();
-    console.log('🔍 Project Summary Debug:', {
-        projectMode,
-        hasGreenhouseData: !!greenhouseData,
-        projectSummary,
-        rawGreenhouseData: greenhouseData?.summary
-    });
 
     return (
         <div className="rounded-lg bg-gray-700 p-6">
@@ -836,7 +837,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             {projectSummary && (
                 <div className="mb-6 rounded-lg bg-blue-900 p-4">
                     <h3 className="mb-3 text-lg font-bold text-blue-300">
-                        📊 {t('สรุปโครงการ ทั้งหมด')}
+                        📊 {t('สรุปโครงการทั้งหมด')}
                     </h3>
                     <div className="grid grid-cols-2 gap-4 text-sm text-gray-300 md:grid-cols-4">
                         <div>
