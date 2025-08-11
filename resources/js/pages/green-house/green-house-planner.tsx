@@ -61,6 +61,8 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
     const [isPanning, setIsPanning] = useState(false);
     const [lastPanPoint, setLastPanPoint] = useState<Point | null>(null);
     const [isMouseOverCanvas, setIsMouseOverCanvas] = useState(false);
+    const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
+    const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
 
     // Selection states
     const [isDragging, setIsDragging] = useState(false);
@@ -1450,33 +1452,54 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
             {/* Main Content with top padding to account for fixed navbar */}
             <div className="pt-16 h-full flex flex-col">
                 {/* Header */}
-                <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-3">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                            <div>
-                                <h1 className="text-xl font-bold">
-                                    {t('ออกแบบพื้นที่โรงเรือน พร้อมระบบวัดระยะ')}
-                                </h1>
-                                <p className="text-sm text-gray-400">
-                                    {t('วาดโครงสร้างโรงเรือนและแปลงปลูกของคุณ - พื้นที่ 2400x1600 pixels (1 grid = 1 เมตร)')}
-                                    <span className="ml-2 text-blue-300">
-                                        {t('แสดงการวัดระยะแบบ Real-time')}
-                                    </span>
-                                </p>
+                {!isHeaderCollapsed ? (
+                    <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-3 relative">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-4">
+                                <div>
+                                    <h1 className="text-xl font-bold">
+                                        {t('ออกแบบพื้นที่โรงเรือน พร้อมระบบวัดระยะ')}
+                                    </h1>
+                                    <p className="text-sm text-gray-400">
+                                        {t('วาดโครงสร้างโรงเรือนและแปลงปลูกของคุณ - พื้นที่ 2400x1600 pixels (1 grid = 1 เมตร)')}
+                                        <span className="ml-2 text-blue-300">
+                                            {t('แสดงการวัดระยะแบบ Real-time')}
+                                        </span>
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center space-x-2 text-sm text-gray-400">
+                                <span className="text-green-400">✓ {t('เลือกพืช')}</span>
+                                <span>→</span>
+                                <span className="text-green-400">✓ {t('เลือกวิธีการวางแผน')}</span>
+                                <span>→</span>
+                                <span className="font-medium text-blue-400">{t('ออกแบบพื้นที่')}</span>
+                                <span>→</span>
+                                <span>{t('ระบบน้ำ')}</span>
                             </div>
                         </div>
 
-                        <div className="flex items-center space-x-2 text-sm text-gray-400">
-                            <span className="text-green-400">✓ {t('เลือกพืช')}</span>
-                            <span>→</span>
-                            <span className="text-green-400">✓ {t('เลือกวิธีการวางแผน')}</span>
-                            <span>→</span>
-                            <span className="font-medium text-blue-400">{t('ออกแบบพื้นที่')}</span>
-                            <span>→</span>
-                            <span>{t('ระบบน้ำ')}</span>
-                        </div>
+                        <button
+                            onClick={() => setIsHeaderCollapsed(true)}
+                            className="absolute right-2 top-2 rounded bg-gray-700 px-2 py-1 text-xs text-gray-200 hover:bg-gray-600"
+                            title={t('ซ่อนแถบหัวข้อ')}
+                        >
+                            ▲
+                        </button>
                     </div>
-                </div>
+                ) : (
+                    <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-1 flex items-center justify-between">
+                        <span className="text-xs text-gray-400">{t('แถบหัวข้อถูกซ่อน')}</span>
+                        <button
+                            onClick={() => setIsHeaderCollapsed(false)}
+                            className="rounded bg-gray-700 px-2 py-1 text-xs text-gray-200 hover:bg-gray-600"
+                            title={t('แสดงแถบหัวข้อ')}
+                        >
+                            ▼ {t('แสดง')}
+                        </button>
+                    </div>
+                )}
 
                 {/* Main Content */}
                 <div className="flex flex-1 overflow-hidden">
@@ -1680,30 +1703,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                             </button>
                         </div>
 
-                        {/* Status Messages */}
-                        {isDrawing && (
-                            <div className="absolute left-4 top-20 rounded bg-blue-600 px-3 py-1 text-sm text-white">
-                                {t('กำลังวาด... 🟢 ระยะรอบด้าน 🟡 ระยะรวม (Enter=จบ, Escape=ยกเลิก)')}
-                            </div>
-                        )}
-
-                        {measuringMode && !measureEnd && (
-                            <div className="absolute left-4 top-20 rounded bg-red-600 px-3 py-1 text-sm text-white">
-                                {t('คลิกจุดที่สองเพื่อวัดระยะ (1 กริด = 1m, Escape เพื่อยกเลิก)')}
-                            </div>
-                        )}
-
-                        {isDragging && (
-                            <div className="absolute left-4 top-20 rounded bg-yellow-600 px-3 py-1 text-sm text-white">
-                                🤏 {t('กำลังขยับองค์ประกอบ... (ไม่กด Ctrl)')}
-                            </div>
-                        )}
-
-                        {isPanning && (
-                            <div className="absolute left-4 top-20 rounded bg-purple-600 px-3 py-1 text-sm text-white">
-                                🤏 {t('กำลังเลื่อนมุมมอง... (Ctrl+Drag หรือ คลิกพื้นที่ว่าง)')}
-                            </div>
-                        )}
+                        
 
                         {/* Action Buttons */}
                         <div className="absolute right-4 top-4 flex space-x-2">
@@ -1726,8 +1726,16 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                     </div>
 
                     {/* Properties Panel */}
-                    <div className="flex w-64 flex-col border-l border-gray-700 bg-gray-800">
-                        <div className="flex-1 overflow-y-auto p-4">
+                    {!isRightPanelCollapsed && (
+                        <div className="flex w-64 flex-col border-l border-gray-700 bg-gray-800 relative">
+                            <button
+                                onClick={() => setIsRightPanelCollapsed(true)}
+                                className="absolute -left-3 top-2 rounded bg-gray-700 px-1 py-0.5 text-xs text-gray-200 shadow hover:bg-gray-600"
+                                title={t('ซ่อนแผงข้อมูล')}
+                            >
+                                ▶
+                            </button>
+                            <div className="flex-1 overflow-y-auto p-4">
                             <h3 className="mb-3 text-sm font-medium text-gray-300">{t('รายการออบเจ็ค')}</h3>
 
                             {shapes.length === 0 ? (
@@ -1972,6 +1980,18 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                             </div>
                         </div>
                     </div>
+                    )}
+                    {isRightPanelCollapsed && (
+                        <div className="flex w-6 flex-col items-center justify-center border-l border-gray-700 bg-gray-800">
+                            <button
+                                onClick={() => setIsRightPanelCollapsed(false)}
+                                className="text-gray-300 transition-colors hover:text-white"
+                                title={t('แสดงแผงข้อมูล')}
+                            >
+                                ◀
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Bottom Bar */}
