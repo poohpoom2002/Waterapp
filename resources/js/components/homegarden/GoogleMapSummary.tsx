@@ -249,9 +249,9 @@ const ClippedSprinklerCoverage: React.FC<{
                     center: { lat: center.lat, lng: center.lng },
                     radius: radius,
                     fillColor: color,
-                    fillOpacity: 0.2,
+                    fillOpacity: 0.1,
                     strokeColor: color,
-                    strokeOpacity: 0.6,
+                    strokeOpacity: 0.8,
                     strokeWeight: 2,
                     map: map,
                 });
@@ -504,7 +504,7 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
         []
     );
 
-    const createWaterSourceIcon = useCallback((type: 'main' | 'pump'): google.maps.Icon => {
+    const createWaterSourceIcon = useCallback((): google.maps.Icon => {
         return {
             url: '/images/water-pump.png',
             scaledSize: new google.maps.Size(26, 26),
@@ -572,9 +572,9 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
                             center: { lat: sprinkler.position.lat, lng: sprinkler.position.lng },
                             radius: sprinkler.type.radius,
                             fillColor: sprinkler.type.color,
-                            fillOpacity: 0.15,
+                            fillOpacity: 0.1,
                             strokeColor: sprinkler.type.color,
-                            strokeOpacity: 0.5,
+                            strokeOpacity: 0.8,
                             strokeWeight: 2,
                             map: map,
                         });
@@ -600,7 +600,7 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
                             lat: gardenData.waterSource.position.lat,
                             lng: gardenData.waterSource.position.lng,
                         },
-                        icon: createWaterSourceIcon(gardenData.waterSource.type),
+                        icon: createWaterSourceIcon(),
                         title: `แหล่งน้ำ: ${gardenData.waterSource.type === 'pump' ? 'ปั๊มน้ำ' : 'ท่อเมน'}`,
                         map: map,
                     });

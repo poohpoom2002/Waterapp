@@ -154,32 +154,43 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
             </h3>
 
             <div className="mb-4">
-                <SearchableDropdown
-                    value={currentPipe?.id || ''}
-                    onChange={(value) => {
-                        const selected = config.analyzedPipes.find(
-                            (p) => p.id === parseInt(value.toString())
-                        );
-                        onPipeChange(selected || null);
-                    }}
-                    options={[
-                        { value: '', label: `-- ${t('ใช้การเลือกอัตโนมัติ')} --` },
-                        ...sortedPipes.map((pipe) => {
-                            const group = getPipeGrouping(pipe);
-                            const isAuto = pipe.id === config.autoSelectedPipe?.id;
-                            const rolls = calculateCurrentPipeRolls(pipe);
-                            const currentHeadLossPer100m = getHeadLossPer100m(pipe);
-                            return {
-                                value: pipe.id,
-                                label: `${isAuto ? '🤖 ' : ''}${pipe.name || pipe.productCode} - ${pipe.sizeMM}mm - ${pipe.price?.toLocaleString()} ${t('บาท/ม้วน')}`,
-                                searchableText: `${pipe.productCode || ''} ${pipe.name || ''} ${pipe.brand || ''} ${pipe.sizeMM}mm ${pipe.pipeType || ''} ${group}`
-                            };
-                        })
-                    ]}
-                    placeholder={`-- ${t('ใช้การเลือกอัตโนมัติ')} --`}
-                    searchPlaceholder={t('พิมพ์เพื่อค้นหาท่อ (ชื่อ, รหัสสินค้า, ขนาด)...')}
-                    className="w-full"
-                />
+                            <SearchableDropdown
+                value={currentPipe?.id || ''}
+                onChange={(value) => {
+                    const selected = config.analyzedPipes.find(
+                        (p) => p.id === parseInt(value.toString())
+                    );
+                    onPipeChange(selected || null);
+                }}
+                options={[
+                    { value: '', label: `-- ${t('ใช้การเลือกอัตโนมัติ')} --` },
+                    ...sortedPipes.map((pipe) => {
+                        const group = getPipeGrouping(pipe);
+                        const isAuto = pipe.id === config.autoSelectedPipe?.id;
+                        const rolls = calculateCurrentPipeRolls(pipe);
+                        const currentHeadLossPer100m = getHeadLossPer100m(pipe);
+                        return {
+                            value: pipe.id,
+                            label: `${isAuto ? '🤖 ' : ''}${pipe.name || pipe.productCode || pipe.product_code} - ${pipe.sizeMM}mm - ${pipe.price?.toLocaleString()} ${t('บาท/ม้วน')}`,
+                            searchableText: `${pipe.productCode || pipe.product_code} ${pipe.name || ''} ${pipe.brand || ''} ${pipe.sizeMM}mm ${pipe.pipeType || ''} ${group}`,
+                            image: pipe.image,
+                            productCode: pipe.productCode || pipe.product_code,
+                            name: pipe.name,
+                            brand: pipe.brand,
+                            price: pipe.price,
+                            unit: t('บาท/ม้วน'),
+                            score: pipe.score,
+                            isRecommended: pipe.isRecommended,
+                            isGoodChoice: pipe.isGoodChoice,
+                            isUsable: pipe.isUsable,
+                            isAutoSelected: isAuto
+                        };
+                    })
+                ]}
+                placeholder={`-- ${t('ใช้การเลือกอัตโนมัติ')} --`}
+                searchPlaceholder={t('พิมพ์เพื่อค้นหาท่อ (ชื่อ, รหัสสินค้า, ขนาด)...')}
+                className="w-full"
+            />
             </div>
 
             {currentPipe ? (

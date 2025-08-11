@@ -282,7 +282,18 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                             return {
                                 value: pump.id,
                                 label: `${isAuto ? '🤖 ' : ''}${pump.name || pump.productCode} - ${pump.powerHP}HP - ${pump.price?.toLocaleString()} ${t('บาท')} | ${group} | ${t('คะแนน:')} ${pump.score}${!pump.isFlowAdequate || !pump.isHeadAdequate ? ' ' + t('(ไม่เพียงพอ)') : ''}`,
-                                searchableText: `${pump.productCode || ''} ${pump.name || ''} ${pump.brand || ''} ${pump.powerHP}HP ${group}`
+                                searchableText: `${pump.productCode || ''} ${pump.name || ''} ${pump.brand || ''} ${pump.powerHP}HP ${group}`,
+                                image: (pump as any).image_url || pump.image || (pump as any).imageUrl,
+                                productCode: pump.productCode,
+                                name: pump.name,
+                                brand: pump.brand,
+                                price: pump.price,
+                                unit: t('บาท'),
+                                score: pump.score,
+                                isRecommended: pump.isRecommended,
+                                isGoodChoice: pump.isGoodChoice,
+                                isUsable: pump.isUsable,
+                                isAutoSelected: isAuto
                             };
                         })
                     ]}
