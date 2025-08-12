@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ProfilePhotoController;
 use App\Http\Controllers\SuperUserController;
 use App\Http\Controllers\FarmController; // เพิ่มบรรทัดนี้
 
@@ -28,15 +29,49 @@ Route::get('/test-web', function () {
     return response()->json(['message' => 'Web route is working']);
 });
 
+// Test authentication route
+Route::get('/test-auth', function () {
+    $user = auth()->user();
+    if ($user) {
+        return response()->json([
+            'success' => true,
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'is_super_user' => $user->isSuperUser(),
+            ],
+            'session_id' => session()->getId(),
+        ]);
+    } else {
+        return response()->json([
+            'success' => false,
+            'message' => 'Not authenticated',
+            'session_id' => session()->getId(),
+        ]);
+    }
+});
+
 // Folder Management Routes - Added to web routes to avoid API middleware issues
 Route::get('/folders-api', function () {
     try {
         $user = auth()->user();
         
+        // Debug logging
+        \Log::info('Folders API called', [
+            'user' => $user ? $user->id : 'null',
+            'session_id' => session()->getId(),
+            'headers' => request()->headers->all()
+        ]);
+        
         if (!$user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Authentication required'
+                'message' => 'Authentication required',
+                'debug' => [
+                    'session_id' => session()->getId(),
+                    'has_user' => auth()->check()
+                ]
             ], 401);
         }
 
@@ -275,10 +310,11 @@ Route::get('/fields-api', function () {
             ], 401);
         }
 
-        // Fetch real fields from database
+        // Fetch real fields from database with limit to avoid memory issues
         $fields = \App\Models\Field::where('user_id', $user->id)
             ->with('plantType')
-            ->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc') // Use ID instead of created_at for better performance
+            ->limit(100) // Add limit to prevent memory issues
             ->get();
 
         return response()->json([
@@ -293,7 +329,7 @@ Route::get('/fields-api', function () {
                     'folderId' => $field->folder_id,
                     'status' => $field->status,
                     'isCompleted' => $field->is_completed,
-                    'area' => json_decode($field->area_coordinates, true) ?? [],
+                    'area' => is_string($field->area_coordinates) ? json_decode($field->area_coordinates, true) ?? [] : ($field->area_coordinates ?? []),
                     'plantType' => $field->plantType ? [
                         'id' => $field->plantType->id,
                         'name' => $field->plantType->name,
@@ -306,7 +342,7 @@ Route::get('/fields-api', function () {
                     'totalArea' => $field->total_area,
                     'total_water_need' => $field->total_water_need,
                     'createdAt' => $field->created_at,
-                    'layers' => $field->layers ? json_decode($field->layers, true) : [],
+                    'layers' => $field->layers ? (is_string($field->layers) ? json_decode($field->layers, true) : $field->layers) : [],
                 ];
             })
         ]);
@@ -548,9 +584,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
   
     // Super User Routes
     Route::prefix('super')->name('super.')->group(function () {
-        // Route::get('/dashboard', function () {
-        //     return Inertia::render('SuperUserDashboard');
-        // })->name('dashboard');
+        Route::get('/dashboard', function () {
+            return Inertia::render('SuperUserDashboard');
+        })->name('dashboard');
         Route::get('/users', [SuperUserController::class, 'getUsers'])->name('users');
         Route::post('/users', [SuperUserController::class, 'createUser'])->name('create-user');
         Route::put('/users/{userId}', [SuperUserController::class, 'updateUser'])->name('update-user');
