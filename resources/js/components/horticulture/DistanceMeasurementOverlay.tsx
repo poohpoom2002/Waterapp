@@ -18,7 +18,7 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
 }) => {
     const [startPoint, setStartPoint] = useState<Coordinate | null>(null);
     const startPointRef = useRef<Coordinate | null>(null);
-    const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+    const labelMarkerRef = useRef<google.maps.Marker | null>(null);
     const polylineRef = useRef<google.maps.Polyline | null>(null);
     const listenersRef = useRef<google.maps.MapsEventListener[]>([]);
     const cleanupFunctionsRef = useRef<(() => void)[]>([]);
@@ -62,10 +62,9 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
         cleanupFunctionsRef.current = [];
 
         if (!map || !isActive || !editMode) {
-            // ล้าง InfoWindow และ Polyline เมื่อไม่ active
-            if (infoWindowRef.current) {
-                infoWindowRef.current.close();
-                infoWindowRef.current = null;
+            if (labelMarkerRef.current) {
+                labelMarkerRef.current.setMap(null);
+                labelMarkerRef.current = null;
             }
             if (polylineRef.current) {
                 polylineRef.current.setMap(null);
@@ -161,9 +160,9 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                             // รีเซ็ต
                             setStartPoint(null);
                             startPointRef.current = null;
-                            if (infoWindowRef.current) {
-                                infoWindowRef.current.close();
-                                infoWindowRef.current = null;
+                            if (labelMarkerRef.current) {
+                                labelMarkerRef.current.setMap(null);
+                                labelMarkerRef.current = null;
                             }
                             if (polylineRef.current) {
                                 polylineRef.current.setMap(null);
@@ -195,13 +194,13 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                 // รีเซ็ตการวัดระยะเมื่อวาดเสร็จ
                 setStartPoint(null);
                 startPointRef.current = null;
-                if (infoWindowRef.current) {
-                    infoWindowRef.current.close();
-                    infoWindowRef.current = null;
-                }
                 if (polylineRef.current) {
                     polylineRef.current.setMap(null);
                     polylineRef.current = null;
+                }
+                if (labelMarkerRef.current) {
+                    labelMarkerRef.current.setMap(null);
+                    labelMarkerRef.current = null;
                 }
             });
             listenersRef.current.push(drawingCompleteListener);
@@ -212,13 +211,13 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                 setTimeout(() => {
                     setStartPoint(null);
                     startPointRef.current = null;
-                    if (infoWindowRef.current) {
-                        infoWindowRef.current.close();
-                        infoWindowRef.current = null;
-                    }
                     if (polylineRef.current) {
                         polylineRef.current.setMap(null);
                         polylineRef.current = null;
+                    }
+                    if (labelMarkerRef.current) {
+                        labelMarkerRef.current.setMap(null);
+                        labelMarkerRef.current = null;
                     }
                 }, 100); // รอเล็กน้อยเพื่อให้ drawing complete ก่อน
             });
@@ -229,13 +228,13 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                 if (e.key === 'Escape' && startPoint) {
                     setStartPoint(null);
                     startPointRef.current = null;
-                    if (infoWindowRef.current) {
-                        infoWindowRef.current.close();
-                        infoWindowRef.current = null;
-                    }
                     if (polylineRef.current) {
                         polylineRef.current.setMap(null);
                         polylineRef.current = null;
+                    }
+                    if (labelMarkerRef.current) {
+                        labelMarkerRef.current.setMap(null);
+                        labelMarkerRef.current = null;
                     }
                 }
             };
@@ -280,54 +279,59 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                         
                         const distance = calculateDistance(startPointRef.current, currentPoint);
 
-                        // ซ่อนเส้นสีแดงเพื่อไม่ให้ลายตา (แสดงเฉพาะข้อความระยะทาง)
-                        const latLngMouse = new google.maps.LatLng(lat, lng);
-                        
-                        // ล้างเส้นเก่าถ้ามี
-                        if (polylineRef.current) {
-                            polylineRef.current.setMap(null);
-                            polylineRef.current = null;
+                        // วาดเส้นวัดระยะจากจุดเริ่มถึงตำแหน่งเมาส์
+                        const path = [
+                            new google.maps.LatLng(startPointRef.current.lat, startPointRef.current.lng),
+                            new google.maps.LatLng(currentPoint.lat, currentPoint.lng)
+                        ];
+
+                        if (!polylineRef.current) {
+                            polylineRef.current = new google.maps.Polyline({
+                                path,
+                                strokeColor: '#ffffff',
+                                strokeOpacity: 0.9,
+                                strokeWeight: 2,
+                                map,
+                            });
+                        } else {
+                            polylineRef.current.setPath(path);
+                            polylineRef.current.setMap(map);
                         }
 
-                        // สร้างหรืออัพเดท InfoWindow
-                        if (distance > 0) {
-                            const content = `
-                                <div style="
-                                    background: rgba(0,0,0,0.85); 
-                                    color: white; 
-                                    padding: 8px 12px; 
-                                    border-radius: 6px; 
-                                    font-size: 14px; 
-                                    font-weight: bold;
-                                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                                    border: 1px solid rgba(255,255,255,0.2);
-                                    text-align: center;
-                                    min-width: 60px;
-                                ">
-                                    ${formatDistance(distance)}
-                                    <div style="
-                                        font-size: 10px; 
-                                        color: rgba(255,255,255,0.8); 
-                                        margin-top: 2px;
-                                    ">ระยะทาง</div>
-                                </div>
-                            `;
-                            
-                            if (infoWindowRef.current) {
-                                // อัพเดท InfoWindow ที่มีอยู่
-                                infoWindowRef.current.setContent(content);
-                                infoWindowRef.current.setPosition(latLngMouse);
-                            } else {
-                                // สร้าง InfoWindow ใหม่
-                                const infoWindow = new google.maps.InfoWindow({
-                                    content,
-                                    position: latLngMouse,
-                                    disableAutoPan: true,
-                                    pixelOffset: new google.maps.Size(0, -10)
-                                });
-                                infoWindow.open(map);
-                                infoWindowRef.current = infoWindow;
-                            }
+                        // คำนวณจุดกึ่งกลางสำหรับตำแหน่งป้ายตัวเลข
+                        const midLat = (startPointRef.current.lat + currentPoint.lat) / 2;
+                        const midLng = (startPointRef.current.lng + currentPoint.lng) / 2;
+                        const mid = new google.maps.LatLng(midLat, midLng);
+
+                        const labelText = formatDistance(distance);
+
+                        if (!labelMarkerRef.current) {
+                            labelMarkerRef.current = new google.maps.Marker({
+                                position: mid,
+                                map,
+                                icon: {
+                                    path: google.maps.SymbolPath.CIRCLE,
+                                    scale: 0,
+                                    labelOrigin: new google.maps.Point(0, 14),
+                                } as google.maps.Symbol,
+                                label: {
+                                    text: labelText,
+                                    color: '#ffffff',
+                                    fontSize: '12px',
+                                    fontWeight: '700',
+                                },
+                                clickable: false,
+                                zIndex: 9999,
+                            });
+                        } else {
+                            labelMarkerRef.current.setPosition(mid);
+                            labelMarkerRef.current.setLabel({
+                                text: labelText,
+                                color: '#ffffff',
+                                fontSize: '12px',
+                                fontWeight: '700',
+                            } as google.maps.MarkerLabel);
+                            labelMarkerRef.current.setMap(map);
                         }
                     } catch (error) {
                         console.error('Error in mousemove handler:', error);
@@ -363,10 +367,10 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
             cleanupFunctionsRef.current.forEach(cleanup => cleanup());
             cleanupFunctionsRef.current = [];
             
-            // ล้าง InfoWindow และ Polyline
-            if (infoWindowRef.current) {
-                infoWindowRef.current.close();
-                infoWindowRef.current = null;
+            // ล้าง Marker และ Polyline
+            if (labelMarkerRef.current) {
+                labelMarkerRef.current.setMap(null);
+                labelMarkerRef.current = null;
             }
             if (polylineRef.current) {
                 polylineRef.current.setMap(null);
@@ -379,9 +383,9 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
     useEffect(() => {
         setStartPoint(null);
         startPointRef.current = null;
-        if (infoWindowRef.current) {
-            infoWindowRef.current.close();
-            infoWindowRef.current = null;
+        if (labelMarkerRef.current) {
+            labelMarkerRef.current.setMap(null);
+            labelMarkerRef.current = null;
         }
         if (polylineRef.current) {
             polylineRef.current.setMap(null);

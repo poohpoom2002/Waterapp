@@ -164,7 +164,7 @@ const getPlantCategories = (t: (key: string) => string): PlantCategory[] => [
         description: t('field_crop_desc'),
         icon: '🌾',
         color: 'from-yellow-600 to-yellow-800',
-        route: '/field-crop',
+	        route: '/choose-crop',
         features: [
             t('large_scale_planning'),
             t('efficient_irrigation'),
