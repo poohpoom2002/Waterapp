@@ -5640,12 +5640,6 @@ export default function EnhancedHorticulturePlannerPage() {
             description: t('ปั๊มและท่อน้ำ'),
         },
         {
-            id: 'advanced',
-            name: t('แก้ไข'),
-            icon: '⚙️',
-            description: t('เครื่องมือแก้ไข'),
-        },
-        {
             id: 'summary',
             name: t('สรุป'),
             icon: '📊',
@@ -9217,12 +9211,6 @@ export default function EnhancedHorticulturePlannerPage() {
                                             <span>{t('ปั๊มพร้อม')}</span>
                                         </div>
                                     )}
-                                    {history.present.isEditModeEnabled && (
-                                        <div className="flex items-center space-x-1 text-yellow-400">
-                                            <span>⚙️</span>
-                                            <span>{t('โหมดแก้ไข')}</span>
-                                        </div>
-                                    )}
                                     {isDragging && (
                                         <div className="flex items-center space-x-1 text-blue-400">
                                             <span>🖱️</span>
@@ -9506,164 +9494,6 @@ export default function EnhancedHorticulturePlannerPage() {
                                 </div>
                             )}
 
-                            {activeTab === 'advanced' && (
-                                <div className="p-4">
-                                    <h3 className="mb-4 flex items-center font-semibold text-white">
-                                        <span className="mr-2">⚙️</span>
-                                        {t('แก้ไข')}
-                                    </h3>
-
-                                    <div className="space-y-4">
-                                        <div className="rounded-lg border border-gray-200 bg-gray-900 p-4">
-                                            <h4 className="mb-3 font-medium text-white">
-                                                {t('โหมดแก้ไข')}
-                                            </h4>
-
-                                            <button
-                                                onClick={handleToggleEditMode}
-                                                disabled={!canEnableEditMode}
-                                                className={`w-full rounded-lg border px-4 py-3 font-medium transition-colors ${
-                                                    !canEnableEditMode
-                                                        ? 'cursor-not-allowed border-green-300 bg-green-300 text-green-900'
-                                                        : history.present.isEditModeEnabled
-                                                          ? 'border-red-300 bg-red-300 text-red-900 hover:bg-red-100'
-                                                          : 'border-green-300 bg-green-300 text-green-900 hover:bg-green-100'
-                                                }`}
-                                            >
-                                                {history.present.isEditModeEnabled ? (
-                                                    <>
-                                                        <FaTimes className="mr-2 inline" />
-                                                        {t('ออกจากโหมดแก้ไข')}
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <FaEdit className="mr-2 inline" />
-                                                        {t('เข้าสู่โหมดแก้ไข')}
-                                                    </>
-                                                )}
-                                            </button>
-
-                                            {!canEnableEditMode && (
-                                                <div className="mt-3 rounded-lg border border-amber-200 bg-gray-900 p-3 text-sm text-white">
-                                                    ⚠️{' '}
-                                                    {t(
-                                                        'ต้องมีพื้นที่หลัก, ปั๊ม, ท่อและต้นไม้ก่อนเข้าโหมดแก้ไข'
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {history.present.isEditModeEnabled && (
-                                            <>
-                                                <div className="rounded-lg border border-purple-200 bg-gray-900 p-4">
-                                                    <h4 className="mb-3 font-medium text-white">
-                                                        👁️ {t('การแสดงผล')}
-                                                    </h4>
-
-                                                    <div className="space-y-2">
-                                                        {Object.entries(
-                                                            history.present.layerVisibility
-                                                        )
-                                                            .filter(
-                                                                ([key]) =>
-                                                                    ![
-                                                                        'grid',
-                                                                        'measurements',
-                                                                    ].includes(key)
-                                                            )
-                                                            .map(([key, visible]) => (
-                                                                <label
-                                                                    key={key}
-                                                                    className="flex items-center space-x-2"
-                                                                >
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={visible}
-                                                                        onChange={() =>
-                                                                            handleToggleLayer(
-                                                                                key as keyof ProjectState['layerVisibility']
-                                                                            )
-                                                                        }
-                                                                        className="h-4 w-4 rounded border-gray-300"
-                                                                    />
-                                                                    <span className="text-sm text-white">
-                                                                        {visible ? (
-                                                                            <FaEye className="mr-1 inline" />
-                                                                        ) : (
-                                                                            <FaEyeSlash className="mr-1 inline" />
-                                                                        )}
-                                                                        {key === 'plants' &&
-                                                                            t('ต้นไม้')}
-                                                                        {key === 'pipes' &&
-                                                                            t('ท่อน้ำ')}
-                                                                        {key === 'zones' &&
-                                                                            t('โซน')}
-                                                                        {key === 'exclusions' &&
-                                                                            t('พื้นที่หลีกเลี่ยง')}
-                                                                    </span>
-                                                                </label>
-                                                            ))}
-                                                    </div>
-                                                </div>
-
-                                                <div className="rounded-lg border border-green-200 bg-gray-900 p-4">
-                                                    <h4 className="mb-3 font-medium text-white">
-                                                        🛠️ {t('การตั้งค่าแก้ไข')}
-                                                    </h4>
-
-                                                    <div className="space-y-3">
-                                                        <label className="flex items-center space-x-2">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={
-                                                                    history.present.editModeSettings
-                                                                        .autoConnect
-                                                                }
-                                                                onChange={(e) =>
-                                                                    handleUpdateEditSettings({
-                                                                        autoConnect:
-                                                                            e.target.checked,
-                                                                    })
-                                                                }
-                                                                className="h-4 w-4 rounded border-gray-300"
-                                                            />
-                                                            <span className="text-sm text-white">
-                                                                <FaLink className="mr-1 inline" />
-                                                                {t('เชื่อมต่ออัตโนมัติ')}
-                                                            </span>
-                                                        </label>
-                                                    </div>
-                                                </div>
-                                            </>
-                                        )}
-
-                                        {isCreatingConnection && (
-                                            <div className="rounded-lg border border-blue-200 bg-gray-900 p-4">
-                                                <h4 className="mb-2 font-medium text-white">
-                                                    🔗 {t('โหมดเชื่อมต่อท่อ')}
-                                                </h4>
-                                                <p className="mb-3 text-sm text-white">
-                                                    {t(
-                                                        'คลิกที่ท่อเมนรองหรือท่อย่อยหรือต้นไม้เพื่อเชื่อมต่อ'
-                                                    )}
-                                                </p>
-                                            <button
-                                                    onClick={() => {
-                                                        setIsCreatingConnection(false);
-                                                        setConnectionStartPlant(null);
-                                                        setHighlightedPipes([]);
-                                                        setDragMode('none');
-                                                    }}
-                                                    className="w-full rounded bg-red-100 px-3 py-2 text-red-700 transition-colors hover:bg-red-200"
-                                                >
-                                                    {t('ยกเลิกการเชื่อมต่อ')}
-                                            </button>
-                                        </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
                             {/* แสดงคำแนะนำเมื่ออยู่ใน Plant Move Mode */}
                             {isPlantMoveMode && (
                                 <div className="flex items-center space-x-2 rounded-lg border border-orange-300 bg-orange-50 px-3 py-2">
@@ -9797,7 +9627,7 @@ export default function EnhancedHorticulturePlannerPage() {
                     <div className="border-b border-gray-200 bg-red-500">
                         <nav className={`${isCompactMode ? 'px-2' : 'px-4'} py-2`}>
                             <div
-                                className={`grid gap-1 ${isCompactMode ? 'grid-cols-1' : 'grid-cols-4'}`}
+                                className={`grid gap-1 ${isCompactMode ? 'grid-cols-1' : 'grid-cols-3'}`}
                             >
                                 {tabs.map((tab) => (
                                     <button
@@ -11841,6 +11671,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                 setSelectedPlantsForMove={setSelectedPlantsForMove}
                                 isDeleteMode={isDeleteMode}
                                 handleDeletePipe={handleDeletePipe}
+                                handleCurvedPipeEditingChange={handleCurvedPipeEditingChange}
                                 t={t}
                             />
                         </HorticultureMapComponent>
@@ -12435,6 +12266,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
     setSelectedPlantsForMove: React.Dispatch<React.SetStateAction<Set<string>>>;
     isDeleteMode: boolean;
     handleDeletePipe: (pipeId: string, pipeType: 'mainPipe' | 'subMainPipe' | 'lateralPipe' | 'branchPipe') => void;
+    handleCurvedPipeEditingChange: (pipeId: string, isEditing: boolean) => void;
 }> = ({
     map,
     data,
@@ -12474,6 +12306,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
     setSelectedPlantsForMove,
     isDeleteMode,
     handleDeletePipe,
+    handleCurvedPipeEditingChange,
 }) => {
 
     const overlaysRef = useRef<{
@@ -13088,10 +12921,18 @@ const EnhancedGoogleMapsOverlays: React.FC<{
             data.mainPipes.forEach((pipe) => {
                 const isSelected = data.selectedItems.pipes.includes(pipe.id);
 
+                // เพิ่มขนาดท่อในโหมดลบเพื่อให้คลิกได้ง่ายขึ้น
+                let mainPipeStrokeWeight = 8; // ขนาดปกติ
+                if (isDeleteMode) {
+                    mainPipeStrokeWeight = 14; // ใหญ่มากในโหมดลบ
+                } else if (isSelected) {
+                    mainPipeStrokeWeight = 12; // ใหญ่เมื่อเลือก
+                }
+
                 const mainPipePolyline = new google.maps.Polyline({
                     path: pipe.coordinates.map((coord) => ({ lat: coord.lat, lng: coord.lng })),
                     strokeColor: isSelected ? '#FFD700' : '#FF0000',
-                    strokeWeight: isSelected ? 10 : 8, // เพิ่มขนาดท่อให้ใหญ่ขึ้น
+                    strokeWeight: mainPipeStrokeWeight,
                     strokeOpacity: 0.9,
                     clickable: true,
                     zIndex: isDeleteMode ? 2100 : isSelected ? 1600 : 1300, // เพิ่ม z-index สูงสำหรับ mainPipe
@@ -13113,23 +12954,39 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                 });
 
                 mainPipePolyline.addListener('click', (event: google.maps.MapMouseEvent) => {
-                    event.stop(); // ป้องกัน event propagation ในทุกกรณี
+                    // หยุด event propagation ทันทีเพื่อป้องกันการคลิกโดนอื่น
+                    if (event.stop) event.stop();
+                    if (event.domEvent) {
+                        event.domEvent.stopPropagation();
+                        event.domEvent.preventDefault();
+                    }
+                    
                     const domEvent = event.domEvent as MouseEvent;
+                    
                     if (isDeleteMode) {
+                        // ในโหมดลบ ให้แสดงข้อความยืนยัน
                         if (confirm(t('คุณต้องการลบท่อเมนนี้หรือไม่?'))) {
                             handleDeletePipe(pipe.id, 'mainPipe');
                         }
+                    } else if (data.curvedPipeEditing.isEnabled) {
+                        // ในโหมดแก้ไขรูปร่างท่อ - เพิ่มท่อเข้าสู่การแก้ไข
+                        const isCurrentlyEditing = data.curvedPipeEditing.editingPipes.has(pipe.id);
+                        handleCurvedPipeEditingChange(pipe.id, !isCurrentlyEditing);
                     } else if (
                         data.isEditModeEnabled &&
                         data.editModeSettings.selectionMode !== 'single' &&
                         domEvent?.ctrlKey
                     ) {
-                        event.stop();
+                        // การเลือกท่อในโหมดแก้ไข
                         onSelectItem(pipe.id, 'pipes');
-                    } else {
+                    } else if (!data.lateralPipeDrawing.isActive) {
+                        // แสดง info window เมื่อไม่อยู่ในโหมดวาดท่อย่อย
                         infoWindow.setPosition(event.latLng);
                         infoWindow.open(map);
                     }
+                    
+                    // หยุด event bubble ขึ้นไปยัง map
+                    return false;
                 });
 
                 overlaysRef.current.infoWindows.set(pipe.id, infoWindow);
@@ -13287,12 +13144,19 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                 const isHighlighted = highlightedPipes.includes(lateralPipe.id);
 
                 let strokeColor = '#FFD700';
-                let strokeWeight = 3;
+                let strokeWeight = 4; // เพิ่มจาก 3 เป็น 4
                 let strokeOpacity = 0.9;
 
-                if (isSelectedInConnectionMode) {
+                // เพิ่มขนาดท่อในโหมดลบเพื่อให้คลิกได้ง่ายขึ้น
+                if (isDeleteMode) {
+                    strokeWeight = 10; // ใหญ่มากในโหมดลบ
+                    strokeOpacity = 1;
+                } else if (isSelectedInConnectionMode) {
                     strokeColor = '#FFD700';
-                    strokeWeight = 6;
+                    strokeWeight = 8; // เพิ่มจาก 6 เป็น 8
+                    strokeOpacity = 1;
+                } else if (isSelected || isHighlighted) {
+                    strokeWeight = 6; // เพิ่มขนาดเมื่อเลือก
                     strokeOpacity = 1;
                 } else if (data.pipeConnection.isActive) {
                     strokeColor = '#D1D5DB';
@@ -13315,21 +13179,29 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                 overlaysRef.current.polylines.set(lateralPipe.id, lateralPolyline);
 
                 lateralPolyline.addListener('click', (event: google.maps.MapMouseEvent) => {
-                    event.stop(); // ป้องกัน event propagation ในทุกกรณี
+                    // หยุด event propagation ทันทีเพื่อป้องกันการคลิกโดนอื่น
+                    if (event.stop) event.stop();
+                    if (event.domEvent) {
+                        event.domEvent.stopPropagation();
+                        event.domEvent.preventDefault();
+                    }
+                    
                     if (isDeleteMode) {
                         if (confirm(t('คุณต้องการลบท่อย่อยนี้หรือไม่?'))) {
                             handleDeletePipe(lateralPipe.id, 'lateralPipe');
                         }
                     } else if (data.pipeConnection.isActive && event.latLng) {
-                        event.stop();
                         onPipeClickInConnectionMode(
                             lateralPipe.id,
                             'lateralPipe',
                             { lat: event.latLng.lat(), lng: event.latLng.lng() }
                         );
-                    } else if (onLateralPipeClick) {
+                    } else if (onLateralPipeClick && !data.curvedPipeEditing.isEnabled) {
                         onLateralPipeClick(event, lateralPipe.id);
                     }
+                    
+                    // หยุด event bubble ขึ้นไปยัง map
+                    return false;
                 });
 
                 if (data.layerVisibility.emitterLines) { 
@@ -13381,17 +13253,21 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                 let strokeWeight = 5;
                 let strokeOpacity = 0.9;
 
-                if (isSelectedInConnectionMode) {
+                // เพิ่มขนาดท่อในโหมดลบเพื่อให้คลิกได้ง่ายขึ้น
+                if (isDeleteMode) {
+                    strokeWeight = 12; // ใหญ่มากในโหมดลบ
+                    strokeOpacity = 1;
+                } else if (isSelectedInConnectionMode) {
                     strokeColor = '#8B5CF6';
-                    strokeWeight = 8;
+                    strokeWeight = 10; // เพิ่มจาก 8 เป็น 10
                     strokeOpacity = 1;
                 } else if (isSelected) {
                     strokeColor = '#FFD700';
-                    strokeWeight = 8;
+                    strokeWeight = 10; // เพิ่มจาก 8 เป็น 10
                     strokeOpacity = 1;
                 } else if (isHighlighted) {
                     strokeColor = '#FFD700';
-                    strokeWeight = 7;
+                    strokeWeight = 9; // เพิ่มจาก 7 เป็น 9
                     strokeOpacity = 1;
                 } else if (data.pipeConnection.isActive) {
                     strokeColor = '#D1D5DB';
@@ -13411,11 +13287,21 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                 overlaysRef.current.polylines.set(pipe.id, subMainPipePolyline);
 
                 subMainPipePolyline.addListener('click', (event: google.maps.MapMouseEvent) => {
-                    event.stop(); // ป้องกัน event propagation ในทุกกรณี
+                    // หยุด event propagation ทันทีเพื่อป้องกันการคลิกโดนอื่น
+                    if (event.stop) event.stop();
+                    if (event.domEvent) {
+                        event.domEvent.stopPropagation();
+                        event.domEvent.preventDefault();
+                    }
+                    
                     if (isDeleteMode) {
                         if (confirm(t('คุณต้องการลบท่อเมนรองนี้หรือไม่?'))) {
                             handleDeletePipe(pipe.id, 'subMainPipe');
                         }
+                    } else if (data.curvedPipeEditing.isEnabled) {
+                        // ในโหมดแก้ไขรูปร่างท่อ - เพิ่มท่อเข้าสู่การแก้ไข
+                        const isCurrentlyEditing = data.curvedPipeEditing.editingPipes.has(pipe.id);
+                        handleCurvedPipeEditingChange(pipe.id, !isCurrentlyEditing);
                     } else if (data.pipeConnection.isActive && event.latLng) {
                         onPipeClickInConnectionMode(
                             pipe.id,
@@ -13423,7 +13309,6 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                             { lat: event.latLng.lat(), lng: event.latLng.lng() }
                         );
                     } else if (isCreatingConnection && isHighlighted && event.latLng) {
-                        event.stop();
                         onConnectToPipe(
                             { lat: event.latLng.lat(), lng: event.latLng.lng() },
                             pipe.id,
@@ -13436,17 +13321,16 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                         if (onLateralPipeClick) {
                             onLateralPipeClick(event);
                         }
-                    } else {
-                        const domEvent = event.domEvent as MouseEvent;
-                        if (
-                            data.isEditModeEnabled &&
-                            data.editModeSettings.selectionMode !== 'single' &&
-                            domEvent?.ctrlKey
-                        ) {
-                            event.stop();
-                            onSelectItem(pipe.id, 'pipes');
-                        }
+                    } else if (
+                        data.isEditModeEnabled &&
+                        data.editModeSettings.selectionMode !== 'single' &&
+                        (event.domEvent as MouseEvent)?.ctrlKey
+                    ) {
+                        onSelectItem(pipe.id, 'pipes');
                     }
+                    
+                    // หยุด event bubble ขึ้นไปยัง map
+                    return false;
                 });
 
                 pipe.branchPipes.forEach((branchPipe) => {
@@ -13554,6 +13438,36 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                     circleRadius = 8;
                 }
 
+                // ปรับ z-index ให้เหมาะสมกับโหมดต่างๆ
+                let plantZIndex = 500; // ค่าเริ่มต้นต่ำกว่าท่อ
+                let plantClickable = true;
+                let plantDraggable = data.isEditModeEnabled;
+
+                // ในโหมดลบ ให้ต้นไม้มี z-index ต่ำและไม่สามารถคลิกได้
+                if (isDeleteMode) {
+                    plantZIndex = 100; // ต่ำมาก
+                    plantClickable = false; // ปิดการคลิก
+                    plantDraggable = false; // ปิดการลาก
+                }
+                // ในโหมดแก้ไขท่อโค้ง ให้ต้นไม้มี z-index ต่ำ
+                else if (data.curvedPipeEditing.isEnabled) {
+                    plantZIndex = 200; 
+                    plantClickable = false;
+                    plantDraggable = false;
+                }
+                // ในโหมดวาดท่อย่อย ลด z-index ของต้นไม้
+                else if (data.lateralPipeDrawing.isActive) {
+                    plantZIndex = 300; 
+                }
+                // ในโหมดเชื่อมต่อท่อ เพิ่ม z-index สำหรับต้นไม้ที่เกี่ยวข้อง
+                else if (data.pipeConnection.isActive && isHighlightedForConnection) {
+                    plantZIndex = 1500; // สูงกว่าท่อเพื่อให้คลิกได้
+                }
+                // โหมดย้ายต้นไม้หรือเลือกต้นไม้ 
+                else if (isInPlantMoveMode || isSelectedForMove || data.plantSelectionMode.type === 'multiple') {
+                    plantZIndex = 1200; // สูงกว่าท่อเล็กน้อย
+                }
+
                 const plantMarker = new google.maps.Marker({
                     position: { lat: plant.position.lat, lng: plant.position.lng },
                     map: map,
@@ -13561,23 +13475,24 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                         url:
                             'data:image/svg+xml;charset=UTF-8,' +
                             encodeURIComponent(`
-                            <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-                                ${isConnectionStart ? '<circle cx="16" cy="16" r="14" fill="none" stroke="#FFD700" stroke-width="3"/>' : ''}
-                                ${isSelected ? '<circle cx="16" cy="16" r="13" fill="none" stroke="#9333EA" stroke-width="2"/>' : ''}
-                                ${isCurrentlyDragging ? '<circle cx="16" cy="16" r="12" fill="none" stroke="#FF6B35" stroke-width="3"/>' : ''}
-                                ${isHighlightedForConnection ? '<circle cx="16" cy="16" r="13" fill="none" stroke="#FFD700" stroke-width="2"/>' : ''}
-                                ${isInPlantMoveMode ? '<circle cx="16" cy="16" r="15" fill="none" stroke="#F97316" stroke-width="2" stroke-dasharray="4,2"/>' : ''}
-                                ${isSelectedForMove ? '<circle cx="16" cy="16" r="16" fill="none" stroke="#10B981" stroke-width="3"/>' : ''}
-                            ${data.plantSelectionMode.type === 'multiple' ? `<circle cx="16" cy="16" r="${circleRadius}" fill="${plantColor}" />` : ''}
-                                <text x="16" y="16" text-anchor="middle" dominant-baseline="central" fill="white" font-size="12" font-weight="bold">${plantSymbol}</text>
+                            <svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+                                ${isConnectionStart ? '<circle cx="14" cy="14" r="12" fill="none" stroke="#FFD700" stroke-width="3"/>' : ''}
+                                ${isSelected ? '<circle cx="14" cy="14" r="11" fill="none" stroke="#9333EA" stroke-width="2"/>' : ''}
+                                ${isCurrentlyDragging ? '<circle cx="14" cy="14" r="10" fill="none" stroke="#FF6B35" stroke-width="3"/>' : ''}
+                                ${isHighlightedForConnection ? '<circle cx="14" cy="14" r="11" fill="none" stroke="#FFD700" stroke-width="2"/>' : ''}
+                                ${isInPlantMoveMode ? '<circle cx="14" cy="14" r="13" fill="none" stroke="#F97316" stroke-width="2" stroke-dasharray="4,2"/>' : ''}
+                                ${isSelectedForMove ? '<circle cx="14" cy="14" r="13" fill="none" stroke="#10B981" stroke-width="3"/>' : ''}
+                            ${data.plantSelectionMode.type === 'multiple' ? `<circle cx="14" cy="14" r="${Math.max(6, circleRadius - 2)}" fill="${plantColor}" />` : ''}
+                                <text x="14" y="14" text-anchor="middle" dominant-baseline="central" fill="white" font-size="10" font-weight="bold">${plantSymbol}</text>
                             </svg>
                         `),
-                        scaledSize: new google.maps.Size(36, 36),
-                        anchor: new google.maps.Point(16, 16),
+                        scaledSize: new google.maps.Size(28, 28), // ลดขนาดจาก 36 เป็น 28
+                        anchor: new google.maps.Point(14, 14),
                     },
                     title: `${plant.plantData.name} (${plant.id})`,
-                    draggable: data.isEditModeEnabled,
-                    zIndex: 1000,
+                    draggable: plantDraggable,
+                    clickable: plantClickable,
+                    zIndex: plantZIndex,
                 });
 
                 overlaysRef.current.markers.set(plant.id, plantMarker);
