@@ -155,6 +155,10 @@ export const formatFlowRate = (flowRate: number): string => {
     return `${flowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ลิตร/นาที`;
 };
 
+export const formatFlowRatePerHour = (flowRate: number): string => {
+    return `${flowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ลิตร/ชั่วโมง`;
+};
+
 /**
  * ฟอร์แมตหน่วยแรงดัน
  * @param pressure แรงดัน

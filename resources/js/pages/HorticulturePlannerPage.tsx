@@ -42,6 +42,7 @@ import {
     SprinklerFormData,
     calculateTotalFlowRate,
     formatFlowRate,
+    formatFlowRatePerHour,
     formatPressure,
     formatRadius,
 } from '../utils/sprinklerUtils';
@@ -1741,13 +1742,13 @@ const formatArea = (area: number, t: (key: string) => string): string => {
 };
 
 const formatWaterVolume = (volume: number, t: (key: string) => string): string => {
-    if (typeof volume !== 'number' || isNaN(volume) || volume < 0) return `0 ${t('ลิตร')}`;
+    if (typeof volume !== 'number' || isNaN(volume) || volume < 0) return `0 ${t('ลิตร/ครั้ง')}`;
     if (volume >= 1000000) {
-        return `${(volume / 1000000).toFixed(2)} ${t('ล้านลิตร')}`;
+        return `${(volume / 1000000).toFixed(2)} ${t('ล้านลิตร/ครั้ง')}`;
     } else if (volume >= 1000) {
-        return `${volume.toLocaleString('th-TH')} ${t('ลิตร')}`;
+        return `${volume.toLocaleString('th-TH')} ${t('ลิตร/ครั้ง')}`;
     } else {
-        return `${volume.toFixed(2)} ${t('ลิตร')}`;
+        return `${volume.toFixed(2)} ${t('ลิตร/ครั้ง')}`;
     }
 };
 
@@ -4496,6 +4497,11 @@ export default function EnhancedHorticulturePlannerPage() {
         const formatFlowRate = (plantCount: number, flowRate: number): string => {
             const totalFlowRate = plantCount * flowRate;
             return `${totalFlowRate.toFixed(2)} ${t('ลิตร/นาที')}`;
+        };
+
+        const formatFlowRatePerHour = (plantCount: number, flowRate: number): string => {
+            const totalFlowRate = plantCount * flowRate;
+            return `${totalFlowRate.toFixed(2)} ${t('ลิตร/ชั่วโมง')}`;
         };
 
         const getDifferenceText = () => {
@@ -10422,12 +10428,12 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                                     {t('Q รวมต่อชั่วโมง')}:
                                                                                 </span>
                                                                                 <span className="font-bold text-yellow-400">
-                                                                                    {formatFlowRate(totalFlowRatePerHour)}
+                                                                                    {formatFlowRatePerHour(totalFlowRatePerHour)}
                                                                                 </span>
                                                                             </div>
                                                                             <div className="flex justify-between">
                                                                                 <span className="text-cyan-400">
-                                                                                    {t('ไหลต่อต้น')}:
+                                                                                    {t('Q หัวฉีด')}:
                                                                                 </span>
                                                                                 <span className="font-bold text-cyan-400">
                                                                                     {sprinklerConfig.flowRatePerMinute.toFixed(1)} {t('ลิตร/นาที')}
@@ -10435,7 +10441,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                             </div>
                                                                             <div className="flex justify-between">
                                                                                 <span className="text-orange-400">
-                                                                                    {t('แรงดัน')}:
+                                                                                    {t('แรงดันหัวฉีด')}:
                                                                                 </span>
                                                                                 <span className="font-bold text-orange-400">
                                                                                     {formatPressure(sprinklerConfig.pressureBar)}
@@ -10443,7 +10449,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                             </div>
                                                                             <div className="flex justify-between">
                                                                                 <span className="text-purple-400">
-                                                                                    {t('รัศมีฉีด')}:
+                                                                                    {t('รัศมีหัวฉีด')}:
                                                                                 </span>
                                                                                 <span className="font-bold text-purple-400">
                                                                                     {formatRadius(sprinklerConfig.radiusMeters)}
@@ -10719,7 +10725,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                                         {zone.name}
                                                                                     </span>
                                                                                 </div>
-                                                                                <span className="text-xs text-gray-400">
+                                                                                <span className="text-xs text-green-400">
                                                                                     {zone.plants.length}{' '}
                                                                                     {t('ต้น')}
                                                                                 </span>
@@ -10728,7 +10734,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                                 <span className="text-xs text-gray-400">
                                                                                     {zone.totalWaterNeed} {t('ลิตร/ครั้ง')}
                                                                                 </span>
-                                                                                <span className="text-xs text-gray-400">
+                                                                                <span className="text-xs text-blue-400">
                                                                                     {/* ERROR: totalFlowRatePerMinute is not defined in this scope. */}
                                                                                     {/* To debug, calculate per-zone flow rate using sprinklerConfig if available */}
                                                                                     {(() => {

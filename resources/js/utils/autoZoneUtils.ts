@@ -470,12 +470,12 @@ export const balanceWaterNeeds = (
 export const enhancedBalanceWaterNeeds = (
     clusters: PlantLocation[][],
     targetWaterNeedPerZone: number,
-    tolerance: number = 0.05 // Increased to 5% for more realistic balance, especially for 3+ zones
+    tolerance: number = 0.05 // Base tolerance: 5% for realistic balance, especially for 3+ zones
 ): PlantLocation[][] => {
     const balancedClusters = clusters.map(cluster => [...cluster]);
     
-    // Adaptive tolerance based on number of zones - more zones = more tolerance needed
-    const adaptiveTolerance = Math.min(0.10, tolerance + (clusters.length - 2) * 0.01); // Max 10% tolerance
+    // Adaptive tolerance: more zones = more tolerance needed
+    const adaptiveTolerance = Math.min(0.12, tolerance + (clusters.length - 2) * 0.015); // Max 12% tolerance, scales by 1.5% per additional zone
     
     const getClusterWaterNeed = (cluster: PlantLocation[]): number => {
         return cluster.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
@@ -488,16 +488,16 @@ export const enhancedBalanceWaterNeeds = (
 
     let improved = true;
     let iterations = 0;
-    const maxIterations = Math.min(1000, clusters.length * 200); // Scale iterations with zone count
+    const maxIterations = Math.min(1500, clusters.length * 250); // Scale iterations with zone count (up to 1500)
     let currentMaxDeviation = getMaxDeviation(balancedClusters);
     const strictTolerance = targetWaterNeedPerZone * adaptiveTolerance;
 
     console.log(`🔧 Starting enhanced water balance for ${clusters.length} zones:`);
-    console.log(`   - Target water per zone: ${targetWaterNeedPerZone.toFixed(2)}`);
+    console.log(`   - Target water per zone: ${targetWaterNeedPerZone.toFixed(2)} L/min`);
     console.log(`   - Base tolerance: ${(tolerance * 100).toFixed(1)}%`);
     console.log(`   - Adaptive tolerance: ${(adaptiveTolerance * 100).toFixed(1)}%`);
-    console.log(`   - Strict tolerance: ±${strictTolerance.toFixed(2)}`);
-    console.log(`   - Initial max deviation: ${currentMaxDeviation.toFixed(2)}`);
+    console.log(`   - Allowable deviation: ±${strictTolerance.toFixed(2)} L/min`);
+    console.log(`   - Initial max deviation: ${currentMaxDeviation.toFixed(2)} L/min (${(currentMaxDeviation / targetWaterNeedPerZone * 100).toFixed(1)}%)`);
 
     while (improved && iterations < maxIterations && currentMaxDeviation > strictTolerance) {
         improved = false;
@@ -514,28 +514,28 @@ export const enhancedBalanceWaterNeeds = (
         // Sort by deviation (most unbalanced first)
         clusterWaterNeeds.sort((a, b) => b.deviation - a.deviation);
 
-        // Find most and least water clusters with smart target selection
+        // Smart target selection: Find the best pairing for optimal balance improvement
         const mostUnbalanced = clusterWaterNeeds[0];
         
-        // Find the best target cluster for balancing (considering both water need and geographic distribution)
-        let bestTarget = null;
+        // Find the best target cluster for balancing (considering both water need and potential improvement)
+        let bestTarget: typeof clusterWaterNeeds[0] | null = null;
         let bestBalanceScore = -1;
         
         for (const candidate of clusterWaterNeeds) {
             if (candidate.index === mostUnbalanced.index) continue;
             
             // Calculate potential balance improvement
-            const waterDiff = mostUnbalanced.waterNeed - candidate.waterNeed;
-            const avgWaterDiff = Math.abs(waterDiff / 2);
+            const waterDiff = Math.abs(mostUnbalanced.waterNeed - candidate.waterNeed);
             
-            // Calculate how much this would improve overall balance
-            const currentTotalDeviation = mostUnbalanced.deviation + candidate.deviation;
-            const potentialNewDeviation = Math.abs((mostUnbalanced.waterNeed - avgWaterDiff) - targetWaterNeedPerZone) + 
-                                        Math.abs((candidate.waterNeed + avgWaterDiff) - targetWaterNeedPerZone);
+            // Score based on potential for improvement and current deviation
+            const potentialImprovement = waterDiff / 2; // Maximum possible improvement
+            const combinedDeviation = mostUnbalanced.deviation + candidate.deviation;
             
-            const balanceScore = currentTotalDeviation - potentialNewDeviation;
+            // Higher score for pairs with:
+            // 1. More combined deviation (more room for improvement)
+            // 2. Reasonable water difference (not too extreme)
+            const balanceScore = combinedDeviation * 2 - Math.abs(potentialImprovement - targetWaterNeedPerZone * 0.05);
             
-            // Prefer targets that would create better balance
             if (balanceScore > bestBalanceScore) {
                 bestBalanceScore = balanceScore;
                 bestTarget = candidate;
@@ -544,8 +544,8 @@ export const enhancedBalanceWaterNeeds = (
         
         if (!bestTarget) continue;
 
-        // Try precision balancing strategies
-        improved = tryPrecisionBalancing(balancedClusters, mostUnbalanced, bestTarget, targetWaterNeedPerZone, strictTolerance);
+        // Try precision balancing strategies with enhanced algorithm
+        improved = tryEnhancedPrecisionBalancing(balancedClusters, mostUnbalanced, bestTarget, targetWaterNeedPerZone, strictTolerance);
         
         if (!improved && iterations % 50 === 0) {
             // Try more aggressive rebalancing every 50 iterations
@@ -565,20 +565,30 @@ export const enhancedBalanceWaterNeeds = (
     const finalDeviations = finalWaterNeeds.map(need => Math.abs(need - targetWaterNeedPerZone));
     const deviationPercentages = finalDeviations.map(dev => (dev / targetWaterNeedPerZone * 100));
     
-    console.log(`✅ Enhanced balance completed for ${clusters.length} zones:`);
+    // Calculate balance quality rating
+    const balanceQuality = finalMaxDeviation <= strictTolerance ? 'EXCELLENT' : 
+                          finalMaxDeviation <= targetWaterNeedPerZone * 0.08 ? 'GOOD' :
+                          finalMaxDeviation <= targetWaterNeedPerZone * 0.12 ? 'ACCEPTABLE' : 'NEEDS IMPROVEMENT';
+    
+    const qualityIcon = balanceQuality === 'EXCELLENT' ? '🏆' :
+                       balanceQuality === 'GOOD' ? '✅' :
+                       balanceQuality === 'ACCEPTABLE' ? '⚠️' : '❌';
+    
+    console.log(`${qualityIcon} Enhanced balance completed for ${clusters.length} zones:`);
     console.log(`   - Iterations used: ${iterations}/${maxIterations}`);
-    console.log(`   - Final max deviation: ${finalMaxDeviation.toFixed(2)} (${(finalMaxDeviation / targetWaterNeedPerZone * 100).toFixed(1)}%)`);
-    console.log(`   - Zone water needs: ${finalWaterNeeds.map(w => w.toFixed(1)).join(', ')}`);
-    console.log(`   - Deviations (%): ${deviationPercentages.map(p => p.toFixed(1)).join(', ')}`);
-    console.log(`   - Balance quality: ${finalMaxDeviation <= strictTolerance ? '✅ EXCELLENT' : finalMaxDeviation <= targetWaterNeedPerZone * 0.1 ? '⚠️ ACCEPTABLE' : '❌ POOR'}`);
+    console.log(`   - Final max deviation: ${finalMaxDeviation.toFixed(2)} L/min (${(finalMaxDeviation / targetWaterNeedPerZone * 100).toFixed(1)}%)`);
+    console.log(`   - Zone water needs: [${finalWaterNeeds.map(w => w.toFixed(1)).join(', ')}] L/min`);
+    console.log(`   - Individual deviations: [${deviationPercentages.map(p => p.toFixed(1) + '%').join(', ')}]`);
+    console.log(`   - Balance quality: ${qualityIcon} ${balanceQuality}`);
+    
+    if (balanceQuality === 'NEEDS IMPROVEMENT') {
+        console.log(`   💡 Tip: Consider reducing the number of zones or adjusting plant distribution for better balance`);
+    }
 
     return balancedClusters;
 };
 
-// Calculate geographic distance between two plant locations
-const calculatePlantDistance = (plant1: PlantLocation, plant2: PlantLocation): number => {
-    return calculateDistance(plant1.position, plant2.position);
-};
+
 
 // Find geographic center of a cluster
 const getClusterCenter = (cluster: PlantLocation[]): Coordinate => {
@@ -593,8 +603,8 @@ const getClusterCenter = (cluster: PlantLocation[]): Coordinate => {
     };
 };
 
-// Precision balancing between two clusters with geographic considerations
-const tryPrecisionBalancing = (
+// Enhanced precision balancing with geographic considerations
+const tryEnhancedPrecisionBalancing = (
     clusters: PlantLocation[][],
     mostUnbalanced: { index: number; waterNeed: number; deviation: number },
     target: { index: number; waterNeed: number; deviation: number },
@@ -616,20 +626,16 @@ const tryPrecisionBalancing = (
     const idealExchange = (waterNeedA - waterNeedB) / 2;
     
     // If the difference is too small, no need to balance
-    if (Math.abs(idealExchange) < tolerance / 2) return false;
-    const totalWater = mostUnbalanced.waterNeed + target.waterNeed;
-    const idealWaterA = totalWater / 2;
-    const waterToMove = mostUnbalanced.waterNeed - idealWaterA;
+    if (Math.abs(idealExchange) < tolerance / 4) return false;
     
-    if (Math.abs(waterToMove) < 0.01) return false;
-    
-    // Find best single plant to move
-    const sourceCluster = waterToMove > 0 ? clusterA : clusterB;
-    const destCluster = waterToMove > 0 ? clusterB : clusterA;
-    const targetMove = Math.abs(waterToMove);
+    // Determine source and destination clusters
+    const sourceCluster = waterNeedA > waterNeedB ? clusterA : clusterB;
+    const destCluster = waterNeedA > waterNeedB ? clusterB : clusterA;
+    const sourceCenter = waterNeedA > waterNeedB ? centerA : centerB;
+    const destCenter = waterNeedA > waterNeedB ? centerB : centerA;
     
     let bestPlant: PlantLocation | null = null;
-    let bestImprovement = 0;
+    let bestScore = -1;
     
     sourceCluster.forEach(plant => {
         const plantWater = plant.plantData.waterNeed;
@@ -642,26 +648,24 @@ const tryPrecisionBalancing = (
         const balanceImprovement = currentDeviation - newDeviation;
         
         if (balanceImprovement > 0) {
-            // Calculate geographic penalty - prefer moving plants that are closer to destination center
-            const sourceCenter = sourceCluster === clusterA ? centerA : centerB;
-            const destCenter = sourceCluster === clusterA ? centerB : centerA;
+            // Calculate geographic score - prefer moving plants that are closer to destination
             const distanceToSource = calculateDistance(plant.position, sourceCenter);
             const distanceToDestination = calculateDistance(plant.position, destCenter);
             
-            // Geographic bonus: negative penalty if plant is closer to destination than to current center
-            const geographicPenalty = Math.max(0, distanceToSource - distanceToDestination) * 0.1;
+            // Geographic bonus: positive if plant is closer to destination
+            const geographicBonus = Math.max(0, (distanceToSource - distanceToDestination) / 1000); // Convert to km for scaling
             
-            // Combined score: balance improvement minus geographic penalty
-            const overallScore = balanceImprovement - geographicPenalty;
+            // Combined score: balance improvement + geographic bonus
+            const totalScore = balanceImprovement + geographicBonus * 0.1; // Geographic factor weighted at 10%
             
-            if (overallScore > bestImprovement || bestPlant === null) {
+            if (totalScore > bestScore) {
                 bestPlant = plant;
-                bestImprovement = overallScore;
+                bestScore = totalScore;
             }
         }
     });
     
-    if (bestPlant && bestImprovement > 0.01) {
+    if (bestPlant && bestScore > 0.005) { // Lower threshold for more flexibility
         // Move the plant
         const plantIndex = sourceCluster.findIndex(p => p.id === bestPlant!.id);
         if (plantIndex !== -1) {
