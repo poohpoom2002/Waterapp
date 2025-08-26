@@ -49,8 +49,6 @@ export type PipeConnection = {
 export type WaterSource = { lat: number; lng: number; type: 'tap' | 'pump' } | null;
 
 // Import router if using Inertia.js
-// @ts-ignore
-// eslint-disable-next-line
 import { router } from '@inertiajs/react';
 
 export const useSprinklerLayoutData = () => {

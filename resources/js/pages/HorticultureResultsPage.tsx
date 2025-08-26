@@ -20,16 +20,16 @@ import {
 } from '../utils/horticultureUtils';
 
 const ZONE_COLORS = [
-    '#FF69B4', // Hot Pink - โซน 1
-    '#00CED1', // Dark Turquoise - โซน 2  
-    '#32CD32', // Lime Green - โซน 3
-    '#FFD700', // Gold - โซน 4
-    '#FF6347', // Tomato - โซน 5
-    '#9370DB', // Medium Purple - โซน 6
-    '#20B2AA', // Light Sea Green - โซน 7
-    '#FF1493', // Deep Pink - โซน 8
-    '#00FA9A', // Medium Spring Green - โซน 9
-    '#FFA500', // Orange - โซน 10
+    '#FF69B4', 
+    '#00CED1', 
+    '#32CD32', 
+    '#FFD700', 
+    '#FF6347', 
+    '#9370DB', 
+    '#20B2AA', 
+    '#FF1493', 
+    '#00FA9A', 
+    '#FFA500', 
 ];
 
 const EXCLUSION_COLORS = {
@@ -116,7 +116,6 @@ const isPointsClose = (point1: Coordinate, point2: Coordinate, threshold: number
     return distance <= threshold;
 };
 
-// ฟังก์ชันตรวจสอบว่าจุดบนท่อเมนรองเป็นจุดเริ่มต้นหรือไม่
 const isPointAtSubMainPipeStart = (
     point: Coordinate, 
     subMainPipeCoordinates: Coordinate[], 
@@ -128,7 +127,6 @@ const isPointAtSubMainPipeStart = (
     return distance <= threshold;
 };
 
-// ฟังก์ชันตรวจสอบว่าจุดอยู่ระหว่างท่อเมนรองหรือไม่ (ไม่ใช่จุดเริ่มต้น)
 const isPointOnSubMainPipeMidway = (
     point: Coordinate, 
     subMainPipeCoordinates: Coordinate[], 
@@ -136,12 +134,10 @@ const isPointOnSubMainPipeMidway = (
 ): boolean => {
     if (subMainPipeCoordinates.length < 2) return false;
     
-    // ตรวจสอบว่าไม่ใช่จุดเริ่มต้น
     if (isPointAtSubMainPipeStart(point, subMainPipeCoordinates, threshold)) {
         return false;
     }
     
-    // ตรวจสอบระยะห่างจากแต่ละเส้นของท่อเมนรอง
     for (let i = 0; i < subMainPipeCoordinates.length - 1; i++) {
         const start = subMainPipeCoordinates[i];
         const end = subMainPipeCoordinates[i + 1];
@@ -156,7 +152,6 @@ const isPointOnSubMainPipeMidway = (
     return false;
 };
 
-// ฟังก์ชันหาจุดที่ใกล้ที่สุดบนเส้นระหว่างสองจุด
 const findClosestPointOnLineSegment = (
     point: Coordinate,
     lineStart: Coordinate,
@@ -186,26 +181,23 @@ const findClosestPointOnLineSegment = (
     }
 };
 
-// ฟังก์ชันคำนวณข้อต่อท่อเมนหลักตามจำนวนจุดและการ snap กับท่อเมนรอง
 const calculateMainPipeConnectors = (
     coordinates: Coordinate[], 
     subMainPipes: any[] = []
 ): number => {
     const pointCount = coordinates.length;
     
-    // คำนวณข้อต่อจากจำนวนจุดในการวาด (เหมือนเดิม)
     let baseConnectors = 0;
     if (pointCount === 2) {
-        baseConnectors = 0; // เส้นตรง ไม่ต้องใช้ข้อต่อ
+        baseConnectors = 0; 
     } else if (pointCount === 3) {
-        baseConnectors = 1; // มี 3 จุด ใช้ 2 ทาง 1 ตัว
+        baseConnectors = 1; 
     } else if (pointCount === 4) {
-        baseConnectors = 2; // มี 4 จุด ใช้ 2 ทาง 2 ตัว
+        baseConnectors = 2; 
     } else if (pointCount > 4) {
-        baseConnectors = pointCount - 2; // สำหรับจุดที่มากกว่า 4 จุด
+        baseConnectors = pointCount - 2; 
     }
     
-    // ตรวจสอบการ snap ของปลายท่อเมนหลักกับท่อเมนรอง
     let snapConnectors = 0;
     if (coordinates.length > 0 && subMainPipes.length > 0) {
         const mainPipeEnd = coordinates[coordinates.length - 1];
@@ -213,15 +205,13 @@ const calculateMainPipeConnectors = (
         for (const subMainPipe of subMainPipes) {
             if (!subMainPipe.coordinates || subMainPipe.coordinates.length === 0) continue;
             
-            // ตรวจสอบว่า snap เข้ากับจุดเริ่มต้นของท่อเมนรอง
             if (isPointAtSubMainPipeStart(mainPipeEnd, subMainPipe.coordinates)) {
-                snapConnectors += 1; // เพิ่มข้อต่อ 2 ทาง 1 ตัว
-                break; // หยุดตรวจสอบเมื่อพบการ snap แล้ว
+                snapConnectors += 1; 
+                break; 
             }
-            // ตรวจสอบว่า snap เข้ากับระหว่างท่อเมนรอง (ไม่ใช่จุดเริ่มต้น)
             else if (isPointOnSubMainPipeMidway(mainPipeEnd, subMainPipe.coordinates)) {
-                snapConnectors += 2; // เพิ่มข้อต่อ 3 ทาง 1 ตัว (2 หน่วยสำหรับ 3 ทาง)
-                break; // หยุดตรวจสอบเมื่อพบการ snap แล้ว
+                snapConnectors += 2; 
+                break; 
             }
         }
     }
@@ -243,31 +233,21 @@ const calculatePipeConnectors = (projectData: HorticultureProjectData): PipeConn
         }
     };
 
-    // คำนวณข้อต่อท่อเมนหลักตามจำนวนจุดที่ใช้ในการวาดและการ snap กับท่อเมนรอง
     projectData.mainPipes.forEach(mainPipe => {
         if (mainPipe.coordinates.length === 0) return;
         
         const connectorCount = calculateMainPipeConnectors(mainPipe.coordinates, projectData.subMainPipes);
         
-        // คำนวณข้อต่อพื้นฐานจากจำนวนจุดในการวาดท่อ
         const baseConnectors = mainPipe.coordinates.length > 2 ? mainPipe.coordinates.length - 2 : 0;
         
-        // คำนวณข้อต่อเพิ่มเติมจากการ snap กับท่อเมนรอง
         const snapConnectors = connectorCount - baseConnectors;
         
-        // จัดสรรข้อต่อแต่ละประเภท:
-        // - ข้อต่อพื้นฐาน: 2 ทาง
-        // - snap เข้ากับจุดเริ่มต้นท่อเมนรอง: เพิ่ม 2 ทาง 1 ตัว (+1 หน่วย)
-        // - snap เข้ากับระหว่างท่อเมนรอง: เพิ่ม 3 ทาง 1 ตัว (+1 หน่วยใน threeWay)
         if (snapConnectors === 1) {
-            // snap กับจุดเริ่มต้น: เพิ่ม 2 ทาง
             summary.details.mainPipes.twoWay += baseConnectors + 1;
-        } else if (snapConnectors === 2) {
-            // snap กับระหว่างท่อ: เพิ่ม 3 ทาง (snapConnectors = 2 หมายถึง 3 ทาง 1 ตัว)
+        } else if (snapConnectors === 2) {  
             summary.details.mainPipes.twoWay += baseConnectors;
             summary.details.mainPipes.threeWay += 1;
         } else {
-            // ไม่มีการ snap หรือกรณีปกติ
             summary.details.mainPipes.twoWay += connectorCount;
         }
     });
@@ -295,7 +275,6 @@ const calculatePipeConnectors = (projectData: HorticultureProjectData): PipeConn
         connectedBranches.forEach(branch => {
             const branchStart = branch.coordinates[0];
             
-            // หาตำแหน่งที่ใกล้ที่สุดบนท่อเมนรอง
             let closestIndex = 0;
             let minDistance = Infinity;
             
@@ -324,7 +303,6 @@ const calculatePipeConnectors = (projectData: HorticultureProjectData): PipeConn
                     subMainPipe.coordinates[1].lat - subMainPipe.coordinates[0].lat
                 ) : 0;
             
-            // ตรวจสอบว่าท่อย่อยออกจากด้านซ้ายหรือขวาของท่อเมนรอง
             const relativeAngle = branchDirection - pipeDirection;
             const normalizedAngle = ((relativeAngle + Math.PI) % (2 * Math.PI)) - Math.PI;
             
@@ -365,7 +343,6 @@ const calculatePipeConnectors = (projectData: HorticultureProjectData): PipeConn
         
         if (connectedBranches.length < 2) return oppositePairs;
         
-        // คำนวณระยะทางรวมของท่อเมนรอง
         let totalPipeLength = 0;
         for (let i = 1; i < subMainPipe.coordinates.length; i++) {
             const prev = subMainPipe.coordinates[i - 1];
@@ -379,7 +356,6 @@ const calculatePipeConnectors = (projectData: HorticultureProjectData): PipeConn
         const branchPositions = connectedBranches.map(branch => {
             const branchStart = branch.coordinates[0];
             
-            // หาตำแหน่งที่ใกล้ที่สุดบนท่อเมนรอง
             let closestIndex = 0;
             let minDistance = Infinity;
             
@@ -434,7 +410,6 @@ const calculatePipeConnectors = (projectData: HorticultureProjectData): PipeConn
                     branch.coordinates[1].lat - branch.coordinates[0].lat
                 ) : 0;
             
-            // ตรวจสอบว่าท่อย่อยออกจากด้านซ้ายหรือขวาของท่อเมนรอง
             const relativeAngle = branchDirection - pipeDirection;
             const normalizedAngle = ((relativeAngle + Math.PI) % (2 * Math.PI)) - Math.PI;
             
@@ -466,13 +441,11 @@ const calculatePipeConnectors = (projectData: HorticultureProjectData): PipeConn
         return oppositePairs;
     };
 
-    // ฟังก์ชันตรวจสอบว่าท่อย่อยอยู่ตรงกลางหรือขอบของท่อเมนรอง
     const isBranchAtCenter = (branch: any, subMainPipe: any, branchPipes: any[]): boolean => {
         if (subMainPipe.coordinates.length < 2) return false;
         
         const branchStart = branch.coordinates[0];
         
-        // หาตำแหน่งที่ใกล้ที่สุดบนท่อเมนรอง
         let closestIndex = 0;
         let minDistance = Infinity;
         
@@ -488,7 +461,6 @@ const calculatePipeConnectors = (projectData: HorticultureProjectData): PipeConn
             }
         });
         
-        // คำนวณระยะทางรวมของท่อเมนรอง
         let totalPipeLength = 0;
         for (let i = 1; i < subMainPipe.coordinates.length; i++) {
             const prev = subMainPipe.coordinates[i - 1];
@@ -498,7 +470,6 @@ const calculatePipeConnectors = (projectData: HorticultureProjectData): PipeConn
             );
         }
         
-        // คำนวณระยะทางจากจุดเริ่มต้นถึงตำแหน่งที่ใกล้ที่สุด
         let distanceFromStart = 0;
         for (let i = 1; i <= closestIndex; i++) {
             const prev = subMainPipe.coordinates[i - 1];
@@ -508,9 +479,7 @@ const calculatePipeConnectors = (projectData: HorticultureProjectData): PipeConn
             );
         }
         
-        // สำหรับท่อที่มีแค่ 2 จุด ให้ใช้วิธีพิเศษ
         if (subMainPipe.coordinates.length === 2) {
-            // หาท่อย่อยทั้งหมดที่เชื่อมต่อกับท่อเมนรองนี้
             const allBranches = branchPipes.filter(bp => {
                 if (bp.coordinates.length === 0) return false;
                 const bpStart = bp.coordinates[0];
@@ -523,11 +492,9 @@ const calculatePipeConnectors = (projectData: HorticultureProjectData): PipeConn
             });
             
             if (allBranches.length <= 2) {
-                // ถ้ามีท่อย่อยน้อยกว่า 2 ตัว ให้ถือว่าทั้งหมดเป็น edge
                 return false;
             }
             
-            // เรียงลำดับท่อย่อยตามตำแหน่ง
             const branchPositions = allBranches.map(bp => {
                 const bpStart = bp.coordinates[0];
                 let bpClosestIndex = 0;
@@ -561,28 +528,21 @@ const calculatePipeConnectors = (projectData: HorticultureProjectData): PipeConn
                 };
             });
             
-            // เรียงลำดับตามตำแหน่ง
             branchPositions.sort((a, b) => a.position - b.position);
             
-            // หาตำแหน่งของท่อย่อยปัจจุบัน
             const currentBranchIndex = branchPositions.findIndex(bp => bp.branch.id === branch.id);
             
             if (currentBranchIndex === -1) return false;
             
-            // ถ้าอยู่ในตำแหน่งแรกหรือสุดท้าย ให้ถือว่าเป็น edge
             if (currentBranchIndex === 0 || currentBranchIndex === branchPositions.length - 1) {
                 return false;
             }
             
-            // ถ้าอยู่ในตำแหน่งกลาง ให้ถือว่าเป็น center
             return true;
         }
         
-        // สำหรับท่อที่มีมากกว่า 2 จุด ใช้วิธีเดิม
         const positionRatio = distanceFromStart / totalPipeLength;
         const isCenter = positionRatio >= 0.15 && positionRatio <= 0.85;
-        
-        console.log(`🔍 Branch ${branch.id}: position ratio ${positionRatio.toFixed(3)}, center: ${isCenter}`);
         
         return isCenter;
     };
@@ -1019,7 +979,7 @@ const GoogleMapsResultsOverlays: React.FC<{
                         lat: coord.lat,
                         lng: coord.lng,
                     })),
-                    strokeColor: '#FFFF66',
+                    strokeColor: '#FFD700',
                     strokeWeight: 2 * pipeSize,
                     strokeOpacity: 0.8,
                 });
@@ -1188,13 +1148,10 @@ function EnhancedHorticultureResultsPageContent() {
     };
 
     const handleEditProject = () => {
-        // ตั้งค่า flag บอกว่ากำลังแก้ไขโครงการเดิม
         localStorage.setItem('isEditingExistingProject', 'true');
         
-        // ตรวจสอบว่าข้อมูลโครงการยังอยู่ใน localStorage หรือไม่
         const existingData = localStorage.getItem('horticultureIrrigationData');
         if (!existingData && projectData) {
-            // หากไม่มีข้อมูลใน localStorage แต่มี projectData ให้บันทึกกลับ
             localStorage.setItem('horticultureIrrigationData', JSON.stringify(projectData));
         }
         

@@ -13,6 +13,10 @@ export interface PlantData {
     waterNeed: number;
 }
 
+/**
+ * @deprecated ใช้ IrrigationZone แทน - interface นี้จะถูกลบในอนาคต
+ * ปัจจุบันใช้เฉพาะการแบ่งโซนให้น้ำ (💧 แบ่งโซนให้น้ำ) และการแบ่งโซนน้ำเอง (💧 แบ่งโซนน้ำเอง)
+ */
 export interface Zone {
     id: string;
     name: string;
@@ -118,50 +122,54 @@ export interface HorticultureProjectData {
     exclusionAreas: ExclusionArea[];
     plants: PlantLocation[];
     useZones: boolean;
-    selectedPlantType?: PlantData; // [FIX] เพิ่ม property นี้
+    selectedPlantType?: PlantData;
     branchPipeSettings?: BranchPipeSettings;
+    irrigationZones?: {
+        id: string;
+        name: string;
+        coordinates: Coordinate[];
+        plants: PlantLocation[];
+        totalWaterNeed: number;
+        color: string;
+        layoutIndex: number;
+    }[]; // เพิ่มสำหรับระบบโซนใหม่
     createdAt: string;
     updatedAt: string;
 }
 
-// ข้อมูลโครงการที่ต้องการสำหรับรายงาน
 export interface ProjectSummaryData {
-    // ข้อมูลโดยรวม
-    totalAreaInRai: number; // พื้นที่รวมเป็นไร่
-    totalZones: number; // จำนวนโซน
-    totalPlants: number; // จำนวนต้นไม้ทั้งหมด
-    totalWaterNeedPerSession: number; // ปริมาณน้ำต่อครั้ง (ลิตร)
-    waterPerPlant: number; // ปริมาณน้ำต่อต้น (ลิตร)
+    totalAreaInRai: number;
+    totalZones: number;
+    totalPlants: number;
+    totalWaterNeedPerSession: number;
+    waterPerPlant: number;
 
-    // ข้อมูลท่อ
     mainPipes: {
-        longest: number; // ท่อเมนที่ยาวที่สุด (เมตร)
-        totalLength: number; // ความยาวรวมท่อเมน (เมตร)
+        longest: number;
+        totalLength: number;
     };
     subMainPipes: {
-        longest: number; // ท่อเมนรองที่ยาวที่สุด (เมตร)
-        totalLength: number; // ความยาวรวมท่อเมนรอง (เมตร)
+        longest: number;
+        totalLength: number;
     };
     branchPipes: {
-        longest: number; // ท่อย่อยที่ยาวที่สุด (เมตร)
-        totalLength: number; // ความยาวรวมท่อย่อย (เมตร)
+        longest: number;
+        totalLength: number;
     };
-    longestPipesCombined: number; // ท่อที่ยาวที่สุดรวมกัน (เมตร)
+    longestPipesCombined: number;
 
-    // ข้อมูลแยกโซน (ถ้ามี)
     zoneDetails: ZoneSummaryData[];
 }
 
 export interface ZoneSummaryData {
     zoneId: string;
     zoneName: string;
-    areaInRai: number; // พื้นที่โซนเป็นไร่
-    plantCount: number; // จำนวนต้นไม้ในโซน
-    waterNeedPerSession: number; // ปริมาณน้ำโซนต่อครั้ง (ลิตร)
-    waterPerPlant: number; // ปริมาณน้ำต่อต้น (ลิตร)
-    plantData?: PlantData; // เพิ่มข้อมูลพืช
+    areaInRai: number;
+    plantCount: number;
+    waterNeedPerSession: number;
+    waterPerPlant: number;
+    plantData?: PlantData;
 
-    // ข้อมูลท่อในโซน
     mainPipesInZone: {
         longest: number;
         totalLength: number;
@@ -175,8 +183,6 @@ export interface ZoneSummaryData {
         totalLength: number;
     };
 }
-
-// Utility Functions
 export const calculateAreaFromCoordinates = (coordinates: Coordinate[]): number => {
     if (!coordinates || coordinates.length < 3) return 0;
 
@@ -260,35 +266,28 @@ export const isPointInPolygon = (point: Coordinate, polygon: Coordinate[]): bool
     }
 };
 
-// Main function to calculate project summary
 export const calculateProjectSummary = (
     projectData: HorticultureProjectData
 ): ProjectSummaryData => {
-    console.log('📊 Calculating project summary...');
-
-    // คำนวณข้อมูลโดยรวม
-    const totalAreaInRai = projectData.totalArea / 1600; // แปลงจากตร.ม. เป็นไร่
-    const totalZones = projectData.useZones ? projectData.zones.length : 1;
+    const totalAreaInRai = projectData.totalArea / 1600;
+    const totalZones = (projectData.irrigationZones?.length ?? 0) > 0 ? projectData.irrigationZones?.length ?? 1 : 1;
     const totalPlants = projectData.plants?.length || 0;
     const totalWaterNeedPerSession =
         projectData.plants?.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0) || 0;
     const waterPerPlant = totalPlants > 0 ? totalWaterNeedPerSession / totalPlants : 0;
 
-    // คำนวณข้อมูลท่อเมน
     const mainPipeLengths = projectData.mainPipes?.map((pipe) => pipe.length) || [];
     const mainPipesData = {
         longest: mainPipeLengths.length > 0 ? Math.max(...mainPipeLengths) : 0,
         totalLength: mainPipeLengths.reduce((sum, length) => sum + length, 0),
     };
 
-    // คำนวณข้อมูลท่อเมนรอง
     const subMainPipeLengths = projectData.subMainPipes?.map((pipe) => pipe.length) || [];
     const subMainPipesData = {
         longest: subMainPipeLengths.length > 0 ? Math.max(...subMainPipeLengths) : 0,
         totalLength: subMainPipeLengths.reduce((sum, length) => sum + length, 0),
     };
 
-    // คำนวณข้อมูลท่อย่อย
     const allBranchPipes =
         projectData.subMainPipes?.flatMap((subMain) => subMain.branchPipes || []) || [];
     const branchPipeLengths = allBranchPipes.map((pipe) => pipe.length);
@@ -297,87 +296,19 @@ export const calculateProjectSummary = (
         totalLength: branchPipeLengths.reduce((sum, length) => sum + length, 0),
     };
 
-    // คำนวณท่อที่ยาวที่สุดรวมกัน
     const longestPipesCombined =
         mainPipesData.longest + subMainPipesData.longest + branchPipesData.longest;
 
-    // คำนวณข้อมูลแยกโซน
     const zoneDetails: ZoneSummaryData[] = [];
 
-    if (projectData.useZones && projectData.zones && projectData.zones.length > 0) {
-        // โหมดหลายโซน
-        projectData.zones.forEach((zone) => {
-            // หาต้นไม้ในโซนนี้
-            const plantsInZone =
-                projectData.plants?.filter(
-                    (plant) =>
-                        (plant.zoneId && plant.zoneId === zone.id) ||
-                        (!plant.zoneId && isPointInPolygon(plant.position, zone.coordinates))
-                ) || [];
-
-            // หาท่อในโซนนี้
-            const zoneSubMainPipes =
-                projectData.subMainPipes?.filter((pipe) => pipe.zoneId === zone.id) || [];
-            const zoneBranchPipes = zoneSubMainPipes.flatMap(
-                (subMain) => subMain.branchPipes || []
-            );
-
-            // หาท่อเมนที่ไปยังโซนนี้
-            const zoneMainPipes =
-                projectData.mainPipes?.filter((pipe) => pipe.toZone === zone.id) || [];
-
-            // คำนวณความยาวท่อแต่ละประเภทในโซน
-            const mainPipeLengthsInZone = zoneMainPipes.map((pipe) => pipe.length);
-            const subMainPipeLengthsInZone = zoneSubMainPipes.map((pipe) => pipe.length);
-            const branchPipeLengthsInZone = zoneBranchPipes.map((pipe) => pipe.length);
-            const waterNeedInZone = plantsInZone.reduce(
-                (sum, plant) => sum + plant.plantData.waterNeed,
-                0
-            );
-
-            const zoneData: ZoneSummaryData = {
-                zoneId: zone.id,
-                zoneName: zone.name,
-                areaInRai: zone.area / 1600, // แปลงเป็นไร่
-                plantCount: plantsInZone.length,
-                waterNeedPerSession: waterNeedInZone,
-                waterPerPlant: plantsInZone.length > 0 ? waterNeedInZone / plantsInZone.length : 0,
-                plantData: zone.plantData, // เพิ่มข้อมูลพืช
-                mainPipesInZone: {
-                    longest:
-                        mainPipeLengthsInZone.length > 0 ? Math.max(...mainPipeLengthsInZone) : 0,
-                    totalLength: mainPipeLengthsInZone.reduce((sum, length) => sum + length, 0),
-                },
-                subMainPipesInZone: {
-                    longest:
-                        subMainPipeLengthsInZone.length > 0
-                            ? Math.max(...subMainPipeLengthsInZone)
-                            : 0,
-                    totalLength: subMainPipeLengthsInZone.reduce((sum, length) => sum + length, 0),
-                },
-                branchPipesInZone: {
-                    longest:
-                        branchPipeLengthsInZone.length > 0
-                            ? Math.max(...branchPipeLengthsInZone)
-                            : 0,
-                    totalLength: branchPipeLengthsInZone.reduce((sum, length) => sum + length, 0),
-                },
-            };
-
-            zoneDetails.push(zoneData);
-        });
-    } else {
-        // โหมดโซนเดียว
+    // ปิดการใช้งาน zones แบบเดิม ใช้ irrigationZones แทน
+    // โค้ดเก่าถูกลบออกเพราะไม่ใช้แล้ว
+    
+    // กรณีไม่มีการแบ่งโซนหรือใช้พื้นที่เดียว
+    {
         const plantDataForSingleZone =
             projectData.selectedPlantType || projectData.plants?.[0]?.plantData;
         const waterPerPlantSingleZone = plantDataForSingleZone?.waterNeed || 0;
-
-        console.log('🔍 Debug single zone plant data:', {
-            selectedPlantType: projectData.selectedPlantType,
-            firstPlantData: projectData.plants?.[0]?.plantData,
-            plantDataForSingleZone,
-            waterPerPlantSingleZone,
-        });
 
         const singleZoneData: ZoneSummaryData = {
             zoneId: 'main-area',
@@ -387,7 +318,7 @@ export const calculateProjectSummary = (
             waterNeedPerSession: totalWaterNeedPerSession,
             waterPerPlant:
                 totalPlants > 0 ? totalWaterNeedPerSession / totalPlants : waterPerPlantSingleZone,
-            plantData: plantDataForSingleZone, // เพิ่มข้อมูลพืช
+            plantData: plantDataForSingleZone,
             mainPipesInZone: mainPipesData,
             subMainPipesInZone: subMainPipesData,
             branchPipesInZone: branchPipesData,
@@ -409,11 +340,9 @@ export const calculateProjectSummary = (
         zoneDetails,
     };
 
-    console.log('✅ Project summary calculated:', summary);
     return summary;
 };
 
-// Formatting functions
 export const formatArea = (area: number): string => {
     if (typeof area !== 'number' || isNaN(area) || area < 0) return '0 ตร.ม.';
     if (area >= 1600) {
@@ -448,7 +377,6 @@ export const formatWaterVolume = (volume: number): string => {
     }
 };
 
-// Storage functions
 export const STORAGE_KEY = 'horticultureIrrigationData';
 
 export const saveProjectData = (data: HorticultureProjectData): boolean => {
@@ -456,7 +384,6 @@ export const saveProjectData = (data: HorticultureProjectData): boolean => {
         data.updatedAt = new Date().toISOString();
         data.version = '3.2.0';
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        console.log('✅ Project data saved successfully');
         return true;
     } catch (error) {
         console.error('❌ Error saving project data:', error);
@@ -469,7 +396,6 @@ export const loadProjectData = (): HorticultureProjectData | null => {
         const storedData = localStorage.getItem(STORAGE_KEY);
         if (storedData) {
             const data = JSON.parse(storedData);
-            console.log('✅ Project data loaded successfully');
             return data;
         }
         return null;
@@ -482,13 +408,239 @@ export const loadProjectData = (): HorticultureProjectData | null => {
 export const clearProjectData = (): void => {
     try {
         localStorage.removeItem(STORAGE_KEY);
-        console.log('✅ Project data cleared');
     } catch (error) {
         console.error('❌ Error clearing project data:', error);
     }
 };
 
-// Navigation functions
+// ฟังก์ชันใหม่สำหรับสร้างเส้นวัดระยะทางตั้งฉาก
+export const generatePerpendicularDimensionLines = (
+    exclusionArea: ExclusionArea,
+    mainArea: Coordinate[],
+    angleOffset: number = 0 // มุมในการปรับเอียง (องศา)
+): { id: string; start: Coordinate; end: Coordinate; distance: number; angle: number }[] => {
+    const lines: { id: string; start: Coordinate; end: Coordinate; distance: number; angle: number }[] = [];
+    
+    // ตรวจสอบข้อมูลพื้นฐาน
+    if (!exclusionArea || !exclusionArea.coordinates || exclusionArea.coordinates.length < 3) {
+        return lines;
+    }
+    
+    if (!mainArea || mainArea.length < 3) {
+        return lines;
+    }
+    
+    // คำนวณขอบเขตของพื้นที่หลีกเลี่ยง
+    const bounds = {
+        minLat: Math.min(...exclusionArea.coordinates.map(c => c.lat)),
+        maxLat: Math.max(...exclusionArea.coordinates.map(c => c.lat)),
+        minLng: Math.min(...exclusionArea.coordinates.map(c => c.lng)),
+        maxLng: Math.max(...exclusionArea.coordinates.map(c => c.lng))
+    };
+
+    // จุดกลางของพื้นที่หลีกเลี่ยง
+    const center = {
+        lat: (bounds.minLat + bounds.maxLat) / 2,
+        lng: (bounds.minLng + bounds.maxLng) / 2
+    };
+
+    // สร้างเส้นตั้งฉาก 4 ทิศทาง (เหนือ, ใต้, ตะวันออก, ตะวันตก)
+    const directions = [
+        { name: 'north', angle: 0 + angleOffset },    // ขึ้นเหนือ
+        { name: 'east', angle: 90 + angleOffset },    // ไปตะวันออก
+        { name: 'south', angle: 180 + angleOffset },  // ลงใต้
+        { name: 'west', angle: 270 + angleOffset }    // ไปตะวันตก
+    ];
+
+    directions.forEach((direction) => {
+        // คำนวณจุดเริ่มต้นบนขอบของพื้นที่หลีกเลี่ยง
+        const startPoint = calculatePointOnExclusionBoundary(
+            exclusionArea.coordinates,
+            center,
+            direction.angle
+        );
+
+        if (startPoint) {
+            // คำนวณจุดสิ้นสุดบนขอบของพื้นที่หลัก
+            const endPoint = calculateIntersectionWithMainArea(
+                startPoint,
+                direction.angle,
+                mainArea
+            );
+
+            if (endPoint) {
+                const distance = calculateDistanceBetweenPoints(startPoint, endPoint);
+                const line = {
+                    id: generateUniqueId('dimension'),
+                    start: startPoint,
+                    end: endPoint,
+                    distance: distance,
+                    angle: direction.angle
+                };
+                
+                lines.push(line);
+            }
+        }
+    });
+
+    return lines;
+};
+
+// ฟังก์ชันช่วยคำนวณจุดบนขอบของพื้นที่หลีกเลี่ยง
+const calculatePointOnExclusionBoundary = (
+    exclusionCoordinates: Coordinate[],
+    center: Coordinate,
+    angle: number
+): Coordinate | null => {
+    if (exclusionCoordinates.length < 3) return null;
+
+    try {
+        // แปลงมุมเป็นเรเดียน
+        const angleRad = (angle * Math.PI) / 180;
+        
+        // คำนวณเวกเตอร์ทิศทาง
+        const directionVector = {
+            lat: Math.cos(angleRad),
+            lng: Math.sin(angleRad)
+        };
+
+        // หาจุดตัดระหว่างเส้นจากจุดกลางไปในทิศทางที่กำหนดกับขอบของพื้นที่หลีกเลี่ยง
+        let intersectionPoint: Coordinate | null = null;
+        let minDistance = Infinity;
+
+        for (let i = 0; i < exclusionCoordinates.length; i++) {
+            const j = (i + 1) % exclusionCoordinates.length;
+            const segmentStart = exclusionCoordinates[i];
+            const segmentEnd = exclusionCoordinates[j];
+
+            const intersection = findLineSegmentIntersection(
+                center,
+                {
+                    lat: center.lat + directionVector.lat * 0.01, // ขยายเส้นออกไปเล็กน้อย
+                    lng: center.lng + directionVector.lng * 0.01
+                },
+                segmentStart,
+                segmentEnd
+            );
+
+            if (intersection) {
+                const distance = calculateDistanceBetweenPoints(center, intersection);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    intersectionPoint = intersection;
+                }
+            }
+        }
+
+        return intersectionPoint;
+    } catch (error) {
+        console.error('Error calculating point on exclusion boundary:', error);
+        return null;
+    }
+};
+
+// ฟังก์ชันช่วยหาจุดตัดระหว่างเส้นสองเส้น
+const findLineSegmentIntersection = (
+    line1Start: Coordinate,
+    line1End: Coordinate,
+    line2Start: Coordinate,
+    line2End: Coordinate
+): Coordinate | null => {
+    try {
+        const x1 = line1Start.lat;
+        const y1 = line1Start.lng;
+        const x2 = line1End.lat;
+        const y2 = line1End.lng;
+        const x3 = line2Start.lat;
+        const y3 = line2Start.lng;
+        const x4 = line2End.lat;
+        const y4 = line2End.lng;
+
+        const denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+        
+        if (Math.abs(denominator) < 1e-10) {
+            return null; // เส้นขนานกัน
+        }
+
+        const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denominator;
+        const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denominator;
+
+        // ตรวจสอบว่าจุดตัดอยู่ในช่วงของทั้งสองเส้น
+        if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+            return {
+                lat: x1 + t * (x2 - x1),
+                lng: y1 + t * (y2 - y1)
+            };
+        }
+
+        return null;
+    } catch (error) {
+        console.error('Error finding line segment intersection:', error);
+        return null;
+    }
+};
+
+// ฟังก์ชันช่วยคำนวณจุดตัดกับพื้นที่หลัก
+const calculateIntersectionWithMainArea = (
+    startPoint: Coordinate,
+    angle: number,
+    mainArea: Coordinate[]
+): Coordinate | null => {
+    if (mainArea.length < 3) return null;
+
+    try {
+        // แปลงมุมเป็นเรเดียน
+        const angleRad = (angle * Math.PI) / 180;
+        
+        // คำนวณเวกเตอร์ทิศทาง
+        const directionVector = {
+            lat: Math.cos(angleRad),
+            lng: Math.sin(angleRad)
+        };
+
+        // สร้างจุดปลายของเส้น (ขยายออกไปไกล)
+        const endPoint = {
+            lat: startPoint.lat + directionVector.lat * 0.1, // ขยายเส้นออกไป 0.1 องศา
+            lng: startPoint.lng + directionVector.lng * 0.1
+        };
+
+        // หาจุดตัดกับขอบของพื้นที่หลัก
+        let intersectionPoint: Coordinate | null = null;
+        let minDistance = Infinity;
+
+        for (let i = 0; i < mainArea.length; i++) {
+            const j = (i + 1) % mainArea.length;
+            const segmentStart = mainArea[i];
+            const segmentEnd = mainArea[j];
+
+            const intersection = findLineSegmentIntersection(
+                startPoint,
+                endPoint,
+                segmentStart,
+                segmentEnd
+            );
+
+            if (intersection) {
+                const distance = calculateDistanceBetweenPoints(startPoint, intersection);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    intersectionPoint = intersection;
+                }
+            }
+        }
+
+        return intersectionPoint;
+    } catch (error) {
+        console.error('Error calculating intersection with main area:', error);
+        return null;
+    }
+};
+
+// ฟังก์ชันช่วยสร้าง ID ที่ไม่ซ้ำกัน
+const generateUniqueId = (prefix: string): string => {
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+};
+
 export const navigateToPlanner = (): void => {
     router.visit('/horticulture/planner');
 };
@@ -496,3 +648,4 @@ export const navigateToPlanner = (): void => {
 export const navigateToResults = (): void => {
     router.visit('/horticulture/results');
 };
+
