@@ -1,11 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-/**
- * horticultureProjectStats.ts
- * ไฟล์สำหรับส่งออกข้อมูลสถิติโครงการระบบน้ำสวนผลไม้
- * รวมถึงการสร้างและดาวน์โหลดภาพแผนที่
- * สามารถ import เพื่อนำไปใช้ในไฟล์อื่นๆ ได้
- */
-
 import {
     HorticultureProjectData,
     ProjectSummaryData,
@@ -16,6 +10,17 @@ import {
     formatDistance,
     formatWaterVolume,
 } from './horticultureUtils';
+import { loadSprinklerConfig, calculateTotalFlowRate, formatFlowRate } from './sprinklerUtils';
+
+interface SprinklerFlowRateInfo {
+    totalFlowRatePerMinute: number;
+    totalFlowRatePerHour: number;
+    formattedFlowRatePerMinute: string;
+    formattedFlowRatePerHour: string;
+    flowRatePerPlant: number;
+    pressureBar: number;
+    radiusMeters: number;
+}
 
 /**
  * ดึงข้อมูลสถิติโครงการจาก localStorage
@@ -30,7 +35,6 @@ export const getProjectStats = (): ProjectSummaryData | null => {
         }
 
         const summary = calculateProjectSummary(projectData);
-        console.log('✅ ดึงข้อมูลสถิติโครงการสำเร็จ');
         return summary;
     } catch (error) {
         console.error('❌ เกิดข้อผิดพลาดในการดึงข้อมูลสถิติ:', error);
@@ -50,7 +54,7 @@ export const getProjectStatsFromData = (
 };
 
 /**
- * ดึงข้อมูลโดยรวมของโครงการ
+ * ดึงข้อมูลโดยรวมของโครงการพร้อมข้อมูลหัวฉีด
  * @returns ข้อมูลโดยรวม หรือ null ถ้าไม่มีข้อมูล
  */
 export const getOverallStats = (): {
@@ -59,9 +63,32 @@ export const getOverallStats = (): {
     totalPlants: number;
     totalWaterNeedPerSession: number;
     longestPipesCombined: number;
+    sprinklerFlowRate?: SprinklerFlowRateInfo;
 } | null => {
     const stats = getProjectStats();
     if (!stats) return null;
+
+    // ดึงข้อมูลหัวฉีด
+    const sprinklerConfig = loadSprinklerConfig();
+    let sprinklerFlowRate: SprinklerFlowRateInfo | undefined = undefined;
+
+    if (sprinklerConfig && stats.totalPlants > 0) {
+        const totalFlowRatePerMinute = calculateTotalFlowRate(
+            stats.totalPlants,
+            sprinklerConfig.flowRatePerMinute
+        );
+        const totalFlowRatePerHour = totalFlowRatePerMinute * 60;
+
+        sprinklerFlowRate = {
+            totalFlowRatePerMinute,
+            totalFlowRatePerHour,
+            formattedFlowRatePerMinute: formatFlowRate(totalFlowRatePerMinute),
+            formattedFlowRatePerHour: formatFlowRate(totalFlowRatePerHour),
+            flowRatePerPlant: sprinklerConfig.flowRatePerMinute,
+            pressureBar: sprinklerConfig.pressureBar,
+            radiusMeters: sprinklerConfig.radiusMeters,
+        };
+    }
 
     return {
         totalAreaInRai: stats.totalAreaInRai,
@@ -69,6 +96,7 @@ export const getOverallStats = (): {
         totalPlants: stats.totalPlants,
         totalWaterNeedPerSession: stats.totalWaterNeedPerSession,
         longestPipesCombined: stats.longestPipesCombined,
+        sprinklerFlowRate,
     };
 };
 
@@ -148,71 +176,60 @@ export const getLongestBranchPipeStats = ():
             };
         }[] = [];
 
-        if (projectData.useZones && projectData.zones && projectData.zones.length > 0) {
-            // โหมดหลายโซน
-            projectData.zones.forEach((zone) => {
-                // หาท่อเมนรองในโซนนี้
-                const zoneSubMainPipes =
-                    projectData.subMainPipes?.filter((pipe) => pipe.zoneId === zone.id) || [];
+        // ปิดการใช้งาน zones แบบเดิม รอการพัฒนาระบบโซนใหม่
+        // if (projectData.useZones && projectData.zones && projectData.zones.length > 0) {
+        //     projectData.zones.forEach((zone) => {
+        //         const zoneSubMainPipes =
+        //             projectData.subMainPipes?.filter((pipe) => pipe.zoneId === zone.id) || [];
+        //         const allBranchPipes = zoneSubMainPipes.flatMap(
+        //             (subMain) => subMain.branchPipes || []
+        //         );
 
-                // หาท่อย่อยทั้งหมดในโซนนี้
-                const allBranchPipes = zoneSubMainPipes.flatMap(
-                    (subMain) => subMain.branchPipes || []
-                );
+        //         if (allBranchPipes.length > 0) {
+        //             const longestBranchPipe = allBranchPipes.reduce((longest, current) =>
+        //                 current.length > longest.length ? current : longest
+        //             );
+        //             const plantCount = longestBranchPipe.plants?.length || 0;
+        //             const plantNames =
+        //             longestBranchPipe.plants?.map((plant) => plant.plantData.name) || [];
 
-                if (allBranchPipes.length > 0) {
-                    // หาท่อย่อยที่ยาวที่สุด
-                    const longestBranchPipe = allBranchPipes.reduce((longest, current) =>
-                        current.length > longest.length ? current : longest
-                    );
+        //             stats.push({
+        //                 zoneId: zone.id,
+        //                 zoneName: zone.name,
+        //                 longestBranchPipe: {
+        //                     id: longestBranchPipe.id,
+        //                     length: longestBranchPipe.length,
+        //                     plantCount,
+        //                     plantNames,
+        //                 },
+        //             });
+        //         }
+        //     });
+        // } else {
+        const allBranchPipes =
+            projectData.subMainPipes?.flatMap((subMain) => subMain.branchPipes || []) || [];
 
-                    // นับจำนวนต้นไม้ในท่อย่อยที่ยาวที่สุด
-                    const plantCount = longestBranchPipe.plants?.length || 0;
-                    const plantNames =
-                        longestBranchPipe.plants?.map((plant) => plant.plantData.name) || [];
+        if (allBranchPipes.length > 0) {
+            const longestBranchPipe = allBranchPipes.reduce((longest, current) =>
+                current.length > longest.length ? current : longest
+            );
 
-                    stats.push({
-                        zoneId: zone.id,
-                        zoneName: zone.name,
-                        longestBranchPipe: {
-                            id: longestBranchPipe.id,
-                            length: longestBranchPipe.length,
-                            plantCount,
-                            plantNames,
-                        },
-                    });
-                }
+            const plantCount = longestBranchPipe.plants?.length || 0;
+            const plantNames = longestBranchPipe.plants?.map((plant) => plant.plantData.name) || [];
+
+            stats.push({
+                zoneId: 'main-area',
+                zoneName: 'พื้นที่หลัก',
+                longestBranchPipe: {
+                    id: longestBranchPipe.id,
+                    length: longestBranchPipe.length,
+                    plantCount,
+                    plantNames,
+                },
             });
-        } else {
-            // โหมดโซนเดียว
-            const allBranchPipes =
-                projectData.subMainPipes?.flatMap((subMain) => subMain.branchPipes || []) || [];
-
-            if (allBranchPipes.length > 0) {
-                // หาท่อย่อยที่ยาวที่สุด
-                const longestBranchPipe = allBranchPipes.reduce((longest, current) =>
-                    current.length > longest.length ? current : longest
-                );
-
-                // นับจำนวนต้นไม้ในท่อย่อยที่ยาวที่สุด
-                const plantCount = longestBranchPipe.plants?.length || 0;
-                const plantNames =
-                    longestBranchPipe.plants?.map((plant) => plant.plantData.name) || [];
-
-                stats.push({
-                    zoneId: 'main-area',
-                    zoneName: 'พื้นที่หลัก',
-                    longestBranchPipe: {
-                        id: longestBranchPipe.id,
-                        length: longestBranchPipe.length,
-                        plantCount,
-                        plantNames,
-                    },
-                });
-            }
         }
+        // }
 
-        console.log('✅ ดึงข้อมูลท่อย่อยที่ยาวที่สุดสำเร็จ:', stats);
         return stats;
     } catch (error) {
         console.error('❌ เกิดข้อผิดพลาดในการดึงข้อมูลท่อย่อยที่ยาวที่สุด:', error);
@@ -254,61 +271,58 @@ export const getSubMainPipeBranchCount = ():
             }[];
         }[] = [];
 
-        if (projectData.useZones && projectData.zones && projectData.zones.length > 0) {
-            // โหมดหลายโซน
-            projectData.zones.forEach((zone) => {
-                // หาท่อเมนรองในโซนนี้
-                const zoneSubMainPipes =
-                    projectData.subMainPipes?.filter((pipe) => pipe.zoneId === zone.id) || [];
+        // ปิดการใช้งาน zones แบบเดิม รอการพัฒนาระบบโซนใหม่
+        // if (projectData.useZones && projectData.zones && projectData.zones.length > 0) {
+        //     projectData.zones.forEach((zone) => {
+        //         const zoneSubMainPipes =
+        //             projectData.subMainPipes?.filter((pipe) => pipe.zoneId === zone.id) || [];
 
-                const subMainPipesData = zoneSubMainPipes.map((subMain) => {
-                    const branchCount = subMain.branchPipes?.length || 0;
-                    const totalBranchLength =
-                        subMain.branchPipes?.reduce((sum, branch) => sum + branch.length, 0) || 0;
+        //         const subMainPipesData = zoneSubMainPipes.map((subMain) => {
+        //             const branchCount = subMain.branchPipes?.length || 0;
+        //             const totalBranchLength =
+        //                 subMain.branchPipes?.reduce((sum, branch) => sum + branch.length, 0) || 0;
 
-                    return {
-                        id: subMain.id,
-                        length: subMain.length,
-                        branchCount,
-                        totalBranchLength,
-                    };
-                });
+        //             return {
+        //                 id: subMain.id,
+        //                 length: subMain.length,
+        //                 branchCount,
+        //                 totalBranchLength,
+        //             };
+        //         });
 
-                if (subMainPipesData.length > 0) {
-                    stats.push({
-                        zoneId: zone.id,
-                        zoneName: zone.name,
-                        subMainPipes: subMainPipesData,
-                    });
-                }
+        //         if (subMainPipesData.length > 0) {
+        //             stats.push({
+        //                 zoneId: zone.id,
+        //                 zoneName: zone.name,
+        //                 subMainPipes: subMainPipesData,
+        //             });
+        //         }
+        //     });
+        // } else {
+        const allSubMainPipes = projectData.subMainPipes || [];
+
+        const subMainPipesData = allSubMainPipes.map((subMain) => {
+            const branchCount = subMain.branchPipes?.length || 0;
+            const totalBranchLength =
+                subMain.branchPipes?.reduce((sum, branch) => sum + branch.length, 0) || 0;
+
+            return {
+                id: subMain.id,
+                length: subMain.length,
+                branchCount,
+                totalBranchLength,
+            };
+        });
+
+        if (subMainPipesData.length > 0) {
+            stats.push({
+                zoneId: 'main-area',
+                zoneName: 'พื้นที่หลัก',
+                subMainPipes: subMainPipesData,
             });
-        } else {
-            // โหมดโซนเดียว
-            const allSubMainPipes = projectData.subMainPipes || [];
-
-            const subMainPipesData = allSubMainPipes.map((subMain) => {
-                const branchCount = subMain.branchPipes?.length || 0;
-                const totalBranchLength =
-                    subMain.branchPipes?.reduce((sum, branch) => sum + branch.length, 0) || 0;
-
-                return {
-                    id: subMain.id,
-                    length: subMain.length,
-                    branchCount,
-                    totalBranchLength,
-                };
-            });
-
-            if (subMainPipesData.length > 0) {
-                stats.push({
-                    zoneId: 'main-area',
-                    zoneName: 'พื้นที่หลัก',
-                    subMainPipes: subMainPipesData,
-                });
-            }
         }
+        // }
 
-        console.log('✅ ดึงข้อมูลจำนวนท่อย่อยที่ออกจากท่อเมนรองสำเร็จ:', stats);
         return stats;
     } catch (error) {
         console.error('❌ เกิดข้อผิดพลาดในการดึงข้อมูลจำนวนท่อย่อยที่ออกจากท่อเมนรอง:', error);
@@ -359,7 +373,6 @@ export const getDetailedBranchPipeStats = ():
             };
         });
 
-        console.log('✅ ดึงข้อมูลสถิติท่อย่อยแบบละเอียดสำเร็จ:', detailedStats);
         return detailedStats;
     } catch (error) {
         console.error('❌ เกิดข้อผิดพลาดในการดึงข้อมูลสถิติท่อย่อยแบบละเอียด:', error);
@@ -426,8 +439,6 @@ export const downloadBranchPipeStatsAsJSON = (filename: string = 'branch-pipe-st
     a.download = `${filename}.json`;
     a.click();
     URL.revokeObjectURL(url);
-
-    console.log('✅ ดาวน์โหลดไฟล์ JSON ท่อย่อยสำเร็จ');
 };
 
 /**
@@ -448,8 +459,6 @@ export const downloadBranchPipeStatsAsCSV = (filename: string = 'branch-pipe-sta
     a.download = `${filename}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-
-    console.log('✅ ดาวน์โหลดไฟล์ CSV ท่อย่อยสำเร็จ');
 };
 
 /**
@@ -552,7 +561,6 @@ export const createMapImage = async (
     } = options;
 
     try {
-        console.log('🖼️ เริ่มสร้างภาพแผนที่...');
         await new Promise((resolve) => setTimeout(resolve, 2000));
         const html2canvas = await import('html2canvas');
         const html2canvasLib = html2canvas.default || html2canvas;
@@ -586,7 +594,6 @@ export const createMapImage = async (
         });
 
         const dataUrl = canvas.toDataURL('image/jpeg', quality);
-        console.log('✅ สร้างภาพแผนที่สำเร็จ');
         return dataUrl;
     } catch (error) {
         console.error('❌ เกิดข้อผิดพลาดในการสร้างภาพ:', error);
@@ -636,8 +643,6 @@ export const downloadImage = (
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-
-        console.log('✅ ดาวน์โหลดภาพสำเร็จ:', filename);
     } catch (error) {
         console.error('❌ เกิดข้อผิดพลาดในการดาวน์โหลดภาพ:', error);
         try {
@@ -812,7 +817,6 @@ export const createPDFReport = async (
             : 'horticulture-report.pdf';
 
         doc.save(filename);
-        console.log('✅ สร้างไฟล์ PDF สำเร็จ');
         return true;
     } catch (error) {
         console.error('❌ เกิดข้อผิดพลาดในการสร้าง PDF:', error);
@@ -838,8 +842,6 @@ export const downloadStatsAsJSON = (filename: string = 'horticulture-stats'): vo
     a.download = `${filename}.json`;
     a.click();
     URL.revokeObjectURL(url);
-
-    console.log('✅ ดาวน์โหลดไฟล์ JSON สำเร็จ');
 };
 
 /**
@@ -860,17 +862,17 @@ export const downloadStatsAsCSV = (filename: string = 'horticulture-stats'): voi
     a.download = `${filename}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-
-    console.log('✅ ดาวน์โหลดไฟล์ CSV สำเร็จ');
 };
 
 /**
- * Get formatted stats
+ * Get formatted stats พร้อมข้อมูลหัวฉีด
  * @returns Formatted string of stats or null if no data
  */
 export const getFormattedStats = (): string | null => {
     const stats = getProjectStats();
     if (!stats) return null;
+
+    const overallStats = getOverallStats();
 
     let formatted = `📊 รายงานสถิติโครงการระบบน้ำสวนผลไม้\n\n`;
 
@@ -878,7 +880,18 @@ export const getFormattedStats = (): string | null => {
     formatted += `  • พื้นที่รวม: ${formatAreaInRai(stats.totalAreaInRai)}\n`;
     formatted += `  • จำนวนโซน: ${stats.totalZones} โซน\n`;
     formatted += `  • จำนวนต้นไม้: ${stats.totalPlants.toLocaleString()} ต้น\n`;
-    formatted += `  • ปริมาณน้ำต่อครั้ง: ${formatWaterVolume(stats.totalWaterNeedPerSession)}\n\n`;
+    formatted += `  • ปริมาณน้ำต่อครั้ง: ${formatWaterVolume(stats.totalWaterNeedPerSession)}\n`;
+
+    // เพิ่มข้อมูลหัวฉีด
+    if (overallStats?.sprinklerFlowRate) {
+        formatted += `\n🚿 ข้อมูลหัวฉีด:\n`;
+        formatted += `  • อัตราการไหลต่อต้น: ${overallStats.sprinklerFlowRate.flowRatePerPlant.toFixed(2)} ลิตร/นาที\n`;
+        formatted += `  • Q รวมต่อนาที: ${overallStats.sprinklerFlowRate.formattedFlowRatePerMinute}\n`;
+        formatted += `  • Q รวมต่อชั่วโมง: ${overallStats.sprinklerFlowRate.formattedFlowRatePerHour}\n`;
+        formatted += `  • แรงดันน้ำ: ${overallStats.sprinklerFlowRate.pressureBar.toFixed(1)} บาร์\n`;
+        formatted += `  • รัศมีฉีด: ${overallStats.sprinklerFlowRate.radiusMeters.toFixed(1)} เมตร\n`;
+    }
+    formatted += `\n`;
 
     formatted += `🔧 ระบบท่อ:\n`;
     formatted += `  • ท่อเมนยาวที่สุด: ${formatDistance(stats.mainPipes.longest)}\n`;
@@ -915,29 +928,9 @@ export const debugProjectStats = (): void => {
 
     const stats = getProjectStats();
     if (!stats) {
-        console.log('❌ ไม่พบข้อมูลสถิติ');
         console.groupEnd();
         return;
     }
-
-    console.log('📊 ข้อมูลโดยรวม:');
-    console.log(`  พื้นที่: ${stats.totalAreaInRai.toFixed(2)} ไร่`);
-    console.log(`  โซน: ${stats.totalZones}`);
-    console.log(`  ต้นไม้: ${stats.totalPlants}`);
-    console.log(`  น้ำ: ${stats.totalWaterNeedPerSession} ลิตร`);
-
-    console.log('🔧 ระบบท่อ:');
-    console.log(`  ท่อเมนยาวที่สุด: ${stats.mainPipes.longest.toFixed(2)} ม.`);
-    console.log(`  ท่อเมนรองยาวที่สุด: ${stats.subMainPipes.longest.toFixed(2)} ม.`);
-    console.log(`  ท่อย่อยยาวที่สุด: ${stats.branchPipes.longest.toFixed(2)} ม.`);
-    console.log(`  ท่อยาวที่สุดรวม: ${stats.longestPipesCombined.toFixed(2)} ม.`);
-
-    console.log('🏞️ โซน:');
-    stats.zoneDetails.forEach((zone, index) => {
-        console.log(
-            `  ${index + 1}. ${zone.zoneName}: ${zone.areaInRai.toFixed(2)} ไร่, ${zone.plantCount} ต้น`
-        );
-    });
 
     console.groupEnd();
 };
@@ -968,7 +961,6 @@ if (typeof window !== 'undefined') {
         downloadBranchPipeStatsAsCSV,
         getFormattedBranchPipeStats,
     };
-
 }
 
 export default {

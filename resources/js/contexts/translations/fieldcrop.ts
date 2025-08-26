@@ -407,7 +407,11 @@ export const fieldCropTranslations = {
         "Connection Mode Active": "Connection Mode Active",
         "From": "From",
         "Connection Mode: Click another junction or draw a new pipe": "Connection Mode: Click another junction or draw a new pipe",
-        "Error connecting pipes": "Error connecting pipes"
+        "Error connecting pipes": "Error connecting pipes",
+        
+        // Manual irrigation zone redesign
+        "ออกแบบใหม่ - แบ่งโซนให้น้ำ": "Redesign - Auto Zone Division",
+        "ออกแบบใหม่ - แบ่งโซนน้ำเอง": "Redesign - Manual Zone Division"
     },
     th: {
         // Common
@@ -814,6 +818,10 @@ export const fieldCropTranslations = {
         "Connection Mode Active": "โหมดการเชื่อมต่อเปิดอยู่",
         "From": "จาก",
         "Connection Mode: Click another junction or draw a new pipe": "โหมดเชื่อมต่อ: คลิกจุดเชื่อมอื่นหรือวาดท่อใหม่",
-        "Error connecting pipes": "เกิดข้อผิดพลาดในการเชื่อมต่อท่อ"
+        "Error connecting pipes": "เกิดข้อผิดพลาดในการเชื่อมต่อท่อ",
+        
+        // Manual irrigation zone redesign
+        "ออกแบบใหม่ - แบ่งโซนให้น้ำ": "ออกแบบใหม่ - แบ่งโซนให้น้ำ",
+        "ออกแบบใหม่ - แบ่งโซนน้ำเอง": "ออกแบบใหม่ - แบ่งโซนน้ำเอง"
     },
 };
