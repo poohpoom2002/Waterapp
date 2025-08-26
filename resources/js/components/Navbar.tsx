@@ -42,7 +42,7 @@ const Navbar: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <h1 className="text-xl font-bold">{t('Chaiyo Irrigation System')}</h1>
+                                <h1 className="text-xl font-bold">{t('Chaiyo Irrigation Planning System')}</h1>
                                 <p className="text-sm">{t('บจก.กนกโปรดักส์ จำกัด & บจก.ไชโยไปป์แอนด์ฟิตติ้ง จำกัด')}</p>
                             </div>
                         </Link>
