@@ -10,6 +10,7 @@ import PlantRotationControl from '../components/horticulture/PlantRotationContro
 import LateralPipeInfoPanel from '../components/horticulture/LateralPipeInfoPanel';
 import LateralPipeModeSelector from '../components/horticulture/LateralPipeModeSelector';
 import ContinuousLateralPipePanel from '../components/horticulture/ContinuousLateralPipePanel';
+import DeletePipePanel from '../components/horticulture/DeletePipePanel';
 import { loadSprinklerConfig } from '../utils/sprinklerUtils';
 import {
     calculateZoneStats,
@@ -3074,13 +3075,7 @@ const PlantGenerationModal = ({
                                     </div>
                                 ))}
                                 
-                                {/* ปุ่มเพิ่มพืชใหม่ */}
-                                <button
-                                    onClick={onCreateCustomPlant}
-                                    className="w-full rounded border border-purple-300 bg-purple-100 px-4 py-2 text-sm text-purple-700 transition-colors hover:bg-purple-200"
-                                >
-                                    ➕ {t('เพิ่มพืชใหม่')}
-                                </button>
+                                
                             </div>
                         </div>
                     )}
@@ -3127,6 +3122,14 @@ const PlantGenerationModal = ({
                             </div>
                         </div>
                     </div>
+
+                    {/* ปุ่มเพิ่มพืชใหม่ */}
+                    <button
+                                    onClick={onCreateCustomPlant}
+                                    className="w-full rounded border border-purple-300 bg-purple-100 px-4 py-2 text-sm text-purple-700 transition-colors hover:bg-purple-200"
+                                >
+                                    ➕ {t('เพิ่มพืชใหม่')}
+                                </button>
 
                     {/* รูปแบบการวาง */}
                     <div>
@@ -3192,20 +3195,6 @@ const PlantGenerationModal = ({
                                     {t('แบบสลับฟันปลา')}
                                 </span>
                             </label>
-                        </div>
-                    </div>
-
-                    <div className="rounded-lg bg-blue-900 p-3">
-                        <div className="text-sm text-blue-200">
-                            <p className="font-medium">{t('ข้อมูลการสร้างต้นไม้')}:</p>
-                            <ul className="mt-1 space-y-1">
-                                <li>• {t('ระบบจะสร้างต้นไม้ตามระยะห่างที่กำหนดในแต่ละพืช')}</li>
-                                <li>
-                                    • {t('ต้นไม้จะถูกวางในพื้นที่หลักและพื้นที่ปลูกพืชที่กำหนด')}
-                                </li>
-                                <li>• {t('ต้นไม้ในพื้นที่หลีกเลี่ยงจะถูกลบออกโดยอัตโนมัติ')}</li>
-                                <li>• {t('สามารถปรับมุมเอียงได้หลังจากสร้างต้นไม้เสร็จแล้ว')}</li>
-                            </ul>
                         </div>
                     </div>
                 </div>
@@ -4907,6 +4896,7 @@ export default function EnhancedHorticulturePlannerPage() {
     // เพิ่ม state สำหรับฟีเจอร์ลบ
     const [isDeleteMode, setIsDeleteMode] = useState(false);
     const [showDeleteMainAreaConfirm, setShowDeleteMainAreaConfirm] = useState(false);
+    const [deletedPipeCount, setDeletedPipeCount] = useState(0);
 
     const [isRulerMode, setIsRulerMode] = useState(false);
     const [rulerStartPoint, setRulerStartPoint] = useState<Coordinate | null>(null);
@@ -8677,7 +8667,18 @@ export default function EnhancedHorticulturePlannerPage() {
             });
             pushToHistory({ subMainPipes: updatedSubMainPipes });
         }
-        setIsDeleteMode(false); // รีเซ็ตโหมดลบหลังจากลบท่อ
+        
+        // เพิ่มจำนวนท่อที่ลบแล้ว
+        setDeletedPipeCount(prev => prev + 1);
+        
+        // ไม่รีเซ็ต isDeleteMode ให้สามารถลบได้ต่อเนื่อง
+        // setIsDeleteMode(false); // ลบบรรทัดนี้ออก
+    };
+
+    // ฟังก์ชันออกจากโหมดลบท่อ
+    const handleCancelDeleteMode = () => {
+        setIsDeleteMode(false);
+        setDeletedPipeCount(0);
     };
 
     const handleSavePlantArea = (plantType: PlantData) => {
@@ -9750,7 +9751,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                 onClick={isRulerMode ? stopRulerMode : startRulerMode}
                                 className={`h-10 w-10 rounded-lg px-3 py-2 text-center text-sm font-medium transition-colors ${
                                     isRulerMode
-                                        ? 'bg-yellow-600 text-white ring-2 ring-yellow-300 hover:bg-yellow-700'
+                                        ? 'bg-red-600 text-white ring-2 ring-red-300 hover:bg-red-700'
                                         : 'bg-purple-600 text-white hover:bg-purple-700'
                                 }`}
                                 title={
@@ -9781,13 +9782,17 @@ export default function EnhancedHorticulturePlannerPage() {
                                 }}
                                 className={`flex h-10 w-10 items-center rounded-md px-3 py-2 text-sm font-medium shadow-md transition-all duration-200 hover:shadow-lg ${
                                     history.present.curvedPipeEditing.isEnabled
-                                        ? 'border-2 border-green-300 bg-green-100 text-green-700 hover:bg-green-200'
+                                        ? 'border-2 border-red-300 bg-red-600 text-white hover:bg-red-700'
                                         : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
                                 }`}
                                 type="button"
                                 title={t('แก้ไขรูปร่างท่อ')}
-                            >
-                                <FaBezierCurve className="h-4 w-4" />
+                            > 
+                                {history.present.curvedPipeEditing.isEnabled ? ( 
+                                    <FaTimes className="h-4 w-4" />
+                                ) : (
+                                    <FaBezierCurve className="h-4 w-4" />
+                                )}
                             </button>
 
                             <button
@@ -9874,37 +9879,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                 </div>
                             )}
 
-                            {/* ปุ่มเลื่อนต้นไม้ */}
-                            {history.present.plants.length > 0 && (
-                                <div className="flex items-center space-x-2">
-                                    <button
-                                        onClick={handleTogglePlantMoveMode}
-                                        className={`h-10 w-10 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                                            isPlantMoveMode
-                                                ? 'bg-orange-600 text-white ring-2 ring-orange-300 hover:bg-orange-700'
-                                                : 'bg-blue-600 text-white hover:bg-blue-700'
-                                        }`}
-                                        title={
-                                            isPlantMoveMode
-                                                ? t('ออกจากโหมดเลื่อนต้นไม้ (กด Escape)')
-                                                : t(
-                                                      'เข้าสู่โหมดเลื่อนต้นไม้ - ใช้ปุ่มลูกศรเพื่อเลื่อนต้นไม้ทั้งหมด หรือเฉพาะต้นไม้ที่เลือก'
-                                                  )
-                                        }
-                                        type="button"
-                                    >
-                                        {isPlantMoveMode ? (
-                                            <>
-                                                <FaTimes className="h-4 w-4" />
-                                            </>
-                                        ) : (
-                                            <>
-                                                <FaArrowsAlt className="h-4 w-4" />
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            )}
+                            
 
                             {isPlantMoveMode && (
                                 <div className="flex flex-col space-y-2">
@@ -10076,16 +10051,52 @@ export default function EnhancedHorticulturePlannerPage() {
                                 </div>
                             )}
 
+                            {/* ปุ่มเลื่อนต้นไม้ */}
+                            {history.present.plants.length > 0 && (
+                                <div className="flex items-center space-x-2">
+                                    <button
+                                        onClick={handleTogglePlantMoveMode}
+                                        className={`h-10 w-10 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                                            isPlantMoveMode
+                                                ? 'bg-red-600 text-white ring-2 ring-red-300 hover:bg-red-700'
+                                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                                        }`}
+                                        title={
+                                            isPlantMoveMode
+                                                ? t('ออกจากโหมดเลื่อนต้นไม้ (กด Escape)')
+                                                : t(
+                                                      'เข้าสู่โหมดเลื่อนต้นไม้ - ใช้ปุ่มลูกศรเพื่อเลื่อนต้นไม้ทั้งหมด หรือเฉพาะต้นไม้ที่เลือก'
+                                                  )
+                                        }
+                                        type="button"
+                                    >
+                                        {isPlantMoveMode ? (
+                                            <>
+                                                <FaTimes className="h-4 w-4" />
+                                            </>
+                                        ) : (
+                                            <>
+                                                <FaArrowsAlt className="h-4 w-4" />
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            )}
+
                             <button
                                 onClick={() => togglePipeConnectionMode()}
                                 className={`h-10 w-10 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                                     history.present.pipeConnection.isActive
-                                        ? 'bg-green-600 text-white hover:bg-green-700'
-                                        : 'bg-orange-600 text-white hover:bg-orange-700'
+                                        ? 'bg-red-600 text-white hover:bg-red-700'
+                                        : 'bg-green-600 text-white hover:bg-green-700'
                                 }`}
                                 title={history.present.pipeConnection.isActive ? t('ออกจากโหมดเชื่อมท่อ') : t('เชื่อมท่อ')}
                             >
-                                <FaLink />
+                                {history.present.pipeConnection.isActive ? (
+                                    <FaTimes className="h-4 w-4" />
+                                ) : (
+                                    <FaLink className="h-4 w-4" />
+                                )}
                             </button>
 
                             <div className="flex items-center rounded-lg border border-gray-200">
@@ -11301,7 +11312,14 @@ export default function EnhancedHorticulturePlannerPage() {
                                             {/* ปุ่มลบท่อ */}
                                             <div className="mt-3">
                                                 <button
-                                                    onClick={() => setIsDeleteMode(!isDeleteMode)}
+                                                    onClick={() => {
+                                                        if (isDeleteMode) {
+                                                            handleCancelDeleteMode();
+                                                        } else {
+                                                            setIsDeleteMode(true);
+                                                            setDeletedPipeCount(0); // รีเซ็ตตัวนับ
+                                                        }
+                                                    }}
                                                     disabled={
                                                         history.present.mainPipes.length === 0 &&
                                                         history.present.subMainPipes.length === 0 &&
@@ -11315,11 +11333,6 @@ export default function EnhancedHorticulturePlannerPage() {
                                                 >
                                                     {isDeleteMode ? '❌ ' : '🗑️ '}{t('ลบท่อ')}
                                                 </button>
-                                                {isDeleteMode && (
-                                                    <p className="mt-2 text-xs text-red-600">
-                                                        💡 {t('คลิกที่ท่อที่ต้องการลบ')}
-                                                    </p>
-                                                )}
                                             </div>
 
                                             {!history.present.pump && (
@@ -12334,6 +12347,14 @@ export default function EnhancedHorticulturePlannerPage() {
                             totalPipesCreated={history.present.lateralPipes.length} // จำนวนท่อทั้งหมดในโปรเจกต์
                             onChangePlacementMode={handleChangePlacementMode}
                             onStopContinuousDrawing={handleCancelLateralPipeDrawing}
+                            t={t}
+                        />
+
+                        {/* Delete Pipe Panel - แสดงเมื่ออยู่ในโหมดลบท่อ */}
+                        <DeletePipePanel
+                            isVisible={isDeleteMode}
+                            onCancel={handleCancelDeleteMode}
+                            deletedCount={deletedPipeCount}
                             t={t}
                         />
 
@@ -13694,12 +13715,14 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                     
                     const domEvent = event.domEvent as MouseEvent;
                     
-                    if (isDeleteMode) {
-                        // ในโหมดลบ ให้แสดงข้อความยืนยัน
-                        if (confirm(t('คุณต้องการลบท่อเมนนี้หรือไม่?'))) {
-                            handleDeletePipe(pipe.id, 'mainPipe');
-                        }
-                    } else if (data.curvedPipeEditing.isEnabled) {
+                    // ปิดการลบในโหมด left-click
+                    // if (isDeleteMode) {
+                    //     // ในโหมดลบ ให้แสดงข้อความยืนยัน
+                    //     if (confirm(t('คุณต้องการลบท่อเมนนี้หรือไม่?'))) {
+                    //         handleDeletePipe(pipe.id, 'mainPipe');
+                    //     }
+                    // } else 
+                    if (data.curvedPipeEditing.isEnabled) {
                         // ในโหมดแก้ไขรูปร่างท่อ - เพิ่มท่อเข้าสู่การแก้ไข
                         const isCurrentlyEditing = data.curvedPipeEditing.editingPipes.has(pipe.id);
                         handleCurvedPipeEditingChange(pipe.id, !isCurrentlyEditing);
@@ -13717,6 +13740,23 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                     }
                     
                     // หยุด event bubble ขึ้นไปยัง map
+                    return false;
+                });
+
+                // เพิ่ม right-click listener สำหรับการลบท่อ
+                mainPipePolyline.addListener('rightclick', (event: google.maps.MapMouseEvent) => {
+                    // หยุด event propagation
+                    if (event.stop) event.stop();
+                    if (event.domEvent) {
+                        event.domEvent.stopPropagation();
+                        event.domEvent.preventDefault();
+                    }
+                    
+                    // ลบท่อเฉพาะในโหมดลบเท่านั้น
+                    if (isDeleteMode) {
+                        handleDeletePipe(pipe.id, 'mainPipe');
+                    }
+                    
                     return false;
                 });
 
@@ -13917,11 +13957,13 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                         event.domEvent.preventDefault();
                     }
                     
-                    if (isDeleteMode) {
-                        if (confirm(t('คุณต้องการลบท่อย่อยนี้หรือไม่?'))) {
-                            handleDeletePipe(lateralPipe.id, 'lateralPipe');
-                        }
-                    } else if (data.pipeConnection.isActive && event.latLng) {
+                    // ปิดการลบในโหมด left-click
+                    // if (isDeleteMode) {
+                    //     if (confirm(t('คุณต้องการลบท่อย่อยนี้หรือไม่?'))) {
+                    //         handleDeletePipe(lateralPipe.id, 'lateralPipe');
+                    //     }
+                    // } else 
+                    if (data.pipeConnection.isActive && event.latLng) {
                         onPipeClickInConnectionMode(
                             lateralPipe.id,
                             'lateralPipe',
@@ -13932,6 +13974,23 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                     }
                     
                     // หยุด event bubble ขึ้นไปยัง map
+                    return false;
+                });
+
+                // เพิ่ม right-click listener สำหรับการลบท่อย่อย
+                lateralPolyline.addListener('rightclick', (event: google.maps.MapMouseEvent) => {
+                    // หยุด event propagation
+                    if (event.stop) event.stop();
+                    if (event.domEvent) {
+                        event.domEvent.stopPropagation();
+                        event.domEvent.preventDefault();
+                    }
+                    
+                    // ลบท่อเฉพาะในโหมดลบเท่านั้น
+                    if (isDeleteMode) {
+                        handleDeletePipe(lateralPipe.id, 'lateralPipe');
+                    }
+                    
                     return false;
                 });
 
@@ -14025,11 +14084,13 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                         event.domEvent.preventDefault();
                     }
                     
-                    if (isDeleteMode) {
-                        if (confirm(t('คุณต้องการลบท่อเมนรองนี้หรือไม่?'))) {
-                            handleDeletePipe(pipe.id, 'subMainPipe');
-                        }
-                    } else if (data.curvedPipeEditing.isEnabled) {
+                    // ปิดการลบในโหมด left-click
+                    // if (isDeleteMode) {
+                    //     if (confirm(t('คุณต้องการลบท่อเมนรองนี้หรือไม่?'))) {
+                    //         handleDeletePipe(pipe.id, 'subMainPipe');
+                    //     }
+                    // } else 
+                    if (data.curvedPipeEditing.isEnabled) {
                         // ในโหมดแก้ไขรูปร่างท่อ - เพิ่มท่อเข้าสู่การแก้ไข
                         const isCurrentlyEditing = data.curvedPipeEditing.editingPipes.has(pipe.id);
                         handleCurvedPipeEditingChange(pipe.id, !isCurrentlyEditing);
@@ -14061,6 +14122,23 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                     }
                     
                     // หยุด event bubble ขึ้นไปยัง map
+                    return false;
+                });
+
+                // เพิ่ม right-click listener สำหรับการลบท่อเมนรอง
+                subMainPipePolyline.addListener('rightclick', (event: google.maps.MapMouseEvent) => {
+                    // หยุด event propagation
+                    if (event.stop) event.stop();
+                    if (event.domEvent) {
+                        event.domEvent.stopPropagation();
+                        event.domEvent.preventDefault();
+                    }
+                    
+                    // ลบท่อเฉพาะในโหมดลบเท่านั้น
+                    if (isDeleteMode) {
+                        handleDeletePipe(pipe.id, 'subMainPipe');
+                    }
+                    
                     return false;
                 });
 
@@ -14104,11 +14182,13 @@ const EnhancedGoogleMapsOverlays: React.FC<{
 
                                     branchPolyline.addListener('click', (event: google.maps.MapMouseEvent) => {
                     event.stop(); // ป้องกัน event propagation ในทุกกรณี
-                    if (isDeleteMode) {
-                        if (confirm(t('คุณต้องการลบท่อย่อยนี้หรือไม่?'))) {
-                            handleDeletePipe(branchPipe.id, 'branchPipe');
-                        }
-                    } else if (isCreatingConnection && isBranchHighlighted && event.latLng) {
+                    // ปิดการลบในโหมด left-click
+                    // if (isDeleteMode) {
+                    //     if (confirm(t('คุณต้องการลบท่อย่อยนี้หรือไม่?'))) {
+                    //         handleDeletePipe(branchPipe.id, 'branchPipe');
+                    //     }
+                    // } else 
+                    if (isCreatingConnection && isBranchHighlighted && event.latLng) {
                         onConnectToPipe(
                             { lat: event.latLng.lat(), lng: event.latLng.lng() },
                             branchPipe.id,
@@ -14128,6 +14208,23 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                             branchInfoWindow.open(map);
                         }
                     }
+                });
+
+                // เพิ่ม right-click listener สำหรับการลบท่อสาขา
+                branchPolyline.addListener('rightclick', (event: google.maps.MapMouseEvent) => {
+                    // หยุด event propagation
+                    event.stop();
+                    if (event.domEvent) {
+                        event.domEvent.stopPropagation();
+                        event.domEvent.preventDefault();
+                    }
+                    
+                    // ลบท่อเฉพาะในโหมดลบเท่านั้น
+                    if (isDeleteMode) {
+                        handleDeletePipe(branchPipe.id, 'branchPipe');
+                    }
+                    
+                    return false;
                 });
 
                     overlaysRef.current.infoWindows.set(branchPipe.id, branchInfoWindow);

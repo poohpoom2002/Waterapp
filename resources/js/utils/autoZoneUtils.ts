@@ -720,7 +720,7 @@ const tryAggressiveRebalancing = (
 
 // Create true non-overlapping Voronoi zones that cover the entire main area
 // Helper function to find plants that are actually inside a polygon
-const findPlantsInPolygon = (plants: PlantLocation[], polygon: Coordinate[]): PlantLocation[] => {
+export const findPlantsInPolygon = (plants: PlantLocation[], polygon: Coordinate[]): PlantLocation[] => {
     if (polygon.length < 3) return [];
     
     return plants.filter(plant => {
@@ -1713,7 +1713,7 @@ const validatePlantAssignment = (zones: IrrigationZone[]): { errors: string[]; w
 };
 
 // Check if two polygons intersect
-const checkPolygonIntersection = (poly1: Coordinate[], poly2: Coordinate[]): boolean => {
+export const checkPolygonIntersection = (poly1: Coordinate[], poly2: Coordinate[]): boolean => {
     // Simple intersection check: if any edge of poly1 intersects any edge of poly2
     for (let i = 0; i < poly1.length; i++) {
         const p1Start = poly1[i];
