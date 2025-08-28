@@ -492,13 +492,6 @@ export const enhancedBalanceWaterNeeds = (
     let currentMaxDeviation = getMaxDeviation(balancedClusters);
     const strictTolerance = targetWaterNeedPerZone * adaptiveTolerance;
 
-    console.log(`🔧 Starting enhanced water balance for ${clusters.length} zones:`);
-    console.log(`   - Target water per zone: ${targetWaterNeedPerZone.toFixed(2)} L/min`);
-    console.log(`   - Base tolerance: ${(tolerance * 100).toFixed(1)}%`);
-    console.log(`   - Adaptive tolerance: ${(adaptiveTolerance * 100).toFixed(1)}%`);
-    console.log(`   - Allowable deviation: ±${strictTolerance.toFixed(2)} L/min`);
-    console.log(`   - Initial max deviation: ${currentMaxDeviation.toFixed(2)} L/min (${(currentMaxDeviation / targetWaterNeedPerZone * 100).toFixed(1)}%)`);
-
     while (improved && iterations < maxIterations && currentMaxDeviation > strictTolerance) {
         improved = false;
         iterations++;
@@ -554,36 +547,33 @@ export const enhancedBalanceWaterNeeds = (
 
         if (improved) {
             currentMaxDeviation = getMaxDeviation(balancedClusters);
-            if (iterations % 100 === 0) {
-                console.log(`📊 Iteration ${iterations}: Max deviation = ${currentMaxDeviation.toFixed(3)}`);
-            }
         }
     }
 
-    const finalMaxDeviation = getMaxDeviation(balancedClusters);
-    const finalWaterNeeds = balancedClusters.map(getClusterWaterNeed);
-    const finalDeviations = finalWaterNeeds.map(need => Math.abs(need - targetWaterNeedPerZone));
-    const deviationPercentages = finalDeviations.map(dev => (dev / targetWaterNeedPerZone * 100));
+    // const finalMaxDeviation = getMaxDeviation(balancedClusters);
+    // const finalWaterNeeds = balancedClusters.map(getClusterWaterNeed);
+    // const finalDeviations = finalWaterNeeds.map(need => Math.abs(need - targetWaterNeedPerZone));
+    // const deviationPercentages = finalDeviations.map(dev => (dev / targetWaterNeedPerZone * 100));
     
-    // Calculate balance quality rating
-    const balanceQuality = finalMaxDeviation <= strictTolerance ? 'EXCELLENT' : 
-                          finalMaxDeviation <= targetWaterNeedPerZone * 0.08 ? 'GOOD' :
-                          finalMaxDeviation <= targetWaterNeedPerZone * 0.12 ? 'ACCEPTABLE' : 'NEEDS IMPROVEMENT';
+    // // Calculate balance quality rating
+    // const balanceQuality = finalMaxDeviation <= strictTolerance ? 'EXCELLENT' : 
+    //                       finalMaxDeviation <= targetWaterNeedPerZone * 0.08 ? 'GOOD' :
+    //                       finalMaxDeviation <= targetWaterNeedPerZone * 0.12 ? 'ACCEPTABLE' : 'NEEDS IMPROVEMENT';
     
-    const qualityIcon = balanceQuality === 'EXCELLENT' ? '🏆' :
-                       balanceQuality === 'GOOD' ? '✅' :
-                       balanceQuality === 'ACCEPTABLE' ? '⚠️' : '❌';
+    // const qualityIcon = balanceQuality === 'EXCELLENT' ? '🏆' :
+    //                    balanceQuality === 'GOOD' ? '✅' :
+    //                    balanceQuality === 'ACCEPTABLE' ? '⚠️' : '❌';
     
-    console.log(`${qualityIcon} Enhanced balance completed for ${clusters.length} zones:`);
-    console.log(`   - Iterations used: ${iterations}/${maxIterations}`);
-    console.log(`   - Final max deviation: ${finalMaxDeviation.toFixed(2)} L/min (${(finalMaxDeviation / targetWaterNeedPerZone * 100).toFixed(1)}%)`);
-    console.log(`   - Zone water needs: [${finalWaterNeeds.map(w => w.toFixed(1)).join(', ')}] L/min`);
-    console.log(`   - Individual deviations: [${deviationPercentages.map(p => p.toFixed(1) + '%').join(', ')}]`);
-    console.log(`   - Balance quality: ${qualityIcon} ${balanceQuality}`);
+    // console.log(`${qualityIcon} Enhanced balance completed for ${clusters.length} zones:`);
+    // console.log(`   - Iterations used: ${iterations}/${maxIterations}`);
+    // console.log(`   - Final max deviation: ${finalMaxDeviation.toFixed(2)} L/min (${(finalMaxDeviation / targetWaterNeedPerZone * 100).toFixed(1)}%)`);
+    // console.log(`   - Zone water needs: [${finalWaterNeeds.map(w => w.toFixed(1)).join(', ')}] L/min`);
+    // console.log(`   - Individual deviations: [${deviationPercentages.map(p => p.toFixed(1) + '%').join(', ')}]`);
+    // console.log(`   - Balance quality: ${qualityIcon} ${balanceQuality}`);
     
-    if (balanceQuality === 'NEEDS IMPROVEMENT') {
-        console.log(`   💡 Tip: Consider reducing the number of zones or adjusting plant distribution for better balance`);
-    }
+    // if (balanceQuality === 'NEEDS IMPROVEMENT') {
+    //     console.log(`   💡 Tip: Consider reducing the number of zones or adjusting plant distribution for better balance`);
+    // }
 
     return balancedClusters;
 };
@@ -768,8 +758,6 @@ export const createVoronoiZones = (
         return { lat: weightedLat, lng: weightedLng };
     }).filter(centroid => centroid !== null) as Coordinate[];
 
-    console.log(`🔷 Creating ${centroids.length} non-overlapping Voronoi zones...`);
-
     // Create true Voronoi diagram using mathematical approach
     const voronoiZones = createTrueVoronoiZones(centroids, mainArea);
     
@@ -795,7 +783,6 @@ export const createVoronoiZones = (
                 const plantsInPolygon = findPlantsInPolygon(allPlants, fallbackZone);
                 const totalWaterNeed = plantsInPolygon.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
                 
-                console.log(`📊 Zone ${index + 1} (fallback): Original cluster had ${cluster.length} plants, polygon contains ${plantsInPolygon.length} plants`);
                 
                 const zone: IrrigationZone = {
                     id: `auto-zone-${index + 1}`,
@@ -815,7 +802,6 @@ export const createVoronoiZones = (
         const plantsInPolygon = findPlantsInPolygon(allPlants, zoneCoordinates);
         const totalWaterNeed = plantsInPolygon.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
 
-        console.log(`📊 Zone ${index + 1}: Original cluster had ${cluster.length} plants, polygon contains ${plantsInPolygon.length} plants`);
 
         const zone: IrrigationZone = {
             id: `auto-zone-${index + 1}`,
@@ -830,7 +816,6 @@ export const createVoronoiZones = (
         zones.push(zone);
     });
 
-    console.log(`✅ Created ${zones.length} non-overlapping zones`);
     return zones;
 };
 
@@ -1056,7 +1041,6 @@ export const createZonesFromClusters = (
         const plantsInPolygon = findPlantsInPolygon(allPlants, zoneCoordinates);
         const totalWaterNeed = plantsInPolygon.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
 
-        console.log(`📊 Zone ${index + 1} (convex hull): Original cluster had ${cluster.length} plants, polygon contains ${plantsInPolygon.length} plants`);
 
         const zone: IrrigationZone = {
             id: `auto-zone-${index + 1}`,
@@ -1086,7 +1070,6 @@ export const addPolygonPadding = (polygon: Coordinate[], paddingMeters: number, 
     const paddingDegreesLat = paddingMeters / metersPerDegLat;
     const paddingDegreesLng = paddingMeters / metersPerDegLng;
 
-    console.log(`🔧 Adding ${paddingMeters}m padding (${paddingDegreesLat.toFixed(6)}° lat, ${paddingDegreesLng.toFixed(6)}° lng)`);
 
     // Use offset curve algorithm for better padding
     const expandedPolygon = createOffsetPolygon(polygon, paddingDegreesLat, paddingDegreesLng);
@@ -1207,8 +1190,6 @@ export const clipPolygonToMainArea = (polygon: Coordinate[], mainArea: Coordinat
     if (polygon.length === 0 || mainArea.length === 0) return [];
     if (mainArea.length < 3) return [];
 
-    console.log(`✂️ Clipping polygon (${polygon.length} points) to main area (${mainArea.length} points)`);
-
     let clippedPolygon = [...polygon];
 
     // Clip against each edge of the main area
@@ -1252,7 +1233,6 @@ export const clipPolygonToMainArea = (polygon: Coordinate[], mainArea: Coordinat
         // Last resort: try to find the intersection of polygons
         const intersection = findPolygonIntersection(polygon, mainArea);
         if (intersection.length >= 3) {
-            console.log(`🔄 Using polygon intersection as fallback (${intersection.length} points)`);
             return intersection;
         }
         
@@ -1261,7 +1241,6 @@ export const clipPolygonToMainArea = (polygon: Coordinate[], mainArea: Coordinat
         return [];
     }
 
-    console.log(`✅ Clipping successful: ${polygon.length} → ${validatedPolygon.length} points`);
     return validatedPolygon;
 };
 
@@ -1388,11 +1367,6 @@ export const createAutomaticZones = (
 ): AutoZoneResult => {
     const startTime = Date.now();
     
-    // Debug log for randomSeed
-    if (config.randomSeed !== undefined) {
-        console.log(`🎲 Using randomSeed: ${config.randomSeed} for zone creation`);
-    }
-    
     const debugInfo: AutoZoneDebugInfo = {
         totalPlants: plants.length,
         totalWaterNeed: 0,
@@ -1442,8 +1416,6 @@ export const createAutomaticZones = (
         // Create zones from clusters with configurable options
         let zones = createZonesFromClusters(clusters, mainArea, colors, config.paddingMeters, config.useVoronoi);
 
-        console.log(`🏗️ Initial zone creation completed: ${zones.length} zones created`);
-
         // Filter out invalid zones (zones with no coordinates or insufficient points)
         const validZones = zones.filter(zone => zone.coordinates && zone.coordinates.length >= 3);
         if (validZones.length < zones.length) {
@@ -1460,7 +1432,7 @@ export const createAutomaticZones = (
         
         // Log validation results
         if (validation.errors.length > 0) {
-            console.error('❌ Zone validation failed:', validation.errors);
+            console.warn('⚠️ Zone validation warnings:', validation.errors);
         }
         if (validation.warnings.length > 0) {
             console.warn('⚠️ Zone validation warnings:', validation.warnings);
@@ -1507,19 +1479,6 @@ export const createAutomaticZones = (
 
         debugInfo.timeTaken = Date.now() - startTime;
 
-        // Log final statistics
-        console.log(`📊 Zone creation summary:`);
-        console.log(`   - Total zones: ${zones.length}`);
-        console.log(`   - Total plants: ${debugInfo.totalPlants}`);
-        console.log(`   - Water balance efficiency: ${debugInfo.waterBalanceEfficiency.toFixed(1)}%`);
-        console.log(`   - Max water deviation: ${debugInfo.waterNeedDeviationPercent.toFixed(2)}%`);
-        console.log(`   - Validation result: ${validation.isValid ? '✅ PASSED' : '❌ FAILED'}`);
-        console.log(`   - Time taken: ${debugInfo.timeTaken}ms`);
-
-        if (config.debugMode) {
-            console.log('🔍 Full Debug Info:', debugInfo);
-        }
-
         return {
             zones,
             debugInfo,
@@ -1547,8 +1506,6 @@ export const validateZones = (zones: IrrigationZone[], mainArea: Coordinate[]): 
 } => {
     const errors: string[] = [];
     const warnings: string[] = [];
-
-    console.log(`🔍 Starting comprehensive zone validation for ${zones.length} zones...`);
 
     if (zones.length === 0) {
         errors.push('ไม่มีโซนให้ตรวจสอบ');
@@ -1582,7 +1539,6 @@ export const validateZones = (zones: IrrigationZone[], mainArea: Coordinate[]): 
 
     const isValid = errors.length === 0;
     
-    console.log(`${isValid ? '✅' : '❌'} Zone validation complete: ${errors.length} errors, ${warnings.length} warnings`);
     
     return { isValid, errors, warnings };
 };
@@ -1598,24 +1554,17 @@ const validateWaterBalance = (zones: IrrigationZone[]): { errors: string[]; warn
     const avgWaterNeed = waterNeeds.reduce((sum, need) => sum + need, 0) / zones.length;
     const tolerance = avgWaterNeed * 0.01; // 1% tolerance
 
-    console.log(`💧 Water balance check: Average = ${avgWaterNeed.toFixed(2)}, Tolerance = ${tolerance.toFixed(2)}`);
-
-    let hasStrictError = false;
     zones.forEach((zone, index) => {
         const deviation = Math.abs(zone.totalWaterNeed - avgWaterNeed);
         const deviationPercent = (deviation / avgWaterNeed) * 100;
 
         if (deviation > tolerance) {
             errors.push(`โซน ${index + 1} มีความต้องการน้ำเบี่ยงเบนเกินกำหนด: ${zone.totalWaterNeed.toFixed(2)} ลิตร (เบี่ยงเบน ${deviationPercent.toFixed(2)}%)`);
-            hasStrictError = true;
         } else if (deviation > tolerance * 0.5) {
             warnings.push(`โซน ${index + 1} มีความต้องการน้ำเบี่ยงเบนเล็กน้อย: ${deviationPercent.toFixed(2)}%`);
         }
     });
 
-    if (!hasStrictError) {
-        console.log(`✅ Water balance validation passed`);
-    }
 
     return { errors, warnings };
 };
@@ -1625,7 +1574,6 @@ const validateZoneOverlaps = (zones: IrrigationZone[]): { errors: string[]; warn
     const errors: string[] = [];
     const warnings: string[] = [];
 
-    console.log(`🔄 Checking for zone overlaps...`);
 
     for (let i = 0; i < zones.length; i++) {
         for (let j = i + 1; j < zones.length; j++) {
@@ -1657,9 +1605,6 @@ const validateZoneOverlaps = (zones: IrrigationZone[]): { errors: string[]; warn
         }
     }
 
-    if (errors.length === 0) {
-        console.log(`✅ Zone overlap validation passed`);
-    }
 
     return { errors, warnings };
 };
@@ -1673,8 +1618,6 @@ const validateZoneBoundaries = (zones: IrrigationZone[], mainArea: Coordinate[])
         errors.push('พื้นที่หลักไม่ถูกต้อง');
         return { errors, warnings };
     }
-
-    console.log(`🔲 Checking zone boundaries...`);
 
     zones.forEach((zone, index) => {
         // Check every single point
@@ -1697,10 +1640,6 @@ const validateZoneBoundaries = (zones: IrrigationZone[], mainArea: Coordinate[])
         }
     });
 
-    if (errors.length === 0) {
-        console.log(`✅ Zone boundary validation passed`);
-    }
-
     return { errors, warnings };
 };
 
@@ -1708,8 +1647,6 @@ const validateZoneBoundaries = (zones: IrrigationZone[], mainArea: Coordinate[])
 const validateZoneGeometry = (zones: IrrigationZone[]): { errors: string[]; warnings: string[] } => {
     const errors: string[] = [];
     const warnings: string[] = [];
-
-    console.log(`📐 Checking zone geometry...`);
 
     zones.forEach((zone, index) => {
         // Check minimum points
@@ -1735,10 +1672,6 @@ const validateZoneGeometry = (zones: IrrigationZone[]): { errors: string[]; warn
         }
     });
 
-    if (errors.length === 0) {
-        console.log(`✅ Zone geometry validation passed`);
-    }
-
     return { errors, warnings };
 };
 
@@ -1747,17 +1680,14 @@ const validatePlantAssignment = (zones: IrrigationZone[]): { errors: string[]; w
     const errors: string[] = [];
     const warnings: string[] = [];
 
-    console.log(`🌱 Checking plant assignments...`);
-
     const allPlantIds = new Set<string>();
-    let totalPlants = 0;
 
     zones.forEach((zone, index) => {
         if (zone.plants.length === 0) {
             warnings.push(`โซน ${index + 1} ไม่มีต้นไม้`);
         }
 
-        totalPlants += zone.plants.length;
+
 
         // Check for duplicate plant IDs
         zone.plants.forEach(plant => {
@@ -1776,11 +1706,8 @@ const validatePlantAssignment = (zones: IrrigationZone[]): { errors: string[]; w
         });
     });
 
-    console.log(`📊 Plant assignment summary: ${totalPlants} plants in ${zones.length} zones, ${allPlantIds.size} unique plants`);
 
-    if (errors.length === 0) {
-        console.log(`✅ Plant assignment validation passed`);
-    }
+
 
     return { errors, warnings };
 };

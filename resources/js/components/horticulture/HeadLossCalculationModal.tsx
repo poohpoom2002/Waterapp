@@ -14,6 +14,7 @@ interface HeadLossCalculationModalProps {
         length: number;
         pipeName?: string;
     } | null;
+    previousResult?: HeadLossResult | null; // เพิ่มสำหรับเก็บค่าที่เคยคำนวณ
     t: (key: string) => string;
 }
 
@@ -35,6 +36,7 @@ const HeadLossCalculationModal: React.FC<HeadLossCalculationModalProps> = ({
     onClose,
     onSave,
     pipeInfo,
+    previousResult,
 }) => {
     const [formData, setFormData] = useState({
         lossCoefficient: '',
@@ -49,15 +51,17 @@ const HeadLossCalculationModal: React.FC<HeadLossCalculationModalProps> = ({
     // โหลดค่าเริ่มต้นเมื่อเปิด modal
     useEffect(() => {
         if (isOpen && pipeInfo) {
+            // ใช้ค่าจากการคำนวณครั้งก่อนถ้ามี หรือใช้ค่าเริ่มต้น
             setFormData({
-                lossCoefficient: '0.000', // ค่าเริ่มต้น
-                pipeLength: pipeInfo.length.toString(),
-                correctionFactor: '0.000' // ค่าเริ่มต้น
+                lossCoefficient: previousResult ? previousResult.lossCoefficient.toString() : '0.000',
+                pipeLength: pipeInfo.length.toString(), // ใช้ความยาวปัจจุบันเสมอ
+                correctionFactor: previousResult ? previousResult.correctionFactor.toString() : '0.000'
             });
             setErrors({});
-            setCalculationResult(null);
+            // แสดงผลการคำนวณครั้งก่อนถ้ามี
+            setCalculationResult(previousResult ? previousResult.headLoss : null);
         }
-    }, [isOpen, pipeInfo]);
+    }, [isOpen, pipeInfo, previousResult]);
 
     const handleInputChange = (field: string, value: string) => {
         setFormData(prev => ({
@@ -175,6 +179,11 @@ const HeadLossCalculationModal: React.FC<HeadLossCalculationModalProps> = ({
                         </h2>
                         <p className="text-sm text-gray-600 mt-1">
                             {getPipeTypeText(pipeInfo.pipeType)} - {pipeInfo.zoneName}
+                            {previousResult && (
+                                <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                                    ใช้ค่าที่เคยคำนวณไว้
+                                </span>
+                            )}
                         </p>
                     </div>
                     <button
@@ -188,7 +197,24 @@ const HeadLossCalculationModal: React.FC<HeadLossCalculationModalProps> = ({
 
                 {/* Content */}
                 <div className="p-6 space-y-6">
-                   
+                    {/* แสดงข้อมูลการคำนวณครั้งก่อนถ้ามี */}
+                    {previousResult && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <h3 className="text-sm font-medium text-blue-800 mb-2">
+                                📋 ข้อมูลการคำนวณล่าสุด
+                            </h3>
+                            <div className="text-sm text-blue-700 space-y-1">
+                                <p>• ผลลัพธ์: <span className="font-semibold">{previousResult.headLoss.toFixed(3)} ม.</span></p>
+                                <p>• คำนวณเมื่อ: {new Date(previousResult.calculatedAt).toLocaleDateString('th-TH', { 
+                                    year: 'numeric', 
+                                    month: 'short', 
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                })}</p>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Form Fields */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

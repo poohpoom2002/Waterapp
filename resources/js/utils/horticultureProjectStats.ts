@@ -10,7 +10,7 @@ import {
     formatDistance,
     formatWaterVolume,
 } from './horticultureUtils';
-import { loadSprinklerConfig, calculateTotalFlowRate, formatFlowRate } from './sprinklerUtils';
+import { loadSprinklerConfig, calculateTotalFlowRate, formatFlowRate, formatFlowRatePerHour } from './sprinklerUtils';
 
 interface SprinklerFlowRateInfo {
     totalFlowRatePerMinute: number;
@@ -83,7 +83,7 @@ export const getOverallStats = (): {
             totalFlowRatePerMinute,
             totalFlowRatePerHour,
             formattedFlowRatePerMinute: formatFlowRate(totalFlowRatePerMinute),
-            formattedFlowRatePerHour: formatFlowRate(totalFlowRatePerHour),
+            formattedFlowRatePerHour: formatFlowRatePerHour(totalFlowRatePerHour),
             flowRatePerPlant: sprinklerConfig.flowRatePerMinute,
             pressureBar: sprinklerConfig.pressureBar,
             radiusMeters: sprinklerConfig.radiusMeters,
