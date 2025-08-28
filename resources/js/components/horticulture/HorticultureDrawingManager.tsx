@@ -958,17 +958,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
         setAnchorPointsCount(0);
     };
 
-    // ฟังก์ชันการเริ่มต้น Corner Rounding
-    const handleStartCornerRounding = () => {
-        setIsCornerRoundingActive(true);
-        setIsCurvedDrawingActive(true);
-        setAnchorPointsCount(0);
-        
-        // ปิด regular drawing manager
-        if (drawingManagerRef.current) {
-            drawingManagerRef.current.setDrawingMode(null);
-        }
-    };
+    // Corner rounding functionality removed as it was unused
 
     // ฟังก์ชันจัดการเมื่อท่อโค้งเสร็จสิ้น
     const handleCurvedPipeComplete = (coordinates: Coordinate[], pipeType: string) => {

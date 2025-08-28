@@ -2,10 +2,7 @@
 import React from 'react';
 import { 
     FaWater, 
-    FaTree, 
-    FaSeedling,
     FaTimes,
-    FaInfoCircle
 } from 'react-icons/fa';
 
 interface LateralPipeModeSelectorProps {
@@ -25,16 +22,16 @@ const LateralPipeModeSelector: React.FC<LateralPipeModeSelectorProps> = ({
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[2000]">
-            <div className="bg-white rounded-lg shadow-2xl border border-gray-200 p-6 max-w-md w-full mx-4">
+            <div className="bg-gray-800 rounded-lg shadow-2xl border border-gray-200 p-6 max-w-md w-full mx-4">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
                         <FaWater className="text-blue-600" />
                         {t('เลือกโหมดการวางท่อย่อย') || 'เลือกโหมดการวางท่อย่อย'}
                     </h3>
                     <button
                         onClick={onCancel}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                        className="text-white hover:text-gray-600 transition-colors"
                         title={t('ปิด') || 'ปิด'}
                     >
                         <FaTimes size={20} />
@@ -46,31 +43,20 @@ const LateralPipeModeSelector: React.FC<LateralPipeModeSelectorProps> = ({
                     {/* Mode A: Over Plants */}
                     <button
                         onClick={() => onModeSelect('over_plants')}
-                        className="w-full p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all text-left group"
+                        className="w-full p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 hover:bg-green-500 transition-all text-left group"
                     >
-                        <div className="flex items-start gap-3">
-                            <div className="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                                <FaTree className="text-blue-600" size={24} />
+                        <div className="flex items-center gap-4">
+                            <div className="flex-shrink-0 w-32 h-32 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors overflow-hidden">
+                                <img
+                                    src="/images/over_plants.png"
+                                    alt={t('วางทับแนวต้นไม้') || 'วางทับแนวต้นไม้'}
+                                    className="object-contain w-full h-full"
+                                />
                             </div>
-                            <div className="flex-1">
-                                <h4 className="font-semibold text-gray-800 mb-1">
-                                    🎯 {t('วางทับแนวต้นไม้') || 'วางทับแนวต้นไม้'}
+                            <div className="flex-1 flex items-center">
+                                <h4 className="font-semibold text-white text-lg">
+                                    {t('วางทับแนวต้นไม้') || 'วางทับแนวต้นไม้'}
                                 </h4>
-                                <p className="text-sm text-gray-600 mb-2">
-                                    {t('ท่อจะถูกวางทับไปบนแนวยาวของแถวหรือคอลัมน์ต้นไม้โดยตรง') || 
-                                     'ท่อจะถูกวางทับไปบนแนวยาวของแถวหรือคอลัมน์ต้นไม้โดยตรง'}
-                                </p>
-                                <div className="text-xs text-gray-500">
-                                    <div className="flex items-center gap-1 mb-1">
-                                        <FaInfoCircle size={12} />
-                                        <span>{t('เหมาะสำหรับ') || 'เหมาะสำหรับ'}:</span>
-                                    </div>
-                                    <ul className="space-y-1 ml-4">
-                                        <li>• {t('ต้นไม้เรียงเป็นแถวชัดเจน') || 'ต้นไม้เรียงเป็นแถวชัดเจน'}</li>
-                                        <li>• {t('ต้องการประหยัดท่อ') || 'ต้องการประหยัดท่อ'}</li>
-                                        <li>• {t('ระบบชลประทานแบบหยดน้ำ') || 'ระบบชลประทานแบบหยดน้ำ'}</li>
-                                    </ul>
-                                </div>
                             </div>
                         </div>
                     </button>
@@ -78,31 +64,20 @@ const LateralPipeModeSelector: React.FC<LateralPipeModeSelectorProps> = ({
                     {/* Mode B: Between Plants */}
                     <button
                         onClick={() => onModeSelect('between_plants')}
-                        className="w-full p-4 border-2 border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-all text-left group"
+                        className="w-full p-4 border-2 border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-500 transition-all text-left group"
                     >
-                        <div className="flex items-start gap-3">
-                            <div className="flex-shrink-0 w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors">
-                                <FaSeedling className="text-green-600" size={24} />
+                        <div className="flex items-center gap-4">
+                            <div className="flex-shrink-0 w-32 h-32 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors overflow-hidden">
+                                <img
+                                    src="/images/between_plants.png"
+                                    alt={t('วางระหว่างแนวต้นไม้') || 'วางระหว่างแนวต้นไม้'}
+                                    className="object-contain w-full h-full"
+                                />
                             </div>
-                            <div className="flex-1">
-                                <h4 className="font-semibold text-gray-800 mb-1">
-                                    🌱 {t('วางระหว่างแนวต้นไม้') || 'วางระหว่างแนวต้นไม้'}
+                            <div className="flex-1 flex items-center">
+                                <h4 className="font-semibold text-white text-lg">
+                                    {t('วางระหว่างแนวต้นไม้') || 'วางระหว่างแนวต้นไม้'}
                                 </h4>
-                                <p className="text-sm text-gray-600 mb-2">
-                                    {t('ท่อจะถูกวางในช่องว่างระหว่างแถวหรือคอลัมน์ของต้นไม้ 2 แถวที่อยู่ติดกัน') || 
-                                     'ท่อจะถูกวางในช่องว่างระหว่างแถวหรือคอลัมน์ของต้นไม้ 2 แถวที่อยู่ติดกัน'}
-                                </p>
-                                <div className="text-xs text-gray-500">
-                                    <div className="flex items-center gap-1 mb-1">
-                                        <FaInfoCircle size={12} />
-                                        <span>{t('เหมาะสำหรับ') || 'เหมาะสำหรับ'}:</span>
-                                    </div>
-                                    <ul className="space-y-1 ml-4">
-                                        <li>• {t('ต้นไม้ปลูกแบบสลับแถว') || 'ต้นไม้ปลูกแบบสลับแถว'}</li>
-                                        <li>• {t('ต้องการท่อแยกย่อยอัตโนมัติ') || 'ต้องการท่อแยกย่อยอัตโนมัติ'}</li>
-                                        <li>• {t('ระบบชลประทานแบบสปริงเกลอร์') || 'ระบบชลประทานแบบสปริงเกลอร์'}</li>
-                                    </ul>
-                                </div>
                             </div>
                         </div>
                     </button>
