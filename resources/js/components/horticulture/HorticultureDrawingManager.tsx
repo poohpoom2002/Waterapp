@@ -3,6 +3,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import CurvedPipeDrawingManager from './CurvedPipeDrawingManager';
 import CurvedPipeControlPanel from './CurvedPipeControlPanel';
+import {
+    snapMainPipeEndToSubMainPipe as utilsSnapMainPipeEndToSubMainPipe,
+    findClosestPointOnLineSegment as utilsFindClosestPointOnLineSegment,
+    calculateDistanceBetweenPoints as utilsCalculateDistanceBetweenPoints,
+    calculatePipeLength as utilsCalculatePipeLength,
+} from '../../utils/horticultureUtils';
 
 interface Coordinate {
     lat: number;
@@ -157,60 +163,14 @@ interface HorticultureDrawingManagerProps {
         return point;
     };
 
-const findClosestPointOnLineSegment = (
-    point: Coordinate,
-    lineStart: Coordinate,
-    lineEnd: Coordinate
-): Coordinate => {
-    const A = point.lat - lineStart.lat;
-    const B = point.lng - lineStart.lng;
-    const C = lineEnd.lat - lineStart.lat;
-    const D = lineEnd.lng - lineStart.lng;
+// ใช้ฟังก์ชัน findClosestPointOnLineSegment จาก horticultureUtils.ts
+const findClosestPointOnLineSegment = utilsFindClosestPointOnLineSegment;
 
-    const dot = A * C + B * D;
-    const lenSq = C * C + D * D;
+// ใช้ฟังก์ชัน calculateDistanceBetweenPoints จาก horticultureUtils.ts
+const calculateDistanceBetweenPoints = utilsCalculateDistanceBetweenPoints;
 
-    if (lenSq === 0) {
-        return lineStart;
-    }
-
-    const param = dot / lenSq;
-
-    if (param < 0) {
-        return lineStart;
-    } else if (param > 1) {
-        return lineEnd;
-    }
-
-    return {
-        lat: lineStart.lat + param * C,
-        lng: lineStart.lng + param * D
-    };
-};
-
-const calculateDistanceBetweenPoints = (point1: Coordinate, point2: Coordinate): number => {
-    const R = 6371000; 
-    const dLat = (point2.lat - point1.lat) * Math.PI / 180;
-    const dLng = (point2.lng - point1.lng) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(point1.lat * Math.PI / 180) * Math.cos(point2.lat * Math.PI / 180) * 
-            Math.sin(dLng/2) * Math.sin(dLng/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-};
-
-const calculatePipeLength = (coordinates: Coordinate[]): number => {
-    if (coordinates.length < 2) {
-        return 0;
-    }
-    
-    let totalLength = 0;
-    for (let i = 0; i < coordinates.length - 1; i++) {
-        totalLength += calculateDistanceBetweenPoints(coordinates[i], coordinates[i + 1]);
-    }
-    
-    return totalLength;
-};
+// ใช้ฟังก์ชัน calculatePipeLength จาก horticultureUtils.ts
+const calculatePipeLength = utilsCalculatePipeLength;
 
 const snapCoordinatesToMainArea = (
     coordinates: Coordinate[],
@@ -523,32 +483,9 @@ const getShapeOptions = (editMode: string | null, fillColor?: string, strokeColo
         mainPipes: any[],
         mainArea: Coordinate[]
     ): Coordinate[] => {
-        if (coordinates.length === 0) {
-            return coordinates;
-        }
-
-        const snappedCoordinates = [...coordinates];
-        
-        // Snap จุดเริ่มต้นของท่อเมนรองไปยังท่อเมนที่ใกล้ที่สุด
-        if (mainPipes && mainPipes.length > 0) {
-            const snappedStart = snapPointToMainPipe(snappedCoordinates[0], mainPipes, 15);
-            if (snappedStart.lat !== snappedCoordinates[0].lat || snappedStart.lng !== snappedCoordinates[0].lng) {
-                // แสดงข้อความแจ้งเตือนเมื่อ snap สำเร็จ
-                if (typeof window !== 'undefined' && (window as any).showSnapNotification) {
-                    (window as any).showSnapNotification('เชื่อมต่อท่อเมนรองกับท่อเมนสำเร็จ');
-                }
-            }
-            snappedCoordinates[0] = snappedStart;
-        }
-        
-        if (mainArea && mainArea.length > 0) {
-            // Snap เฉพาะจุดระหว่างทาง ไม่รวมปลายท่อ (endpoint)
-            for (let i = 1; i < snappedCoordinates.length - 1; i++) {
-                snappedCoordinates[i] = snapPointToMainAreaBoundary(snappedCoordinates[i], mainArea, 5);
-            }
-        }
-
-        return snappedCoordinates;
+        // 🚫 ปิดการ snap ท่อ sub main ทั้งหมด - ห้ามขยับท่อ sub main!
+        // ให้คืนค่า coordinates เดิมโดยไม่มีการแก้ไขใดๆ
+        return coordinates;
     };
 
     // ฟังก์ชันใหม่สำหรับ snap ไปยังท่อเมน
@@ -593,69 +530,8 @@ const getShapeOptions = (editMode: string | null, fillColor?: string, strokeColo
         return point;
     };
 
-    const snapMainPipeEndToSubMainPipe = (
-        mainPipes: any[],
-        subMainPipeCoordinates: Coordinate[]
-    ): { mainPipes: any[], snapped: boolean } => {
-        if (!mainPipes || mainPipes.length === 0 || !subMainPipeCoordinates || subMainPipeCoordinates.length === 0) {
-            return { mainPipes, snapped: false };
-        }
-
-        let hasSnapped = false;
-        const updatedMainPipes = mainPipes.map(mainPipe => {
-            if (!mainPipe.coordinates || mainPipe.coordinates.length === 0) {
-                return mainPipe;
-            }
-
-            const mainPipeEnd = mainPipe.coordinates[mainPipe.coordinates.length - 1];
-            
-            let closestPoint = mainPipeEnd;
-            let minDistance = Infinity;
-            let closestSubMainPointIndex = -1;
-
-            for (let i = 0; i < subMainPipeCoordinates.length; i++) {
-                const subMainPoint = subMainPipeCoordinates[i];
-                const distance = calculateDistanceBetweenPoints(mainPipeEnd, subMainPoint);
-                
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    closestPoint = subMainPoint;
-                    closestSubMainPointIndex = i;
-                }
-            }
-
-            for (let i = 0; i < subMainPipeCoordinates.length - 1; i++) {
-                const lineStart = subMainPipeCoordinates[i];
-                const lineEnd = subMainPipeCoordinates[i + 1];
-                
-                const closestPointOnLine = findClosestPointOnLineSegment(mainPipeEnd, lineStart, lineEnd);
-                const distanceToLine = calculateDistanceBetweenPoints(mainPipeEnd, closestPointOnLine);
-                
-                if (distanceToLine < minDistance) {
-                    minDistance = distanceToLine;
-                    closestPoint = closestPointOnLine;
-                    closestSubMainPointIndex = i;
-                }
-            }
-
-            if (minDistance <= 5) {
-                const updatedCoordinates = [...mainPipe.coordinates];
-                updatedCoordinates[updatedCoordinates.length - 1] = closestPoint;
-                
-                hasSnapped = true;
-                
-                return {
-                    ...mainPipe,
-                    coordinates: updatedCoordinates,
-                    length: calculatePipeLength(updatedCoordinates)
-                };
-            }
-
-            return mainPipe;
-        });
-
-        return { mainPipes: updatedMainPipes, snapped: hasSnapped };
-    };
+    // ใช้ฟังก์ชัน snap จาก horticultureUtils.ts แทนฟังก์ชันเดิม
+    const snapMainPipeEndToSubMainPipe = utilsSnapMainPipeEndToSubMainPipe;
 
 
 
@@ -680,14 +556,9 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
     const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null);
     const [isDrawingEnabled, setIsDrawingEnabled] = useState(false);
     const [showCurvedPipePanel, setShowCurvedPipePanel] = useState(false);
-    const [curvedDrawingMode, setCurvedDrawingMode] = useState<'straight' | 'curved'>('straight');
     const [isCurvedDrawingActive, setIsCurvedDrawingActive] = useState(false);
     const [anchorPointsCount, setAnchorPointsCount] = useState(0);
-    const [curveSettings, setCurveSettings] = useState({
-        tension: 0.3,
-        smoothness: 50,
-        showControlPoints: true,
-    });
+    const [showGuides, setShowGuides] = useState(true);
     
 
 
@@ -1040,9 +911,31 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
         setIsCurvedDrawingActive(true);
         setAnchorPointsCount(0);
         
-        // ปิด regular drawing manager
+        // ปิด regular drawing manager โดยสมบูรณ์
         if (drawingManagerRef.current) {
-            drawingManagerRef.current.setDrawingMode(null);
+            try {
+                drawingManagerRef.current.setDrawingMode(null);
+                drawingManagerRef.current.setOptions({ drawingControl: false });
+                drawingManagerRef.current.setMap(null);
+                drawingManagerRef.current = null;
+            } catch (e) {
+                drawingManagerRef.current = null;
+            }
+        }
+        
+        // ซ่อน drawing controls บน UI
+        try {
+            if (map) {
+                const mapDiv = map.getDiv();
+                const drawingControls = mapDiv?.querySelectorAll('.gmnoprint');
+                drawingControls?.forEach(control => {
+                    if (control instanceof HTMLElement) {
+                        control.style.display = 'none';
+                    }
+                });
+            }
+        } catch (e) {
+            // ignore errors
         }
     };
 
@@ -1065,14 +958,15 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
         setAnchorPointsCount(0);
     };
 
-    // ฟังก์ชันจัดการการเปลี่ยนโหมดการวาด
-    const handleDrawingModeChange = (mode: 'straight' | 'curved') => {
-        setCurvedDrawingMode(mode);
-        if (mode === 'curved') {
-            setShowCurvedPipePanel(true);
-        } else {
-            setShowCurvedPipePanel(false);
-            setIsCurvedDrawingActive(false);
+    // ฟังก์ชันการเริ่มต้น Corner Rounding
+    const handleStartCornerRounding = () => {
+        setIsCornerRoundingActive(true);
+        setIsCurvedDrawingActive(true);
+        setAnchorPointsCount(0);
+        
+        // ปิด regular drawing manager
+        if (drawingManagerRef.current) {
+            drawingManagerRef.current.setDrawingMode(null);
         }
     };
 
@@ -1081,12 +975,25 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
         onCreated(coordinates, pipeType);
         setIsCurvedDrawingActive(false);
         setAnchorPointsCount(0);
+        
+        // Log completion info for debugging
+        console.log(`PE Pipe completed: ${coordinates.length} points, type: ${pipeType}`);
     };
+
+    // ฟังก์ชันอัปเดตจำนวนจุดควบคุม
+    const handleAnchorPointsChange = (count: number) => {
+        setAnchorPointsCount(count);
+    };
+
+
 
     // Effect สำหรับแสดง control panel เมื่อเริ่มวาดท่อ
     useEffect(() => {
         if (enableCurvedDrawing && (editMode === 'mainPipe' || editMode === 'subMainPipe')) {
             setShowCurvedPipePanel(true);
+            // เริ่มการวาดโค้งทันทีโดยไม่ต้องกดปุ่ม "เริ่มวาด"
+            setIsCurvedDrawingActive(true);
+            setAnchorPointsCount(0);
         } else {
             setShowCurvedPipePanel(false);
             setIsCurvedDrawingActive(false);
@@ -1099,7 +1006,13 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
     useEffect(() => {
         return () => {
             if (drawingManagerRef.current) {
-                drawingManagerRef.current.setMap(null);
+                try {
+                    drawingManagerRef.current.setDrawingMode(null);
+                    drawingManagerRef.current.setOptions({ drawingControl: false });
+                    drawingManagerRef.current.setMap(null);
+                } catch (e) {
+                    console.log('Error cleaning up drawing manager:', e);
+                }
                 drawingManagerRef.current = null;
             }
         };
@@ -1111,22 +1024,18 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
             {enableCurvedDrawing && showCurvedPipePanel && (
                 <CurvedPipeControlPanel
                     isActive={showCurvedPipePanel}
-                    drawingMode={curvedDrawingMode}
-                    onDrawingModeChange={handleDrawingModeChange}
-                    onStartDrawing={handleStartCurvedDrawing}
                     onFinishDrawing={handleFinishCurvedDrawing}
                     onCancelDrawing={handleCancelCurvedDrawing}
                     onClearAll={handleClearAll}
-                    isDrawing={isCurvedDrawingActive}
                     anchorPointsCount={anchorPointsCount}
-                    curveSettings={curveSettings}
-                    onCurveSettingsChange={setCurveSettings}
+                    showGuides={showGuides}
+                    onShowGuidesChange={setShowGuides}
                     t={t}
                 />
             )}
 
-            {/* Curved Pipe Drawing Manager */}
-            {enableCurvedDrawing && curvedDrawingMode === 'curved' && (editMode === 'mainPipe' || editMode === 'subMainPipe') && (
+            {/* Simple Curved Pipe Drawing Manager */}
+            {enableCurvedDrawing && (editMode === 'mainPipe' || editMode === 'subMainPipe') && (
                 <CurvedPipeDrawingManager
                     map={map}
                     isActive={isCurvedDrawingActive}
@@ -1135,6 +1044,8 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                     onCancel={handleCancelCurvedDrawing}
                     strokeColor={strokeColor}
                     strokeWeight={4}
+                    showGuides={showGuides}
+                    onAnchorPointsChange={setAnchorPointsCount}
                 />
             )}
 

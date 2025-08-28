@@ -952,6 +952,8 @@ export const generateEmitterLinesForBetweenPlantsMode = (
     selectedPlants: PlantLocation[], // เปลี่ยนจาก plants เป็น selectedPlants
     emitterDiameter: number = 4
 ): any[] => {
+
+    
     const emitterLines: any[] = [];
 
     selectedPlants.forEach(plant => {
@@ -982,6 +984,7 @@ export const generateEmitterLinesForBetweenPlantsMode = (
             emitterLines.push(emitterLine);
         }
     });
+
 
     return emitterLines;
 };

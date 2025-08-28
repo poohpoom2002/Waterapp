@@ -1,26 +1,10 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 
 interface Coordinate {
     lat: number;
     lng: number;
-}
-
-interface ControlPoint {
-    id: string;
-    position: Coordinate;
-    type: 'anchor' | 'control';
-    index: number;
-    parentIndex?: number; // For control points, which anchor they belong to
-}
-
-interface CurvedPipe {
-    id: string;
-    anchorPoints: Coordinate[];
-    controlPoints: ControlPoint[];
-    smoothedPath: Coordinate[];
-    type: 'mainPipe' | 'subMainPipe';
 }
 
 interface CurvedPipeDrawingManagerProps {
@@ -31,144 +15,215 @@ interface CurvedPipeDrawingManagerProps {
     onCancel?: () => void;
     strokeColor?: string;
     strokeWeight?: number;
+    showGuides?: boolean;
+    onAnchorPointsChange?: (count: number) => void;
 }
 
-// ฟังก์ชันสำหรับสร้าง Bezier curve
-const createBezierCurve = (
-    start: Coordinate,
-    control1: Coordinate,
-    control2: Coordinate,
-    end: Coordinate,
-    segments: number = 50
-): Coordinate[] => {
-    const points: Coordinate[] = [];
+// ฟังก์ชันคำนวณรัศมีโค้งจากระยะการลาก (ลดความโค้งลง 90%)
+const calculateRadiusFromDragDistance = (
+    cornerPoint: Coordinate,
+    draggedPoint: Coordinate
+): number => {
+    const latDiff = draggedPoint.lat - cornerPoint.lat;
+    const lngDiff = draggedPoint.lng - cornerPoint.lng;
+    const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
     
-    for (let i = 0; i <= segments; i++) {
-        const t = i / segments;
-        const invT = 1 - t;
-        
-        const lat = 
-            invT * invT * invT * start.lat +
-            3 * invT * invT * t * control1.lat +
-            3 * invT * t * t * control2.lat +
-            t * t * t * end.lat;
-            
-        const lng = 
-            invT * invT * invT * start.lng +
-            3 * invT * invT * t * control1.lng +
-            3 * invT * t * t * control2.lng +
-            t * t * t * end.lng;
-            
-        points.push({ lat, lng });
-    }
+    // ลดความโค้งลงมาก - ใช้ radius เล็กมากๆ
+    const minRadius = 0.000005; // ~0.5 เมตร  
+    const maxRadius = 0.00005;  // ~5 เมตร (ลดจาก 50 เมตร)
     
-    return points;
+    // ใช้เพียง 20% ของระยะลาก เพื่อให้โค้งเบาๆ
+    const adjustedDistance = distance * 0.2;
+    
+    return Math.max(minRadius, Math.min(maxRadius, adjustedDistance));
 };
 
-// ฟังก์ชันสำหรับสร้าง smooth curve ผ่านหลาย anchor points
-const createSmoothCurve = (anchorPoints: Coordinate[], segments: number = 30): Coordinate[] => {
-    if (anchorPoints.length < 2) return anchorPoints;
-    if (anchorPoints.length === 2) {
-        // สำหรับ 2 จุด ใช้เส้นตรง
-        const points: Coordinate[] = [];
-        for (let i = 0; i <= segments; i++) {
-            const t = i / segments;
-            const lat = anchorPoints[0].lat + t * (anchorPoints[1].lat - anchorPoints[0].lat);
-            const lng = anchorPoints[0].lng + t * (anchorPoints[1].lng - anchorPoints[0].lng);
-            points.push({ lat, lng });
-        }
-        return points;
-    }
-    
-    // สำหรับ 3 จุดขึ้นไป ใช้ Catmull-Rom spline
-    const allPoints: Coordinate[] = [];
-    
-    for (let i = 0; i < anchorPoints.length - 1; i++) {
-        const p0 = i === 0 ? anchorPoints[0] : anchorPoints[i - 1];
-        const p1 = anchorPoints[i];
-        const p2 = anchorPoints[i + 1];
-        const p3 = i === anchorPoints.length - 2 ? anchorPoints[i + 1] : anchorPoints[i + 2];
-        
-        const segmentPoints = createCatmullRomSegment(p0, p1, p2, p3, segments);
-        
-        if (i === 0) {
-            allPoints.push(...segmentPoints);
-        } else {
-            allPoints.push(...segmentPoints.slice(1)); // ข้าม point แรกเพื่อไม่ให้ซ้ำ
-        }
-    }
-    
-    // ตรวจสอบให้แน่ใจว่าจุดแรกและจุดสุดท้ายตรงกับ anchor points อย่างสมบูรณ์
-    if (allPoints.length > 0) {
-        allPoints[0] = { lat: anchorPoints[0].lat, lng: anchorPoints[0].lng }; // รักษาจุดแรก
-        allPoints[allPoints.length - 1] = { lat: anchorPoints[anchorPoints.length - 1].lat, lng: anchorPoints[anchorPoints.length - 1].lng }; // รักษาจุดสุดท้าย
-    }
-    
-    return allPoints;
-};
-
-// ฟังก์ชันสำหรับสร้าง Catmull-Rom spline segment
-const createCatmullRomSegment = (
-    p0: Coordinate,
-    p1: Coordinate,
-    p2: Coordinate,
-    p3: Coordinate,
-    segments: number
-): Coordinate[] => {
-    const points: Coordinate[] = [];
-    
-    for (let i = 0; i <= segments; i++) {
-        const t = i / segments;
-        const t2 = t * t;
-        const t3 = t2 * t;
-        
-        const lat = 0.5 * (
-            (2 * p1.lat) +
-            (-p0.lat + p2.lat) * t +
-            (2 * p0.lat - 5 * p1.lat + 4 * p2.lat - p3.lat) * t2 +
-            (-p0.lat + 3 * p1.lat - 3 * p2.lat + p3.lat) * t3
-        );
-        
-        const lng = 0.5 * (
-            (2 * p1.lng) +
-            (-p0.lng + p2.lng) * t +
-            (2 * p0.lng - 5 * p1.lng + 4 * p2.lng - p3.lng) * t2 +
-            (-p0.lng + 3 * p1.lng - 3 * p2.lng + p3.lng) * t3
-        );
-        
-        points.push({ lat, lng });
-    }
-    
-    return points;
-};
-
-// ฟังก์ชันคำนวณระยะห่างระหว่างจุด
-const calculateDistance = (point1: Coordinate, point2: Coordinate): number => {
-    const R = 6371000; // Earth's radius in meters
-    const dLat = (point2.lat - point1.lat) * Math.PI / 180;
-    const dLng = (point2.lng - point1.lng) * Math.PI / 180;
-    const a = 
-        Math.sin(dLat/2) * Math.sin(dLat/2) +
-        Math.cos(point1.lat * Math.PI / 180) * Math.cos(point2.lat * Math.PI / 180) * 
-        Math.sin(dLng/2) * Math.sin(dLng/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-};
-
-// ฟังก์ชันสร้าง control point ที่ตำแหน่งที่เหมาะสม
-const generateControlPoint = (
+// ฟังก์ชันสร้าง Circular Arc ง่ายๆ
+const createCircularCorner = (
     prev: Coordinate,
-    current: Coordinate,
+    corner: Coordinate,
     next: Coordinate,
-    tension: number = 0.3
-): Coordinate => {
-    const deltaLat = next.lat - prev.lat;
-    const deltaLng = next.lng - prev.lng;
+    radius: number
+): { 
+    tangent1: Coordinate; 
+    tangent2: Coordinate; 
+    center: Coordinate; 
+    arc: Coordinate[];
+    radiusLine1: Coordinate[];
+    radiusLine2: Coordinate[];
+} | null => {
+    if (radius <= 0) return null;
+    
+    // คำนวณ unit vectors
+    const v1 = {
+        lat: prev.lat - corner.lat,
+        lng: prev.lng - corner.lng
+    };
+    const v2 = {
+        lat: next.lat - corner.lat,
+        lng: next.lng - corner.lng
+    };
+    
+    const len1 = Math.sqrt(v1.lat * v1.lat + v1.lng * v1.lng);
+    const len2 = Math.sqrt(v2.lat * v2.lat + v2.lng * v2.lng);
+    
+    if (len1 === 0 || len2 === 0) return null;
+    
+    v1.lat /= len1; v1.lng /= len1;
+    v2.lat /= len2; v2.lng /= len2;
+    
+    const dot = v1.lat * v2.lat + v1.lng * v2.lng;
+    const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
+    
+    if (angle < 0.05 || angle > Math.PI - 0.05) return null;
+    
+    const halfAngle = angle / 2;
+    const tangentDistance = radius / Math.tan(halfAngle);
+    
+    const tangent1 = {
+        lat: corner.lat + v1.lat * tangentDistance,
+        lng: corner.lng + v1.lng * tangentDistance
+    };
+    
+    const tangent2 = {
+        lat: corner.lat + v2.lat * tangentDistance,
+        lng: corner.lng + v2.lng * tangentDistance
+    };
+    
+    const bisector = {
+        lat: (v1.lat + v2.lat) / 2,
+        lng: (v1.lng + v2.lng) / 2
+    };
+    
+    const bisectorLen = Math.sqrt(bisector.lat * bisector.lat + bisector.lng * bisector.lng);
+    if (bisectorLen === 0) return null;
+    
+    bisector.lat /= bisectorLen;
+    bisector.lng /= bisectorLen;
+    
+    const centerDistance = radius / Math.sin(halfAngle);
+    const center = {
+        lat: corner.lat + bisector.lat * centerDistance,
+        lng: corner.lng + bisector.lng * centerDistance
+    };
+    
+    const startAngle = Math.atan2(tangent1.lat - center.lat, tangent1.lng - center.lng);
+    const endAngle = Math.atan2(tangent2.lat - center.lat, tangent2.lng - center.lng);
+    
+    const arcSegments = Math.max(8, Math.floor(Math.abs(angle) * 20));
+    const arc: Coordinate[] = [];
+    
+    let deltaAngle = endAngle - startAngle;
+    if (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
+    if (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
+    
+    if (Math.abs(deltaAngle) > Math.PI) {
+        deltaAngle = deltaAngle > 0 ? deltaAngle - 2 * Math.PI : deltaAngle + 2 * Math.PI;
+    }
+    
+    for (let i = 0; i <= arcSegments; i++) {
+        const t = i / arcSegments;
+        const currentAngle = startAngle + deltaAngle * t;
+        
+        arc.push({
+            lat: center.lat + radius * Math.sin(currentAngle),
+            lng: center.lng + radius * Math.cos(currentAngle)
+        });
+    }
     
     return {
-        lat: current.lat + deltaLat * tension,
-        lng: current.lng + deltaLng * tension
+        tangent1,
+        tangent2,
+        center,
+        arc,
+        radiusLine1: [center, tangent1],
+        radiusLine2: [center, tangent2]
     };
+};
+
+// ฟังก์ชันสร้างท่อแบบใหม่: รักษาแนวท่อ + ปรับรัศมีโค้งเท่านั้น
+const createSimpleDragCurvePipe = (
+    anchorPoints: Coordinate[],
+    radiusControls: Map<number, number> // lineIndex -> radius
+): { path: Coordinate[]; guides: any[] } => {
+    if (anchorPoints.length < 2) {
+        return { path: anchorPoints, guides: [] };
+    }
+    
+    if (anchorPoints.length === 2) {
+        // 2 จุด = เส้นตรงธรรมดา 
+        const path: Coordinate[] = [];
+        const lineIndex = 0;
+        const customRadius = radiusControls.get(lineIndex);
+        
+        if (customRadius && customRadius > 0.000005) {
+            // TODO: implement corner rounding for 2-point lines
+        }
+        
+        // สร้างเส้นตรงปกติ
+        for (let i = 0; i <= 50; i++) {
+            const t = i / 50;
+            path.push({
+                lat: anchorPoints[0].lat + t * (anchorPoints[1].lat - anchorPoints[0].lat),
+                lng: anchorPoints[0].lng + t * (anchorPoints[1].lng - anchorPoints[0].lng)
+            });
+        }
+        return { path, guides: [] };
+    }
+    
+    // 3+ จุด: สร้างเส้นตรงระหว่างจุด + โค้งที่มุม
+    const path: Coordinate[] = [];
+    const guides: any[] = [];
+    
+    // สร้างเส้นโดย rounding เฉพาะมุม
+    path.push(anchorPoints[0]); // เริ่มต้นที่จุดแรก
+    
+    for (let i = 1; i < anchorPoints.length - 1; i++) {
+        const prev = anchorPoints[i - 1];
+        const current = anchorPoints[i];
+        const next = anchorPoints[i + 1];
+        
+        // ดู radius control สำหรับเส้นก่อนหน้าและถัดไป
+        const prevLineRadius = radiusControls.get(i - 1) || 0; // เส้น i-1 -> i
+        const nextLineRadius = radiusControls.get(i) || 0;     // เส้น i -> i+1
+        
+        // ใช้ radius ที่ใหญ่กว่า หรือค่าเฉลี่ย
+        const effectiveRadius = Math.max(prevLineRadius, nextLineRadius);
+        
+        if (effectiveRadius > 0.000005) {
+            // สร้างโค้งที่มุม
+            const cornerData = createCircularCorner(prev, current, next, effectiveRadius);
+            
+            if (cornerData) {
+                guides.push({
+                    center: cornerData.center,
+                    radius: effectiveRadius,
+                    tangent1: cornerData.tangent1,
+                    tangent2: cornerData.tangent2,
+                    radiusLine1: cornerData.radiusLine1,
+                    radiusLine2: cornerData.radiusLine2
+                });
+                
+                // เพิ่มโค้ง
+                path.push(...cornerData.arc.slice(1, -1));
+            } else {
+                path.push(current);
+            }
+        } else {
+            path.push(current); // ใช้เส้นตรง
+        }
+    }
+    
+    // เพิ่มจุดสุดท้าย
+    path.push(anchorPoints[anchorPoints.length - 1]);
+    
+    // รักษาจุดเริ่มต้นและจุดสิ้นสุดให้แน่นอน
+    if (path.length > 0) {
+        path[0] = { ...anchorPoints[0] };
+        path[path.length - 1] = { ...anchorPoints[anchorPoints.length - 1] };
+    }
+    
+    return { path, guides };
 };
 
 const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
@@ -177,21 +232,37 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
     pipeType,
     onPipeComplete,
     onCancel,
-    strokeColor = '#2563eb',
-    strokeWeight = 4
+    strokeColor = '#ff4444',
+    strokeWeight = 4,
+    showGuides = true,
+    onAnchorPointsChange
 }) => {
     const [anchorPoints, setAnchorPoints] = useState<Coordinate[]>([]);
     const [previewPath, setPreviewPath] = useState<Coordinate[]>([]);
     const [isDrawing, setIsDrawing] = useState(false);
     const [currentMousePosition, setCurrentMousePosition] = useState<Coordinate | null>(null);
+    const [dragDistances, setDragDistances] = useState<Map<number, Coordinate>>(new Map());
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragIndex, setDragIndex] = useState<number>(-1);
+    const [guides, setGuides] = useState<any[]>([]);
+    
+    // Virtual radius control - แยกจาก anchor points ต้นฉบับ
+    const [radiusControls, setRadiusControls] = useState<Map<number, number>>(new Map()); // index -> radius
+    const [virtualDragMarkers, setVirtualDragMarkers] = useState<google.maps.Marker[]>([]); // virtual markers สำหรับลาก
     
     const previewPolylineRef = useRef<google.maps.Polyline | null>(null);
     const anchorMarkersRef = useRef<google.maps.Marker[]>([]);
     const mouseListenerRef = useRef<google.maps.MapsEventListener | null>(null);
     const clickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
     const rightClickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
-
-    // ฟังก์ชันสร้าง anchor marker
+    
+    // Guide visualization refs
+    const guidePolylinesRef = useRef<google.maps.Polyline[]>([]);
+    const guideCentersRef = useRef<google.maps.Marker[]>([]);
+    const guideCirclesRef = useRef<google.maps.Circle[]>([]);
+    const dragGuideLineRef = useRef<google.maps.Polyline | null>(null);
+    
+    // สร้าง marker สำหรับแต่ละจุด (แบบใหม่: อ่านอย่างเดียว + virtual radius controls)
     const createAnchorMarker = useCallback((position: Coordinate, index: number): google.maps.Marker => {
         if (!map) throw new Error('Map not available');
         
@@ -199,206 +270,212 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
         
         const marker = new google.maps.Marker({
             position: { lat: position.lat, lng: position.lng },
-            map,
-            draggable: !isEndPoint, // จุดปลายท่อไม่สามารถลากได้
-            clickable: !isEndPoint, // จุดปลายท่อไม่สามารถคลิกได้
+            map: map,
+            draggable: false, // 🔒 ห้ามลาก anchor points เด็ดขาด - รักษาแนวท่อ
             icon: {
                 path: google.maps.SymbolPath.CIRCLE,
-                scale: 8,
-                fillColor: '#ef4444', // จุดควบคุมสีแดง
+                scale: isEndPoint ? 10 : 8,
+                fillColor: isEndPoint ? '#22c55e' : '#ef4444',
                 fillOpacity: 1,
                 strokeColor: '#ffffff',
                 strokeWeight: 2,
             },
-            title: isEndPoint ? `ปลายท่อ ${index === 0 ? 'เริ่มต้น' : 'สิ้นสุด'} (ไม่สามารถลากได้)` : `จุดควบคุม ${index + 1}`,
-            zIndex: 1000
+            title: isEndPoint ? `ปลายท่อ (คงที่)` : `จุดควบคุม (คงที่)`,
+            zIndex: 1000,
+            visible: true
         });
-
-        // เพิ่ม drag listener
-        marker.addListener('dragstart', () => {
-            if (isEndPoint) {
-                // ป้องกันการลากจุดปลายท่อตั้งแต่ต้น
-                marker.setDraggable(false);
-            }
-        });
-
-        marker.addListener('dragend', () => {
-            const newPosition = marker.getPosition();
-            
-            if (newPosition && !isEndPoint) { // ไม่ให้ขยับจุดปลายท่อ
-                setAnchorPoints(prev => {
-                    const updatedPoints = [...prev];
-                    updatedPoints[index] = {
-                        lat: newPosition.lat(),
-                        lng: newPosition.lng()
-                    };
-                    
-                    // รักษาตำแหน่งจุดปลายท่อให้คงที่
-                    if (updatedPoints.length > 0) {
-                        const originalFirst = { lat: anchorPoints[0].lat, lng: anchorPoints[0].lng };
-                        const originalLast = { 
-                            lat: anchorPoints[anchorPoints.length - 1].lat, 
-                            lng: anchorPoints[anchorPoints.length - 1].lng 
-                        };
-                        
-                        updatedPoints[0] = originalFirst;
-                        updatedPoints[updatedPoints.length - 1] = originalLast;
-                    }
-                    
-                    return updatedPoints;
-                });
-            } else if (newPosition && isEndPoint) {
-                // ถ้าเป็นจุดปลายท่อ ให้กลับไปตำแหน่งเดิม
-                marker.setPosition({ lat: position.lat, lng: position.lng });
-            }
-        });
-
+        
         return marker;
-    }, [map, anchorPoints.length]);
+    }, [map]);
 
-    // Effect สำหรับอัปเดต preview path
+    // สร้าง Virtual Radius Control Markers (สำหรับลากปรับรัศมีโค้งเท่านั้น)
+    const createVirtualRadiusMarker = useCallback((
+        lineStart: Coordinate, 
+        lineEnd: Coordinate, 
+        lineIndex: number
+    ): google.maps.Marker => {
+        if (!map) throw new Error('Map not available');
+        
+        // คำนวณจุดกึ่งกลางของเส้น
+        const midPoint = {
+            lat: (lineStart.lat + lineEnd.lat) / 2,
+            lng: (lineStart.lng + lineEnd.lng) / 2
+        };
+        
+        // คำนวณทิศทางตั้งฉาก (perpendicular) ของเส้น
+        const lineVector = { 
+            lat: lineEnd.lat - lineStart.lat, 
+            lng: lineEnd.lng - lineStart.lng 
+        };
+        const perpVector = { 
+            lat: -lineVector.lng, // ตั้งฉาก 90 องศา
+            lng: lineVector.lat 
+        };
+        
+        // Normalize perpendicular vector
+        const length = Math.sqrt(perpVector.lat * perpVector.lat + perpVector.lng * perpVector.lng);
+        if (length > 0) {
+            perpVector.lat /= length;
+            perpVector.lng /= length;
+        }
+        
+        // ตำแหน่งเริ่มต้นของ virtual marker (ห่างจากเส้น 20 เมตร)
+        const initialOffset = 0.0002; // ~20 เมตร
+        const virtualPosition = {
+            lat: midPoint.lat + perpVector.lat * initialOffset,
+            lng: midPoint.lng + perpVector.lng * initialOffset
+        };
+        
+        const virtualMarker = new google.maps.Marker({
+            position: { lat: virtualPosition.lat, lng: virtualPosition.lng },
+            map: map,
+            draggable: true, // ✅ ลากได้เฉพาะ virtual markers
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 6,
+                fillColor: '#ff6b35', // สีส้ม แตกต่างจาก anchor points
+                fillOpacity: 0.8,
+                strokeColor: '#ffffff',
+                strokeWeight: 2,
+            },
+            title: `ลากเพื่อปรับรัศมีโค้ง`,
+            zIndex: 1001,
+            visible: showGuides // แสดงเฉพาะเมื่อ showGuides = true
+        });
+        
+        virtualMarker.addListener('dragstart', () => {
+            setIsDragging(true);
+            setDragIndex(lineIndex);
+            
+            // แสดง guide line จากจุดกึ่งกลางไปยัง virtual marker
+            if (dragGuideLineRef.current) {
+                dragGuideLineRef.current.setPath([midPoint, virtualPosition]);
+                dragGuideLineRef.current.setVisible(true);
+            }
+        });
+        
+        virtualMarker.addListener('drag', () => {
+            const newPosition = virtualMarker.getPosition();
+            if (newPosition) {
+                const draggedCoord = {
+                    lat: newPosition.lat(),
+                    lng: newPosition.lng()
+                };
+                
+                // คำนวณระยะห่างจากจุดกึ่งกลาง = รัศมีโค้ง
+                const dragDistance = Math.sqrt(
+                    Math.pow(draggedCoord.lat - midPoint.lat, 2) + 
+                    Math.pow(draggedCoord.lng - midPoint.lng, 2)
+                );
+                
+                setRadiusControls(prev => {
+                    const newMap = new Map(prev);
+                    newMap.set(lineIndex, Math.max(0.00001, Math.min(0.0001, dragDistance))); // 1-10 เมตร
+                    return newMap;
+                });
+                
+                // อัปเดต guide line
+                if (dragGuideLineRef.current) {
+                    dragGuideLineRef.current.setPath([midPoint, draggedCoord]);
+                }
+            }
+        });
+        
+        virtualMarker.addListener('dragend', () => {
+            setIsDragging(false);
+            setDragIndex(-1);
+            
+            // ซ่อน guide line
+            if (dragGuideLineRef.current) {
+                dragGuideLineRef.current.setVisible(false);
+            }
+        });
+        
+        return virtualMarker;
+    }, [map, showGuides]);
+    
+    // อัปเดต preview path
     useEffect(() => {
+        
         if (anchorPoints.length === 0) {
             setPreviewPath([]);
+            setGuides([]);
+            if (onAnchorPointsChange) onAnchorPointsChange(0);
             return;
         }
-
-        const pathPoints = [...anchorPoints];
+        
+                const pathPoints = [...anchorPoints];
         if (currentMousePosition && isDrawing) {
             pathPoints.push(currentMousePosition);
         }
 
         if (pathPoints.length >= 2) {
-            // ใช้ฟังก์ชันที่รักษาตำแหน่งปลายท่อ
-            const smoothPath = createSmoothCurve(pathPoints, 40);
-            setPreviewPath(smoothPath);
+            const result = createSimpleDragCurvePipe(pathPoints, radiusControls);
+            setPreviewPath(result.path);
+            setGuides(result.guides);
         } else {
             setPreviewPath(pathPoints);
+            setGuides([]);
         }
-    }, [anchorPoints, currentMousePosition, isDrawing]);
-
-    // Effect สำหรับเริ่ม/หยุดการวาด
+        
+        if (onAnchorPointsChange) onAnchorPointsChange(anchorPoints.length);
+    }, [anchorPoints, currentMousePosition, isDrawing, radiusControls]); // เปลี่ยนจาก dragDistances เป็น radiusControls
+    
+    // สร้าง drag guide line (ขณะลากจะเห็นเส้นจากจุดเดิมไปจุดที่ลาก)
+    useEffect(() => {
+        if (!map) return;
+        
+        if (!dragGuideLineRef.current) {
+            dragGuideLineRef.current = new google.maps.Polyline({
+                strokeColor: '#ff9800',
+                strokeOpacity: 0.8,
+                strokeWeight: 3,
+                map: map,
+                visible: true,
+                path: [],
+                zIndex: 2000,
+                icons: [{
+                    icon: {
+                        path: 'M 0,-2 0,2',
+                        strokeOpacity: 0.8,
+                        scale: 1
+                    },
+                    offset: '0',
+                    repeat: '10px'
+                }]
+            });
+        }
+        
+        return () => {
+            if (dragGuideLineRef.current) {
+                dragGuideLineRef.current.setMap(null);
+                dragGuideLineRef.current = null;
+            }
+        };
+    }, [map]);
+    
+    // จัดการการเริ่มต้น/หยุดการวาด
     useEffect(() => {
         if (isActive && !isDrawing) {
             setIsDrawing(true);
             setAnchorPoints([]);
-            setPreviewPath([]);
-
-            if (!map) return;
-
-            // เพิ่ม mouse move listener
-            mouseListenerRef.current = map.addListener('mousemove', (event: google.maps.MapMouseEvent) => {
-                if (event.latLng) {
-                    const mousePos = {
-                        lat: event.latLng.lat(),
-                        lng: event.latLng.lng()
-                    };
-                    setCurrentMousePosition(mousePos);
-                }
-            });
-
-            // เพิ่ม click listener สำหรับเพิ่มจุด
-            clickListenerRef.current = map.addListener('click', (event: google.maps.MapMouseEvent) => {
-                if (event.latLng) {
-                    const newPoint = {
-                        lat: event.latLng.lat(),
-                        lng: event.latLng.lng()
-                    };
-
-                    setAnchorPoints(prev => {
-                        const newAnchorPoints = [...prev, newPoint];
-                        // สร้าง marker สำหรับจุดใหม่
-                        if (map) {
-                            const isEndPoint = newAnchorPoints.length === 1 || newAnchorPoints.length === 2; // จุดแรกและจุดที่สอง (เริ่มต้นและสิ้นสุด)
-                            const marker = new google.maps.Marker({
-                                position: { lat: newPoint.lat, lng: newPoint.lng },
-                                map,
-                                draggable: !isEndPoint, // จุดปลายท่อไม่สามารถลากได้
-                                clickable: !isEndPoint, // จุดปลายท่อไม่สามารถคลิกได้
-                                icon: {
-                                    path: google.maps.SymbolPath.CIRCLE,
-                                    scale: 8,
-                                    fillColor: '#ef4444', // จุดควบคุมสีแดง
-                                    fillOpacity: 1,
-                                    strokeColor: '#ffffff',
-                                    strokeWeight: 2,
-                                },
-                                title: isEndPoint ? `ปลายท่อ ${newAnchorPoints.length === 1 ? 'เริ่มต้น' : 'สิ้นสุด'} (ไม่สามารถลากได้)` : `จุดควบคุม ${newAnchorPoints.length}`,
-                                zIndex: 1000
-                            });
-
-                            // เพิ่ม drag listener
-                            const markerIndex = newAnchorPoints.length - 1;
-
-                            marker.addListener('dragstart', () => {
-                                if (isEndPoint) {
-                                    // ป้องกันการลากจุดปลายท่อตั้งแต่ต้น
-                                    marker.setDraggable(false);
-                                }
-                            });
-
-                            marker.addListener('dragend', () => {
-                                const newPosition = marker.getPosition();
-                                
-                                if (newPosition && !isEndPoint) { // ไม่ให้ขยับจุดปลายท่อ
-                                    setAnchorPoints(current => {
-                                        const updatedPoints = [...current];
-                                        updatedPoints[markerIndex] = {
-                                            lat: newPosition.lat(),
-                                            lng: newPosition.lng()
-                                        };
-                                        
-                                        // รักษาตำแหน่งจุดปลายท่อให้คงที่
-                                        if (updatedPoints.length > 0) {
-                                            const originalFirst = { lat: current[0].lat, lng: current[0].lng };
-                                            const originalLast = { 
-                                                lat: current[current.length - 1].lat, 
-                                                lng: current[current.length - 1].lng 
-                                            };
-                                            
-                                            updatedPoints[0] = originalFirst;
-                                            updatedPoints[updatedPoints.length - 1] = originalLast;
-                                        }
-                                        
-                                        return updatedPoints;
-                                    });
-                                } else if (newPosition && isEndPoint) {
-                                    // ถ้าเป็นจุดปลายท่อ ให้กลับไปตำแหน่งเดิม
-                                    marker.setPosition({ lat: newPoint.lat, lng: newPoint.lng });
-                                }
-                            });
-
-                            anchorMarkersRef.current.push(marker);
+            setRadiusControls(new Map());
+            
+            if (map && !mouseListenerRef.current) {
+                // ซ่อน Google Maps Drawing Manager controls
+                try {
+                    const mapDiv = map.getDiv();
+                    const drawingControls = mapDiv?.querySelectorAll('[role="button"][title*="Draw"], [role="button"][title*="drawing"], .gmnoprint');
+                    drawingControls?.forEach(control => {
+                        if (control instanceof HTMLElement) {
+                            control.style.display = 'none';
                         }
-                        return newAnchorPoints;
                     });
+                } catch (e) {
+                    // ignore errors
                 }
-            });
-
-            // เพิ่ม right click listener สำหรับจบการวาด
-            rightClickListenerRef.current = map.addListener('rightclick', () => {
-                setAnchorPoints(prev => {
-                    if (prev.length >= 2) {
-                        // ใช้ฟังก์ชันที่รักษาตำแหน่งปลายท่อ
-                        const finalPath = createSmoothCurve(prev, 50);
-                        onPipeComplete(finalPath, pipeType);
-                    }
-                    return [];
-                });
                 
-                setIsDrawing(false);
-                setPreviewPath([]);
-                setCurrentMousePosition(null);
-
-                // ล้าง markers
-                anchorMarkersRef.current.forEach(marker => marker.setMap(null));
-                anchorMarkersRef.current = [];
-
-                // ล้าง listeners
-                if (mouseListenerRef.current) {
-                    google.maps.event.removeListener(mouseListenerRef.current);
-                    mouseListenerRef.current = null;
-                }
+                // ล้าง listeners เก่า
                 if (clickListenerRef.current) {
                     google.maps.event.removeListener(clickListenerRef.current);
                     clickListenerRef.current = null;
@@ -407,103 +484,240 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
                     google.maps.event.removeListener(rightClickListenerRef.current);
                     rightClickListenerRef.current = null;
                 }
-            });
-
+                
+                // เมาส์ move
+                mouseListenerRef.current = map.addListener('mousemove', (event: google.maps.MapMouseEvent) => {
+                    if (event.latLng) {
+                        setCurrentMousePosition({
+                            lat: event.latLng.lat(),
+                            lng: event.latLng.lng()
+                        });
+                    }
+                });
+                
+                // คลิกซ้าย = เพิ่มจุด  
+                setTimeout(() => {
+                    if (map && !clickListenerRef.current) {
+                        clickListenerRef.current = map.addListener('click', (event: google.maps.MapMouseEvent) => {
+                            if (event.latLng && !isDragging) {
+                                const newPoint = {
+                                    lat: event.latLng.lat(),
+                                    lng: event.latLng.lng()
+                                };
+                                
+                                setAnchorPoints(prev => {
+                                    const updated = [...prev, newPoint];
+                                    return updated;
+                                });
+                            }
+                        });
+                    }
+                }, 500);
+                
+                // แก้ไข pointer events
+                const mapElement = map.getDiv();
+                if (mapElement) {
+                    mapElement.style.pointerEvents = 'auto';
+                    mapElement.style.zIndex = '1';
+                }
+                
+                // คลิกขวา = จบการวาด
+                rightClickListenerRef.current = map.addListener('rightclick', () => {
+                    if (anchorPoints.length >= 2) {
+                        const finalResult = createSimpleDragCurvePipe(anchorPoints, radiusControls);
+                        onPipeComplete(finalResult.path, pipeType);
+                        
+                        setIsDrawing(false);
+                        setAnchorPoints([]);
+                        setRadiusControls(new Map());
+                        setCurrentMousePosition(null);
+                    }
+                });
+            }
         } else if (!isActive && isDrawing) {
             setIsDrawing(false);
             setAnchorPoints([]);
-            setPreviewPath([]);
+            setRadiusControls(new Map());
             setCurrentMousePosition(null);
-
-            // ล้าง markers
-            anchorMarkersRef.current.forEach(marker => marker.setMap(null));
-            anchorMarkersRef.current = [];
-
-            // ล้าง listeners
-            if (mouseListenerRef.current) {
-                google.maps.event.removeListener(mouseListenerRef.current);
-                mouseListenerRef.current = null;
-            }
-            if (clickListenerRef.current) {
-                google.maps.event.removeListener(clickListenerRef.current);
-                clickListenerRef.current = null;
-            }
-            if (rightClickListenerRef.current) {
-                google.maps.event.removeListener(rightClickListenerRef.current);
-                rightClickListenerRef.current = null;
-            }
-
+            
             if (onCancel) {
                 onCancel();
             }
         }
-    }, [isActive, isDrawing, map, pipeType, onPipeComplete, onCancel]);
-
-    // Effect สำหรับอัปเดต preview polyline
+    }, [isActive, isDrawing, map, pipeType, onPipeComplete, onCancel, isDragging]);
+    
+    // อัปเดต preview polyline
     useEffect(() => {
         if (!map) return;
-
-        // ล้าง polyline เก่า
-        if (previewPolylineRef.current) {
-            previewPolylineRef.current.setMap(null);
-        }
-
-        // สร้าง polyline ใหม่ถ้ามี path
-        if (previewPath.length >= 2) {
-            // กำหนดสีตามประเภทท่อ
-            let pipeColor = strokeColor;
-            if (pipeType === 'mainPipe') {
-                pipeColor = '#FF0000'; // สีแดงสำหรับท่อเมน
-            } else if (pipeType === 'subMainPipe') {
-                pipeColor = '#8B5CF6'; // สีม่วงสำหรับท่อเมนรอง
+        
+        const pipeColor = pipeType === 'mainPipe' ? '#2563eb' : strokeColor;
+        
+        if (previewPath.length > 1) {
+            if (previewPolylineRef.current) {
+                previewPolylineRef.current.setPath(previewPath.map(p => ({ lat: p.lat, lng: p.lng })));
+            } else {
+                previewPolylineRef.current = new google.maps.Polyline({
+                    path: previewPath.map(p => ({ lat: p.lat, lng: p.lng })),
+                    geodesic: false,
+                    strokeColor: pipeColor,
+                    strokeOpacity: 0.8,
+                    strokeWeight: strokeWeight,
+                    map: map,
+                    zIndex: 999
+                });
             }
-
-            previewPolylineRef.current = new google.maps.Polyline({
-                path: previewPath.map(point => ({ lat: point.lat, lng: point.lng })),
-                geodesic: true,
-                strokeColor: pipeColor,
-                strokeOpacity: 0.8,
-                strokeWeight: strokeWeight,
-                map: map,
-                zIndex: 999
-            });
         }
-
+        
         return () => {
             if (previewPolylineRef.current) {
                 previewPolylineRef.current.setMap(null);
                 previewPolylineRef.current = null;
             }
         };
-    }, [map, previewPath, strokeColor, strokeWeight]);
-
-    // Cleanup on unmount
+    }, [map, previewPath, strokeColor, strokeWeight, pipeType]);
+    
+    // อัปเดต anchor markers + virtual radius markers  
+    useEffect(() => {
+        // ล้าง markers เก่า
+        anchorMarkersRef.current.forEach(marker => marker.setMap(null));
+        anchorMarkersRef.current = [];
+        
+        virtualDragMarkers.forEach(marker => marker.setMap(null));
+        setVirtualDragMarkers([]);
+        
+        // สร้าง anchor markers ใหม่ (อ่านอย่างเดียว)
+        anchorPoints.forEach((point, index) => {
+            const marker = createAnchorMarker(point, index);
+            anchorMarkersRef.current.push(marker);
+        });
+        
+        // สร้าง virtual radius control markers ระหว่างทุกเส้น
+        if (anchorPoints.length >= 2 && showGuides) {
+            const virtualMarkers: google.maps.Marker[] = [];
+            
+            for (let i = 0; i < anchorPoints.length - 1; i++) {
+                const lineStart = anchorPoints[i];
+                const lineEnd = anchorPoints[i + 1];
+                const virtualMarker = createVirtualRadiusMarker(lineStart, lineEnd, i);
+                virtualMarkers.push(virtualMarker);
+            }
+            
+            setVirtualDragMarkers(virtualMarkers);
+        }
+        
+        return () => {
+            anchorMarkersRef.current.forEach(marker => marker.setMap(null));
+            virtualDragMarkers.forEach(marker => marker.setMap(null));
+        };
+    }, [anchorPoints, createAnchorMarker, createVirtualRadiusMarker, showGuides]); // เพิ่ม showGuides
+    
+    // อัปเดต Visual Guides
+    useEffect(() => {
+        if (!map) {
+            guidePolylinesRef.current.forEach(polyline => polyline.setMap(null));
+            guideCentersRef.current.forEach(marker => marker.setMap(null));
+            guideCirclesRef.current.forEach(circle => circle.setMap(null));
+            guidePolylinesRef.current = [];
+            guideCentersRef.current = [];
+            guideCirclesRef.current = [];
+            return;
+        }
+        
+        // ล้าง guides เก่า
+        guidePolylinesRef.current.forEach(polyline => polyline.setMap(null));
+        guideCentersRef.current.forEach(marker => marker.setMap(null));
+        guideCirclesRef.current.forEach(circle => circle.setMap(null));
+        guidePolylinesRef.current = [];
+        guideCentersRef.current = [];
+        guideCirclesRef.current = [];
+        
+        // สร้าง Visual Guides ใหม่
+        if (showGuides) {
+            guides.forEach((guide, index) => {
+                // เส้นรัศมี
+                const radiusLine1 = new google.maps.Polyline({
+                    path: guide.radiusLine1,
+                    strokeColor: '#ff6b35',
+                    strokeOpacity: 0.7,
+                    strokeWeight: 2,
+                    map: map,
+                    zIndex: 1002
+                });
+                
+                const radiusLine2 = new google.maps.Polyline({
+                    path: guide.radiusLine2,
+                    strokeColor: '#ff6b35',
+                    strokeOpacity: 0.7,
+                    strokeWeight: 2,
+                    map: map,
+                    zIndex: 1002
+                });
+                
+                // จุดศูนย์กลาง
+                const centerMarker = new google.maps.Marker({
+                    position: guide.center,
+                    map: map,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 6,
+                        fillColor: '#ff6b35',
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2,
+                    },
+                    title: `ศูนย์กลางโค้ง (รัศมี: ${(guide.radius * 111320).toFixed(1)} ม.)`,
+                    zIndex: 1004
+                });
+                
+                // วงกลมรัศมี
+                const radiusInMeters = guide.radius * 111320;
+                if (radiusInMeters > 0.5) {
+                    const previewCircle = new google.maps.Circle({
+                        center: guide.center,
+                        radius: radiusInMeters,
+                        strokeColor: '#ff6b35',
+                        strokeOpacity: 0.3,
+                        strokeWeight: 1,
+                        fillColor: '#ff6b35',
+                        fillOpacity: 0.05,
+                        map: map,
+                        zIndex: 998
+                    });
+                    guideCirclesRef.current.push(previewCircle);
+                }
+                
+                guidePolylinesRef.current.push(radiusLine1, radiusLine2);
+                guideCentersRef.current.push(centerMarker);
+            });
+        }
+    }, [map, guides, showGuides]);
+    
+    // Cleanup
     useEffect(() => {
         return () => {
-            // ล้าง markers
             anchorMarkersRef.current.forEach(marker => marker.setMap(null));
-            anchorMarkersRef.current = [];
-
-            // ล้าง listeners
+            guidePolylinesRef.current.forEach(polyline => polyline.setMap(null));
+            guideCentersRef.current.forEach(marker => marker.setMap(null));
+            guideCirclesRef.current.forEach(circle => circle.setMap(null));
+            
             if (mouseListenerRef.current) {
                 google.maps.event.removeListener(mouseListenerRef.current);
-                mouseListenerRef.current = null;
             }
             if (clickListenerRef.current) {
                 google.maps.event.removeListener(clickListenerRef.current);
-                clickListenerRef.current = null;
             }
             if (rightClickListenerRef.current) {
                 google.maps.event.removeListener(rightClickListenerRef.current);
-                rightClickListenerRef.current = null;
             }
-
             if (previewPolylineRef.current) {
                 previewPolylineRef.current.setMap(null);
             }
+            if (dragGuideLineRef.current) {
+                dragGuideLineRef.current.setMap(null);
+            }
         };
     }, []);
-
+    
     return null;
 };
 
