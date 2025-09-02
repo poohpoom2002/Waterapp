@@ -14,12 +14,15 @@ interface Option {
     brand?: string;
     price?: number;
     unit?: string; // For price unit like "บาท", "บาท/ม้วน", etc.
-    // New properties for score and recommendation
-    score?: number;
+    // New properties for recommendation
     isRecommended?: boolean;
     isGoodChoice?: boolean;
     isUsable?: boolean;
     isAutoSelected?: boolean;
+    // New properties for calculation results
+    headLoss?: number; // ค่า head loss ที่คำนวณได้
+    calculationDetails?: string; // รายละเอียดการคำนวณ
+    hasWarning?: boolean; // มี warning หรือไม่
 }
 
 interface SearchableDropdownProps {
@@ -204,11 +207,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                                 )}
                                 
                                 {/* Recommendation symbol */}
-                                {option.score !== undefined && (
-                                    <span className={`text-sm ${recommendation.color}`}>
-                                        {recommendation.symbol}
-                                    </span>
-                                )}
+
                                 
                                 {option.productCode && (
                                     <span className="font-medium text-blue-300">
@@ -222,6 +221,26 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                                 )}
                             </div>
                             
+                            {/* Head Loss calculation display */}
+                            {option.headLoss !== undefined && (
+                                <div className="mt-1 bg-gray-800 rounded px-2 py-1">
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-blue-300">📊 Head Loss:</span>
+                                        <span className={`font-bold ${
+                                            option.hasWarning ? 'text-red-400' : 'text-green-400'
+                                        }`}>
+                                            {option.headLoss.toFixed(3)} ม.
+                                            {option.hasWarning && ' ⚠️'}
+                                        </span>
+                                    </div>
+                                    {option.calculationDetails && (
+                                        <div className="text-xs text-gray-400 mt-1">
+                                            {option.calculationDetails}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            
                             <div className="flex items-center justify-between mt-1">
                                 <div className="flex items-center space-x-2 text-xs text-gray-300">
                                     {option.brand && (
@@ -230,19 +249,10 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                                         </span>
                                     )}
                                     
-                                    {/* Score */}
-                                    {option.score !== undefined && (
-                                        <span className="text-purple-300">
-                                            {t('คะแนน:')} {option.score}/100
-                                        </span>
-                                    )}
-                                    
                                     {/* Recommendation text */}
-                                    {option.score !== undefined && (
-                                        <span className={`${recommendation.color}`}>
-                                            {recommendation.text}
-                                        </span>
-                                    )}
+                                    <span className={`${recommendation.color}`}>
+                                        {recommendation.text}
+                                    </span>
                                 </div>
                                 
                                 {option.price && (

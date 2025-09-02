@@ -206,8 +206,8 @@ const InputForm: React.FC<InputFormProps> = ({
             // If it's per session, need to convert to per minute
             estimatedFlowLPM = input.totalTrees * input.waterPerTreeLiters; // Assuming it's already LPM per tree
         } else {
-            // Horticulture mode: waterPerTreeLiters is per irrigation session
-            estimatedFlowLPM = (input.totalTrees * input.waterPerTreeLiters) / (input.irrigationTimeMinutes || 30);
+            // Horticulture mode: waterPerTreeLiters is now in LPM (liters per minute)
+            estimatedFlowLPM = input.totalTrees * input.waterPerTreeLiters;
         }
         
         // Convert LPM to m³/s for velocity calculation
@@ -388,6 +388,8 @@ const InputForm: React.FC<InputFormProps> = ({
                 return t('น้ำต่อหัวฉีด (ลิตร/ครั้ง)');
             case 'garden':
                 return t('น้ำต่อหัวฉีด (ลิตร/ครั้ง)');
+            case 'horticulture':
+                return t('ต้องการน้ำ (ลิตร/นาที)');
             default:
                 return t('น้ำต่อ') + getItemName() + t(' (ลิตร/ครั้ง)');
         }
@@ -484,7 +486,7 @@ const InputForm: React.FC<InputFormProps> = ({
                             />
                         </div>
 
-                        <div>
+                        {/* <div>
                             <label className="mb-2 block text-sm font-medium">
                                 {t('เวลารดน้ำ (นาที/ครั้ง)')}
                             </label>
@@ -501,7 +503,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                 onBlur={(e) => updateInputOnBlur('irrigationTimeMinutes', e.target.value)}
                                 className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                             />
-                        </div>
+                        </div> */}
                     </div>
 
                     <div className="rounded-lg bg-gray-700 p-2">
@@ -812,6 +814,81 @@ const InputForm: React.FC<InputFormProps> = ({
                                         className="text-sm text-blue-400 hover:text-blue-300"
                                     >
                                         + {t('เพิ่มท่อเมนหลัก')}
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="rounded-lg bg-gray-700 p-3">
+                        {(input.longestEmitterPipeM && input.longestEmitterPipeM > 0) ? (
+                            <>
+                                <h4 className="mb-2 text-sm font-medium text-green-300">
+                                    🌿 {t('ท่อย่อยแยก (Emitter Pipe)')}
+                                </h4>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="mb-1 block text-sm">
+                                            {t('ท่อเส้นที่ยาวที่สุด (ม.)')}
+                                        </label>
+                                        <input
+                                            type="number"
+                                            defaultValue={input.longestEmitterPipeM?.toFixed(1) || '0.0'}
+                                            onChange={(e) => {
+                                                const value = parseFloat(e.target.value);
+                                                if (!isNaN(value)) {
+                                                    updateInput('longestEmitterPipeM', value);
+                                                }
+                                            }}
+                                            onBlur={(e) => {
+                                                const value = e.target.value;
+                                                if (value === '' || isNaN(parseFloat(value))) {
+                                                    e.target.value = input.longestEmitterPipeM?.toFixed(1) || '0.0';
+                                                }
+                                            }}
+                                            step="0.1"
+                                            min="0"
+                                            className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-sm text-white focus:border-blue-400"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="mb-1 block text-sm">
+                                            {t('ท่อรวมทั้งหมด (ม.)')}
+                                        </label>
+                                        <input
+                                            type="number"
+                                            defaultValue={input.totalEmitterPipeM?.toFixed(1) || '0.0'}
+                                            onChange={(e) => {
+                                                const value = parseFloat(e.target.value);
+                                                if (!isNaN(value)) {
+                                                    updateInput('totalEmitterPipeM', value);
+                                                }
+                                            }}
+                                            onBlur={(e) => {
+                                                const value = e.target.value;
+                                                if (value === '' || isNaN(parseFloat(value))) {
+                                                    e.target.value = input.totalEmitterPipeM?.toFixed(1) || '0.0';
+                                                }
+                                            }}
+                                            step="0.1"
+                                            min="0"
+                                            className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-sm text-white focus:border-blue-400"
+                                        />
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex items-center justify-between">
+                                <div className="text-center text-gray-400">
+                                    <div className="mb-1 text-2xl">➖</div>
+                                    <p className="text-sm">{t('ไม่ใช้ท่อย่อยแยก')}</p>
+                                </div>
+                                {projectMode === 'horticulture' && (
+                                    <button
+                                        onClick={() => updateInput('longestEmitterPipeM', 10)}
+                                        className="text-sm text-blue-400 hover:text-blue-300"
+                                    >
+                                        + {t('เพิ่มท่อย่อยแยก')}
                                     </button>
                                 )}
                             </div>
