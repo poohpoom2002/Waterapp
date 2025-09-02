@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 // resources\js\pages\components\SprinklerSelector.tsx - Fixed units and properties
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { CalculationResults } from '../types/interfaces';
 import { Zone } from '../../utils/horticultureUtils';
 import { formatWaterFlow, formatRadius } from '../utils/calculations';
@@ -29,6 +29,60 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
     const [modalImage, setModalImage] = useState({ src: '', alt: '' });
     const { t } = useLanguage();
     
+    const analyzedSprinklers = useMemo(() => results.analyzedSprinklers || [], [results.analyzedSprinklers]);
+
+    // Auto-select sprinkler for horticulture mode based on system requirements
+    useEffect(() => {
+        if (projectMode === 'horticulture' && !selectedSprinkler && analyzedSprinklers.length > 0) {
+            // โหลดข้อมูลระบบหัวฉีดจาก localStorage
+            const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
+            if (horticultureSystemDataStr) {
+                try {
+                    const horticultureSystemData = JSON.parse(horticultureSystemDataStr);
+                    const { sprinklerConfig } = horticultureSystemData;
+                    
+                    if (sprinklerConfig) {
+                        const { flowRatePerPlant, pressureBar, radiusMeters } = sprinklerConfig;
+                        
+                        // กรองสปริงเกอร์ที่มีคุณสมบัติตรงตามข้อกำหนด
+                        const compatibleSprinklers = analyzedSprinklers.filter((sprinkler: any) => {
+                            // ตรวจสอบ waterVolumeLitersPerMinute
+                            const flowMatch = sprinkler.waterVolumeLitersPerMinute ? 
+                                (Array.isArray(sprinkler.waterVolumeLitersPerMinute) ? 
+                                    (flowRatePerPlant >= sprinkler.waterVolumeLitersPerMinute[0] && 
+                                     flowRatePerPlant <= sprinkler.waterVolumeLitersPerMinute[1]) :
+                                    Math.abs(sprinkler.waterVolumeLitersPerMinute - flowRatePerPlant) <= (flowRatePerPlant * 0.2)) : false;
+                            
+                            // ตรวจสอบ pressureBar
+                            const pressureMatch = sprinkler.pressureBar ? 
+                                (Array.isArray(sprinkler.pressureBar) ? 
+                                    (pressureBar >= sprinkler.pressureBar[0] && 
+                                     pressureBar <= sprinkler.pressureBar[1]) :
+                                    Math.abs(sprinkler.pressureBar - pressureBar) <= (pressureBar * 0.15)) : false;
+                            
+                            // ตรวจสอบ radiusMeters
+                            const radiusMatch = sprinkler.radiusMeters ? 
+                                (Array.isArray(sprinkler.radiusMeters) ? 
+                                    (radiusMeters >= sprinkler.radiusMeters[0] && 
+                                     radiusMeters <= sprinkler.radiusMeters[1]) :
+                                    Math.abs(sprinkler.radiusMeters - radiusMeters) <= (radiusMeters * 0.2)) : false;
+                            
+                            return flowMatch && pressureMatch && radiusMatch;
+                        });
+                        
+                        // เลือกสปริงเกอร์ที่เข้าเงื่อนไข (เรียงตามราคาถูกสุดก่อน)
+                        if (compatibleSprinklers.length > 0) {
+                            const bestSprinkler = compatibleSprinklers.sort((a: any, b: any) => a.price - b.price)[0];
+                            onSprinklerChange(bestSprinkler);
+                        }
+                    }
+                } catch (error) {
+                    console.warn('Failed to parse horticulture system data for sprinkler selection:', error);
+                }
+            }
+        }
+    }, [projectMode, selectedSprinkler, analyzedSprinklers, onSprinklerChange]);
+    
     const openImageModal = (src: string, alt: string) => {
         setModalImage({ src, alt });
         setShowImageModal(true);
@@ -38,9 +92,65 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
         setShowImageModal(false);
         setModalImage({ src: '', alt: '' });
     };
-
-    const analyzedSprinklers = results.analyzedSprinklers || [];
-    const sortedSprinklers = analyzedSprinklers.sort((a, b) => a.price - b.price);
+    
+    // กรองสปริงเกอร์สำหรับ horticulture mode
+    const getFilteredSprinklers = () => {
+        if (projectMode !== 'horticulture') {
+            return analyzedSprinklers.sort((a, b) => a.price - b.price);
+        }
+        
+        // สำหรับ horticulture mode - กรองเฉพาะสปริงเกอร์ที่เข้ากันได้
+        const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
+        if (!horticultureSystemDataStr) {
+            return analyzedSprinklers.sort((a, b) => a.price - b.price);
+        }
+        
+        try {
+            const horticultureSystemData = JSON.parse(horticultureSystemDataStr);
+            const { sprinklerConfig } = horticultureSystemData;
+            
+            if (!sprinklerConfig) {
+                return analyzedSprinklers.sort((a, b) => a.price - b.price);
+            }
+            
+            const { flowRatePerPlant, pressureBar, radiusMeters } = sprinklerConfig;
+            
+            // กรองสปริงเกอร์ที่มีคุณสมบัติตรงตามข้อกำหนด
+            const compatibleSprinklers = analyzedSprinklers.filter((sprinkler: any) => {
+                // ตรวจสอบ waterVolumeLitersPerMinute
+                const flowMatch = sprinkler.waterVolumeLitersPerMinute ? 
+                    (Array.isArray(sprinkler.waterVolumeLitersPerMinute) ? 
+                        (flowRatePerPlant >= sprinkler.waterVolumeLitersPerMinute[0] && 
+                         flowRatePerPlant <= sprinkler.waterVolumeLitersPerMinute[1]) :
+                        Math.abs(sprinkler.waterVolumeLitersPerMinute - flowRatePerPlant) <= (flowRatePerPlant * 0.2)) : false;
+                
+                // ตรวจสอบ pressureBar
+                const pressureMatch = sprinkler.pressureBar ? 
+                    (Array.isArray(sprinkler.pressureBar) ? 
+                        (pressureBar >= sprinkler.pressureBar[0] && 
+                         pressureBar <= sprinkler.pressureBar[1]) :
+                        Math.abs(sprinkler.pressureBar - pressureBar) <= (pressureBar * 0.15)) : false;
+                
+                // ตรวจสอบ radiusMeters
+                const radiusMatch = sprinkler.radiusMeters ? 
+                    (Array.isArray(sprinkler.radiusMeters) ? 
+                        (radiusMeters >= sprinkler.radiusMeters[0] && 
+                         radiusMeters <= sprinkler.radiusMeters[1]) :
+                        Math.abs(sprinkler.radiusMeters - radiusMeters) <= (radiusMeters * 0.2)) : false;
+                
+                return flowMatch && pressureMatch && radiusMatch;
+            });
+            
+            // เรียงตามราคาถูกสุดก่อน
+            return compatibleSprinklers.sort((a: any, b: any) => a.price - b.price);
+            
+        } catch (error) {
+            console.warn('Failed to parse horticulture system data for filtering:', error);
+            return analyzedSprinklers.sort((a, b) => a.price - b.price);
+        }
+    };
+    
+    const sortedSprinklers = getFilteredSprinklers();
     const selectedAnalyzed = selectedSprinkler
         ? analyzedSprinklers.find((s) => s.id === selectedSprinkler.id)
         : null;
@@ -145,12 +255,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         name: sprinkler.name,
                         brand: sprinkler.brand || sprinkler.brand_name,
                         price: sprinkler.price,
-                        unit: t('บาท'),
-                        score: sprinkler.score,
-                        isRecommended: sprinkler.isRecommended,
-                        isGoodChoice: sprinkler.isGoodChoice,
-                        isUsable: sprinkler.isUsable,
-                        isAutoSelected: false // Sprinklers don't have auto-selection in this context
+                        unit: t('บาท')
                     }))
                 ]}
                 placeholder={`-- ${t('เลือก')} ${projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}${activeZone ? ` ${t('สำหรับ')} ${activeZone.name}` : ''} --`}

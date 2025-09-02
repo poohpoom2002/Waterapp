@@ -13,6 +13,8 @@ export interface IrrigationInput {
     totalSecondaryPipeM: number;
     longestMainPipeM: number;
     totalMainPipeM: number;
+    longestEmitterPipeM?: number;
+    totalEmitterPipeM?: number;
     irrigationTimeMinutes: number;
     staticHeadM: number;
     pressureHeadM: number;
@@ -39,7 +41,7 @@ export interface AnalyzedPipe {
     sizeInch: string | null;
     lengthM: number;
     price: number;
-    score: number;
+
     velocity: number;
     headLoss: number;
     optimalSize?: number;
@@ -62,7 +64,7 @@ export interface AnalyzedSprinkler {
     radiusMeters: number;
     pressureBar: number;
     price: number;
-    score: number;
+
     flowMatch: boolean;
     flowCloseMatch: boolean;
     isRecommended: boolean;
@@ -87,7 +89,7 @@ export interface AnalyzedPump {
     inlet_size_inch: number;
     outlet_size_inch: number;
     price: number;
-    score: number;
+
     maxFlow: number;
     maxHead: number;
     flowRatio: number;
@@ -141,22 +143,26 @@ export interface CalculationResults {
     recommendedBranchPipe: AnalyzedPipe[];
     recommendedSecondaryPipe: AnalyzedPipe[];
     recommendedMainPipe: AnalyzedPipe[];
+    recommendedEmitterPipe?: AnalyzedPipe[];
     recommendedPump: AnalyzedPump[];
 
     analyzedBranchPipes?: AnalyzedPipe[];
     analyzedSecondaryPipes?: AnalyzedPipe[];
     analyzedMainPipes?: AnalyzedPipe[];
+    analyzedEmitterPipes?: AnalyzedPipe[];
     analyzedSprinklers?: AnalyzedSprinkler[];
     analyzedPumps?: AnalyzedPump[];
 
     autoSelectedBranchPipe?: AnalyzedPipe;
     autoSelectedSecondaryPipe?: AnalyzedPipe;
     autoSelectedMainPipe?: AnalyzedPipe;
+    autoSelectedEmitterPipe?: AnalyzedPipe;
     autoSelectedPump?: AnalyzedPump;
 
     branchPipeRolls: number;
     secondaryPipeRolls: number;
     mainPipeRolls: number;
+    emitterPipeRolls?: number;
     headLoss: {
         branch: {
             major: number;
@@ -173,6 +179,11 @@ export interface CalculationResults {
             minor: number;
             total: number;
         };
+        emitter?: {
+            major: number;
+            minor: number;
+            total: number;
+        };
         totalMajor: number;
         totalMinor: number;
         total: number;
@@ -181,16 +192,19 @@ export interface CalculationResults {
         branch: number;
         secondary: number;
         main: number;
+        emitter?: number;
     };
     flows: {
         branch: number;
         secondary: number;
         main: number;
+        emitter?: number;
     };
     coefficients: {
         branch: number;
         secondary: number;
         main: number;
+        emitter?: number;
     };
     pumpHeadRequired: number;
     pressureFromSprinkler?: number;
@@ -199,6 +213,7 @@ export interface CalculationResults {
     velocityWarnings: string[];
     hasValidSecondaryPipe?: boolean;
     hasValidMainPipe?: boolean;
+    hasValidEmitterPipe?: boolean;
 
     allZoneResults?: ZoneResults[];
     projectSummary?: ProjectSummary;
@@ -223,6 +238,7 @@ export interface ZoneResults {
         branch: number;
         secondary: number;
         main: number;
+        emitter?: number;
         total: number;
     };
     staticHead: number;
@@ -232,6 +248,7 @@ export interface ZoneResults {
         branch?: AnalyzedPipe;
         secondary?: AnalyzedPipe;
         main?: AnalyzedPipe;
+        emitter?: AnalyzedPipe;
     };
     sprinklerCount: number;
 }
@@ -267,7 +284,7 @@ export interface QuotationDataCustomer {
     phone: string;
 }
 
-export type PipeType = 'branch' | 'secondary' | 'main';
+export type PipeType = 'branch' | 'secondary' | 'main' | 'emitter';
 
 export interface FieldCropZone {
     id: string;
