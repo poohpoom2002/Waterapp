@@ -405,7 +405,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                     </div>
                 )}
 
-                {/* แสดงข้อมูลแรงดันหัวฉีด */}
+                {/* แสดงข้อมูลแรงดันหัวฉีด1 */}
                 {/* {sprinklerPressure && (
                     <div className="mt-4 bg-blue-900 rounded p-3">
                         <h4 className="text-blue-300 font-medium mb-2">💧 ข้อมูลแรงดันหัวฉีด</h4>
