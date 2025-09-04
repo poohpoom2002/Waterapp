@@ -1,169 +1,21 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// components/horticulture/HorticultureDrawingManager.tsx
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useEffect, useRef, useState } from 'react';
+import CurvedPipeDrawingManager from './CurvedPipeDrawingManager';
+import CurvedPipeControlPanel from './CurvedPipeControlPanel';
+import {
+    snapMainPipeEndToSubMainPipe as utilsSnapMainPipeEndToSubMainPipe,
+    findClosestPointOnLineSegment as utilsFindClosestPointOnLineSegment,
+    calculateDistanceBetweenPoints as utilsCalculateDistanceBetweenPoints,
+    calculatePipeLength as utilsCalculatePipeLength,
+} from '../../utils/horticultureUtils';
 
 interface Coordinate {
     lat: number;
     lng: number;
 }
 
-interface DistanceMeasurementProps {
-    map: google.maps.Map | null | undefined;
-    isActive: boolean;
-    editMode: string | null;
-}
 
-// Component แสดงระยะทางระหว่างการวาด
-const DistanceMeasurement: React.FC<DistanceMeasurementProps> = ({
-    map,
-    isActive,
-    editMode,
-}) => {
-    const [startPoint, setStartPoint] = useState<Coordinate | null>(null);
-    const [currentDistance, setCurrentDistance] = useState<number>(0);
-    const [mousePosition, setMousePosition] = useState<Coordinate | null>(null);
-    const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
-
-    // คำนวณระยะทางระหว่างสองจุด
-    const calculateDistance = (point1: Coordinate, point2: Coordinate): number => {
-        const R = 6371000; // รัศมีโลกเป็นเมตร
-        const dLat = (point2.lat - point1.lat) * Math.PI / 180;
-        const dLng = (point2.lng - point1.lng) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(point1.lat * Math.PI / 180) * Math.cos(point2.lat * Math.PI / 180) * 
-                Math.sin(dLng/2) * Math.sin(dLng/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        return R * c;
-    };
-
-    // ฟอร์แมตระยะทาง
-    const formatDistance = (meters: number): string => {
-        if (meters < 1000) {
-            return `${meters.toFixed(1)} ม.`;
-        } else {
-            return `${(meters / 1000).toFixed(2)} กม.`;
-        }
-    };
-
-    useEffect(() => {
-        if (!map || !isActive || !editMode) {
-            // ล้าง InfoWindow เมื่อไม่ active
-            if (infoWindowRef.current) {
-                infoWindowRef.current.close();
-                infoWindowRef.current = null;
-            }
-            setStartPoint(null);
-            setCurrentDistance(0);
-            setMousePosition(null);
-            return;
-        }
-
-        const listeners: google.maps.MapsEventListener[] = [];
-
-        // ฟังการคลิกแรกเพื่อเริ่มวัดระยะ - ใช้ DOM event listener แทน
-        const handleMapClick = (e: google.maps.MapMouseEvent) => {
-            if (e.latLng && !startPoint) {
-                const clickedPoint = {
-                    lat: e.latLng.lat(),
-                    lng: e.latLng.lng()
-                };
-                
-                // จุดแรก - เริ่มวัดระยะ
-                setStartPoint(clickedPoint);
-            }
-        };
-
-        // ใช้ Google Maps event listener แต่มี priority ก่อน
-        const clickListener = google.maps.event.addListener(map, 'click', handleMapClick);
-        listeners.push(clickListener);
-
-        // ฟังการ double click เพื่อจบการวัด
-        const dblClickListener = map.addListener('dblclick', (e: google.maps.MapMouseEvent) => {
-            if (startPoint) {
-                setStartPoint(null);
-                setCurrentDistance(0);
-                setMousePosition(null);
-                if (infoWindowRef.current) {
-                    infoWindowRef.current.close();
-                    infoWindowRef.current = null;
-                }
-            }
-        });
-        listeners.push(dblClickListener);
-
-        // ฟังการเคลื่อนไหวของเมาส์
-        const mouseMoveListener = google.maps.event.addListener(map, 'mousemove', (e: google.maps.MapMouseEvent) => {
-            if (startPoint && e.latLng) {
-                const currentPoint = {
-                    lat: e.latLng.lat(),
-                    lng: e.latLng.lng()
-                };
-                
-                const distance = calculateDistance(startPoint, currentPoint);
-                setCurrentDistance(distance);
-                setMousePosition(currentPoint);
-
-                // สร้างหรืออัพเดท InfoWindow
-                if (distance > 0) {
-                    const content = `
-                        <div style="
-                            background: rgba(0,0,0,0.85); 
-                            color: white; 
-                            padding: 8px 12px; 
-                            border-radius: 6px; 
-                            font-size: 14px; 
-                            font-weight: bold;
-                            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                            border: 1px solid rgba(255,255,255,0.2);
-                            text-align: center;
-                            min-width: 60px;
-                        ">
-                            ${formatDistance(distance)}
-                            <div style="
-                                font-size: 10px; 
-                                color: rgba(255,255,255,0.8); 
-                                margin-top: 2px;
-                            ">ระยะทาง</div>
-                        </div>
-                    `;
-                    
-                    if (infoWindowRef.current) {
-                        // อัพเดท InfoWindow ที่มีอยู่
-                        infoWindowRef.current.setContent(content);
-                        infoWindowRef.current.setPosition(e.latLng);
-                    } else {
-                        // สร้าง InfoWindow ใหม่
-                        const infoWindow = new google.maps.InfoWindow({
-                            content,
-                            position: e.latLng,
-                            disableAutoPan: true,
-                            pixelOffset: new google.maps.Size(0, -10)
-                        });
-                        infoWindow.open(map);
-                        infoWindowRef.current = infoWindow;
-                    }
-                }
-            }
-        });
-        listeners.push(mouseMoveListener);
-
-        return () => {
-            listeners.forEach(listener => {
-                if (listener) {
-                    google.maps.event.removeListener(listener);
-                }
-            });
-            
-            if (infoWindowRef.current) {
-                infoWindowRef.current.close();
-                infoWindowRef.current = null;
-            }
-        };
-    }, [map, isActive, editMode, startPoint]);
-
-    return null;
-};
 
 interface HorticultureDrawingManagerProps {
     map?: google.maps.Map;
@@ -172,14 +24,18 @@ interface HorticultureDrawingManagerProps {
     fillColor?: string;
     strokeColor?: string;
     isEditModeEnabled?: boolean;
-    mainArea?: Coordinate[]; // เพิ่ม mainArea prop
-    pump?: Coordinate | null; // เพิ่ม pump prop
-    mainPipes?: any[]; // เพิ่ม mainPipes prop
-    subMainPipes?: any[]; // เพิ่ม subMainPipes prop
-    onMainPipesUpdate?: (updatedMainPipes: any[]) => void; // เพิ่ม callback สำหรับอัพเดท mainPipes
+    mainArea?: Coordinate[];
+    pump?: Coordinate | null;
+    mainPipes?: any[];
+    subMainPipes?: any[];
+    onMainPipesUpdate?: (updatedMainPipes: any[]) => void;
+    enableCurvedDrawing?: boolean;
+    t?: (key: string) => string;
+    onMainPipeClick?: (pipeId: string, clickPosition: Coordinate) => void;
+    onLateralPipeClick?: (event: google.maps.MapMouseEvent) => void;
+    onLateralPipeMouseMove?: (event: google.maps.MapMouseEvent) => void;
 }
 
-// ฟังก์ชัน snap จุดเข้ากับตำแหน่งปั๊ม
     const snapPointToPump = (
         point: Coordinate,
         pumpPosition: Coordinate | null,
@@ -198,7 +54,6 @@ interface HorticultureDrawingManagerProps {
         return point;
     };
 
-// ฟังก์ชัน snap จุดเข้ากับปลายท่อเมนหลัก
     const snapPointToMainPipeEnd = (
         point: Coordinate,
         mainPipes: any[],
@@ -234,7 +89,6 @@ interface HorticultureDrawingManagerProps {
         return point;
     };
 
-// ฟังก์ชัน snap จุดเข้ากับเส้นท่อเมนรอง
     const snapPointToSubMainPipe = (
         point: Coordinate,
         subMainPipes: any[],
@@ -275,7 +129,6 @@ interface HorticultureDrawingManagerProps {
         return point;
     };
 
-// ฟังก์ชัน snap จุดเข้ากับขอบพื้นที่หลัก
     const snapPointToMainAreaBoundary = (
         point: Coordinate,
         mainArea: Coordinate[],
@@ -310,65 +163,15 @@ interface HorticultureDrawingManagerProps {
         return point;
     };
 
-// ฟังก์ชันหาจุดที่ใกล้ที่สุดบนเส้นตรง
-const findClosestPointOnLineSegment = (
-    point: Coordinate,
-    lineStart: Coordinate,
-    lineEnd: Coordinate
-): Coordinate => {
-    const A = point.lat - lineStart.lat;
-    const B = point.lng - lineStart.lng;
-    const C = lineEnd.lat - lineStart.lat;
-    const D = lineEnd.lng - lineStart.lng;
+// ใช้ฟังก์ชัน findClosestPointOnLineSegment จาก horticultureUtils.ts
+const findClosestPointOnLineSegment = utilsFindClosestPointOnLineSegment;
 
-    const dot = A * C + B * D;
-    const lenSq = C * C + D * D;
+// ใช้ฟังก์ชัน calculateDistanceBetweenPoints จาก horticultureUtils.ts
+const calculateDistanceBetweenPoints = utilsCalculateDistanceBetweenPoints;
 
-    if (lenSq === 0) {
-        return lineStart;
-    }
+// ใช้ฟังก์ชัน calculatePipeLength จาก horticultureUtils.ts
+const calculatePipeLength = utilsCalculatePipeLength;
 
-    const param = dot / lenSq;
-
-    if (param < 0) {
-        return lineStart;
-    } else if (param > 1) {
-        return lineEnd;
-    }
-
-    return {
-        lat: lineStart.lat + param * C,
-        lng: lineStart.lng + param * D
-    };
-};
-
-// ฟังก์ชันคำนวณระยะทางระหว่างสองจุด
-const calculateDistanceBetweenPoints = (point1: Coordinate, point2: Coordinate): number => {
-    const R = 6371000; // รัศมีโลกเป็นเมตร
-    const dLat = (point2.lat - point1.lat) * Math.PI / 180;
-    const dLng = (point2.lng - point1.lng) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(point1.lat * Math.PI / 180) * Math.cos(point2.lat * Math.PI / 180) * 
-            Math.sin(dLng/2) * Math.sin(dLng/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-};
-
-// ฟังก์ชันคำนวณความยาวท่อ
-const calculatePipeLength = (coordinates: Coordinate[]): number => {
-    if (coordinates.length < 2) {
-        return 0;
-    }
-    
-    let totalLength = 0;
-    for (let i = 0; i < coordinates.length - 1; i++) {
-        totalLength += calculateDistanceBetweenPoints(coordinates[i], coordinates[i + 1]);
-    }
-    
-    return totalLength;
-};
-
-// ฟังก์ชัน snap coordinates ทั้งหมด
 const snapCoordinatesToMainArea = (
     coordinates: Coordinate[],
     mainArea: Coordinate[]
@@ -386,43 +189,30 @@ const snapCoordinatesToMainArea = (
         return snappedCoord;
     });
 
-    if (snappedCount > 0) {
-        console.log(`🔗 Snapped ${snappedCount}/${coordinates.length} points to main area boundary`);
-    }
-
     return snappedCoordinates;
 };
 
-// ฟังก์ชัน debug เพื่อแสดงข้อมูลเส้นขอบ
 const debugMainAreaBoundaries = (mainArea: Coordinate[]): void => {
     if (!mainArea || mainArea.length < 3) {
-        console.log('❌ Invalid main area for debugging');
         return;
     }
 
-    console.log('🔍 Main Area Boundaries Debug:');
     for (let i = 0; i < mainArea.length; i++) {
         const start = mainArea[i];
         const end = mainArea[(i + 1) % mainArea.length];
         const edgeLength = calculateDistanceBetweenPoints(start, end);
         
-        // ตรวจสอบว่าเป็นเส้นแนวตั้งหรือแนวนอน
         const latDiff = Math.abs(end.lat - start.lat);
         const lngDiff = Math.abs(end.lng - start.lng);
-        const isVertical = latDiff > lngDiff * 10; // ถ้าความแตกต่างของ lat มากกว่า lng มาก
-        const isHorizontal = lngDiff > latDiff * 10; // ถ้าความแตกต่างของ lng มากกว่า lat มาก
+        const isVertical = latDiff > lngDiff * 10; 
+        const isHorizontal = lngDiff > latDiff * 10; 
         
         let edgeType = 'Diagonal';
         if (isVertical) edgeType = 'Vertical';
         else if (isHorizontal) edgeType = 'Horizontal';
-        
-        console.log(`  Edge ${i}: ${edgeType} - Length: ${edgeLength.toFixed(2)}m`);
-        console.log(`    Start: (${start.lat.toFixed(6)}, ${start.lng.toFixed(6)})`);
-        console.log(`    End: (${end.lat.toFixed(6)}, ${end.lng.toFixed(6)})`);
     }
 };
 
-// ฟังก์ชัน snap แบบ advanced ที่มีความแม่นยำมากขึ้น
 const advancedSnapToMainArea = (
     coordinates: Coordinate[],
     mainArea: Coordinate[]
@@ -430,11 +220,8 @@ const advancedSnapToMainArea = (
     if (!mainArea || mainArea.length < 3) {
         return coordinates;
     }
-
-    // Debug: แสดงข้อมูลเส้นขอบ
     debugMainAreaBoundaries(mainArea);
 
-    // หาเส้นขอบที่ยาวที่สุดของพื้นที่หลัก (มักจะเป็นขอบที่สำคัญ)
     let longestEdge = 0;
     let longestEdgeStart: Coordinate | null = null;
     let longestEdgeEnd: Coordinate | null = null;
@@ -452,46 +239,32 @@ const advancedSnapToMainArea = (
             longestEdgeIndex = i;
         }
     }
-
-    console.log(`🎯 Longest edge: ${longestEdgeIndex} - Length: ${longestEdge.toFixed(2)}m`);
-
-    // Snap coordinates ที่ใกล้กับเส้นขอบที่ยาวที่สุด
-    const snappedCoordinates = coordinates.map((coord, coordIndex) => {
-        console.log(`\n📍 Processing coordinate ${coordIndex}: (${coord.lat.toFixed(6)}, ${coord.lng.toFixed(6)})`);
-        
+    const snappedCoordinates = coordinates.map((coord) => {
         if (longestEdgeStart && longestEdgeEnd) {
             const distanceToLongestEdge = calculateDistanceBetweenPoints(
                 coord,
                 findClosestPointOnLineSegment(coord, longestEdgeStart, longestEdgeEnd)
             );
             
-            // ถ้าใกล้กับเส้นขอบที่ยาวที่สุด ให้ snap ด้วย threshold ที่เข้มงวดกว่า
-            if (distanceToLongestEdge <= 3) { // 3 เมตรสำหรับเส้นขอบหลัก
+            if (distanceToLongestEdge <= 3) { 
                 const snappedPoint = findClosestPointOnLineSegment(coord, longestEdgeStart, longestEdgeEnd);
-                console.log(`🎯 Advanced snap to longest edge: ${distanceToLongestEdge.toFixed(2)}m`);
                 return snappedPoint;
             }
 
         }
 
-        // Snap ปกติกับทุกเส้นขอบ
         return snapPointToMainAreaBoundary(coord, mainArea, 5);
     });
 
-    // แสดง visual feedback
     const originalCount = coordinates.length;
     const snappedCount = snappedCoordinates.filter((coord, index) => 
         coord.lat !== coordinates[index].lat || coord.lng !== coordinates[index].lng
     ).length;
 
     if (snappedCount > 0) {
-        console.log(`🎯 Advanced snap completed: ${snappedCount}/${originalCount} points snapped`);
-        // แสดง notification ถ้ามี
         if (typeof window !== 'undefined' && (window as any).showSnapNotification) {
-            (window as any).showSnapNotification(`${snappedCount} จุดถูก snap เข้ากับขอบพื้นที่หลัก`);
+            (window as any).showSnapNotification(`${snappedCount} points snapped to main area boundary`);
         }
-    } else {
-        console.log(`❌ No points were snapped`);
     }
 
     return snappedCoordinates;
@@ -563,9 +336,12 @@ const getDrawingMode = (editMode: string | null): google.maps.drawing.OverlayTyp
         case 'mainArea':
         case 'zone':
         case 'exclusion':
+        case 'plantArea':
+        case 'manualZone':
             return google.maps.drawing.OverlayType.POLYGON;
         case 'mainPipe':
         case 'subMainPipe':
+        case 'lateralPipe':
             return google.maps.drawing.OverlayType.POLYLINE;
         default:
             return null;
@@ -577,6 +353,8 @@ const getDrawingModes = (editMode: string | null): google.maps.drawing.OverlayTy
         case 'mainArea':
         case 'zone':
         case 'exclusion':
+        case 'plantArea':
+        case 'manualZone':
             return [
                 google.maps.drawing.OverlayType.POLYGON,
                 google.maps.drawing.OverlayType.RECTANGLE,
@@ -584,6 +362,7 @@ const getDrawingModes = (editMode: string | null): google.maps.drawing.OverlayTy
             ];
         case 'mainPipe':
         case 'subMainPipe':
+        case 'lateralPipe':
             return [google.maps.drawing.OverlayType.POLYLINE];
         default:
             return [];
@@ -623,10 +402,22 @@ const getShapeOptions = (editMode: string | null, fillColor?: string, strokeColo
                 rectangleOptions: { ...baseOptions, fillColor: '#F59E0B', strokeColor: '#F59E0B' },
                 circleOptions: { ...baseOptions, fillColor: '#F59E0B', strokeColor: '#F59E0B' },
             };
+        case 'plantArea':
+            return {
+                polygonOptions: { ...baseOptions, fillColor: '#8B5CF6', strokeColor: '#8B5CF6' },
+                rectangleOptions: { ...baseOptions, fillColor: '#8B5CF6', strokeColor: '#8B5CF6' },
+                circleOptions: { ...baseOptions, fillColor: '#8B5CF6', strokeColor: '#8B5CF6' },
+            };
+        case 'manualZone':
+            return {
+                polygonOptions: { ...baseOptions, fillColor: '#3B82F6', strokeColor: '#3B82F6' },
+                rectangleOptions: { ...baseOptions, fillColor: '#3B82F6', strokeColor: '#3B82F6' },
+                circleOptions: { ...baseOptions, fillColor: '#3B82F6', strokeColor: '#3B82F6' },
+            };
         case 'mainPipe':
             return {
                 polylineOptions: {
-                    strokeColor: '#FF0000', // เปลี่ยนเป็นสีแดง
+                    strokeColor: '#FF0000',
                     strokeWeight: 6,
                     strokeOpacity: 0.9,
                     editable: true,
@@ -638,6 +429,16 @@ const getShapeOptions = (editMode: string | null, fillColor?: string, strokeColo
                 polylineOptions: {
                     strokeColor: '#8B5CF6',
                     strokeWeight: 5,
+                    strokeOpacity: 0.9,
+                    editable: true,
+                    draggable: true,
+                },
+            };
+        case 'lateralPipe':
+            return {
+                polylineOptions: {
+                    strokeColor: '#FFD700',
+                    strokeWeight: 4,
                     strokeOpacity: 0.9,
                     editable: true,
                     draggable: true,
@@ -659,7 +460,6 @@ const getShapeOptions = (editMode: string | null, fillColor?: string, strokeColo
     }
 };
 
-// ฟังก์ชัน snap แบบ advanced สำหรับท่อเมนหลัก
     const snapMainPipeCoordinates = (
         coordinates: Coordinate[],
         pumpPosition: Coordinate | null,
@@ -678,91 +478,60 @@ const getShapeOptions = (editMode: string | null, fillColor?: string, strokeColo
         return snappedCoordinates;
     };
 
-// ฟังก์ชัน snap แบบ advanced สำหรับท่อเมนรอง
     const snapSubMainPipeCoordinates = (
         coordinates: Coordinate[],
         mainPipes: any[],
         mainArea: Coordinate[]
     ): Coordinate[] => {
-        if (coordinates.length === 0) {
-            return coordinates;
-        }
-
-        const snappedCoordinates = [...coordinates];
-        
-        if (mainArea && mainArea.length > 0) {
-            for (let i = 1; i < snappedCoordinates.length; i++) {
-                snappedCoordinates[i] = snapPointToMainAreaBoundary(snappedCoordinates[i], mainArea, 5);
-            }
-        }
-
-        return snappedCoordinates;
+        // 🚫 ปิดการ snap ท่อ sub main ทั้งหมด - ห้ามขยับท่อ sub main!
+        // ให้คืนค่า coordinates เดิมโดยไม่มีการแก้ไขใดๆ
+        return coordinates;
     };
 
-// ฟังก์ชันใหม่: ตรวจสอบและ snap ปลายท่อเมนหลักเข้ากับท่อเมนรอง
-    const snapMainPipeEndToSubMainPipe = (
+    // ฟังก์ชันใหม่สำหรับ snap ไปยังท่อเมน
+    const snapPointToMainPipe = (
+        point: Coordinate,
         mainPipes: any[],
-        subMainPipeCoordinates: Coordinate[]
-    ): { mainPipes: any[], snapped: boolean } => {
-        if (!mainPipes || mainPipes.length === 0 || !subMainPipeCoordinates || subMainPipeCoordinates.length === 0) {
-            return { mainPipes, snapped: false };
+        snapThreshold: number = 10
+    ): Coordinate => {
+        if (!mainPipes || mainPipes.length === 0) {
+            return point;
         }
 
-        let hasSnapped = false;
-        const updatedMainPipes = mainPipes.map(mainPipe => {
-            if (!mainPipe.coordinates || mainPipe.coordinates.length === 0) {
-                return mainPipe;
+        let closestPoint = point;
+        let minDistance = Infinity;
+        let closestPipeId = '';
+
+        for (const mainPipe of mainPipes) {
+            if (!mainPipe.coordinates || mainPipe.coordinates.length < 2) {
+                continue;
             }
 
-            const mainPipeEnd = mainPipe.coordinates[mainPipe.coordinates.length - 1];
-            
-            let closestPoint = mainPipeEnd;
-            let minDistance = Infinity;
-            let closestSubMainPointIndex = -1;
-
-            for (let i = 0; i < subMainPipeCoordinates.length; i++) {
-                const subMainPoint = subMainPipeCoordinates[i];
-                const distance = calculateDistanceBetweenPoints(mainPipeEnd, subMainPoint);
+            // ตรวจสอบทุกส่วนของท่อเมน
+            for (let i = 0; i < mainPipe.coordinates.length - 1; i++) {
+                const start = mainPipe.coordinates[i];
+                const end = mainPipe.coordinates[i + 1];
                 
+                const closestPointOnSegment = findClosestPointOnLineSegment(point, start, end);
+                const distance = calculateDistanceBetweenPoints(point, closestPointOnSegment);
+
                 if (distance < minDistance) {
                     minDistance = distance;
-                    closestPoint = subMainPoint;
-                    closestSubMainPointIndex = i;
+                    closestPoint = closestPointOnSegment;
+                    closestPipeId = mainPipe.id;
                 }
             }
+        }
 
-            for (let i = 0; i < subMainPipeCoordinates.length - 1; i++) {
-                const lineStart = subMainPipeCoordinates[i];
-                const lineEnd = subMainPipeCoordinates[i + 1];
-                
-                const closestPointOnLine = findClosestPointOnLineSegment(mainPipeEnd, lineStart, lineEnd);
-                const distanceToLine = calculateDistanceBetweenPoints(mainPipeEnd, closestPointOnLine);
-                
-                if (distanceToLine < minDistance) {
-                    minDistance = distanceToLine;
-                    closestPoint = closestPointOnLine;
-                    closestSubMainPointIndex = i;
-                }
-            }
+        if (minDistance <= snapThreshold) {
+            return closestPoint;
+        }
 
-            if (minDistance <= 5) {
-                const updatedCoordinates = [...mainPipe.coordinates];
-                updatedCoordinates[updatedCoordinates.length - 1] = closestPoint;
-                
-                hasSnapped = true;
-                
-                return {
-                    ...mainPipe,
-                    coordinates: updatedCoordinates,
-                    length: calculatePipeLength(updatedCoordinates)
-                };
-            }
-
-            return mainPipe;
-        });
-
-        return { mainPipes: updatedMainPipes, snapped: hasSnapped };
+        return point;
     };
+
+    // ใช้ฟังก์ชัน snap จาก horticultureUtils.ts แทนฟังก์ชันเดิม
+    const snapMainPipeEndToSubMainPipe = utilsSnapMainPipeEndToSubMainPipe;
 
 
 
@@ -773,19 +542,30 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
     fillColor,
     strokeColor,
     isEditModeEnabled = false,
-    mainArea = [], // เพิ่ม mainArea prop
-    pump = null, // เพิ่ม pump prop
-    mainPipes = [], // เพิ่ม mainPipes prop
-    subMainPipes = [], // เพิ่ม subMainPipes prop
-    onMainPipesUpdate, // เพิ่ม callback
+    mainArea = [], 
+    pump = null, 
+    mainPipes = [], 
+    subMainPipes = [], 
+    onMainPipesUpdate,
+    enableCurvedDrawing = false,
+    t = (key: string) => key,
+    onMainPipeClick,
+    onLateralPipeClick,
+    onLateralPipeMouseMove,
 }) => {
     const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null);
     const [isDrawingEnabled, setIsDrawingEnabled] = useState(false);
+    const [showCurvedPipePanel, setShowCurvedPipePanel] = useState(false);
+    const [isCurvedDrawingActive, setIsCurvedDrawingActive] = useState(false);
+    const [anchorPointsCount, setAnchorPointsCount] = useState(0);
+    const [showGuides, setShowGuides] = useState(true);
     
-    const shouldShowDistanceMeasurement = editMode === 'mainArea' || editMode === 'zone' || editMode === 'exclusion' || editMode === 'mainPipe' || editMode === 'subMainPipe';
+
 
     useEffect(() => {
-        if (!map || !window.google?.maps?.drawing || isEditModeEnabled) {
+
+        
+        if (!map || !window.google?.maps?.drawing) {
             if (drawingManagerRef.current) {
                 drawingManagerRef.current.setMap(null);
                 drawingManagerRef.current = null;
@@ -793,32 +573,114 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
             return;
         }
 
-        const drawingMode = getDrawingMode(editMode);
+        if (isEditModeEnabled && !editMode && editMode !== 'manualZone') {
+            if (drawingManagerRef.current) {
+                drawingManagerRef.current.setMap(null);
+                drawingManagerRef.current = null;
+            }
+            return;
+        }
+
+
         const drawingModes = getDrawingModes(editMode);
         const shapeOptions = getShapeOptions(editMode, fillColor, strokeColor);
+
+
 
         if (drawingManagerRef.current) {
             drawingManagerRef.current.setMap(null);
         }
 
-        if (!drawingMode || drawingModes.length === 0) {
+        if (drawingModes.length === 0) {
             return;
         }
 
+
         try {
+            // ตั้งค่า default drawing mode ตาม editMode
+            const defaultDrawingMode = getDrawingMode(editMode);
+            
             const drawingManager = new google.maps.drawing.DrawingManager({
-                drawingMode: drawingMode,
+                drawingMode: defaultDrawingMode, 
                 drawingControl: true,
                 drawingControlOptions: {
                     position: google.maps.ControlPosition.BOTTOM_CENTER,
                     drawingModes: drawingModes,
                 },
-                ...shapeOptions,
+                polygonOptions: {
+                    ...shapeOptions.polygonOptions,
+                    clickable: false,
+                    editable: true,
+                    draggable: true,
+                },
+                rectangleOptions: {
+                    ...shapeOptions.rectangleOptions,
+                    clickable: false,
+                    editable: true,
+                    draggable: true,
+                },
+                circleOptions: {
+                    ...shapeOptions.circleOptions,
+                    clickable: false,
+                    editable: true,
+                    draggable: true,
+                },
             });
 
             drawingManager.setMap(map);
             drawingManagerRef.current = drawingManager;
             setIsDrawingEnabled(true);
+
+            // ไม่ต้องรีเซ็ต drawing mode เป็น null แล้ว เพราะเราตั้งค่า default ไว้แล้ว
+            
+            drawingManager.addListener('drawingmode_changed', () => {
+                const currentMode = drawingManager.getDrawingMode();
+            });
+            
+            drawingManager.addListener('overlaycomplete', (event) => {
+            });
+            
+            drawingManager.addListener('click', (event) => {
+            });
+            
+            drawingManager.addListener('mousedown', (event) => {
+            });
+            
+            drawingManager.addListener('mouseup', (event) => {
+            });
+            
+            drawingManager.addListener('dblclick', (event) => {
+            });
+            
+            drawingManager.addListener('rightclick', (event) => {
+            });
+            
+            drawingManager.addListener('dragstart', (event) => {
+            });
+            
+            drawingManager.addListener('dragend', (event) => {
+            });
+            
+            drawingManager.addListener('drag', (event) => {
+            });
+            
+            drawingManager.addListener('mouseover', (event) => {
+            });
+            
+            drawingManager.addListener('mouseout', (event) => {
+            });
+            
+            drawingManager.addListener('mousemove', (event) => {
+                // จัดการ mousemove สำหรับ lateral pipe
+                if (editMode === 'lateralPipe' && onLateralPipeMouseMove) {
+                    onLateralPipeMouseMove(event);
+                }
+            });
+            
+            drawingManager.addListener('contextmenu', (event) => {
+            });
+            drawingManager.addListener('tilt_changed', (event) => {
+            });
 
             const listeners: google.maps.MapsEventListener[] = [];
 
@@ -826,11 +688,10 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                 drawingManager.addListener('polygoncomplete', (polygon: google.maps.Polygon) => {
                     let coordinates = extractCoordinatesFromShape(polygon);
                     
-                    // Snap coordinates ถ้าเป็นโซนและมีพื้นที่หลัก
                     if (editMode === 'zone' && mainArea.length > 0) {
                         coordinates = advancedSnapToMainArea(coordinates, mainArea);
-                        console.log('🔗 Snapped zone coordinates to main area boundary');
                     }
+                    // ลบการ snap สำหรับ manualZone ออก
                     
                     if (coordinates.length > 0) {
                         onCreated(coordinates, 'polygon');
@@ -845,11 +706,10 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                     (rectangle: google.maps.Rectangle) => {
                         let coordinates = extractCoordinatesFromShape(rectangle);
                         
-                        // Snap coordinates ถ้าเป็นโซนและมีพื้นที่หลัก
                         if (editMode === 'zone' && mainArea.length > 0) {
                             coordinates = advancedSnapToMainArea(coordinates, mainArea);
-                            console.log('🔗 Snapped zone coordinates to main area boundary');
                         }
+                        // ลบการ snap สำหรับ manualZone ออก
                         
                         if (coordinates.length > 0) {
                             onCreated(coordinates, 'rectangle');
@@ -863,11 +723,10 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                 drawingManager.addListener('circlecomplete', (circle: google.maps.Circle) => {
                     let coordinates = extractCoordinatesFromShape(circle);
                     
-                    // Snap coordinates ถ้าเป็นโซนและมีพื้นที่หลัก
                     if (editMode === 'zone' && mainArea.length > 0) {
                         coordinates = advancedSnapToMainArea(coordinates, mainArea);
-                        console.log('🔗 Snapped zone coordinates to main area boundary');
                     }
+                    // ลบการ snap สำหรับ manualZone ออก
                     
                     if (coordinates.length > 0) {
                         onCreated(coordinates, 'circle');
@@ -880,11 +739,13 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                 drawingManager.addListener('polylinecomplete', (polyline: google.maps.Polyline) => {
                     let coordinates = extractCoordinatesFromShape(polyline);
                     
-                    // Snap coordinates ตามประเภทท่อ
                     if (editMode === 'mainPipe') {
                         coordinates = snapMainPipeCoordinates(coordinates, pump, mainArea, subMainPipes);
                     } else if (editMode === 'subMainPipe') {
                         coordinates = snapSubMainPipeCoordinates(coordinates, mainPipes, mainArea);
+                    } else if (editMode === 'lateralPipe') {
+                        // สำหรับ lateral pipe ใช้ coordinates ที่วาดได้เลย
+                        // การ snap และการจัดการจะทำใน handleLateralPipeClick
                     }
                     
                     if (coordinates.length > 0) {
@@ -893,6 +754,134 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                     polyline.setMap(null);
                 })
             );
+
+            // เพิ่มการจัดการคลิกที่ท่อเมนเมื่ออยู่ในโหมดวาดท่อเมนรอง
+            if (editMode === 'subMainPipe' && onMainPipeClick) {
+                // สร้าง polyline สำหรับท่อเมนที่มีอยู่เพื่อให้สามารถคลิกได้
+                mainPipes.forEach((mainPipe) => {
+                    if (mainPipe.coordinates && mainPipe.coordinates.length >= 2) {
+                        const mainPipePolyline = new google.maps.Polyline({
+                            path: mainPipe.coordinates.map(coord => ({ lat: coord.lat, lng: coord.lng })),
+                            geodesic: true,
+                            strokeColor: '#FF0000',
+                            strokeOpacity: 0.9,
+                            strokeWeight: 8,
+                            map: map,
+                            clickable: true,
+                            zIndex: 998
+                        });
+
+                        // เพิ่ม hover effect
+                        mainPipePolyline.addListener('mouseover', () => {
+                            mainPipePolyline.setOptions({
+                                strokeColor: '#FF6B6B',
+                                strokeWeight: 10
+                            });
+                        });
+
+                        mainPipePolyline.addListener('mouseout', () => {
+                            mainPipePolyline.setOptions({
+                                strokeColor: '#FF0000',
+                                strokeWeight: 8
+                            });
+                        });
+
+                        // เพิ่ม click listener สำหรับท่อเมน
+                        mainPipePolyline.addListener('click', (event: google.maps.MapMouseEvent) => {
+                            if (event.latLng) {
+                                const clickPosition = {
+                                    lat: event.latLng.lat(),
+                                    lng: event.latLng.lng()
+                                };
+                                onMainPipeClick(mainPipe.id, clickPosition);
+                                
+                                // แสดง visual feedback
+                                mainPipePolyline.setOptions({
+                                    strokeColor: '#00FF00',
+                                    strokeWeight: 12
+                                });
+                                
+                                setTimeout(() => {
+                                    mainPipePolyline.setOptions({
+                                        strokeColor: '#FF0000',
+                                        strokeWeight: 8
+                                    });
+                                }, 500);
+                            }
+                        });
+
+                        // เก็บ reference เพื่อลบภายหลัง
+                        setTimeout(() => {
+                            mainPipePolyline.setMap(null);
+                        }, 1000);
+                    }
+                });
+            }
+
+            // เพิ่มการจัดการคลิกที่ท่อเมนรองเมื่ออยู่ในโหมดวาดท่อย่อย
+            if (editMode === 'lateralPipe' && onLateralPipeClick) {
+                // สร้าง polyline สำหรับท่อเมนรองที่มีอยู่เพื่อให้สามารถคลิกได้
+                subMainPipes.forEach((subMainPipe) => {
+                    if (subMainPipe.coordinates && subMainPipe.coordinates.length >= 2) {
+                        const subMainPipePolyline = new google.maps.Polyline({
+                            path: subMainPipe.coordinates.map(coord => ({ lat: coord.lat, lng: coord.lng })),
+                            geodesic: true,
+                            strokeColor: '#8B5CF6',
+                            strokeOpacity: 0.9,
+                            strokeWeight: 6,
+                            map: map,
+                            clickable: true,
+                            zIndex: 998
+                        });
+
+                        // เพิ่ม hover effect
+                        subMainPipePolyline.addListener('mouseover', () => {
+                            subMainPipePolyline.setOptions({
+                                strokeColor: '#A78BFA',
+                                strokeWeight: 8
+                            });
+                        });
+
+                        subMainPipePolyline.addListener('mouseout', () => {
+                            subMainPipePolyline.setOptions({
+                                strokeColor: '#8B5CF6',
+                                strokeWeight: 6
+                            });
+                        });
+
+                        // เพิ่ม click listener สำหรับท่อเมนรอง
+                        subMainPipePolyline.addListener('click', (event: google.maps.MapMouseEvent) => {
+                            if (event.latLng) {
+                                const clickPosition = {
+                                    lat: event.latLng.lat(),
+                                    lng: event.latLng.lng()
+                                };
+                                onLateralPipeClick(event);
+                                
+                                // แสดง visual feedback
+                                subMainPipePolyline.setOptions({
+                                    strokeColor: '#00FF00',
+                                    strokeWeight: 10
+                                });
+                                
+                                setTimeout(() => {
+                                    subMainPipePolyline.setOptions({
+                                        strokeColor: '#8B5CF6',
+                                        strokeWeight: 6
+                                    });
+                                }, 500);
+                            }
+                        });
+
+                        // เก็บ reference เพื่อลบภายหลัง
+                        setTimeout(() => {
+                            subMainPipePolyline.setMap(null);
+                        }, 1000);
+                    }
+                });
+
+
+            }
 
 
 
@@ -915,18 +904,143 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
             console.error('Error creating DrawingManager:', error);
             setIsDrawingEnabled(false);
         }
-    }, [map, editMode, onCreated, fillColor, strokeColor, isEditModeEnabled, mainArea, pump, mainPipes, subMainPipes]);
+    }, [map, editMode, onCreated, fillColor, strokeColor, isEditModeEnabled, mainArea, pump, mainPipes, subMainPipes, onLateralPipeClick, onLateralPipeMouseMove]);
+
+    // ฟังก์ชันจัดการการเริ่มต้นการวาดแบบโค้ง
+    const handleStartCurvedDrawing = () => {
+        setIsCurvedDrawingActive(true);
+        setAnchorPointsCount(0);
+        
+        // ปิด regular drawing manager โดยสมบูรณ์
+        if (drawingManagerRef.current) {
+            try {
+                drawingManagerRef.current.setDrawingMode(null);
+                drawingManagerRef.current.setOptions({ drawingControl: false });
+                drawingManagerRef.current.setMap(null);
+                drawingManagerRef.current = null;
+            } catch (e) {
+                drawingManagerRef.current = null;
+            }
+        }
+        
+        // ซ่อน drawing controls บน UI
+        try {
+            if (map) {
+                const mapDiv = map.getDiv();
+                const drawingControls = mapDiv?.querySelectorAll('.gmnoprint');
+                drawingControls?.forEach(control => {
+                    if (control instanceof HTMLElement) {
+                        control.style.display = 'none';
+                    }
+                });
+            }
+        } catch (e) {
+            // ignore errors
+        }
+    };
+
+    // ฟังก์ชันจัดการการจบการวาดแบบโค้ง
+    const handleFinishCurvedDrawing = () => {
+        setIsCurvedDrawingActive(false);
+        setAnchorPointsCount(0);
+    };
+
+    // ฟังก์ชันจัดการการยกเลิกการวาดแบบโค้ง
+    const handleCancelCurvedDrawing = () => {
+        setIsCurvedDrawingActive(false);
+        setAnchorPointsCount(0);
+        setShowCurvedPipePanel(false);
+    };
+
+    // ฟังก์ชันจัดการการล้างทั้งหมด
+    const handleClearAll = () => {
+        setIsCurvedDrawingActive(false);
+        setAnchorPointsCount(0);
+    };
+
+    // Corner rounding functionality removed as it was unused
+
+    // ฟังก์ชันจัดการเมื่อท่อโค้งเสร็จสิ้น
+    const handleCurvedPipeComplete = (coordinates: Coordinate[], pipeType: string) => {
+        onCreated(coordinates, pipeType);
+        setIsCurvedDrawingActive(false);
+        setAnchorPointsCount(0);
+        
+        // Log completion info for debugging
+        console.log(`PE Pipe completed: ${coordinates.length} points, type: ${pipeType}`);
+    };
+
+    // ฟังก์ชันอัปเดตจำนวนจุดควบคุม
+    const handleAnchorPointsChange = (count: number) => {
+        setAnchorPointsCount(count);
+    };
+
+
+
+    // Effect สำหรับแสดง control panel เมื่อเริ่มวาดท่อ
+    useEffect(() => {
+        if (enableCurvedDrawing && (editMode === 'mainPipe' || editMode === 'subMainPipe')) {
+            setShowCurvedPipePanel(true);
+            // เริ่มการวาดโค้งทันทีโดยไม่ต้องกดปุ่ม "เริ่มวาด"
+            setIsCurvedDrawingActive(true);
+            setAnchorPointsCount(0);
+        } else {
+            setShowCurvedPipePanel(false);
+            setIsCurvedDrawingActive(false);
+        }
+    }, [enableCurvedDrawing, editMode]);
+
+    useEffect(() => {
+    }, [editMode, isEditModeEnabled]);
 
     useEffect(() => {
         return () => {
             if (drawingManagerRef.current) {
-                drawingManagerRef.current.setMap(null);
+                try {
+                    drawingManagerRef.current.setDrawingMode(null);
+                    drawingManagerRef.current.setOptions({ drawingControl: false });
+                    drawingManagerRef.current.setMap(null);
+                } catch (e) {
+                    console.log('Error cleaning up drawing manager:', e);
+                }
                 drawingManagerRef.current = null;
             }
         };
     }, []);
 
-    return null;
+    return (
+        <>
+            {/* Control Panel สำหรับการวาดแบบโค้ง */}
+            {enableCurvedDrawing && showCurvedPipePanel && (
+                <CurvedPipeControlPanel
+                    isActive={showCurvedPipePanel}
+                    onFinishDrawing={handleFinishCurvedDrawing}
+                    onCancelDrawing={handleCancelCurvedDrawing}
+                    onClearAll={handleClearAll}
+                    anchorPointsCount={anchorPointsCount}
+                    showGuides={showGuides}
+                    onShowGuidesChange={setShowGuides}
+                    t={t}
+                />
+            )}
+
+            {/* Simple Curved Pipe Drawing Manager */}
+            {enableCurvedDrawing && (editMode === 'mainPipe' || editMode === 'subMainPipe') && (
+                <CurvedPipeDrawingManager
+                    map={map}
+                    isActive={isCurvedDrawingActive}
+                    pipeType={editMode as 'mainPipe' | 'subMainPipe'}
+                    onPipeComplete={handleCurvedPipeComplete}
+                    onCancel={handleCancelCurvedDrawing}
+                    strokeColor={strokeColor}
+                    strokeWeight={4}
+                    showGuides={showGuides}
+                    onAnchorPointsChange={setAnchorPointsCount}
+                />
+            )}
+
+        </>
+    );
 };
 
 export default HorticultureDrawingManager;

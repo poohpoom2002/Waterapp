@@ -629,7 +629,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
 
             ctx.strokeStyle = '#666';
             ctx.fillStyle = '#ccc';
-            ctx.font = `${12 / viewport.zoom}px Arial`;
+            ctx.font = `12px Arial`;
 
             const startWorldX = -viewport.panX;
             const endWorldX = startWorldX + canvasSize.width / viewport.zoom;
@@ -1448,8 +1448,9 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
 
+            // Allow panning when in view mode or when no specific tools are active
             const isMainClick =
-                editMode === 'view' ||
+                (editMode === 'view' && !dimensionMode && !isSettingScale) ||
                 (!dimensionMode &&
                     !isSettingScale &&
                     editMode !== 'draw' &&
@@ -1457,9 +1458,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                     editMode !== 'edit' &&
                     editMode !== 'main-pipe' &&
                     editMode !== 'drag-sprinkler' &&
-                    editMode !== 'connect-sprinklers' &&
-                    !pipeEditMode &&
-                    pipeEditMode === 'view');
+                    editMode !== 'connect-sprinklers');
 
             if (isMainClick && e.button === 0) {
                 setIsPanning(true);
@@ -1516,8 +1515,8 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 return;
             }
 
-            // Check sprinkler clicks first in pipe edit mode
-            if (pipeEditMode && (editMode === 'connect-sprinklers' || pipeEditMode)) {
+            // Check sprinkler clicks for pipe edit mode and other modes
+            if (pipeEditMode || editMode === 'connect-sprinklers') {
                 const clickedSprinkler = sprinklers.find((s) => {
                     if (!s.canvasPosition) return false;
                     const dist = calculateDistance(worldPos, s.canvasPosition);
@@ -1542,7 +1541,8 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 }
             }
 
-            if (enhancedMode && editMode === 'draw') {
+            // Handle zone drawing tools (rectangle, circle, polygon) - only when editMode is 'draw'
+            if (enhancedMode && editMode === 'draw' && ['rectangle', 'circle', 'polygon', 'freehand'].includes(currentZoneTool)) {
                 switch (currentZoneTool) {
                     case 'freehand':
                         if (!enhancedDrawing.isDrawing) {
@@ -1613,6 +1613,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 return;
             }
 
+            // Handle other tools that should work without needing to press "ใช้เครื่องมือวาด"
             if (editMode === 'drag-sprinkler') {
                 const clickedSprinkler = sprinklers.find((s) => {
                     if (!s.canvasPosition) return false;
@@ -1627,6 +1628,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 }
             }
 
+            // Handle legacy drawing mode (non-enhanced)
             if (editMode === 'draw' && !enhancedMode) {
                 if (!isDrawing) {
                     setIsDrawing(true);
@@ -1959,8 +1961,8 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                 cx={screenPos.x}
                                 cy={screenPos.y}
                                 r={radiusPixels}
-                                fill={isSelected ? '#FFD700' + '26' : sprinkler.type.color + '26'}
-                                stroke={isSelected ? '#FFD700' + '80' : sprinkler.type.color + '80'}
+                                fill={isSelected ? '#FFD700' + '15' : sprinkler.type.color + '15'}
+                                stroke={isSelected ? '#FFD700' : sprinkler.type.color}
                                 strokeWidth={2 / viewport.zoom}
                                 strokeDasharray={
                                     sprinkler.zoneId === 'virtual_zone'
@@ -1991,8 +1993,8 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                 cx={screenPos.x}
                                 cy={screenPos.y}
                                 r={radiusPixels}
-                                fill={isSelected ? '#FFD700' + '26' : sprinkler.type.color + '26'}
-                                stroke={isSelected ? '#FFD700' + '80' : sprinkler.type.color + '80'}
+                                fill={isSelected ? '#FFD700' + '15' : sprinkler.type.color + '15'}
+                                stroke={isSelected ? '#FFD700' : sprinkler.type.color}
                                 strokeWidth={2 / viewport.zoom}
                             />
                         </g>
@@ -2015,8 +2017,8 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                 cx={screenPos.x}
                                 cy={screenPos.y}
                                 r={radiusPixels}
-                                fill={isSelected ? '#FFD700' + '26' : sprinkler.type.color + '26'}
-                                stroke={isSelected ? '#FFD700' + '80' : sprinkler.type.color + '80'}
+                                fill={isSelected ? '#FFD700' + '15' : sprinkler.type.color + '15'}
+                                stroke={isSelected ? '#FFD700' : sprinkler.type.color}
                                 strokeWidth={2 / viewport.zoom}
                                 clipPath={`url(#clip-${sprinkler.id})`}
                             />
@@ -2030,8 +2032,8 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                         <g key={`radius-${sprinkler.id}`}>
                             <polygon
                                 points={points}
-                                fill={isSelected ? '#FFD700' + '26' : sprinkler.type.color + '26'}
-                                stroke={isSelected ? '#FFD700' + '80' : sprinkler.type.color + '80'}
+                                fill={isSelected ? '#FFD700' + '15' : sprinkler.type.color + '15'}
+                                stroke={isSelected ? '#FFD700' : sprinkler.type.color}
                                 strokeWidth={2 / viewport.zoom}
                             />
                         </g>
@@ -2214,38 +2216,48 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             {enhancedMode && (
                 <div className="absolute right-0 top-8 max-w-xs space-y-3 rounded-lg bg-gray-800/95 p-4 backdrop-blur">
                     <h4 className="text-sm font-semibold text-blue-400">
-                        🏗️ {t('เครื่องมือวาดโซนขั้นสูง')}
+                        🛠️ {t('เครื่องมือขั้นสูง')}
                     </h4>
 
-                    <div className="grid grid-cols-2 gap-2">
-                        {zoneDrawingTools.map((tool) => (
-                            <button
-                                key={tool.id}
-                                onClick={() => {
-                                    setCurrentZoneTool(tool.id);
-                                    setEnhancedDrawing({
-                                        isDrawing: false,
-                                        startPoint: null,
-                                        currentPoints: [],
-                                        previewShape: null,
-                                    });
-                                }}
-                                className={`rounded-lg text-xs transition-all ${
-                                    currentZoneTool === tool.id && editMode === 'draw'
-                                        ? 'border-2 border-blue-400 bg-blue-600 text-white'
-                                        : 'border-2 border-transparent bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                }`}
-                                title={tool.description}
-                            >
-                                <div className="text-lg">{tool.icon}</div>
-                                <div className="mt-1">{tool.name}</div>
-                            </button>
-                        ))}
-                    </div>
+                    {/* Zone Drawing Tools - Only show when in draw mode */}
+                    {editMode === 'draw' && (
+                        <>
+                            <div className="mb-3">
+                                <h5 className="mb-2 text-xs font-medium text-blue-300">
+                                    🏗️ {t('เครื่องมือวาดรูปทรง')}
+                                </h5>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {zoneDrawingTools.map((tool) => (
+                                        <button
+                                            key={tool.id}
+                                            onClick={() => {
+                                                setCurrentZoneTool(tool.id);
+                                                setEnhancedDrawing({
+                                                    isDrawing: false,
+                                                    startPoint: null,
+                                                    currentPoints: [],
+                                                    previewShape: null,
+                                                });
+                                            }}
+                                            className={`rounded-lg text-xs transition-all ${
+                                                currentZoneTool === tool.id
+                                                    ? 'border-2 border-blue-400 bg-blue-600 text-white'
+                                                    : 'border-2 border-transparent bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                            }`}
+                                            title={tool.description}
+                                        >
+                                            <div className="text-lg">{tool.icon}</div>
+                                            <div className="mt-1">{tool.name}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </>
+                    )}
 
                     <div className="border-t border-gray-600 pt-3">
                         <div className="mb-2 text-xs font-medium text-gray-300">
-                            📐 {t('เครื่องมือวัด:')}
+                            📐 {t('เครื่องมือวัด (ใช้งานได้เสมอ):')}
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                             <button
@@ -2261,6 +2273,18 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                             >
                                 📏 {t('เพิ่มเส้นวัด')}
                             </button>
+
+                            {dimensionMode && (
+                                <button
+                                    onClick={() => {
+                                        setDimensionMode(false);
+                                        setTempDimensionPoints([]);
+                                    }}
+                                    className="rounded bg-red-600 p-2 text-xs text-white transition-colors hover:bg-red-700"
+                                >
+                                    ❌ {t('ยกเลิก')}
+                                </button>
+                            )}
                             <button
                                 onClick={() => {
                                     setDimensionLines([]);
@@ -2282,6 +2306,9 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                     </div>
 
                     <div className="border-t border-gray-600 pt-3">
+                        <div className="mb-2 text-xs font-medium text-gray-300">
+                            ⚙️ {t('การตั้งค่า (ใช้งานได้เสมอ):')}
+                        </div>
                         <div className="grid grid-cols-2 gap-2">
                             {[
                                 {
@@ -2306,7 +2333,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
 
                     <div className="border-t border-gray-600 pt-3">
                         <div className="mb-2 text-xs font-medium text-gray-300">
-                            🔍 {t('การซูม:')}
+                            🔍 {t('การซูม (ใช้งานได้เสมอ):')}
                         </div>
                         <div className="flex gap-1">
                             <button
@@ -2613,8 +2640,9 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                 {t('เลือกเครื่องมือ')}
                             </div>
                             <div>
-                                {t('เลือกเครื่องมือวาดโซนจากแผงด้านบน')} •{' '}
-                                {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนตาราง')}
+                                {t('กดปุ่ม "ใช้เครื่องมือวาดรูปทรง" เพื่อวาดโซน')} •{' '}
+                                {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนตาราง')} •{' '}
+                                {t('เครื่องมือวัดและแก้ไขท่อใช้งานได้เสมอ')}
                             </div>
                         </div>
                     )}

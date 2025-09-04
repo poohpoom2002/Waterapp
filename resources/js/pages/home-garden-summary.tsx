@@ -10,16 +10,14 @@ import {
     Coordinate,
     CanvasCoordinate,
     GardenPlannerData,
-    GardenStatistics,
     ZONE_TYPES,
     loadGardenData,
-    calculateStatistics,
     formatArea,
-    formatDistance,
     validateGardenData,
     clipCircleToPolygon,
     canvasToGPS,
 } from '../utils/homeGardenData';
+import { calculateGardenStatistics } from '../utils/gardenStatistics';
 interface HomeGardenSummaryProps {
     data?: GardenPlannerData;
 }
@@ -511,8 +509,8 @@ const CanvasRenderer: React.FC<{
                             const radiusPixels = sprinkler.type.radius * scale * transform.scale;
 
                             if (clipResult === 'FULL_CIRCLE') {
-                                ctx.fillStyle = sprinkler.type.color + '33';
-                                ctx.strokeStyle = sprinkler.type.color + '99';
+                                ctx.fillStyle = sprinkler.type.color + '1A';
+                                ctx.strokeStyle = sprinkler.type.color;
                                 ctx.lineWidth =
                                     2 * Math.max(0.5, transform.scale / baseTransform.scale);
                                 ctx.beginPath();
@@ -537,7 +535,10 @@ const CanvasRenderer: React.FC<{
                                 ctx.closePath();
                                 ctx.clip();
 
-                                ctx.fillStyle = sprinkler.type.color + '33';
+                                ctx.fillStyle = sprinkler.type.color + '1A';
+                                ctx.strokeStyle = sprinkler.type.color;
+                                ctx.lineWidth =
+                                    2 * Math.max(0.5, transform.scale / baseTransform.scale);
                                 ctx.beginPath();
                                 ctx.arc(
                                     sprinklerPoint.x,
@@ -547,11 +548,12 @@ const CanvasRenderer: React.FC<{
                                     Math.PI * 2
                                 );
                                 ctx.fill();
+                                ctx.stroke();
                                 ctx.restore();
                             } else if (Array.isArray(clipResult) && clipResult.length >= 3) {
                                 const canvasResult = clipResult as CanvasCoordinate[];
-                                ctx.fillStyle = sprinkler.type.color + '33';
-                                ctx.strokeStyle = sprinkler.type.color + '99';
+                                ctx.fillStyle = sprinkler.type.color + '1A';
+                                ctx.strokeStyle = sprinkler.type.color;
                                 ctx.lineWidth =
                                     2 * Math.max(0.5, transform.scale / baseTransform.scale);
                                 ctx.beginPath();
@@ -573,9 +575,9 @@ const CanvasRenderer: React.FC<{
                     } else if (sprinkler.zoneId === 'virtual_zone') {
                         const radiusPixels = sprinkler.type.radius * scale * transform.scale;
 
-                        ctx.fillStyle = sprinkler.type.color + '26';
-                        ctx.strokeStyle = sprinkler.type.color + '80';
-                        ctx.lineWidth = 1 * Math.max(0.5, transform.scale / baseTransform.scale);
+                        ctx.fillStyle = sprinkler.type.color + '1A';
+                        ctx.strokeStyle = sprinkler.type.color;
+                        ctx.lineWidth = 2 * Math.max(0.5, transform.scale / baseTransform.scale);
                         ctx.setLineDash([
                             8 * Math.max(0.5, transform.scale / baseTransform.scale),
                             4 * Math.max(0.5, transform.scale / baseTransform.scale),
@@ -585,6 +587,17 @@ const CanvasRenderer: React.FC<{
                         ctx.fill();
                         ctx.stroke();
                         ctx.setLineDash([]);
+                    } else {
+                        // No zone or zone without coordinates - draw full circle
+                        const radiusPixels = sprinkler.type.radius * scale * transform.scale;
+
+                        ctx.fillStyle = sprinkler.type.color + '1A';
+                        ctx.strokeStyle = sprinkler.type.color;
+                        ctx.lineWidth = 2 * Math.max(0.5, transform.scale / baseTransform.scale);
+                        ctx.beginPath();
+                        ctx.arc(sprinklerPoint.x, sprinklerPoint.y, radiusPixels, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.stroke();
                     }
                 });
 
@@ -908,10 +921,10 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
         initializeData();
     }, [propsData]);
 
-    const statistics = useMemo<GardenStatistics | null>(() => {
+    const statistics = useMemo(() => {
         if (!gardenData) return null;
         try {
-            return calculateStatistics(gardenData);
+            return calculateGardenStatistics(gardenData);
         } catch (err) {
             console.error('Error calculating statistics:', err);
             return null;
@@ -1387,7 +1400,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                         {t('พื้นที่รวมทั้งหมด')}
                                     </div>
                                     <div className="text-xl font-bold text-white">
-                                        {formatArea(statistics.totalArea)}
+                                        {statistics.summary.totalAreaFormatted}
                                     </div>
                                 </div>
 
@@ -1396,7 +1409,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                         {t('จำนวนโซน (ไม่รวมพื้นที่ห้าม)')}
                                     </div>
                                     <div className="text-xl font-bold text-green-400">
-                                        {statistics.totalZones} {t('โซน')}
+                                        {statistics.summary.totalZones} {t('โซน')}
                                     </div>
                                 </div>
 
@@ -1405,7 +1418,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                         {t('จำนวนหัวฉีดทั้งหมด')}
                                     </div>
                                     <div className="text-xl font-bold text-blue-400">
-                                        {statistics.totalSprinklers} {t('ตัว')}
+                                        {statistics.summary.totalSprinklers} {t('ตัว')}
                                     </div>
                                 </div>
 
@@ -1417,7 +1430,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                                 {t('ท่อที่ยาวที่สุด')}
                                             </div>
                                             <div className="font-bold text-yellow-400">
-                                                {formatDistance(statistics.longestPipe)}
+                                                {statistics.summary.longestPipeFromSourceFormatted}
                                             </div>
                                         </div>
                                         <div>
@@ -1425,40 +1438,69 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                                 {t('ความยาวรวม')}
                                             </div>
                                             <div className="font-bold text-yellow-400">
-                                                {formatDistance(statistics.totalPipeLength)}
+                                                {statistics.summary.totalPipeLengthFormatted}
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+
+                                <div className="rounded-lg bg-gray-700 p-3">
+                                    <div className="mb-1 text-gray-400">{t('ข้อต่อทางแยก')}</div>
+                                    <div className="mt-1 grid grid-cols-2 gap-2">
+                                        <div>
+                                            <div className="text-xs text-gray-500">
+                                                {t('จำนวนรวม')}
+                                            </div>
+                                            <div className="font-bold text-purple-400">
+                                                {statistics.summary.totalJunctions} {t('จุด')}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-gray-500">
+                                                {t('แยกตามประเภท')}
+                                            </div>
+                                            <div className="text-xs">
+                                                <div className="text-purple-300">
+                                                    {t('ท่อ')}: {statistics.summary.junctionStatistics.pipeJunctions}
+                                                </div>
+                                                <div className="text-purple-300">
+                                                    {t('หัวฉีด')}: {statistics.summary.junctionStatistics.sprinklerJunctions}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {Object.keys(statistics.summary.junctionStatistics.junctionsByWays).length > 0 && (
+                                        <div className="mt-2 border-t border-gray-600 pt-2">
+                                            <div className="text-xs text-gray-500 mb-1">{t('จำนวนทางแยก:')}</div>
+                                            <div className="grid grid-cols-3 gap-1 text-xs">
+                                                {Object.entries(statistics.summary.junctionStatistics.junctionsByWays).map(([ways, count]) => (
+                                                    <div key={ways} className="text-purple-300">
+                                                        {ways}-{t('ทาง')}: {count}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {statistics.zoneStatistics.length > 0 && (
+                {statistics.zones.length > 0 && (
                     <div className="mt-6 rounded-xl bg-gray-800 p-6">
                         <h3 className="mb-4 text-lg font-semibold text-green-400">
                             📍 {t('ข้อมูลแยกตามโซน')}
                         </h3>
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                            {statistics.zoneStatistics.map((zone, index) => (
+                            {statistics.zones.map((zone, index) => (
                                 <div key={zone.zoneId} className="rounded-lg bg-gray-700 p-4">
                                     <div className="mb-3 flex items-center justify-between">
                                         <h4 className="font-semibold text-white">
                                             {index + 1}. {t(zone.zoneName)}
                                         </h4>
-                                        <span
-                                            className={`rounded bg-gray-600 px-2 py-1 text-xs ${
-                                                zone.zoneType === t('สนามหญ้า')
-                                                    ? 'bg-green-200 text-green-600'
-                                                    : zone.zoneType === t('แปลงดอกไม้')
-                                                      ? 'bg-pink-200 text-pink-600'
-                                                      : zone.zoneType === t('ต้นไม้')
-                                                        ? 'bg-green-300 text-green-800'
-                                                        : ''
-                                            }`}
-                                        >
-                                            {t(zone.zoneType)}
+                                        <span className="rounded bg-gray-600 px-2 py-1 text-xs text-gray-300">
+                                            {t('โซน')}
                                         </span>
                                     </div>
 
@@ -1466,7 +1508,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                         <div className="flex justify-between">
                                             <span className="text-gray-400">{t('พื้นที่:')}</span>
                                             <span className="font-medium text-white">
-                                                {formatArea(zone.area)}
+                                                {zone.areaFormatted}
                                             </span>
                                         </div>
 
@@ -1519,7 +1561,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                             </>
                                         )}
 
-                                        {zone.pipeLength > 0 && (
+                                        {zone.totalPipeLength > 0 && (
                                             <div className="border-t border-gray-600 pt-2">
                                                 <div className="mb-1 text-gray-400">
                                                     {t('ระบบท่อ:')}
@@ -1530,7 +1572,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                                             {t('ยาวที่สุด:')}{' '}
                                                         </span>
                                                         <span className="text-yellow-400">
-                                                            {formatDistance(zone.longestPipe)}
+                                                            {zone.longestPipeFromSourceFormatted}
                                                         </span>
                                                     </div>
                                                     <div>
@@ -1538,12 +1580,14 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                                             {t('รวม:')}{' '}
                                                         </span>
                                                         <span className="text-yellow-400">
-                                                            {formatDistance(zone.pipeLength)}
+                                                            {zone.totalPipeLengthFormatted}
                                                         </span>
                                                     </div>
                                                 </div>
                                             </div>
                                         )}
+
+
                                     </div>
                                 </div>
                             ))}

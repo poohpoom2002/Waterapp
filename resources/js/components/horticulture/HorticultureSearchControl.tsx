@@ -1,6 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// components/horticulture/EnhancedHorticultureSearchControl.tsx
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
     FaSearch,
@@ -92,20 +91,18 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
     const [activeCategory, setActiveCategory] = useState<string | null>(null);
     const [showCategories, setShowCategories] = useState(false);
 
-    // Load recent searches from localStorage
     useEffect(() => {
         const stored = localStorage.getItem('recentMapSearches');
         if (stored) {
             try {
                 const parsed = JSON.parse(stored);
-                setRecentSearches(parsed.slice(0, 5)); // Keep only 5 most recent
+                setRecentSearches(parsed.slice(0, 5)); 
             } catch (e) {
                 console.error('Error loading recent searches:', e);
             }
         }
     }, []);
 
-    // Check if Google Maps is ready
     useEffect(() => {
         const checkGoogleMapsReady = () => {
             if (
@@ -130,12 +127,10 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         }
     }, []);
 
-    // Initialize Google services
     useEffect(() => {
         if (!isGoogleMapsReady) return;
 
         try {
-            // Create a hidden map element for PlacesService
             const mapDiv = document.createElement('div');
             mapDiv.style.display = 'none';
             document.body.appendChild(mapDiv);
@@ -149,8 +144,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
             autocompleteServiceRef.current = new google.maps.places.AutocompleteService();
             geocoderRef.current = new google.maps.Geocoder();
 
-            console.log('✅ Enhanced search services initialized');
-
             return () => {
                 document.body.removeChild(mapDiv);
             };
@@ -160,7 +153,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         }
     }, [isGoogleMapsReady]);
 
-    // Save to recent searches
     const saveToRecentSearches = useCallback(
         (result: SearchResult) => {
             const newRecent: RecentSearch = {
@@ -180,7 +172,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         [recentSearches]
     );
 
-    // Get place type icon
     const getPlaceIcon = (types: string[]): string => {
         const typeIconMap: { [key: string]: string } = {
             restaurant: '🍽️',
@@ -239,7 +230,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         return '📍';
     };
 
-    // Get place type display name
     const getPlaceTypeName = (types: string[]): string => {
         const typeNameMap: { [key: string]: string } = {
             restaurant: 'ร้านอาหาร',
@@ -271,13 +261,11 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         return 'สถานที่';
     };
 
-    // Get price level display
     const getPriceLevelDisplay = (priceLevel?: number): string => {
         if (!priceLevel) return '';
         return '฿'.repeat(priceLevel);
     };
 
-    // Format distance
     const formatDistance = (meters: number): string => {
         if (meters < 1000) {
             return `${Math.round(meters)} ม.`;
@@ -285,7 +273,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         return `${(meters / 1000).toFixed(1)} กม.`;
     };
 
-    // Search with autocomplete predictions
     const searchWithPredictions = useCallback(async (query: string) => {
         if (!autocompleteServiceRef.current || query.length < 2) {
             setAutocompletePredictions([]);
@@ -294,7 +281,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
 
         const request: google.maps.places.AutocompletionRequest = {
             input: query,
-            // Remove country restrictions for worldwide search
             language: 'th',
             types: ['establishment', 'geocode'],
         };
@@ -308,7 +294,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         });
     }, []);
 
-    // Enhanced text search
     const performTextSearch = useCallback(async (query: string) => {
         if (!searchServiceRef.current || !query.trim()) return;
 
@@ -317,9 +302,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
 
         const request: google.maps.places.TextSearchRequest = {
             query: query,
-            // Remove location bias for worldwide search
-            language: 'th',
-            // region: 'th', // Remove region restriction
+                language: 'th',
         };
 
         searchServiceRef.current.textSearch(request, (results, status) => {
@@ -352,7 +335,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         });
     }, []);
 
-    // Search by category
     const searchByCategory = useCallback(async (category: SearchCategory) => {
         if (!searchServiceRef.current) return;
 
@@ -361,7 +343,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         setActiveCategory(category.id);
         setSearchQuery(category.name);
 
-        // Get current location or use default
         const request: google.maps.places.TextSearchRequest = {
             query: category.types.join(' OR '),
             type: category.types[0],
@@ -395,7 +376,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         });
     }, []);
 
-    // Get place details
     const getPlaceDetails = useCallback(
         async (placeId: string) => {
             if (!searchServiceRef.current) return;
@@ -456,7 +436,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         [onPlaceSelect, saveToRecentSearches]
     );
 
-    // Handle search input change
     const handleSearchChange = useCallback(
         (value: string) => {
             setSearchQuery(value);
@@ -475,10 +454,8 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                 return;
             }
 
-            // Get predictions immediately
             searchWithPredictions(value);
 
-            // Debounce full search
             searchTimeoutRef.current = setTimeout(() => {
                 performTextSearch(value);
             }, 500);
@@ -486,7 +463,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         [searchWithPredictions, performTextSearch]
     );
 
-    // Handle prediction selection
     const handlePredictionSelect = useCallback(
         (prediction: google.maps.places.AutocompletePrediction) => {
             getPlaceDetails(prediction.place_id);
@@ -494,7 +470,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         [getPlaceDetails]
     );
 
-    // Handle result selection
     const handleResultSelect = useCallback(
         (result: SearchResult) => {
             if (result.geometry?.location) {
@@ -511,7 +486,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         [onPlaceSelect, saveToRecentSearches]
     );
 
-    // Handle recent search selection
     const handleRecentSearchSelect = useCallback(
         (recent: RecentSearch) => {
             getPlaceDetails(recent.place_id);
@@ -519,7 +493,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         [getPlaceDetails]
     );
 
-    // Handle keyboard navigation
     const handleKeyDown = useCallback(
         (e: React.KeyboardEvent) => {
             const totalItems = autocompletePredictions.length + searchResults.length;
@@ -564,7 +537,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         ]
     );
 
-    // Clear search
     const handleClearSearch = useCallback(() => {
         setSearchQuery('');
         setSearchResults([]);
@@ -576,7 +548,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         inputRef.current?.focus();
     }, []);
 
-    // Handle click outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             const target = event.target as Element;
@@ -590,7 +561,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // Get photo URL
     const getPhotoUrl = (photos?: any[]): string | null => {
         if (!photos || photos.length === 0) return null;
         try {
@@ -603,7 +573,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
     if (!isGoogleMapsReady) {
         return (
             <div className="enhanced-search-container absolute left-4 top-4 z-[1000] w-[420px] max-w-[calc(100vw-2rem)]">
-                <div className="rounded-lg border border-white/20 bg-white/95 p-3 text-sm text-gray-700 shadow-xl backdrop-blur">
+                <div className="rounded-lg border border-gray-600 bg-gray-900/95 p-3 text-sm text-white shadow-xl backdrop-blur">
                     <div className="flex items-center gap-2">
                         <FaSpinner className="h-4 w-4 animate-spin text-gray-400" />
                         <span>กำลังโหลด Google Maps...</span>
@@ -616,7 +586,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
     return (
         <div className="enhanced-search-container absolute left-4 top-4 z-[1000] w-[420px] max-w-[calc(100vw-2rem)]">
             <div className="relative">
-                {/* Search Input */}
+
                 <div className="relative">
                     <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 transform text-gray-400" />
                     <input
@@ -632,7 +602,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                             setShowCategories(false);
                         }}
                         placeholder={placeholder}
-                        className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 pl-10 pr-24 text-sm text-gray-900 placeholder-gray-500 shadow-xl backdrop-blur transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        className="w-full rounded-lg border border-gray-600 bg-gray-800 px-4 py-3 pl-10 pr-24 text-sm text-white placeholder-gray-400 shadow-xl backdrop-blur transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     />
 
                     {isLoading && (
@@ -665,9 +635,9 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
 
                 {/* Categories Dropdown */}
                 {showCategories && (
-                    <div className="absolute mt-2 w-full rounded-lg border border-gray-200 bg-white shadow-xl">
+                    <div className="absolute mt-2 w-full rounded-lg border border-gray-600 bg-gray-900 shadow-xl">
                         <div className="p-3">
-                            <h3 className="mb-2 text-sm font-semibold text-gray-700">
+                            <h3 className="mb-2 text-sm font-semibold text-white">
                                 หมวดหมู่สถานที่
                             </h3>
                             <div className="grid grid-cols-2 gap-2">
@@ -680,8 +650,8 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                                         }}
                                         className={`flex items-center gap-2 rounded-lg p-2 text-sm transition-colors ${
                                             activeCategory === category.id
-                                                ? 'bg-blue-100 text-blue-700'
-                                                : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                                                ? 'bg-blue-800 text-white'
+                                                : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
                                         }`}
                                     >
                                         <span className="text-lg">{category.icon}</span>
@@ -695,7 +665,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
 
                 {/* Error Message */}
                 {error && (
-                    <div className="mt-2 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 shadow-xl">
+                    <div className="mt-2 rounded-lg border border-red-600 bg-red-900 p-3 text-sm text-red-200 shadow-xl">
                         <div className="flex items-center gap-2">
                             <span>⚠️</span>
                             <span>{error}</span>

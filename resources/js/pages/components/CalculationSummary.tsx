@@ -53,6 +53,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
     const actualBranchPipe = results.autoSelectedBranchPipe;
     const actualSecondaryPipe = results.autoSelectedSecondaryPipe;
     const actualMainPipe = results.autoSelectedMainPipe;
+    const actualEmitterPipe = results.autoSelectedEmitterPipe;
 
     const isMultiZone =
         selectedZones.length > 1 || (results.allZoneResults && results.allZoneResults.length > 1);
@@ -212,11 +213,12 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
             results.velocity.branch,
             results.velocity.secondary,
             results.velocity.main,
-        ].filter((v) => v > 0);
+            results.velocity.emitter,
+        ].filter((v) => v && v > 0);
 
-        const hasHighVelocity = velocities.some((v) => v > 2.5);
-        const hasLowVelocity = velocities.some((v) => v < 0.6);
-        const hasOptimalVelocity = velocities.some((v) => v >= 0.8 && v <= 2.0);
+        const hasHighVelocity = velocities.some((v) => v && v > 2.5);
+        const hasLowVelocity = velocities.some((v) => v && v < 0.6);
+        const hasOptimalVelocity = velocities.some((v) => v && v >= 0.8 && v <= 2.0);
 
         if (hasHighVelocity) performance.velocityStatus = 'critical';
         else if (hasLowVelocity && !hasOptimalVelocity) performance.velocityStatus = 'warning';
@@ -467,9 +469,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                         ? t('⚡ ใช้ได้')
                                         : t('❌ ไม่มี')}
                         </p>
-                        <p className="text-xs text-blue-200">
-                            {t('คะแนน:')} {actualBranchPipe?.score || t('N/A')}/{t('100')}
-                        </p>
+
                     </div>
 
                     {results.hasValidSecondaryPipe && (
@@ -494,9 +494,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                             ? t('⚡ ใช้ได้')
                                             : t('❌ ไม่มี')}
                             </p>
-                            <p className="text-xs text-orange-200">
-                                {t('คะแนน:')} {actualSecondaryPipe?.score || t('N/A')}/{t('100')}
-                            </p>
+
                         </div>
                     )}
 
@@ -522,9 +520,33 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                             ? t('⚡ ใช้ได้')
                                             : t('❌ ไม่มี')}
                             </p>
-                            <p className="text-xs text-cyan-200">
-                                {t('คะแนน:')} {actualMainPipe?.score || t('N/A')}/{t('100')}
+
+                        </div>
+                    )}
+
+                    {results.hasValidEmitterPipe && (
+                        <div className="text-center">
+                            <p className="text-green-200">{t('ท่อย่อยแยก')}</p>
+                            <p
+                                className={`text-xl font-bold ${actualEmitterPipe?.isRecommended
+                                        ? 'text-green-300'
+                                        : actualEmitterPipe?.isGoodChoice
+                                            ? 'text-yellow-300'
+                                            : 'text-orange-300'
+                                    }`}
+                            >
+                                {actualEmitterPipe ? `${actualEmitterPipe.sizeMM}mm` : t('ไม่มี')}
                             </p>
+                            <p className="text-xs text-green-100">
+                                {actualEmitterPipe?.isRecommended
+                                    ? t('🌟 แนะนำ')
+                                    : actualEmitterPipe?.isGoodChoice
+                                        ? t('✅ ดี')
+                                        : actualEmitterPipe
+                                            ? t('⚡ ใช้ได้')
+                                            : t('❌ ไม่มี')}
+                            </p>
+
                         </div>
                     )}
 
@@ -550,9 +572,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                             ? t('⚡ ใช้ได้')
                                             : t('❌ ไม่มี')}
                             </p>
-                            <p className="text-xs text-red-200">
-                                {t('คะแนน:')} {actualPump?.score || t('N/A')}/{t('100')}
-                            </p>
+
                         </div>
                     )}
                 </div>
@@ -797,11 +817,22 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         <p className="text-lg font-bold">
                             {results.totalWaterRequiredLPM.toFixed(1)} {t('ลิตร/นาที')}
                         </p>
-                        <p className="text-sm text-gray-300">
+                        <div className="mt-1 text-sm text-gray-300 space-y-1">
+                            <p>
+                                {t('ความต้องการน้ำทั้งโซน:')} {input.waterPerTreeLiters.toFixed(1)} {t('ลิตร/นาที')} {t('(จาก input)')}
+                            </p>
+                            <p>
+                                {t('หัวฉีดละ')} {results.waterPerSprinklerLPM.toFixed(1)} {t('ลิตร/นาที')}
+                            </p>
+                            <p className="text-xs text-blue-300">
+                                {t('ค่าจาก input โดยตรง:')} {input.waterPerTreeLiters.toFixed(1)} {t('ลิตร/นาที')}
+                            </p>
+                        </div>
+                        <p className="mt-1 text-sm text-gray-300">
                             + {t('Safety Factor')} {(results.safetyFactor * 100 - 100).toFixed(0)}%
                         </p>
                         <p className="text-sm font-bold text-green-300">
-                            {results.adjustedFlow.toFixed(1)} {t('ลิตร/นาที')}
+                            {results.adjustedFlow.toFixed(1)} {t('ลิตร/นาที')} {t('(ปรับแล้ว)')}
                         </p>
                         {currentZoneData && (
                             <p className="mt-1 text-xs text-blue-200">
@@ -822,11 +853,37 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         <p className="text-lg font-bold">
                             {results.waterPerSprinklerLPM.toFixed(1)} {t('ลิตร/นาที')}
                         </p>
-                        <p className="text-sm text-gray-300">
-                            ({results.waterPerSprinklerLPM.toFixed(3)} {t('ลิตร/นาที')})
-                        </p>
+                        <div className="text-sm text-gray-300 space-y-1 mt-2">
+                            <p>
+                                {t('ทั้งโซน:')} {' '}
+                                <span className="font-medium text-white">
+                                    {input.waterPerTreeLiters.toFixed(1)} {t('ลิตร/นาที')}
+                                </span>
+                                <span className="text-xs text-blue-300 ml-2">{t('(จาก input)')}</span>
+                            </p>
+                            {projectMode === 'horticulture' && (
+                                <p>
+                                    {t('จำนวนต้น:')} {' '}
+                                    <span className="font-medium text-white">
+                                        {input.totalTrees} {t('ต้น')}
+                                    </span>
+                                </p>
+                            )}
+                            <p className="text-xs text-blue-300">
+                                {t('ค่าจาก input โดยตรง:')} {input.waterPerTreeLiters.toFixed(1)} {t('ลิตร/นาที')}
+                            </p>
+                        </div>
                         {selectedSprinkler && (
-                            <p className="mt-1 text-xs text-purple-200">{selectedSprinkler.name}</p>
+                            <div className="mt-2 border-t border-purple-700 pt-2">
+                                <p className="text-xs text-purple-200">{selectedSprinkler.name}</p>
+                                {selectedSprinkler.pressureBar && (
+                                    <p className="text-xs text-gray-400">
+                                        {t('แรงดัน:')} {Array.isArray(selectedSprinkler.pressureBar) 
+                                            ? `${selectedSprinkler.pressureBar[0]}-${selectedSprinkler.pressureBar[1]}` 
+                                            : selectedSprinkler.pressureBar} {t('บาร์')}
+                                    </p>
+                                )}
+                            </div>
                         )}
                         <p className="mt-1 text-xs text-gray-400">
                             {t('สำหรับ')} {input.irrigationTimeMinutes} {t('นาที/ครั้ง')}
@@ -864,95 +921,167 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
 
                     <div className="rounded bg-gray-600 p-4">
                         <h3 className="mb-2 font-medium text-red-300">📉 {t('Head Loss รายละเอียด')}</h3>
-                        <div className="text-sm">
-                            <p>
-                                {t('Major Loss:')} {' '}
+                        <div className="text-sm space-y-1">
+                            <div className="flex justify-between">
+                                <span>{t('Major Loss:')}</span>
                                 <span className="font-bold text-red-400">
                                     {results.headLoss.totalMajor.toFixed(2)} m
                                 </span>
-                            </p>
-                            <p>
-                                {t('Minor Loss:')} {' '}
+                            </div>
+                            <div className="flex justify-between">
+                                <span>{t('Minor Loss:')}</span>
                                 <span className="font-bold text-orange-400">
                                     {results.headLoss.totalMinor.toFixed(2)} m
                                 </span>
-                            </p>
-                            <p>
-                                {t('รวม:')} {' '}
-                                <span
-                                    className={`font-bold ${getStatusColor(systemPerformance.headLossStatus)}`}
-                                >
-                                    {results.headLoss.total.toFixed(1)} m
-                                </span>
-                            </p>
+                            </div>
+                            <div className="border-t border-gray-500 pt-1 mt-1">
+                                <div className="flex justify-between">
+                                    <span className="font-medium">{t('รวม:')}</span>
+                                    <span
+                                        className={`font-bold ${getStatusColor(systemPerformance.headLossStatus)}`}
+                                    >
+                                        {results.headLoss.total.toFixed(1)} m
+                                    </span>
+                                </div>
+                            </div>
                         </div>
-                        <div className="mt-2 text-xs text-gray-300">
-                            <p>{t('ย่อย:')} {results.headLoss.branch.total.toFixed(1)}m</p>
-                            {results.hasValidSecondaryPipe && (
-                                <p>{t('รอง:')} {results.headLoss.secondary.total.toFixed(1)}m</p>
-                            )}
-                            {results.hasValidMainPipe && (
-                                <p>{t('หลัก:')} {results.headLoss.main.total.toFixed(1)}m</p>
-                            )}
+                        <div className="mt-2 border-t border-gray-500 pt-2">
+                            <h4 className="text-xs font-medium text-gray-400 mb-1">{t('แยกตามประเภทท่อ:')}</h4>
+                            <div className="text-xs text-gray-300 space-y-0.5">
+                                <div className="flex justify-between">
+                                    <span>{t('ย่อย:')}</span>
+                                    <span>{results.headLoss.branch.total.toFixed(2)}m</span>
+                                </div>
+                                {results.hasValidSecondaryPipe && (
+                                    <div className="flex justify-between">
+                                        <span>{t('รอง:')}</span>
+                                        <span>{results.headLoss.secondary.total.toFixed(2)}m</span>
+                                    </div>
+                                )}
+                                {results.hasValidMainPipe && (
+                                    <div className="flex justify-between">
+                                        <span>{t('หลัก:')}</span>
+                                        <span>{results.headLoss.main.total.toFixed(2)}m</span>
+                                    </div>
+                                )}
+                                {results.hasValidEmitterPipe && (
+                                    <div className="flex justify-between">
+                                        <span>{t('ย่อยแยก:')}</span>
+                                        <span>
+                                            {results.headLoss.emitter && typeof results.headLoss.emitter === 'object' 
+                                                ? results.headLoss.emitter.total.toFixed(2) 
+                                                : '0.00'}m
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
                     <div className="rounded bg-gray-600 p-4">
                         <h3 className="mb-2 font-medium text-cyan-300">🌊 {t('ความเร็วน้ำ')} ({t('m/s')})</h3>
-                        <div className="text-sm">
-                            <p>
-                                {t('ย่อย:')} {' '}
-                                <span
-                                    className={`font-bold ${results.velocity.branch > 2.5
-                                            ? 'text-red-400'
-                                            : results.velocity.branch < 0.3
-                                                ? 'text-blue-400'
-                                                : 'text-green-400'
-                                        }`}
-                                >
-                                    {results.velocity.branch.toFixed(2)}
-                                </span>
-                            </p>
-                            {results.hasValidSecondaryPipe && (
-                                <p>
-                                    {t('รอง:')} {' '}
+                        <div className="text-sm space-y-1">
+                            <div className="flex justify-between items-center">
+                                <span>{t('ย่อย:')}</span>
+                                <div className="flex items-center gap-2">
                                     <span
-                                        className={`font-bold ${results.velocity.secondary > 2.5
+                                        className={`font-bold ${results.velocity.branch > 2.5
                                                 ? 'text-red-400'
-                                                : results.velocity.secondary < 0.3
+                                                : results.velocity.branch < 0.3
                                                     ? 'text-blue-400'
-                                                    : 'text-green-400'
+                                                    : results.velocity.branch > 0.8 && results.velocity.branch <= 2.0
+                                                        ? 'text-green-400'
+                                                        : 'text-yellow-400'
                                             }`}
                                     >
-                                        {results.velocity.secondary.toFixed(2)}
+                                        {results.velocity.branch.toFixed(2)}
                                     </span>
-                                </p>
+                                    <span className="text-xs">
+                                        ({results.flows.branch.toFixed(0)} LPM)
+                                    </span>
+                                </div>
+                            </div>
+                            {results.hasValidSecondaryPipe && (
+                                <div className="flex justify-between items-center">
+                                    <span>{t('รอง:')}</span>
+                                    <div className="flex items-center gap-2">
+                                        <span
+                                            className={`font-bold ${results.velocity.secondary > 2.5
+                                                    ? 'text-red-400'
+                                                    : results.velocity.secondary < 0.3
+                                                        ? 'text-blue-400'
+                                                        : results.velocity.secondary > 0.8 && results.velocity.secondary <= 2.0
+                                                            ? 'text-green-400'
+                                                            : 'text-yellow-400'
+                                                }`}
+                                        >
+                                            {results.velocity.secondary.toFixed(2)}
+                                        </span>
+                                        <span className="text-xs">
+                                            ({results.flows.secondary.toFixed(0)} LPM)
+                                        </span>
+                                    </div>
+                                </div>
                             )}
                             {results.hasValidMainPipe && (
-                                <p>
-                                    {t('หลัก:')} {' '}
-                                    <span
-                                        className={`font-bold ${results.velocity.main > 2.5
-                                                ? 'text-red-400'
-                                                : results.velocity.main < 0.3
-                                                    ? 'text-blue-400'
-                                                    : 'text-green-400'
-                                            }`}
-                                    >
-                                        {results.velocity.main.toFixed(2)}
-                                    </span>
-                                </p>
+                                <div className="flex justify-between items-center">
+                                    <span>{t('หลัก:')}</span>
+                                    <div className="flex items-center gap-2">
+                                        <span
+                                            className={`font-bold ${results.velocity.main > 2.5
+                                                    ? 'text-red-400'
+                                                    : results.velocity.main < 0.3
+                                                        ? 'text-blue-400'
+                                                        : results.velocity.main > 0.8 && results.velocity.main <= 2.0
+                                                            ? 'text-green-400'
+                                                            : 'text-yellow-400'
+                                                }`}
+                                        >
+                                            {results.velocity.main.toFixed(2)}
+                                        </span>
+                                        <span className="text-xs">
+                                            ({results.flows.main.toFixed(0)} LPM)
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                            {results.hasValidEmitterPipe && (
+                                <div className="flex justify-between items-center">
+                                    <span>{t('ย่อยแยก:')}</span>
+                                    <div className="flex items-center gap-2">
+                                        <span
+                                            className={`font-bold ${(results.velocity.emitter || 0) > 2.5
+                                                    ? 'text-red-400'
+                                                    : (results.velocity.emitter || 0) < 0.3
+                                                        ? 'text-blue-400'
+                                                        : (results.velocity.emitter || 0) > 0.8 && (results.velocity.emitter || 0) <= 2.0
+                                                            ? 'text-green-400'
+                                                            : 'text-yellow-400'
+                                                }`}
+                                        >
+                                            {results.velocity.emitter?.toFixed(2) || '0.00'}
+                                        </span>
+                                        <span className="text-xs">
+                                            ({(results.flows.emitter || 0).toFixed(0)} LPM)
+                                        </span>
+                                    </div>
+                                </div>
                             )}
                         </div>
-                        <p className="mt-1 text-xs text-gray-400">{t('แนะนำ:')} 0.8-2.0 {t('m/s')}</p>
-                        <p className="mt-1 text-xs text-cyan-200">
-                            {t('สถานะ:')} {getStatusIcon(systemPerformance.velocityStatus)}
-                            {systemPerformance.velocityStatus === 'good'
-                                ? t('เหมาะสม')
-                                : systemPerformance.velocityStatus === 'warning'
-                                    ? t('ควรปรับ')
-                                    : t('ต้องปรับ')}
-                        </p>
+                        <div className="mt-2 border-t border-gray-500 pt-2">
+                            <p className="text-xs text-gray-400">{t('แนะนำ:')} 0.8-2.0 {t('m/s')}</p>
+                            <p className="text-xs text-cyan-200 flex items-center gap-1">
+                                <span>{t('สถานะ:')}</span>
+                                <span>{getStatusIcon(systemPerformance.velocityStatus)}</span>
+                                <span>
+                                    {systemPerformance.velocityStatus === 'good'
+                                        ? t('เหมาะสม')
+                                        : systemPerformance.velocityStatus === 'warning'
+                                            ? t('ควรปรับ')
+                                            : t('ต้องปรับ')}
+                                </span>
+                            </p>
+                        </div>
                     </div>
 
                     

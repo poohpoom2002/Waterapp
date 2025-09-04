@@ -804,7 +804,8 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                     }
                 }
 
-                if (editMode === 'draw') {
+                // Handle zone drawing tools (rectangle, circle, polygon) - only when editMode is 'draw'
+                if (editMode === 'draw' && ['rectangle', 'circle', 'polygon', 'freehand'].includes(currentZoneTool)) {
                     switch (currentZoneTool) {
                         case 'freehand':
                             if (!enhancedDrawing.isDrawing && !isDrawing) {
@@ -878,6 +879,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                     return;
                 }
 
+                // Handle other tools that should work without needing to press "ใช้เครื่องมือวาด"
                 if (editMode === 'place') {
                     onSprinklerPlaced(point);
                     return;
@@ -1143,8 +1145,8 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                 cx={sprinkler.canvasPosition.x}
                                 cy={sprinkler.canvasPosition.y}
                                 r={radiusPixels}
-                                fill={isSelected ? '#FFD700' + '26' : sprinkler.type.color + '26'}
-                                stroke={isSelected ? '#FFD700' + '80' : sprinkler.type.color + '80'}
+                                fill={isSelected ? '#FFD700' + '15' : sprinkler.type.color + '15'}
+                                stroke={isSelected ? '#FFD700' : sprinkler.type.color}
                                 strokeWidth={2}
                                 strokeDasharray={sprinkler.zoneId === 'virtual_zone' ? '8,4' : '0'}
                             />
@@ -1172,8 +1174,8 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                 cx={sprinkler.canvasPosition.x}
                                 cy={sprinkler.canvasPosition.y}
                                 r={radiusPixels}
-                                fill={isSelected ? '#FFD700' + '26' : sprinkler.type.color + '26'}
-                                stroke={isSelected ? '#FFD700' + '80' : sprinkler.type.color + '80'}
+                                fill={isSelected ? '#FFD700' + '15' : sprinkler.type.color + '15'}
+                                stroke={isSelected ? '#FFD700' : sprinkler.type.color}
                                 strokeWidth={2}
                             />
                         </g>
@@ -1195,8 +1197,8 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                 cx={sprinkler.canvasPosition.x}
                                 cy={sprinkler.canvasPosition.y}
                                 r={radiusPixels}
-                                fill={isSelected ? '#FFD700' + '26' : sprinkler.type.color + '26'}
-                                stroke={isSelected ? '#FFD700' + '80' : sprinkler.type.color + '80'}
+                                fill={isSelected ? '#FFD700' + '15' : sprinkler.type.color + '15'}
+                                stroke={isSelected ? '#FFD700' : sprinkler.type.color}
                                 strokeWidth={2}
                                 clipPath={`url(#clip-${sprinkler.id})`}
                             />
@@ -1209,8 +1211,8 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                         <g key={`radius-${sprinkler.id}`}>
                             <polygon
                                 points={points}
-                                fill={isSelected ? '#FFD700' + '26' : sprinkler.type.color + '26'}
-                                stroke={isSelected ? '#FFD700' + '80' : sprinkler.type.color + '80'}
+                                fill={isSelected ? '#FFD700' + '15' : sprinkler.type.color + '15'}
+                                stroke={isSelected ? '#FFD700' : sprinkler.type.color}
                                 strokeWidth={2}
                             />
                         </g>
@@ -1492,11 +1494,11 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                             )}
                         </div>
 
-                        {/* Enhanced Zone Tools Panel */}
+                        {/* Enhanced Zone Tools Panel - Only show when in draw mode */}
                         {isScaleSet && editMode === 'draw' && (
                             <div className="rounded-lg bg-gray-700 p-4">
                                 <h4 className="mb-3 text-lg font-semibold text-blue-400">
-                                    🏗️ {t('เครื่องมือวาดโซน')}
+                                    🏗️ {t('เครื่องมือวาดรูปทรง')}
                                 </h4>
 
                                 {/* Zone Drawing Tools */}
@@ -1546,7 +1548,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                             </div>
                         )}
 
-                        {/* Dimension Tools */}
+                        {/* Dimension Tools - Available without draw mode */}
                         {isScaleSet && (
                             <div className="rounded-lg bg-gray-700 p-4">
                                 <h4 className="mb-3 text-lg font-semibold text-yellow-400">
@@ -1556,7 +1558,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                 <div className="space-y-2">
                                     <button
                                         onClick={() => {
-                                            setDimensionMode(!dimensionMode);
+                                            setDimensionMode(true);
                                             setTempDimensionPoints([]);
                                         }}
                                         className={`w-full rounded-lg p-3 font-medium transition-colors ${
@@ -1565,10 +1567,20 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                 : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
                                         }`}
                                     >
-                                        {dimensionMode
-                                            ? '❌ ' + t('ยกเลิกการวัด')
-                                            : '📏 ' + t('เพิ่มเส้นวัด')}
+                                        📏 {t('เพิ่มเส้นวัด')}
                                     </button>
+
+                                    {dimensionMode && (
+                                        <button
+                                            onClick={() => {
+                                                setDimensionMode(false);
+                                                setTempDimensionPoints([]);
+                                            }}
+                                            className="w-full rounded-lg bg-red-600 p-3 font-medium text-white transition-colors hover:bg-red-700"
+                                        >
+                                            ❌ {t('ยกเลิกการวัด')}
+                                        </button>
+                                    )}
 
                                     {dimensionLines.length > 0 && (
                                         <button
@@ -1598,11 +1610,11 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                             </div>
                         )}
 
-                        {/* Pipe Editing Tools */}
-                        {isScaleSet && editMode === 'draw' && pipes.length > 0 && (
+                        {/* Pipe Editing Tools - Available without draw mode */}
+                        {isScaleSet && pipes.length > 0 && (
                             <div className="rounded-lg bg-gray-700 p-4">
                                 <h4 className="mb-3 text-lg font-semibold text-purple-400">
-                                    🔧 {t('แก้ไขระบบท่อ')}
+                                    🔧 {t('แก้ไขระบบท่อ (ใช้งานได้เสมอ)')}
                                 </h4>
 
                                 <div className="space-y-3">

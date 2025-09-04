@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // resources\js\pages\components\PumpSelector.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { CalculationResults, IrrigationInput } from '../types/interfaces';
 import { useLanguage } from '@/contexts/LanguageContext';
 import SearchableDropdown from './SearchableDropdown';
@@ -16,6 +16,7 @@ interface PumpSelectorProps {
     allZoneResults?: any[];
     projectSummary?: any;
     zoneOperationMode?: string;
+    projectMode?: 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
 }
 
 interface ZoneOperationGroup {
@@ -29,13 +30,113 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
     results,
     selectedPump,
     onPumpChange,
+    zoneOperationGroups = [],
+    zoneInputs = {},
     simultaneousZonesCount = 1,
     selectedZones = [],
-    zoneInputs = {},
+    zoneOperationMode = 'sequential',
+    projectMode = 'horticulture',
 }) => {
     const [showImageModal, setShowImageModal] = useState(false);
     const [modalImage, setModalImage] = useState({ src: '', alt: '' });
     const { t } = useLanguage();
+    
+    // คำนวณความต้องการตามเงื่อนไขใหม่สำหรับ horticulture mode
+    const getHorticultureRequirements = () => {
+        if (projectMode !== 'horticulture') {
+            return {
+                requiredFlowLPM: requiredFlow,
+                minRequiredHead: requiredHead,
+                qHeadSpray: 0
+            };
+        }
+
+        const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
+        if (!horticultureSystemDataStr) {
+            return {
+                requiredFlowLPM: requiredFlow,
+                minRequiredHead: requiredHead,
+                qHeadSpray: 0
+            };
+        }
+
+        try {
+            const horticultureSystemData = JSON.parse(horticultureSystemDataStr);
+            const { sprinklerConfig, zones } = horticultureSystemData;
+            
+            if (!sprinklerConfig || !zones) {
+                return {
+                    requiredFlowLPM: requiredFlow,
+                    minRequiredHead: requiredHead,
+                    qHeadSpray: 0
+                };
+            }
+
+            const qHeadSpray = sprinklerConfig.flowRatePerPlant || 0;
+            let requiredFlowLPM = 0;
+            
+            if (zoneOperationMode === 'simultaneous') {
+                requiredFlowLPM = zones.reduce((total: number, zone: any) => total + zone.waterNeedPerMinute, 0);
+            } else if (zoneOperationMode === 'custom' && zoneOperationGroups.length > 0) {
+                let maxGroupFlow = 0;
+                zoneOperationGroups.forEach((group: ZoneOperationGroup) => {
+                    const groupFlow = group.zones.reduce((sum: number, zoneId: string) => {
+                        const zone = zones.find((z: any) => z.id === zoneId);
+                        return sum + (zone?.waterNeedPerMinute || 0);
+                    }, 0);
+                    maxGroupFlow = Math.max(maxGroupFlow, groupFlow);
+                });
+                requiredFlowLPM = maxGroupFlow;
+            } else {
+                requiredFlowLPM = Math.max(...zones.map((zone: any) => zone.waterNeedPerMinute || 0));
+            }
+
+            const minRequiredHead = qHeadSpray * 10;
+
+            return {
+                requiredFlowLPM,
+                minRequiredHead,
+                qHeadSpray
+            };
+        } catch (error) {
+            return {
+                requiredFlowLPM: requiredFlow,
+                minRequiredHead: requiredHead,
+                qHeadSpray: 0
+            };
+        }
+    };
+
+    const horticultureReq = getHorticultureRequirements();
+    
+    // ประเมินความเพียงพอของปั๊มตามเงื่อนไขใหม่
+    const evaluatePumpAdequacy = (pump: any) => {
+        if (!pump || projectMode !== 'horticulture') {
+            return {
+                isFlowAdequate: pump?.isFlowAdequate || true,
+                isHeadAdequate: pump?.isHeadAdequate || true,
+                flowRatio: pump?.flowRatio || 1,
+                headRatio: pump?.headRatio || 1
+            };
+        }
+
+        const maxFlow = pump.max_flow_rate_lpm || pump.maxFlowLPM || 0;
+        const maxHead = pump.max_head_m || pump.maxHead || 0;
+
+        const isFlowAdequate = maxFlow >= horticultureReq.requiredFlowLPM;
+        const isHeadAdequate = maxHead >= horticultureReq.minRequiredHead;
+
+        const flowRatio = horticultureReq.requiredFlowLPM > 0 ? (maxFlow / horticultureReq.requiredFlowLPM) : 0;
+        const headRatio = horticultureReq.minRequiredHead > 0 ? (maxHead / horticultureReq.minRequiredHead) : 0;
+
+        return {
+            isFlowAdequate,
+            isHeadAdequate,
+            flowRatio,
+            headRatio
+        };
+    };
+    
     const openImageModal = (src: string, alt: string) => {
         setModalImage({ src, alt });
         setShowImageModal(true);
@@ -73,9 +174,8 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 const zoneInput = zoneInputs[zoneId];
                 if (!zoneInput) return { zoneId, flow: 0, head: 0 };
 
-                const flowLPM =
-                    (zoneInput.totalTrees * zoneInput.waterPerTreeLiters) /
-                    (zoneInput.irrigationTimeMinutes);
+                // For horticulture mode, waterPerTreeLiters is now in LPM
+                const flowLPM = zoneInput.totalTrees * zoneInput.waterPerTreeLiters;
                 const headTotal = zoneInput.staticHeadM + zoneInput.pressureHeadM;
 
                 return {
@@ -109,34 +209,104 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
     const currentPump = selectedPump || results.autoSelectedPump;
     const autoSelectedPump = results.autoSelectedPump;
-    const analyzedPumps = results.analyzedPumps || [];
+    const analyzedPumps = useMemo(() => results.analyzedPumps || [], [results.analyzedPumps]);
 
-    const sortedPumps = analyzedPumps.sort((a, b) => {
-        if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
-        if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
-        if (a.isUsable !== b.isUsable) return b.isUsable ? 1 : -1;
-        return b.score - a.score;
-    });
+    // กรองปั๊มสำหรับ horticulture mode
+    const getFilteredPumps = () => {
+        if (projectMode !== 'horticulture') {
+            return analyzedPumps.sort((a, b) => a.price - b.price);
+        }
+
+        // สำหรับ horticulture mode - กรองตามเงื่อนไขเฉพาะ
+        const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
+        if (!horticultureSystemDataStr) {
+            return analyzedPumps.sort((a, b) => a.price - b.price);
+        }
+
+        try {
+            const horticultureSystemData = JSON.parse(horticultureSystemDataStr);
+            const { sprinklerConfig, zones, isMultipleZones } = horticultureSystemData;
+            
+            if (!sprinklerConfig || !zones) {
+                return analyzedPumps.sort((a, b) => a.price - b.price);
+            }
+
+            const qHeadSpray = sprinklerConfig.flowRatePerPlant || 0; // Q หัวฉีด
+            
+            // คำนวณความต้องการน้ำตาม mode การเปิดโซน
+            let requiredFlowLPM = 0;
+            
+            if (zoneOperationMode === 'simultaneous') {
+                // เปิดพร้อมกันทุกโซน - รวมน้ำทุกโซน
+                requiredFlowLPM = zones.reduce((total: number, zone: any) => total + zone.waterNeedPerMinute, 0);
+            } else if (zoneOperationMode === 'custom' && zoneOperationGroups.length > 0) {
+                // กำหนดเอง - หากลุ่มที่มีความต้องการมากที่สุด
+                let maxGroupFlow = 0;
+                zoneOperationGroups.forEach((group: ZoneOperationGroup) => {
+                    const groupFlow = group.zones.reduce((sum: number, zoneId: string) => {
+                        const zone = zones.find((z: any) => z.id === zoneId);
+                        return sum + (zone?.waterNeedPerMinute || 0);
+                    }, 0);
+                    maxGroupFlow = Math.max(maxGroupFlow, groupFlow);
+                });
+                requiredFlowLPM = maxGroupFlow;
+            } else {
+                // เปิดทีละโซน (sequential) - ใช้โซนที่ต้องการน้ำมากที่สุด
+                requiredFlowLPM = Math.max(...zones.map((zone: any) => zone.waterNeedPerMinute || 0));
+            }
+
+            // เงื่อนไขการกรอง
+            const minRequiredHead = qHeadSpray * 10; // maxHead >= Q หัวฉีด * 10
+            
+            // กรองปั๊มที่เข้าเงื่อนไข
+            const compatiblePumps = analyzedPumps.filter((pump: any) => {
+                // ตรวจสอบ maxHead
+                const maxHead = pump.max_head_m || pump.maxHead || 0;
+                const headCheck = maxHead >= minRequiredHead;
+                
+                // ตรวจสอบ maxFlow
+                const maxFlow = pump.max_flow_rate_lpm || pump.maxFlowLPM || 0;
+                const flowCheck = maxFlow >= requiredFlowLPM;
+                
+                return headCheck && flowCheck;
+            });
+
+            // เรียงตามราคาถูกสุดก่อน
+            return compatiblePumps.sort((a, b) => a.price - b.price);
+            
+        } catch (error) {
+            return analyzedPumps.sort((a, b) => a.price - b.price);
+        }
+    };
+
+    const sortedPumps = getFilteredPumps();
+
+    // Auto-select pump for horticulture mode based on system requirements
+    useEffect(() => {
+        if (projectMode === 'horticulture' && !selectedPump && analyzedPumps.length > 0) {
+            if (sortedPumps.length > 0) {
+                // เลือกปั๊มตัวแรก (ราคาถูกสุดที่เข้าเงื่อนไข)
+                const bestPump = sortedPumps[0];
+                if (bestPump) {
+                    onPumpChange(bestPump);
+                }
+            }
+        }
+    }, [projectMode, selectedPump, analyzedPumps, onPumpChange, zoneOperationMode, zoneOperationGroups, sortedPumps]);
 
     const getSelectionStatus = (pump: any) => {
         if (!pump) return null;
         const isAutoSelected = pump.id === autoSelectedPump?.id;
 
         if (isAutoSelected) {
-            if (pump.isRecommended) return t('🤖⭐ เลือกอัตโนมัติ (แนะนำ)');
-            if (pump.isGoodChoice) return t('🤖✅ เลือกอัตโนมัติ (ดี)');
-            if (pump.isUsable) return t('🤖⚡ เลือกอัตโนมัติ (ใช้ได้)');
-            return t('🤖⚠️ เลือกอัตโนมัติ (ตัวดีที่สุดที่มี)');
+            return t('🤖 เลือกอัตโนมัติ');
         } else {
             return t('👤 เลือกเอง');
         }
     };
 
     const getPumpGrouping = (pump: any) => {
-        if (pump.isRecommended) return t('แนะนำ');
-        if (pump.isGoodChoice) return t('ตัวเลือกดี');
-        if (pump.isUsable) return t('ใช้ได้');
-        return t('อื่นๆ');
+        return t('ปั๊มน้ำ');
     };
 
     const formatRangeValue = (value: any) => {
@@ -221,20 +391,21 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                     <p>
                         {t('อัตราการไหล:')} {' '}
                         <span className="font-bold text-blue-300">
-                            {results.projectSummary
-                                ? results.projectSummary.selectedGroupFlowLPM.toFixed(1)
-                                : requiredFlow.toFixed(1)}{' '}
+                            {horticultureReq.requiredFlowLPM.toFixed(1)}{' '}
                             {t('LPM')}
                         </span>
                     </p>
                     <p>
                         {t('Head รวม:')} {' '}
                         <span className="font-bold text-yellow-300">
-                            {results.projectSummary
-                                ? results.projectSummary.selectedGroupHeadM.toFixed(1)
-                                : requiredHead.toFixed(1)}{' '}
+                            {horticultureReq.minRequiredHead.toFixed(1)}{' '}
                             {t('เมตร')}
                         </span>
+                        {projectMode === 'horticulture' && (
+                            <span className="ml-2 text-xs text-gray-400">
+                                (Q หัวฉีด {horticultureReq.qHeadSpray} × 10)
+                            </span>
+                        )}
                     </p>
                 </div>
                 {results.projectSummary && (
@@ -253,16 +424,24 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                         )}
                     </div>
                 )}
-                {selectedZones &&
-                    selectedZones.length > 1 &&
-                    simultaneousZonesCount &&
-                    simultaneousZonesCount > 1 &&
-                    !results.projectSummary && (
-                        <div className="mt-2 text-xs text-purple-200">
-                            <p>🔄 {t('คำนวณสำหรับ')} {simultaneousZonesCount} {t('โซนที่เปิดพร้อมกัน')}</p>
-                            <p>💧 {t('อัตราการไหลรวม:')} {actualRequiredFlow.toFixed(1)} {t('LPM')} ({t('Fallback')})</p>
-                        </div>
-                    )}
+                {projectMode === 'horticulture' && (
+                    <div className="mt-2 text-xs text-purple-200">
+                        <p>🎯 {t('รูปแบบการเปิด:')} {' '}
+                            {zoneOperationMode === 'simultaneous'
+                                ? t('เปิดพร้อมกันทุกโซน')
+                                : zoneOperationMode === 'custom'
+                                  ? t('เปิดแบบกำหนดเอง')
+                                  : t('เปิดทีละโซน')}
+                        </p>
+                        <p>💧 {t('คำนวณจาก:')} {' '}
+                            {zoneOperationMode === 'simultaneous'
+                                ? t('น้ำรวมทุกโซน')
+                                : zoneOperationMode === 'custom'
+                                  ? t('กลุ่มโซนที่ต้องการมากสุด')
+                                  : t('โซนที่ต้องการมากสุด')}
+                        </p>
+                    </div>
+                )}
             </div>
 
             <div className="mb-4">
@@ -281,8 +460,15 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                             const isAuto = pump.id === autoSelectedPump?.id;
                             return {
                                 value: pump.id,
-                                label: `${isAuto ? '🤖 ' : ''}${pump.name || pump.productCode} - ${pump.powerHP}HP - ${pump.price?.toLocaleString()} ${t('บาท')} | ${group} | ${t('คะแนน:')} ${pump.score}${!pump.isFlowAdequate || !pump.isHeadAdequate ? ' ' + t('(ไม่เพียงพอ)') : ''}`,
-                                searchableText: `${pump.productCode || ''} ${pump.name || ''} ${pump.brand || ''} ${pump.powerHP}HP ${group}`
+                                label: `${isAuto ? '🤖 ' : ''}${pump.name || pump.productCode} - ${pump.powerHP}HP - ${pump.price?.toLocaleString()} ${t('บาท')}`,
+                                searchableText: `${pump.productCode || ''} ${pump.name || ''} ${pump.brand || ''} ${pump.powerHP}HP`,
+                                image: (pump as any).image_url || pump.image || (pump as any).imageUrl,
+                                productCode: pump.productCode,
+                                name: pump.name,
+                                brand: pump.brand,
+                                price: pump.price,
+                                unit: t('บาท'),
+                                isAutoSelected: isAuto
                             };
                         })
                     ]}
@@ -296,9 +482,6 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 <div className="rounded bg-gray-600 p-3">
                     <div className="mb-3 flex items-center justify-between">
                         <h4 className="font-medium text-white">{t('ปั๊มที่เลือก')}</h4>
-                        <span className="text-sm font-bold text-green-300">
-                            {t('คะแนน:')} {currentPump.score}/100
-                        </span>
                     </div>
 
                     <div className="mb-3 rounded bg-blue-900 p-2">
@@ -365,76 +548,39 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                     </div>
 
                     <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                        {(() => {
+                            const adequacy = evaluatePumpAdequacy(currentPump);
+                            return (
+                                <>
                         <p>
                             <strong>{t('Flow:')}</strong>{' '}
                             <span
-                                className={`font-bold ${currentPump.isFlowAdequate ? 'text-green-300' : 'text-red-300'}`}
+                                            className={`font-bold ${adequacy.isFlowAdequate ? 'text-green-300' : 'text-red-300'}`}
                             >
-                                {currentPump.isFlowAdequate ? '✅ ' + t('เพียงพอ') : '❌ ' + t('ไม่เพียงพอ')}
+                                            {adequacy.isFlowAdequate ? '✅ ' + t('เพียงพอ') : '❌ ' + t('ไม่เพียงพอ')}
                             </span>
                             <span className="ml-2 text-gray-400">
-                                ({currentPump.flowRatio.toFixed(1)}x)
+                                            ({adequacy.flowRatio.toFixed(1)}x)
                             </span>
                         </p>
 
                         <p>
                             <strong>{t('Head:')}</strong>{' '}
                             <span
-                                className={`font-bold ${currentPump.isHeadAdequate ? 'text-green-300' : 'text-red-300'}`}
+                                            className={`font-bold ${adequacy.isHeadAdequate ? 'text-green-300' : 'text-red-300'}`}
                             >
-                                {currentPump.isHeadAdequate ? '✅ ' + t('เพียงพอ') : '❌ ' + t('ไม่เพียงพอ')}
+                                            {adequacy.isHeadAdequate ? '✅ ' + t('เพียงพอ') : '❌ ' + t('ไม่เพียงพอ')}
                             </span>
                             <span className="ml-2 text-gray-400">
-                                ({currentPump.headRatio.toFixed(1)}x)
+                                            ({adequacy.headRatio.toFixed(1)}x)
                             </span>
                         </p>
+                                </>
+                            );
+                        })()}
                     </div>
 
-                    <div className="mt-3 rounded bg-gray-500 p-2">
-                            <h5 className="text-xs font-medium text-yellow-300">{t('การวิเคราะห์:')}</h5>
-                        <div className="grid grid-cols-3 gap-2 text-xs">
-                            <p>
-                                {t('คะแนนรวม:')} <span className="font-bold">{currentPump.score}</span>/100
-                            </p>
-                            <p>
-                                {t('กำลังประมาณ:')} {' '}
-                                <span className="font-bold">
-                                    {currentPump.estimatedHP.toFixed(1)}
-                                </span>{' '}
-                                {t('HP')}
-                            </p>
-                            <p>
-                                {t('ประสิทธิภาพ/บาท:')} {' '}
-                                <span className="font-bold">
-                                    {currentPump.flowPerBaht.toFixed(3)}
-                                </span>
-                            </p>
-                        </div>
-                        <div className="mt-1 text-xs">
-                            <p>
-                                {t('ความเหมาะสม:')}
-                                <span
-                                    className={`ml-1 font-bold ${
-                                        currentPump.isRecommended
-                                            ? 'text-green-300'
-                                            : currentPump.isGoodChoice
-                                              ? 'text-yellow-300'
-                                              : currentPump.isUsable
-                                                ? 'text-orange-300'
-                                                : 'text-red-300'
-                                    }`}
-                                >
-                                    {currentPump.isRecommended
-                                        ? '⭐ ' + t('แนะนำ')
-                                        : currentPump.isGoodChoice
-                                          ? '✅ ' + t('ดี')
-                                          : currentPump.isUsable
-                                            ? '⚡ ' + t('ใช้ได้')
-                                            : '⚠️ ' + t('ไม่เหมาะสม')}
-                                </span>
-                            </p>
-                        </div>
-                    </div>
+
 
                     {currentPump.description && (
                         <div className="mt-3 rounded bg-gray-800 p-2">
@@ -542,19 +688,22 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                         </div>
                     )}
 
-                    {(!currentPump.isFlowAdequate || !currentPump.isHeadAdequate) && (
+                    {(() => {
+                        const adequacy = evaluatePumpAdequacy(currentPump);
+                        return (!adequacy.isFlowAdequate || !adequacy.isHeadAdequate) && (
                         <div className="mt-3 rounded bg-red-900 p-2">
                             <p className="text-sm text-red-300">
                                 ⚠️ <strong>{t('คำเตือน:')}</strong> {t('ปั๊มนี้')}
-                                {!currentPump.isFlowAdequate && ' อัตราการไหลไม่เพียงพอ'}
-                                {!currentPump.isFlowAdequate &&
-                                    !currentPump.isHeadAdequate &&
+                                    {!adequacy.isFlowAdequate && ' อัตราการไหลไม่เพียงพอ'}
+                                    {!adequacy.isFlowAdequate &&
+                                        !adequacy.isHeadAdequate &&
                                     ' และ'}
-                                {!currentPump.isHeadAdequate && ' ' + t('ความสูงยกไม่เพียงพอ')}{' '}
+                                    {!adequacy.isHeadAdequate && ' ' + t('ความสูงยกไม่เพียงพอ')}{' '}
                                 {t('สำหรับระบบนี้')}
                             </p>
                         </div>
-                    )}
+                        );
+                    })()}
 
                 </div>
             ) : (

@@ -14,7 +14,7 @@ class GeminiAiService
     public function __construct()
     {
         $this->apiKey = env('GEMINI_API_KEY');
-        $this->baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent';
+        $this->baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent';
         
         if (empty($this->apiKey)) {
             throw new Exception('GEMINI_API_KEY not found in .env file');

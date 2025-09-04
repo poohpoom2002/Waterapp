@@ -43,6 +43,7 @@ interface QuotationDocumentProps {
     selectedBranchPipe: any;
     selectedSecondaryPipe: any;
     selectedMainPipe: any;
+    selectedEmitterPipe?: any;
     selectedExtraPipe?: any;
     projectImage?: string | null;
     projectMode: 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
@@ -50,7 +51,7 @@ interface QuotationDocumentProps {
     projectData: any;
     showPump: boolean;
     zoneSprinklers: { [zoneId: string]: any };
-    selectedPipes: { [zoneId: string]: { branch?: any; secondary?: any; main?: any } };
+    selectedPipes: { [zoneId: string]: { branch?: any; secondary?: any; main?: any; emitter?: any } };
     onClose: () => void;
 }
 const QuotationDocument: React.FC<QuotationDocumentProps> = ({
@@ -63,6 +64,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     selectedBranchPipe,
     selectedSecondaryPipe,
     selectedMainPipe,
+    selectedEmitterPipe,
     selectedExtraPipe,
     projectImage,
     projectData,
@@ -501,6 +503,21 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     originalData: selectedMainPipe,
                 });
             }
+
+            if (selectedEmitterPipe && results) {
+                initialItems.push({
+                    id: 'emitterPipe',
+                    seq: seq++,
+                    image: selectedEmitterPipe.image_url || selectedEmitterPipe.image || '',
+                    date: '',
+                    description: `${selectedEmitterPipe.productCode || selectedEmitterPipe.product_code || ''} - ท่อย่อยแยก ${selectedEmitterPipe.pipeType || ''} ${selectedEmitterPipe.sizeMM || ''}mm ยาว ${selectedEmitterPipe.lengthM || ''} ม./ม้วน`,
+                    quantity: results.emitterPipeRolls || 0,
+                    unitPrice: selectedEmitterPipe.price || 0,
+                    discount: 30.0,
+                    taxes: 'Output\nVAT\n7%',
+                    originalData: selectedEmitterPipe,
+                });
+            }
         }
 
         if (selectedPump && results) {
@@ -612,6 +629,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         selectedBranchPipe,
         selectedSecondaryPipe,
         selectedMainPipe,
+        selectedEmitterPipe,
         results,
         zoneSprinklers,
         selectedPipes,
