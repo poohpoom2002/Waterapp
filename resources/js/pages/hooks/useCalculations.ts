@@ -103,101 +103,37 @@ const calculateSprinklerPressure = (sprinkler: any, defaultPressure: number, pro
 const calculateSprinklerBasedFlow = (sprinkler: any, input: IrrigationInput, projectMode?: string) => {
     let totalWaterPerMinute: number;
     let totalSprinklers: number;
+    let flowPerSprinkler: number;
     
     if (projectMode === 'field-crop') {
-        // Fix: waterPerTreeLiters for field-crop should be flow rate (LPM)
-        // If it's per session, convert to per minute
-        const waterPerTreeLPM = input.waterPerTreeLiters / (input.irrigationTimeMinutes || 30);
-        totalWaterPerMinute = input.totalTrees * waterPerTreeLPM;
+        // Field-crop: waterPerTreeLiters is LPM per head
         totalSprinklers = input.totalTrees;
+        flowPerSprinkler = input.waterPerTreeLiters;
+        totalWaterPerMinute = totalSprinklers * flowPerSprinkler;
     } else if (projectMode === 'greenhouse') {
-        // Fix: Convert from per-session to per-minute flow rate
-        const waterPerSprinklerPerMinute = input.waterPerTreeLiters / (input.irrigationTimeMinutes || 30);
-        totalWaterPerMinute = input.totalTrees * waterPerSprinklerPerMinute;
+        // Greenhouse: Convert from per-session to per-minute flow rate
         totalSprinklers = input.totalTrees;
+        flowPerSprinkler = input.waterPerTreeLiters / (input.irrigationTimeMinutes || 30);
+        totalWaterPerMinute = totalSprinklers * flowPerSprinkler;
     } else if (projectMode === 'garden') {
-        // Fix: Convert from per-session to per-minute flow rate
-        const waterPerSprinklerPerMinute = input.waterPerTreeLiters / (input.irrigationTimeMinutes || 30);
-        totalWaterPerMinute = input.totalTrees * waterPerSprinklerPerMinute;
+        // Garden: Convert from per-session to per-minute flow rate
         totalSprinklers = input.totalTrees;
+        flowPerSprinkler = input.waterPerTreeLiters / (input.irrigationTimeMinutes || 30);
+        totalWaterPerMinute = totalSprinklers * flowPerSprinkler;
     } else {
-        // Horticulture mode: waterPerTreeLiters is per irrigation session
-        const totalWaterPerIrrigation = input.totalTrees * input.waterPerTreeLiters * (input.sprinklersPerTree || 1);
-        totalWaterPerMinute = totalWaterPerIrrigation / (input.irrigationTimeMinutes || 30);
+        // Horticulture mode: waterPerTreeLiters is TOTAL water requirement for entire zone (LPM)
         totalSprinklers = Math.ceil(input.totalTrees * (input.sprinklersPerTree || 1));
+        // ใช้ค่าจาก input เป็น total water requirement ทั้งโซน
+        totalWaterPerMinute = input.waterPerTreeLiters;
+        flowPerSprinkler = totalSprinklers > 0 ? totalWaterPerMinute / totalSprinklers : 0;
     }
 
-    if (!sprinkler) {
-        return {
-            totalFlowLPM: totalWaterPerMinute,
-            sprinklerFlowLPM: totalSprinklers > 0 ? totalWaterPerMinute / totalSprinklers : 0,
-            sprinklersUsed: totalSprinklers,
-        };
-    }
-
-    try {
-        let sprinklerFlowLPM;
-        const flowData = sprinkler.waterVolumeLitersPerMinute || sprinkler.waterVolumeLPM;
-
-        if (Array.isArray(flowData)) {
-            const avgFlow = (flowData[0] + flowData[1]) / 2;
-            sprinklerFlowLPM = avgFlow;
-        } else if (typeof flowData === 'string' && flowData.includes('-')) {
-            const parts = flowData.split('-');
-            const min = parseFloat(parts[0]);
-            const max = parseFloat(parts[1]);
-            const avgFlow = (min + max) / 2;
-            sprinklerFlowLPM = avgFlow;
-        } else {
-            sprinklerFlowLPM = parseFloat(String(flowData)) || 0;
-        }
-
-        if (sprinklerFlowLPM <= 0 || isNaN(sprinklerFlowLPM)) {
-            throw new Error('Invalid sprinkler flow rate');
-        }
-
-        if (projectMode === 'greenhouse') {
-            return {
-                totalFlowLPM: totalWaterPerMinute,
-                sprinklerFlowLPM: formatNumber(totalWaterPerMinute / totalSprinklers, 1),
-                sprinklersUsed: totalSprinklers,
-            };
-        }
-
-        const expectedFlowPerSprinkler = totalWaterPerMinute / totalSprinklers;
-
-        if (sprinklerFlowLPM > expectedFlowPerSprinkler * 3) {
-            return {
-                totalFlowLPM: totalWaterPerMinute,
-                sprinklerFlowLPM: expectedFlowPerSprinkler,
-                sprinklersUsed: totalSprinklers,
-            };
-        }
-
-        if (sprinklerFlowLPM < expectedFlowPerSprinkler / 3) {
-            return {
-                totalFlowLPM: totalWaterPerMinute,
-                sprinklerFlowLPM: expectedFlowPerSprinkler,
-                sprinklersUsed: totalSprinklers,
-            };
-        }
-
-        const effectiveFlowPerSprinkler = Math.min(sprinklerFlowLPM, expectedFlowPerSprinkler * 1.2);
-        const totalFlowLPM = effectiveFlowPerSprinkler * totalSprinklers;
-
-        return {
-            totalFlowLPM: totalFlowLPM,
-            sprinklerFlowLPM: formatNumber(effectiveFlowPerSprinkler, 1),
-            sprinklersUsed: totalSprinklers,
-        };
-    } catch (error) {
-        console.error('Error in calculateSprinklerBasedFlow:', error);
-        return {
-            totalFlowLPM: totalWaterPerMinute,
-            sprinklerFlowLPM: totalSprinklers > 0 ? totalWaterPerMinute / totalSprinklers : 0,
-            sprinklersUsed: totalSprinklers,
-        };
-    }
+    // ใช้ค่าจาก input เป็นหลัก ไม่ดึงจาก sprinkler data
+    return {
+        totalFlowLPM: totalWaterPerMinute,
+        sprinklerFlowLPM: formatNumber(flowPerSprinkler, 2),
+        sprinklersUsed: totalSprinklers,
+    };
 };
 
 const calculateFlowRequirements = (input: IrrigationInput, selectedSprinkler: any, projectMode?: string) => {
@@ -244,6 +180,11 @@ const calculateFlowRequirements = (input: IrrigationInput, selectedSprinkler: an
         ? Math.min(sprinklerFlow.totalFlowLPM, secondaryFlowLPM * 2) 
         : 0;
 
+    // Calculate emitter flow based on plant density and connection method
+    const emitterFlowLPM = (input.longestEmitterPipeM && input.longestEmitterPipeM > 0)
+        ? Math.max(flowPerSprinklerLPM * 0.5, flowPerSprinklerLPM) // Typically 50-100% of single sprinkler flow
+        : 0;
+
     return {    
         totalFlowLPM: sprinklerFlow.totalFlowLPM,
         totalSprinklers,
@@ -252,6 +193,7 @@ const calculateFlowRequirements = (input: IrrigationInput, selectedSprinkler: an
         branchFlowLPM: formatNumber(branchFlowLPM, 1),
         secondaryFlowLPM: formatNumber(secondaryFlowLPM, 1),
         mainFlowLPM: formatNumber(mainFlowLPM, 1),
+        emitterFlowLPM: formatNumber(emitterFlowLPM, 1),
     };
 };
 
@@ -275,7 +217,12 @@ const calculateZoneResults = (
                     []
                 )
             )
-            .sort((a, b) => b.score - a.score);
+            .sort((a, b) => {
+                // Sort by recommendation status first, then by price
+                if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
+                if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
+                return a.price - b.price;
+            });
 
         const autoSelectedBranchPipe = autoSelectBestPipe(
             analyzedBranchPipes,
@@ -298,7 +245,12 @@ const calculateZoneResults = (
                         []
                     )
                 )
-                .sort((a, b) => b.score - a.score);
+                .sort((a, b) => {
+                    // Sort by recommendation status first, then by price
+                    if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
+                    if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
+                    return a.price - b.price;
+                });
 
             autoSelectedSecondaryPipe = autoSelectBestPipe(
                 analyzedSecondaryPipes,
@@ -322,7 +274,12 @@ const calculateZoneResults = (
                         []
                     )
                 )
-                .sort((a, b) => b.score - a.score);
+                .sort((a, b) => {
+                    // Sort by recommendation status first, then by price
+                    if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
+                    if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
+                    return a.price - b.price;
+                });
 
             autoSelectedMainPipe = autoSelectBestPipe(
                 analyzedMainPipes,
@@ -365,7 +322,48 @@ const calculateZoneResults = (
               )
             : { major: 0, minor: 0, total: 0, velocity: 0, C: 145, K: 0 };
 
-        const totalHeadLoss = branchLoss.total + secondaryLoss.total + mainLoss.total;
+        // Calculate emitter pipe selection and head loss
+        const hasValidEmitterPipe = input.longestEmitterPipeM && input.longestEmitterPipeM > 0 && input.totalEmitterPipeM && input.totalEmitterPipeM > 0;
+        let autoSelectedEmitterPipe: any = null;
+        if (hasValidEmitterPipe) {
+            const analyzedEmitterPipes = pipeData
+                .map((pipe) =>
+                    evaluatePipeOverall(
+                        pipe,
+                        flowData.emitterFlowLPM,
+                        input.longestEmitterPipeM || 0,
+                        'emitter',
+                        input.pipeAgeYears || 0,
+                        []
+                    )
+                )
+                .sort((a, b) => {
+                    // Sort by recommendation status first, then by price
+                    if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
+                    if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
+                    return a.price - b.price;
+                });
+
+            autoSelectedEmitterPipe = autoSelectBestPipe(
+                analyzedEmitterPipes,
+                'emitter',
+                flowData.emitterFlowLPM,
+                projectMode
+            );
+        }
+
+        const emitterLoss = autoSelectedEmitterPipe && hasValidEmitterPipe
+            ? calculateImprovedHeadLoss(
+                  flowData.emitterFlowLPM,
+                  autoSelectedEmitterPipe.sizeMM,
+                  input.longestEmitterPipeM || 0,
+                  autoSelectedEmitterPipe.pipeType,
+                  'emitter',
+                  input.pipeAgeYears || 0
+              )
+            : { major: 0, minor: 0, total: 0, velocity: 0, C: 135, K: 0 };
+
+        const totalHeadLoss = branchLoss.total + secondaryLoss.total + mainLoss.total + emitterLoss.total;
         const pressureHead = calculateSprinklerPressure(sprinkler, input.pressureHeadM, projectMode);
         const totalHead = input.staticHeadM + totalHeadLoss + pressureHead;
 
@@ -377,6 +375,7 @@ const calculateZoneResults = (
                 branch: branchLoss.total,
                 secondary: secondaryLoss.total,
                 main: mainLoss.total,
+                emitter: emitterLoss.total,
                 total: totalHeadLoss,
             },
             staticHead: input.staticHeadM,
@@ -386,6 +385,7 @@ const calculateZoneResults = (
                 branch: autoSelectedBranchPipe,
                 secondary: autoSelectedSecondaryPipe,
                 main: autoSelectedMainPipe,
+                emitter: autoSelectedEmitterPipe,
             },
             sprinklerCount: flowData.totalSprinklers,
         };
@@ -526,35 +526,35 @@ const autoSelectBestPipe = (
     let velocityMin = 0.3;
     let velocityMax = 3.5;
     let minPressure = 6;
-    let minScore = 25;
 
     if (projectMode === 'field-crop') {
         velocityMin = 0.4;
         velocityMax = 4.0;
         minPressure = 8;
-        minScore = 30;
     } else if (projectMode === 'greenhouse') {
         velocityMin = 0.2;
         velocityMax = 3.0;
         minPressure = 6;
-        minScore = 35;
     } else if (projectMode === 'garden') {
         velocityMin = 0.3;
         velocityMax = 3.2;
         minPressure = 4;
-        minScore = 20;
     }
 
     const suitablePipes = analyzedPipes.filter((pipe) => {
         const isVelocityOK = pipe.velocity >= velocityMin && pipe.velocity <= velocityMax;
         const isPressureOK = pipe.pn >= minPressure;
-        const hasReasonableScore = pipe.score >= minScore;
         const isHeadLossOK = (pipe.headLoss / pipe.lengthM) * 100 <= 20;
-        return isVelocityOK && isPressureOK && hasReasonableScore && isHeadLossOK;
+        return isVelocityOK && isPressureOK && isHeadLossOK;
     });
 
     if (suitablePipes.length === 0) {
-        return analyzedPipes.sort((a, b) => b.score - a.score)[0];
+        // Return first pipe sorted by recommendation status then price
+        return analyzedPipes.sort((a, b) => {
+            if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
+            if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
+            return a.price - b.price;
+        })[0];
     }
 
     return suitablePipes.sort((a, b) => {
@@ -566,8 +566,6 @@ const autoSelectBestPipe = (
         if (Math.abs(aHeadLossPer100m - bHeadLossPer100m) > 3) {
             return aHeadLossPer100m - bHeadLossPer100m;
         }
-
-        if (Math.abs(a.score - b.score) > 5) return b.score - a.score;
 
         let optimalVelocity = 1.4;
         if (projectMode === 'field-crop') {
@@ -631,7 +629,7 @@ const autoSelectBestPump = (
         const bEfficiency = b.flowPerBaht || 0;
         if (Math.abs(aEfficiency - bEfficiency) > 0.01) return bEfficiency - aEfficiency;
 
-        return b.score - a.score;
+        return b.powerHP - a.powerHP; // Sort by power rating (higher power first for safety)
     })[0];
 };
 
@@ -918,9 +916,13 @@ export const useCalculations = (
         const analyzedSprinklers = sprinklerData
             .map((sprinkler) => ({
                 ...sprinkler,
-                score: 0,
             }))
-            .sort((a, b) => a.price - b.price);
+            .sort((a, b) => {
+                // Sort by recommendation status first, then by price
+                if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
+                if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
+                return a.price - b.price;
+            });
 
         const analyzedBranchPipes = pipeData
             .map((pipe) =>
@@ -933,7 +935,12 @@ export const useCalculations = (
                     []
                 )
             )
-            .sort((a, b) => b.score - a.score);
+            .sort((a, b) => {
+                // Sort by recommendation status first, then by price
+                if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
+                if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
+                return a.price - b.price;
+            });
 
         const autoSelectedBranchPipe = autoSelectBestPipe(
             analyzedBranchPipes,
@@ -954,7 +961,12 @@ export const useCalculations = (
                           []
                       )
                   )
-                  .sort((a, b) => b.score - a.score)
+                  .sort((a, b) => {
+                      // Sort by recommendation status first, then by price
+                      if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
+                      if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
+                      return a.price - b.price;
+                  })
             : [];
 
         const autoSelectedSecondaryPipe = hasValidSecondaryPipe
@@ -973,11 +985,45 @@ export const useCalculations = (
                           []
                       )
                   )
-                  .sort((a, b) => b.score - a.score)
+                  .sort((a, b) => {
+                      // Sort by recommendation status first, then by price
+                      if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
+                      if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
+                      return a.price - b.price;
+                  })
             : [];
 
         const autoSelectedMainPipe = hasValidMainPipe
             ? autoSelectBestPipe(analyzedMainPipes, 'main', flowData.mainFlowLPM, projectMode)
+            : null;
+
+        // Emitter pipe analysis and selection
+        const hasValidEmitterPipe = 
+            sanitizedInput.longestEmitterPipeM && sanitizedInput.longestEmitterPipeM > 0 && 
+            sanitizedInput.totalEmitterPipeM && sanitizedInput.totalEmitterPipeM > 0;
+
+        const analyzedEmitterPipes = hasValidEmitterPipe
+            ? pipeData
+                  .map((pipe) =>
+                      evaluatePipeOverall(
+                          pipe,
+                          flowData.emitterFlowLPM,
+                          sanitizedInput.longestEmitterPipeM || 0,
+                          'emitter',
+                          sanitizedInput.pipeAgeYears || 0,
+                          []
+                      )
+                  )
+                  .sort((a, b) => {
+                      // Sort by recommendation status first, then by price
+                      if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
+                      if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
+                      return a.price - b.price;
+                  })
+            : [];
+
+        const autoSelectedEmitterPipe = hasValidEmitterPipe
+            ? autoSelectBestPipe(analyzedEmitterPipes, 'emitter', flowData.emitterFlowLPM, projectMode)
             : null;
 
         const branchLoss = autoSelectedBranchPipe
@@ -1015,13 +1061,25 @@ export const useCalculations = (
                   )
                 : { major: 0, minor: 0, total: 0, velocity: 0, C: 145, K: 0 };
 
-        let totalHeadLoss = branchLoss.total + secondaryLoss.total + mainLoss.total;
+        const emitterLoss =
+            autoSelectedEmitterPipe && hasValidEmitterPipe
+                ? calculateImprovedHeadLoss(
+                      flowData.emitterFlowLPM,
+                      autoSelectedEmitterPipe.sizeMM,
+                      sanitizedInput.longestEmitterPipeM || 0,
+                      autoSelectedEmitterPipe.pipeType,
+                      'emitter',
+                      sanitizedInput.pipeAgeYears || 0
+                  )
+                : { major: 0, minor: 0, total: 0, velocity: 0, C: 135, K: 0 };
+
+        let totalHeadLoss = branchLoss.total + secondaryLoss.total + mainLoss.total + emitterLoss.total;
         const connectionLoss = totalHeadLoss * 0.03;
         totalHeadLoss += connectionLoss;
 
-        const totalMajorLoss = branchLoss.major + secondaryLoss.major + mainLoss.major;
+        const totalMajorLoss = branchLoss.major + secondaryLoss.major + mainLoss.major + emitterLoss.major;
         const totalMinorLoss =
-            branchLoss.minor + secondaryLoss.minor + mainLoss.minor + connectionLoss;
+            branchLoss.minor + secondaryLoss.minor + mainLoss.minor + emitterLoss.minor + connectionLoss;
 
         const pressureFromSprinkler = calculateSprinklerPressure(
             selectedSprinkler,
@@ -1044,7 +1102,12 @@ export const useCalculations = (
 
         const analyzedPumps = pumpData
             .map((pump) => evaluatePumpOverall(pump, requiredPumpFlow, pumpHeadRequired))
-            .sort((a, b) => b.score - a.score);
+            .sort((a, b) => {
+                // Sort by recommendation status first, then by price
+                if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
+                if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
+                return a.price - b.price;
+            });
 
         const autoSelectedPump = autoSelectBestPump(
             analyzedPumps,
@@ -1071,6 +1134,10 @@ export const useCalculations = (
             autoSelectedMainPipe && hasValidMainPipe
                 ? calculatePipeRolls(sanitizedInput.totalMainPipeM, autoSelectedMainPipe.lengthM)
                 : 0;
+        const emitterRolls =
+            autoSelectedEmitterPipe && hasValidEmitterPipe
+                ? calculatePipeRolls(sanitizedInput.totalEmitterPipeM || 0, autoSelectedEmitterPipe.lengthM)
+                : 0;
 
         const velocityWarnings: string[] = [];
         if (branchLoss.velocity > 0) {
@@ -1085,6 +1152,10 @@ export const useCalculations = (
             const warning = checkVelocity(mainLoss.velocity, 'ท่อหลัก');
             if (!warning.includes('🟢')) velocityWarnings.push(warning);
         }
+        if (hasValidEmitterPipe && emitterLoss.velocity > 0) {
+            const warning = checkVelocity(emitterLoss.velocity, 'ท่อย่อยแยก');
+            if (!warning.includes('🟢')) velocityWarnings.push(warning);
+        }
 
         return {
             totalWaterRequiredLPM: flowData.totalFlowLPM,
@@ -1097,22 +1168,26 @@ export const useCalculations = (
             recommendedBranchPipe: analyzedBranchPipes.filter((p) => p.isRecommended),
             recommendedSecondaryPipe: analyzedSecondaryPipes.filter((p) => p.isRecommended),
             recommendedMainPipe: analyzedMainPipes.filter((p) => p.isRecommended),
+            recommendedEmitterPipe: analyzedEmitterPipes.filter((p) => p.isRecommended),
             recommendedPump: analyzedPumps.filter((p) => p.isRecommended),
 
             analyzedBranchPipes,
             analyzedSecondaryPipes,
             analyzedMainPipes,
+            analyzedEmitterPipes,
             analyzedSprinklers,
             analyzedPumps,
 
             autoSelectedBranchPipe,
             autoSelectedSecondaryPipe,
             autoSelectedMainPipe,
+            autoSelectedEmitterPipe,
             autoSelectedPump,
 
             branchPipeRolls: branchRolls,
             secondaryPipeRolls: secondaryRolls,
             mainPipeRolls: mainRolls,
+            emitterPipeRolls: emitterRolls,
 
             headLoss: {
                 branch: {
@@ -1130,6 +1205,11 @@ export const useCalculations = (
                     minor: formatNumber(mainLoss.minor, 3),
                     total: formatNumber(mainLoss.total, 3),
                 },
+                emitter: {
+                    major: formatNumber(emitterLoss.major, 3),
+                    minor: formatNumber(emitterLoss.minor, 3),
+                    total: formatNumber(emitterLoss.total, 3),
+                },
                 totalMajor: formatNumber(totalMajorLoss, 3),
                 totalMinor: formatNumber(totalMinorLoss, 3),
                 total: formatNumber(totalHeadLoss, 3),
@@ -1139,18 +1219,21 @@ export const useCalculations = (
                 branch: formatNumber(branchLoss.velocity, 3),
                 secondary: formatNumber(secondaryLoss.velocity, 3),
                 main: formatNumber(mainLoss.velocity, 3),
+                emitter: formatNumber(emitterLoss.velocity, 3),
             },
 
             flows: {
                 branch: flowData.branchFlowLPM,
                 secondary: flowData.secondaryFlowLPM,
                 main: flowData.mainFlowLPM,
+                emitter: flowData.emitterFlowLPM,
             },
 
             coefficients: {
                 branch: formatNumber(branchLoss.C, 0),
                 secondary: formatNumber(secondaryLoss.C, 0),
                 main: formatNumber(mainLoss.C, 0),
+                emitter: formatNumber(emitterLoss.C, 0),
             },
 
             pumpHeadRequired: formatNumber(pumpHeadRequired, 3),
@@ -1160,6 +1243,7 @@ export const useCalculations = (
             velocityWarnings,
             hasValidSecondaryPipe,
             hasValidMainPipe,
+            hasValidEmitterPipe: Boolean(hasValidEmitterPipe),
 
             headLossValidation,
 

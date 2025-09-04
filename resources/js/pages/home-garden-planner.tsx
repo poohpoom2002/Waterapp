@@ -1371,7 +1371,7 @@ export default function HomeGardenPlanner() {
                                             onClick={() => setEditMode('draw')}
                                             className="w-full rounded-lg bg-blue-600 py-3 font-medium text-white shadow-lg transition-all hover:bg-blue-700"
                                         >
-                                            ✏️ {t('ใช้เครื่องมือวาด')}
+                                            ✏️ {t('ใช้เครื่องมือวาดรูปทรง')}
                                         </button>
                                     ) : (
                                         <div className="space-y-2">
