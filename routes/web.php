@@ -22,6 +22,11 @@ Route::get('/', function () {
     return Inertia::render('home');
 })->middleware(['auth', 'verified'])->name('home');
 
+// Test route without authentication
+Route::get('/test', function () {
+    return response()->json(['message' => 'Test route working']);
+})->name('test');
+
 Route::get('/profile', [ProfileController::class, 'show'])->middleware(['auth', 'verified'])->name('profile');
 
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -118,21 +123,46 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('field-map');
 
     // Field Crop Step Routes
+    Route::get('choose-crop', function () {
+        $cropType = request()->query('crop_type');
+        $crops = request()->query('crops');
+        return Inertia::render('field-crop/choose-crop', [
+            'cropType' => $cropType,
+            'crops' => $crops,
+        ]);
+    })->name('choose-crop');
+
     Route::get('step1-field-area', function () {
-        return Inertia::render('field-crop/initial-area');
+        return Inertia::render('field-crop/initial-area', [
+            'crops' => request()->query('crops'),
+            'currentStep' => request()->query('currentStep'),
+            'completedSteps' => request()->query('completedSteps'),
+        ]);
     })->name('initial-area');
 
-    Route::get('step2-zones-obstacles', function () {
-        return Inertia::render('field-crop/zone-obstacle');
+    Route::get('step2-irrigation-system', function () {
+        return Inertia::render('field-crop/irrigation-generate', [
+            'crops' => request()->query('crops'),
+            'currentStep' => request()->query('currentStep'),
+            'completedSteps' => request()->query('completedSteps'),
+        ]);
+    })->name('irrigation-generate');
+
+    Route::get('step3-zones-obstacles', function () {
+        return Inertia::render('field-crop/zone-obstacle', [
+            'crops' => request()->query('crops'),
+            'currentStep' => request()->query('currentStep'),
+            'completedSteps' => request()->query('completedSteps'),
+        ]);
     })->name('zone-obstacle');
 
-    Route::get('step3-pipe-system', function () {
-        return Inertia::render('field-crop/pipe-generate');
+    Route::get('step4-pipe-system', function () {
+        return Inertia::render('field-crop/pipe-generate', [
+            'crops' => request()->query('crops'),
+            'currentStep' => request()->query('currentStep'),
+            'completedSteps' => request()->query('completedSteps'),
+        ]);
     })->name('pipe-generate');
-
-    Route::get('step4-irrigation-system', function () {
-        return Inertia::render('field-crop/irrigation-generate');
-    })->name('irrigation-generate');
 
     // Greenhouse Crop Route
     Route::get('greenhouse-crop', function () {
@@ -212,12 +242,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Field Crop Summary Route
     Route::get('field-crop-summary', function () {
-        return Inertia::render('field-crop-summary');
+        return Inertia::render('field-crop/field-crop-summary', [
+            'crops' => request()->query('crops'),
+            'currentStep' => request()->query('currentStep'),
+            'completedSteps' => request()->query('completedSteps'),
+        ]);
     })->name('field-crop-summary');
     
     // Field Crop Summary Route with POST data
     Route::post('field-crop-summary', function () {
-        return Inertia::render('field-crop-summary', [
+        return Inertia::render('field-crop/field-crop-summary', [
             'summary' => request()->input('summary'),
             'mainField' => request()->input('mainField'),
             'fieldAreaSize' => request()->input('fieldAreaSize'),
@@ -225,6 +259,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'zones' => request()->input('zones'),
             'zoneAssignments' => request()->input('zoneAssignments'),
             'pipes' => request()->input('pipes'),
+            'obstacles' => request()->input('obstacles'),
             'equipment' => request()->input('equipment'),
             'equipmentIcons' => request()->input('equipment'), // Alias for backward compatibility
             'irrigationPoints' => request()->input('irrigationPoints'),
