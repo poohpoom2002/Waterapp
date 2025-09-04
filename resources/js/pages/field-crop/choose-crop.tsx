@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { router } from '@inertiajs/react';
 import Navbar from '../../components/Navbar';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { cropTranslations, categoryTranslations, irrigationNeedsTranslations } from '../../contexts/translations/cropts';
@@ -387,7 +388,11 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
     }, [selectedCrops.length]);
 
     const handleBackToPlanner = () => {
-        window.location.href = "/";
+        router.get("/");
+    };
+
+    const handleContinueToMap = () => {
+        router.get(`/step1-field-area?crops=${selectedCrops.join(',')}`);
     };
 
     const getSelectedCropsText = () => {
@@ -541,8 +546,8 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
                                                 {getContinueDescription()}
                                             </p>
                                         </div>
-                                        <a
-                                            href={`/step1-field-area?crops=${selectedCrops.join(',')}`}
+                                        <button
+                                            onClick={handleContinueToMap}
                                             className="flex items-center rounded-lg bg-blue-600 px-6 py-3 font-medium text-white transition-colors hover:bg-blue-700"
                                         >
                                             {t('Continue to Map')}
@@ -559,7 +564,7 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
                                                     d="M9 5l7 7-7 7"
                                                 />
                                             </svg>
-                                        </a>
+                                        </button>
                                     </div>
                                 ) : (
                                     <div className="rounded-lg border border-gray-600 bg-gray-700/50 p-4">

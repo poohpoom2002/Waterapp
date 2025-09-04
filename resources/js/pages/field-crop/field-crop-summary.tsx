@@ -1,29 +1,15 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import * as turf from '@turf/turf';
-import type {
-    Feature as GeoFeature,
-    LineString as GeoLineString,
-    FeatureCollection,
-    Point,
-} from 'geojson';
 import lineIntersect from '@turf/line-intersect';
+import type { Feature as GeoJsonFeature, FeatureCollection as GeoJsonFeatureCollection, Point as GeoJsonPoint, LineString as GeoJsonLineString } from 'geojson';
+import type { Feature as GeoFeature, LineString as GeoLineString } from 'geojson';
 import pointToLineDistance from '@turf/point-to-line-distance';
-import { getCropByValue } from '@/pages/utils/cropData';
-import {
-    calculateEnhancedFieldStats,
-    saveEnhancedFieldCropData,
-    FieldCropData,
-} from '@/utils/fieldCropData';
-import {
-    PIPE_TYPES,
-    EQUIPMENT_TYPES,
-    type PipeType,
-    type EquipmentType,
-} from '@/pages/utils/fieldMapConstants';
+import { getCropByValue, getTranslatedCropByValue } from './choose-crop';
 import Navbar from '../../components/Navbar';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { createGoogleMapsApiUrl } from '@/utils/googleMapsConfig';
 
 // Proper TypeScript interfaces
 interface Coordinate {
@@ -36,6 +22,7 @@ interface Zone {
     name: string;
     color: string;
     coordinates: Coordinate[];
+    cropType?: string;
 }
 
 interface Pipe {
@@ -54,6 +41,13 @@ interface Equipment {
     type: string;
     lat: number;
     lng: number;
+    name?: string;
+}
+
+interface Obstacle {
+    id: string | number;
+    type: 'water_source' | 'building' | 'rock' | 'other';
+    coordinates: Coordinate[];
     name?: string;
 }
 
@@ -102,9 +96,9 @@ interface ZoneSummary {
     calculationMethod?: string;
     // Add irrigation count properties
     sprinklerCount?: number;
-    miniSprinklerCount?: number;
-    microSprayCount?: number;
     dripTapeCount?: number;
+    pivotCount?: number;
+    waterJetTapeCount?: number;
     totalIrrigationPoints?: number;
 }
 
@@ -117,6 +111,7 @@ interface FieldCropSummaryProps {
     zoneSummaries?: Record<string, ZoneSummary>;
     pipes?: Pipe[];
     equipmentIcons?: Equipment[];
+    obstacles?: Obstacle[];
     irrigationPoints?: IrrigationPoint[];
     irrigationLines?: IrrigationLine[];
     irrigationAssignments?: Record<string, string>;
@@ -136,6 +131,7 @@ interface GoogleMapsDisplayProps {
     mainField?: MainField;
     zones: Zone[];
     pipes: Pipe[];
+    obstacles: Obstacle[];
     equipment: Equipment[];
     irrigationPoints: IrrigationPoint[];
     irrigationLines: IrrigationLine[];
@@ -172,6 +168,7 @@ const GoogleMapsDisplay = ({
     mainField,
     zones,
     pipes,
+    obstacles,
     equipment,
     irrigationPoints,
     irrigationLines,
@@ -185,20 +182,29 @@ const GoogleMapsDisplay = ({
 
     useEffect(() => {
         // Load Google Maps API if not already loaded
-        if (!window.google?.maps) {
-            const loadGoogleMaps = () => {
-                const script = document.createElement('script');
-                script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.GOOGLE_MAPS_API_KEY}&libraries=geometry,drawing`;
-                script.async = true;
-                script.defer = true;
-                script.onload = () => {
-                    setIsLoaded(true);
-                };
-                document.head.appendChild(script);
-            };
-            loadGoogleMaps();
-        } else {
+        if (window.google?.maps) {
             setIsLoaded(true);
+            return;
+        }
+
+        const existing = document.getElementById('__googleMapsScriptId') as HTMLScriptElement | null;
+        const url = createGoogleMapsApiUrl();
+        if (!url) return;
+
+        (window as unknown as { __googleMapsCallback?: () => void }).__googleMapsCallback = () => {
+            setIsLoaded(true);
+        };
+
+        if (!existing) {
+            const script = document.createElement('script');
+            script.id = '__googleMapsScriptId';
+            script.src = url;
+            script.async = true;
+            script.defer = true;
+            script.onerror = () => console.error('❌ Failed to load Google Maps script');
+            document.head.appendChild(script);
+        } else {
+            existing.addEventListener('load', () => setIsLoaded(true), { once: true });
         }
     }, []);
 
@@ -268,10 +274,15 @@ const GoogleMapsDisplay = ({
                 }
             });
 
-            // Draw pipes
+            // Draw pipes (match colors/styles with pipe-generate)
             pipes.forEach((pipe) => {
                 if (pipe.coordinates && Array.isArray(pipe.coordinates)) {
-                    const pipeConfig = PIPE_TYPES[pipe.type as PipeType] || { color: '#888888', weight: 3 };
+                    const style = (
+                        pipe.type === 'main' ? { color: '#dc2626', weight: 8 } :
+                        pipe.type === 'submain' ? { color: '#8b5cf6', weight: 5 } :
+                        pipe.type === 'lateral' ? { color: '#fbbf24', weight: 3 } :
+                        { color: '#888888', weight: 3 }
+                    );
 
                     const pipePath = pipe.coordinates.map((coord: Coordinate) => {
                         if (Array.isArray(coord)) {
@@ -283,35 +294,39 @@ const GoogleMapsDisplay = ({
                     new google.maps.Polyline({
                         path: pipePath,
                         geodesic: true,
-                        strokeColor: pipeConfig.color,
-                        strokeOpacity: 0.9,
-                        strokeWeight: pipeConfig.weight,
+                        strokeColor: style.color,
+                        strokeOpacity: 1.0,
+                        strokeWeight: style.weight,
                         map: map,
                     });
                 }
             });
 
-            // Draw equipment
-            equipment.forEach((equip) => {
-                if (equip.lat && equip.lng) {
-                    const equipmentConfig = EQUIPMENT_TYPES[equip.type as EquipmentType];
-                    if (equipmentConfig) {
-                        new google.maps.Marker({
-                            position: { lat: equip.lat, lng: equip.lng },
-                            map: map,
-                            title: equipmentConfig.name,
-                            icon: {
-                                url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-                                    <svg width="28" height="28" xmlns="http://www.w3.org/2000/svg">
-                                        <circle cx="14" cy="14" r="12" fill="white" stroke="${equipmentConfig.color}" stroke-width="2"/>
-                                        <text x="14" y="18" text-anchor="middle" font-size="12" fill="${equipmentConfig.color}">${equipmentConfig.icon}</text>
-                                    </svg>
-                                `)}`,
-                                scaledSize: new google.maps.Size(28, 28),
-                                anchor: new google.maps.Point(14, 14),
-                            },
-                        });
-                    }
+            // Equipment rendering removed (unused)
+
+            // Draw obstacles (water sources and others)
+            obstacles.forEach((obs) => {
+                if (obs.coordinates && Array.isArray(obs.coordinates) && obs.coordinates.length >= 3) {
+                    const coords = obs.coordinates.map((coord: Coordinate) => {
+                        if (Array.isArray(coord)) {
+                            return { lat: coord[0], lng: coord[1] } as unknown as { lat: number; lng: number };
+                        }
+                        return { lat: coord.lat, lng: coord.lng };
+                    });
+                    const colors = obs.type === 'water_source'
+                        ? { fill: '#3B82F6', stroke: '#1D4ED8' }
+                        : { fill: '#6B7280', stroke: '#374151' };
+
+                    new google.maps.Polygon({
+                        paths: coords,
+                        fillColor: colors.fill,
+                        fillOpacity: 0.4,
+                        strokeColor: colors.stroke,
+                        strokeOpacity: 1,
+                        strokeWeight: 2,
+                        map: googleMapRef.current!,
+                        clickable: false,
+                    });
                 }
             });
 
@@ -396,6 +411,7 @@ const GoogleMapsDisplay = ({
         mainField,
         zones,
         pipes,
+        obstacles,
         equipment,
         irrigationPoints,
         irrigationLines,
@@ -434,14 +450,15 @@ const captureMapImage = async (
     projectType: string = 'field-crop'
 ): Promise<string | null> => {
     try {
-        console.log('🖼️ Starting map image capture...');
+        // Starting map image capture
 
         // Check for html2canvas availability
         let html2canvas;
         try {
             html2canvas = (await import('html2canvas')).default;
-        } catch (error) {
-            console.error('❌ html2canvas not available:', error);
+        } catch {
+            // html2canvas not available
+            console.error('❌ html2canvas not available');
             return null;
         }
 
@@ -967,14 +984,15 @@ const normalizeIrrigationType = (type: string): string => {
     const typeMapping: { [key: string]: string } = {
         sprinkler: 'sprinkler',
         'sprinkler-system': 'sprinkler',
-        'mini-sprinkler': 'mini_sprinkler',
-        mini_sprinkler: 'mini_sprinkler',
-        minisprinkler: 'mini_sprinkler',
-        'micro-spray': 'micro_spray',
-        micro_spray: 'micro_spray',
-        microspray: 'micro_spray',
-        micro: 'micro_spray',
-        microsprinkler: 'micro_spray',
+        // Map all mini/micro variants to sprinkler
+        'mini-sprinkler': 'sprinkler',
+        mini_sprinkler: 'sprinkler',
+        minisprinkler: 'sprinkler',
+        'micro-spray': 'sprinkler',
+        micro_spray: 'sprinkler',
+        microspray: 'sprinkler',
+        micro: 'sprinkler',
+        microsprinkler: 'sprinkler',
         drip: 'drip_tape',
         'drip-tape': 'drip_tape',
         drip_tape: 'drip_tape',
@@ -984,6 +1002,7 @@ const normalizeIrrigationType = (type: string): string => {
 };
 
 // Calculate fittings (2-way, 3-way, 4-way) based on pipes and irrigation points
+
 interface FittingsBreakdown {
     twoWay: number;
     threeWay: number;
@@ -995,22 +1014,6 @@ interface FittingsBreakdown {
     };
 }
 
-const toLngLat = (coord: CoordinateInput): [number, number] | null => {
-    if (Array.isArray(coord) && coord.length === 2) {
-        return [coord[1], coord[0]]; // [lng, lat]
-    }
-    if (
-        (coord as Coordinate) &&
-        typeof (coord as Coordinate).lat === 'number' &&
-        typeof (coord as Coordinate).lng === 'number'
-    ) {
-        const c = coord as Coordinate;
-        return [c.lng, c.lat];
-    }
-    return null;
-};
-
-// Segment intersection in lat/lng using local planar approximation; returns intersection point if segments intersect
 const segmentIntersectionLatLng = (
     a: { lat: number; lng: number },
     b: { lat: number; lng: number },
@@ -1049,104 +1052,6 @@ const segmentIntersectionLatLng = (
     return null;
 };
 
-// Removed unused helper pointDistanceMeters (projection logic replaced usage)
-
-// Cluster intersections by distance ALONG the submain (station in meters)
-// intersections carry a 'crossing' flag indicating lateral crosses through the submain (both sides) vs a tee (one side)
-// We cluster by along-line distance and aggregate flags within each cluster
-const clusterIntersectionsByDistanceOnSubmain = (
-    subCoords: [number, number][],
-    intersections: { lng: number; lat: number; crossing: boolean }[],
-    thresholdMeters: number = 0.5
-): { hasCrossing: boolean; station: number }[] => {
-    if (!Array.isArray(subCoords) || subCoords.length < 2 || intersections.length === 0) {
-        return [];
-    }
-
-    // Local planar transform around the first submain coordinate
-    const originLng = subCoords[0][0];
-    const originLat = subCoords[0][1];
-    const lat0 = (originLat * Math.PI) / 180;
-    const metersPerDegLat = 111320;
-    const metersPerDegLng = 111320 * Math.cos(lat0);
-
-    const toMeters = (lng: number, lat: number) => ({
-        x: (lng - originLng) * metersPerDegLng,
-        y: (lat - originLat) * metersPerDegLat,
-    });
-
-    // Convert submain to meter coordinates and precompute cumulative segment lengths
-    const S = subCoords.map(([lng, lat]) => toMeters(lng, lat));
-    const segLen: number[] = [];
-    const cumLen: number[] = [0];
-    for (let i = 1; i < S.length; i++) {
-        const dx = S[i].x - S[i - 1].x;
-        const dy = S[i].y - S[i - 1].y;
-        const len = Math.hypot(dx, dy);
-        segLen.push(len);
-        cumLen.push(cumLen[i - 1] + len);
-    }
-
-    // Each intersection as {station, side}
-    type StationFlag = { station: number; crossing: boolean };
-    const stationFlags: StationFlag[] = [];
-
-    intersections.forEach(({ lng, lat, crossing }) => {
-        const P = toMeters(lng, lat);
-        let bestStation = 0;
-        let bestDist = Number.POSITIVE_INFINITY;
-        for (let i = 1; i < S.length; i++) {
-            const A = S[i - 1];
-            const B = S[i];
-            const ABx = B.x - A.x;
-            const ABy = B.y - A.y;
-            const APx = P.x - A.x;
-            const APy = P.y - A.y;
-            const denom = ABx * ABx + ABy * ABy;
-            if (denom === 0) continue;
-            let t = (APx * ABx + APy * ABy) / denom; // projection factor
-            t = Math.max(0, Math.min(1, t));
-            const projX = A.x + t * ABx;
-            const projY = A.y + t * ABy;
-            const dist = Math.hypot(P.x - projX, P.y - projY);
-            if (dist < bestDist) {
-                bestDist = dist;
-                bestStation = cumLen[i - 1] + t * Math.hypot(ABx, ABy);
-            }
-        }
-        stationFlags.push({ station: bestStation, crossing });
-    });
-
-    // Sort by station, then cluster by along-line threshold, aggregating crossing flag
-    stationFlags.sort((a, b) => a.station - b.station);
-    const clusters: { hasCrossing: boolean; station: number }[] = [];
-    let curStart = Number.NEGATIVE_INFINITY;
-    let curHasCrossing = false;
-    let curStation = 0;
-    stationFlags.forEach(({ station, crossing }) => {
-        if (curStart === Number.NEGATIVE_INFINITY) {
-            curStart = station;
-            curHasCrossing = crossing;
-            curStation = station;
-            return;
-        }
-        const isWithinThreshold = station - curStart <= thresholdMeters;
-        const bothAreTees = !crossing && !curHasCrossing;
-        // Merge only tee-to-tee events that are very close; keep any crossing as its own cluster
-        if (isWithinThreshold && bothAreTees) {
-            return;
-        }
-        // Close previous cluster and start a new one
-        clusters.push({ hasCrossing: curHasCrossing, station: curStation });
-        curStart = station;
-        curHasCrossing = crossing;
-        curStation = station;
-    });
-    if (curStart !== Number.NEGATIVE_INFINITY) clusters.push({ hasCrossing: curHasCrossing, station: curStation });
-
-    return clusters;
-};
-
 const calculateFittingsCounts = (
     pipes: Pipe[],
     irrigationPoints: IrrigationPoint[]
@@ -1155,23 +1060,56 @@ const calculateFittingsCounts = (
     const submainPipes = pipes.filter((p) => identifyPipeType(p) === 'submain');
     const lateralPipes = pipes.filter((p) => identifyPipeType(p) === 'lateral');
 
+    // Main 2-way at internal corners
     let twoWayMain = 0;
-    // Rule (updated): Main pipe has 2-way at each internal corner only (no endpoint 2-way)
     mainPipes.forEach((pipe) => {
         if (!pipe.coordinates || pipe.coordinates.length < 2) return;
-        const pointCount = pipe.coordinates.length;
-        const internalCorners = Math.max(0, pointCount - 2);
+        const internalCorners = Math.max(0, pipe.coordinates.length - 2);
         twoWayMain += internalCorners;
     });
 
-    // Rule: Submain gets 3-way per lateral branch; if two laterals branch at the same crossing point on submain, use 4-way instead
-    // Intersection-based grouping between lateral lines and each submain line
-    const intersectionCountsPerSubmain: Record<string | number, Record<string, number>> = {};
-    let threeWaySubDirect = 0;
-    let fourWaySubDirect = 0;
-    let twoWaySubAdd = 0; // submain-derived 2-way per single-side cluster
-    // Count junctions at main–submain connection (adds to main 3-way or 2-way when at main endpoint)
-    let threeWayAtMain = 0;
+    // Main–submain junctions: classify by position along main
+    let threeWayMain = 0;
+    let twoWayMainEndpoint = 0;
+    const endpointTolM = 0.5; // endpoint window
+    const snapEndpointOverrideM = 8; // if long run remains, treat as mid-span tee
+
+    const stationOnMain = (mainCoords: [number, number][], lng: number, lat: number): { station: number; total: number; minDist: number } => {
+        const originLng = mainCoords[0][0];
+        const originLat = mainCoords[0][1];
+        const lat0 = (originLat * Math.PI) / 180;
+        const mLat = 111320;
+        const mLng = 111320 * Math.cos(lat0);
+        const toM = (p: [number, number]) => ({ x: (p[0] - originLng) * mLng, y: (p[1] - originLat) * mLat });
+        const S = mainCoords.map(toM);
+        const P = { x: (lng - originLng) * mLng, y: (lat - originLat) * mLat };
+        let bestStation = 0;
+        let bestDist = Number.POSITIVE_INFINITY;
+        let total = 0;
+        for (let i = 1; i < S.length; i++) total += Math.hypot(S[i].x - S[i - 1].x, S[i].y - S[i - 1].y);
+        let cum = 0;
+        for (let i = 1; i < S.length; i++) {
+            const A = S[i - 1];
+            const B = S[i];
+            const ABx = B.x - A.x;
+            const ABy = B.y - A.y;
+            const APx = P.x - A.x;
+            const APy = P.y - A.y;
+            const denom = ABx * ABx + ABy * ABy;
+            if (denom === 0) { cum += Math.hypot(ABx, ABy); continue; }
+            let t = (APx * ABx + APy * ABy) / denom;
+            t = Math.max(0, Math.min(1, t));
+            const projX = A.x + t * ABx;
+            const projY = A.y + t * ABy;
+            const dist = Math.hypot(P.x - projX, P.y - projY);
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestStation = cum + t * Math.hypot(ABx, ABy);
+            }
+            cum += Math.hypot(ABx, ABy);
+        }
+        return { station: bestStation, total, minDist: bestDist };
+    };
 
     submainPipes.forEach((sub) => {
         const subCoords = (sub.coordinates || [])
@@ -1179,94 +1117,97 @@ const calculateFittingsCounts = (
             .filter((v): v is [number, number] => v !== null);
         if (subCoords.length < 2) return;
         const subLine = turf.lineString(subCoords);
-        const mapKey = sub.id;
-        if (!intersectionCountsPerSubmain[mapKey]) intersectionCountsPerSubmain[mapKey] = {};
 
-        // Detect connections to main (per submain). Each intersection/attachment contributes either 3-way (along main) or 2-way (at main endpoint)
-        try {
-            // counted flag not needed for final logic; we short-circuit per submain when matched
-            for (const main of mainPipes) {
-                const mainCoords = (main.coordinates || [])
-                    .map((c) => toLngLat(c))
-                    .filter((v): v is [number, number] => v !== null);
-                if (mainCoords.length < 2) continue;
-                const mainLine = turf.lineString(mainCoords);
-                const inter: FeatureCollection<Point> = lineIntersect(mainLine, subLine) as FeatureCollection<Point>;
-                const attachTol = 3.0; // meters (more tolerant to detect tee connection on main)
+        mainPipes.forEach((main) => {
+            const mainCoords = (main.coordinates || [])
+                .map((c) => toLngLat(c))
+                .filter((v): v is [number, number] => v !== null);
+            if (mainCoords.length < 2) return;
+            const mainLine = turf.lineString(mainCoords);
 
-                // Case 1: explicit intersections
-                if ((inter.features || []).length > 0) {
-                    // Count each intersection once (usually 1)
-                    for (const f of inter.features) {
-                        const coords = f.geometry?.coordinates as [number, number] | undefined;
-                        if (!coords) continue;
-                        // Any main–submain junction is a tee on the main → 3-way on main
-                        // Do not count as 2-way even if the junction is near a main endpoint
-                        threeWayAtMain += 1;
-                        break; // count first meaningful junction only per submain
+            let classified = false;
+            try {
+                const inter: GeoJsonFeatureCollection<GeoJsonPoint> = lineIntersect(mainLine as GeoJsonFeature<GeoJsonLineString>, subLine as GeoJsonFeature<GeoJsonLineString>);
+                if (inter && inter.features && inter.features.length > 0) {
+                    const ic = inter.features[0].geometry?.coordinates as [number, number] | undefined;
+                    if (ic) {
+                        const st = stationOnMain(mainCoords, ic[0], ic[1]);
+                        const atEndpoint = st.station <= endpointTolM || (st.total - st.station) <= endpointTolM;
+                        const longRunBeyond = st.station > endpointTolM ? st.station : (st.total - st.station);
+                        if (atEndpoint && longRunBeyond >= snapEndpointOverrideM) threeWayMain += 1;
+                        else if (atEndpoint) twoWayMainEndpoint += 1;
+                        else threeWayMain += 1;
+                        classified = true;
                     }
-                    break;
                 }
+            } catch {
+                // ignore intersect errors
+            }
 
-                // Case 2: endpoint attachment of submain to main (no lineIntersect)
-                const end1 = subCoords[0];
-                const end2 = subCoords[subCoords.length - 1];
-                const p1 = turf.point(end1);
-                const p2 = turf.point(end2);
-                const d1 = pointToLineDistance(p1, mainLine as unknown as GeoFeature<GeoLineString>, { units: 'kilometers' }) * 1000;
-                const d2 = pointToLineDistance(p2, mainLine as unknown as GeoFeature<GeoLineString>, { units: 'kilometers' }) * 1000;
-                const attaches = Math.min(d1, d2) <= attachTol;
-                if (attaches) {
-                    // Attachment of submain onto main is a tee on the main → 3-way on main
-                    threeWayAtMain += 1;
-                    break;
+            if (!classified) {
+                // Endpoint proximity fallback
+                try {
+                    const end1 = subCoords[0];
+                    const end2 = subCoords[subCoords.length - 1];
+                    const p1 = turf.point(end1);
+                    const p2 = turf.point(end2);
+                    const d1 = pointToLineDistance(p1, mainLine as unknown as GeoFeature<GeoLineString>, { units: 'kilometers' }) * 1000;
+                    const d2 = pointToLineDistance(p2, mainLine as unknown as GeoFeature<GeoLineString>, { units: 'kilometers' }) * 1000;
+                    const attaches = Math.min(d1, d2) <= 3.0;
+                    if (attaches) {
+                        const use = d1 <= d2 ? end1 : end2;
+                        const st = stationOnMain(mainCoords, use[0], use[1]);
+                        const atEndpoint = st.station <= endpointTolM || (st.total - st.station) <= endpointTolM;
+                        const longRunBeyond = st.station > endpointTolM ? st.station : (st.total - st.station);
+                        if (atEndpoint && longRunBeyond >= snapEndpointOverrideM) threeWayMain += 1;
+                        else if (atEndpoint) twoWayMainEndpoint += 1;
+                        else threeWayMain += 1;
+                        classified = true;
+                    }
+                } catch {
+                    // ignore endpoint fallback errors
                 }
             }
-            // If nothing counted, no junction for this submain on any main
-        } catch {
-            // ignore intersection detection errors for main-submain connection
-        }
+        });
+    });
 
-        // Collect all intersections for this submain first
-        const subIntersections: { lng: number; lat: number; crossing: boolean }[] = [];
+    // Submain clusters of laterals
+    let twoWaySub = 0;
+    let threeWaySub = 0;
+    let fourWaySub = 0;
+    
+    submainPipes.forEach((sub) => {
+        const subCoords = (sub.coordinates || [])
+            .map((c) => toLngLat(c))
+            .filter((v): v is [number, number] => v !== null);
+        if (subCoords.length < 2) return;
 
-        // Local planar helpers for side detection relative to this submain
         const originLng = subCoords[0][0];
         const originLat = subCoords[0][1];
         const lat0 = (originLat * Math.PI) / 180;
-        const metersPerDegLat = 111320;
-        const metersPerDegLng = 111320 * Math.cos(lat0);
-        const toMetersLocal = (lng: number, lat: number) => ({
-            x: (lng - originLng) * metersPerDegLng,
-            y: (lat - originLat) * metersPerDegLat,
-        });
-        const S_local = subCoords.map(([lng, lat]) => toMetersLocal(lng, lat));
+        const mLat = 111320;
+        const mLng = 111320 * Math.cos(lat0);
+        const toM = (p: [number, number]) => ({ x: (p[0] - originLng) * mLng, y: (p[1] - originLat) * mLat });
+        const S = subCoords.map(toM);
+
         const nearestSegmentSide = (lng: number, lat: number): number => {
-            const P = toMetersLocal(lng, lat);
-            let bestDist = Number.POSITIVE_INFINITY;
-            let side = 0;
-            for (let i = 1; i < S_local.length; i++) {
-                const A = S_local[i - 1];
-                const B = S_local[i];
-                const ABx = B.x - A.x;
-                const ABy = B.y - A.y;
-                const APx = P.x - A.x;
-                const APy = P.y - A.y;
-                const denom = ABx * ABx + ABy * ABy;
-                if (denom === 0) continue;
-                let t = (APx * ABx + APy * ABy) / denom;
-                t = Math.max(0, Math.min(1, t));
-                const projX = A.x + t * ABx;
-                const projY = A.y + t * ABy;
+            const P = { x: (lng - originLng) * mLng, y: (lat - originLat) * mLat };
+            let bestDist = Number.POSITIVE_INFINITY; let side = 0;
+            for (let i = 1; i < S.length; i++) {
+                const A = S[i - 1]; const B = S[i];
+                const ABx = B.x - A.x; const ABy = B.y - A.y;
+                const APx = P.x - A.x; const APy = P.y - A.y;
+                const denom = ABx * ABx + ABy * ABy; if (denom === 0) continue;
+                let t = (APx * ABx + APy * ABy) / denom; t = Math.max(0, Math.min(1, t));
+                const projX = A.x + t * ABx; const projY = A.y + t * ABy;
                 const dist = Math.hypot(P.x - projX, P.y - projY);
-                if (dist < bestDist) {
-                    bestDist = dist;
-                    const crossZ = ABx * APy - ABy * APx;
-                    side = crossZ >= 0 ? 1 : -1;
-                }
+                if (dist < bestDist) { bestDist = dist; const crossZ = ABx * APy - ABy * APx; side = crossZ >= 0 ? 1 : -1; }
             }
             return side;
         };
+
+        type Junction = { station: number; crossing: boolean; side: number };
+        const junctions: Junction[] = [];
 
         lateralPipes.forEach((lat) => {
             const latCoords = (lat.coordinates || [])
@@ -1274,159 +1215,574 @@ const calculateFittingsCounts = (
                 .filter((v): v is [number, number] => v !== null);
             if (latCoords.length < 2) return;
             const latLine = turf.lineString(latCoords);
-            // Prefer turf lineIntersect; fall back to segment-by-segment intersections when unavailable
-            let intersections: [number, number][] = [];
-            try {
-                const inter: FeatureCollection<Point> = lineIntersect(subLine, latLine) as FeatureCollection<Point>;
-                if (inter.features && inter.features.length > 0) {
-                    intersections = inter.features
-                        .map((f) => {
-                            const coords = f.geometry?.coordinates;
-                            return Array.isArray(coords) && coords.length === 2
-                                ? (coords as [number, number])
-                                : undefined;
-                        })
-                        .filter((c): c is [number, number] => Array.isArray(c) && c.length === 2);
+            const subLine = turf.lineString(subCoords);
+            let inters: [number, number][] = [];
+            // Determine if this lateral truly crosses the submain using a tighter heuristic
+            const startLngLat = latCoords[0];
+            const endLngLat = latCoords[latCoords.length - 1];
+            const sideStart = nearestSegmentSide(startLngLat[0], startLngLat[1]);
+            const sideEnd = nearestSegmentSide(endLngLat[0], endLngLat[1]);
+            const pStart = turf.point(startLngLat);
+            const pEnd = turf.point(endLngLat);
+            const dStartM = pointToLineDistance(pStart, subLine as unknown as GeoFeature<GeoLineString>, { units: 'kilometers' }) * 1000;
+            const dEndM = pointToLineDistance(pEnd, subLine as unknown as GeoFeature<GeoLineString>, { units: 'kilometers' }) * 1000;
+            // Define stationAlongSub here so it's available before use
+            const stationAlongSub = (lng: number, lat: number): number => {
+                const originLng = subCoords[0][0];
+                const originLat = subCoords[0][1];
+                const lat0 = (originLat * Math.PI) / 180;
+                const mLat = 111320;
+                const mLng = 111320 * Math.cos(lat0);
+                const toM = (p: [number, number]) => ({
+                    x: (p[0] - originLng) * mLng,
+                    y: (p[1] - originLat) * mLat,
+                });
+                const S = subCoords.map(toM);
+                const P = { x: (lng - originLng) * mLng, y: (lat - originLat) * mLat };
+                let bestStation = 0; let bestDist = Number.POSITIVE_INFINITY; let cum = 0;
+                for (let i = 1; i < S.length; i++) {
+                    const A = S[i - 1]; const B = S[i];
+                    const ABx = B.x - A.x; const ABy = B.y - A.y;
+                    const APx = P.x - A.x; const APy = P.y - A.y;
+                    const denom = ABx * ABx + ABy * ABy;
+                    if (denom === 0) { cum += Math.hypot(ABx, ABy); continue; }
+                    let t = (APx * ABx + APy * ABy) / denom; t = Math.max(0, Math.min(1, t));
+                    const projX = A.x + t * ABx; const projY = A.y + t * ABy;
+                    const dist = Math.hypot(P.x - projX, P.y - projY);
+                    if (dist < bestDist) { bestDist = dist; bestStation = cum + t * Math.hypot(ABx, ABy); }
+                    cum += Math.hypot(ABx, ABy);
                 }
+                return bestStation;
+            };
+            const stStart = stationAlongSub(startLngLat[0], startLngLat[1]);
+            const stEnd = stationAlongSub(endLngLat[0], endLngLat[1]);
+            const attachTolCross = 3.0; // meters (tolerance to treat endpoints as attached for crossing heuristic)
+            const stationTol = 2.0; // meters along submain to consider same crossing spot
+            const crossesHeuristic = (dStartM <= attachTolCross && dEndM <= attachTolCross && (sideStart * sideEnd < 0) && Math.abs(stStart - stEnd) <= stationTol);
+            try {
+                const inter: GeoJsonFeatureCollection<GeoJsonPoint> = lineIntersect(subLine as GeoJsonFeature<GeoJsonLineString>, latLine as GeoJsonFeature<GeoJsonLineString>);
+                if (inter && inter.features) inters = inter.features.map((f) => f.geometry!.coordinates as [number, number]).filter(Boolean);
             } catch {
-                // Manual intersection check between segments
-                const segs = (coords: [number, number][]) => coords;
-                const A = segs(subCoords);
-                const B = segs(latCoords);
-                for (let i = 1; i < A.length; i++) {
-                    for (let j = 1; j < B.length; j++) {
-                        const a1 = { lng: A[i - 1][0], lat: A[i - 1][1] };
-                        const a2 = { lng: A[i][0], lat: A[i][1] };
-                        const b1 = { lng: B[j - 1][0], lat: B[j - 1][1] };
-                        const b2 = { lng: B[j][0], lat: B[j][1] };
-                        const interPt = segmentIntersectionLatLng(
-                            { lat: a1.lat, lng: a1.lng },
-                            { lat: a2.lat, lng: a2.lng },
-                            { lat: b1.lat, lng: b1.lng },
-                            { lat: b2.lat, lng: b2.lng }
-                        );
-                        if (interPt) intersections.push([interPt.lng, interPt.lat]);
+                // ignore lateral intersect errors
+            }
+            if (inters.length === 0) {
+                // manual segment check
+                for (let i = 1; i < subCoords.length; i++) {
+                    for (let j = 1; j < latCoords.length; j++) {
+                        const a1 = { lat: subCoords[i - 1][1], lng: subCoords[i - 1][0] };
+                        const a2 = { lat: subCoords[i][1], lng: subCoords[i][0] };
+                        const b1 = { lat: latCoords[j - 1][1], lng: latCoords[j - 1][0] };
+                        const b2 = { lat: latCoords[j][1], lng: latCoords[j][0] };
+                        const ip = segmentIntersectionLatLng(a1, a2, b1, b2);
+                        if (ip) inters.push([ip.lng, ip.lat]);
                     }
                 }
             }
-
-            // Determine if this lateral crosses through the submain (two sides) or tees (one side)
-            const end1 = latCoords[0];
-            const end2 = latCoords[latCoords.length - 1];
-            const interCount = intersections.length;
-            let isCrossing = false;
-            try {
-                const s1 = nearestSegmentSide(end1[0], end1[1]);
-                const s2 = nearestSegmentSide(end2[0], end2[1]);
-                // Crossing if: clearly two intersection points OR endpoints lie on opposite sides
-                // Do not suppress by an endpoint-attachment check; some drawings touch exactly at the line but still cross through
-                isCrossing = interCount >= 2 || s1 * s2 < 0;
-            } catch {
-                isCrossing = interCount >= 2;
-            }
-
-            // If classified as crossing but turf couldn't produce explicit intersection points
-            // (common when lines just touch the submain geometry), add a representative point
-            if (isCrossing && intersections.length === 0) {
-                const mid = latCoords[Math.floor(latCoords.length / 2)];
-                subIntersections.push({ lng: mid[0], lat: mid[1], crossing: true });
-            }
-
-            // Accumulate explicit intersection points; grouping will be applied after collecting all for this submain
-            intersections.forEach((coords) => subIntersections.push({ lng: coords[0], lat: coords[1], crossing: isCrossing }));
-
-            // Also treat lateral endpoints that are very close to submain as junctions (T)
-            try {
-                const attachThresholdMeters2 = 1.2; // tighter tolerance to avoid misclassifying crossings as tees
-                const endpoints: [number, number][] = [
-                    latCoords[0],
-                    latCoords[latCoords.length - 1],
-                ];
+            // side & station
+            const originLng2 = subCoords[0][0]; const originLat2 = subCoords[0][1];
+            const lat02 = (originLat2 * Math.PI) / 180; const mLat2 = 111320; const mLng2 = 111320 * Math.cos(lat02);
+            const toM2 = (p: [number, number]) => ({ x: (p[0] - originLng2) * mLng2, y: (p[1] - originLat2) * mLat2 });
+            const S2 = subCoords.map(toM2);
+            const stationOf = (lng: number, lat: number) => {
+                const P = { x: (lng - originLng2) * mLng2, y: (lat - originLat2) * mLat2 };
+                let bestStation = 0; let bestDist = Number.POSITIVE_INFINITY; let cum = 0;
+                for (let i = 1; i < S2.length; i++) {
+                    const A = S2[i - 1]; const B = S2[i];
+                    const ABx = B.x - A.x; const ABy = B.y - A.y;
+                    const APx = P.x - A.x; const APy = P.y - A.y;
+                    const denom = ABx * ABx + ABy * ABy; if (denom === 0) { cum += Math.hypot(ABx, ABy); continue; }
+                    let t = (APx * ABx + APy * ABy) / denom; t = Math.max(0, Math.min(1, t));
+                    const projX = A.x + t * ABx; const projY = A.y + t * ABy;
+                    const dist = Math.hypot(P.x - projX, P.y - projY);
+                    if (dist < bestDist) { bestDist = dist; bestStation = cum + t * Math.hypot(ABx, ABy); }
+                    cum += Math.hypot(ABx, ABy);
+                }
+                return bestStation;
+            };
+            const crossFlag = (inters.length >= 2) || crossesHeuristic;
+            if (inters.length > 0) {
+                inters.forEach(([lng, lat]) => junctions.push({ station: stationOf(lng, lat), crossing: crossFlag, side: nearestSegmentSide(lng, lat) }));
+            } else {
+                // treat endpoint near submain as tee
+                const endpoints: [number, number][] = [latCoords[0], latCoords[latCoords.length - 1]];
                 endpoints.forEach(([lng, lat]) => {
                     const p = turf.point([lng, lat]);
                     const distKm = pointToLineDistance(p, subLine as unknown as GeoFeature<GeoLineString>, { units: 'kilometers' });
-                    if (distKm * 1000 <= attachThresholdMeters2) {
-                        // endpoint touch: tee on one side, not crossing
-                        subIntersections.push({ lng, lat, crossing: false });
-                    }
+                    if (distKm * 1000 <= 3.0) junctions.push({ station: stationOf(lng, lat), crossing: crossFlag, side: nearestSegmentSide(lng, lat) });
                 });
-            } catch {
-                // ignore numerical robustness errors
             }
         });
 
-        // Group intersections by proximity in meters along/near the submain
-        // Use a small tolerance to avoid accidentally merging distinct crossings
-        const clusters = clusterIntersectionsByDistanceOnSubmain(subCoords, subIntersections, 0.2);
-        if (clusters.length > 0) {
-            try {
-                console.log('🔗 Submain junction clusters', {
-                    submainId: mapKey,
-                    clusterCount: clusters.length,
-                    clusters,
-                });
-            } catch (error) {
-                console.warn('Failed to log submain junction clusters', error);
+        // Three-step approach: snap -> cluster -> smart classify
+        const gridSnapMeters = 0.5; // Position Snapping grid size
+        const clusterTolMeters = 1.0; // Spatial Clustering tolerance
+
+        type Group = { center: number; left: boolean; right: boolean };
+        const groups: Group[] = [];
+        const pushToGroup = (station: number, side: number) => {
+            const snapped = Math.round(station / gridSnapMeters) * gridSnapMeters;
+            for (const g of groups) {
+                if (Math.abs(g.center - snapped) <= clusterTolMeters) {
+                    g.center = (g.center + snapped) / 2; // refine center
+                    if (side < 0) g.left = true; else if (side > 0) g.right = true;
+                    return;
+                }
             }
+            groups.push({ center: snapped, left: side < 0, right: side > 0 });
+        };
+        junctions.forEach(j => pushToGroup(j.station, j.side));
+
+        if (groups.length > 0) groups.sort((a, b) => a.center - b.center);
+
+        // Smart classification
+        if (groups.length > 0) {
+            const first = groups[0];
+            if (first.left && first.right) threeWaySub += 1; else twoWaySub += 1;
         }
-        // Apply final rules:
-        // - If cluster hasCrossing=true → 4-way (middle) or 3-way (end)
-        // - If hasCrossing=false → 2-way (single side)
-        clusters.forEach(({ hasCrossing }, idx) => {
-            const isEnd = idx === 0 || idx === clusters.length - 1;
-            if (hasCrossing) {
-                if (isEnd) threeWaySubDirect += 1; else fourWaySubDirect += 1;
-            } else {
-                twoWaySubAdd += 1;
-            }
-            const key = `cluster_${String(idx)}`;
-            intersectionCountsPerSubmain[mapKey][key] = hasCrossing ? 2 : 1;
-        });
+        if (groups.length > 1) {
+            const last = groups[groups.length - 1];
+            if (last.left && last.right) threeWaySub += 1; else twoWaySub += 1;
+        }
+        for (let gi = 1; gi < groups.length - 1; gi++) {
+            const g = groups[gi];
+            if (g.left && g.right) fourWaySub += 1; else if (g.left || g.right) threeWaySub += 1;
+        }
     });
-    // Use the direct side-aware totals
-    const threeWayMain = threeWayAtMain;
-    const threeWaySub = threeWaySubDirect;
-    const fourWaySub = fourWaySubDirect;
 
-    // Rule: Lateral has 3-way per sprinkler except the last sprinkler uses a 2-way
-    const sprinklerTypes = new Set(['sprinkler', 'mini_sprinkler', 'micro_spray']);
-    let threeWayLat = 0;
-    let twoWayLat = 0;
+    // Lateral: sprinklers along line
+    let threeWayLat = 0; let twoWayLat = 0;
     const sprinklerAttachThresholdMeters = 1.5;
-
+    const sprinklerTypes = new Set(['sprinkler']);
     lateralPipes.forEach((latPipe) => {
-        const coords = (latPipe.coordinates || [])
-            .map((c) => toLngLat(c))
-            .filter((v): v is [number, number] => v !== null);
+        const coords = (latPipe.coordinates || []).map((c) => toLngLat(c)).filter((v): v is [number, number] => v !== null);
         if (coords.length < 2) return;
         const line = turf.lineString(coords);
-
         const sprinklersOnLateral = irrigationPoints.filter((pt) => {
             const type = normalizeIrrigationType(pt.type);
             if (!sprinklerTypes.has(type)) return false;
             if (typeof pt.lat !== 'number' || typeof pt.lng !== 'number') return false;
             const point = turf.point([pt.lng, pt.lat]);
-            const distKm = pointToLineDistance(point, line, { units: 'kilometers' });
+            const distKm = pointToLineDistance(point, line as unknown as GeoFeature<GeoLineString>, { units: 'kilometers' });
             return distKm * 1000 <= sprinklerAttachThresholdMeters;
         }).length;
-
-        if (sprinklersOnLateral > 0) {
-            // tees for all sprinklers except the last one
-            threeWayLat += Math.max(0, sprinklersOnLateral - 1);
-            // last sprinkler uses a 2-way
-            twoWayLat += 1;
-        }
+        if (sprinklersOnLateral > 0) { threeWayLat += Math.max(0, sprinklersOnLateral - 1); twoWayLat += 1; }
     });
 
     return {
-        twoWay: twoWayMain + twoWayLat + twoWaySubAdd,
-        threeWay: threeWayMain + threeWaySub + threeWayLat,
+        twoWay: (twoWayMain + twoWayMainEndpoint) + twoWaySub + twoWayLat,
+        threeWay: (threeWayMain) + threeWaySub + threeWayLat,
         fourWay: fourWaySub,
         breakdown: {
-            main: { twoWay: twoWayMain, threeWay: threeWayMain, fourWay: 0 },
-            submain: { twoWay: twoWaySubAdd, threeWay: threeWaySub, fourWay: fourWaySub },
+            main: { twoWay: twoWayMain + twoWayMainEndpoint, threeWay: threeWayMain, fourWay: 0 },
+            submain: { twoWay: twoWaySub, threeWay: threeWaySub, fourWay: fourWaySub },
             lateral: { twoWay: twoWayLat, threeWay: threeWayLat, fourWay: 0 },
         },
+    };
+};
+
+const toLngLat = (coord: CoordinateInput): [number, number] | null => {
+    if (Array.isArray(coord) && coord.length === 2) {
+        return [coord[1], coord[0]]; // [lng, lat]
+    }
+    if (
+        (coord as Coordinate) &&
+        typeof (coord as Coordinate).lat === 'number' &&
+        typeof (coord as Coordinate).lng === 'number'
+    ) {
+        const c = coord as Coordinate;
+        return [c.lng, c.lat];
+    }
+    return null;
+};
+
+// ===== Global pipe connectivity & flow summary =====
+type LateralFlowInfo = {
+    id: string | number;
+    unitsByType: Record<string, number>;
+    flowLMin: number;
+};
+
+type SubmainSummary = {
+    id: string | number;
+    lateralIds: Array<string | number>;
+    laterals: LateralFlowInfo[];
+    totalFlowLMin: number;
+    flowDistribution: Array<{ flowLMin: number; count: number }>;
+};
+
+type MainSummary = {
+    id: string | number;
+    submainIds: Array<string | number>;
+    submains: SubmainSummary[];
+    totalFlowLMin: number;
+};
+
+type PipeNetworkSummary = {
+    mains: MainSummary[];
+    counts: { main: number; submain: number; lateral: number };
+};
+
+const buildPipeNetworkSummary = (
+    pipes: Pipe[],
+    irrigationPoints: IrrigationPoint[],
+    flowSettings: Record<string, { flow?: number }>
+): PipeNetworkSummary => {
+    const mains = pipes.filter((p) => identifyPipeType(p) === 'main');
+    const subs = pipes.filter((p) => identifyPipeType(p) === 'submain');
+    const lats = pipes.filter((p) => identifyPipeType(p) === 'lateral');
+
+    const toLine = (pipe: Pipe) => {
+        const coords = (pipe.coordinates || [])
+            .map((c) => toLngLat(c))
+            .filter((v): v is [number, number] => v !== null);
+        return coords.length >= 2 ? turf.lineString(coords) : null;
+    };
+
+    const attachTolM = 3.0;
+
+    // Map submain -> main
+    const subToMain: Record<string | number, string | number> = {};
+    subs.forEach((sub) => {
+        const subLine = toLine(sub);
+        if (!subLine) return;
+        for (const main of mains) {
+            const mainLine = toLine(main);
+            if (!mainLine) continue;
+            let connected = false;
+            try {
+                const inter = lineIntersect(mainLine as GeoJsonFeature<GeoJsonLineString>, subLine as GeoJsonFeature<GeoJsonLineString>);
+                connected = !!(inter && inter.features && inter.features.length > 0);
+            } catch {
+                connected = false;
+            }
+            if (!connected) {
+                try {
+                    const sCoords = (sub.coordinates || [])
+                        .map((c) => toLngLat(c))
+                        .filter((v): v is [number, number] => v !== null);
+                    if (sCoords.length >= 2 && mainLine) {
+                        const ends: [number, number][] = [sCoords[0], sCoords[sCoords.length - 1]];
+                        connected = ends.some(([lng, lat]) => {
+                            const p = turf.point([lng, lat]);
+                            const dKm = pointToLineDistance(p, mainLine as unknown as GeoFeature<GeoLineString>, { units: 'kilometers' });
+                            return dKm * 1000 <= attachTolM;
+                        });
+                    }
+                } catch {
+                    /* noop */
+                }
+            }
+            if (connected) {
+                subToMain[sub.id] = main.id;
+                break;
+            }
+        }
+    });
+
+    // Map lateral -> submain
+    const latToSub: Record<string | number, string | number> = {};
+    lats.forEach((lat) => {
+        const latLine = toLine(lat);
+        if (!latLine) return;
+        for (const sub of subs) {
+            const subLine = toLine(sub);
+            if (!subLine) continue;
+            let connected = false;
+            try {
+                const inter = lineIntersect(subLine as GeoJsonFeature<GeoJsonLineString>, latLine as GeoJsonFeature<GeoJsonLineString>);
+                connected = !!(inter && inter.features && inter.features.length > 0);
+            } catch {
+                connected = false;
+            }
+            if (!connected) {
+                try {
+                    const lCoords = (lat.coordinates || [])
+                        .map((c) => toLngLat(c))
+                        .filter((v): v is [number, number] => v !== null);
+                    if (lCoords.length >= 2 && subLine) {
+                        const ends: [number, number][] = [lCoords[0], lCoords[lCoords.length - 1]];
+                        connected = ends.some(([lng, latV]) => {
+                            const p = turf.point([lng, latV]);
+                            const dKm = pointToLineDistance(p, subLine as unknown as GeoFeature<GeoLineString>, { units: 'kilometers' });
+                            return dKm * 1000 <= attachTolM;
+                        });
+                    }
+                } catch {
+                    /* noop */
+                }
+            }
+            if (connected) {
+                latToSub[lat.id] = sub.id;
+                break;
+            }
+        }
+    });
+
+    // Flow per lateral: count nearby irrigation points by type and multiply per-unit flows
+    const flowPerUnit: Record<string, number> = {
+        sprinkler: flowSettings?.sprinkler_system?.flow ?? 0,
+        pivot: flowSettings?.pivot?.flow ?? 0,
+        water_jet_tape: flowSettings?.water_jet_tape?.flow ?? 0,
+        drip_tape: flowSettings?.drip_tape?.flow ?? 0,
+    };
+
+    const lateralFlowInfo: Record<string | number, LateralFlowInfo> = {};
+    const attachThresholdMeters = 1.5;
+    lats.forEach((lat) => {
+        const line = toLine(lat);
+        if (!line) return;
+        const unitsByType: Record<string, number> = {};
+        let totalFlow = 0;
+        irrigationPoints.forEach((pt) => {
+            const type = normalizeIrrigationType(pt.type);
+            if (typeof pt.lat !== 'number' || typeof pt.lng !== 'number') return;
+            try {
+                const point = turf.point([pt.lng, pt.lat]);
+                const distKm = pointToLineDistance(point, line as unknown as GeoFeature<GeoLineString>, { units: 'kilometers' });
+                if (distKm * 1000 <= attachThresholdMeters) {
+                    unitsByType[type] = (unitsByType[type] || 0) + 1;
+                }
+            } catch {
+                /* noop */
+            }
+        });
+        Object.entries(unitsByType).forEach(([k, n]) => {
+            const per = flowPerUnit[k] || 0;
+            totalFlow += n * per;
+        });
+        lateralFlowInfo[lat.id] = { id: lat.id, unitsByType, flowLMin: totalFlow };
+    });
+
+    // Group into mains → submains → laterals
+    const mainIdToSubIds: Record<string | number, Array<string | number>> = {};
+    Object.entries(subToMain).forEach(([subId, mainId]) => {
+        const key = mainId;
+        if (!mainIdToSubIds[key]) mainIdToSubIds[key] = [];
+        mainIdToSubIds[key].push(subId);
+    });
+
+    const subIdToLatIds: Record<string | number, Array<string | number>> = {};
+    Object.entries(latToSub).forEach(([latId, subId]) => {
+        const key = subId;
+        if (!subIdToLatIds[key]) subIdToLatIds[key] = [];
+        subIdToLatIds[key].push(latId);
+    });
+
+    const mainsSummary: MainSummary[] = mains.map((m) => {
+        const subIds = mainIdToSubIds[m.id] || [];
+        const subSummaries: SubmainSummary[] = subIds.map((sid) => {
+            const latIds = subIdToLatIds[sid] || [];
+            const lInfos: LateralFlowInfo[] = latIds.map((lid) => lateralFlowInfo[lid]).filter(Boolean);
+            const total = lInfos.reduce((s, li) => s + (li?.flowLMin || 0), 0);
+            // Build distribution of identical flow values (rounded to 1 decimal for grouping)
+            const distMap = new Map<number, number>();
+            lInfos.forEach((li) => {
+                const key = Math.round((li.flowLMin + Number.EPSILON) * 10) / 10;
+                distMap.set(key, (distMap.get(key) || 0) + 1);
+            });
+            const flowDistribution = Array.from(distMap.entries())
+                .map(([flowLMin, count]) => ({ flowLMin, count }))
+                .sort((a, b) => b.flowLMin - a.flowLMin);
+            return {
+                id: sid,
+                lateralIds: latIds,
+                laterals: lInfos,
+                totalFlowLMin: total,
+                flowDistribution,
+            };
+        });
+        const totalFlow = subSummaries.reduce((s, sub) => s + sub.totalFlowLMin, 0);
+        return {
+            id: m.id,
+            submainIds: subIds,
+            submains: subSummaries,
+            totalFlowLMin: totalFlow,
+        };
+    });
+
+    return {
+        mains: mainsSummary,
+        counts: { main: mains.length, submain: subs.length, lateral: lats.length },
+    };
+};
+
+// Zone-scoped connectivity and longest-flow summary
+const buildZoneConnectivityLongestFlows = (
+    zone: Zone,
+    pipes: Pipe[],
+    irrigationPoints: IrrigationPoint[],
+    flowSettings: Record<string, { flow?: number }>
+): {
+    main: { longestId: string | number | null; connectedSubmains: number; flowLMin: number };
+    submain: { longestId: string | number | null; connectedLaterals: number; flowLMin: number };
+    lateral: { longestId: string | number | null; sprinklers: number; flowLMin: number };
+} => {
+    // Filter pipes belonging to this zone (by zoneId or geometry)
+    const inZone = pipes.filter((p) => {
+        if (!p) return false;
+        const byId = (p.zoneId?.toString?.() || '') === zone.id.toString();
+        const byGeom = isPipeInZone(p, zone);
+        return byId || byGeom;
+    });
+    // Submains/laterals strictly within zone; mains can be just outside zone but connected
+    const mainsAll = pipes.filter((p) => identifyPipeType(p) === 'main');
+    const subs = inZone.filter((p) => identifyPipeType(p) === 'submain');
+    const lats = inZone.filter((p) => identifyPipeType(p) === 'lateral');
+
+    const toLine = (pipe: Pipe) => {
+        const coords = (pipe.coordinates || [])
+            .map((c) => toLngLat(c))
+            .filter((v): v is [number, number] => v !== null);
+        return coords.length >= 2 ? turf.lineString(coords) : null;
+    };
+    const attachTolM = 3.0;
+
+    const pipeLength = (p: Pipe) => calculatePipeLength(p.coordinates || []);
+    const findLongest = (arr: Pipe[]) => {
+        if (arr.length === 0) return null as Pipe | null;
+        let best: Pipe | null = null; let bestLen = -1;
+        arr.forEach((p) => {
+            const len = pipeLength(p);
+            if (len > bestLen) { bestLen = len; best = p; }
+        });
+        return best;
+    };
+
+    // Connectivity maps within the zone
+    const subToMain: Record<string | number, string | number> = {};
+    subs.forEach((sub) => {
+        const subLine = toLine(sub);
+        if (!subLine) return;
+        for (const main of mainsAll) {
+            const mainLine = toLine(main);
+            if (!mainLine) continue;
+            let connected = false;
+            try {
+                const inter = lineIntersect(mainLine as GeoJsonFeature<GeoJsonLineString>, subLine as GeoJsonFeature<GeoJsonLineString>);
+                connected = !!(inter && inter.features && inter.features.length > 0);
+            } catch {
+                /* ignore */
+            }
+            if (!connected) {
+                const sCoords = (sub.coordinates || []).map((c) => toLngLat(c)).filter((v): v is [number, number] => v !== null);
+                if (sCoords.length >= 2 && mainLine) {
+                    const ends: [number, number][] = [sCoords[0], sCoords[sCoords.length - 1]];
+                    connected = ends.some(([lng, lat]) => {
+                        const p = turf.point([lng, lat]);
+                        const dKm = pointToLineDistance(p, mainLine as unknown as GeoFeature<GeoLineString>, { units: 'kilometers' });
+                        return dKm * 1000 <= attachTolM;
+                    });
+                }
+            }
+            if (connected) { subToMain[String(sub.id)] = String(main.id); break; }
+        }
+    });
+
+    const latToSub: Record<string, string> = {};
+    lats.forEach((lat) => {
+        const latLine = toLine(lat);
+        if (!latLine) return;
+        for (const sub of subs) {
+            const subLine = toLine(sub);
+            if (!subLine) continue;
+            let connected = false;
+            try {
+                const inter = lineIntersect(subLine as GeoJsonFeature<GeoJsonLineString>, latLine as GeoJsonFeature<GeoJsonLineString>);
+                connected = !!(inter && inter.features && inter.features.length > 0);
+            } catch {
+                /* ignore */
+            }
+            if (!connected) {
+                const lCoords = (lat.coordinates || []).map((c) => toLngLat(c)).filter((v): v is [number, number] => v !== null);
+                if (lCoords.length >= 2 && subLine) {
+                    const ends: [number, number][] = [lCoords[0], lCoords[lCoords.length - 1]];
+                    connected = ends.some(([lng, latV]) => {
+                        const p = turf.point([lng, latV]);
+                        const dKm = pointToLineDistance(p, subLine as unknown as GeoFeature<GeoLineString>, { units: 'kilometers' });
+                        return dKm * 1000 <= attachTolM;
+                    });
+                }
+            }
+            if (connected) { latToSub[String(lat.id)] = String(sub.id); break; }
+        }
+    });
+
+    // Flow from lateral sprinklers
+    const perSprinkler = flowSettings?.sprinkler_system?.flow ?? 0;
+    const lateralUnits = (lat: Pipe): number => {
+        const line = toLine(lat);
+        if (!line) return 0;
+        const thresh = 1.5; // meters
+        try {
+            return irrigationPoints.filter((pt) => {
+                const type = normalizeIrrigationType(pt.type);
+                if (type !== 'sprinkler') return false;
+                if (typeof pt.lat !== 'number' || typeof pt.lng !== 'number') return false;
+                const point = turf.point([pt.lng, pt.lat]);
+                const dKm = pointToLineDistance(point, line as unknown as GeoFeature<GeoLineString>, { units: 'kilometers' });
+                return dKm * 1000 <= thresh;
+            }).length;
+        } catch { return 0; }
+    };
+
+    // Lateral longest flow
+    const latLongest = findLongest(lats);
+    const latLongestUnits = latLongest ? lateralUnits(latLongest) : 0;
+    const latLongestFlow = latLongestUnits * perSprinkler;
+
+    // Submain longest flow (use laterals connected to that submain; flow = lateral(longest) × number of laterals connected)
+    const subIdToLatIds: Record<string, Array<string>> = {};
+    Object.entries(latToSub).forEach(([latId, sid]) => {
+        const key = sid;
+        if (!subIdToLatIds[key]) subIdToLatIds[key] = [];
+        subIdToLatIds[key].push(latId);
+    });
+    const subLongest = findLongest(subs);
+    const computeSubFlow = (sid: string): { latCount: number; flow: number } => {
+        const latIds = subIdToLatIds[sid] || [];
+        let maxUnits = 0;
+        latIds.forEach((lid) => {
+            const lp = lats.find((p) => String(p.id) === lid);
+            if (!lp) return;
+            const n = lateralUnits(lp);
+            if (n > maxUnits) maxUnits = n;
+        });
+        const latCount = latIds.length;
+        return { latCount, flow: maxUnits * perSprinkler * latCount };
+    };
+    const subLongestStats = subLongest ? computeSubFlow(String(subLongest.id)) : { latCount: 0, flow: 0 };
+
+    // Main longest flow (use submains connected to that main; flow = submain(longest among those) × number of connected submains)
+    // Consider only mains that are actually connected to submains in this zone
+    const connectedMainIds = Array.from(new Set(Object.values(subToMain)));
+    const connectedMains = mainsAll.filter((m) => connectedMainIds.includes(String(m.id)));
+    const mainLongest = findLongest(connectedMains);
+    const mainIdToSubIds: Record<string, Array<string>> = {};
+    Object.entries(subToMain).forEach(([sid, mid]) => {
+        const key = mid;
+        if (!mainIdToSubIds[key]) mainIdToSubIds[key] = [];
+        mainIdToSubIds[key].push(sid as string);
+    });
+    let subFlowAtMain = 0; let subCountAtMain = 0;
+    if (mainLongest) {
+        const subIds = mainIdToSubIds[String(mainLongest.id)] || [];
+        subCountAtMain = subIds.length;
+        if (subIds.length > 0) {
+            // find longest submain by lateral units among those connected
+            let bestFlow = 0;
+            subIds.forEach((sid) => {
+                const f = computeSubFlow(sid).flow;
+                if (f > bestFlow) bestFlow = f;
+            });
+            subFlowAtMain = bestFlow;
+        }
+    }
+    const mainLongestFlow = subFlowAtMain * subCountAtMain;
+
+    return {
+        main: { longestId: mainLongest?.id ?? null, connectedSubmains: subCountAtMain, flowLMin: mainLongestFlow },
+        submain: { longestId: subLongest?.id ?? null, connectedLaterals: subLongestStats.latCount, flowLMin: subLongestStats.flow },
+        lateral: { longestId: latLongest?.id ?? null, sprinklers: latLongestUnits, flowLMin: latLongestFlow },
     };
 };
 
@@ -1436,13 +1792,13 @@ const calculateZoneIrrigationCounts = (
     irrigationPoints: IrrigationPoint[]
 ): {
     sprinkler: number;
-    miniSprinkler: number;
-    microSpray: number;
     dripTape: number;
+    pivot: number;
+    waterJetTape: number;
     total: number;
 } => {
     if (!zone.coordinates || !Array.isArray(zone.coordinates) || zone.coordinates.length < 3) {
-        return { sprinkler: 0, miniSprinkler: 0, microSpray: 0, dripTape: 0, total: 0 };
+        return { sprinkler: 0, dripTape: 0, pivot: 0, waterJetTape: 0, total: 0 };
     }
 
     try {
@@ -1459,7 +1815,7 @@ const calculateZoneIrrigationCounts = (
             .filter((coord): coord is [number, number] => coord !== null);
 
         if (zoneCoords.length < 3) {
-            return { sprinkler: 0, miniSprinkler: 0, microSpray: 0, dripTape: 0, total: 0 };
+            return { sprinkler: 0, dripTape: 0, pivot: 0, waterJetTape: 0, total: 0 };
         }
 
         const firstPoint = zoneCoords[0];
@@ -1471,9 +1827,10 @@ const calculateZoneIrrigationCounts = (
         const zonePolygon = turf.polygon([zoneCoords]);
 
         let sprinklerCount = 0;
-        let miniSprinklerCount = 0;
-        let microSprayCount = 0;
+        // removed miniSprinklerCount and microSprayCount
         let dripTapeCount = 0;
+        let pivotCount = 0;
+        let waterJetTapeCount = 0;
 
         irrigationPoints.forEach((point) => {
             if (!point.lat || !point.lng) return;
@@ -1487,14 +1844,15 @@ const calculateZoneIrrigationCounts = (
                     case 'sprinkler':
                         sprinklerCount++;
                         break;
-                    case 'mini_sprinkler':
-                        miniSprinklerCount++;
-                        break;
-                    case 'micro_spray':
-                        microSprayCount++;
-                        break;
+                    // mini_sprinkler and micro_spray are normalized to sprinkler earlier
                     case 'drip_tape':
                         dripTapeCount++;
+                        break;
+                    case 'pivot':
+                        pivotCount++;
+                        break;
+                    case 'water_jet_tape':
+                        waterJetTapeCount++;
                         break;
                     default:
                         // Default to sprinkler for unknown types
@@ -1507,31 +1865,35 @@ const calculateZoneIrrigationCounts = (
         // Debug: ตรวจสอบการคำนวณในโซน
         console.log(`🔍 Zone ${zone.name} irrigation calculation:`, {
             zoneId: zone.id,
-            totalPointsInZone: sprinklerCount + miniSprinklerCount + microSprayCount + dripTapeCount,
+            totalPointsInZone: sprinklerCount + dripTapeCount,
             sprinkler: sprinklerCount,
-            miniSprinkler: miniSprinklerCount,
-            microSpray: microSprayCount,
             dripTape: dripTapeCount,
             totalIrrigationPoints: irrigationPoints.length
         });
 
-        const total = sprinklerCount + miniSprinklerCount + microSprayCount + dripTapeCount;
+        const total = sprinklerCount + dripTapeCount + pivotCount + waterJetTapeCount;
 
         return {
             sprinkler: sprinklerCount,
-            miniSprinkler: miniSprinklerCount,
-            microSpray: microSprayCount,
             dripTape: dripTapeCount,
+            pivot: pivotCount,
+            waterJetTape: waterJetTapeCount,
             total: total,
         };
     } catch (error) {
         console.error('Error calculating zone irrigation counts:', error);
-        return { sprinkler: 0, miniSprinkler: 0, microSpray: 0, dripTape: 0, total: 0 };
+        return { sprinkler: 0, dripTape: 0, pivot: 0, waterJetTape: 0, total: 0 };
     }
 };
 
 export default function FieldCropSummary() {
     const { t } = useLanguage();
+    const page = usePage<Partial<FieldCropSummaryProps>>();
+    const rawInertiaProps = page?.props as Partial<FieldCropSummaryProps> | undefined;
+    const inertiaProps: Partial<FieldCropSummaryProps> = useMemo(
+        () => rawInertiaProps ?? ({} as Partial<FieldCropSummaryProps>),
+        [rawInertiaProps]
+    );
     const [summaryData, setSummaryData] = useState<FieldCropSummaryProps | null>(null);
     const [calculatedZoneSummaries, setCalculatedZoneSummaries] = useState<Record<string, ZoneSummary>>({});
 
@@ -1541,9 +1903,103 @@ export default function FieldCropSummary() {
     const [captureStatus, setCaptureStatus] = useState<string>('');
     const googleMapRef = useRef<google.maps.Map | null>(null);
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
+    const [zoneDetailsOpen, setZoneDetailsOpen] = useState<Record<string, boolean>>({});
+    const [zoneLateralDetailsOpen, setZoneLateralDetailsOpen] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
-        const savedData = localStorage.getItem('fieldMapData');
+        // Prefer Inertia props first (normalize JSON strings if POSTed)
+        if (
+            inertiaProps &&
+            (inertiaProps.pipes || inertiaProps.zones || inertiaProps.mainField || inertiaProps.selectedCrops)
+        ) {
+            try {
+                const normalized: FieldCropSummaryProps = {
+                    ...inertiaProps,
+                    selectedCrops:
+                        Array.isArray(inertiaProps.selectedCrops)
+                            ? inertiaProps.selectedCrops
+                            : (typeof inertiaProps.selectedCrops === 'string'
+                                ? (inertiaProps.selectedCrops as unknown as string)
+                                      .split(',')
+                                      .map((s) => s.trim())
+                                      .filter(Boolean)
+                                : inertiaProps.selectedCrops),
+                    mainField:
+                        typeof inertiaProps.mainField === 'string'
+                            ? JSON.parse(inertiaProps.mainField)
+                            : inertiaProps.mainField,
+                    zones:
+                        typeof inertiaProps.zones === 'string'
+                            ? JSON.parse(inertiaProps.zones)
+                            : inertiaProps.zones,
+                    pipes:
+                        typeof inertiaProps.pipes === 'string'
+                            ? JSON.parse(inertiaProps.pipes)
+                            : inertiaProps.pipes,
+                    irrigationPoints:
+                        typeof inertiaProps.irrigationPoints === 'string'
+                            ? JSON.parse(inertiaProps.irrigationPoints)
+                            : inertiaProps.irrigationPoints,
+                    irrigationLines:
+                        typeof inertiaProps.irrigationLines === 'string'
+                            ? JSON.parse(inertiaProps.irrigationLines)
+                            : inertiaProps.irrigationLines,
+                    irrigationSettings:
+                        typeof inertiaProps.irrigationSettings === 'string'
+                            ? JSON.parse(inertiaProps.irrigationSettings)
+                            : inertiaProps.irrigationSettings,
+                    obstacles:
+                        typeof (inertiaProps as Partial<FieldCropSummaryProps>).obstacles === 'string'
+                            ? JSON.parse((inertiaProps as Partial<FieldCropSummaryProps>).obstacles as unknown as string)
+                            : (inertiaProps as Partial<FieldCropSummaryProps>).obstacles,
+                    equipment:
+                        typeof (inertiaProps as Partial<FieldCropSummaryProps>).equipment === 'string'
+                            ? JSON.parse((inertiaProps as Partial<FieldCropSummaryProps>).equipment as unknown as string)
+                            : (inertiaProps as Partial<FieldCropSummaryProps>).equipment,
+                    equipmentIcons:
+                        typeof (inertiaProps as Partial<FieldCropSummaryProps>).equipmentIcons === 'string'
+                            ? JSON.parse((inertiaProps as Partial<FieldCropSummaryProps>).equipmentIcons as unknown as string)
+                            : (inertiaProps as Partial<FieldCropSummaryProps>).equipmentIcons,
+                    rowSpacing:
+                        typeof inertiaProps.rowSpacing === 'string'
+                            ? JSON.parse(inertiaProps.rowSpacing)
+                            : inertiaProps.rowSpacing,
+                    plantSpacing:
+                        typeof inertiaProps.plantSpacing === 'string'
+                            ? JSON.parse(inertiaProps.plantSpacing)
+                            : inertiaProps.plantSpacing,
+                    mapCenter:
+                        typeof inertiaProps.mapCenter === 'string'
+                            ? JSON.parse(inertiaProps.mapCenter)
+                            : inertiaProps.mapCenter,
+                } as FieldCropSummaryProps;
+                const derivedIrrigationPoints = (
+                    Array.isArray(normalized.irrigationPoints) && normalized.irrigationPoints.length > 0
+                )
+                    ? normalized.irrigationPoints
+                    : (Array.isArray((normalized as Partial<FieldCropSummaryProps> & { irrigationPositions?: { sprinklers?: { lat: number; lng: number }[] } }).irrigationPositions?.sprinklers)
+                        ? ((normalized as Partial<FieldCropSummaryProps> & { irrigationPositions?: { sprinklers?: { lat: number; lng: number }[] } }).irrigationPositions!.sprinklers!).map((s, i) => ({ id: `sprinkler-${i}`, lat: s.lat, lng: s.lng, type: 'sprinkler' }))
+                        : []);
+
+                const finalData: FieldCropSummaryProps = {
+                    ...normalized,
+                    zoneAssignments: normalized.zoneAssignments ?? {},
+                    irrigationAssignments: normalized.irrigationAssignments ?? {},
+                    zones: normalized.zones ?? [],
+                    pipes: normalized.pipes ?? [],
+                    irrigationPoints: derivedIrrigationPoints,
+                    obstacles: (normalized as Partial<FieldCropSummaryProps>).obstacles ?? [],
+                    equipment: (normalized as Partial<FieldCropSummaryProps>).equipment ?? (normalized as Partial<FieldCropSummaryProps>).equipmentIcons ?? [],
+                    equipmentIcons: (normalized as Partial<FieldCropSummaryProps>).equipmentIcons ?? (normalized as Partial<FieldCropSummaryProps>).equipment ?? []
+                };
+                setSummaryData(finalData);
+                return;
+            } catch (e) {
+                console.warn('Failed to parse Inertia props; falling back to localStorage', e);
+            }
+        }
+
+        const savedData = localStorage.getItem('fieldCropData');
         if (savedData) {
             try {
                 const parsedData = JSON.parse(savedData);
@@ -1552,37 +2008,57 @@ export default function FieldCropSummary() {
                     typeof parsedData === 'object' &&
                     (parsedData.mainField || (parsedData.zones && parsedData.zones.length > 0))
                 ) {
-                    console.log('📥 Using data from localStorage');
-                    console.log('✅ Loaded data from localStorage:', parsedData);
-                    setSummaryData(parsedData);
+                    // Using fieldCropData from localStorage
+                    // Derive selected crops from saved data or URL when available
+                    let derivedSelectedCrops: string[] = Array.isArray(parsedData.selectedCrops)
+                        ? parsedData.selectedCrops
+                        : [];
+                    if (derivedSelectedCrops.length === 0 && typeof window !== 'undefined') {
+                        try {
+                            const search = window.location.search || '';
+                            const match = /[?&]crops=([^&]+)/.exec(search);
+                            if (match && match[1]) {
+                                derivedSelectedCrops = decodeURIComponent(match[1]).split(',').map((s) => s.trim()).filter(Boolean);
+                            }
+                        } catch { /* noop */ }
+                    }
+                    const derivedIrrigationPoints = (
+                        Array.isArray(parsedData.irrigationPoints) && parsedData.irrigationPoints.length > 0
+                    )
+                        ? parsedData.irrigationPoints
+                        : (Array.isArray((parsedData as Partial<FieldCropSummaryProps> & { irrigationPositions?: { sprinklers?: { lat: number; lng: number }[] } }).irrigationPositions?.sprinklers)
+                            ? ((parsedData as Partial<FieldCropSummaryProps> & { irrigationPositions?: { sprinklers?: { lat: number; lng: number }[] } }).irrigationPositions!.sprinklers!).map((s: { lat: number; lng: number }, i: number) => ({ id: `sprinkler-${i}`, lat: s.lat, lng: s.lng, type: 'sprinkler' }))
+                            : []);
+
+                    const coerced: FieldCropSummaryProps = {
+                        ...parsedData,
+                        selectedCrops: derivedSelectedCrops,
+                        zoneAssignments: parsedData.zoneAssignments ?? {},
+                        irrigationAssignments: parsedData.irrigationAssignments ?? {},
+                        zones: parsedData.zones ?? [],
+                        pipes: parsedData.pipes ?? [],
+                        irrigationPoints: derivedIrrigationPoints,
+                        obstacles: (parsedData as FieldCropSummaryProps).obstacles ?? [],
+                        equipment: (parsedData as FieldCropSummaryProps).equipment ?? (parsedData as FieldCropSummaryProps).equipmentIcons ?? [],
+                        equipmentIcons: (parsedData as FieldCropSummaryProps).equipmentIcons ?? (parsedData as FieldCropSummaryProps).equipment ?? []
+                    };
+                    setSummaryData(coerced);
                 } else {
-                    console.warn('📥 Invalid or empty localStorage data structure');
+                    console.warn('📥 Invalid or empty fieldCropData structure');
                     setSummaryData(null);
                 }
             } catch (error) {
-                console.error('Error parsing saved data:', error);
+                console.error('Error parsing fieldCropData:', error);
                 setSummaryData(null);
             }
         } else {
-            console.warn('📥 No data found in localStorage');
+            console.warn('📥 No fieldCropData found in localStorage');
             setSummaryData(null);
         }
-    }, []);
-
-    // Enhanced auto-capture with better timing and error handling
-    useEffect(() => {
-        if (summaryData && !mapImageCaptured && !isCapturingImage) {
-            // Delay to ensure map is fully rendered and tiles are loaded
-            const timer = setTimeout(() => {
-                handleCaptureMapImage();
-            }, 5000); // Increased delay for better reliability
-
-            return () => clearTimeout(timer);
-        }
-    }, [summaryData, mapImageCaptured, isCapturingImage]);
+    }, [inertiaProps]);
 
     // Enhanced function to handle map image capture with better feedback
-    const handleCaptureMapImage = async () => {
+    const handleCaptureMapImage = useCallback(async () => {
         if (mapImageCaptured || isCapturingImage) return;
 
         setIsCapturingImage(true);
@@ -1613,7 +2089,6 @@ export default function FieldCropSummary() {
                     if (isVerified) {
                         setMapImageCaptured(true);
                         setCaptureStatus(t('Successfully saved'));
-                        console.log('✅ Map image captured and verified for product page');
 
                         // Clear status after delay
                         setTimeout(() => setCaptureStatus(''), 3000);
@@ -1636,7 +2111,19 @@ export default function FieldCropSummary() {
         } finally {
             setIsCapturingImage(false);
         }
-    };
+    }, [isCapturingImage, mapImageCaptured, t]);
+
+    // Enhanced auto-capture with better timing and error handling
+    useEffect(() => {
+        if (summaryData && !mapImageCaptured && !isCapturingImage) {
+            // Delay to ensure map is fully rendered and tiles are loaded
+            const timer = setTimeout(() => {
+                handleCaptureMapImage();
+            }, 5000); // Increased delay for better reliability
+
+            return () => clearTimeout(timer);
+        }
+    }, [summaryData, mapImageCaptured, isCapturingImage, handleCaptureMapImage]);
 
     // Enhanced manual capture function with user feedback
     const handleManualCapture = async () => {
@@ -1650,12 +2137,7 @@ export default function FieldCropSummary() {
         }
     };
 
-    // Placeholder for Save Project functionality
-    const handleSaveProject = () => {
-        console.log('💾 Save Project button clicked.');
-        alert(t('Project has been saved. (Placeholder)'));
-        // In a real application, this would trigger an API call or more complex localStorage logic
-    };
+    // Save Project functionality removed per UI simplification
 
     const {
         mainField,
@@ -1664,14 +2146,88 @@ export default function FieldCropSummary() {
         zoneAssignments = {},
         pipes = [],
         equipmentIcons = [],
+        obstacles = [],
         irrigationPoints = [],
-        irrigationLines = [],
         irrigationAssignments = {},
         rowSpacing = {},
         plantSpacing = {},
         mapCenter = [14.5995, 120.9842],
         mapZoom = 18,
     } = summaryData || {};
+
+    const actualZones = Array.isArray(zones) ? zones : [];
+    const actualPipes = useMemo(() => (Array.isArray(pipes) ? pipes : []), [pipes]);
+    const actualEquipmentIcons = useMemo(() => {
+        const icons = Array.isArray(equipmentIcons) ? equipmentIcons : [];
+        const eq = Array.isArray((summaryData as Partial<FieldCropSummaryProps> | null)?.equipment)
+            ? ((summaryData as Partial<FieldCropSummaryProps> | null)?.equipment as Equipment[])
+            : [];
+        // Prefer icons if present; otherwise fall back to equipment
+        return icons.length > 0 ? icons : eq;
+    }, [equipmentIcons, summaryData]);
+    const actualObstacles = Array.isArray(obstacles) ? obstacles : [];
+    const actualIrrigationPoints = useMemo(() => (
+        Array.isArray(irrigationPoints) ? irrigationPoints : []
+    ), [irrigationPoints]);
+
+    // Global irrigation type selected on the irrigation page (fallback when zone has no assignment)
+    const globalIrrigationType = useMemo(() => {
+        try {
+            const data = localStorage.getItem('fieldCropData');
+            if (!data) return undefined;
+            const parsed = JSON.parse(data) as { selectedIrrigationType?: string } | null;
+            return parsed?.selectedIrrigationType || undefined;
+        } catch {
+            return undefined;
+        }
+    }, []);
+
+    // Flow settings from irrigation page (used to display flowrate per zone)
+    const irrigationSettingsData = useMemo(() => {
+        try {
+            const fromProps = (summaryData as Partial<FieldCropSummaryProps> | null)?.irrigationSettings as unknown as Record<string, { flow?: number }> | undefined;
+            if (fromProps && typeof fromProps === 'object') return fromProps;
+            const data = localStorage.getItem('fieldCropData');
+            if (!data) return {} as Record<string, { flow?: number }>;
+            const parsed = JSON.parse(data) as { irrigationSettings?: Record<string, { flow?: number }> } | null;
+            return parsed?.irrigationSettings || ({} as Record<string, { flow?: number }>);
+        } catch {
+            return {} as Record<string, { flow?: number }>;
+        }
+    }, [summaryData]);
+
+    // Build global pipe network connectivity & flow summary
+    const pipeNetworkSummary = useMemo(() => {
+        try {
+            return buildPipeNetworkSummary(actualPipes, actualIrrigationPoints, irrigationSettingsData || {});
+        } catch {
+            return { mains: [], counts: { main: 0, submain: 0, lateral: 0 } } as PipeNetworkSummary;
+        }
+    }, [actualPipes, actualIrrigationPoints, irrigationSettingsData]);
+
+    // Normalize and format irrigation type for display, accepting keys from both pages
+    const formatIrrigationType = (type?: string) => {
+        if (!type) return t('Not defined');
+        const norm = normalizeIrrigationType(type);
+        switch (norm) {
+            case 'sprinkler':
+                return t('Sprinkler');
+            case 'drip_tape':
+                return t('Drip Tape');
+            default:
+                // Support raw keys coming from irrigation page
+                switch ((type || '').toLowerCase()) {
+                    case 'sprinkler_system':
+                        return t('Sprinkler');
+                    case 'pivot':
+                        return t('System Pivot');
+                    case 'water_jet_tape':
+                        return t('Water Jet Tape');
+                    default:
+                        return type;
+                }
+        }
+    };
 
     useEffect(() => {
         if (summaryData && zones.length > 0) {
@@ -1680,10 +2236,39 @@ export default function FieldCropSummary() {
             console.log('🎯 Available zones:', zones);
 
             const newZoneSummaries: Record<string, ZoneSummary> = {};
+            const zAssign: Record<string, string> = (zoneAssignments && typeof zoneAssignments === 'object') ? (zoneAssignments as Record<string, string>) : {};
+            const iAssign: Record<string, string> = (irrigationAssignments && typeof irrigationAssignments === 'object') ? (irrigationAssignments as Record<string, string>) : {};
+
+            // ดึงจุดปลูกจริง (plant points) จาก props หรือตกลง localStorage ถ้าไม่มีใน props
+            let actualPlantPoints: Array<{ lat: number; lng: number }> = [];
+            try {
+                const maybePlants = (summaryData as unknown as { plantPoints?: { lat: number; lng: number }[] } | null)?.plantPoints;
+                if (Array.isArray(maybePlants)) {
+                    actualPlantPoints = maybePlants;
+                }
+                if (actualPlantPoints.length === 0 && typeof window !== 'undefined') {
+                    const fieldDataStr = localStorage.getItem('fieldCropData');
+                    if (fieldDataStr) {
+                        const parsed = JSON.parse(fieldDataStr);
+                        if (parsed && Array.isArray(parsed.plantPoints)) {
+                            actualPlantPoints = parsed.plantPoints;
+                        }
+                    }
+                }
+            } catch {
+                // ignore
+            }
 
             zones.forEach((zone: Zone) => {
                 const zoneId = zone.id.toString();
-                const assignedCropValue = zoneAssignments[zoneId];
+                let assignedCropValue = zone.cropType || zAssign[zoneId];
+                // ถ้าโซนยังไม่ได้กำหนดพืช ให้ fallback เป็นพืชตัวแรกที่เลือกจาก choose-crop (ถ้ามี)
+                if (!assignedCropValue) {
+                    const firstSelected = Array.isArray(summaryData?.selectedCrops) && summaryData.selectedCrops.length > 0
+                        ? summaryData.selectedCrops[0]
+                        : undefined;
+                    if (firstSelected) assignedCropValue = firstSelected;
+                }
 
                 if (assignedCropValue && zone.coordinates) {
                     const crop = getCropByValue(assignedCropValue);
@@ -1701,14 +2286,61 @@ export default function FieldCropSummary() {
                         // คำนวณจำนวนจุดปลูกจากท่อย่อยที่มีอยู่จริง (ถ้ามี)
                         // ถ้าไม่มีท่อย่อย ให้คำนวณจากพื้นที่โซน
                         let totalPlantingPoints = 0;
+                        // นับจำนวนจุดปลูกจริงภายในโซน (ถ้ามีข้อมูล)
+                        let actualPlantsInZone = 0;
                         try {
-                            totalPlantingPoints = pipes && pipes.length > 0
-                                ? calculatePlantingPointsFromPipes(pipes, zoneId, crop, effectiveRowSpacing, effectivePlantSpacing)
-                                : calculatePlantingPoints(zoneArea, crop, effectiveRowSpacing, effectivePlantSpacing);
-                        } catch (error) {
-                            console.warn(`⚠️ Error calculating planting points for zone ${zoneId}:`, error);
+                            if (Array.isArray(zone.coordinates) && zone.coordinates.length >= 3 && actualPlantPoints.length > 0) {
+                                const zoneCoords = zone.coordinates.map((c) => [c.lng, c.lat]);
+                                // ปิด polygon หากยังไม่ปิด
+                                if (zoneCoords.length >= 3) {
+                                    const first = zoneCoords[0];
+                                    const last = zoneCoords[zoneCoords.length - 1];
+                                    if (first[0] !== last[0] || first[1] !== last[1]) zoneCoords.push(first);
+                                }
+                                const zonePolygon = turf.polygon([zoneCoords as [number, number][]]);
+                                actualPlantsInZone = actualPlantPoints.reduce((acc, pt) => {
+                                    const p = turf.point([pt.lng, pt.lat]);
+                                    return acc + (booleanPointInPolygon(p, zonePolygon) ? 1 : 0);
+                                }, 0);
+                            }
+                        } catch {
+                            // Error counting actual plant points in zone
+                            console.warn('Error counting actual plant points in zone');
+                        }
+                        try {
+                            const fromArea = calculatePlantingPoints(
+                                zoneArea,
+                                crop,
+                                effectiveRowSpacing,
+                                effectivePlantSpacing
+                            );
+                            let fromPipes = 0;
+                            if (pipes && pipes.length > 0) {
+                                try {
+                                    fromPipes = calculatePlantingPointsFromPipes(
+                                        pipes,
+                                        zoneId,
+                                        crop,
+                                        effectiveRowSpacing,
+                                        effectivePlantSpacing
+                                    );
+                                } catch {
+                                    // Pipe-based planting calc failed for zone
+                                    console.warn('Pipe-based planting calc failed for zone');
+                                }
+                            }
+                            totalPlantingPoints = fromPipes > 0 ? fromPipes : fromArea;
+                        } catch {
+                            // Error calculating planting points for zone
+                            console.warn('Error calculating planting points for zone');
                             // Fallback to area-based calculation
                             totalPlantingPoints = calculatePlantingPoints(zoneArea, crop, effectiveRowSpacing, effectivePlantSpacing);
+                        }
+                        // ใช้จำนวนจริงหากมี (มากกว่า 0)
+                        if (actualPlantsInZone > 0) totalPlantingPoints = actualPlantsInZone;
+                        // ป้องกันกรณีติดลบ/ไม่ใช่ตัวเลข
+                        if (!Number.isFinite(totalPlantingPoints) || totalPlantingPoints < 0) {
+                            totalPlantingPoints = 0;
                         }
 
                         const { estimatedYield, estimatedPrice } = calculateYieldAndPrice(
@@ -1749,12 +2381,13 @@ export default function FieldCropSummary() {
                             cropWaterPerPlantPerIrrigation: crop.waterRequirement,
                             growthPeriod: crop.growthPeriod,
                             irrigationNeeds: crop.irrigationNeeds,
-                            irrigationType: irrigationAssignments[zoneId] || 'ไม่ได้กำหนด',
+                            irrigationType: iAssign[zoneId] || 'ไม่ได้กำหนด',
                             // เพิ่มข้อมูลจำนวนสปริงเกอร์
                             sprinklerCount: zoneIrrigationCounts.sprinkler,
-                            miniSprinklerCount: zoneIrrigationCounts.miniSprinkler,
-                            microSprayCount: zoneIrrigationCounts.microSpray,
+                            // miniSprinklerCount and microSprayCount removed
                             dripTapeCount: zoneIrrigationCounts.dripTape,
+                            pivotCount: zoneIrrigationCounts.pivot,
+                            waterJetTapeCount: zoneIrrigationCounts.waterJetTape,
                             totalIrrigationPoints: zoneIrrigationCounts.total,
                         };
 
@@ -1786,41 +2419,109 @@ export default function FieldCropSummary() {
                         zone,
                         actualIrrigationPoints
                     );
+                    // ลองใช้ fallback crop อีกครั้งเพื่อกำหนดข้อมูลโซนให้ครบถ้วน
+                    const fallbackCropValue = (Array.isArray(summaryData?.selectedCrops) && summaryData.selectedCrops.length > 0)
+                        ? summaryData.selectedCrops[0]
+                        : null;
+                    const fallbackCrop = fallbackCropValue ? getCropByValue(fallbackCropValue) : undefined;
 
-                    newZoneSummaries[zoneId] = {
-                        zoneId: zoneId,
-                        zoneName: zone.name,
-                        cropName: t('Not defined'),
-                        cropValue: null,
-                        cropIcon: '❓',
-                        cropCategory: null,
-                        zoneArea: zone.coordinates
-                            ? Math.round(calculateZoneArea(zone.coordinates))
-                            : 0,
-                        zoneAreaRai: zone.coordinates
-                            ? Math.round((calculateZoneArea(zone.coordinates) / 1600) * 100) / 100
-                            : 0,
-                        rowSpacing: 0,
-                        plantSpacing: 0,
-                        totalPlantingPoints: 0,
-                        estimatedYield: 0,
-                        estimatedPrice: 0,
-                        waterRequirementPerIrrigation: 0,
-                        waterRequirementPerDay: 0,
-                        cropYieldPerRai: 0,
-                        cropPricePerKg: 0,
-                        cropWaterPerPlant: 0,
-                        cropWaterPerPlantPerIrrigation: 0,
-                        growthPeriod: 0,
-                        irrigationNeeds: 'unknown',
-                        irrigationType: irrigationAssignments[zoneId] || 'ไม่ได้กำหนด',
-                        // เพิ่มข้อมูลจำนวนสปริงเกอร์
-                        sprinklerCount: zoneIrrigationCounts.sprinkler,
-                        miniSprinklerCount: zoneIrrigationCounts.miniSprinkler,
-                        microSprayCount: zoneIrrigationCounts.microSpray,
-                        dripTapeCount: zoneIrrigationCounts.dripTape,
-                        totalIrrigationPoints: zoneIrrigationCounts.total,
-                    };
+                    if (fallbackCrop && zone.coordinates) {
+                        const zoneArea = calculateZoneArea(zone.coordinates);
+                        const effectiveRowSpacing = rowSpacing[fallbackCropValue!]
+                            ? rowSpacing[fallbackCropValue!]
+                            : fallbackCrop.rowSpacing;
+                        const effectivePlantSpacing = plantSpacing[fallbackCropValue!]
+                            ? plantSpacing[fallbackCropValue!]
+                            : fallbackCrop.plantSpacing;
+                        // เริ่มจากจำนวนคำนวณตาม spacing แล้ว fallback ในภายหลังถ้าจากท่อย่อยเป็น 0
+                        let totalPlantingPoints = calculatePlantingPoints(zoneArea, fallbackCrop, effectiveRowSpacing, effectivePlantSpacing);
+                        // นับจำนวนจุดปลูกจริงภายในโซน (ถ้ามีข้อมูล)
+                        try {
+                            if (Array.isArray(zone.coordinates) && zone.coordinates.length >= 3 && actualPlantPoints.length > 0) {
+                                const zoneCoords = zone.coordinates.map((c) => [c.lng, c.lat]);
+                                if (zoneCoords.length >= 3) {
+                                    const first = zoneCoords[0];
+                                    const last = zoneCoords[zoneCoords.length - 1];
+                                    if (first[0] !== last[0] || first[1] !== last[1]) zoneCoords.push(first);
+                                }
+                                const zonePolygon = turf.polygon([zoneCoords as [number, number][]]);
+                                const actualPlantsInZone = actualPlantPoints.reduce((acc, pt) => {
+                                    const p = turf.point([pt.lng, pt.lat]);
+                                    return acc + (booleanPointInPolygon(p, zonePolygon) ? 1 : 0);
+                                }, 0);
+                                if (actualPlantsInZone > 0) totalPlantingPoints = actualPlantsInZone;
+                            }
+                        } catch {
+                            // Error counting actual plant points in zone (fallback)
+                            console.warn('Error counting actual plant points in zone (fallback)');
+                        }
+                        const { estimatedYield, estimatedPrice } = calculateYieldAndPrice(zoneArea, fallbackCrop);
+                        const waterRequirementPerIrrigation = calculateWaterRequirement(totalPlantingPoints, fallbackCrop);
+
+                        newZoneSummaries[zoneId] = {
+                            zoneId: zoneId,
+                            zoneName: zone.name,
+                            cropName: fallbackCrop.name,
+                            cropValue: fallbackCropValue,
+                            cropIcon: fallbackCrop.icon,
+                            cropCategory: fallbackCrop.category,
+                            zoneArea: Math.round(zoneArea),
+                            zoneAreaRai: Math.round((zoneArea / 1600) * 100) / 100,
+                            rowSpacing: effectiveRowSpacing,
+                            plantSpacing: effectivePlantSpacing,
+                            totalPlantingPoints: totalPlantingPoints,
+                            estimatedYield: estimatedYield,
+                            estimatedPrice: estimatedPrice,
+                            waterRequirementPerIrrigation: waterRequirementPerIrrigation,
+                            waterRequirementPerDay: waterRequirementPerIrrigation,
+                            cropYieldPerRai: fallbackCrop.yield,
+                            cropPricePerKg: fallbackCrop.price,
+                            cropWaterPerPlant: fallbackCrop.waterRequirement,
+                            cropWaterPerPlantPerIrrigation: fallbackCrop.waterRequirement,
+                            growthPeriod: fallbackCrop.growthPeriod,
+                            irrigationNeeds: fallbackCrop.irrigationNeeds,
+                            irrigationType: iAssign[zoneId] || 'ไม่ได้กำหนด',
+                            sprinklerCount: zoneIrrigationCounts.sprinkler,
+                            // miniSprinklerCount and microSprayCount removed
+                            dripTapeCount: zoneIrrigationCounts.dripTape,
+                            pivotCount: zoneIrrigationCounts.pivot,
+                            waterJetTapeCount: zoneIrrigationCounts.waterJetTape,
+                            totalIrrigationPoints: zoneIrrigationCounts.total,
+                        };
+                    } else {
+                        newZoneSummaries[zoneId] = {
+                            zoneId: zoneId,
+                            zoneName: zone.name,
+                            cropName: t('Not defined'),
+                            cropValue: null,
+                            cropIcon: '❓',
+                            cropCategory: null,
+                            zoneArea: zone.coordinates
+                                ? Math.round(calculateZoneArea(zone.coordinates))
+                                : 0,
+                            zoneAreaRai: zone.coordinates
+                                ? Math.round((calculateZoneArea(zone.coordinates) / 1600) * 100) / 100
+                                : 0,
+                            rowSpacing: 0,
+                            plantSpacing: 0,
+                            totalPlantingPoints: 0,
+                            estimatedYield: 0,
+                            estimatedPrice: 0,
+                            waterRequirementPerIrrigation: 0,
+                            waterRequirementPerDay: 0,
+                            cropYieldPerRai: 0,
+                            cropPricePerKg: 0,
+                            cropWaterPerPlant: 0,
+                            cropWaterPerPlantPerIrrigation: 0,
+                            growthPeriod: 0,
+                            irrigationNeeds: 'unknown',
+                            irrigationType: iAssign[zoneId] || 'ไม่ได้กำหนด',
+                            sprinklerCount: zoneIrrigationCounts.sprinkler,
+                            // miniSprinklerCount and microSprayCount removed
+                            dripTapeCount: zoneIrrigationCounts.dripTape,
+                            totalIrrigationPoints: zoneIrrigationCounts.total,
+                        };
+                    }
                 }
             });
 
@@ -1838,38 +2539,13 @@ export default function FieldCropSummary() {
         plantSpacing,
         irrigationAssignments,
         pipes,
+        actualIrrigationPoints,
         t,
     ]);
 
-    const handleCalculateEquipment = () => {
-        if (!summaryData) {
-            alert(t('No project to calculate'));
-            return;
-        }
+    // Equipment calculation removed in simplified summary
 
-        console.log('🚀 Preparing data for product page...');
-
-        const fieldData: FieldCropData = calculateEnhancedFieldStats(summaryData);
-        saveEnhancedFieldCropData(fieldData);
-        localStorage.setItem('projectType', 'field-crop');
-
-        // Ensure image is saved before navigating
-        if (!mapImageCaptured && !isCapturingImage) {
-            handleCaptureMapImage().then(() => {
-                console.log('Navigating to /product?mode=field-crop');
-                router.visit('/product?mode=field-crop');
-            });
-        } else {
-            console.log('Navigating to /product?mode=field-crop');
-            router.visit('/product?mode=field-crop');
-        }
-    };
-
-    const actualZones = Array.isArray(zones) ? zones : [];
-    const actualPipes = Array.isArray(pipes) ? pipes : [];
-    const actualEquipmentIcons = Array.isArray(equipmentIcons) ? equipmentIcons : [];
-    const actualIrrigationPoints = Array.isArray(irrigationPoints) ? irrigationPoints : [];
-    const actualIrrigationLines = Array.isArray(irrigationLines) ? irrigationLines : [];
+    
 
     const calculateMapBounds = (): { center: [number, number]; zoom: number } => {
         if (mainField && mainField.coordinates && mainField.coordinates.length > 0) {
@@ -1984,36 +2660,31 @@ export default function FieldCropSummary() {
     );
     
     const sprinklerPoints = zoneIrrigationCounts.reduce((sum, counts) => sum + counts.sprinkler, 0);
-    const miniSprinklerPoints = zoneIrrigationCounts.reduce((sum, counts) => sum + counts.miniSprinkler, 0);
-    const microSprayPoints = zoneIrrigationCounts.reduce((sum, counts) => sum + counts.microSpray, 0);
+    const pivotPoints = zoneIrrigationCounts.reduce((sum, counts) => sum + (counts.pivot || 0), 0);
+    const waterJetPoints = zoneIrrigationCounts.reduce((sum, counts) => sum + (counts.waterJetTape || 0), 0);
     const dripPoints = zoneIrrigationCounts.reduce((sum, counts) => sum + counts.dripTape, 0);
 
     // Debug: ตรวจสอบการคำนวณจำนวน irrigation points รวม
     console.log('🔍 Total irrigation points calculation:', {
         totalSprinklers: sprinklerPoints,
-        totalMiniSprinklers: miniSprinklerPoints,
-        totalMicroSprays: microSprayPoints,
+        totalPivots: pivotPoints,
+        totalWaterJet: waterJetPoints,
         totalDripTape: dripPoints,
-        totalPoints: sprinklerPoints + miniSprinklerPoints + microSprayPoints + dripPoints,
+        totalPoints: sprinklerPoints + pivotPoints + waterJetPoints + dripPoints,
         zoneCounts: zoneIrrigationCounts.map((counts, index) => ({
             zoneIndex: index,
             sprinkler: counts.sprinkler,
-            miniSprinkler: counts.miniSprinkler,
-            microSpray: counts.microSpray,
+            pivot: counts.pivot,
+            waterJetTape: counts.waterJetTape,
             dripTape: counts.dripTape,
             total: counts.total
         }))
     });
 
 
-    const uniqueIrrigationLines = actualIrrigationLines.filter((line, index, array) => {
-        if (!line || !line.id) return false;
-        const firstIndex = array.findIndex((l) => l && l.id === line.id);
-        return firstIndex === index;
-    });
-    const dripLines = uniqueIrrigationLines.filter(
-        (l) => normalizeIrrigationType(l.type) === 'drip_tape'
-    ).length;
+    // Irrigation lines not used in simplified summary
+    // Drip lines not shown in simplified summary
+    const dripLines = 0;
 
     const totalZones = actualZones.length;
 
@@ -2024,17 +2695,68 @@ export default function FieldCropSummary() {
     // Calculate fittings (2-way, 3-way, 4-way)
     const fittings = calculateFittingsCounts(actualPipes, uniqueIrrigationPoints);
 
-    const uniqueEquipment = actualEquipmentIcons.filter(
-        (equipment, index, array) => array.findIndex((e) => e.id === equipment.id) === index
-    );
-    const pumpCount = uniqueEquipment.filter((e) => e.type === 'pump').length;
-    const valveCount = uniqueEquipment.filter((e) => e.type === 'ballvalve').length;
-    const solenoidCount = uniqueEquipment.filter((e) => e.type === 'solenoid').length;
+    const uniqueEquipment = actualEquipmentIcons
+        .filter((equipment, index, array) => array.findIndex((e) => e.id === equipment.id) === index)
+        .filter((e) => e.type === 'pump');
+    const pumpCount = uniqueEquipment.length;
 
     const totalEstimatedYield = Object.values(calculatedZoneSummaries).reduce((sum: number, summary: ZoneSummary) => sum + (summary.estimatedYield || 0), 0);
-    const totalEstimatedIncome = Object.values(calculatedZoneSummaries).reduce((sum: number, summary: ZoneSummary) => sum + (summary.estimatedPrice || 0), 0);
+    // Financial estimation removed in simplified summary
+    // const totalEstimatedIncome = Object.values(calculatedZoneSummaries).reduce((sum: number, summary: ZoneSummary) => sum + (summary.estimatedPrice || 0), 0);
     const totalPlantingPoints = Object.values(calculatedZoneSummaries).reduce((sum: number, summary: ZoneSummary) => sum + (summary.totalPlantingPoints || 0), 0);
     const totalWaterRequirementPerIrrigation = Object.values(calculatedZoneSummaries).reduce((sum: number, summary: ZoneSummary) => sum + (summary.waterRequirementPerIrrigation || 0), 0);
+
+    // Actual plant points from Initial Area (fallback to localStorage if not provided)
+    const actualPlantPointsInfo = useMemo(() => {
+        try {
+            let plants = (summaryData as unknown as { plantPoints?: { lat: number; lng: number }[] } | null)?.plantPoints || [];
+            if ((!plants || plants.length === 0) && typeof window !== 'undefined') {
+                const fieldDataStr = localStorage.getItem('fieldCropData');
+                if (fieldDataStr) {
+                    const parsed = JSON.parse(fieldDataStr);
+                    if (parsed && Array.isArray(parsed.plantPoints)) plants = parsed.plantPoints;
+                }
+            }
+            const count: number = Array.isArray(plants) ? plants.length : 0;
+
+            const primaryCropValue = (summaryData?.selectedCrops && summaryData.selectedCrops[0]) ? summaryData.selectedCrops[0] : undefined;
+            const crop = primaryCropValue ? getCropByValue(primaryCropValue) : undefined;
+            const perPlantWaterLPerDay = crop?.waterRequirement ?? 0; // liters/plant/day
+            const totalWaterLPerDay = count * perPlantWaterLPerDay;
+
+            // Estimate revenue per plant based on yield per rai and spacing (cm)
+            const rowCm = (primaryCropValue && summaryData?.rowSpacing && summaryData.rowSpacing[primaryCropValue] !== undefined)
+                ? summaryData.rowSpacing[primaryCropValue]
+                : (crop?.rowSpacing ?? 0);
+            const plantCm = (primaryCropValue && summaryData?.plantSpacing && summaryData.plantSpacing[primaryCropValue] !== undefined)
+                ? summaryData.plantSpacing[primaryCropValue]
+                : (crop?.plantSpacing ?? 0);
+
+            let yieldPerPlantKg = 0;
+            let revenuePerPlant = 0;
+            let estimatedTotalRevenue = 0;
+            if (crop && rowCm > 0 && plantCm > 0) {
+                const plantsPerRai = 16000000 / (rowCm * plantCm); // cm^2 basis
+                if (plantsPerRai > 0) {
+                    yieldPerPlantKg = crop.yield / plantsPerRai;
+                    revenuePerPlant = yieldPerPlantKg * crop.price;
+                    estimatedTotalRevenue = revenuePerPlant * count;
+                }
+            }
+
+            return {
+                count,
+                cropName: crop?.name || primaryCropValue || '-',
+                perPlantWaterLPerDay,
+                totalWaterLPerDay,
+                yieldPerPlantKg,
+                revenuePerPlant,
+                estimatedTotalRevenue
+            };
+        } catch {
+            return { count: 0, cropName: '-', perPlantWaterLPerDay: 0, totalWaterLPerDay: 0, yieldPerPlantKg: 0, revenuePerPlant: 0, estimatedTotalRevenue: 0 };
+        }
+    }, [summaryData]);
 
     const areaInRai = fieldAreaSize / 1600;
 
@@ -2082,7 +2804,7 @@ export default function FieldCropSummary() {
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                             <div className="flex-1">
                                 <Link
-                                    href="/field-map?edit=true&step=4"
+                                    href="/step4-pipe-system?currentStep=4&completedSteps=4"
                                     className="mb-2 inline-flex items-center text-blue-400 hover:text-blue-300"
                                 >
                                     <svg
@@ -2152,43 +2874,18 @@ export default function FieldCropSummary() {
                                     )}
                                 </button>
 
-                                {/* Save Project Button */}
-                                <button
-                                    onClick={handleSaveProject}
-                                    className="inline-flex transform items-center rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500 px-6 py-3 font-semibold text-white transition-all duration-200 hover:scale-105 hover:from-teal-600 hover:to-cyan-600 hover:shadow-lg"
-                                >
-                                    <svg className="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
-                                    {t('Save Project')}
-                                </button>
+                                {/* Save Project Button (removed by UI simplification request) */}
 
                                 {/* New Project Button */}
                                 <Link
-                                    href="/field-map"
+                                    href="/step4-pipe-system?currentStep=4&completedSteps=4"
                                     className="inline-flex transform items-center rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 px-6 py-3 font-semibold text-white transition-all duration-200 hover:scale-105 hover:from-blue-600 hover:to-indigo-600 hover:shadow-lg"
                                 >
                                     <svg className="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                                     {t('New Project')}
                                 </Link>
 
-                                <button
-                                    onClick={handleCalculateEquipment}
-                                    className="inline-flex transform items-center rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 font-semibold text-white transition-all duration-200 hover:scale-105 hover:from-purple-700 hover:to-blue-700 hover:shadow-lg"
-                                >
-                                    <svg
-                                        className="mr-2 h-5 w-5"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                                        />
-                                    </svg>
-                                    🧮 {t('Calculate Equipment')}
-                                </button>
+                                
                             </div>
                         </div>
 
@@ -2228,7 +2925,7 @@ export default function FieldCropSummary() {
             <div className="print:print-layout">
                 <div className="container mx-auto px-4 py-4">
                     <div className="mx-auto max-w-7xl print:max-w-none">
-                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 print:grid-cols-2 print:gap-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 print:grid-cols-2 print:gap-6">
                             <div className="print:print-summary-section space-y-4">
                                 {/* Enhanced Map Visualization with better capture capabilities */}
                                 <div className="print:print-map-container overflow-hidden rounded-lg bg-gray-800 print:border">
@@ -2246,7 +2943,7 @@ export default function FieldCropSummary() {
                                         <div
                                             ref={mapContainerRef}
                                             className="print:print-map-container google-maps-container relative"
-                                            style={{ minHeight: 300, height: '400px' }}
+                                            style={{ minHeight: 350, height: '550px' }}
                                         >
                                             <GoogleMapsDisplay
                                                 center={optimalCenter as [number, number]}
@@ -2254,12 +2951,12 @@ export default function FieldCropSummary() {
                                                 mainField={mainField}
                                                 zones={actualZones}
                                                 pipes={actualPipes}
+                                                obstacles={actualObstacles as unknown as Obstacle[]}
                                                 equipment={uniqueEquipment}
                                                 irrigationPoints={uniqueIrrigationPoints}
-                                                irrigationLines={uniqueIrrigationLines}
+                                                irrigationLines={[]}
                                                 onMapReady={(map) => {
                                                     googleMapRef.current = map;
-                                                    console.log('✅ Google Map ready for capture');
                                                 }}
                                             />
                                         </div>
@@ -2298,14 +2995,10 @@ export default function FieldCropSummary() {
                                         </div>
                                         <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-1">
                                             <div className="text-lg font-bold text-cyan-400 print:text-sm print:text-black">
-                                                {sprinklerPoints +
-                                                    miniSprinklerPoints +
-                                                    microSprayPoints +
-                                                    dripPoints +
-                                                    dripLines}
+                                                {sprinklerPoints + pivotPoints + waterJetPoints + dripPoints + dripLines}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-gray-600">
-                                                สปริงเกอร์
+                                                {t('Irrigation Points')}
                                             </div>
                                         </div>
                                         <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-1">
@@ -2456,112 +3149,85 @@ export default function FieldCropSummary() {
                                         <h3 className="mb-2 text-sm font-semibold text-orange-400 print:text-xs print:text-black">
                                             ⚙️ {t('Equipment')}
                                         </h3>
-                                        <div className="grid grid-cols-3 gap-1">
+                                        <div className="grid grid-cols-1 gap-1">
                                             <div className="rounded bg-gray-700 p-1 text-center print:border">
                                                 <div className="text-sm font-bold text-orange-400">
                                                     {pumpCount}
                                                 </div>
                                                 <div className="text-xs text-gray-400">{t('Pumps')}</div>
                                             </div>
-                                            <div className="rounded bg-gray-700 p-1 text-center print:border">
-                                                <div className="text-sm font-bold text-red-400">
-                                                    {valveCount}
-                                                </div>
-                                                <div className="text-xs text-gray-400">{t('Valves')}</div>
-                                            </div>
-                                            <div className="rounded bg-gray-700 p-1 text-center print:border">
-                                                <div className="text-sm font-bold text-yellow-400">
-                                                    {solenoidCount}
-                                                </div>
-                                                <div className="text-xs text-gray-400">
-                                                    {t('Solenoids')}
-                                                </div>
-                                            </div>
                                         </div>
                                     </div>
-                                    {/* Fittings section */}
-                                    <div className="mb-3">
-                                        <h3 className="mb-2 text-sm font-semibold text-rose-400 print:text-xs print:text-black">
-                                            🔩 {t('Fittings (2-way / 3-way / 4-way)')}
-                                        </h3>
-                                        {/* Totals */}
-                                        <div className="grid grid-cols-3 gap-1">
-                                            <div className="rounded bg-gray-700 p-1 text-center print:border print:bg-gray-50">
-                                                <div className="text-sm font-bold text-rose-400">
-                                                    {fittings.twoWay}
-                                                </div>
-                                                <div className="text-xs text-gray-400">{t('2-way')}</div>
+                                    <div className="mt-3">
+                                        <div className="text-xs font-semibold text-gray-300 mb-2">
+                                            {t('Fittings')} (2/3/4 {t('way')})
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 text-center">
+                                            <div className="bg-gray-700/40 border border-gray-600/50 rounded p-2">
+                                                <div className="text-sm font-bold text-gray-200">{fittings.twoWay.toLocaleString()}</div>
+                                                <div className="text-[11px] text-gray-300">{t('2-way')}</div>
                                             </div>
-                                            <div className="rounded bg-gray-700 p-1 text-center print:border print:bg-gray-50">
-                                                <div className="text-sm font-bold text-rose-400">
-                                                    {fittings.threeWay}
-                                                </div>
-                                                <div className="text-xs text-gray-400">{t('3-way')}</div>
+                                            <div className="bg-gray-700/40 border border-gray-600/50 rounded p-2">
+                                                <div className="text-sm font-bold text-gray-200">{fittings.threeWay.toLocaleString()}</div>
+                                                <div className="text-[11px] text-gray-300">{t('3-way')}</div>
                                             </div>
-                                            <div className="rounded bg-gray-700 p-1 text-center print:border print:bg-gray-50">
-                                                <div className="text-sm font-bold text-rose-400">
-                                                    {fittings.fourWay}
-                                                </div>
-                                                <div className="text-xs text-gray-400">{t('4-way')}</div>
+                                            <div className="bg-gray-700/40 border border-gray-600/50 rounded p-2">
+                                                <div className="text-sm font-bold text-gray-200">{fittings.fourWay.toLocaleString()}</div>
+                                                <div className="text-[11px] text-gray-300">{t('4-way')}</div>
                                             </div>
                                         </div>
-                                        {/* Breakdown by pipe type */}
-                                        <div className="mt-2 grid grid-cols-3 gap-1 text-xs">
-                                            <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
-                                                <div className="mb-1 font-semibold text-blue-300">{t('Main')}</div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-gray-300">{t('2-way')}</span>
-                                                    <span className="font-bold text-blue-300">{fittings.breakdown.main.twoWay}</span>
-                                                </div>
-                                                <div className="mt-1 flex items-center justify-between">
-                                                    <span className="text-gray-300">{t('3-way')}</span>
-                                                    <span className="font-bold text-blue-300">{fittings.breakdown.main.threeWay}</span>
-                                                </div>
-                                            </div>
-                                            <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
-                                                <div className="mb-1 font-semibold text-green-300">{t('Submain')}</div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-gray-300">{t('2-way')}</span>
-                                                    <span className="font-bold text-green-300">{fittings.breakdown.submain.twoWay}</span>
-                                                </div>
-                                                <div className="mt-1 flex items-center justify-between">
-                                                    <span className="text-gray-300">{t('3-way')}</span>
-                                                    <span className="font-bold text-green-300">{fittings.breakdown.submain.threeWay}</span>
-                                                </div>
-                                                <div className="mt-1 flex items-center justify-between">
-                                                    <span className="text-gray-300">{t('4-way')}</span>
-                                                    <span className="font-bold text-green-300">{fittings.breakdown.submain.fourWay}</span>
+                                        <div className="mt-3 space-y-2">
+                                            <div>
+                                                <div className="text-xs font-semibold text-gray-300 mb-1">{t('Main')}</div>
+                                                <div className="grid grid-cols-3 gap-2 text-center">
+                                                    <div className="bg-gray-700/30 border border-gray-600/40 rounded p-2">
+                                                        <div className="text-sm font-bold text-gray-200">{fittings.breakdown.main.twoWay}</div>
+                                                        <div className="text-[11px] text-gray-300">{t('2-way')}</div>
+                                                    </div>
+                                                    <div className="bg-gray-700/30 border border-gray-600/40 rounded p-2">
+                                                        <div className="text-sm font-bold text-gray-200">{fittings.breakdown.main.threeWay}</div>
+                                                        <div className="text-[11px] text-gray-300">{t('3-way')}</div>
+                                                    </div>
+                                                    <div className="bg-gray-700/30 border border-gray-600/40 rounded p-2 opacity-60">
+                                                        <div className="text-sm font-bold text-gray-200">0</div>
+                                                        <div className="text-[11px] text-gray-300">{t('4-way')}</div>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
-                                                <div className="mb-1 font-semibold text-purple-300">{t('Lateral')}</div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-gray-300">{t('2-way')}</span>
-                                                    <span className="font-bold text-purple-300">{fittings.breakdown.lateral.twoWay}</span>
-                                                </div>
-                                                <div className="mt-1 flex items-center justify-between">
-                                                    <span className="text-gray-300">{t('3-way')}</span>
-                                                    <span className="font-bold text-purple-300">{fittings.breakdown.lateral.threeWay}</span>
-                                                </div>
-                                                <div className="mt-1 flex items-center justify-between">
-                                                    <span className="text-gray-300">{t('4-way')}</span>
-                                                    <span className="font-bold text-purple-300">{fittings.breakdown.lateral.fourWay}</span>
+                                            <div>
+                                                <div className="text-xs font-semibold text-gray-300 mb-1">{t('Submain')}</div>
+                                                <div className="grid grid-cols-3 gap-2 text-center">
+                                                    <div className="bg-gray-700/30 border border-gray-600/40 rounded p-2">
+                                                        <div className="text-sm font-bold text-gray-200">{fittings.breakdown.submain.twoWay}</div>
+                                                        <div className="text-[11px] text-gray-300">{t('2-way')}</div>
+                                                    </div>
+                                                    <div className="bg-gray-700/30 border border-gray-600/40 rounded p-2">
+                                                        <div className="text-sm font-bold text-gray-200">{fittings.breakdown.submain.threeWay}</div>
+                                                        <div className="text-[11px] text-gray-300">{t('3-way')}</div>
+                                                    </div>
+                                                    <div className="bg-gray-700/30 border border-gray-600/40 rounded p-2">
+                                                        <div className="text-sm font-bold text-gray-200">{fittings.breakdown.submain.fourWay}</div>
+                                                        <div className="text-[11px] text-gray-300">{t('4-way')}</div>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div className="mt-2 rounded bg-rose-900/30 p-2 text-xs text-rose-100 print:bg-rose-50 print:text-rose-800">
-                                            <div>{t('Rules:')}</div>
-                                            <ul className="ml-4 list-disc space-y-1">
-                                                <li>
-                                                    {t('Main: 2-way at each internal corner and at both endpoints.')}
-                                                </li>
-                                                <li>
-                                                    {t('Submain: 3-way per lateral branch; when two laterals branch at the same vertex, use one 4-way instead of two 3-way.')}
-                                                </li>
-                                                <li>
-                                                    {t('Lateral: 3-way at each sprinkler except the last sprinkler on each lateral uses a 2-way.')}
-                                                </li>
-                                            </ul>
+                                            <div>
+                                                <div className="text-xs font-semibold text-gray-300 mb-1">{t('Lateral')}</div>
+                                                <div className="grid grid-cols-3 gap-2 text-center">
+                                                    <div className="bg-gray-700/30 border border-gray-600/40 rounded p-2">
+                                                        <div className="text-sm font-bold text-gray-200">{fittings.breakdown.lateral.twoWay}</div>
+                                                        <div className="text-[11px] text-gray-300">{t('2-way')}</div>
+                                                    </div>
+                                                    <div className="bg-gray-700/30 border border-gray-600/40 rounded p-2">
+                                                        <div className="text-sm font-bold text-gray-200">{fittings.breakdown.lateral.threeWay}</div>
+                                                        <div className="text-[11px] text-gray-300">{t('3-way')}</div>
+                                                    </div>
+                                                    <div className="bg-gray-700/30 border border-gray-600/40 rounded p-2 opacity-60">
+                                                        <div className="text-sm font-bold text-gray-200">0</div>
+                                                        <div className="text-[11px] text-gray-300">{t('4-way')}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                     <div>
@@ -2578,19 +3244,19 @@ export default function FieldCropSummary() {
                                                 </div>
                                             </div>
                                             <div className="rounded bg-gray-700 p-1 text-center print:border">
-                                                <div className="text-sm font-bold text-blue-400">
-                                                    {miniSprinklerPoints}
+                                                <div className="text-sm font-bold text-orange-400">
+                                                    {pivotPoints}
                                                 </div>
                                                 <div className="text-xs text-gray-400">
-                                                    {t('Mini Sprinklers')}
+                                                    {t('Pivots')}
                                                 </div>
                                             </div>
                                             <div className="rounded bg-gray-700 p-1 text-center print:border">
-                                                <div className="text-sm font-bold text-orange-400">
-                                                    {microSprayPoints}
+                                                <div className="text-sm font-bold text-blue-400">
+                                                    {waterJetPoints}
                                                 </div>
                                                 <div className="text-xs text-gray-400">
-                                                    {t('Micro Sprays')}
+                                                    {t('Water Jet Tape')}
                                                 </div>
                                             </div>
                                             <div className="rounded bg-gray-700 p-1 text-center print:border">
@@ -2608,12 +3274,92 @@ export default function FieldCropSummary() {
                                                 Total Irrigation Points:
                                             </div>
                                             <div className="text-sm font-bold text-cyan-100 print:text-cyan-800">
-                                                {sprinklerPoints +
-                                                    miniSprinklerPoints +
-                                                    microSprayPoints +
-                                                    dripPoints +
-                                                    dripLines}{' '}
+                                                {sprinklerPoints + pivotPoints + waterJetPoints + dripPoints + dripLines}{' '}
                                                 จุด
+                                            </div>
+                                        </div>
+                                        {/* Global Pipe Network Summary under Irrigation System */}
+                                        <div className="mt-3 space-y-2 rounded bg-gray-700/40 p-2 print:border">
+                                            <div className="text-xs font-semibold text-gray-200 mb-1">
+                                                {t('Pipe Network Summary')}
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-2 text-center">
+                                                <div className="rounded bg-gray-700/30 p-2 border border-gray-600/40">
+                                                    <div className="text-sm font-bold text-blue-300">{pipeNetworkSummary.counts.main}</div>
+                                                    <div className="text-[11px] text-gray-300">{t('Main')}</div>
+                                                </div>
+                                                <div className="rounded bg-gray-700/30 p-2 border border-gray-600/40">
+                                                    <div className="text-sm font-bold text-green-300">{pipeNetworkSummary.counts.submain}</div>
+                                                    <div className="text-[11px] text-gray-300">{t('Submain')}</div>
+                                                </div>
+                                                <div className="rounded bg-gray-700/30 p-2 border border-gray-600/40">
+                                                    <div className="text-sm font-bold text-purple-300">{pipeNetworkSummary.counts.lateral}</div>
+                                                    <div className="text-[11px] text-gray-300">{t('Lateral')}</div>
+                                                </div>
+                                            </div>
+                                            {/* Per-main aggregation: outlets (connections) */}
+                                            <div className="space-y-1 mt-2">
+                                                {pipeNetworkSummary.mains.length === 0 ? (
+                                                    <div className="text-[11px] text-gray-400">{t('No main pipes')}</div>
+                                                ) : (
+                                                    pipeNetworkSummary.mains.map((m) => {
+                    const subCount = m.submains.length;
+                    const latTotal = m.submains.reduce((s, sm) => s + sm.laterals.length, 0);
+                    return (
+                        <div key={String(m.id)} className="rounded bg-gray-700/30 p-2 text-xs border border-gray-600/40">
+                            <div className="flex items-center justify-between">
+                                <div className="text-blue-300">{t('Main')}</div>
+                                <div className="text-right text-gray-200">
+                                    <span className="mr-3">{t('Submain')}: <span className="font-semibold text-green-300">{subCount}</span></span>
+                                    <span className="mr-3">{t('Lateral')}: <span className="font-semibold text-purple-300">{latTotal}</span></span>
+                                    <span className="font-semibold text-cyan-200">{m.totalFlowLMin.toLocaleString()} {t('L/min')}</span>
+                                </div>
+                            </div>
+                            {/* Submain → Lateral counts */}
+                            <div className="mt-1 space-y-1">
+                                {m.submains.map((sm) => (
+                                    <div key={String(sm.id)} className="rounded bg-gray-700/10 p-1">
+                                        <div className="flex items-center justify-between">
+                                            <div className="text-green-300">{t('Submain')}</div>
+                                            <div className="text-gray-200">
+                                                <span className="mr-3">{t('Lateral')}: <span className="font-semibold text-purple-300">{sm.laterals.length}</span></span>
+                                                <span className="font-semibold text-cyan-200">{sm.totalFlowLMin.toLocaleString()} {t('L/min')}</span>
+                                            </div>
+                                        </div>
+                                        {/* Lateral → Sprinkler counts (distribution only, no individual names) */}
+                                        {sm.laterals.length > 0 && (
+                                            <div className="mt-1 text-[11px] text-gray-300">
+                                                {(() => {
+                                                    type Bucket = { count: number; totalFlow: number };
+                                                    const buckets = new Map<number, Bucket>();
+                                                    sm.laterals.forEach((li) => {
+                                                        const spr = (li.unitsByType && li.unitsByType['sprinkler']) ? li.unitsByType['sprinkler'] : 0;
+                                                        const cur = buckets.get(spr) || { count: 0, totalFlow: 0 };
+                                                        cur.count += 1;
+                                                        cur.totalFlow += (li.flowLMin || 0);
+                                                        buckets.set(spr, cur);
+                                                    });
+                                                    const rows = Array.from(buckets.entries()).sort((a, b) => b[0] - a[0]);
+                                                    return (
+                                                        <div className="rounded bg-gray-700/5 p-1">
+                                                            {rows.map(([sprCount, val], i) => (
+                                                                <div key={i} className="flex items-center justify-between">
+                                                                    <div>{val.count} × {sprCount} {t('Sprinklers')}</div>
+                                                                    <div className="font-semibold text-cyan-200">{Math.round(val.totalFlow).toLocaleString()} {t('L/min')}</div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                })
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -2622,31 +3368,9 @@ export default function FieldCropSummary() {
                                 {/* Financial & Water Summary - keeping existing code with translation */}
                                 <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
                                     <h2 className="mb-3 text-lg font-bold text-green-400 print:text-base print:text-black">
-                                        💰 {t('Financial & Water Summary')}
+                                        💧 {t('Water Summary')}
                                     </h2>
                                     <div className="space-y-3 print:space-y-2">
-                                        <div className="space-y-2">
-                                            <div className="rounded-lg bg-gray-700 p-2 print:border print:bg-gray-50">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-sm text-gray-400 print:text-gray-700">
-                                                        {t('Total Estimated Yield')}
-                                                    </span>
-                                                    <span className="text-sm font-bold text-yellow-400 print:text-black">
-                                                        {totalEstimatedYield.toLocaleString()} {t('kg')}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div className="rounded-lg bg-gray-700 p-2 print:border print:bg-gray-50">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-sm text-gray-400 print:text-gray-700">
-                                                        {t('Total Estimated Income')}
-                                                    </span>
-                                                    <span className="text-sm font-bold text-green-400 print:text-black">
-                                                        ฿{totalEstimatedIncome.toLocaleString()}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
 
                                         <div className="rounded-lg bg-cyan-900/30 p-3 print:border-2 print:border-cyan-200 print:bg-cyan-50">
                                             <h3 className="mb-2 text-sm font-semibold text-cyan-300 print:text-cyan-800">
@@ -2658,47 +3382,25 @@ export default function FieldCropSummary() {
                                                         {t('Total Farm Area:')} {areaInRai.toFixed(2)} {t('Rai')}
                                                     </div>
                                                     <div className="text-xs text-cyan-200 print:text-cyan-700">
-                                                        {t('Total Plants:')}{' '}
-                                                        {totalPlantingPoints.toLocaleString()} {t('trees')}
+                                                        {t('Total Plants:')} {totalPlantingPoints.toLocaleString()} {t('trees')}
                                                     </div>
                                                     <div className="text-xs text-cyan-200 print:text-cyan-700">
-                                                        {t('Active Zones:')}{' '}
-                                                        {
-                                                            Object.values(
-                                                                calculatedZoneSummaries
-                                                            ).filter(
-                                                                (summary: ZoneSummary) => summary.cropValue
-                                                            ).length
-                                                        }{' '}
-                                                        {t('zones')}
+                                                        {t('Active Zones:')} {Object.values(calculatedZoneSummaries).filter((summary: ZoneSummary) => summary.cropValue).length} {t('zones')}
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <div className="mb-1 text-xs text-cyan-200 print:text-cyan-700">
-                                                        {t('Water Need per Irrigation:')}
-                                                    </div>
-                                                    <div className="text-xl font-bold text-cyan-100 print:text-cyan-800">
-                                                        {totalWaterRequirementPerIrrigation.toLocaleString()}
-                                                    </div>
-                                                    <div className="text-xs text-cyan-200 print:text-cyan-700">
-                                                        {t('Liters/irrigation')}
-                                                    </div>
-                                                    <div className="mt-1 text-xs text-cyan-200 print:text-cyan-700">
-                                                        (
-                                                        {(
-                                                            totalWaterRequirementPerIrrigation /
-                                                            1000
-                                                        ).toFixed(1)}{' '}
-                                                        {t('m³/irrigation')})
-                                                    </div>
+                                                    <div className="text-[11px] text-cyan-200 print:text-cyan-700">{t('Water need')}</div>
+                                                    <div className="text-2xl font-extrabold tracking-tight text-cyan-100 print:text-cyan-800">{totalWaterRequirementPerIrrigation.toLocaleString()} <span className="text-base font-semibold opacity-80">{t('L/irrigation')}</span></div>
+                                                    <div className="text-[11px] text-cyan-200 print:text-cyan-700">({(totalWaterRequirementPerIrrigation / 1000).toFixed(1)} {t('m³/irrigation')})</div>
                                                 </div>
                                             </div>
 
                                             <div className="mt-3 border-t border-cyan-700 pt-2 print:border-cyan-300">
-                                                <div className="mb-2 text-xs font-medium text-cyan-200 print:text-cyan-700">
-                                                    {t('Water Requirements by Zone (per irrigation):')}
+                                                <div className="mb-2 flex items-center justify-between">
+                                                    <div className="text-xs font-medium text-cyan-200 print:text-cyan-700">{t('Water by zone')}</div>
+                                                    <div className="text-[10px] text-cyan-300/70 print:text-cyan-700">{t('per irrigation')}</div>
                                                 </div>
-                                                <div className="max-h-24 space-y-1 overflow-y-auto">
+                                                <div className="max-h-32 space-y-1.5 overflow-y-auto pr-1">
                                                     {Object.values(calculatedZoneSummaries)
                                                         .filter((summary: ZoneSummary) => summary.cropValue)
                                                         .map((summary: ZoneSummary) => (
@@ -2716,6 +3418,22 @@ export default function FieldCropSummary() {
                                                                 </span>
                                                             </div>
                                                         ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Actual plant points summary (from Initial Area) */}
+                                            <div className="mt-3 border-t border-cyan-700 pt-2 print:border-cyan-300">
+                                                <div className="mb-2 text-xs font-medium text-cyan-200 print:text-cyan-700">
+                                                    {t('Actual Plants & Daily Water (from Initial Area):')}
+                                                </div>
+                                                <div className="flex items-center justify-between text-xs">
+                                                    <div className="text-cyan-200 print:text-cyan-700">
+                                                        {t('Plants')}: <span className="font-semibold">{actualPlantPointsInfo.count.toLocaleString()}</span> {t('trees')}
+                                                    </div>
+                                                    <div className="text-right text-cyan-200 print:text-cyan-700">
+                                                        <div>{t('Per-plant water (day)')}: <span className="font-semibold">{actualPlantPointsInfo.perPlantWaterLPerDay.toFixed(2)}</span> {t('L/day')}</div>
+                                                        <div>{t('Total water (day)')}: <span className="font-semibold">{actualPlantPointsInfo.totalWaterLPerDay.toFixed(1)}</span> {t('L/day')}</div>
+                                                    </div>
                                                 </div>
                                             </div>
 
@@ -2757,24 +3475,18 @@ export default function FieldCropSummary() {
                                     </div>
                                 </div>
 
-                                {/* Action Buttons */}
+                                {/* Action Buttons - simplified (print removed) */}
                                 <div className="rounded-lg bg-gray-800 p-4 print:hidden">
                                     <h2 className="mb-3 text-lg font-bold text-purple-400">
                                         📋 {t('Actions')}
                                     </h2>
                                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                                         <Link
-                                            href="/field-map?edit=true&step=4"
+                                            href="/step4-pipe-system?currentStep=4&completedSteps=4"
                                             className="rounded-lg bg-blue-600 px-4 py-2 text-center font-semibold text-white hover:bg-blue-700"
                                         >
                                             🔄 {t('Edit Project')}
                                         </Link>
-                                        <button
-                                            onClick={() => window.print()}
-                                            className="rounded-lg bg-green-600 px-4 py-2 font-semibold text-white hover:bg-green-700"
-                                        >
-                                            🖨️ {t('Print Summary')}
-                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -2791,7 +3503,7 @@ export default function FieldCropSummary() {
                                             const assignedCrop = zoneAssignments[zone.id]
                                                 ? getCropByValue(zoneAssignments[zone.id])
                                                 : null;
-                                            const irrigationType = irrigationAssignments[zone.id];
+                                            const irrigationType = globalIrrigationType || irrigationAssignments[zone.id];
                                             const zonePipeStats = calculateZonePipeStats(
                                                 actualPipes,
                                                 zone.id.toString(),
@@ -2803,13 +3515,12 @@ export default function FieldCropSummary() {
                                                     actualIrrigationPoints
                                                 );
                                             
-                                            // Debug: ตรวจสอบการคำนวณในโซนแต่ละโซน
+                                            // Zone irrigation counts calculated
                                             console.log(`🔍 Zone ${zone.name} irrigation counts:`, {
                                                 zoneId: zone.id,
                                                 zoneName: zone.name,
                                                 sprinkler: zoneIrrigationCounts.sprinkler,
-                                                miniSprinkler: zoneIrrigationCounts.miniSprinkler,
-                                                microSpray: zoneIrrigationCounts.microSpray,
+                                                // miniSprinkler and microSpray removed
                                                 dripTape: zoneIrrigationCounts.dripTape,
                                                 total: zoneIrrigationCounts.total
                                             });
@@ -2829,14 +3540,33 @@ export default function FieldCropSummary() {
                                                             <h3 className="text-sm font-semibold text-white print:text-black">
                                                                 {zone.name}
                                                             </h3>
+                                                            {/* แสดงชื่อพืชที่เลือกจาก choose-crop ถ้ามี และตรงกับโซนนี้ */}
+                                                            {assignedCrop && (
+                                                                <span className="ml-2 text-xs text-gray-300 print:text-black">
+                                                                    {getTranslatedCropByValue(assignedCrop.value, 'th')?.name || assignedCrop.name}
+                                                                </span>
+                                                            )}
                                                         </div>
-                                                        {assignedCrop && (
-                                                            <span className="text-lg">
-                                                                {assignedCrop.icon}
-                                                            </span>
-                                                        )}
+                                                        {/* Toggle and crop icon */}
+                                                        <div className="flex items-center space-x-2">
+                                                            {assignedCrop && (
+                                                                <span className="text-lg">
+                                                                    {assignedCrop.icon}
+                                                                </span>
+                                                            )}
+                                                            <button
+                                                                onClick={() => {
+                                                                    const key = zone.id.toString();
+                                                                    setZoneDetailsOpen(prev => ({ ...prev, [key]: !(prev[key] !== false) }));
+                                                                }}
+                                                                className="rounded border border-gray-400/40 px-2 py-0.5 text-xs text-gray-200 hover:bg-gray-600/40"
+                                                                title={(zoneDetailsOpen[zone.id.toString()] !== false) ? t('Hide details') : t('Show details')}
+                                                            >
+                                                                {(zoneDetailsOpen[zone.id.toString()] !== false) ? '▲' : '▼'}
+                                                            </button>
+                                                        </div>
                                                     </div>
-                                                    {summary ? (
+                                                    {(zoneDetailsOpen[zone.id.toString()] !== false) && (summary ? (
                                                         <div className="space-y-3">
                                                             {/* แสดงข้อมูลจำนวนสปริงเกอร์ในส่วนสรุปข้อมูลโซน */}
                                                             <div className="grid grid-cols-4 gap-2 text-xs">
@@ -2878,7 +3608,7 @@ export default function FieldCropSummary() {
                                                                         Crop
                                                                     </div>
                                                                     <div className="text-xs font-semibold text-white print:text-black">
-                                                                        {summary.cropName}
+                                                                        {getTranslatedCropByValue(summary.cropValue || '', 'th')?.name || summary.cropName}
                                                                     </div>
                                                                     <div className="text-xs text-gray-400 print:text-gray-600">
                                                                         {summary.cropCategory}
@@ -2888,65 +3618,53 @@ export default function FieldCropSummary() {
 
                                                             <div className="rounded-lg bg-cyan-900/30 p-3 print:border print:bg-cyan-50">
                                                                 <h4 className="mb-2 text-sm font-semibold text-cyan-300 print:text-cyan-800">
-                                                                    💧 {t('Water Requirements (liters per irrigation - from cropData)')}
+                                                                    💧 {t('Water Requirements (liters per irrigation)')}
                                                                 </h4>
-                                                                <div className="grid grid-cols-2 gap-3 text-xs">
-                                                                    <div>
-                                                                        <div className="mb-1 text-cyan-200 print:text-cyan-700">
-                                                                            {t('Zone Area:')}{' '}
-                                                                            {summary.zoneAreaRai}{' '}
-                                                                            {t('Rai')}
-                                                                        </div>
-                                                                        <div className="mb-1 text-cyan-200 print:text-cyan-700">
-                                                                            {t('Plants:')}{' '}
-                                                                            {summary.totalPlantingPoints.toLocaleString()}{' '}
-                                                                            {t('trees')}
-                                                                        </div>
-                                                                        <div className="mb-1 text-cyan-200 print:text-cyan-700">
-                                                                            {t('Rate:')}{' '}
-                                                                            {summary.cropWaterPerPlantPerIrrigation.toFixed(
-                                                                                1
-                                                                            )}{' '}
-                                                                            {t('liters/plant/irrigation')}
-                                                                        </div>
-                                                                        <div className="text-cyan-200 print:text-cyan-700">
-                                                                            ({t('from cropData:')}{' '}
-                                                                            {
-                                                                                summary.cropWaterPerPlant
-                                                                            }{' '}
-                                                                            {t('liters/plant/irrigation')})
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="text-right">
-                                                                        <div className="mb-1 text-xs text-cyan-200 print:text-cyan-700">
-                                                                            {t('Water Need per Irrigation:')}
-                                                                        </div>
-                                                                        <div className="text-lg font-bold text-cyan-100 print:text-cyan-800">
-                                                                            {summary.waterRequirementPerIrrigation.toLocaleString()}
-                                                                        </div>
-                                                                        <div className="text-xs text-cyan-200 print:text-cyan-700">
-                                                                            {t('Liters/irrigation')}
-                                                                        </div>
-                                                                        <div className="mt-1 text-xs text-cyan-200 print:text-cyan-700">
-                                                                            (
-                                                                            {(
-                                                                                summary.waterRequirementPerIrrigation /
-                                                                                1000
-                                                                            ).toFixed(1)}{' '}
-                                                                            {t('m³/irrigation')})
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="mt-2 rounded bg-cyan-800/30 p-2 text-xs text-cyan-200 print:bg-cyan-100 print:text-cyan-700">
-                                                                    <strong>{t('Calculation:')}</strong>{' '}
-                                                                    {summary.totalPlantingPoints.toLocaleString()}{' '}
-                                                                    {t('trees')} ×{' '}
-                                                                    {summary.cropWaterPerPlantPerIrrigation.toFixed(
-                                                                        1
-                                                                    )}{' '}
-                                                                    {t('liters/plant/irrigation')} ={' '}
-                                                                    {summary.waterRequirementPerIrrigation.toLocaleString()}{' '}
-                                                                    {t('Liters/irrigation')}
+                                                                <div className="mt-1 rounded bg-cyan-800/30 p-2 text-xs text-cyan-200 print:bg-cyan-100 print:text-cyan-700">
+                                                                    <div className="mb-1 font-semibold text-base text-cyan-100">{t('Flowrate')}</div>
+                                                                    {(() => {
+                                                                        const flowPerUnit: Record<string, number> = {
+                                                                            sprinkler: irrigationSettingsData?.sprinkler_system?.flow ?? 0,
+                                                                            pivot: irrigationSettingsData?.pivot?.flow ?? 0,
+                                                                            water_jet_tape: irrigationSettingsData?.water_jet_tape?.flow ?? 0,
+                                                                            drip_tape: irrigationSettingsData?.drip_tape?.flow ?? 0,
+                                                                        };
+                                                                        const counts = calculateZoneIrrigationCounts(zone, actualIrrigationPoints);
+                                                                        const rows: Array<{ label: string; units: number; flow: number; total: number }> = [];
+                                                                        const pushRow = (label: string, units: number, key: string) => {
+                                                                            if (units > 0) {
+                                                                                const per = flowPerUnit[key] || 0;
+                                                                                rows.push({ label, units, flow: per, total: units * per });
+                                                                            }
+                                                                        };
+                                                                        pushRow(t('Sprinklers'), counts.sprinkler, 'sprinkler');
+                                                                        pushRow(t('Pivots'), counts.pivot, 'pivot');
+                                                                        pushRow(t('Water Jet Tape'), counts.waterJetTape, 'water_jet_tape');
+                                                                        pushRow(t('Drip Tape'), counts.dripTape, 'drip_tape');
+                                                                        const zoneTotal = rows.reduce((s, r) => s + r.total, 0);
+                                                                        return (
+                                                                            <div className="space-y-1">
+                                                                                {rows.length === 0 ? (
+                                                                                    <div className="text-cyan-300/70">{t('No flow data')}</div>
+                                                                                ) : (
+                                                                                    <>
+                                                                                        {rows.map((r, i) => (
+                                                                                            <div key={i} className="flex items-center justify-between">
+                                                                                                <div>
+                                                                                                    {r.label}: {r.units} {t('units')} × {r.flow.toLocaleString()} {t('L/min')}
+                                                                                                </div>
+                                                                                                <div className="font-bold">{r.total.toLocaleString()} {t('L/min')}</div>
+                                                                                            </div>
+                                                                                        ))}
+                                                                                        <div className="mt-1 border-t border-cyan-700 pt-1 flex items-center justify-between print:border-cyan-300">
+                                                                                            <div className="font-semibold">{t('Total flowrate')}</div>
+                                                                                            <div className="text-2xl font-extrabold text-cyan-100">{zoneTotal.toLocaleString()} {t('L/min')}</div>
+                                                                                        </div>
+                                                                                    </>
+                                                                                )}
+                                                                            </div>
+                                                                        );
+                                                                    })()}
                                                                 </div>
                                                             </div>
 
@@ -2960,55 +3678,38 @@ export default function FieldCropSummary() {
                                                                         {t('Irrigation Type:')}
                                                                     </div>
                                                                     <div className="text-sm font-semibold text-blue-100 print:text-blue-900">
-                                                                        {irrigationType ? (() => {
-                                                                            switch (irrigationType) {
-                                                                                case 'sprinkler':
-                                                                                    return t('Sprinkler');
-                                                                                case 'mini_sprinkler':
-                                                                                    return t('Mini Sprinkler');
-                                                                                case 'micro_spray':
-                                                                                    return t('Micro Spray');
-                                                                                case 'drip-tape':
-                                                                                    return t('Drip System');
-                                                                                default:
-                                                                                    return irrigationType;
-                                                                            }
-                                                                        })() : t('Not defined')}
+                                                                        {formatIrrigationType(irrigationType)}
                                                                     </div>
                                                                 </div>
 
-                                                                {/* เพิ่มส่วนแสดงจำนวนสปริงเกอร์แต่ละประเภท */}
+                                                                {/* เพิ่มส่วนแสดงจำนวนสปริงเกอร์แต่ละประเภท (เหลือเฉพาะ Sprinklers) */}
                                                                 <div className="mb-3">
                                                 <div className="mb-2 text-xs font-medium text-blue-200 print:text-blue-700">
                                                     💧 {t('Irrigation Points in Zone:')}
                                                 </div>
                                                                     <div className="grid grid-cols-2 gap-2 text-xs">
-                                                                        {zoneIrrigationCounts.sprinkler >
-                                                                            0 && (
+                                                                        {zoneIrrigationCounts.sprinkler > 0 && (
                                                                             <div className="rounded bg-blue-700/20 p-2 text-center print:bg-blue-50">
                                                                                 <div className="text-blue-200 print:text-blue-800">
                                                                                     🟢 {t('Sprinklers')} {zoneIrrigationCounts.sprinkler} {t('units')}
                                                                                 </div>
                                                                             </div>
                                                                         )}
-                                                                        {zoneIrrigationCounts.miniSprinkler >
-                                                                            0 && (
+                                                                        {zoneIrrigationCounts.pivot > 0 && (
                                                                             <div className="rounded bg-blue-700/20 p-2 text-center print:bg-blue-50">
                                                                                 <div className="text-blue-200 print:text-blue-800">
-                                                                                    🟢 {t('Mini Sprinklers')} {zoneIrrigationCounts.miniSprinkler} {t('units')}
+                                                                                    🔄 {t('Pivots')} {zoneIrrigationCounts.pivot} {t('units')}
                                                                                 </div>
                                                                             </div>
                                                                         )}
-                                                                        {zoneIrrigationCounts.microSpray >
-                                                                            0 && (
+                                                                        {zoneIrrigationCounts.waterJetTape > 0 && (
                                                                             <div className="rounded bg-blue-700/20 p-2 text-center print:bg-blue-50">
                                                                                 <div className="text-blue-200 print:text-blue-800">
-                                                                                    🟠 {t('Micro Sprays')} {zoneIrrigationCounts.microSpray} {t('units')}
+                                                                                    🌊 {t('Water Jet Tape')} {zoneIrrigationCounts.waterJetTape} {t('units')}
                                                                                 </div>
                                                                             </div>
                                                                         )}
-                                                                        {zoneIrrigationCounts.dripTape >
-                                                                            0 && (
+                                                                        {zoneIrrigationCounts.dripTape > 0 && (
                                                                             <div className="rounded bg-blue-700/20 p-2 text-center print:bg-blue-50">
                                                                                 <div className="text-blue-200 print:text-blue-800">
                                                                                     🟣 {t('Drip Tape')} {zoneIrrigationCounts.dripTape} {t('units')}
@@ -3102,6 +3803,95 @@ export default function FieldCropSummary() {
                                                                                 </div>
                                                                             </div>
                                                                         </div>
+
+                                                                        {/* Lateral outlet details */}
+                                                                        {(() => {
+                                                                            try {
+                                                                                // Zone-specific longest-pipe flow summary (display only, per request)
+                                                                                const zFlows = buildZoneConnectivityLongestFlows(zone, actualPipes, actualIrrigationPoints, irrigationSettingsData || {});
+                                                                                const header = (
+                                                                                    <div className="mb-2 rounded bg-cyan-900/30 p-2 text-xs print:bg-cyan-50">
+                                                                                        <div className="font-semibold text-cyan-200 print:text-cyan-800">{t('Longest pipe flowrates')}</div>
+                                                                                        <div className="mt-1 space-y-0.5 text-cyan-100">
+                                                                                            <div>
+                                                                                                {t('Main')} ({t('longest')}): <span className="font-bold">{Math.round(zFlows.main.flowLMin).toLocaleString()} {t('L/min')}</span> — {t('Submain')}: {zFlows.main.connectedSubmains}
+                                                                                            </div>
+                                                                                            <div>
+                                                                                                {t('Submain')} ({t('longest')}): <span className="font-bold">{Math.round(zFlows.submain.flowLMin).toLocaleString()} {t('L/min')}</span> — {t('Lateral')}: {zFlows.submain.connectedLaterals}
+                                                                                            </div>
+                                                                                            <div>
+                                                                                                {t('Lateral')} ({t('longest')}): <span className="font-bold">{Math.round(zFlows.lateral.flowLMin).toLocaleString()} {t('L/min')}</span> — {t('Sprinklers')}: {zFlows.lateral.sprinklers}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                );
+                                                                                // existing lateral outlets UI below
+                                                                                const lateralPipes = actualPipes.filter((p) => {
+                                                                                    if (identifyPipeType(p) !== 'lateral') return false;
+                                                                                    const byId = (p.zoneId?.toString?.() || '') === zone.id.toString();
+                                                                                    const byGeom = isPipeInZone(p, zone);
+                                                                                    return byId || byGeom;
+                                                                                });
+                                                                                // Count sprinklers attached to each lateral by distance threshold
+                                                                                const attachThresholdMeters = 1.5;
+                                                                                const rows = lateralPipes.map((lat) => {
+                                                                                    const coords = (lat.coordinates || [])
+                                                                                        .map((c) => toLngLat(c))
+                                                                                        .filter((v): v is [number, number] => v !== null);
+                                                                                    const line = coords.length >= 2 ? turf.lineString(coords) : null;
+                                                                                    const units = line
+                                                                                        ? actualIrrigationPoints.filter((pt) => {
+                                                                                            const type = normalizeIrrigationType(pt.type);
+                                                                                            if (type !== 'sprinkler') return false;
+                                                                                            if (typeof pt.lat !== 'number' || typeof pt.lng !== 'number') return false;
+                                                                                            const point = turf.point([pt.lng, pt.lat]);
+                                                                                            const distKm = pointToLineDistance(point, line as unknown as GeoFeature<GeoLineString>, { units: 'kilometers' });
+                                                                                            return distKm * 1000 <= attachThresholdMeters;
+                                                                                        }).length
+                                                                                        : 0;
+                                                                                    return { id: lat.id, units };
+                                                                                });
+                                                                                const most = rows.reduce<{ id: string | number | null; units: number }>((acc, r) => (r.units > acc.units ? { id: r.id, units: r.units } : acc), { id: null, units: -1 });
+                                                                                const open = zoneLateralDetailsOpen[zone.id.toString()] || false;
+                                                                                return (
+                                                                                    <div className="mt-2 rounded bg-blue-800/20 p-2 print:bg-blue-100">
+                                                                                        {/* Move header block outside Zone Pipe Summary, show here separately above outlets */}
+                                                                                        {header}
+                                                                                        <div className="mb-2 flex items-center justify-between">
+                                                                                            <div className="text-xs font-semibold text-blue-200 print:text-blue-800">{t('Lateral outlets')}</div>
+                                                                                            <button
+                                                                                                onClick={() => setZoneLateralDetailsOpen((prev) => ({ ...prev, [zone.id.toString()]: !open }))}
+                                                                                                className="rounded border border-blue-400/40 px-2 py-0.5 text-[11px] text-blue-100 hover:bg-blue-700/30 print:text-blue-900"
+                                                                                            >
+                                                                                                {open ? t('Hide') : t('View all')}
+                                                                                            </button>
+                                                                                        </div>
+                                                                                        {!open ? (
+                                                                                            <div className="text-xs text-blue-100 print:text-blue-900">
+                                                                                                {t('Most outlets')}: <span className="font-bold">{(most.units < 0 ? 0 : most.units).toLocaleString()}</span> {t('sprinklers')}
+                                                                                            </div>
+                                                                                        ) : (
+                                                                                            <div className="space-y-1">
+                                                                                                {rows.length === 0 ? (
+                                                                                                    <div className="text-xs text-blue-200/70 print:text-blue-800">{t('No laterals')}</div>
+                                                                                                ) : (
+                                                                                                    rows
+                                                                                                        .sort((a, b) => b.units - a.units)
+                                                                                                        .map((r) => (
+                                                                                                            <div key={String(r.id)} className="flex items-center justify-between text-xs">
+                                                                                                                <div className="text-blue-100 print:text-blue-900">{t('Lateral')} #{String(r.id)}</div>
+                                                                                                                <div className="font-semibold text-blue-200 print:text-blue-800">{r.units.toLocaleString()} {t('sprinklers')}</div>
+                                                                                                            </div>
+                                                                                                        ))
+                                                                                                )}
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                );
+                                                                            } catch {
+                                                                                return null;
+                                                                            }
+                                                                        })()}
 
                                                                         <div className="grid grid-cols-2 gap-2 border-t border-cyan-600 pt-2 text-xs print:border-cyan-300">
                                                                             <div className="rounded bg-cyan-700/30 p-2 text-center print:bg-cyan-50">
@@ -3212,26 +4002,7 @@ export default function FieldCropSummary() {
                                                                             }
                                                                         </div>
                                                                     </div>
-                                                                    <div className="rounded bg-blue-700/20 p-2 text-center print:bg-blue-50">
-                                                                        <div className="text-blue-200 print:text-blue-800">
-                                                                            🔵 Mini Sprinklers
-                                                                        </div>
-                                                                        <div className="font-semibold text-blue-100 print:text-blue-900">
-                                                                            {
-                                                                                zoneIrrigationCounts.miniSprinkler
-                                                                            }
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="rounded bg-blue-700/20 p-2 text-center print:bg-blue-50">
-                                                                        <div className="text-blue-200 print:text-blue-800">
-                                                                            🟠 Micro Sprays
-                                                                        </div>
-                                                                        <div className="font-semibold text-blue-100 print:text-blue-900">
-                                                                            {
-                                                                                zoneIrrigationCounts.microSpray
-                                                                            }
-                                                                        </div>
-                                                                    </div>
+                                                                    {/* Removed Mini Sprinklers and Micro Sprays sections */}
                                                                     <div className="rounded bg-blue-700/20 p-2 text-center print:bg-blue-50">
                                                                         <div className="text-blue-200 print:text-blue-800">
                                                                             🟣 Drip Tape
@@ -3254,7 +4025,7 @@ export default function FieldCropSummary() {
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                    )}
+                                                    ))}
                                                 </div>
                                             );
                                         })}
@@ -3268,3 +4039,4 @@ export default function FieldCropSummary() {
         </div>
     );
 }
+
