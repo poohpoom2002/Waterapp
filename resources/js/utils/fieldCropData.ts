@@ -67,8 +67,6 @@ export interface FieldCropData {
         totalCount: number;
         byType: {
             sprinkler: number;
-            miniSprinkler: number;
-            microSpray: number;
             dripTape: number;
         };
         points: any[];
@@ -386,17 +384,16 @@ export const calculateEnhancedFieldStats = (summaryData: any): FieldCropData => 
 
     const irrigationByType = {
         sprinkler: 0,
-        miniSprinkler: 0,
-        microSpray: 0,
         dripTape: 0
-    };
+    } as { sprinkler: number; dripTape: number; };
 
     irrigationPoints.forEach((point: any) => {
         const normalizedType = normalizeIrrigationTypeEnhanced(point.type);
-        if (normalizedType === 'sprinkler') irrigationByType.sprinkler++;
-        else if (normalizedType === 'mini_sprinkler') irrigationByType.miniSprinkler++;
-        else if (normalizedType === 'micro_spray') irrigationByType.microSpray++;
-        else if (normalizedType === 'drip_tape') irrigationByType.dripTape++;
+        if (normalizedType === 'sprinkler' || normalizedType === 'mini_sprinkler' || normalizedType === 'micro_spray') {
+            irrigationByType.sprinkler++;
+        } else if (normalizedType === 'drip_tape') {
+            irrigationByType.dripTape++;
+        }
     });
 
     irrigationLines.forEach((line: any) => {
@@ -515,13 +512,14 @@ export const normalizeIrrigationTypeEnhanced = (type: string): string => {
     const typeMapping: { [key: string]: string } = {
         'sprinkler': 'sprinkler',
         'sprinkler-system': 'sprinkler',
-        'mini-sprinkler': 'mini_sprinkler',
-        'mini_sprinkler': 'mini_sprinkler',
-        'minisprinkler': 'mini_sprinkler',
-        'micro-spray': 'micro_spray',
-        'micro_spray': 'micro_spray',
-        'microspray': 'micro_spray',
-        'micro': 'micro_spray',
+        // Map legacy mini/micro variants to sprinkler
+        'mini-sprinkler': 'sprinkler',
+        'mini_sprinkler': 'sprinkler',
+        'minisprinkler': 'sprinkler',
+        'micro-spray': 'sprinkler',
+        'micro_spray': 'sprinkler',
+        'microspray': 'sprinkler',
+        'micro': 'sprinkler',
         'drip': 'drip_tape',
         'drip-tape': 'drip_tape',
         'drip_tape': 'drip_tape',
