@@ -4,6 +4,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import Navbar from '../../components/Navbar';
 import HorticultureMapComponent from '../../components/horticulture/HorticultureMapComponent';
 import { isPointInPolygonEnhanced } from '../../utils/fieldCropData';
+import { parseCompletedSteps, toCompletedStepsCsv } from '../../utils/stepUtils';
 
 // ===== TYPES =====
 // ... (ส่วนนี้เหมือนเดิมทั้งหมด) ...
@@ -97,6 +98,15 @@ interface Pump {
   name?: string;
   capacity?: number; // liters per hour
 }
+
+// Typed shape for equipment data persisted in storage
+type StoredEquipment = {
+  id?: string;
+  type?: string;
+  lat?: number;
+  lng?: number;
+  name?: string;
+};
 
 // Styled pill label overlay for better readability on map
 interface PillLabelOptions {
@@ -2163,6 +2173,19 @@ export default function PipeGenerate(props: PipeGenerateProps) {
           if (storageData.pipes) {
             setPipes(storageData.pipes, { resetHistory: true });
           }
+          // Restore pumps from equipment/equipmentIcons saved in storage
+          try {
+            const eqSource = (storageData ?? {}) as Partial<{ equipment: StoredEquipment[]; equipmentIcons: StoredEquipment[] }>;
+            const eq: StoredEquipment[] = eqSource.equipment ?? eqSource.equipmentIcons ?? [];
+            if (Array.isArray(eq) && eq.length > 0) {
+              const restored = eq
+                .filter(e => (e?.type === 'pump' || e?.type === 'water_pump') && typeof e?.lat === 'number' && typeof e?.lng === 'number')
+                .map((e, idx) => ({ id: e.id ?? `pump-${idx}`, lat: e.lat as number, lng: e.lng as number, type: 'water_pump', name: e.name ?? `Water Pump ${idx + 1}` } as Pump));
+              if (restored.length > 0) setPumps(restored);
+            }
+          } catch {
+            // ignore pump restore errors
+          }
           if(storageData.mapCenter && storageData.mapZoom) {
             setMapStatus({ center: storageData.mapCenter, zoom: storageData.mapZoom });
           }
@@ -2178,6 +2201,19 @@ export default function PipeGenerate(props: PipeGenerateProps) {
         setFieldData(prev => ({ ...prev, ...mergedData }));
         if (storageData.pipes && !propsData.pipes) {
           setPipes(storageData.pipes, { resetHistory: true });
+        }
+        // Restore pumps if present in storage and not provided via props
+        try {
+          const eqSource = (storageData ?? {}) as Partial<{ equipment: StoredEquipment[]; equipmentIcons: StoredEquipment[] }>;
+          const eq: StoredEquipment[] = eqSource.equipment ?? eqSource.equipmentIcons ?? [];
+          if (Array.isArray(eq) && eq.length > 0) {
+            const restored = eq
+              .filter(e => (e?.type === 'pump' || e?.type === 'water_pump') && typeof e?.lat === 'number' && typeof e?.lng === 'number')
+              .map((e, idx) => ({ id: e.id ?? `pump-${idx}`, lat: e.lat as number, lng: e.lng as number, type: 'water_pump', name: e.name ?? `Water Pump ${idx + 1}` } as Pump));
+            if (restored.length > 0) setPumps(restored);
+          }
+        } catch {
+          // ignore pump restore errors
         }
       }
     };
@@ -3262,6 +3298,13 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     // Initial draw
     mapManager.updateMapVisuals(fieldData);
 
+    // Ensure pipes are drawn on first map load with currently loaded state
+    try {
+      mapManager.drawPipes(pipeManager.pipes, pipeManager.editingPipeId, (pipeId) => pipeManager.setEditingPipeId(pipeId));
+    } catch (err) {
+      console.warn('drawPipes on initial map load failed:', err);
+    }
+
   }, [fieldData, mapManager, handleMapClick]);
   // ======================== MODIFIED SECTION END ========================
 
@@ -3275,11 +3318,14 @@ export default function PipeGenerate(props: PipeGenerateProps) {
   const handleBack = useCallback(() => {
     // บันทึกข้อมูลทั้งหมดรวมถึง pipes ที่วาดไว้ และคงค่า zones จาก storage หากมี
     const stored = loadFromStorage();
+    const equipmentFromPumps = (pumps || []).map((p, idx) => ({ id: p.id ?? `pump-${idx}`, type: 'pump', lat: p.lat, lng: p.lng, name: p.name ?? `Water Pump ${idx + 1}` }));
     const allData = {
       ...fieldData,
       // รับประกันว่า zones ถูกเก็บก่อนกลับไปหน้าโซน
       zones: (stored && Array.isArray(stored.zones)) ? stored.zones as unknown as Zone[] : fieldData.zones,
       pipes: pipeManager.pipes,
+      equipment: equipmentFromPumps,
+      equipmentIcons: equipmentFromPumps,
       mapCenter: mapStatus.center,
       mapZoom: mapStatus.zoom
     };
@@ -3288,7 +3334,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     const params = {
       crops: fieldData.selectedCrops.join(','),
       currentStep: 3,
-      completedSteps: props.completedSteps,
+      completedSteps: toCompletedStepsCsv(parseCompletedSteps(props.completedSteps)),
     };
     router.get('/step3-zones-obstacles', params);
   }, [fieldData, pipeManager.pipes, mapStatus, props.completedSteps, saveToStorage, loadFromStorage]);
@@ -3315,6 +3361,15 @@ export default function PipeGenerate(props: PipeGenerateProps) {
         mapZoom: fieldData.mapZoom,
       };
       localStorage.setItem('fieldMapData', JSON.stringify(fieldMapData));
+      // Persist unified fieldCropData with equipment to support summary fallback
+      const existing = localStorage.getItem('fieldCropData');
+      const base = existing ? JSON.parse(existing) : {};
+      localStorage.setItem('fieldCropData', JSON.stringify({
+        ...base,
+        equipment: equipmentFromPumps,
+        equipmentIcons: equipmentFromPumps,
+        pipes: pipeManager.pipes,
+      }));
     } catch (e) {
       console.warn('Failed to persist fieldMapData to localStorage', e);
     }
@@ -3342,7 +3397,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
       mapZoom: fieldData.mapZoom,
       mapType: undefined,
       currentStep: 5,
-      completedSteps: props.completedSteps
+      completedSteps: toCompletedStepsCsv([...parseCompletedSteps(props.completedSteps), 4])
     };
     router.post('/field-crop-summary', payload);
   }, [fieldData, pipeManager.pipes, props.completedSteps]);
@@ -3371,12 +3426,28 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     mapManager.drawPumps(pumps, removePump);
   }, [pumps, removePump]); // Removed mapManager from dependencies
 
+  // Persist pumps to localStorage so summary page can read them
+  useEffect(() => {
+    try {
+      const existing = localStorage.getItem('fieldCropData');
+      const base = existing ? JSON.parse(existing) : {};
+      const equipmentFromPumps = (pumps || []).map((p, idx) => ({ id: p.id ?? `pump-${idx}`, type: 'pump', lat: p.lat, lng: p.lng, name: p.name ?? `Water Pump ${idx + 1}` }));
+      localStorage.setItem('fieldCropData', JSON.stringify({
+        ...base,
+        equipment: equipmentFromPumps,
+        equipmentIcons: equipmentFromPumps,
+      }));
+    } catch {
+      // ignore persistence errors
+    }
+  }, [pumps]);
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleStepClick = useCallback((step: typeof steps[0]) => {
     const params = {
       crops: fieldData.selectedCrops.join(','),
       currentStep: step.id,
-      completedSteps: props.completedSteps
+      completedSteps: toCompletedStepsCsv(parseCompletedSteps(props.completedSteps))
     };
     router.get(step.route, params);
   }, [fieldData.selectedCrops, props.completedSteps]);
@@ -3414,7 +3485,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
                 <div className="flex items-center justify-between mb-4">
                   {steps.map((step, index) => {
                     const isActive = step.id === (props.currentStep || 4);
-                    const isCompleted = parseInt(props.completedSteps || '0') >= step.id;
+                    const isCompleted = (parseCompletedSteps(props.completedSteps).includes(step.id)) || (Math.max(0, ...parseCompletedSteps(props.completedSteps)) >= step.id);
                     
                     return (
                       <div key={step.id} className="flex items-center">
