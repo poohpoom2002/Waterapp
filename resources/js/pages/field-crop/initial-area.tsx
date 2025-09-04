@@ -8,6 +8,7 @@ import HorticultureDrawingManager from '../../components/horticulture/Horticultu
 import EnhancedHorticultureSearchControl from '../../components/horticulture/HorticultureSearchControl';
 import DistanceMeasurementOverlay from '../../components/horticulture/DistanceMeasurementOverlay';
 import { getCropByValue, getTranslatedCropByValue } from './choose-crop';
+import { parseCompletedSteps, toCompletedStepsCsv } from '../../utils/stepUtils';
 
 // Lightweight env-aware logger to reduce noisy logs in production
 const __DEV__ = typeof import.meta !== 'undefined' ? ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV ?? true) : (typeof process !== 'undefined' ? process.env.NODE_ENV !== 'production' : true);
@@ -1206,7 +1207,7 @@ export default function InitialArea({
 		}
 		
 		if (completedSteps) {
-			const completedArray = completedSteps.split(',').map(Number).filter(Boolean);
+			const completedArray = parseCompletedSteps(completedSteps);
 			setCompleted(completedArray);
 		}
 
@@ -1826,7 +1827,7 @@ export default function InitialArea({
         const params = {
             crops: selectedCrops.join(','),
             currentStep: step.id,
-            completedSteps: completed.join(',')
+            completedSteps: toCompletedStepsCsv(completed)
         };
         router.get(step.route, params);
     };
@@ -1882,7 +1883,7 @@ export default function InitialArea({
         const params = {
             crops: selectedCrops.join(','),
             currentStep: 2,
-            completedSteps: newCompleted.join(',')
+            completedSteps: toCompletedStepsCsv(newCompleted)
         };
         log('Sending data to irrigation-generate:', params);
         router.get('/step2-irrigation-system', params);

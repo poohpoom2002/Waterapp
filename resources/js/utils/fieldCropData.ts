@@ -68,9 +68,12 @@ export interface FieldCropData {
         byType: {
             sprinkler: number;
             dripTape: number;
+            pivot: number;
+            waterJetTape: number;
         };
         points: any[];
         lines: any[];
+        settings?: Record<string, { flow?: number; coverageRadius?: number; pressure?: number; emitterSpacing?: number; placement?: string; side?: string }>;
     };
     crops: {
         selectedCrops: string[];
@@ -384,21 +387,28 @@ export const calculateEnhancedFieldStats = (summaryData: any): FieldCropData => 
 
     const irrigationByType = {
         sprinkler: 0,
-        dripTape: 0
-    } as { sprinkler: number; dripTape: number; };
+        dripTape: 0,
+        pivot: 0,
+        waterJetTape: 0
+    } as { sprinkler: number; dripTape: number; pivot: number; waterJetTape: number };
 
     irrigationPoints.forEach((point: any) => {
         const normalizedType = normalizeIrrigationTypeEnhanced(point.type);
-        if (normalizedType === 'sprinkler' || normalizedType === 'mini_sprinkler' || normalizedType === 'micro_spray') {
+        if (normalizedType === 'sprinkler') {
             irrigationByType.sprinkler++;
         } else if (normalizedType === 'drip_tape') {
             irrigationByType.dripTape++;
+        } else if (normalizedType === 'pivot') {
+            irrigationByType.pivot++;
+        } else if (normalizedType === 'water_jet_tape') {
+            irrigationByType.waterJetTape++;
         }
     });
 
     irrigationLines.forEach((line: any) => {
         const normalizedType = normalizeIrrigationTypeEnhanced(line.type);
         if (normalizedType === 'drip_tape') irrigationByType.dripTape++;
+        else if (normalizedType === 'water_jet_tape') irrigationByType.waterJetTape++;
     });
 
     const totalPlantingPoints = enhancedZones.reduce((sum, zone) => sum + zone.totalPlantingPoints, 0);
@@ -438,7 +448,8 @@ export const calculateEnhancedFieldStats = (summaryData: any): FieldCropData => 
             totalCount: irrigationPoints.length + irrigationLines.length,
             byType: irrigationByType,
             points: irrigationPoints,
-            lines: irrigationLines
+            lines: irrigationLines,
+            settings: (summaryData.irrigationSettings || {})
         },
         crops: {
             selectedCrops: summaryData.selectedCrops || [],
@@ -523,7 +534,11 @@ export const normalizeIrrigationTypeEnhanced = (type: string): string => {
         'drip': 'drip_tape',
         'drip-tape': 'drip_tape',
         'drip_tape': 'drip_tape',
-        'drip-irrigation': 'drip_tape'
+        'drip-irrigation': 'drip_tape',
+        'pivot': 'pivot',
+        'center_pivot': 'pivot',
+        'water_jet_tape': 'water_jet_tape',
+        'water-jet-tape': 'water_jet_tape'
     };
     
     return typeMapping[normalizedType] || normalizedType;

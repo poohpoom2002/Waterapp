@@ -5,6 +5,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import HorticultureMapComponent from '../../components/horticulture/HorticultureMapComponent';
 import { getCropByValue } from './choose-crop';
 import type { FieldData } from './pipe-generate';
+import { parseCompletedSteps, toCompletedStepsCsv } from '../../utils/stepUtils';
 
 interface Zone {
 	id: string;
@@ -433,7 +434,62 @@ export default function IrrigationGenerate({
 		}
 	];
 
+	const persistIrrigation = () => {
+		try {
+			const existingData = localStorage.getItem('fieldCropData');
+			let fieldData: FieldData = existingData ? (JSON.parse(existingData) as FieldData) : {
+				selectedCrops: finalSelectedCrops,
+				mainArea: finalMainArea,
+				zones: [],
+				obstacles: finalObstacles,
+				plantPoints: finalPlantPoints,
+				pipes: [],
+				areaRai: finalAreaRai,
+				perimeterMeters: finalPerimeterMeters,
+				rotationAngle: finalRotationAngle,
+				rowSpacing: finalRowSpacing,
+				plantSpacing: finalPlantSpacing,
+				selectedIrrigationType: '',
+				irrigationCounts: { sprinkler_system: 0, pivot: 0, drip_tape: 0, water_jet_tape: 0 },
+				totalWaterRequirement: 0,
+				irrigationSettings: irrigationSettings,
+				irrigationPositions: irrigationPositions,
+				mapCenter: calculatedMapCenter,
+				mapZoom: finalMapZoom,
+			};
+			fieldData = {
+				...fieldData,
+				selectedCrops: finalSelectedCrops,
+				mainArea: finalMainArea,
+				obstacles: finalObstacles,
+				plantPoints: finalPlantPoints,
+				areaRai: finalAreaRai,
+				perimeterMeters: finalPerimeterMeters,
+				rotationAngle: finalRotationAngle,
+				rowSpacing: finalRowSpacing,
+				plantSpacing: finalPlantSpacing,
+				mapCenter: calculatedMapCenter,
+				mapZoom: finalMapZoom,
+				selectedIrrigationType,
+				irrigationSettings,
+				irrigationCounts,
+				totalWaterRequirement,
+				irrigationPositions,
+			};
+			localStorage.setItem('fieldCropData', JSON.stringify(fieldData));
+		} catch {
+			// ignore storage errors
+		}
+	};
+
 	const handleStepClick = (step: StepData) => {
+		// Gate: must generate irrigation before moving to zones
+		if (step.id === 3 && !hasGeneratedIrrigation) {
+			alert(t('Please generate at least one Irrigation Type before continuing to Zones'));
+			return;
+		}
+		// Persist current irrigation state
+		persistIrrigation();
 		// Update completed steps before navigating
 		const updatedCompletedSteps = updateCompletedSteps();
 		
@@ -466,15 +522,12 @@ export default function IrrigationGenerate({
 
 	// Helper function to update completed steps
 	const updateCompletedSteps = () => {
-		const existingCompleted = parseInt(completedSteps || '0', 10) || 0;
-		let highestCompleted = existingCompleted;
-		
-		// Mark current step as completed if it meets completion criteria
-		if (isCurrentStepCompleted() && currentStep > highestCompleted) {
-			highestCompleted = currentStep;
+		const existing = parseCompletedSteps(completedSteps);
+		let result = existing;
+		if (isCurrentStepCompleted()) {
+			result = Array.from(new Set([...existing, currentStep]));
 		}
-		
-		return String(highestCompleted);
+		return toCompletedStepsCsv(result);
 	};
 
 	const handleNext = () => {
@@ -545,7 +598,7 @@ export default function IrrigationGenerate({
 			crops: crops || selectedCrops.join(','),
 			currentStep: 3,
 			// Ensure step 2 is marked completed when proceeding to zones
-			completedSteps: String(Math.max(parseInt(updatedCompletedSteps || '0', 10) || 0, 2)),
+			completedSteps: toCompletedStepsCsv([...parseCompletedSteps(updatedCompletedSteps), 2]),
 		};
 		
 		console.log('Navigating to zone-obstacle with minimal params:', params);

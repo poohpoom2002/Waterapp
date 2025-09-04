@@ -11,6 +11,9 @@ import Navbar from '../../components/Navbar';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { createGoogleMapsApiUrl } from '@/utils/googleMapsConfig';
 
+// Reduce verbose logs in production/dev by toggling this flag
+const DEBUG_ZONE_PIPE_STATS = false as const;
+
 // Proper TypeScript interfaces
 interface Coordinate {
     lat: number;
@@ -302,7 +305,26 @@ const GoogleMapsDisplay = ({
                 }
             });
 
-            // Equipment rendering removed (unused)
+            // Draw equipment (pumps)
+            if (Array.isArray(equipment) && equipment.length > 0) {
+                equipment.forEach((eq) => {
+                    const t = (eq as { type?: string }).type;
+                    const isPump = t === 'pump' || t === 'water_pump';
+                    const hasCoords = typeof (eq as { lat?: number }).lat === 'number' && typeof (eq as { lng?: number }).lng === 'number';
+                    if (!isPump || !hasCoords) return;
+                    new google.maps.Marker({
+                        position: { lat: (eq as { lat: number }).lat, lng: (eq as { lng: number }).lng },
+                        map: googleMapRef.current!,
+                        title: (eq as { name?: string }).name || 'Water Pump',
+                        icon: {
+                            url: '/generateTree/wtpump.png',
+                            scaledSize: new google.maps.Size(28, 28),
+                            anchor: new google.maps.Point(14, 14)
+                        },
+                        zIndex: 3000
+                    });
+                });
+            }
 
             // Draw obstacles (water sources and others)
             obstacles.forEach((obs) => {
@@ -904,8 +926,10 @@ const calculateZonePipeStats = (pipes: Pipe[], zoneId: string, zones: Zone[]): Z
         };
     }
 
-    console.log(`🔍 Checking pipes for zone ${zoneId} (${currentZone.name})...`);
-    console.log(`📏 Total pipes to check: ${pipes.length}`);
+    if (DEBUG_ZONE_PIPE_STATS) {
+        console.log(`🔍 Checking pipes for zone ${zoneId} (${currentZone.name})...`);
+        console.log(`📏 Total pipes to check: ${pipes.length}`);
+    }
 
     const zonePipes = pipes.filter((pipe) => {
         if (!pipe.coordinates || !Array.isArray(pipe.coordinates) || pipe.coordinates.length < 2) {
@@ -917,7 +941,7 @@ const calculateZonePipeStats = (pipes: Pipe[], zoneId: string, zones: Zone[]): Z
 
         const isZonePipe = hasZoneId || isInZone;
 
-        if (isZonePipe) {
+        if (DEBUG_ZONE_PIPE_STATS && isZonePipe) {
             const pipeType = identifyPipeType(pipe);
             console.log(`✅ Found pipe in zone ${zoneId}:`, {
                 id: pipe.id,
@@ -935,15 +959,17 @@ const calculateZonePipeStats = (pipes: Pipe[], zoneId: string, zones: Zone[]): Z
         return isZonePipe;
     });
 
-    console.log(`📊 Found ${zonePipes.length} pipes in zone ${zoneId}`);
+    if (DEBUG_ZONE_PIPE_STATS) console.log(`📊 Found ${zonePipes.length} pipes in zone ${zoneId}`);
 
     const mainPipes = zonePipes.filter((pipe) => identifyPipeType(pipe) === 'main');
     const submainPipes = zonePipes.filter((pipe) => identifyPipeType(pipe) === 'submain');
     const lateralPipes = zonePipes.filter((pipe) => identifyPipeType(pipe) === 'lateral');
 
-    console.log(`🔵 Main pipes (สีน้ำเงิน): ${mainPipes.length}`);
-    console.log(`🟢 Submain pipes (สีเขียว): ${submainPipes.length}`);
-    console.log(`🟣 Lateral pipes (สีส้ม/ม่วง): ${lateralPipes.length}`);
+    if (DEBUG_ZONE_PIPE_STATS) {
+        console.log(`🔵 Main pipes (สีน้ำเงิน): ${mainPipes.length}`);
+        console.log(`🟢 Submain pipes (สีเขียว): ${submainPipes.length}`);
+        console.log(`🟣 Lateral pipes (สีส้ม/ม่วง): ${lateralPipes.length}`);
+    }
 
     const calculateTypeStats = (typePipes: Pipe[]): PipeStats => {
         if (typePipes.length === 0) return { count: 0, totalLength: 0, longestLength: 0 };
@@ -973,7 +999,7 @@ const calculateZonePipeStats = (pipes: Pipe[], zoneId: string, zones: Zone[]): Z
         totalLongestLength: totalLongestLength,
     };
 
-    console.log(`📋 Zone ${zoneId} pipe stats:`, result);
+    if (DEBUG_ZONE_PIPE_STATS) console.log(`📋 Zone ${zoneId} pipe stats:`, result);
 
     return result;
 };
@@ -1461,8 +1487,7 @@ const buildPipeNetworkSummary = (
                         .map((c) => toLngLat(c))
                         .filter((v): v is [number, number] => v !== null);
                     if (sCoords.length >= 2 && mainLine) {
-                        const ends: [number, number][] = [sCoords[0], sCoords[sCoords.length - 1]];
-                        connected = ends.some(([lng, lat]) => {
+                        connected = sCoords.some(([lng, lat]) => {
                             const p = turf.point([lng, lat]);
                             const dKm = pointToLineDistance(p, mainLine as unknown as GeoFeature<GeoLineString>, { units: 'kilometers' });
                             return dKm * 1000 <= attachTolM;
@@ -1500,8 +1525,7 @@ const buildPipeNetworkSummary = (
                         .map((c) => toLngLat(c))
                         .filter((v): v is [number, number] => v !== null);
                     if (lCoords.length >= 2 && subLine) {
-                        const ends: [number, number][] = [lCoords[0], lCoords[lCoords.length - 1]];
-                        connected = ends.some(([lng, latV]) => {
+                        connected = lCoords.some(([lng, latV]) => {
                             const p = turf.point([lng, latV]);
                             const dKm = pointToLineDistance(p, subLine as unknown as GeoFeature<GeoLineString>, { units: 'kilometers' });
                             return dKm * 1000 <= attachTolM;
@@ -1752,35 +1776,55 @@ const buildZoneConnectivityLongestFlows = (
     };
     const subLongestStats = subLongest ? computeSubFlow(String(subLongest.id)) : { latCount: 0, flow: 0 };
 
-    // Main longest flow (use submains connected to that main; flow = submain(longest among those) × number of connected submains)
-    // Consider only mains that are actually connected to submains in this zone
+    // Main highest-flow selection (among mains connected to any submains in this zone)
+    // For each main: flow = (max submain flow among its submains) × (# of connected submains)
     const connectedMainIds = Array.from(new Set(Object.values(subToMain)));
     const connectedMains = mainsAll.filter((m) => connectedMainIds.includes(String(m.id)));
-    const mainLongest = findLongest(connectedMains);
     const mainIdToSubIds: Record<string, Array<string>> = {};
     Object.entries(subToMain).forEach(([sid, mid]) => {
-        const key = mid;
+        const key = String(mid);
         if (!mainIdToSubIds[key]) mainIdToSubIds[key] = [];
-        mainIdToSubIds[key].push(sid as string);
+        mainIdToSubIds[key].push(String(sid));
     });
-    let subFlowAtMain = 0; let subCountAtMain = 0;
-    if (mainLongest) {
-        const subIds = mainIdToSubIds[String(mainLongest.id)] || [];
-        subCountAtMain = subIds.length;
-        if (subIds.length > 0) {
-            // find longest submain by lateral units among those connected
-            let bestFlow = 0;
-            subIds.forEach((sid) => {
-                const f = computeSubFlow(sid).flow;
-                if (f > bestFlow) bestFlow = f;
-            });
-            subFlowAtMain = bestFlow;
+
+    let bestMainId: string | number | null = null;
+    let bestMainFlow = 0;
+    let bestMainSubCount = 0;
+
+    connectedMains.forEach((m) => {
+        const mid = String(m.id);
+        const subIds = mainIdToSubIds[mid] || [];
+        const subCount = subIds.length;
+        if (subCount === 0) return;
+        let bestSubFlow = 0;
+        subIds.forEach((sid) => {
+            const f = computeSubFlow(sid).flow;
+            if (f > bestSubFlow) bestSubFlow = f;
+        });
+        const flowAtMain = bestSubFlow * subCount;
+        if (flowAtMain > bestMainFlow) {
+            bestMainFlow = flowAtMain;
+            bestMainId = m.id;
+            bestMainSubCount = subCount;
+        }
+    });
+
+    // Fallback: if no flow found, still pick the physically longest connected main (for ID/connection info)
+    if (bestMainId === null && connectedMains.length > 0) {
+        const longest = connectedMains.reduce<{ m: Pipe | null; len: number }>((acc, cur) => {
+            const len = pipeLength(cur);
+            if (len > acc.len) return { m: cur, len };
+            return acc;
+        }, { m: null, len: -1 }).m;
+        if (longest) {
+            const mid = String(longest.id);
+            bestMainId = longest.id;
+            bestMainSubCount = (mainIdToSubIds[mid] || []).length;
         }
     }
-    const mainLongestFlow = subFlowAtMain * subCountAtMain;
 
     return {
-        main: { longestId: mainLongest?.id ?? null, connectedSubmains: subCountAtMain, flowLMin: mainLongestFlow },
+        main: { longestId: bestMainId, connectedSubmains: bestMainSubCount, flowLMin: bestMainFlow },
         submain: { longestId: subLongest?.id ?? null, connectedLaterals: subLongestStats.latCount, flowLMin: subLongestStats.flow },
         lateral: { longestId: latLongest?.id ?? null, sprinklers: latLongestUnits, flowLMin: latLongestFlow },
     };
@@ -2157,13 +2201,58 @@ export default function FieldCropSummary() {
 
     const actualZones = Array.isArray(zones) ? zones : [];
     const actualPipes = useMemo(() => (Array.isArray(pipes) ? pipes : []), [pipes]);
+    const zonePipeStatsMap = useMemo(() => {
+        try {
+            const m = new Map<string, ZonePipeStats>();
+            for (const z of actualZones) {
+                const id = z.id.toString();
+                m.set(id, calculateZonePipeStats(actualPipes, id, actualZones));
+            }
+            return m;
+        } catch {
+            return new Map<string, ZonePipeStats>();
+        }
+    }, [actualPipes, actualZones]);
     const actualEquipmentIcons = useMemo(() => {
+        const isValidPump = (e: Partial<Equipment> | undefined | null): e is Equipment => {
+            return !!(
+                e &&
+                (e.type === 'pump' || e.type === 'water_pump') &&
+                typeof e.lat === 'number' && Number.isFinite(e.lat) &&
+                typeof e.lng === 'number' && Number.isFinite(e.lng)
+            );
+        };
+
         const icons = Array.isArray(equipmentIcons) ? equipmentIcons : [];
         const eq = Array.isArray((summaryData as Partial<FieldCropSummaryProps> | null)?.equipment)
             ? ((summaryData as Partial<FieldCropSummaryProps> | null)?.equipment as Equipment[])
             : [];
-        // Prefer icons if present; otherwise fall back to equipment
-        return icons.length > 0 ? icons : eq;
+        // Merge and de-duplicate by id to ensure pumps are included regardless of source
+        const merged = [...icons, ...eq];
+        const seen = new Set<string | number>();
+        const deduped = merged.filter((item) => {
+            const id = (item as { id?: string | number }).id ?? Math.random();
+            if (seen.has(id)) return false;
+            seen.add(id);
+            return true;
+        });
+        // If no valid pump info from props, fallback to localStorage
+        const hasValidPump = deduped.some(isValidPump);
+        if (!hasValidPump) {
+            try {
+                const fieldDataStr = localStorage.getItem('fieldCropData');
+                if (fieldDataStr) {
+                    const parsed = JSON.parse(fieldDataStr) as Partial<{ equipment: Equipment[]; equipmentIcons: Equipment[] }> | null;
+                    const storageEquip = Array.isArray(parsed?.equipment) ? parsed!.equipment : [];
+                    const storageIcons = Array.isArray(parsed?.equipmentIcons) ? parsed!.equipmentIcons : [];
+                    const pumps = [...storageEquip, ...storageIcons].filter(isValidPump);
+                    if (pumps.length > 0) return pumps as Equipment[];
+                }
+            } catch {
+                // ignore
+            }
+        }
+        return deduped as Equipment[];
     }, [equipmentIcons, summaryData]);
     const actualObstacles = Array.isArray(obstacles) ? obstacles : [];
     const actualIrrigationPoints = useMemo(() => (
@@ -2185,14 +2274,14 @@ export default function FieldCropSummary() {
     // Flow settings from irrigation page (used to display flowrate per zone)
     const irrigationSettingsData = useMemo(() => {
         try {
-            const fromProps = (summaryData as Partial<FieldCropSummaryProps> | null)?.irrigationSettings as unknown as Record<string, { flow?: number }> | undefined;
+            const fromProps = (summaryData as Partial<FieldCropSummaryProps> | null)?.irrigationSettings as unknown as Record<string, { flow?: number; coverageRadius?: number; pressure?: number }> | undefined;
             if (fromProps && typeof fromProps === 'object') return fromProps;
             const data = localStorage.getItem('fieldCropData');
-            if (!data) return {} as Record<string, { flow?: number }>;
-            const parsed = JSON.parse(data) as { irrigationSettings?: Record<string, { flow?: number }> } | null;
-            return parsed?.irrigationSettings || ({} as Record<string, { flow?: number }>);
+            if (!data) return {} as Record<string, { flow?: number; coverageRadius?: number; pressure?: number }>;
+            const parsed = JSON.parse(data) as { irrigationSettings?: Record<string, { flow?: number; coverageRadius?: number; pressure?: number }> } | null;
+            return parsed?.irrigationSettings || ({} as Record<string, { flow?: number; coverageRadius?: number; pressure?: number }>);
         } catch {
-            return {} as Record<string, { flow?: number }>;
+            return {} as Record<string, { flow?: number; coverageRadius?: number; pressure?: number }>;
         }
     }, [summaryData]);
 
@@ -2697,8 +2786,58 @@ export default function FieldCropSummary() {
 
     const uniqueEquipment = actualEquipmentIcons
         .filter((equipment, index, array) => array.findIndex((e) => e.id === equipment.id) === index)
-        .filter((e) => e.type === 'pump');
+        .filter((e) => e.type === 'pump' || e.type === 'water_pump');
     const pumpCount = uniqueEquipment.length;
+
+    // Persist merged equipment to localStorage so pump markers remain across navigation
+    useEffect(() => {
+        try {
+            const fieldDataStr = localStorage.getItem('fieldCropData');
+            const parsed = fieldDataStr ? JSON.parse(fieldDataStr) as Record<string, unknown> : {};
+            const isEquipmentArray = (arr: unknown): arr is Equipment[] => {
+                if (!Array.isArray(arr)) return false;
+                return arr.every((o) => {
+                    if (!o || typeof o !== 'object') return false;
+                    const obj = o as Record<string, unknown>;
+                    return (
+                        typeof obj.lat === 'number' &&
+                        typeof obj.lng === 'number' &&
+                        typeof obj.type === 'string'
+                    );
+                });
+            };
+
+            const existingEquip = isEquipmentArray((parsed as { equipment?: unknown }).equipment)
+                ? (parsed as { equipment: Equipment[] }).equipment
+                : [];
+            const existingIcons = isEquipmentArray((parsed as { equipmentIcons?: unknown }).equipmentIcons)
+                ? (parsed as { equipmentIcons: Equipment[] }).equipmentIcons
+                : [];
+
+            // Build pumps from uniqueEquipment, keep other equipment as-is
+            const pumpEquip: Equipment[] = (uniqueEquipment || [])
+                .filter((e) => (e && (e.type === 'pump' || e.type === 'water_pump') && typeof e.lat === 'number' && typeof e.lng === 'number'))
+                .map((e) => ({
+                    id: e.id,
+                    type: 'pump',
+                    lat: e.lat,
+                    lng: e.lng,
+                    name: e.name || 'Water Pump',
+                }));
+
+            // If there's no valid pump to persist, don't touch existing data
+            if (pumpEquip.length === 0) return;
+
+            const nonPump = (e: Equipment) => e.type !== 'pump' && e.type !== 'water_pump';
+            const mergedEquip: Equipment[] = [...existingEquip.filter(nonPump), ...pumpEquip];
+            const mergedIcons: Equipment[] = [...existingIcons.filter(nonPump), ...pumpEquip];
+
+            const next = { ...(parsed || {}), equipment: mergedEquip, equipmentIcons: mergedIcons };
+            localStorage.setItem('fieldCropData', JSON.stringify(next));
+        } catch {
+            // ignore persistence errors
+        }
+    }, [uniqueEquipment]);
 
     const totalEstimatedYield = Object.values(calculatedZoneSummaries).reduce((sum: number, summary: ZoneSummary) => sum + (summary.estimatedYield || 0), 0);
     // Financial estimation removed in simplified summary
@@ -3022,6 +3161,40 @@ export default function FieldCropSummary() {
                                             📏 {t('Pipe System (finished drawing only)')}
                                         </h3>
                                         <div className="space-y-2">
+                                            {/* Sprinkler specs summary */}
+                                            <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
+                                                <div className="mb-1 flex items-center justify-between">
+                                                    <span className="text-xs font-medium text-cyan-300 print:text-black">
+                                                        {t('Sprinkler Specs')}
+                                                    </span>
+                                                </div>
+                                                <div className="grid grid-cols-3 gap-1 text-xs">
+                                                    <div>
+                                                        <span className="text-gray-400 print:text-gray-600">
+                                                            {t('Flow:')}{' '}
+                                                        </span>
+                                                        <span className="font-medium text-cyan-300 print:text-black">
+                                                            {(irrigationSettingsData?.sprinkler_system?.flow ?? 0).toLocaleString()} {t('L/min')}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-gray-400 print:text-gray-600">
+                                                            {t('Radius:')}{' '}
+                                                        </span>
+                                                        <span className="font-medium text-cyan-300 print:text-black">
+                                                            {(irrigationSettingsData?.sprinkler_system?.coverageRadius ?? 0).toLocaleString()} {t('m.')}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-gray-400 print:text-gray-600">
+                                                            {t('Pressure:')}{' '}
+                                                        </span>
+                                                        <span className="font-medium text-cyan-300 print:text-black">
+                                                            {(irrigationSettingsData?.sprinkler_system?.pressure ?? 0).toFixed(1)} {t('bar')}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
                                             <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
                                                 <div className="mb-1 flex items-center justify-between">
                                                     <span className="text-xs font-medium text-blue-300 print:text-black">
@@ -3504,11 +3677,16 @@ export default function FieldCropSummary() {
                                                 ? getCropByValue(zoneAssignments[zone.id])
                                                 : null;
                                             const irrigationType = globalIrrigationType || irrigationAssignments[zone.id];
-                                            const zonePipeStats = calculateZonePipeStats(
-                                                actualPipes,
-                                                zone.id.toString(),
-                                                actualZones
-                                            );
+                                            // Read from precomputed map to avoid recomputation per render
+                                            const zonePipeStats: ZonePipeStats =
+                                                zonePipeStatsMap.get(zone.id.toString()) ?? {
+                                                    main: { count: 0, totalLength: 0, longestLength: 0 },
+                                                    submain: { count: 0, totalLength: 0, longestLength: 0 },
+                                                    lateral: { count: 0, totalLength: 0, longestLength: 0 },
+                                                    total: 0,
+                                                    totalLength: 0,
+                                                    totalLongestLength: 0,
+                                                };
                                             const zoneIrrigationCounts =
                                                 calculateZoneIrrigationCounts(
                                                     zone,

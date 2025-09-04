@@ -21,6 +21,7 @@ export const fieldCropTranslations = {
         'm.': 'm.',
         lines: 'lines',
         units: 'units',
+        bar: 'bar',
         
         // Basic units and measurements
         meters: 'meters',
@@ -280,7 +281,11 @@ export const fieldCropTranslations = {
         'Planting Points': 'Planting Points',
         'Crop Information (from cropData)': 'Crop Information (from cropData)',
         'Infrastructure Summary': 'Infrastructure Summary',
+        'Sprinkler Specs': 'Sprinkler Specs',
         'Pipe System (finished drawing only)': 'Pipe System (finished drawing only)',
+        'Flow:': 'Flow:',
+        'Radius:': 'Radius:',
+        'Pressure:': 'Pressure:',
         'Main Pipes': 'Main Pipes',
         'Submain Pipes': 'Submain Pipes',
         'Lateral Pipes': 'Lateral Pipes',
@@ -451,6 +456,7 @@ export const fieldCropTranslations = {
         'm.': 'ม.',
         lines: 'เส้น',
         units: 'หน่วย',
+        bar: 'บาร์',
         
         // Basic units and measurements
         meters: 'เมตร',
@@ -709,7 +715,11 @@ export const fieldCropTranslations = {
         'Planting Points': 'จุดปลูก',
         'Crop Information (from cropData)': 'ข้อมูลพืช (จาก cropData)',
         'Infrastructure Summary': 'สรุปโครงสร้างพื้นฐาน',
+        'Sprinkler Specs': 'สเปคสปริงเกลอร์',
         'Pipe System (finished drawing only)': 'ระบบท่อ (เฉพาะที่วาดเสร็จ)',
+        'Flow:': 'อัตราการไหล:',
+        'Radius:': 'รัศมี:',
+        'Pressure:': 'แรงดัน:',
         'Main Pipes': 'ท่อเมน',
         'Submain Pipes': 'ท่อรอง',
         'Lateral Pipes': 'ท่อย่อย',

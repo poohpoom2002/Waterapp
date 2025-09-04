@@ -6,6 +6,7 @@ import HorticultureMapComponent from '../../components/horticulture/Horticulture
 import * as turf from '@turf/turf';
 import type * as GeoJSON from 'geojson';
 import type { FieldData } from './pipe-generate';
+import { parseCompletedSteps, toCompletedStepsCsv } from '../../utils/stepUtils';
 import { getTranslatedCropByValue } from './choose-crop';
 
 // ==================== CONSTANTS ====================
@@ -1686,7 +1687,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 		const params = {
 			crops: fieldData.selectedCrops.join(','),
 			currentStep: 2,
-			completedSteps: completedSteps,
+			completedSteps: toCompletedStepsCsv(parseCompletedSteps(completedSteps)),
 		};
 		router.get('/step2-irrigation-system', params);
 	};
@@ -1700,7 +1701,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 			alert(t('Please create at least one zone within the main area'));
 			return;
 		}
-		const updatedCompleted = String(Math.max(parseInt(completedSteps || '0', 10) || 0, 3));
+		const updatedCompleted = toCompletedStepsCsv([...parseCompletedSteps(completedSteps), 3]);
 		const params = {
 			crops: fieldData.selectedCrops.join(','),
 			currentStep: 4,
@@ -1726,7 +1727,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 				alert(t('Please create at least one zone within the main area'));
 				return;
 			}
-			const updatedCompleted = String(Math.max(parseInt(completedSteps || '0', 10) || 0, 3));
+			const updatedCompleted = toCompletedStepsCsv([...parseCompletedSteps(completedSteps), 3]);
 			const params = {
 				crops: fieldData.selectedCrops.join(','),
 				currentStep: step.id,
@@ -1738,7 +1739,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 		const params = {
 			crops: fieldData.selectedCrops.join(','),
 			currentStep: step.id,
-			completedSteps: completedSteps,
+			completedSteps: toCompletedStepsCsv(parseCompletedSteps(completedSteps)),
 		};
 		router.get(step.route, params);
 	};
@@ -1777,7 +1778,8 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 								<div className="flex items-center justify-between mb-4">
 									{steps.map((step, index) => {
 										const isActive = step.id === currentStep;
-										const isCompleted = parseInt(completedSteps) >= step.id;
+										const parsedSteps = parseCompletedSteps(completedSteps);
+										const isCompleted = parsedSteps.includes(step.id) || (Math.max(0, ...parsedSteps) >= step.id);
 
 										return (
 											<div key={step.id} className="flex items-center">
