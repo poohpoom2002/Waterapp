@@ -614,7 +614,7 @@ const CanvasRenderer: React.FC<{
                     ctx.shadowOffsetY = 1 * Math.max(0.5, transform.scale / baseTransform.scale);
 
                     ctx.fillStyle = sprinkler.type.color;
-                    ctx.font = `bold ${8 * Math.max(0.8, transform.scale / baseTransform.scale)}px Arial`;
+                    ctx.font = `bold ${12 * Math.max(0.8, transform.scale / baseTransform.scale)}px Arial`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
 
@@ -1555,6 +1555,28 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                                     <span className="font-medium text-cyan-400">
                                                         {zone.sprinklerRadius > 0
                                                             ? `${zone.sprinklerRadius.toFixed(1)} ${t('ม.')}`
+                                                            : '-'}
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-400">
+                                                        {t('แรงดัน:')}
+                                                    </span>
+                                                    <span className="font-medium text-cyan-400">
+                                                        {zone.sprinklerPressure > 0
+                                                            ? `${zone.sprinklerPressure.toFixed(1)} ${t('บาร์')}`
+                                                            : '-'}
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-400">
+                                                        {t('อัตราการไหล:')}
+                                                    </span>
+                                                    <span className="font-medium text-cyan-400">
+                                                        {zone.sprinklerFlowRate > 0
+                                                            ? `${zone.sprinklerFlowRate.toFixed(1)} ${t('ล./นาที')}`
                                                             : '-'}
                                                     </span>
                                                 </div>

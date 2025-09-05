@@ -617,8 +617,10 @@ export const calculateProjectSummary = (
                 return plantsInThisZone.length > lateral.plants.length / 2; // majority voting
             }) || [];
 
-            // emitter pipes: จาก lateral pipes ในโซนนี้
-            const emitterPipesInZone = lateralPipesInZone.flatMap(lateral => lateral.emitterLines || []);
+            // emitter pipes: จาก lateral pipes ในโซนนี้ - เฉพาะโหมด 'between_plants' เท่านั้น
+            const emitterPipesInZone = lateralPipesInZone
+                .filter(lateral => lateral.placementMode === 'between_plants') // กรองเฉพาะ between_plants
+                .flatMap(lateral => lateral.emitterLines || []);
 
             const mainPipeLengthsInZone = mainPipesInZone.map(pipe => pipe.length);
             const mainPipesDataInZone = {
@@ -736,8 +738,10 @@ export const calculateProjectSummary = (
             
 
 
-            // emitter pipes: จาก lateral pipes ในโซนนี้
-            const emitterPipesInZone = lateralPipesInZone.flatMap(lateral => lateral.emitterLines || []);
+            // emitter pipes: จาก lateral pipes ในโซนนี้ - เฉพาะโหมด 'between_plants' เท่านั้น
+            const emitterPipesInZone = lateralPipesInZone
+                .filter(lateral => lateral.placementMode === 'between_plants') // กรองเฉพาะ between_plants
+                .flatMap(lateral => lateral.emitterLines || []);
 
             // ใช้ข้อมูลจริงจากท่อที่อยู่ในโซนนี้
             const mainPipesDataInZone = {
