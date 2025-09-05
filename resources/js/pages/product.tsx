@@ -110,13 +110,11 @@ const getStoredProjectImage = (projectMode: ProjectMode): string | null => {
     for (const key of imageKeys) {
         const image = localStorage.getItem(key);
         if (image && image.startsWith('data:image/')) {
-            console.log(`✅ Found project image with key: ${key}`);
 
             try {
                 const metadata = localStorage.getItem('projectMapMetadata');
                 if (metadata) {
                     const parsedMetadata = JSON.parse(metadata);
-                    console.log(`📊 Image metadata:`, parsedMetadata);
                 }
             } catch (error) {
                 console.warn('⚠️ Could not parse image metadata:', error);
@@ -164,9 +162,6 @@ const cleanupOldImages = (): void => {
         }
     });
 
-    if (cleanedCount > 0) {
-        console.log(`🧹 Cleaned up ${cleanedCount} old image references`);
-    }
 };
 
 export default function Product() {
@@ -234,7 +229,6 @@ export default function Product() {
                         }
                     });
 
-                    console.log('✅ User uploaded image saved successfully');
                 } else {
                     setImageLoadError('Invalid image format');
                 }
@@ -268,7 +262,6 @@ export default function Product() {
 
         setProjectImage(null);
         setImageLoadError(null);
-        console.log('🗑️ Project image deleted');
     };
 
     useEffect(() => {
@@ -298,9 +291,7 @@ export default function Product() {
 
         if (image && validateImageData(image)) {
             setProjectImage(image);
-            console.log(`✅ Successfully loaded project image for ${projectMode} mode`);
         } else {
-            console.log(`ℹ️ No valid project image found for ${projectMode} mode`);
             setProjectImage(null);
             const modeNames = {
                 'field-crop': 'Field Crop Summary',
@@ -997,7 +988,6 @@ export default function Product() {
             if (horticultureSystemDataStr) {
                 try {
                     horticultureSystemData = JSON.parse(horticultureSystemDataStr);
-                    console.log('Loaded horticultureSystemData:', horticultureSystemData);
                     setHorticultureSystemData(horticultureSystemData);
                 } catch (error) {
                     console.warn('Failed to parse horticulture system data:', error);
@@ -1034,7 +1024,6 @@ export default function Product() {
 
             // ถ้าไม่มีข้อมูลโปรเจกต์ ให้สร้างข้อมูล default
             if (!data && horticultureSystemData) {
-                console.log('Creating default project data from horticultureSystemData');
                 data = {
                     projectName: 'Default Project',
                     totalArea: horticultureSystemData.zones[0]?.area || 1600,
@@ -1210,7 +1199,6 @@ export default function Product() {
                 }
             } else {
                 // ถ้าไม่มีข้อมูลเลย ให้สร้าง default
-                console.log('No data found, creating minimal default');
                 const defaultInput: IrrigationInput = {
                     farmSizeRai: 1,
                     totalTrees: 100,
@@ -1461,6 +1449,45 @@ export default function Product() {
         return projectData?.zones.find((z) => z.id === activeZoneId);
     };
 
+    // ฟังก์ชันดึงข้อมูลพื้นที่โซนจาก horticultureSystemData หรือข้อมูลโซนที่มีอยู่
+    const getZoneAreaData = (): {
+        zoneId: string;
+        zoneName: string;
+        areaInRai: number;
+        coordinates?: { lat: number; lng: number }[];
+    } | undefined => {
+        if (!activeZoneId) return undefined;
+
+        // ลองดึงจาก horticultureSystemData ก่อน (จาก HorticultureResultsPage.tsx)
+        if (horticultureSystemData && horticultureSystemData.zones) {
+            const zoneFromHorticultureData = horticultureSystemData.zones.find(
+                (zone: any) => zone.id === activeZoneId
+            );
+            
+            if (zoneFromHorticultureData) {
+                return {
+                    zoneId: zoneFromHorticultureData.id as string,
+                    zoneName: zoneFromHorticultureData.name as string,
+                    areaInRai: zoneFromHorticultureData.area ? zoneFromHorticultureData.area / 1600 : 0, // แปลงจากตร.ม. เป็นไร่
+                    coordinates: undefined, // ไม่มี coordinates ใน horticultureSystemData
+                };
+            }
+        }
+
+        // ถ้าไม่เจอใน horticultureSystemData ให้ลองดึงจากข้อมูลโซนปกติ
+        const activeZone = getActiveZone();
+        if (activeZone && activeZone.area) {
+            return {
+                zoneId: activeZone.id as string,
+                zoneName: (activeZone.name || `โซน ${activeZone.id}`) as string,
+                areaInRai: activeZone.area / 1600, // แปลงจากตร.ม. เป็นไร่
+                coordinates: undefined,
+            };
+        }
+
+        return undefined;
+    };
+
     const hasEssentialData =
         (projectMode === 'horticulture' && projectData && projectStats) ||
         (projectMode === 'garden' && gardenData && gardenStats) ||
@@ -1687,21 +1714,36 @@ export default function Product() {
                                     {zones.map((zone) => {
                                         const isActive = activeZoneId === zone.id;
                                         const hasSprinkler = !!zoneSprinklers[zone.id];
+                                        
+                                        // หาสีของโซนจาก horticultureSystemData
+                                        let zoneColor = null;
+                                        if (horticultureSystemData && horticultureSystemData.zones) {
+                                            const systemZone = horticultureSystemData.zones.find((hz: any) => hz.id === zone.id);
+                                            zoneColor = systemZone?.color;
+                                        }
+
+                                        const buttonStyle = zoneColor
+                                            ? {
+                                                backgroundColor: zoneColor,
+                                                color: 'black',
+                                            }
+                                            : {};
 
                                         return (
                                             <button
                                                 key={zone.id}
                                                 onClick={() => setActiveZoneId(zone.id)}
-                                                className={`relative rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                                                className={`relative rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
                                                     isActive
-                                                        ? 'bg-blue-600 text-white'
-                                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                        ? 'border-2 border-blue-600 text-blue-400 ring-2 ring-blue-400'
+                                                        : 'opacity-80'
                                                 }`}
+                                                style={buttonStyle}
                                             >
                                                 <div className="flex items-center gap-2">
                                                     <span>{zone.name}</span>
                                                     {hasSprinkler && (
-                                                        <span className="text-xs text-green-400">
+                                                        <span className="text-xs text-green-700">
                                                             ✓
                                                         </span>
                                                     )}
@@ -1917,6 +1959,7 @@ export default function Product() {
                             selectedSprinkler={currentSprinkler}
                             activeZone={activeZone}
                             projectMode={projectMode}
+                            zoneAreaData={getZoneAreaData()}
                         />
 
                         <SprinklerSelector

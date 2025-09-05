@@ -235,19 +235,52 @@ export const findMainToSubMainConnections = (
             const subMainStart = subMainPipe.coordinates[0];
             const subMainZone = findPipeZone(subMainPipe);
             
-            // 🔥 เงื่อนไขสำคัญ: เชื่อมต่อเฉพาะท่อที่อยู่ในโซนเดียวกัน
-            if (mainZone && subMainZone && mainZone !== subMainZone) {
-                continue; // ข้าม - ต่างโซนกัน
-            }
-            
             const distance = calculateDistanceBetweenPoints(mainEnd, subMainStart);
             
+            if (mainZone && subMainZone && mainZone !== subMainZone) {
+                continue; // ข้าม - ท่อคนละโซนไม่ควรเชื่อมกัน
+            }
+            
             if (distance <= snapThreshold) {
-                // หาจุดกลางระหว่างสองจุด
-                const connectionPoint = {
-                    lat: (mainEnd.lat + subMainStart.lat) / 2,
-                    lng: (mainEnd.lng + subMainStart.lng) / 2
-                };
+                // หาจุดที่ใกล้ที่สุดบนท่อเมนรองสำหรับการเชื่อมต่อ
+                let connectionPoint: Coordinate;
+                
+                // ตรวจสอบว่าเป็นการเชื่อมต่อแบบ end-to-end หรือ intersection
+                if (distance <= 10) { // ถ้าใกล้มาก = end-to-end connection
+                    connectionPoint = {
+                        lat: (mainEnd.lat + subMainStart.lat) / 2,
+                        lng: (mainEnd.lng + subMainStart.lng) / 2
+                    };
+                } else {
+                    // หาจุดตัดจริงระหว่างท่อเมนกับท่อเมนรอง
+                    let actualIntersection: Coordinate | null = null;
+                    
+                    // ตรวจสอบการตัดกันระหว่างแต่ละ segment ของท่อเมน
+                    for (let i = 0; i < mainPipe.coordinates.length - 1; i++) {
+                        const mainSegStart = mainPipe.coordinates[i];
+                        const mainSegEnd = mainPipe.coordinates[i + 1];
+                        
+                        // ตรวจสอบกับ segment แรกของท่อเมนรอง
+                        const intersection = findLineIntersection(
+                            mainSegStart,
+                            mainSegEnd,
+                            subMainStart,
+                            subMainPipe.coordinates[1] || subMainStart
+                        );
+                        
+                        if (intersection) {
+                            actualIntersection = intersection;
+                            break;
+                        }
+                    }
+                    
+                    // ถ้าไม่เจอจุดตัด ใช้จุดที่ใกล้ที่สุดบนท่อเมน
+                    connectionPoint = actualIntersection || findClosestPointOnLineSegment(
+                        subMainStart,
+                        mainPipe.coordinates[mainPipe.coordinates.length - 2] || mainEnd,
+                        mainEnd
+                    );
+                }
 
                 connections.push({
                     mainPipeId: mainPipe.id,
@@ -258,7 +291,67 @@ export const findMainToSubMainConnections = (
         }
     }
 
+
     return connections;
+};
+
+// Helper function สำหรับตรวจสอบว่าท่อเมนผ่านหลายโซนหรือไม่
+const checkMainPipePassesThroughMultipleZones = (
+    mainPipe: any,
+    zones?: any[],
+    irrigationZones?: any[]
+): boolean => {
+    if (!mainPipe.coordinates || mainPipe.coordinates.length < 2) return false;
+    
+    const zonesFound = new Set<string>();
+    
+    // ตรวจสอบทุกจุดของท่อเมน
+    for (const point of mainPipe.coordinates) {
+        // ตรวจสอบใน irrigationZones ก่อน
+        if (irrigationZones) {
+            for (const zone of irrigationZones) {
+                if (isPointInPolygon(point, zone.coordinates)) {
+                    zonesFound.add(zone.id);
+                }
+            }
+        }
+        
+        // ตรวจสอบใน zones รอง
+        if (zones) {
+            for (const zone of zones) {
+                if (isPointInPolygon(point, zone.coordinates)) {
+                    zonesFound.add(zone.id);
+                }
+            }
+        }
+    }
+    
+    
+    // ถ้าผ่านมากกว่า 1 โซน แสดงว่าเป็นท่อข้ามโซน
+    return zonesFound.size > 1;
+};
+
+// Helper function สำหรับหาโซนที่จุดอยู่
+const findZoneAtPoint = (point: Coordinate, zones?: any[], irrigationZones?: any[]): string | null => {
+    // ตรวจสอบใน irrigationZones ก่อน
+    if (irrigationZones) {
+        for (const zone of irrigationZones) {
+            if (isPointInPolygon(point, zone.coordinates)) {
+                return zone.id;
+            }
+        }
+    }
+    
+    // ตรวจสอบใน zones รอง
+    if (zones) {
+        for (const zone of zones) {
+            if (isPointInPolygon(point, zone.coordinates)) {
+                return zone.id;
+            }
+        }
+    }
+    
+    return null;
 };
 
 // Helper function สำหรับตรวจสอบจุดอยู่ในโซนหรือไม่
@@ -340,9 +433,9 @@ export const findSubMainToLateralStartConnections = (
             }
 
             // ตรวจสอบว่าจุดเริ่มต้นของ lateral pipe อยู่บน submain pipe หรือไม่
-            if (isPointOnSubMainPipe({ position: lateralStart } as any, subMainPipe, snapThreshold)) {
+            if (isPointOnSubMainPipe(lateralStart, subMainPipe, snapThreshold)) {
                 // หาจุดที่ใกล้ที่สุดบน submain pipe
-                const closestPoint = findClosestConnectionPoint({ position: lateralStart } as any, subMainPipe);
+                const closestPoint = findClosestConnectionPoint(lateralStart, subMainPipe);
                 
                 if (closestPoint) {
                     connections.push({
@@ -421,9 +514,9 @@ export const findSubMainToMainIntersections = (
 
             const mainZone = findPipeZone(mainPipe);
             
-            // 🔥 เงื่อนไขสำคัญ: เชื่อมต่อเฉพาะท่อที่อยู่ในโซนเดียวกัน
+            // 🔥 เข้มงวดการตรวจสอบโซน: ห้ามท่อคนละโซนตัดกัน
             if (subMainZone && mainZone && subMainZone !== mainZone) {
-                continue; // ข้าม - ต่างโซนกัน
+                continue; // ข้าม - ท่อคนละโซนไม่ควรตัดกัน
             }
 
             // ตรวจสอบการตัดกันระหว่างแต่ละ segment
@@ -530,9 +623,9 @@ export const findMidConnections = (
 
                 const targetZone = findPipeZone(targetPipe);
                 
-                // 🔥 เงื่อนไขสำคัญ: เชื่อมต่อเฉพาะท่อที่อยู่ในโซนเดียวกัน
+                // 🔥 เข้มงวดการตรวจสอบโซนก่อนคำนวณระยะทาง: ห้ามท่อคนละโซนเชื่อมกัน
                 if (sourceZone && targetZone && sourceZone !== targetZone) {
-                    continue; // ข้าม - ต่างโซนกัน
+                    continue; // ข้าม - ท่อคนละโซนไม่ควรเชื่อมกัน
                 }
 
                 // ตรวจสอบว่าจุดปลายของ source pipe อยู่บน target pipe หรือไม่
@@ -630,21 +723,33 @@ export const findClosestPointOnLineSegment = (
     };
 };
 
-// ฟังก์ชันตรวจสอบว่าจุดอยู่บนท่อเมนรองหรือไม่
+// ฟังก์ชันตรวจสอบว่าจุดอยู่บนท่อเมนรองหรือไม่ (รวมถึง endpoints)
 export const isPointOnSubMainPipe = (
     point: Coordinate,
     subMainPipe: SubMainPipe,
     threshold: number = 5
 ): boolean => {
-    // Debug logs removed
-    
     if (!subMainPipe.coordinates || subMainPipe.coordinates.length < 2) {
-        // Debug logs removed
         return false;
     }
 
-    // Debug logs removed
+    // 🔥 ตรวจสอบ endpoints ของท่อเมนรองก่อน (สำหรับท่อย่อยที่เชื่อมกับปลายท่อ)
+    const startPoint = subMainPipe.coordinates[0];
+    const endPoint = subMainPipe.coordinates[subMainPipe.coordinates.length - 1];
+    
+    // ตรวจสอบระยะห่างจากจุดเริ่มต้น
+    const distanceToStart = calculateDistanceBetweenPoints(point, startPoint);
+    if (distanceToStart <= threshold) {
+        return true;
+    }
+    
+    // ตรวจสอบระยะห่างจากจุดสิ้นสุด
+    const distanceToEnd = calculateDistanceBetweenPoints(point, endPoint);
+    if (distanceToEnd <= threshold) {
+        return true;
+    }
 
+    // ตรวจสอบ line segments ตามเดิม
     for (let i = 0; i < subMainPipe.coordinates.length - 1; i++) {
         const start = subMainPipe.coordinates[i];
         const end = subMainPipe.coordinates[i + 1];
@@ -652,19 +757,15 @@ export const isPointOnSubMainPipe = (
         const closestPoint = findClosestPointOnLineSegment(point, start, end);
         const distance = calculateDistanceBetweenPoints(point, closestPoint);
         
-        // Debug logs removed
-        
         if (distance <= threshold) {
-            // Debug logs removed
             return true;
         }
     }
     
-    // Debug logs removed
     return false;
 };
 
-// ฟังก์ชันหาจุดเชื่อมต่อที่ใกล้ที่สุดบนท่อเมนรอง
+// ฟังก์ชันหาจุดเชื่อมต่อที่ใกล้ที่สุดบนท่อเมนรอง (รวมถึง endpoints)
 export const findClosestConnectionPoint = (
     point: Coordinate,
     subMainPipe: SubMainPipe
@@ -676,6 +777,25 @@ export const findClosestConnectionPoint = (
     let closestPoint: Coordinate | null = null;
     let minDistance = Infinity;
 
+    // 🔥 ตรวจสอบ endpoints ของท่อเมนรองก่อน
+    const startPoint = subMainPipe.coordinates[0];
+    const endPoint = subMainPipe.coordinates[subMainPipe.coordinates.length - 1];
+    
+    // ตรวจสอบระยะห่างจากจุดเริ่มต้น
+    const distanceToStart = calculateDistanceBetweenPoints(point, startPoint);
+    if (distanceToStart < minDistance) {
+        minDistance = distanceToStart;
+        closestPoint = startPoint;
+    }
+    
+    // ตรวจสอบระยะห่างจากจุดสิ้นสุด
+    const distanceToEnd = calculateDistanceBetweenPoints(point, endPoint);
+    if (distanceToEnd < minDistance) {
+        minDistance = distanceToEnd;
+        closestPoint = endPoint;
+    }
+
+    // ตรวจสอบ line segments ตามเดิม
     for (let i = 0; i < subMainPipe.coordinates.length - 1; i++) {
         const start = subMainPipe.coordinates[i];
         const end = subMainPipe.coordinates[i + 1];
@@ -1479,18 +1599,53 @@ export const generateLateralPipeId = (): string => {
     return `lateral_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 };
 
-// ฟังก์ชันสร้างท่อแยกย่อย (Emitter Lines) - โหมดวางทับแนวต้นไม้
-// ในโหมดนี้ ท่อย่อยวางทับแนวต้นไม้โดยตรง ไม่ต้องมีท่อแยกย่อย
+// ฟังก์ชันสร้างท่อแยกย่อย (Emitter Lines)
+// 🔧 แก้ไขตามความต้องการ: สร้าง emitterLines เฉพาะโหมด 'between_plants' เท่านั้น
 export const generateEmitterLines = (
     lateralPipeId: string,
     lateralStart: Coordinate,
     lateralEnd: Coordinate,
     plants: PlantLocation[],
-    emitterDiameter: number = 4
+    emitterDiameter: number = 4,
+    placementMode?: 'over_plants' | 'between_plants'
 ): any[] => {
-    // ในโหมดวางทับแนวต้นไม้ ไม่ต้องสร้างท่อแยกย่อย
-    // ต้นไม้จะได้รับน้ำจากท่อย่อยที่วางทับแนวต้นไม้โดยตรง
-    return [];
+    // ⚠️ สร้างเฉพาะโหมด 'between_plants' เท่านั้น
+    // โหมด 'over_plants' ท่อวางทับแนวต้นไม้โดยตรง จึงไม่ต้องมีท่อย่อยแยก
+    if (placementMode !== 'between_plants') {
+        return []; // ไม่สร้าง emitterLines สำหรับโหมดอื่น
+    }
+    
+    const emitterLines: any[] = [];
+    
+    // สร้าง emitterLines สำหรับแต่ละต้นไม้ในโหมด between_plants
+    plants.forEach((plant, index) => {
+        // หาจุดที่ใกล้ที่สุดบนท่อย่อยสำหรับแต่ละต้นไม้
+        const closestPointOnLateral = findClosestPointOnLineSegment(
+            plant.position,
+            lateralStart,
+            lateralEnd
+        );
+
+        // สร้างท่อแยกย่อยขนาดเล็กจาก lateral pipe ไปยังต้นไม้
+        const distance = calculateDistanceBetweenPoints(closestPointOnLateral, plant.position);
+
+        // สร้างเฉพาะกับต้นไม้ที่อยู่ใกล้ท่อย่อย (ไม่เกิน 10 เมตร)
+        if (distance <= 10) {
+            const emitterLine = {
+                id: `emitter_${lateralPipeId}_${index}`,
+                lateralPipeId: lateralPipeId,
+                plantId: plant.id,
+                coordinates: [closestPointOnLateral, plant.position],
+                length: distance,
+                diameter: emitterDiameter,
+                emitterType: 'drip'
+            };
+            
+            emitterLines.push(emitterLine);
+        }
+    });
+
+    return emitterLines;
 };
 
 // ฟังก์ชันสร้างท่อแขนงอัตโนมัติสำหรับโหมดวางระหว่างแนวต้นไม้

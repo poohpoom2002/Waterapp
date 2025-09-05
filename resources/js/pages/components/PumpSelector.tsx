@@ -34,10 +34,13 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
     zoneInputs = {},
     simultaneousZonesCount = 1,
     selectedZones = [],
+    allZoneResults,
+    projectSummary,
     zoneOperationMode = 'sequential',
     projectMode = 'horticulture',
 }) => {
     const [showImageModal, setShowImageModal] = useState(false);
+    const [showAccessoriesModal, setShowAccessoriesModal] = useState(false);
     const [modalImage, setModalImage] = useState({ src: '', alt: '' });
     const { t } = useLanguage();
     
@@ -211,6 +214,47 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
     const autoSelectedPump = results.autoSelectedPump;
     const analyzedPumps = useMemo(() => results.analyzedPumps || [], [results.analyzedPumps]);
 
+    // คำนวณ Pump Head เหมือนใน CalculationSummary.tsx
+    const calculatePumpHead = () => {
+        // ดึงท่อที่เลือกปัจจุบัน
+        const actualBranchPipe = results.autoSelectedBranchPipe;
+        const actualSecondaryPipe = results.autoSelectedSecondaryPipe;
+        const actualMainPipe = results.autoSelectedMainPipe;
+        const actualEmitterPipe = results.autoSelectedEmitterPipe;
+
+        // รวม Head Loss จากท่อทุกประเภท
+        const branchHeadLoss = actualBranchPipe?.headLoss || 0;
+        const secondaryHeadLoss = actualSecondaryPipe?.headLoss || 0;
+        const mainHeadLoss = actualMainPipe?.headLoss || 0;
+        const emitterHeadLoss = actualEmitterPipe?.headLoss || 0;
+        const totalPipeHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+
+        // คำนวณ Head Loss หัวฉีด (Q หัวฉีด * 10)
+        const sprinklerFlowLPM = results.waterPerSprinklerLPM || 6.0;
+        const sprinklerHeadLoss = sprinklerFlowLPM * 10;
+
+        return totalPipeHeadLoss + sprinklerHeadLoss;
+    };
+
+    // สำหรับกรณีหลายโซน ให้หาค่าสูงสุด
+    const getMaxPumpHeadFromAllZones = () => {
+        if (allZoneResults && allZoneResults.length > 1) {
+            // คำนวณ Pump Head สำหรับแต่ละโซน แล้วหาค่าสูงสุด
+            return Math.max(...allZoneResults.map((zone: any) => {
+                const zoneHeadLoss = zone.headLoss?.total || 0;
+                const zoneSprinklerFlow = zone.waterPerSprinklerLPM || 6.0;
+                const zoneSprinklerHeadLoss = zoneSprinklerFlow * 10;
+                return zoneHeadLoss + zoneSprinklerHeadLoss;
+            }));
+        } else {
+            // โซนเดียว ใช้การคำนวณปกติ
+            return calculatePumpHead();
+        }
+    };
+
+    const actualPumpHead = getMaxPumpHeadFromAllZones();
+
+
     // กรองปั๊มสำหรับ horticulture mode
     const getFilteredPumps = () => {
         if (projectMode !== 'horticulture') {
@@ -255,20 +299,20 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 requiredFlowLPM = Math.max(...zones.map((zone: any) => zone.waterNeedPerMinute || 0));
             }
 
-            // เงื่อนไขการกรอง
-            const minRequiredHead = qHeadSpray * 10; // maxHead >= Q หัวฉีด * 10
+            // ใช้ค่า actualPumpHead ที่คำนวณแล้ว (ใช้ค่าสูงสุดจากทุกโซน)
+            const maxPumpHeadFromZones = actualPumpHead;
             
             // กรองปั๊มที่เข้าเงื่อนไข
             const compatiblePumps = analyzedPumps.filter((pump: any) => {
-                // ตรวจสอบ maxHead
-                const maxHead = pump.max_head_m || pump.maxHead || 0;
-                const headCheck = maxHead >= minRequiredHead;
-                
-                // ตรวจสอบ maxFlow
+                // ตรวจสอบ maxFlow - ต้องมากกว่าที่ต้องการ
                 const maxFlow = pump.max_flow_rate_lpm || pump.maxFlowLPM || 0;
                 const flowCheck = maxFlow >= requiredFlowLPM;
                 
-                return headCheck && flowCheck;
+                // ตรวจสอบ maxHead - ต้องมากกว่า Pump Head ของโซนที่สูงสุด
+                const maxHead = pump.max_head_m || pump.maxHead || 0;
+                const headCheck = maxHead >= maxPumpHeadFromZones;
+                
+                return flowCheck && headCheck;
             });
 
             // เรียงตามราคาถูกสุดก่อน
@@ -385,63 +429,22 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 {t('ปั๊มน้ำ')}
             </h3>
 
-            <div className="mb-4 rounded bg-gray-600 p-3">
-                <h4 className="mb-2 text-sm font-medium text-red-300">⚡ {t('ความต้องการ:')}</h4>
-                <div className="text-xs text-gray-300">
-                    <p>
-                        {t('อัตราการไหล:')} {' '}
+            <div className="mb-4 rounded bg-gray-600 p-3 flex flex-row items-center space-x-6">
+                <h4 className="text-lg font-medium text-red-300 mr-4 whitespace-nowrap">⚡ {t('ความต้องการ:')}</h4>
+                <div className="flex flex-row items-center space-x-4">
+                    <span>
+                        {t('อัตราการไหล:')}{' '}
                         <span className="font-bold text-blue-300">
-                            {horticultureReq.requiredFlowLPM.toFixed(1)}{' '}
-                            {t('LPM')}
+                            {Number(horticultureReq.requiredFlowLPM.toFixed(2)).toLocaleString()} {t('LPM')}
                         </span>
-                    </p>
-                    <p>
-                        {t('Head รวม:')} {' '}
-                        <span className="font-bold text-yellow-300">
-                            {horticultureReq.minRequiredHead.toFixed(1)}{' '}
-                            {t('เมตร')}
+                    </span>
+                    <span>
+                        {t('Pump Head:')}{' '}
+                        <span className="font-bold text-orange-300">
+                            {Number(actualPumpHead.toFixed(2)).toLocaleString()} {t('เมตร')}
                         </span>
-                        {projectMode === 'horticulture' && (
-                            <span className="ml-2 text-xs text-gray-400">
-                                (Q หัวฉีด {horticultureReq.qHeadSpray} × 10)
-                            </span>
-                        )}
-                    </p>
+                    </span>
                 </div>
-                {results.projectSummary && (
-                    <div className="mt-2 text-xs text-purple-200">
-                        <p>
-                            🎯 {t('รูปแบบการเปิด:')} {' '}
-                            {results.projectSummary.operationMode === 'simultaneous'
-                                ? t('เปิดพร้อมกันทุกโซน')
-                                : results.projectSummary.operationMode === 'custom'
-                                  ? t('เปิดแบบกำหนดเอง')
-                                  : t('เปิดทีละโซน')}
-                        </p>
-                        <p>💧 {t('คำนวณจากโซน:')} {results.projectSummary.criticalZone}</p>
-                        {results.projectSummary.criticalGroup && (
-                            <p>🔗 {t('กลุ่มที่คำนวณ:')} {results.projectSummary.criticalGroup.label}</p>
-                        )}
-                    </div>
-                )}
-                {projectMode === 'horticulture' && (
-                    <div className="mt-2 text-xs text-purple-200">
-                        <p>🎯 {t('รูปแบบการเปิด:')} {' '}
-                            {zoneOperationMode === 'simultaneous'
-                                ? t('เปิดพร้อมกันทุกโซน')
-                                : zoneOperationMode === 'custom'
-                                  ? t('เปิดแบบกำหนดเอง')
-                                  : t('เปิดทีละโซน')}
-                        </p>
-                        <p>💧 {t('คำนวณจาก:')} {' '}
-                            {zoneOperationMode === 'simultaneous'
-                                ? t('น้ำรวมทุกโซน')
-                                : zoneOperationMode === 'custom'
-                                  ? t('กลุ่มโซนที่ต้องการมากสุด')
-                                  : t('โซนที่ต้องการมากสุด')}
-                        </p>
-                    </div>
-                )}
             </div>
 
             <div className="mb-4">
@@ -590,99 +593,34 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                         </div>
                     )}
 
-
-                    
-
                     {currentPump.pumpAccessories && currentPump.pumpAccessories.length > 0 && (
-                        <div className="mt-3 rounded bg-purple-900 p-2">
-                            <h5 className="mb-2 text-xs font-medium text-purple-300">
-                                🔧 {t('อุปกรณ์ประกอบ')} ({currentPump.pumpAccessories.length} {t('รายการ')}):
-                            </h5>
-                            <div className="space-y-2">
-                                {currentPump.pumpAccessories
-                                    .sort(
-                                        (a: any, b: any) =>
-                                            (a.sort_order || 0) - (b.sort_order || 0)
-                                    )
-                                    .map((accessory: any, index: number) => (
-                                        <div
-                                            key={accessory.id || index}
-                                            className="flex items-center justify-between rounded bg-purple-800 p-2"
-                                        >
-                                            <div className="flex items-center space-x-3">
-                                                {renderAccessoryImage(accessory)}
-                                                <div className="text-xs">
-                                                    <p className="font-medium text-white">
-                                                        {accessory.name}
-                                                    </p>
-                                                    <p className="capitalize text-purple-200">
-                                                        {accessory.accessory_type?.replace(
-                                                            '_',
-                                                            ' '
-                                                        )}
-                                                        {accessory.size && ` • ${accessory.size}`}
-                                                    </p>
-                                                    {accessory.specifications &&
-                                                        Object.keys(accessory.specifications)
-                                                            .length > 0 && (
-                                                            <p className="text-purple-300">
-                                                                {Object.entries(
-                                                                    accessory.specifications
-                                                                )
-                                                                    .slice(0, 1)
-                                                                    .map(
-                                                                        ([key, value]) =>
-                                                                            `${key}: ${value}`
-                                                                    )
-                                                                    .join(', ')}
-                                                                {Object.keys(
-                                                                    accessory.specifications
-                                                                ).length > 1 && '...'}
-                                                            </p>
-                                                        )}
-                                                </div>
-                                            </div>
-                                            <div className="text-right text-xs">
-                                                <div
-                                                    className={`font-medium ${accessory.is_included ? 'text-green-300' : 'text-yellow-300'}`}
-                                                >
-                                                    {accessory.is_included ? (
-                                                        <span>✅ {t('รวมในชุด')}</span>
-                                                    ) : (
-                                                        <span>
-                                                            💰 +
-                                                            {Number(
-                                                                accessory.price || 0
-                                                            ).toLocaleString()}{' '}
-                                                            {t('บาท')}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                {!accessory.is_included && (
-                                                    <div className="text-purple-200">({t('แยกขาย')})</div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
+                        <div className="mt-3 rounded bg-purple-900 p-3">
+                            <div className="flex items-center justify-between">
+                                <h5 className="text-sm font-medium text-purple-300">
+                                    🔧 {t('อุปกรณ์ประกอบ')} ({currentPump.pumpAccessories.length} {t('รายการ')})
+                                </h5>
+                                <button
+                                    onClick={() => setShowAccessoriesModal(true)}
+                                    className="rounded bg-purple-600 px-3 py-1 text-xs text-white hover:bg-purple-500 transition-colors"
+                                >
+                                    {t('ดูอุปกรณ์')}
+                                </button>
                             </div>
-
                             {currentPump.pumpAccessories.some((acc: any) => !acc.is_included) && (
-                                <div className="mt-2 rounded bg-purple-800 p-2 text-xs">
-                                    <div className="flex justify-between text-purple-200">
-                                        <span>{t('ราคาอุปกรณ์เสริม:')}</span>
-                                        <span className="font-medium text-yellow-300">
-                                            +
-                                            {currentPump.pumpAccessories
-                                                .filter((acc: any) => !acc.is_included)
-                                                .reduce(
-                                                    (sum: number, acc: any) =>
-                                                        sum + (Number(acc.price) || 0),
-                                                    0
-                                                )
-                                                .toLocaleString()}{' '}
-                                            {t('บาท')}
-                                        </span>
-                                    </div>
+                                <div className="mt-2 text-xs text-purple-200">
+                                    <span>{t('ราคาอุปกรณ์เสริม:')}</span>{' '}
+                                    <span className="font-medium text-yellow-300">
+                                        +
+                                        {currentPump.pumpAccessories
+                                            .filter((acc: any) => !acc.is_included)
+                                            .reduce(
+                                                (sum: number, acc: any) =>
+                                                    sum + (Number(acc.price) || 0),
+                                                0
+                                            )
+                                            .toLocaleString()}{' '}
+                                        {t('บาท')}
+                                    </span>
                                 </div>
                             )}
                         </div>
@@ -738,6 +676,131 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                             <p className="inline-block rounded bg-black bg-opacity-50 px-2 py-1 text-sm text-white">
                                 {modalImage.alt}
                             </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showAccessoriesModal && currentPump && currentPump.pumpAccessories && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
+                    onClick={() => setShowAccessoriesModal(false)}
+                >
+                    <div
+                        className="relative max-h-[90vh] max-w-[800px] w-full mx-4 bg-gray-800 rounded-lg shadow-2xl overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between bg-purple-900 px-4 py-3">
+                            <h3 className="text-lg font-medium text-white">
+                                🔧 {t('อุปกรณ์ประกอบ')} - {currentPump.name}
+                            </h3>
+                            <button
+                                onClick={() => setShowAccessoriesModal(false)}
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700"
+                                title={t('ปิด')}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="p-4">
+                            {currentPump.pumpAccessories.length > 5 && (
+                                <div className="mb-3 text-center text-xs text-gray-400">
+                                    📜 {t('มีอุปกรณ์')} {currentPump.pumpAccessories.length} {t('รายการ - เลื่อนเพื่อดูเพิ่มเติม')}
+                                </div>
+                            )}
+                            <div className="max-h-[400px] overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+                                {currentPump.pumpAccessories
+                                    .sort(
+                                        (a: any, b: any) =>
+                                            (a.sort_order || 0) - (b.sort_order || 0)
+                                    )
+                                    .map((accessory: any, index: number) => (
+                                        <div
+                                            key={accessory.id || index}
+                                            className="flex items-center justify-between rounded bg-gray-700 p-3"
+                                        >
+                                            <div className="flex items-center space-x-4">
+                                                {renderAccessoryImage(accessory)}
+                                                <div className="text-sm">
+                                                    <p className="font-medium text-white">
+                                                        {accessory.name}
+                                                    </p>
+                                                    <p className="capitalize text-gray-300">
+                                                        {accessory.accessory_type?.replace(
+                                                            '_',
+                                                            ' '
+                                                        )}
+                                                        {accessory.size && ` • ${accessory.size}`}
+                                                    </p>
+                                                    {accessory.specifications &&
+                                                        Object.keys(accessory.specifications)
+                                                            .length > 0 && (
+                                                            <div className="mt-1 text-xs text-gray-400">
+                                                                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                                                                    {Object.entries(
+                                                                        accessory.specifications
+                                                                    ).map(([key, value]) => (
+                                                                        <div key={key}>
+                                                                            <span className="font-medium">{key}:</span>{' '}
+                                                                            <span>{String(value)}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    {accessory.description && (
+                                                        <p className="mt-1 text-xs text-gray-400">
+                                                            {accessory.description}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div
+                                                    className={`text-sm font-medium ${accessory.is_included ? 'text-green-300' : 'text-yellow-300'}`}
+                                                >
+                                                    {accessory.is_included ? (
+                                                        <span>✅ {t('รวมในชุด')}</span>
+                                                    ) : (
+                                                        <span>
+                                                            💰 +
+                                                            {Number(
+                                                                accessory.price || 0
+                                                            ).toLocaleString()}{' '}
+                                                            {t('บาท')}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {!accessory.is_included && (
+                                                    <div className="text-xs text-gray-400 mt-1">
+                                                        ({t('แยกขาย')})
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                            </div>
+
+                            {currentPump.pumpAccessories.some((acc: any) => !acc.is_included) && (
+                                <div className="mt-4 rounded bg-purple-800 p-3">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-purple-200">{t('รวมราคาอุปกรณ์เสริม:')}</span>
+                                        <span className="font-medium text-yellow-300">
+                                            +
+                                            {currentPump.pumpAccessories
+                                                .filter((acc: any) => !acc.is_included)
+                                                .reduce(
+                                                    (sum: number, acc: any) =>
+                                                        sum + (Number(acc.price) || 0),
+                                                    0
+                                                )
+                                                .toLocaleString()}{' '}
+                                            {t('บาท')}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

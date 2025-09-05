@@ -11,6 +11,7 @@ import {
 } from '../../utils/horticultureProjectStats';
 import { useCalculations } from '../hooks/useCalculations';
 import { useLanguage } from '@/contexts/LanguageContext';
+import SearchableDropdown from './SearchableDropdown';
 
 interface InputFormProps {
     input: IrrigationInput;
@@ -19,6 +20,12 @@ interface InputFormProps {
     activeZone?: Zone;
     projectMode?: ProjectMode;
     maxZones?: number;
+    zoneAreaData?: {
+        zoneId: string;
+        zoneName: string;
+        areaInRai: number;
+        coordinates?: { lat: number; lng: number }[];
+    };
 }
 
 interface BranchPipeStats {
@@ -50,11 +57,43 @@ const InputForm: React.FC<InputFormProps> = ({
     selectedSprinkler,
     activeZone,
     projectMode = 'horticulture' as ProjectMode,
+    zoneAreaData,
 }) => {
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [validationMessages, setValidationMessages] = useState<string[]>([]);
     const [pipeData, setPipeData] = useState<any[]>([]);
     const { t } = useLanguage();
+
+    // ฟังก์ชันคำนวณพื้นที่โซนจาก coordinates (นำมาจาก HorticultureResultsPage.tsx)
+    const calculatePolygonArea = (coords: { lat: number; lng: number }[]): number => {
+        if (!coords || coords.length < 3) return 0;
+        
+        let area = 0;
+        for (let i = 0; i < coords.length; i++) {
+            const j = (i + 1) % coords.length;
+            area += coords[i].lat * coords[j].lng;
+            area -= coords[j].lat * coords[i].lng;
+        }
+        area = Math.abs(area) / 2;
+        
+        // แปลงจากองศา² เป็นตารางเมตร (โดยประมาณ)
+        const metersPerDegree = 111320; // ประมาณการ
+        return area * metersPerDegree * metersPerDegree;
+    };
+
+    // ฟังก์ชันได้รับพื้นที่โซนในไร่
+    const getZoneAreaInRai = (): number => {
+        if (zoneAreaData?.areaInRai && zoneAreaData.areaInRai > 0) {
+            return zoneAreaData.areaInRai;
+        }
+        
+        if (zoneAreaData?.coordinates && zoneAreaData.coordinates.length > 0) {
+            const areaInSquareMeters = calculatePolygonArea(zoneAreaData.coordinates);
+            return areaInSquareMeters / 1600; // แปลงเป็นไร่
+        }
+        
+        return 0;
+    };
 
     useEffect(() => {
         const fetchPipeData = async () => {
@@ -422,10 +461,10 @@ const InputForm: React.FC<InputFormProps> = ({
                         📋 {t('ข้อมูลพื้นฐาน')}
                     </h2>
 
-                    <div className="grid grid-cols-2 gap-3 rounded-lg bg-gray-700 p-2">
+                    <div className="grid grid-cols-3 gap-3 rounded-lg bg-gray-700 p-2">
                         <div>
                             <label className="mb-2 block text-sm font-medium">
-                                {t('ขนาดพื้นที่')} ({getAreaUnit()}) ({(input.farmSizeRai * 1600).toFixed(2)} {t('ตร.ม.')})
+                                {t('ขนาดพื้นที่')} ({getAreaUnit()}) 
                             </label>
                             <input
                                 type="number"
@@ -444,7 +483,27 @@ const InputForm: React.FC<InputFormProps> = ({
                                 min="0"
                                 className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                             />
+                            <p className="mt-1 text-xs text-gray-400">
+                            ({(input.farmSizeRai * 1600).toLocaleString(undefined, { minimumFractionDigits: 0 , maximumFractionDigits: 2 })} {t('ตร.ม.')})
+                            </p>
                         </div>
+
+                        {/* แสดงข้อมูลพื้นที่โซน (ถ้ามี)
+                        {zoneAreaData && (
+                            <div>
+                                <label className="mb-2 block text-sm font-medium text-green-400">
+                                    {t('พื้นที่โซน')}: {zoneAreaData.zoneName}
+                                </label>
+                                <div className="rounded border border-green-500 bg-green-900/20 p-2">
+                                    <div className="text-lg font-bold text-green-400">
+                                        {getZoneAreaInRai() > 0 ? `${getZoneAreaInRai().toFixed(2)} ${t('ไร่')}` : t('ไม่ระบุ')}
+                                    </div>
+                                    <div className="text-xs text-gray-400">
+                                        ({(getZoneAreaInRai() * 1600).toFixed(2)} {t('ตร.ม.')})
+                                    </div>
+                                </div>
+                            </div>
+                        )} */}
 
                         <div>
                             <label className="mb-2 block text-sm font-medium">
@@ -507,7 +566,7 @@ const InputForm: React.FC<InputFormProps> = ({
                     </div>
 
                     <div className="rounded-lg bg-gray-700 p-2">
-                        <h3 className="mb-3 text-base font-semibold text-orange-400">
+                        <h3 className="mb-3 text-lg font-semibold text-orange-400">
                             ⚙️ {t('การตั้งค่าระบบ')}
                         </h3>
                         <div className="grid grid-cols-2 gap-3">
@@ -560,51 +619,89 @@ const InputForm: React.FC<InputFormProps> = ({
                                     className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                                 />
                             </div>
-
-                            <div>
-                                <label className="mb-2 block text-sm font-medium">
-                                    {t('จำนวนโซน')}
-                                </label>
-                                <input
-                                    type="number"
-                                    value={input.numberOfZones}
-                                    onChange={(e) =>
-                                        updateInput('numberOfZones', parseInt(e.target.value) || 1)
-                                    }
-                                    min="1"
-                                    step="1"
-                                    className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
-                                    disabled={true}
-                                />
-                            </div>
-
-                            <div>
-                                <label className="mb-2 block text-sm font-medium">
-                                    {t('อายุท่อ (ปี)')}
-                                </label>
-                                <input
-                                    type="number"
-                                    defaultValue={input.pipeAgeYears}
-                                    onChange={(e) => {
-                                        const value = parseInt(e.target.value);
-                                        if (!isNaN(value)) {
-                                            updateInput('pipeAgeYears', value);
-                                        }
-                                    }}
-                                    onBlur={(e) => {
-                                        const value = e.target.value;
-                                        if (value === '' || isNaN(parseInt(value))) {
-                                            e.target.value = input.pipeAgeYears.toString();
-                                        }
-                                    }}
-                                    min="0"
-                                    max="50"
-                                    step="1"
-                                    className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
-                                />
-                            </div>
                         </div>
                     </div>
+                    <div className="rounded-lg bg-gray-700 p-3">
+                            <h4 className="mb-3 text-lg font-semibold text-blue-300">
+                                🔧 {t('ท่อเสริมต่อหัวสปริงเกอร์')}
+                            </h4>
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium">
+                                        {t('เลือกชนิดท่อ')}
+                                    </label>
+                                    <SearchableDropdown
+                                        value={input.extraPipePerSprinkler?.pipeId || ''}
+                                        onChange={(value) => {
+                                            const pipeId = value ? parseInt(value.toString()) : null;
+                                            onInputChange({
+                                                ...input,
+                                                extraPipePerSprinkler: {
+                                                    pipeId,
+                                                    lengthPerHead:
+                                                        input.extraPipePerSprinkler?.lengthPerHead || 0,
+                                                },
+                                            });
+                                        }}
+                                        options={[
+                                            { 
+                                                value: '', 
+                                                label: `-- ${t('ไม่ใช้ท่อเสริม')} --` 
+                                            },
+                                            ...(pipeData || []).map((pipe) => ({
+                                                value: pipe.id,
+                                                label: `${pipe.name || pipe.productCode} - ${pipe.sizeMM}mm (PN${pipe.pn}) - ${pipe.price?.toLocaleString()} ${t('บาท/ม้วน')}`,
+                                                searchableText: `${pipe.name || ''} ${pipe.productCode || ''} ${pipe.brand || ''} ${pipe.sizeMM}mm PN${pipe.pn}`,
+                                                image: pipe.image,
+                                                productCode: pipe.productCode,
+                                                name: pipe.name,
+                                                brand: pipe.brand,
+                                                price: pipe.price,
+                                                unit: t('บาท/ม้วน')
+                                            }))
+                                        ]}
+                                        placeholder={`-- ${t('ไม่ใช้ท่อเสริม')} --`}
+                                        searchPlaceholder={t('พิมพ์เพื่อค้นหาท่อ (ชื่อ, รหัสสินค้า, แบรนด์, ขนาด)...')}
+                                        className="w-full"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium">
+                                        {t('ความยาวต่อหัว (เมตร)')}
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.1"
+                                        defaultValue={input.extraPipePerSprinkler?.lengthPerHead || ''}
+                                        onChange={(e) => {
+                                            const lengthPerHead = parseFloat(e.target.value) || 0;
+                                            onInputChange({
+                                                ...input,
+                                                extraPipePerSprinkler: {
+                                                    pipeId:
+                                                        input.extraPipePerSprinkler?.pipeId ?? null,
+                                                    lengthPerHead,
+                                                },
+                                            });
+                                        }}
+                                        onBlur={(e) => {
+                                            const value = e.target.value;
+                                            if (value === '' || isNaN(parseFloat(value))) {
+                                                e.target.value = (input.extraPipePerSprinkler?.lengthPerHead || 0).toString();
+                                            }
+                                        }}
+                                        className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
+                                        placeholder="0.5"
+                                    />
+                                    <p className="mt-1 text-xs text-gray-400">
+                                        {projectMode === 'greenhouse'
+                                            ? t('เช่น 0.3-0.8 เมตร/หัว สำหรับโรงเรือน')
+                                            : t('เช่น 0.5-1 เมตร/หัว')}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                 </div>
 
                 <div className="space-y-4">
@@ -898,170 +995,6 @@ const InputForm: React.FC<InputFormProps> = ({
                 </div>
             </div>
 
-            <div className="mt-4">
-                <button
-                    type="button"
-                    onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="text-sm text-blue-400 hover:text-blue-300"
-                >
-                    {showAdvanced
-                        ? ' 🔼' + t('ซ่อนการตั้งค่าขั้นสูง')
-                        : '🔽 ' + t('แสดงการตั้งค่าขั้นสูง')}
-                </button>
-
-                {showAdvanced && (
-                    <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div className="rounded-lg bg-gray-700 p-3">
-                            <h4 className="mb-3 text-sm font-medium text-blue-300">
-                                🔧 {t('ค่าขั้นสูง')}
-                            </h4>
-                            <div className="space-y-3">
-                                <div>
-                                    <label className="mb-2 block text-sm font-medium">
-                                        {projectMode === 'greenhouse'
-                                            ? t('หัวฉีดต่อท่อย่อย 1 เส้น (เส้นที่ยาวที่สุด)')
-                                            : projectMode === 'field-crop'
-                                              ? t('หัวฉีดต่อท่อย่อย 1 เส้น (เส้นที่ยาวที่สุด)')
-                                              : getItemName() +
-                                                t('ต่อท่อย่อย 1 เส้น (เส้นที่ยาวที่สุด)')}
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        defaultValue={
-                                            input.sprinklersPerLongestBranch ||
-                                            input.sprinklersPerBranch
-                                        }
-                                        onChange={(e) => {
-                                            const value = parseInt(e.target.value);
-                                            if (!isNaN(value)) {
-                                                updateInput('sprinklersPerLongestBranch', value);
-                                            }
-                                        }}
-                                        onBlur={(e) => updateInputOnBlur('sprinklersPerLongestBranch', e.target.value)}
-                                        step="1"
-                                        className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
-                                    />
-                                    {projectMode === 'greenhouse' && (
-                                        <p className="mt-1 text-xs text-gray-400">
-                                            {t('จำนวนหัวฉีดสูงสุดในแต่ละแถวหรือท่อย่อย')}
-                                        </p>
-                                    )}
-                                </div>
-
-                                {(projectMode === 'horticulture' ||
-                                    projectMode === 'field-crop' ||
-                                    projectMode === 'greenhouse') && (
-                                    <div>
-                                        <label className="mb-2 block text-sm font-medium">
-                                            {t('ท่อย่อยต่อท่อรอง 1 เส้น (เส้นที่ยาวที่สุด)')}
-                                        </label>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            defaultValue={
-                                                input.branchesPerLongestSecondary ||
-                                                input.branchesPerSecondary
-                                            }
-                                            onChange={(e) => {
-                                                const value = parseInt(e.target.value);
-                                                if (!isNaN(value)) {
-                                                    updateInput('branchesPerLongestSecondary', value);
-                                                }
-                                            }}
-                                            onBlur={(e) => updateInputOnBlur('branchesPerLongestSecondary', e.target.value)}
-                                            step="1"
-                                            className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
-                                        />
-                                        {projectMode === 'greenhouse' && (
-                                            <p className="mt-1 text-xs text-gray-400">
-                                                {t(
-                                                    'จำนวนท่อย่อยสูงสุดที่เชื่อมต่อกับท่อรองแต่ละเส้น'
-                                                )}
-                                            </p>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="rounded-lg bg-gray-700 p-3">
-                            <h4 className="mb-3 text-sm font-medium text-blue-300">
-                                🔧 {t('ท่อเสริมต่อหัวสปริงเกอร์')}
-                            </h4>
-                            <div className="space-y-3">
-                                <div>
-                                    <label className="mb-2 block text-sm font-medium">
-                                        {t('เลือกชนิดท่อ')}
-                                    </label>
-                                    <select
-                                        value={input.extraPipePerSprinkler?.pipeId || ''}
-                                        onChange={(e) => {
-                                            const pipeId = e.target.value
-                                                ? parseInt(e.target.value)
-                                                : null;
-                                            onInputChange({
-                                                ...input,
-                                                extraPipePerSprinkler: {
-                                                    pipeId,
-                                                    lengthPerHead:
-                                                        input.extraPipePerSprinkler
-                                                            ?.lengthPerHead || 0,
-                                                },
-                                            });
-                                        }}
-                                        className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
-                                    >
-                                        <option value="">-- {t('ไม่ใช้ท่อเสริม')} --</option>
-                                        {pipeData &&
-                                            pipeData.map((pipe) => (
-                                                <option key={pipe.id} value={pipe.id}>
-                                                    {pipe.name || pipe.productCode} - {pipe.sizeMM}
-                                                    mm - {pipe.price?.toLocaleString()} บาท/ม้วน
-                                                </option>
-                                            ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="mb-2 block text-sm font-medium">
-                                        {t('ความยาวต่อหัว (เมตร)')}
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        step="0.1"
-                                        defaultValue={input.extraPipePerSprinkler?.lengthPerHead || ''}
-                                        onChange={(e) => {
-                                            const lengthPerHead = parseFloat(e.target.value) || 0;
-                                            onInputChange({
-                                                ...input,
-                                                extraPipePerSprinkler: {
-                                                    pipeId:
-                                                        input.extraPipePerSprinkler?.pipeId ?? null,
-                                                    lengthPerHead,
-                                                },
-                                            });
-                                        }}
-                                        onBlur={(e) => {
-                                            const value = e.target.value;
-                                            if (value === '' || isNaN(parseFloat(value))) {
-                                                e.target.value = (input.extraPipePerSprinkler?.lengthPerHead || 0).toString();
-                                            }
-                                        }}
-                                        className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
-                                        placeholder="0.5"
-                                    />
-                                    <p className="mt-1 text-xs text-gray-400">
-                                        {projectMode === 'greenhouse'
-                                            ? t('เช่น 0.3-0.8 เมตร/หัว สำหรับโรงเรือน')
-                                            : t('เช่น 0.5-1 เมตร/หัว')}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </div>
         </div>
     );
 };

@@ -786,7 +786,7 @@ export const createVoronoiZones = (
                 
                 const zone: IrrigationZone = {
                     id: `auto-zone-${index + 1}`,
-                    name: `โซนอัตโนมัติ ${index + 1}`,
+                    name: `โซน ${index + 1}`,
                     coordinates: fallbackZone,
                     plants: plantsInPolygon, // Use actual plants in polygon
                     totalWaterNeed,
@@ -805,7 +805,7 @@ export const createVoronoiZones = (
 
         const zone: IrrigationZone = {
             id: `auto-zone-${index + 1}`,
-            name: `โซนอัตโนมัติ ${index + 1}`,
+            name: `โซน ${index + 1}`,
             coordinates: zoneCoordinates,
             plants: plantsInPolygon, // Use actual plants in polygon instead of original cluster
             totalWaterNeed,
@@ -1044,7 +1044,7 @@ export const createZonesFromClusters = (
 
         const zone: IrrigationZone = {
             id: `auto-zone-${index + 1}`,
-            name: `โซนอัตโนมัติ ${index + 1}`,
+            name: `โซน ${index + 1}`,
             coordinates: zoneCoordinates,
             plants: plantsInPolygon, // Use actual plants in polygon instead of original cluster
             totalWaterNeed,

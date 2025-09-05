@@ -325,7 +325,7 @@ export const updateZoneControlPoints = (
     controlPoints: ZoneControlPoint[],
     updatedCoordinates: Coordinate[],
     draggedPointIndex: number,
-    zone?: IrrigationZone
+    // zone?: IrrigationZone 
 ): ZoneControlPoint[] => {
     // สร้าง deep copy ของทุก control point
     return controlPoints.map(controlPoint => {

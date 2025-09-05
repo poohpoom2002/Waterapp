@@ -6,7 +6,6 @@ import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
 import { useLanguage } from '../contexts/LanguageContext';
 import HorticultureMapComponent from '../components/horticulture/HorticultureMapComponent';
-import HeadLossCalculationModal from '../components/horticulture/HeadLossCalculationModal';
 import SprinklerConfigModal from '../components/horticulture/SprinklerConfigModal';
 
 import {
@@ -442,6 +441,102 @@ const GoogleMapsResultsOverlays: React.FC<{
             }
         });
 
+        // 🔥 เพิ่มการแสดงจุดเชื่อมต่อระหว่างท่อเมนและท่อเมนรอง
+        if (projectData.mainPipes && projectData.subMainPipes) {
+            const mainToSubMainConnections = findMainToSubMainConnections(
+                projectData.mainPipes,
+                projectData.subMainPipes,
+                projectData.zones,
+                irrigationZones,
+                100 // snapThreshold - เพิ่มเป็น 100m เพื่อความสอดคล้อง
+            );
+
+            mainToSubMainConnections.forEach((connection, index) => {
+                const connectionMarker = new google.maps.Marker({
+                    position: new google.maps.LatLng(
+                        connection.connectionPoint.lat,
+                        connection.connectionPoint.lng
+                    ),
+                    map: map,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 6 * iconSize, // ใหญ่กว่า lateral connections
+                        fillColor: '#DC2626', // สีแดงเข้มสำหรับ main-submain connections
+                        fillOpacity: 1.0,
+                        strokeColor: '#FFFFFF',
+                        strokeWeight: 2,
+                    },
+                    zIndex: 2000,
+                    title: `การเชื่อมต่อท่อเมน → ท่อเมนรอง`
+                });
+                overlaysRef.current.markers.set(`main-submain-connection-${index}`, connectionMarker);
+            });
+        }
+
+        // 🔥 เพิ่มการแสดงจุดเชื่อมต่อแบบ Mid-connections (ท่อเชื่อมกลางเส้น)
+        if (projectData.subMainPipes && projectData.mainPipes) {
+            const midConnections = findMidConnections(
+                projectData.subMainPipes,
+                projectData.mainPipes,
+                100, // snapThreshold - เพิ่มเป็น 100m เพื่อความสอดคล้อง
+                projectData.zones,
+                irrigationZones
+            );
+
+            midConnections.forEach((connection, index) => {
+                const midConnectionMarker = new google.maps.Marker({
+                    position: new google.maps.LatLng(
+                        connection.connectionPoint.lat,
+                        connection.connectionPoint.lng
+                    ),
+                    map: map,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 5 * iconSize,
+                        fillColor: '#7C3AED', // สีม่วงสำหรับ mid-connections
+                        fillOpacity: 1.0,
+                        strokeColor: '#FFFFFF',
+                        strokeWeight: 2,
+                    },
+                    zIndex: 1900,
+                    title: `การเชื่อมต่อกลางเส้นท่อ (Mid-connection)`
+                });
+                overlaysRef.current.markers.set(`mid-connection-${index}`, midConnectionMarker);
+            });
+        }
+
+        // 🔥 เพิ่มการแสดงจุดเชื่อมต่อระหว่างท่อเมนรองและท่อย่อย
+        if (projectData.subMainPipes && lateralPipes) {
+            const subMainToLateralConnections = findSubMainToLateralStartConnections(
+                projectData.subMainPipes,
+                lateralPipes,
+                projectData.zones,
+                irrigationZones,
+                100 // snapThreshold - เพิ่มเป็น 100m เพื่อความสอดคล้อง
+            );
+
+            subMainToLateralConnections.forEach((connection, index) => {
+                const connectionMarker = new google.maps.Marker({
+                    position: new google.maps.LatLng(
+                        connection.connectionPoint.lat,
+                        connection.connectionPoint.lng
+                    ),
+                    map: map,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 4 * iconSize, 
+                        fillColor: '#F59E0B', // สีเหลืองทองสำหรับ submain-lateral connections
+                        fillOpacity: 1.0,
+                        strokeColor: '#FFFFFF',
+                        strokeWeight: 2,
+                    },
+                    zIndex: 1800,
+                    title: `การเชื่อมต่อท่อเมนรอง → ท่อย่อย`
+                });
+                overlaysRef.current.markers.set(`submain-lateral-connection-${index}`, connectionMarker);
+            });
+        }
+
         projectData.plants?.forEach((plant) => {
             // Different icons for plants in different zones
             let plantIcon = '🌳';
@@ -506,6 +601,82 @@ const GoogleMapsResultsOverlays: React.FC<{
 
 
 
+
+// ฟังก์ชันสร้าง emitterLines สำหรับ lateral pipes ที่มีอยู่แล้ว
+// 🔧 แก้ไขให้สร้างเฉพาะ placementMode: 'between_plants' เท่านั้น
+const generateEmitterLinesForExistingPipes = (lateralPipe: any): any[] => {
+    // ⚠️ สร้างเฉพาะโหมด 'between_plants' เท่านั้น
+    if (!lateralPipe.plants || lateralPipe.plants.length === 0 || lateralPipe.placementMode !== 'between_plants') {
+        return [];
+    }
+    
+    const emitterLines: any[] = [];
+    
+    lateralPipe.plants.forEach((plant: any, index: number) => {
+        // หาจุดที่ใกล้ที่สุดบนท่อย่อยสำหรับแต่ละต้นไม้
+        const closestPointOnLateral = findClosestPointOnLineSegment(
+            plant.position,
+            lateralPipe.coordinates[0],
+            lateralPipe.coordinates[lateralPipe.coordinates.length - 1]
+        );
+
+        // คำนวณระยะห่าง
+        const distance = Math.sqrt(
+            Math.pow(closestPointOnLateral.lat - plant.position.lat, 2) +
+            Math.pow(closestPointOnLateral.lng - plant.position.lng, 2)
+        ) * 111320; // แปลงเป็นเมตร
+
+        // สร้างเฉพาะกับต้นไม้ที่อยู่ใกล้ท่อย่อย (ไม่เกิน 15 เมตร)
+        if (distance <= 15) {
+            const emitterLine = {
+                id: `emitter_${lateralPipe.id}_${index}`,
+                lateralPipeId: lateralPipe.id,
+                plantId: plant.id,
+                coordinates: [closestPointOnLateral, plant.position],
+                length: distance,
+                diameter: 4,
+                emitterType: 'drip'
+            };
+            
+            emitterLines.push(emitterLine);
+        }
+    });
+
+    return emitterLines;
+};
+
+// ฟังก์ชันหาจุดที่ใกล้ที่สุดบนเส้นตรง (คัดลอกมาจาก lateralPipeUtils.ts)
+const findClosestPointOnLineSegment = (
+    point: { lat: number; lng: number },
+    lineStart: { lat: number; lng: number },
+    lineEnd: { lat: number; lng: number }
+): { lat: number; lng: number } => {
+    const A = point.lat - lineStart.lat;
+    const B = point.lng - lineStart.lng;
+    const C = lineEnd.lat - lineStart.lat;
+    const D = lineEnd.lng - lineStart.lng;
+
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+    let param = -1;
+    if (lenSq !== 0) {
+        param = dot / lenSq;
+    }
+
+    let xx, yy;
+    if (param < 0) {
+        xx = lineStart.lat;
+        yy = lineStart.lng;
+    } else if (param > 1) {
+        xx = lineEnd.lat;
+        yy = lineEnd.lng;
+    } else {
+        xx = lineStart.lat + param * C;
+        yy = lineStart.lng + param * D;
+    }
+
+    return { lat: xx, lng: yy };
+};
 
 function EnhancedHorticultureResultsPageContent() {
     const page = usePage();
@@ -657,10 +828,27 @@ function EnhancedHorticultureResultsPageContent() {
                 const overallStats = getOverallStats();
                 setEnhancedStats(overallStats);
 
-                // Load irrigation zones if available
+                // Load irrigation zones if available (including manual zones)
                 if (data.irrigationZones && data.irrigationZones.length > 0) {
                     setIrrigationZones(data.irrigationZones);
                 }
+                
+                                        // Load lateral pipes if available
+                        if (data.lateralPipes && data.lateralPipes.length > 0) {
+                            // 🔧 แก้ไข: เสริม emitterLines ให้ lateral pipes ที่ยังไม่มี emitterLines
+                            const enhancedLateralPipes = data.lateralPipes.map(lateral => {
+                                if (!lateral.emitterLines || lateral.emitterLines.length === 0) {
+                                    // สร้าง emitterLines ใหม่สำหรับ lateral pipes ที่ยังไม่มี
+                                    const emitterLines = generateEmitterLinesForExistingPipes(lateral);
+                                    return {
+                                        ...lateral,
+                                        emitterLines: emitterLines
+                                    };
+                                }
+                                return lateral;
+                            });
+                            setLateralPipes(enhancedLateralPipes);
+                        }
 
                 // Load sprinkler config
                 const config = loadSprinklerConfig();
@@ -1633,7 +1821,7 @@ function EnhancedHorticultureResultsPageContent() {
                                     </h3>
                                     <div className="space-y-2">
                                         {irrigationZones.length > 0
-                                            ? // แสดงข้อมูลโซนอัตโนมัติ
+                                            ? // แสดงข้อมูลโซนทั้งหมด (รวมโซนอัตโนมัติและโซนที่วาดเอง)
                                               irrigationZones.map((zone, index) => {
                                                   const isCollapsed = collapsedZones.has(zone.id);
                                                   return (
@@ -1676,7 +1864,38 @@ function EnhancedHorticultureResultsPageContent() {
                                                                       <h5 className="mb-2 text-sm font-semibold text-green-300">
                                                                           🌱 ข้อมูลการปลูก
                                                                       </h5>
-                                                                      <div className="grid grid-cols-4 gap-3 text-sm">
+                                                                      <div className="grid grid-cols-5 gap-3 text-sm">
+                                                                          <div>
+                                                                              <span className="text-gray-200">
+                                                                                  พื้นที่โซน:
+                                                                              </span>
+                                                                              <div className="font-bold text-orange-400">
+                                                                                  {(() => {
+                                                                                      // คำนวณพื้นที่จาก coordinates โดยใช้ Shoelace formula
+                                                                                      const calculatePolygonArea = (coords: { lat: number; lng: number }[]): number => {
+                                                                                          if (coords.length < 3) return 0;
+                                                                                          
+                                                                                          let area = 0;
+                                                                                          for (let i = 0; i < coords.length; i++) {
+                                                                                              const j = (i + 1) % coords.length;
+                                                                                              area += coords[i].lat * coords[j].lng;
+                                                                                              area -= coords[j].lat * coords[i].lng;
+                                                                                          }
+                                                                                          area = Math.abs(area) / 2;
+                                                                                          
+                                                                                          // แปลงจากองศา² เป็นตารางเมตร (โดยประมาณ)
+                                                                                          const metersPerDegree = 111320; // ประมาณการ
+                                                                                          return area * metersPerDegree * metersPerDegree;
+                                                                                      };
+                                                                                      
+                                                                                      // ลองใช้ zone.area ก่อน ถ้าไม่มีก็คำนวณจาก coordinates
+                                                                                      const areaInSquareMeters = zone.area || calculatePolygonArea(zone.coordinates);
+                                                                                      const areaInRai = areaInSquareMeters / 1600; // แปลงเป็นไร่
+                                                                                      
+                                                                                      return areaInRai > 0 ? `${areaInRai.toFixed(2)} ไร่` : 'ไม่ระบุ';
+                                                                                  })()}
+                                                                              </div>
+                                                                          </div>
                                                                           <div>
                                                                               <span className="text-gray-200">
                                                                                   จำนวนต้นไม้:
@@ -1693,7 +1912,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                                               <div className="font-bold text-cyan-400">
                                                                                   {formatWaterVolume(
                                                                                       zone.totalWaterNeed
-                                                                                  )}
+                                                                                  )}/ตรั้ง
                                                                               </div>
                                                                           </div>
                                                                           <div>
@@ -1710,13 +1929,13 @@ function EnhancedHorticultureResultsPageContent() {
                                                                                                 .length
                                                                                         ).toFixed(0)
                                                                                       : 0}{' '}
-                                                                                  ลิตร
+                                                                                  ลิตร/ต้น
                                                                               </div>
                                                                           </div>
                                                                           {sprinklerConfig && (
                                                                               <div>
                                                                                   <span className="text-gray-200">
-                                                                                      ความต้องการน้ำ/นาที:
+                                                                                      ความต้องการน้ำ:
                                                                                   </span>
                                                                                   <div className="font-bold text-cyan-400">
                                                                                       {calculateTotalFlowRate(
@@ -1743,16 +1962,64 @@ function EnhancedHorticultureResultsPageContent() {
                                                                           );
 
                                                                       if (!zoneData) {
+                                                                          // คำนวณข้อมูลท่อโดยตรงสำหรับโซนนี้
+                                                                          const lateralPipesInThisZone = lateralPipes?.filter(lateral => {
+                                                                              // ตรวจสอบว่าท่อ lateral นี้มี plants ที่ส่วนใหญ่อยู่ในโซนนี้
+                                                                              const plantsInThisZone = lateral.plants.filter(lateralPlant => {
+                                                                                  return zone.plants.some(zonePlant => zonePlant.id === lateralPlant.id);
+                                                                              });
+                                                                              return plantsInThisZone.length > lateral.plants.length / 2; // majority vote
+                                                                          }) || [];
+                                                                          
                                                                           return (
-                                                                              <div className="mb-4 rounded border border-red-700/50 bg-red-900/20 p-3">
-                                                                                  <h5 className="mb-2 text-sm font-semibold text-red-300">
-                                                                                      ❌
-                                                                                      ข้อมูลท่อในโซน
+                                                                              <div className="rounded border border-blue-700/50 bg-blue-900/20 p-3">
+                                                                                  <h5 className="mb-2 text-sm font-semibold text-blue-300">
+                                                                                      🔧 ระบบท่อในโซน (คำนวณแบบ Direct)
                                                                                   </h5>
-                                                                                  <div className="text-xs text-red-400">
-                                                                                      ไม่พบข้อมูลท่อสำหรับโซนนี้
-                                                                                      (Zone ID:{' '}
-                                                                                      {zone.id})
+                                                                                  
+                                                                                  {/* ท่อย่อย (Lateral Pipes) */}
+                                                                                  <div className="mb-2 rounded bg-yellow-700/20 px-2 py-1">
+                                                                                      <div className="grid grid-cols-2 items-center gap-2 text-xs">
+                                                                                          <div className="text-left text-sm font-bold">
+                                                                                              🟡 ท่อย่อย
+                                                                                              ({lateralPipesInThisZone.length} ท่อ)
+                                                                                              (ยาวรวม: {formatDistance(lateralPipesInThisZone.reduce((sum, pipe) => sum + pipe.length, 0))})
+                                                                                          </div>
+                                                                                          <div className="text-center">
+                                                                                              {lateralPipesInThisZone.length > 0 ? (
+                                                                                                  <span className="text-gray-100 flex flex-col items-center font-semibold">
+                                                                                                      <p>🔥 ข้อมูลท่อย่อย:</p>
+                                                                                                      <p>รวม {lateralPipesInThisZone.length} ท่อ</p>
+                                                                                                      <p>ปลายท่อรวม: {lateralPipesInThisZone.reduce((sum, pipe) => sum + pipe.plants.length, 0)} จุด</p>
+                                                                                                      <p>ใช้น้ำรวม: {lateralPipesInThisZone.reduce((sum, pipe) => sum + pipe.totalFlowRate, 0).toFixed(1)} L/min</p>
+                                                                                                  </span>
+                                                                                              ) : (
+                                                                                                  <span className="text-gray-500">ไม่พบท่อย่อยในโซน</span>
+                                                                                              )}
+                                                                                          </div>
+                                                                                      </div>
+                                                                                  </div>
+
+                                                                                  {/* ท่อย่อยแยก (Emitter Lines) */}
+                                                                                  {(() => {
+                                                                                      const allEmitterLines = lateralPipesInThisZone.flatMap(lateral => lateral.emitterLines || []);
+                                                                                      return allEmitterLines.length > 0 && (
+                                                                                          <div className="mb-2 rounded bg-green-700/20 px-2 py-1">
+                                                                                              <div className="grid grid-cols-2 items-center gap-2 text-xs">
+                                                                                                  <div className="text-left text-sm font-bold">
+                                                                                                      🌿 ท่อย่อยแยก
+                                                                                                      ({allEmitterLines.length} ท่อ)
+                                                                                                  </div>
+                                                                                                  <div className="text-left text-sm font-bold">
+                                                                                                      ยาวรวม: {formatDistance(allEmitterLines.reduce((sum, emitter) => sum + emitter.length, 0))}
+                                                                                                  </div>
+                                                                                              </div>
+                                                                                          </div>
+                                                                                      );
+                                                                                  })()}
+                                                                                  
+                                                                                  <div className="text-xs text-orange-400 mt-2">
+                                                                                      ℹ️ คำนวณโดยตรงจากข้อมูลท่อย่อย (Zone ID: {zone.id})
                                                                                   </div>
                                                                               </div>
                                                                           );
@@ -1848,6 +2115,8 @@ function EnhancedHorticultureResultsPageContent() {
                                                                                   </div>
                                                                               </div>
 
+                                                                              {/* ลบการแสดง 🔵 ท่อลาเทอรัล ออกแล้วตามที่ผู้ใช้ต้องการ */}
+
                                                                               {/* ท่อย่อยแยก */}
                                                                               {(zoneData
                                                                                   .emitterPipesInZone
@@ -1934,6 +2203,14 @@ function EnhancedHorticultureResultsPageContent() {
                                                                           🌱 ข้อมูลการปลูก
                                                                       </h5>
                                                                       <div className="grid grid-cols-4 gap-3 text-sm">
+                                                                          <div>
+                                                                              <span className="text-gray-200">
+                                                                                  พื้นที่โซน:
+                                                                              </span>
+                                                                              <div className="font-bold text-blue-400">
+                                                                                  {zone.areaInRai.toFixed(2)} ไร่
+                                                                              </div>
+                                                                          </div>
                                                                           <div>
                                                                               <span className="text-gray-200">
                                                                                   จำนวนต้นไม้:
@@ -2138,20 +2415,6 @@ function EnhancedHorticultureResultsPageContent() {
             </div>
 
             <Footer />
-
-            {/* Enhanced Feature Modals */}
-            {showHeadLossModal && selectedPipeForHeadLoss && (
-                <HeadLossCalculationModal
-                    isOpen={showHeadLossModal}
-                    onClose={() => {
-                        setShowHeadLossModal(false);
-                        setSelectedPipeForHeadLoss(null);
-                    }}
-                    onSave={handleHeadLossSave}
-                    pipeInfo={selectedPipeForHeadLoss}
-                    t={t}
-                />
-            )}
 
             {showSprinklerConfigModal && projectData && (
                 <SprinklerConfigModal
