@@ -184,7 +184,7 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
                     <div className="border-t border-gray-700 p-6">
                         {canProceed ? (
                             <a
-                                href={`/field-map?crops=${selectedCrops.join(',')}`}
+                                href={`/step1-field-area?crops=${selectedCrops.join(',')}`}
                                 className="inline-flex w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700"
                             >
                                 {t('Continue to Map')}
