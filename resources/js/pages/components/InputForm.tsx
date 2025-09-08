@@ -426,7 +426,7 @@ const InputForm: React.FC<InputFormProps> = ({
             case 'greenhouse':
                 return t('น้ำต่อหัวฉีด (ลิตร/ครั้ง)');
             case 'garden':
-                return t('น้ำต่อหัวฉีด (ลิตร/ครั้ง)');
+                return t('ต้องการน้ำ (ลิตร/นาที)');
             case 'horticulture':
                 return t('ต้องการน้ำ (ลิตร/นาที)');
             default:
