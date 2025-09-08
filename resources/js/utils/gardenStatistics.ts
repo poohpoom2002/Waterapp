@@ -183,8 +183,11 @@ function calculateZoneStatistics(
                       zoneSprinklers.length
                     : 0;
 
-            // คำนวณอัตราการไหลรวม
-            const sprinklerFlowRate = zoneSprinklers.reduce((sum, s) => sum + s.type.flowRate, 0);
+            // คำนวณอัตราการไหลเฉลี่ย (Q หัวฉีด)
+            const sprinklerFlowRate =
+                zoneSprinklers.length > 0
+                    ? zoneSprinklers.reduce((sum, s) => sum + s.type.flowRate, 0) / zoneSprinklers.length
+                    : 0;
 
             // หาท่อในโซนนี้และคำนวณความยาวรวม
             const zonePipes = pipes.filter((p) => p.zoneId === zone.id);

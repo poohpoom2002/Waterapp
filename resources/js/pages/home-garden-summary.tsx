@@ -1572,7 +1572,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
 
                                                 <div className="flex justify-between">
                                                     <span className="text-gray-400">
-                                                        {t('อัตราการไหล:')}
+                                                        {t('อัตราการไหลหัวฉีด:')}
                                                     </span>
                                                     <span className="font-medium text-cyan-400">
                                                         {zone.sprinklerFlowRate > 0
@@ -1585,24 +1585,57 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
 
                                         {zone.totalPipeLength > 0 && (
                                             <div className="border-t border-gray-600 pt-2">
-                                                <div className="mb-1 text-gray-400">
+                                                <div className="mb-2 text-gray-400">
                                                     {t('ระบบท่อ:')}
                                                 </div>
-                                                <div className="grid grid-cols-2 gap-2 text-xs">
-                                                    <div>
+                                                
+                                                {/* ความยาวท่อ */}
+                                                <div className="mb-2">
+                                                    <div className="flex justify-between text-xs">
                                                         <span className="text-gray-500">
-                                                            {t('ยาวที่สุด:')}{' '}
+                                                            {t('ความยาวท่อ:')}
                                                         </span>
-                                                        <span className="text-yellow-400">
-                                                            {zone.longestPipeFromSourceFormatted}
+                                                        <span className="font-medium text-yellow-400">
+                                                            {zone.totalPipeLengthFormatted}
                                                         </span>
                                                     </div>
-                                                    <div>
+                                                </div>
+
+                                                {/* จำนวนทางออก (สปริงเกอร์) */}
+                                                <div className="mb-2">
+                                                    <div className="flex justify-between text-xs">
                                                         <span className="text-gray-500">
-                                                            {t('รวม:')}{' '}
+                                                            {t('จำนวนทางออก:')}
                                                         </span>
-                                                        <span className="text-yellow-400">
-                                                            {zone.totalPipeLengthFormatted}
+                                                        <span className="font-medium text-orange-400">
+                                                            {zone.sprinklerCount} {t('ทาง')}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* อัตราการใช้น้ำรวมของท่อ (Q หัวฉีด × จำนวนหัวฉีด) */}
+                                                <div className="mb-2">
+                                                    <div className="flex justify-between text-xs">
+                                                        <span className="text-gray-500">
+                                                            {t('อัตราการใช้น้ำท่อ:')}
+                                                        </span>
+                                                        <span className="font-medium text-cyan-400">
+                                                            {zone.sprinklerCount > 0 && zone.sprinklerFlowRate > 0
+                                                                ? `${(zone.sprinklerFlowRate * zone.sprinklerCount).toFixed(1)} ${t('ล./นาที')}`
+                                                                : '-'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+
+                                                {/* ท่อที่ยาวที่สุด */}
+                                                <div className="text-xs">
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-500">
+                                                            {t('ท่อยาวที่สุด:')}
+                                                        </span>
+                                                        <span className="font-medium text-yellow-400">
+                                                            {zone.longestPipeFromSourceFormatted}
                                                         </span>
                                                     </div>
                                                 </div>
