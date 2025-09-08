@@ -27,6 +27,7 @@ interface PipeSelectorProps {
     selectedPipe?: any;
     onPipeChange: (pipe: any) => void;
     horticultureSystemData?: any;
+    gardenSystemData?: any; // เพิ่มสำหรับ garden mode
     activeZoneId?: string;
     selectedSprinkler?: any;
     projectMode?: 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
@@ -40,6 +41,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
     selectedPipe,
     onPipeChange,
     horticultureSystemData,
+    gardenSystemData,
     activeZoneId,
     selectedSprinkler,
     projectMode = 'horticulture',
@@ -57,6 +59,38 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
 
     // Get current zone's best pipe info
     const currentZoneBestPipe = useMemo(() => {
+        // สำหรับ garden mode ใช้ gardenSystemData
+        if (projectMode === 'garden' && gardenSystemData && activeZoneId) {
+            const currentZone = gardenSystemData.zones?.find(
+                (zone: any) => zone.id === activeZoneId
+            );
+            if (!currentZone?.bestPipes) return null;
+
+            switch (pipeType) {
+                case 'branch':
+                    return currentZone.bestPipes.branch;
+                case 'secondary':
+                    return currentZone.bestPipes.subMain;
+                case 'main':
+                    return currentZone.bestPipes.main;
+                case 'emitter':
+                    // สำหรับ garden mode ใช้ข้อมูลจาก gardenSystemData
+                    if (gardenSystemData?.sprinklerConfig) {
+                        return {
+                            id: 'emitter-pipe',
+                            length: 10, // default emitter length สำหรับ garden
+                            count: 1, // จำนวนทางออก = 1
+                            waterFlowRate: gardenSystemData.sprinklerConfig.flowRatePerPlant,
+                            details: { type: 'emitter' },
+                        };
+                    }
+                    return currentZone.bestPipes.branch; // fallback
+                default:
+                    return null;
+            }
+        }
+
+        // สำหรับ horticulture mode ใช้ horticultureSystemData (เดิม)
         if (!horticultureSystemData || !activeZoneId) return null;
 
         const currentZone = horticultureSystemData.zones?.find(
@@ -116,12 +150,32 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
             default:
                 return null;
         }
-    }, [horticultureSystemData, activeZoneId, pipeType]);
+    }, [projectMode, horticultureSystemData, gardenSystemData, activeZoneId, pipeType]);
 
     // Calculate sprinkler pressure info
     useEffect(() => {
-        // ใช้ข้อมูลจาก horticultureSystemData.sprinklerConfig.pressureBar แทน selectedSprinkler
-        if (horticultureSystemData?.sprinklerConfig?.pressureBar) {
+        // สำหรับ garden mode ใช้ gardenSystemData
+        if (projectMode === 'garden') {
+            if (gardenSystemData?.sprinklerConfig?.pressureBar) {
+                const pressureBar = gardenSystemData.sprinklerConfig.pressureBar;
+                const pressureInfo = {
+                    pressureBar: pressureBar,
+                    headM: pressureBar * 10, // แปลงจากบาร์เป็นเมตร (1 บาร์ = 10 ม.)
+                    head20PercentM: pressureBar * 10 * 0.2, // 20% ของ head
+                };
+                setSprinklerPressure(pressureInfo);
+            } else {
+                // ใช้ค่า default สำหรับ garden mode
+                const pressureInfo = {
+                    pressureBar: 2.5,
+                    headM: 25,
+                    head20PercentM: 5,
+                };
+                setSprinklerPressure(pressureInfo);
+            }
+        }
+        // สำหรับ horticulture mode ใช้ horticultureSystemData (เดิม)
+        else if (horticultureSystemData?.sprinklerConfig?.pressureBar) {
             const pressureBar = horticultureSystemData.sprinklerConfig.pressureBar;
             const pressureInfo = {
                 pressureBar: pressureBar,
@@ -130,11 +184,11 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
             };
             setSprinklerPressure(pressureInfo);
         } else if (selectedSprinkler) {
-            // fallback ถ้าไม่มี horticultureSystemData
+            // fallback ถ้าไม่มี systemData
             const pressureInfo = calculateSprinklerPressure(selectedSprinkler);
             setSprinklerPressure(pressureInfo);
         }
-    }, [horticultureSystemData, selectedSprinkler]);
+    }, [projectMode, horticultureSystemData, gardenSystemData, selectedSprinkler]);
 
     // Get pipe type name function
     const getPipeTypeName = useCallback((pipeType: PipeType) => {
@@ -609,13 +663,13 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
             return a.diffFrom19 - b.diffFrom19;
         });
 
-    // Only show for horticulture mode
-    if (projectMode !== 'horticulture') {
+    // Only show for horticulture and garden modes
+    if (projectMode !== 'horticulture' && projectMode !== 'garden') {
         return (
             <div className="flex items-center justify-center rounded-lg bg-gray-800 p-8">
                 <div className="text-center text-gray-500">
                     <div className="mb-2 text-4xl">🚧</div>
-                    <p>ระบบใหม่สำหรับ Horticulture เท่านั้น</p>
+                    <p>ระบบใหม่สำหรับ Horticulture และ Garden เท่านั้น</p>
                 </div>
             </div>
         );

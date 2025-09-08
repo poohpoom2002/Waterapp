@@ -1138,6 +1138,26 @@ function EnhancedHorticultureResultsPageContent() {
                                 const bestSubMainPipe = findBestSubMainPipeInZone(zone.id, projectData, irrigationZones, sprinklerConfig);
                                 const bestBranchPipe = findBestBranchPipeInZone(zone.id, projectData, irrigationZones, sprinklerConfig);
 
+                                // คำนวณพื้นที่จาก coordinates โดยใช้ Shoelace formula (เหมือนใน UI)
+                                const calculatePolygonArea = (coords: { lat: number; lng: number }[]): number => {
+                                    if (!coords || coords.length < 3) return 0;
+                                    
+                                    let area = 0;
+                                    for (let i = 0; i < coords.length; i++) {
+                                        const j = (i + 1) % coords.length;
+                                        area += coords[i].lat * coords[j].lng;
+                                        area -= coords[j].lat * coords[i].lng;
+                                    }
+                                    area = Math.abs(area) / 2;
+                                    
+                                    // แปลงจากองศา² เป็นตารางเมตร (โดยประมาณ)
+                                    const metersPerDegree = 111320; // ประมาณการ
+                                    return area * metersPerDegree * metersPerDegree;
+                                };
+                                
+                                // ลองใช้ zone.area ก่อน ถ้าไม่มีก็คำนวณจาก coordinates
+                                const areaInSquareMeters = zone.area || calculatePolygonArea(zone.coordinates);
+
                                 return {
                                     id: zone.id,
                                     name: zone.name,
@@ -1145,7 +1165,7 @@ function EnhancedHorticultureResultsPageContent() {
                                     totalWaterNeed: zone.totalWaterNeed || 0,
                                     waterPerTree: waterPerTree,
                                     waterNeedPerMinute: waterNeedPerMinute,
-                                    area: zone.area || 0,
+                                    area: areaInSquareMeters,
                                     color: zone.color,
                                     // ข้อมูลท่อในโซน
                                     pipes: zoneData ? {

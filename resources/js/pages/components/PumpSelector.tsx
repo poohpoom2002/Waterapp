@@ -44,14 +44,93 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
     const [modalImage, setModalImage] = useState({ src: '', alt: '' });
     const { t } = useLanguage();
     
-    // คำนวณความต้องการตามเงื่อนไขใหม่สำหรับ horticulture mode
+    // ประกาศตัวแปรที่จำเป็นก่อน
+    const requiredFlow = results.flows.main;
+    const requiredHead = results.pumpHeadRequired;
+    
+    // คำนวณความต้องการตามเงื่อนไขใหม่สำหรับ horticulture และ garden mode
     const getHorticultureRequirements = () => {
-        if (projectMode !== 'horticulture') {
+        if (projectMode !== 'horticulture' && projectMode !== 'garden') {
             return {
                 requiredFlowLPM: requiredFlow,
                 minRequiredHead: requiredHead,
                 qHeadSpray: 0
             };
+        }
+
+        // สำหรับ garden mode ใช้ข้อมูลจาก garden statistics
+        if (projectMode === 'garden') {
+            // ดึงข้อมูลจาก localStorage หรือ props
+            const gardenDataStr = localStorage.getItem('garden_planner_data');
+            if (!gardenDataStr) {
+                return {
+                    requiredFlowLPM: requiredFlow,
+                    minRequiredHead: requiredHead,
+                    qHeadSpray: 0
+                };
+            }
+
+            try {
+                const gardenData = JSON.parse(gardenDataStr);
+                const gardenStatsStr = localStorage.getItem('garden_statistics');
+                if (!gardenStatsStr) {
+                    return {
+                        requiredFlowLPM: requiredFlow,
+                        minRequiredHead: requiredHead,
+                        qHeadSpray: 0
+                    };
+                }
+
+                const gardenStats = JSON.parse(gardenStatsStr);
+                
+                // คำนวณความต้องการน้ำรวมจากทุกโซน
+                let totalWaterRequirement = 0;
+                if (gardenStats.zones && gardenStats.zones.length > 0) {
+                    // ดึงข้อมูลรูปแบบการเปิดโซนจาก garden_planner_data
+                    const gardenPlannerDataStr = localStorage.getItem('garden_planner_data');
+                    let simultaneousZones = gardenStats.zones.length; // default: เปิดทุกโซนพร้อมกัน
+                    
+                    if (gardenPlannerDataStr) {
+                        try {
+                            const gardenPlannerData = JSON.parse(gardenPlannerDataStr);
+                            if (gardenPlannerData.zoneOperationMode === 'sequential') {
+                                simultaneousZones = 1; // เปิดทีละโซน
+                            } else if (gardenPlannerData.zoneOperationMode === 'group') {
+                                simultaneousZones = gardenPlannerData.simultaneousZones || 1;
+                            }
+                        } catch (e) {
+                            console.error('Error parsing garden planner data:', e);
+                        }
+                    }
+                    
+                    // คำนวณความต้องการน้ำตามรูปแบบการเปิดโซน
+                    if (simultaneousZones >= gardenStats.zones.length) {
+                        // เปิดทุกโซนพร้อมกัน
+                        totalWaterRequirement = gardenStats.zones.reduce((total: number, zone: any) => {
+                            return total + (zone.sprinklerFlowRate * zone.sprinklerCount);
+                        }, 0);
+                    } else {
+                        // หาโซนที่ใช้น้ำมากที่สุด
+                        const maxZoneRequirement = Math.max(...gardenStats.zones.map((zone: any) => 
+                            zone.sprinklerFlowRate * zone.sprinklerCount
+                        ));
+                        totalWaterRequirement = maxZoneRequirement * simultaneousZones;
+                    }
+                }
+
+                return {
+                    requiredFlowLPM: totalWaterRequirement || requiredFlow,
+                    minRequiredHead: requiredHead,
+                    qHeadSpray: gardenStats.zones?.[0]?.sprinklerFlowRate || 0
+                };
+            } catch (error) {
+                console.error('Error parsing garden data:', error);
+                return {
+                    requiredFlowLPM: requiredFlow,
+                    minRequiredHead: requiredHead,
+                    qHeadSpray: 0
+                };
+            }
         }
 
         const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
@@ -150,9 +229,6 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
         setModalImage({ src: '', alt: '' });
     };
 
-    const requiredFlow = results.flows.main;
-    const requiredHead = results.pumpHeadRequired;
-
     const calculateSimultaneousFlow = () => {
         if (results.projectSummary) {
             return {
@@ -229,9 +305,49 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
         const emitterHeadLoss = actualEmitterPipe?.headLoss || 0;
         const totalPipeHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
 
-        // คำนวณ Head Loss หัวฉีด (Q หัวฉีด * 10)
-        const sprinklerFlowLPM = results.waterPerSprinklerLPM || 6.0;
-        const sprinklerHeadLoss = sprinklerFlowLPM * 10;
+        // คำนวณ Head Loss หัวฉีด (แรงดัน(บาร์) * 10)
+        let sprinklerPressureBar = 2.5; // default
+        
+        if (projectMode === 'horticulture') {
+            // สำหรับ horticulture mode ใช้ข้อมูลจาก horticultureSystemData
+            try {
+                const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
+                if (horticultureSystemDataStr) {
+                    const horticultureSystemData = JSON.parse(horticultureSystemDataStr);
+                    if (horticultureSystemData?.sprinklerConfig?.pressureBar) {
+                        sprinklerPressureBar = horticultureSystemData.sprinklerConfig.pressureBar;
+                    }
+                }
+            } catch (error) {
+                console.error('Error parsing horticulture system data:', error);
+            }
+        } else if (projectMode === 'garden') {
+            // สำหรับ garden mode ใช้ข้อมูลจาก gardenStats
+            try {
+                const gardenStatsStr = localStorage.getItem('garden_statistics');
+                if (gardenStatsStr) {
+                    const gardenStats = JSON.parse(gardenStatsStr);
+                    if (gardenStats.zones && gardenStats.zones.length > 0) {
+                        // ใช้แรงดันจากโซนแรก หรือค่าเฉลี่ย
+                        sprinklerPressureBar = gardenStats.zones[0].sprinklerPressure || 2.5;
+                    }
+                }
+            } catch (error) {
+                console.error('Error parsing garden stats:', error);
+            }
+        } else {
+            // สำหรับ mode อื่นๆ ใช้ข้อมูลจาก results
+            if (results.analyzedSprinklers && results.analyzedSprinklers.length > 0) {
+                const firstSprinkler = results.analyzedSprinklers[0];
+                if (firstSprinkler.pressureBar) {
+                    sprinklerPressureBar = Array.isArray(firstSprinkler.pressureBar) 
+                        ? (firstSprinkler.pressureBar[0] + firstSprinkler.pressureBar[1]) / 2
+                        : parseFloat(String(firstSprinkler.pressureBar));
+                }
+            }
+        }
+        
+        const sprinklerHeadLoss = sprinklerPressureBar * 10;
 
         return totalPipeHeadLoss + sprinklerHeadLoss;
     };
@@ -257,11 +373,53 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
     // กรองปั๊มสำหรับ horticulture mode
     const getFilteredPumps = () => {
-        if (projectMode !== 'horticulture') {
+        if (projectMode !== 'horticulture' && projectMode !== 'garden') {
             return analyzedPumps.sort((a, b) => a.price - b.price);
         }
 
-        // สำหรับ horticulture mode - กรองตามเงื่อนไขเฉพาะ
+        // สำหรับ horticulture และ garden mode - กรองตามเงื่อนไขเฉพาะ
+        if (projectMode === 'garden') {
+            // สำหรับ garden mode ใช้ข้อมูลจาก garden statistics
+            const gardenStatsStr = localStorage.getItem('garden_statistics');
+            if (!gardenStatsStr) {
+                return analyzedPumps.sort((a, b) => a.price - b.price);
+            }
+
+            try {
+                const gardenStats = JSON.parse(gardenStatsStr);
+                
+                // คำนวณความต้องการน้ำรวมจากทุกโซน
+                let requiredFlowLPM = 0;
+                if (gardenStats.zones && gardenStats.zones.length > 0) {
+                    // สำหรับ garden mode ปกติจะเปิดทุกโซนพร้อมกัน
+                    requiredFlowLPM = gardenStats.zones.reduce((total: number, zone: any) => {
+                        return total + (zone.sprinklerFlowRate * zone.sprinklerCount);
+                    }, 0);
+                }
+
+                // ใช้ค่า actualPumpHead ที่คำนวณแล้ว
+                const maxPumpHeadFromZones = actualPumpHead;
+                
+                // กรองปั๊มที่เข้าเงื่อนไข
+                const compatiblePumps = analyzedPumps.filter((pump: any) => {
+                    const maxFlow = pump.max_flow_rate_lpm || pump.maxFlowLPM || 0;
+                    const flowCheck = maxFlow >= requiredFlowLPM;
+                    
+                    const maxHead = pump.max_head_m || pump.maxHead || 0;
+                    const headCheck = maxHead >= maxPumpHeadFromZones;
+                    
+                    return flowCheck && headCheck;
+                });
+
+                return compatiblePumps.length > 0 
+                    ? compatiblePumps.sort((a, b) => a.price - b.price)
+                    : analyzedPumps.sort((a, b) => a.price - b.price);
+            } catch (error) {
+                console.error('Error parsing garden stats:', error);
+                return analyzedPumps.sort((a, b) => a.price - b.price);
+            }
+        }
+
         const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
         if (!horticultureSystemDataStr) {
             return analyzedPumps.sort((a, b) => a.price - b.price);
