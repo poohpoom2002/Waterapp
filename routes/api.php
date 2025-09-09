@@ -2,7 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AiChatController;
+use App\Http\Controllers\ChaiyoAiChatController; // Updated controller name
 use App\Http\Controllers\FarmController;
 use App\Http\Controllers\HomeGardenController;
 use App\Http\Controllers\Api\SprinklerController;
@@ -27,22 +27,26 @@ Route::middleware(['auth:sanctum,web'])->get('/user', function (Request $request
 });
 
 // ==================================================
-// 🤖 CHAIYO AI ROUTES (Simple Version)
+// 🤖 CHAIYO AI ROUTES (Enhanced Company Representative)
 // ==================================================
 
-// Main AI Chat Endpoint
-Route::post('/ai-chat', [AiChatController::class, 'handleChat']);
+// Main ChaiyoAI Chat Endpoint
+Route::post('/ai-chat', [ChaiyoAiChatController::class, 'handleChat']);
 
-// AI Management & Info Routes
+// ChaiyoAI Management & Info Routes
 Route::prefix('ai')->group(function () {
-    Route::get('/stats', [AiChatController::class, 'getStats']);
-    Route::get('/popular-questions', [AiChatController::class, 'getPopularQuestions']);
-    Route::get('/health', [AiChatController::class, 'health']);
-    Route::post('/test', [AiChatController::class, 'test']);
+    Route::get('/stats', [ChaiyoAiChatController::class, 'getStats']);
+    Route::get('/popular-questions', [ChaiyoAiChatController::class, 'getPopularQuestions']);
+    Route::get('/health', [ChaiyoAiChatController::class, 'health']);
+    Route::post('/test', [ChaiyoAiChatController::class, 'test']);
+    
+    // Company-specific endpoints
+    Route::get('/company-info', [ChaiyoAiChatController::class, 'getCompanyInfo']);
+    Route::post('/product-recommendations', [ChaiyoAiChatController::class, 'getProductRecommendations']);
 });
 
-// Legacy compatibility routes
-Route::get('/ai-training-stats', [AiChatController::class, 'getStats']);
+// Legacy compatibility routes (for backward compatibility)
+Route::get('/ai-training-stats', [ChaiyoAiChatController::class, 'getStats']);
 
 // ==================================================
 // 🛠️ EQUIPMENT & PRODUCT ROUTES (รวมแล้ว)
@@ -145,6 +149,7 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::get('/fields/{fieldId}', [FarmController::class, 'getField']);
     Route::post('/save-field', [FarmController::class, 'saveField']);
     Route::put('/fields/{fieldId}', [FarmController::class, 'updateField']);
+    Route::put('/fields/{fieldId}/data', [FarmController::class, 'updateFieldData']);
     Route::delete('/fields/{fieldId}', [FarmController::class, 'deleteField']);
 
     // Field Status Management
@@ -216,13 +221,19 @@ Route::get('/health', function () {
     return response()->json([
         'status' => 'healthy',
         'timestamp' => now(),
-        'version' => '2.0.0',
-        'type' => 'simple',
+        'version' => '3.0.0',
+        'type' => 'ChaiyoAI Enhanced',
         'environment' => app()->environment(),
         'services' => [
-            'ai' => 'operational',
+            'chaiyo_ai' => 'operational',
             'database' => 'connected',
-            'storage' => 'available'
+            'storage' => 'available',
+            'company_knowledge' => 'loaded'
+        ],
+        'ai_identity' => 'ChaiyoAI',
+        'supported_companies' => [
+            'chaiyo_pipe_fitting' => 'บริษัท ไชโยไปป์แอนด์ฟิตติ้ง จำกัด',
+            'kanok_product' => 'บริษัท กนกส์โปรดัก จำกัด'
         ]
     ]);
 });
@@ -231,36 +242,173 @@ Route::get('/health', function () {
 Route::get('/info', function () {
     return response()->json([
         'app_name' => config('app.name'),
-        'version' => '2.0.0',
-        'api_version' => 'v2',
-        'type' => 'Complete Waterapp + Simple Chaiyo AI (Merged Controllers)',
+        'version' => '3.0.0',
+        'api_version' => 'v3',
+        'type' => 'ChaiyoAI - Enhanced Company Representative System',
+        'ai_identity' => 'ChaiyoAI',
+        'description' => 'Complete Waterapp + ChaiyoAI (Enhanced with Company Knowledge)',
         'features' => [
+            'chaiyo_ai_chat' => true,
+            'company_information' => true,
+            'product_consultation' => true,
+            'irrigation_expertise' => true,
             'farm_planning' => true,
             'home_garden' => true,
-            'ai_chat' => true,
             'equipment_catalog' => true,
             'image_management' => true,
             'field_management' => true,
             'sprinkler_calculation' => true,
+            'multilingual_support' => true,
+            'context_awareness' => true,
             'knowledge_base' => false,
             'pdf_processing' => false,
             'web_scraping' => false,
         ],
+        'ai_capabilities' => [
+            'general_conversation' => 'สนทนาทั่วไป',
+            'company_information' => 'ข้อมูลบริษัททั้ง 2 แห่ง',
+            'product_consultation' => 'คำปรึกษาผลิตภัณฑ์',
+            'irrigation_expertise' => 'ความเชี่ยวชาญด้านระบบน้ำ',
+            'technical_support' => 'การสนับสนุนทางเทคนิค',
+            'customer_service' => 'บริการลูกค้า'
+        ],
+        'supported_companies' => [
+            'chaiyo_pipe_fitting' => [
+                'name' => 'บริษัท ไชโยไปป์แอนด์ฟิตติ้ง จำกัด',
+                'founded' => '2551 (17 ปี)',
+                'specializes' => 'ผลิตภัณฑ์พลาสติกเพื่อการเกษตร',
+                'brands' => ['RED HAND', 'CHAIYO', 'CHAMP']
+            ],
+            'kanok_product' => [
+                'name' => 'บริษัท กนกส์โปรดัก จำกัด',
+                'founded' => '2541 (27 ปี)',
+                'specializes' => 'ระบบน้ำเพื่อการเกษตรและชลประทาน',
+                'products' => '6,000+ รายการ',
+                'brands' => ['KANOK', 'RED HAND', 'CHAIYO']
+            ]
+        ],
         'endpoints' => [
-            'ai_chat' => '/api/ai-chat',
+            'chaiyo_ai_chat' => '/api/ai-chat',
+            'company_info' => '/api/ai/company-info',
+            'product_recommendations' => '/api/ai/product-recommendations',
             'equipment' => '/api/equipments (รวม PumpAccessory + ImageUpload)',
             'farm_planning' => '/api/generate-pipe-layout',
             'field_management' => '/api/fields',
             'image_upload' => '/api/equipments/upload-image หรือ /api/images/upload',
             'pump_accessories' => '/api/equipments/pump-accessories หรือ /api/pump-accessories',
-            'health_check' => '/api/health'
+            'health_check' => '/api/health',
+            'ai_stats' => '/api/ai/stats',
+            'popular_questions' => '/api/ai/popular-questions'
         ],
         'backward_compatibility' => [
             '/api/images/* => /api/equipments/*',
             '/api/pump-accessories => /api/equipments/pump-accessories',
-            'All old endpoints still work!'
+            'All old endpoints still work!',
+            'Added new ChaiyoAI-specific endpoints'
+        ],
+        'contact_info' => [
+            'chaiyo_phone' => '02-451-1111',
+            'chaiyo_website' => 'www.chaiyopipe.co.th',
+            'kanok_website' => 'www.kanokgroup.com',
+            'email' => 'chaiyopipeonline@gmail.com'
         ]
     ]);
+});
+
+// ==================================================
+// 🏢 COMPANY INFORMATION ROUTES
+// ==================================================
+
+// Public company information endpoints
+Route::prefix('company')->group(function () {
+    Route::get('/chaiyo-pipe-fitting', function () {
+        return response()->json([
+            'company_name' => 'บริษัท ไชโยไปป์แอนด์ฟิตติ้ง จำกัด',
+            'english_name' => 'Chaiyo Pipe & Fitting Co., Ltd.',
+            'registration_number' => '0105551062871',
+            'founded_date' => '13 มิถุนายน 2551',
+            'years_in_operation' => '17 ปี',
+            'capital' => '35,000,000 บาท',
+            'address' => '71/6 หมู่ที่ 1 ตำบลคอกกระบือ อำเภอเมืองสมุทรสาคร จังหวัดสมุทรสาคร 74000',
+            'business_type' => 'การผลิตผลิตภัณฑ์พลาสติกเพื่อการเกษตรทุกชนิด',
+            'relationship' => 'บริษัทในเครือของ บริษัท กนกส์โปรดัก จำกัด',
+            'contact' => [
+                'phone' => ['065-9404230', '065-9404231', '02-451-1111'],
+                'website_main' => 'www.kanokgroup.com (ช่องทางหลัก)',
+                'email' => 'chaiyopipeonline@gmail.com',
+                'note' => 'ติดต่อผ่านบริษัทกนกส์โปรดัก เป็นช่องทางหลัก'
+            ]
+        ]);
+    });
+
+    Route::get('/kanok-product', function () {
+        return response()->json([
+            'company_name' => 'บริษัท กนกส์โปรดัก จำกัด',
+            'english_name' => 'Kanok Product Co., Ltd.',
+            'registration_number' => '0105549044446',
+            'founded_date' => 'พ.ศ. 2541 (1998)',
+            'experience' => 'มากกว่า 27 ปี',
+            'managing_director' => 'คุณโผล์กฤษณ์ กนกสินปิณโย',
+            'address' => '15-23 ซอยพระยามนธาตุฯ แยก 10 ถนนบางขุนเทียน แขวงคลองบางบอน เขตบางบอน กรุงเทพมหานคร 10150',
+            'business_type' => 'ผู้ผลิต ส่งออก และจัดจำหน่ายระบบน้ำเพื่อการเกษตรและระบบชลประทาน',
+            'products_count' => 'มากกว่า 6,000-9,000 รายการ',
+            'target_revenue' => 'มากกว่า 600 ล้านบาท ต่อปี',
+            'contact' => [
+                'phone' => '02-451-1111',
+                'websites' => ['www.kanokgroup.com', 'www.kanokproduct.com'],
+                'mobile' => '098-286-0809'
+            ]
+        ]);
+    });
+
+    Route::get('/products', function () {
+        return response()->json([
+            'main_categories' => [
+                'ท่อและข้อต่อ PVC' => 'ได้รับมาตรฐาน มอก. 1131-2535',
+                'ท่อ PE และ HDPE' => 'สำหรับระบบน้ำการเกษตร',
+                'ระบบน้ำหยด' => 'สเปรย์เทป, ดริปเทป',
+                'หัวสปริงเกอร์' => 'มินิสปริงเกอร์และสปริงเกอร์',
+                'วาล์วและอุปกรณ์' => 'ฟุตวาล์ว, เช็ควาล์ว, บอลวาล์ว (ทนแรงดันถึง 13.5 บาร์)',
+                'อุปกรณ์ประปา' => 'ปั๊มน้ำและอะไหล่'
+            ],
+            'brands' => [
+                'RED HAND (ตรามือแดง)' => 'แบรนด์หลักสำหรับท่อและข้อต่อ PVC',
+                'CHAIYO (ไชโย)' => 'ผลิตภัณฑ์เกษตรและระบบน้ำ',
+                'CHAMP (แชมป์)' => 'สายผลิตภัณฑ์เสริม',
+                'KANOK' => 'ผลิตภัณฑ์จากบริษัทกนกส์โปรดัก'
+            ],
+            'certifications' => [
+                'ISO 9001:2015',
+                'มาตรฐาน มอก.',
+                'Bureau Veritas Certification',
+                'UV Protection Technology'
+            ]
+        ]);
+    });
+
+    Route::get('/contact', function () {
+        return response()->json([
+            'chaiyo_pipe_fitting' => [
+                'phones' => ['065-9404230', '065-9404231', '089-9892211', '086-3107020', '066-1549-5974', '02-451-1111'],
+                'fax' => '02-416-3011',
+                'emails' => ['chaiyopipeonline@gmail.com', 'chayut@kanokproduct.com'],
+                'website' => 'www.chaiyopipe.co.th',
+                'line_id' => 'chayut.tee'
+            ],
+            'kanok_product' => [
+                'phone_main' => '02-451-1111',
+                'phone_product_inquiry' => 'กด 2 สำหรับสอบถามผลิตภัณฑ์',
+                'extensions' => 'ต่อ 103-136, 185-187',
+                'mobile' => '098-286-0809',
+                'websites' => ['www.kanokgroup.com', 'www.kanokproduct.com', 'shop.kanokproduct.com']
+            ],
+            'social_media' => [
+                'facebook_chaiyo' => 'Red hand ท่อ PVC (2,850+ ผู้ติดตาม)',
+                'facebook_kanok' => 'kanokproduct (42,541+ ผู้ติดตาม)',
+                'lazada' => 'lazada.co.th/shop/kanok-product'
+            ]
+        ]);
+    });
 });
 
 // ==================================================
@@ -270,6 +418,55 @@ Route::get('/info', function () {
 if (app()->environment('local')) {
     Route::prefix('debug')->group(function () {
         
+        // Test ChaiyoAI Service
+        Route::post('/chaiyo-ai-test', function (Request $request) {
+            try {
+                $message = $request->input('message', 'สวัสดี บริษัทไชโยมีสินค้าอะไรบ้าง');
+                $service = new \App\Services\ChaiyoAiService();
+                $response = $service->generateResponse($message);
+                
+                return response()->json([
+                    'success' => true,
+                    'input_message' => $message,
+                    'ai_response' => $response,
+                    'response_length' => strlen($response),
+                    'ai_identity' => 'ChaiyoAI',
+                    'service_status' => $service->getStatus()
+                ]);
+            } catch (Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $e->getMessage(),
+                    'input_message' => $request->input('message', 'สวัสดี'),
+                    'ai_identity' => 'ChaiyoAI'
+                ]);
+            }
+        });
+
+        // Test company knowledge
+        Route::get('/company-knowledge-test', function () {
+            try {
+                $service = new \App\Services\ChaiyoAiService();
+                
+                return response()->json([
+                    'company_overview' => $service->getCompanyInfo('overview'),
+                    'products' => $service->getCompanyInfo('products'),
+                    'contact' => $service->getCompanyInfo('contact'),
+                    'certifications' => $service->getCompanyInfo('certifications'),
+                    'partnerships' => $service->getCompanyInfo('partnerships'),
+                    'timeline' => $service->getCompanyInfo('timeline'),
+                    'ai_identity' => 'ChaiyoAI',
+                    'knowledge_loaded' => true
+                ]);
+            } catch (Exception $e) {
+                return response()->json([
+                    'error' => $e->getMessage(),
+                    'ai_identity' => 'ChaiyoAI',
+                    'knowledge_loaded' => false
+                ], 500);
+            }
+        });
+
         // Test UTF-8 handling
         Route::post('/utf8-test', function (Request $request) {
             $input = $request->input('message', 'สวัสดี');
@@ -284,28 +481,6 @@ if (app()->environment('local')) {
                 'json_last_error' => json_last_error_msg(),
                 'server_encoding' => mb_internal_encoding()
             ]);
-        });
-
-        // Test Gemini API directly
-        Route::post('/gemini-direct', function (Request $request) {
-            try {
-                $message = $request->input('message', 'Hello');
-                $service = new \App\Services\GeminiAiService();
-                $response = $service->generateResponse($message);
-                
-                return response()->json([
-                    'success' => true,
-                    'input_message' => $message,
-                    'ai_response' => $response,
-                    'response_length' => strlen($response)
-                ]);
-            } catch (Exception $e) {
-                return response()->json([
-                    'success' => false,
-                    'error' => $e->getMessage(),
-                    'input_message' => $request->input('message', 'Hello')
-                ]);
-            }
         });
 
         // Test database connections
@@ -323,12 +498,14 @@ if (app()->environment('local')) {
                         'equipment_categories' => \Schema::hasTable('equipment_categories'),
                         'pump_accessories' => \Schema::hasTable('pump_accessories'),
                     ],
+                    'ai_identity' => 'ChaiyoAI',
                     'timestamp' => now()
                 ]);
             } catch (\Exception $e) {
                 return response()->json([
                     'database_connected' => false,
                     'error' => $e->getMessage(),
+                    'ai_identity' => 'ChaiyoAI',
                     'timestamp' => now()
                 ], 500);
             }
@@ -365,42 +542,13 @@ if (app()->environment('local')) {
                     'guards' => $guards,
                     'session_id' => session()->getId(),
                     'csrf_token' => csrf_token(),
-                    'auth_config' => [
-                        'default_guard' => config('auth.defaults.guard'),
-                        'web_driver' => config('auth.guards.web.driver'),
-                        'session_driver' => config('session.driver')
-                    ],
-                    'headers' => [
-                        'user_agent' => request()->header('User-Agent'),
-                        'x_requested_with' => request()->header('X-Requested-With'),
-                        'accept' => request()->header('Accept')
-                    ],
+                    'ai_identity' => 'ChaiyoAI',
                     'timestamp' => now()
                 ]);
             } catch (\Exception $e) {
                 return response()->json([
                     'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                    'timestamp' => now()
-                ], 500);
-            }
-        });
-
-        // Test farm controller
-        Route::get('/farm-test', function () {
-            try {
-                $controller = app(FarmController::class);
-                $plantTypes = $controller->getPlantTypes();
-                
-                return response()->json([
-                    'farm_controller' => 'working',
-                    'plant_types_available' => $plantTypes->getData(),
-                    'timestamp' => now()
-                ]);
-            } catch (\Exception $e) {
-                return response()->json([
-                    'farm_controller' => 'error',
-                    'error' => $e->getMessage(),
+                    'ai_identity' => 'ChaiyoAI',
                     'timestamp' => now()
                 ], 500);
             }
@@ -411,6 +559,7 @@ if (app()->environment('local')) {
             return response()->json([
                 'echo' => $request->all(),
                 'headers' => $request->headers->all(),
+                'ai_identity' => 'ChaiyoAI',
                 'timestamp' => now()
             ]);
         });
@@ -423,6 +572,10 @@ if (app()->environment('local')) {
                 'GET /api/images' => '/api/images',
                 'GET /api/pump-accessories' => '/api/pump-accessories',
                 'GET /api/ai/health' => '/api/ai/health',
+                'GET /api/ai/stats' => '/api/ai/stats',
+                'GET /api/ai/company-info' => '/api/ai/company-info',
+                'GET /api/company/chaiyo-pipe-fitting' => '/api/company/chaiyo-pipe-fitting',
+                'GET /api/company/kanok-product' => '/api/company/kanok-product',
                 'GET /api/health' => '/api/health',
                 'GET /api/info' => '/api/info'
             ];
@@ -451,6 +604,7 @@ if (app()->environment('local')) {
 
             return response()->json([
                 'endpoints_test' => $results,
+                'ai_identity' => 'ChaiyoAI',
                 'timestamp' => now()
             ]);
         });
@@ -466,8 +620,11 @@ Route::fallback(function () {
     return response()->json([
         'error' => 'API endpoint not found',
         'message' => 'The requested API endpoint does not exist.',
+        'ai_identity' => 'ChaiyoAI',
         'available_endpoints' => [
-            'POST /api/ai-chat' => 'Chaiyo AI chat interface',
+            'POST /api/ai-chat' => 'ChaiyoAI chat interface (Enhanced with Company Knowledge)',
+            'GET /api/ai/company-info' => 'Get company information',
+            'POST /api/ai/product-recommendations' => 'Get product recommendations',
             'GET /api/equipments' => 'Equipment catalog (รวม PumpAccessory + ImageUpload)',
             'GET /api/equipment-categories' => 'Equipment categories',
             'GET /api/fields' => 'Field management (requires auth)',
@@ -476,27 +633,33 @@ Route::fallback(function () {
             'POST /api/images/upload' => 'Image upload (backward compatibility)',
             'GET /api/pump-accessories' => 'Pump accessories (backward compatibility)',
             'GET /api/sprinklers' => 'Sprinkler equipment',
+            'GET /api/company/chaiyo-pipe-fitting' => 'Chaiyo company information',
+            'GET /api/company/kanok-product' => 'Kanok company information',
             'GET /api/health' => 'System health check',
             'GET /api/info' => 'API information',
-            'POST /api/ai/test' => 'Test AI with custom message',
+            'POST /api/ai/test' => 'Test ChaiyoAI with custom message',
+        ],
+        'company_focus' => [
+            'chaiyo_pipe_fitting' => 'บริษัท ไชโยไปป์แอนด์ฟิตติ้ง จำกัด',
+            'kanok_product' => 'บริษัท กนกส์โปรดัก จำกัด'
         ],
         'authentication_required' => [
             '/api/fields',
             '/api/folders',
             '/api/profile-photo'
         ],
-        'merged_functionality' => [
-            'EquipmentController now includes PumpAccessory + ImageUpload',
-            'All old routes still work for backward compatibility',
-            'New routes are under /api/equipments/* for better organization'
+        'enhanced_features' => [
+            'ChaiyoAI now represents both companies officially',
+            'Comprehensive company knowledge base loaded',
+            'Product consultation and recommendations',
+            'Enhanced irrigation expertise',
+            'Context-aware responses',
+            'All old routes still work for backward compatibility'
         ],
-        'documentation' => [
-            'ai_endpoints' => '/api/ai/*',
-            'equipment_endpoints' => '/api/equipments/* (primary) + backward compatibility',
-            'farm_endpoints' => '/api/fields, /api/generate-*',
-            'image_endpoints' => '/api/images/* (compat) or /api/equipments/*',
-            'pump_accessories' => '/api/pump-accessories (compat) or /api/equipments/pump-accessories',
-            'debug_endpoints' => '/api/debug/* (local only)'
+        'contact_info' => [
+            'phone' => '02-451-1111',
+            'website' => 'www.chaiyopipe.co.th',
+            'email' => 'chaiyopipeonline@gmail.com'
         ]
     ], 404);
 });

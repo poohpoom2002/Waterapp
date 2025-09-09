@@ -130,7 +130,11 @@ export type DrawingStage = 'field' | 'zones' | 'pipes' | 'irrigation';
 export type DrawingMode = 'zone' | 'obstacle';
 
 // Translation Helper Function
-export const getTranslatedName = (t: (key: string) => string, type: 'obstacle' | 'pipe' | 'equipment' | 'map', key: string): string => {
+export const getTranslatedName = (
+    t: (key: string) => string,
+    type: 'obstacle' | 'pipe' | 'equipment' | 'map',
+    key: string
+): string => {
     switch (type) {
         case 'obstacle':
             return t((OBSTACLE_TYPES as any)[key]?.name || key);

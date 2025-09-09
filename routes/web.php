@@ -29,6 +29,11 @@ Route::get('/test-web', function () {
     return response()->json(['message' => 'Web route is working']);
 });
 
+// CSRF token route
+Route::get('/csrf-token', function () {
+    return response()->json(['token' => csrf_token()]);
+})->middleware('web');
+
 // Test authentication route
 Route::get('/test-auth', function () {
     $user = auth()->user();
@@ -320,6 +325,35 @@ Route::get('/fields-api', function () {
         return response()->json([
             'success' => true,
             'fields' => $fields->map(function ($field) {
+                // Extract real calculated values from JSON fields
+                $projectStats = is_string($field->project_stats) ? json_decode($field->project_stats, true) : $field->project_stats;
+                $projectData = is_string($field->project_data) ? json_decode($field->project_data, true) : $field->project_data;
+                
+                // Get real calculated values
+                $realArea = 0;
+                $realWaterNeed = 0;
+                $realPlants = 0;
+                
+                if ($projectStats) {
+                    // Use the real calculated values from project_stats
+                    $realArea = $projectStats['totalAreaInRai'] ?? $projectStats['totalArea'] ?? 0;
+                    $realWaterNeed = $projectStats['totalWaterNeedPerSession'] ?? $projectStats['totalWaterNeed'] ?? 0;
+                    $realPlants = $projectStats['totalPlants'] ?? 0;
+                } elseif ($projectData) {
+                    // Fallback to project_data if project_stats is not available
+                    if (isset($projectData['plants']) && is_array($projectData['plants'])) {
+                        $realPlants = count($projectData['plants']);
+                    }
+                    if (isset($projectData['totalArea'])) {
+                        $realArea = $projectData['totalArea'];
+                    }
+                }
+                
+                // Convert area to ไร่ if it's in square meters
+                if ($realArea > 1000) { // If it's likely in square meters
+                    $realArea = $realArea / 1600; // Convert to ไร่ (1 ไร่ = 1600 ตร.ม.)
+                }
+                
                 return [
                     'id' => $field->id,
                     'name' => $field->name,
@@ -338,11 +372,26 @@ Route::get('/fields-api', function () {
                         'row_spacing' => $field->plantType->row_spacing,
                         'water_needed' => $field->plantType->water_needed,
                     ] : null,
-                    'totalPlants' => $field->total_plants,
-                    'totalArea' => $field->total_area,
-                    'total_water_need' => $field->total_water_need,
+                    'totalPlants' => $realPlants, // Use real calculated value
+                    'totalArea' => $realArea, // Use real calculated value
+                    'total_water_need' => $realWaterNeed, // Use real calculated value
                     'createdAt' => $field->created_at,
                     'layers' => $field->layers ? (is_string($field->layers) ? json_decode($field->layers, true) : $field->layers) : [],
+                    'zoneInputs' => $field->zone_inputs,
+                    'selectedPipes' => $field->selected_pipes,
+                    'selectedPump' => $field->selected_pump,
+                    'zoneSprinklers' => $field->zone_sprinklers,
+                    'zoneOperationMode' => $field->zone_operation_mode,
+                    'zoneOperationGroups' => $field->zone_operation_groups,
+                    'projectData' => $field->project_data,
+                    'projectStats' => $field->project_stats,
+                    'effectiveEquipment' => $field->effective_equipment,
+                    'zoneCalculationData' => $field->zone_calculation_data,
+                    // Additional data for different field types
+                    'garden_data' => $field->garden_data,
+                    'garden_stats' => $field->garden_stats,
+                    'greenhouse_data' => $field->greenhouse_data,
+                    'field_crop_data' => $field->field_crop_data,
                 ];
             })
         ]);
@@ -447,6 +496,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'irrigation' => $irrigation
         ]);
     })->name('field-map');
+
+    // Field Crop Step Routes
+    Route::get('step1-field-area', function () {
+        return Inertia::render('field-crop/initial-area');
+    })->name('initial-area');
+
+    Route::get('step2-zones-obstacles', function () {
+        return Inertia::render('field-crop/zone-obstacle');
+    })->name('zone-obstacle');
+
+    Route::get('step3-pipe-system', function () {
+        return Inertia::render('field-crop/pipe-generate');
+    })->name('pipe-generate');
+
+    Route::get('step4-irrigation-system', function () {
+        return Inertia::render('field-crop/irrigation-generate');
+    })->name('irrigation-generate');
 
     // Greenhouse Crop Route
     Route::get('greenhouse-crop', function () {
@@ -564,9 +630,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Field Management Routes
     Route::post('/api/save-field', [FarmController::class, 'saveField'])->name('save-field');
+    Route::post('/api/fields', [FarmController::class, 'createField'])->name('create-field');
     Route::get('/api/fields', [FarmController::class, 'getFields'])->name('get-fields');
+    Route::get('/api/fields/{fieldId}', [FarmController::class, 'getField'])->name('get-field');
     Route::put('/api/fields/{fieldId}', [FarmController::class, 'updateField'])->name('update-field');
     Route::delete('/api/fields/{fieldId}', [FarmController::class, 'deleteField'])->name('delete-field');
+    // Alternative delete route using POST with _method=DELETE for better CSRF compatibility
+    Route::post('/api/fields/{fieldId}', [FarmController::class, 'deleteField'])->name('delete-field-post');
     
     // Folder Management Routes
     Route::get('/api/folders', [FarmController::class, 'getFolders'])->name('get-folders');
@@ -576,7 +646,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     
     // Field Status Management
     Route::put('/api/fields/{fieldId}/status', [FarmController::class, 'updateFieldStatus'])->name('update-field-status');
+    Route::put('/api/fields/{fieldId}/data', [FarmController::class, 'updateFieldData'])->name('update-field-data');
     Route::put('/api/fields/{fieldId}/folder', [FarmController::class, 'updateFieldFolder'])->name('update-field-folder');
+    
+    // Field Image Management
+    Route::put('/api/fields/{fieldId}/image', [FarmController::class, 'updateFieldImage'])->name('update-field-image');
+    Route::get('/api/fields/{fieldId}/image', [FarmController::class, 'getFieldImage'])->name('get-field-image');
     
     // Profile Photo Routes
     Route::post('/api/profile-photo/upload', [ProfilePhotoController::class, 'upload'])->name('profile-photo.upload');

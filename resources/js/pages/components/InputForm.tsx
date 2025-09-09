@@ -195,20 +195,31 @@ const InputForm: React.FC<InputFormProps> = ({
     };
 
     const calculateEstimatedVelocity = (input: IrrigationInput): number => {
-        let estimatedFlow: number;
-        
+        let estimatedFlowLPM: number;
+
+        // Fix: Correct calculation for different project modes
         if (projectMode === 'greenhouse' || projectMode === 'garden') {
-            estimatedFlow = (input.totalTrees * input.waterPerTreeLiters) / (input.irrigationTimeMinutes || 30) / 60;
+            // waterPerTreeLiters is per irrigation session, convert to LPM
+            estimatedFlowLPM =
+                (input.totalTrees * input.waterPerTreeLiters) / (input.irrigationTimeMinutes || 30);
         } else if (projectMode === 'field-crop') {
-            estimatedFlow = (input.totalTrees * input.waterPerTreeLiters) / 60;
+            // For field crop, waterPerTreeLiters should be flow rate per minute
+            // If it's per session, need to convert to per minute
+            estimatedFlowLPM = input.totalTrees * input.waterPerTreeLiters; // Assuming it's already LPM per tree
         } else {
-            estimatedFlow = (input.totalTrees * input.waterPerTreeLiters) / (input.irrigationTimeMinutes || 30) / 60;
+            // Horticulture mode: waterPerTreeLiters is per irrigation session
+            estimatedFlowLPM =
+                (input.totalTrees * input.waterPerTreeLiters) / (input.irrigationTimeMinutes || 30);
         }
-        
-        const estimatedDiameter = Math.sqrt((4 * estimatedFlow) / (Math.PI * 1.5));
-        
-        const pipeArea = Math.PI * Math.pow(0.032 / 2, 2);
-        return estimatedFlow / pipeArea;
+
+        // Convert LPM to m³/s for velocity calculation
+        const flowM3s = estimatedFlowLPM / 60000;
+
+        // Use a standard 32mm pipe diameter for estimation
+        const diameterM = 0.032;
+        const pipeArea = Math.PI * Math.pow(diameterM / 2, 2);
+
+        return flowM3s / pipeArea;
     };
 
     const getSprinklerPressureInfo = (): SprinklerPressureInfo | null => {
@@ -344,22 +355,18 @@ const InputForm: React.FC<InputFormProps> = ({
     const getAreaUnit = () => {
         switch (projectMode) {
             case 'garden':
-                return t('ตร.ม.');
             case 'greenhouse':
-                return t('ตร.ม.');
+            case 'field-crop':
+            case 'horticulture':
             default:
-                return t('ตร.ม.');
+                return t('ไร่'); // Fix: All project modes now use rai consistently
         }
     };
 
     const getAreaConversionFactor = () => {
-        switch (projectMode) {
-            case 'garden':
-            case 'greenhouse':
-                return 1;
-            default:
-                return 1600;
-        }
+        // Fix: All project modes now store farmSizeRai in rai units
+        // No conversion needed for display - all are already in rai
+        return 1; // Always 1 since farmSizeRai is now consistently in rai
     };
 
     const getWaterSourceLabel = () => {
@@ -418,29 +425,20 @@ const InputForm: React.FC<InputFormProps> = ({
                     <div className="grid grid-cols-2 gap-3 rounded-lg bg-gray-700 p-2">
                         <div>
                             <label className="mb-2 block text-sm font-medium">
-                                {t('ขนาดพื้นที่')} ({getAreaUnit()}) ({input.farmSizeRai.toFixed(2)} {t('ไร่')})
+                                {t('ขนาดพื้นที่')} ({getAreaUnit()}) (
+                                {(input.farmSizeRai * 1600).toFixed(2)} {t('ตร.ม.')})
                             </label>
                             <input
                                 type="number"
-                                defaultValue={
-                                    projectMode === 'greenhouse' || projectMode === 'garden'
-                                        ? input.farmSizeRai.toFixed(2)
-                                        : (input.farmSizeRai * 1600).toFixed(2)
-                                }
+                                defaultValue={input.farmSizeRai.toFixed(2)} // Fix: Always display rai since all modes store in rai
                                 onChange={(e) => {
                                     const value = parseFloat(e.target.value) || 0;
-                                    if (projectMode === 'greenhouse' || projectMode === 'garden') {
-                                        updateInput('farmSizeRai', value);
-                                    } else {
-                                        updateInput('farmSizeRai', value / 1600);
-                                    }
+                                    updateInput('farmSizeRai', value); // Fix: Direct assignment since value is already in rai
                                 }}
                                 onBlur={(e) => {
                                     const value = e.target.value;
                                     if (value === '' || isNaN(parseFloat(value))) {
-                                        e.target.value = projectMode === 'greenhouse' || projectMode === 'garden'
-                                            ? input.farmSizeRai.toFixed(2)
-                                            : (input.farmSizeRai * 1600).toFixed(2);
+                                        e.target.value = input.farmSizeRai.toFixed(2); // Fix: Always show rai
                                     }
                                 }}
                                 step="0.1"
@@ -482,7 +480,9 @@ const InputForm: React.FC<InputFormProps> = ({
                                         updateInput('waterPerTreeLiters', value);
                                     }
                                 }}
-                                onBlur={(e) => updateInputOnBlur('waterPerTreeLiters', e.target.value)}
+                                onBlur={(e) =>
+                                    updateInputOnBlur('waterPerTreeLiters', e.target.value)
+                                }
                                 step="0.1"
                                 min="0.1"
                                 className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
@@ -503,7 +503,9 @@ const InputForm: React.FC<InputFormProps> = ({
                                         updateInput('irrigationTimeMinutes', value);
                                     }
                                 }}
-                                onBlur={(e) => updateInputOnBlur('irrigationTimeMinutes', e.target.value)}
+                                onBlur={(e) =>
+                                    updateInputOnBlur('irrigationTimeMinutes', e.target.value)
+                                }
                                 className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                             />
                         </div>
@@ -529,7 +531,9 @@ const InputForm: React.FC<InputFormProps> = ({
                                                 updateInput('sprinklersPerTree', value);
                                             }
                                         }}
-                                        onBlur={(e) => updateInputOnBlur('sprinklersPerTree', e.target.value)}
+                                        onBlur={(e) =>
+                                            updateInputOnBlur('sprinklersPerTree', e.target.value)
+                                        }
                                         min="1"
                                         max="5"
                                         className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
@@ -611,7 +615,7 @@ const InputForm: React.FC<InputFormProps> = ({
                 </div>
 
                 <div className="space-y-4">
-                    <h3 className="text-base font-semibold text-blue-400">🔧 {t('ข้อมูลท่อ')}</h3>
+                    <h3 className="text-lg font-semibold text-blue-400">🔧 {t('ข้อมูลท่อ')}</h3>
 
                     <div className="rounded-lg bg-gray-700 p-3">
                         <h4 className="mb-2 text-sm font-medium text-purple-300">
@@ -692,7 +696,8 @@ const InputForm: React.FC<InputFormProps> = ({
                                             onBlur={(e) => {
                                                 const value = e.target.value;
                                                 if (value === '' || isNaN(parseFloat(value))) {
-                                                    e.target.value = input.longestSecondaryPipeM.toFixed(1);
+                                                    e.target.value =
+                                                        input.longestSecondaryPipeM.toFixed(1);
                                                 }
                                             }}
                                             step="0.1"
@@ -716,7 +721,8 @@ const InputForm: React.FC<InputFormProps> = ({
                                             onBlur={(e) => {
                                                 const value = e.target.value;
                                                 if (value === '' || isNaN(parseFloat(value))) {
-                                                    e.target.value = input.totalSecondaryPipeM.toFixed(1);
+                                                    e.target.value =
+                                                        input.totalSecondaryPipeM.toFixed(1);
                                                 }
                                             }}
                                             step="0.1"
@@ -769,7 +775,8 @@ const InputForm: React.FC<InputFormProps> = ({
                                             onBlur={(e) => {
                                                 const value = e.target.value;
                                                 if (value === '' || isNaN(parseFloat(value))) {
-                                                    e.target.value = input.longestMainPipeM.toFixed(1);
+                                                    e.target.value =
+                                                        input.longestMainPipeM.toFixed(1);
                                                 }
                                             }}
                                             step="0.1"
@@ -793,7 +800,8 @@ const InputForm: React.FC<InputFormProps> = ({
                                             onBlur={(e) => {
                                                 const value = e.target.value;
                                                 if (value === '' || isNaN(parseFloat(value))) {
-                                                    e.target.value = input.totalMainPipeM.toFixed(1);
+                                                    e.target.value =
+                                                        input.totalMainPipeM.toFixed(1);
                                                 }
                                             }}
                                             step="0.1"
@@ -865,7 +873,12 @@ const InputForm: React.FC<InputFormProps> = ({
                                                 updateInput('sprinklersPerLongestBranch', value);
                                             }
                                         }}
-                                        onBlur={(e) => updateInputOnBlur('sprinklersPerLongestBranch', e.target.value)}
+                                        onBlur={(e) =>
+                                            updateInputOnBlur(
+                                                'sprinklersPerLongestBranch',
+                                                e.target.value
+                                            )
+                                        }
                                         step="1"
                                         className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                                     />
@@ -893,10 +906,18 @@ const InputForm: React.FC<InputFormProps> = ({
                                             onChange={(e) => {
                                                 const value = parseInt(e.target.value);
                                                 if (!isNaN(value)) {
-                                                    updateInput('branchesPerLongestSecondary', value);
+                                                    updateInput(
+                                                        'branchesPerLongestSecondary',
+                                                        value
+                                                    );
                                                 }
                                             }}
-                                            onBlur={(e) => updateInputOnBlur('branchesPerLongestSecondary', e.target.value)}
+                                            onBlur={(e) =>
+                                                updateInputOnBlur(
+                                                    'branchesPerLongestSecondary',
+                                                    e.target.value
+                                                )
+                                            }
                                             step="1"
                                             className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                                         />
@@ -957,7 +978,9 @@ const InputForm: React.FC<InputFormProps> = ({
                                         type="number"
                                         min="0"
                                         step="0.1"
-                                        defaultValue={input.extraPipePerSprinkler?.lengthPerHead || ''}
+                                        defaultValue={
+                                            input.extraPipePerSprinkler?.lengthPerHead || ''
+                                        }
                                         onChange={(e) => {
                                             const lengthPerHead = parseFloat(e.target.value) || 0;
                                             onInputChange({
@@ -972,7 +995,9 @@ const InputForm: React.FC<InputFormProps> = ({
                                         onBlur={(e) => {
                                             const value = e.target.value;
                                             if (value === '' || isNaN(parseFloat(value))) {
-                                                e.target.value = (input.extraPipePerSprinkler?.lengthPerHead || 0).toString();
+                                                e.target.value = (
+                                                    input.extraPipePerSprinkler?.lengthPerHead || 0
+                                                ).toString();
                                             }
                                         }}
                                         className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"

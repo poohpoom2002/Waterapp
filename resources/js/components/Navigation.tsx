@@ -20,7 +20,7 @@ const Navigation: React.FC = () => {
         console.warn('Inertia context not available in Navigation, using fallback values');
         url = '';
     }
-    
+
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 

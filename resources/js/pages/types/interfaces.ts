@@ -1,6 +1,6 @@
 // resources\js\pages\types\interfaces.ts
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { PlantData } from "@/utils/horticultureUtils";
+import { PlantData } from '@/utils/horticultureUtils';
 export interface IrrigationInput {
     farmSizeRai: number;
     totalTrees: number;
@@ -24,8 +24,8 @@ export interface IrrigationInput {
     branchesPerLongestSecondary: number;
     secondariesPerLongestMain: number;
     extraPipePerSprinkler?: {
-        pipeId: number | null; 
-        lengthPerHead: number; 
+        pipeId: number | null;
+        lengthPerHead: number;
     };
 }
 
@@ -207,9 +207,9 @@ export interface CalculationResults {
 export interface Zone {
     id: string;
     name: string;
-    area: number; 
-    plantCount: number; 
-    sprinklerCount?: number; 
+    area: number;
+    plantCount: number;
+    sprinklerCount?: number;
     coordinates: any[];
     totalWaterNeed: number;
     plantData?: PlantData;
@@ -272,7 +272,7 @@ export type PipeType = 'branch' | 'secondary' | 'main';
 export interface FieldCropZone {
     id: string;
     name: string;
-    area: number; 
+    area: number;
     areaInRai: number;
     coordinates: any[];
     cropType?: string;
@@ -289,7 +289,7 @@ export interface FieldCropZone {
 export interface GreenhousePlot {
     plotId: string;
     plotName: string;
-    area: number; 
+    area: number;
     cropType?: string;
     totalPlants: number;
     waterRequirementPerIrrigation: number;

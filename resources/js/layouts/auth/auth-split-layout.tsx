@@ -15,7 +15,7 @@ export default function AuthSplitLayout({
 }: PropsWithChildren<AuthLayoutProps>) {
     // Defensive usePage call with error handling
     let name = '';
-    let quote = null;
+    let quote: { message: string; author: string } | null = null;
     try {
         const page = usePage<SharedData>();
         name = page.props.name;

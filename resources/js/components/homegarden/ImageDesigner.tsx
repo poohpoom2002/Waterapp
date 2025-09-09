@@ -16,6 +16,7 @@ import {
     formatDistance,
     clipCircleToPolygon,
     canvasToGPS,
+    calculatePipeStatistics,
 } from '../../utils/homeGardenData';
 import { useLanguage } from '../../contexts/LanguageContext';
 
@@ -112,6 +113,18 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
 
     const [showGrid, setShowGrid] = useState(false);
     const [gridSize, setGridSize] = useState(50);
+    const [enableGridSnap, setEnableGridSnap] = useState(false);
+
+    // Auto-enable grid snap when grid is shown
+    useEffect(() => {
+        setEnableGridSnap(showGrid);
+    }, [showGrid]);
+
+    // เพิ่ม state สำหรับการจัดการรูปภาพ
+    const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
+    const [isDraggingImage, setIsDraggingImage] = useState(false);
+    const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
+    const [imageAspectRatio, setImageAspectRatio] = useState(1);
 
     const [zoom, setZoom] = useState(1);
     const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -240,42 +253,26 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
         []
     );
 
-    const handleWheel = useCallback(
-        (e: React.WheelEvent<HTMLDivElement>) => {
-            e.preventDefault();
-
-            if (!containerRef.current) return;
-
-            const rect = containerRef.current.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-
-            const delta = e.deltaY;
-            const zoomFactor = delta > 0 ? 0.9 : 1.1;
-            const newZoom = Math.max(0.1, Math.min(5, zoom * zoomFactor));
-
-            const zoomRatio = newZoom / zoom;
-            const newPanX = mouseX - (mouseX - panOffset.x) * zoomRatio;
-            const newPanY = mouseY - (mouseY - panOffset.y) * zoomRatio;
-
-            setZoom(newZoom);
-            setPanOffset({ x: newPanX, y: newPanY });
-            setLastPanOffset({ x: newPanX, y: newPanY });
-        },
-        [zoom, panOffset]
-    );
-
     const getCanvasCoordinate = useCallback(
         (clientX: number, clientY: number): CanvasCoordinate => {
             if (!containerRef.current) return { x: 0, y: 0 };
 
             const rect = containerRef.current.getBoundingClientRect();
-            const x = (clientX - rect.left - panOffset.x) / zoom;
-            const y = (clientY - rect.top - panOffset.y) / zoom;
+            let x = (clientX - rect.left - panOffset.x) / zoom;
+            let y = (clientY - rect.top - panOffset.y) / zoom;
+
+            // Apply grid snapping if enabled and grid is visible
+            // Only snap when drawing zones or adding dimension lines
+            if (enableGridSnap && showGrid && (editMode === 'draw' || dimensionMode)) {
+                // Snap to fine grid (1/5 of main grid) for more precision
+                const fineGridSize = gridSize / 5;
+                x = Math.round(x / fineGridSize) * fineGridSize;
+                y = Math.round(y / fineGridSize) * fineGridSize;
+            }
 
             return { x, y };
         },
-        [zoom, panOffset]
+        [zoom, panOffset, enableGridSnap, showGrid, gridSize, editMode, dimensionMode]
     );
 
     const findSprinklerAtPosition = useCallback(
@@ -445,9 +442,9 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
         (coordinates: CanvasCoordinate[]) => {
             const area = calculatePolygonArea(coordinates, currentScale);
 
-            if (area > 300) {
+            if (area > 1200) {
                 alert(
-                    `❌ ${t('ขนาดพื้นที่เกินกำหนด!')}\n\n${t('ขนาดที่วาด:')} ${formatArea(area)}\n${t('ขนาดสูงสุดที่อนุญาต:')} 300 ${t('ตร.ม.')}\n\n${t('กรุณาวาดพื้นที่ให้มีขนาดเล็กลง')}`
+                    `❌ ${t('ขนาดพื้นที่เกินกำหนด!')}\n\n${t('ขนาดที่วาด:')} ${formatArea(area)}\n${t('ขนาดสูงสุดที่อนุญาต:')} 1200 ${t('ตร.ม.')}\n\n${t('กรุณาวาดพื้นที่ให้มีขนาดเล็กลง')}`
                 );
                 return;
             }
@@ -488,32 +485,122 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
     }, []);
 
     const handleFileChange = useCallback(
-        (e: React.ChangeEvent<HTMLInputElement>) => {
-            const file = e.target.files?.[0];
+        (event: React.ChangeEvent<HTMLInputElement>) => {
+            const file = event.target.files?.[0];
             if (!file) return;
 
-            const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-            if (!validTypes.includes(file.type)) {
-                return;
-            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const imageData = {
+                        url: e.target?.result as string,
+                        width: img.width,
+                        height: img.height,
+                        scale: 20,
+                        isScaleSet: false,
+                    };
 
-            const maxSize = 15 * 1024 * 1024;
-            if (file.size > maxSize) {
-                return;
-            }
-
-            setMeasurementMode(null);
-            setMeasurementLine({ start: null, end: null });
-            setRealDistance('');
-            setMeasurementHistory([]);
-
-            onImageUpload(file);
-
-            if (e.target) {
-                e.target.value = '';
-            }
+                    onImageUpload(file);
+                };
+                img.src = e.target?.result as string;
+            };
+            reader.readAsDataURL(file);
         },
         [onImageUpload]
+    );
+
+    // เพิ่ม useEffect เพื่อเรียกใช้ centerImage เมื่อ imageData เปลี่ยน
+    useEffect(() => {
+        if (imageData) {
+            setTimeout(() => {
+                centerImage();
+            }, 100);
+        }
+    }, [imageData]);
+
+    // เพิ่มฟังก์ชันสำหรับการจัดการรูปภาพ - แก้ไขให้รูปเต็มพื้นที่
+    const centerImage = useCallback(() => {
+        if (!containerRef.current || !imageData) return;
+
+        const container = containerRef.current.getBoundingClientRect();
+        const containerWidth = container.width;
+        const containerHeight = container.height;
+
+        const imageWidth = imageData?.width || 0;
+        const imageHeight = imageData?.height || 0;
+
+        // คำนวณอัตราส่วนของรูปภาพ
+        const aspectRatio = imageWidth / imageHeight;
+        setImageAspectRatio(aspectRatio);
+
+        // คำนวณขนาดให้เต็มพื้นที่
+        const containerAspectRatio = containerWidth / containerHeight;
+
+        let displayWidth, displayHeight;
+
+        if (aspectRatio > containerAspectRatio) {
+            // รูปภาพกว้างกว่า container ให้ปรับตามความกว้าง
+            displayWidth = containerWidth;
+            displayHeight = containerWidth / aspectRatio;
+        } else {
+            // รูปภาพสูงกว่า container ให้ปรับตามความสูง
+            displayHeight = containerHeight;
+            displayWidth = containerHeight * aspectRatio;
+        }
+
+        // คำนวณตำแหน่งกึ่งกลาง
+        const centerX = (containerWidth - displayWidth) / 2;
+        const centerY = (containerHeight - displayHeight) / 2;
+
+        setImagePosition({ x: centerX, y: centerY });
+        setPanOffset({ x: centerX, y: centerY });
+        setLastPanOffset({ x: centerX, y: centerY });
+
+        // ตั้งค่า zoom ให้เหมาะสมกับขนาดที่คำนวณ
+        const zoomX = displayWidth / imageWidth;
+        const zoomY = displayHeight / imageHeight;
+        const newZoom = Math.min(zoomX, zoomY);
+        setZoom(newZoom);
+    }, [imageData]);
+
+    // ปิดการลากรูปภาพในโหมดรูปแบบแปลน
+    const handleImageDragStart = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        // ไม่ทำการลากรูปภาพในโหมดรูปแบบแปลน
+    }, []);
+
+    const handleImageDragMove = useCallback((e: React.MouseEvent) => {
+        // ไม่ทำการลากรูปภาพในโหมดรูปแบบแปลน
+    }, []);
+
+    const handleImageDragEnd = useCallback(() => {
+        // ไม่ทำการลากรูปภาพในโหมดรูปแบบแปลน
+    }, []);
+
+    // ฟังก์ชันสำหรับการซูมที่รักษาอัตราส่วน
+    const handleZoom = useCallback(
+        (delta: number, mouseX: number, mouseY: number) => {
+            const zoomFactor = delta > 0 ? 0.9 : 1.1;
+            const newZoom = Math.max(0.1, Math.min(5, zoom * zoomFactor));
+
+            // คำนวณจุดศูนย์กลางของการซูม
+            const rect = containerRef.current?.getBoundingClientRect();
+            if (!rect) return;
+
+            const centerX = mouseX - rect.left;
+            const centerY = mouseY - rect.top;
+
+            // คำนวณการเปลี่ยนแปลงของ pan offset
+            const zoomRatio = newZoom / zoom;
+            const newPanX = centerX - (centerX - panOffset.x) * zoomRatio;
+            const newPanY = centerY - (centerY - panOffset.y) * zoomRatio;
+
+            setZoom(newZoom);
+            setPanOffset({ x: newPanX, y: newPanY });
+            setLastPanOffset({ x: newPanX, y: newPanY });
+        },
+        [zoom, panOffset]
     );
 
     const calculatePixelDistance = useCallback(
@@ -624,6 +711,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
 
             const point = getCanvasCoordinate(e.clientX, e.clientY);
 
+            // ปิดการ panning และการลากรูปภาพในโหมดรูปแบบแปลน
             if (
                 e.button === 0 &&
                 editMode !== 'draw' &&
@@ -637,9 +725,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                 !measurementMode &&
                 !pipeEditMode
             ) {
-                setIsPanning(true);
-                setPanStartPos({ x: e.clientX, y: e.clientY });
-                setLastPanOffset(panOffset);
+                // ไม่ทำการ panning หรือการลากรูปภาพในโหมดรูปแบบแปลน
                 return;
             }
 
@@ -718,7 +804,11 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                     }
                 }
 
-                if (editMode === 'draw') {
+                // Handle zone drawing tools (rectangle, circle, polygon) - only when editMode is 'draw'
+                if (
+                    editMode === 'draw' &&
+                    ['rectangle', 'circle', 'polygon', 'freehand'].includes(currentZoneTool)
+                ) {
                     switch (currentZoneTool) {
                         case 'freehand':
                             if (!enhancedDrawing.isDrawing && !isDrawing) {
@@ -792,6 +882,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                     return;
                 }
 
+                // Handle other tools that should work without needing to press "ใช้เครื่องมือวาด"
                 if (editMode === 'place') {
                     onSprinklerPlaced(point);
                     return;
@@ -867,6 +958,12 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
             const point = getCanvasCoordinate(e.clientX, e.clientY);
             setMousePos(point);
 
+            // จัดการการลากรูปภาพ
+            if (isDraggingImage) {
+                handleImageDragMove(e);
+                return;
+            }
+
             if (isPanning && panStartPos) {
                 const deltaX = e.clientX - panStartPos.x;
                 const deltaY = e.clientY - panStartPos.y;
@@ -941,7 +1038,12 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
         setDraggedItem(null);
         setIsPanning(false);
         setPanStartPos(null);
-    }, []);
+
+        // จัดการการลากรูปภาพ
+        if (isDraggingImage) {
+            handleImageDragEnd();
+        }
+    }, [isDraggingImage]);
 
     const handleRightClick = useCallback(
         (e: React.MouseEvent<HTMLDivElement>) => {
@@ -1046,8 +1148,8 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                 cx={sprinkler.canvasPosition.x}
                                 cy={sprinkler.canvasPosition.y}
                                 r={radiusPixels}
-                                fill={isSelected ? '#FFD700' + '26' : sprinkler.type.color + '26'}
-                                stroke={isSelected ? '#FFD700' + '80' : sprinkler.type.color + '80'}
+                                fill={isSelected ? '#FFD700' + '15' : sprinkler.type.color + '15'}
+                                stroke={isSelected ? '#FFD700' : sprinkler.type.color}
                                 strokeWidth={2}
                                 strokeDasharray={sprinkler.zoneId === 'virtual_zone' ? '8,4' : '0'}
                             />
@@ -1075,8 +1177,8 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                 cx={sprinkler.canvasPosition.x}
                                 cy={sprinkler.canvasPosition.y}
                                 r={radiusPixels}
-                                fill={isSelected ? '#FFD700' + '26' : sprinkler.type.color + '26'}
-                                stroke={isSelected ? '#FFD700' + '80' : sprinkler.type.color + '80'}
+                                fill={isSelected ? '#FFD700' + '15' : sprinkler.type.color + '15'}
+                                stroke={isSelected ? '#FFD700' : sprinkler.type.color}
                                 strokeWidth={2}
                             />
                         </g>
@@ -1098,21 +1200,10 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                 cx={sprinkler.canvasPosition.x}
                                 cy={sprinkler.canvasPosition.y}
                                 r={radiusPixels}
-                                fill={isSelected ? '#FFD700' + '26' : sprinkler.type.color + '26'}
-                                stroke={isSelected ? '#FFD700' + '80' : sprinkler.type.color + '80'}
+                                fill={isSelected ? '#FFD700' + '15' : sprinkler.type.color + '15'}
+                                stroke={isSelected ? '#FFD700' : sprinkler.type.color}
                                 strokeWidth={2}
                                 clipPath={`url(#clip-${sprinkler.id})`}
-                            />
-
-                            {/* Show zone boundary as dashed line */}
-                            <polygon
-                                points={zone.canvasCoordinates
-                                    .map((p) => `${p.x},${p.y}`)
-                                    .join(' ')}
-                                fill="none"
-                                stroke={isSelected ? '#FFD700' + '60' : sprinkler.type.color + '60'}
-                                strokeWidth={1}
-                                strokeDasharray="3,3"
                             />
                         </g>
                     );
@@ -1123,27 +1214,15 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                         <g key={`radius-${sprinkler.id}`}>
                             <polygon
                                 points={points}
-                                fill={isSelected ? '#FFD700' + '26' : sprinkler.type.color + '26'}
-                                stroke={isSelected ? '#FFD700' + '80' : sprinkler.type.color + '80'}
+                                fill={isSelected ? '#FFD700' + '15' : sprinkler.type.color + '15'}
+                                stroke={isSelected ? '#FFD700' : sprinkler.type.color}
                                 strokeWidth={2}
                             />
                         </g>
                     );
                 } else {
-                    // Show dashed circle for no coverage
-                    return (
-                        <g key={`radius-${sprinkler.id}`}>
-                            <circle
-                                cx={sprinkler.canvasPosition.x}
-                                cy={sprinkler.canvasPosition.y}
-                                r={radiusPixels}
-                                fill="none"
-                                stroke={isSelected ? '#FFD700' + '40' : sprinkler.type.color + '40'}
-                                strokeWidth={1}
-                                strokeDasharray="5,5"
-                            />
-                        </g>
-                    );
+                    // No coverage, don't show anything to ensure strict zone boundaries
+                    return null;
                 }
             } catch (error) {
                 console.error('Error rendering sprinkler radius:', error);
@@ -1219,6 +1298,23 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
         };
     }, []);
 
+    // ปิดการซูมในโหมดรูปแบบแปลน - เพิ่ม wheel event listener ที่ไม่ทำอะไร
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const wheelHandler = (e: WheelEvent) => {
+            e.preventDefault();
+            // ไม่ทำการซูมในโหมดรูปแบบแปลน
+        };
+
+        container.addEventListener('wheel', wheelHandler, { passive: false });
+
+        return () => {
+            container.removeEventListener('wheel', wheelHandler);
+        };
+    }, []);
+
     return (
         <div className="flex h-full flex-col items-center justify-center gap-4">
             {!imageData ? (
@@ -1257,28 +1353,10 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
 
                             {isScaleSet ? (
                                 <div className="space-y-3">
-                                    <div className="rounded-lg bg-green-900/30 p-3">
-                                        <div className="mb-2 text-sm font-medium text-green-400">
-                                            ✅ {t('ตั้งค่าขนาดแล้ว')}
-                                        </div>
-                                        <div className="space-y-1 text-xs text-green-200">
-                                            <div>
-                                                📐 {currentScale.toFixed(2)} {t('พิกเซล/เมตร')}
-                                            </div>
-                                            <div>
-                                                📏 {(100 / currentScale).toFixed(2)}{' '}
-                                                {t('ซม./พิกเซล')}
-                                            </div>
-                                            <div>
-                                                🔬 {(1 / currentScale).toFixed(4)} {t('ม./พิกเซล')}
-                                            </div>
-                                        </div>
-                                    </div>
-
                                     {measurementHistory.length > 0 && (
                                         <div className="rounded-lg bg-blue-900/30 p-3">
                                             <div className="mb-1 text-xs text-blue-300">
-                                                {t('ประวัติการวัด:')}
+                                                {t('วัดเทียบระยะแล้ว:')}
                                             </div>
                                             <div className="text-xs text-blue-200">
                                                 {measurementHistory[
@@ -1295,14 +1373,88 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                         </div>
                                     )}
 
-                                    <div className="space-y-2">
-                                        <button
-                                            onClick={resetScale}
-                                            className="w-full rounded bg-amber-600 px-3 py-2 text-sm text-white transition-colors hover:bg-amber-700"
-                                        >
-                                            📏 {t('วัดใหม่')}
-                                        </button>
-                                    </div>
+                                    {/* Grid Controls */}
+                                    {isScaleSet && (
+                                        <div className="rounded-lg bg-gray-700">
+                                            <div className="space-y-3">
+                                                <label className="flex items-center gap-2 text-sm text-white">
+                                                    <button
+                                                        type="button"
+                                                        aria-pressed={showGrid}
+                                                        onClick={() => setShowGrid(!showGrid)}
+                                                        className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none ${
+                                                            showGrid ? 'bg-blue-600' : 'bg-gray-400'
+                                                        }`}
+                                                    >
+                                                        <span
+                                                            className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                                                                showGrid
+                                                                    ? 'translate-x-5'
+                                                                    : 'translate-x-1'
+                                                            }`}
+                                                        />
+                                                    </button>
+                                                    {t('แสดงตาราง')}
+                                                    {showGrid && enableGridSnap && (
+                                                        <span className="ml-2 rounded-full bg-green-600 px-2 py-1 text-xs">
+                                                            🧲 {t('จับตำแหน่ง')}
+                                                        </span>
+                                                    )}
+                                                </label>
+
+                                                {showGrid && (
+                                                    <div>
+                                                        <label className="mb-1 block text-xs text-gray-300">
+                                                            {t('ระยะห่างตาราง:')}{' '}
+                                                            {(gridSize / currentScale).toFixed(1)}{' '}
+                                                            {t('ม.')}
+                                                        </label>
+                                                        <input
+                                                            type="range"
+                                                            min="20"
+                                                            max="100"
+                                                            step="10"
+                                                            value={gridSize}
+                                                            onChange={(e) =>
+                                                                setGridSize(Number(e.target.value))
+                                                            }
+                                                            className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-600"
+                                                        />
+                                                        <div className="mt-1 flex justify-between text-xs text-gray-400">
+                                                            <span>{t('ใกล้')}</span>
+                                                            <span>{t('ไกล')}</span>
+                                                        </div>
+                                                        {enableGridSnap &&
+                                                            (editMode === 'draw' ||
+                                                                dimensionMode) && (
+                                                                <div className="mt-2 rounded-lg bg-green-900/30 p-2 text-xs text-green-200">
+                                                                    <div className="flex items-center gap-1">
+                                                                        🧲{' '}
+                                                                        <span className="font-medium">
+                                                                            {t('โหมดจับตำแหน่ง')}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="mt-1 text-green-300/80">
+                                                                        {t(
+                                                                            'เมาส์จะเดินตามจุดตัดของตารางย่อย (ความละเอียดสูง)'
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="mt-1 text-xs text-green-400/60">
+                                                                        📏 {t('ระยะห่างตารางย่อย:')}{' '}
+                                                                        {(
+                                                                            gridSize /
+                                                                            5 /
+                                                                            currentScale
+                                                                        ).toFixed(2)}{' '}
+                                                                        {t('ม.')}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="space-y-3">
@@ -1358,11 +1510,11 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                             )}
                         </div>
 
-                        {/* Enhanced Zone Tools Panel */}
+                        {/* Enhanced Zone Tools Panel - Only show when in draw mode */}
                         {isScaleSet && editMode === 'draw' && (
                             <div className="rounded-lg bg-gray-700 p-4">
                                 <h4 className="mb-3 text-lg font-semibold text-blue-400">
-                                    🏗️ {t('เครื่องมือวาดโซน')}
+                                    🏗️ {t('เครื่องมือวาดรูปทรง')}
                                 </h4>
 
                                 {/* Zone Drawing Tools */}
@@ -1412,7 +1564,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                             </div>
                         )}
 
-                        {/* Dimension Tools */}
+                        {/* Dimension Tools - Available without draw mode */}
                         {isScaleSet && (
                             <div className="rounded-lg bg-gray-700 p-4">
                                 <h4 className="mb-3 text-lg font-semibold text-yellow-400">
@@ -1422,7 +1574,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                 <div className="space-y-2">
                                     <button
                                         onClick={() => {
-                                            setDimensionMode(!dimensionMode);
+                                            setDimensionMode(true);
                                             setTempDimensionPoints([]);
                                         }}
                                         className={`w-full rounded-lg p-3 font-medium transition-colors ${
@@ -1431,8 +1583,20 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                 : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
                                         }`}
                                     >
-                                        📏 {dimensionMode ? t('กำลังวัดระยะ') : t('เพิ่มเส้นวัด')}
+                                        📏 {t('เพิ่มเส้นวัด')}
                                     </button>
+
+                                    {dimensionMode && (
+                                        <button
+                                            onClick={() => {
+                                                setDimensionMode(false);
+                                                setTempDimensionPoints([]);
+                                            }}
+                                            className="w-full rounded-lg bg-red-600 p-3 font-medium text-white transition-colors hover:bg-red-700"
+                                        >
+                                            ❌ {t('ยกเลิกการวัด')}
+                                        </button>
+                                    )}
 
                                     {dimensionLines.length > 0 && (
                                         <button
@@ -1455,21 +1619,18 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                 </div>
 
                                 {dimensionMode && (
-                                    <div className="mt-3 rounded-lg bg-yellow-900/30 p-3 text-sm text-yellow-200">
-                                        📐 {t('คลิกจุดที่ 1 และจุดที่ 2 เพื่อสร้างเส้นวัด')} (
-                                        {tempDimensionPoints.length}/{t('2')})
-                                        <br />
-                                        💡 {t('คลิกที่หัวฉีดเพื่อ snap ที่จุดศูนย์กลาง')}
+                                    <div className="mt-3 rounded-lg bg-yellow-900/30 text-sm text-yellow-200">
+                                        💡 {t('คลิกจุดที่ 1 และจุดที่ 2 เพื่อสร้างเส้นวัด')}
                                     </div>
                                 )}
                             </div>
                         )}
 
-                        {/* Pipe Editing Tools */}
-                        {isScaleSet && (
+                        {/* Pipe Editing Tools - Available without draw mode */}
+                        {isScaleSet && pipes.length > 0 && (
                             <div className="rounded-lg bg-gray-700 p-4">
                                 <h4 className="mb-3 text-lg font-semibold text-purple-400">
-                                    🔧 {t('แก้ไขระบบท่อ')}
+                                    🔧 {t('แก้ไขระบบท่อ (ใช้งานได้เสมอ)')}
                                 </h4>
 
                                 <div className="space-y-3">
@@ -1485,7 +1646,25 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                             <div>
                                                 {t('ความยาวรวม:')}{' '}
                                                 {formatDistance(
-                                                    pipes.reduce((sum, p) => sum + p.length, 0)
+                                                    calculatePipeStatistics(
+                                                        pipes,
+                                                        sprinklers,
+                                                        waterSource,
+                                                        true,
+                                                        imageData?.scale || 20
+                                                    ).totalLength
+                                                )}
+                                            </div>
+                                            <div>
+                                                {t('ท่อที่ยาวที่สุด:')}{' '}
+                                                {formatDistance(
+                                                    calculatePipeStatistics(
+                                                        pipes,
+                                                        sprinklers,
+                                                        waterSource,
+                                                        true,
+                                                        imageData?.scale || 20
+                                                    ).longestPath
                                                 )}
                                             </div>
                                         </div>
@@ -1532,148 +1711,6 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                             </div>
                         )}
 
-                        {/* Grid Controls */}
-                        {isScaleSet && (
-                            <div className="rounded-lg bg-gray-700 p-4">
-                                <h4 className="mb-3 text-lg font-semibold text-purple-400">
-                                    🔲 {t('ตาราง')}
-                                </h4>
-
-                                <div className="space-y-3">
-                                    <label className="flex items-center gap-2 text-sm text-white">
-                                        <input
-                                            type="checkbox"
-                                            checked={showGrid}
-                                            onChange={(e) => setShowGrid(e.target.checked)}
-                                            className="rounded"
-                                        />
-                                        {t('แสดงตาราง')}
-                                    </label>
-
-                                    {showGrid && (
-                                        <div>
-                                            <label className="mb-1 block text-xs text-gray-300">
-                                                {t('ระยะห่างตาราง:')}{' '}
-                                                {(gridSize / currentScale).toFixed(1)} {t('ม.')}
-                                            </label>
-                                            <input
-                                                type="range"
-                                                min="20"
-                                                max="100"
-                                                step="10"
-                                                value={gridSize}
-                                                onChange={(e) =>
-                                                    setGridSize(Number(e.target.value))
-                                                }
-                                                className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-600"
-                                            />
-                                            <div className="mt-1 flex justify-between text-xs text-gray-400">
-                                                <span>{t('ใกล้')}</span>
-                                                <span>{t('ไกล')}</span>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="rounded-lg bg-gray-700 p-4">
-                            <h4 className="mb-2 text-sm font-semibold text-gray-300">
-                                📊 {t('ข้อมูลรูปภาพ')}
-                            </h4>
-                            <div className="space-y-1 text-xs text-gray-400">
-                                <div>
-                                    📐 {t('ขนาด:')} {imageData.width} × {imageData.height} {t('px')}
-                                </div>
-                                <div className="text-yellow-300">
-                                    ⚖️ {t('Scale:')} {currentScale.toFixed(2)} {t('พิกเซล/เมตร')}
-                                </div>
-                                <div
-                                    className={`text-sm font-medium ${isScaleSet ? 'text-green-400' : 'text-red-400'}`}
-                                >
-                                    🔧 {t('สถานะ:')}{' '}
-                                    {isScaleSet
-                                        ? '✅' + t('ตั้งค่าแล้ว')
-                                        : '❌' + t('ยังไม่ตั้งค่า')}
-                                </div>
-                                {gardenZones.length > 0 && isScaleSet && (
-                                    <div className="text-blue-300">
-                                        🏡 {t('โซน')} : {gardenZones.length} {t('โซน')}
-                                    </div>
-                                )}
-                                {sprinklers.length > 0 && isScaleSet && (
-                                    <div className="text-green-300">
-                                        💧 {t('หัวฉีด:')} {sprinklers.length} {t('ตัว')}
-                                    </div>
-                                )}
-                                {pipes.length > 0 && isScaleSet && (
-                                    <div className="text-purple-300">
-                                        🔧 {t('ท่อ:')} {pipes.length} {t('เส้น')}
-                                    </div>
-                                )}
-                                {dimensionLines.length > 0 && (
-                                    <div className="text-yellow-300">
-                                        📏 {t('เส้นวัด:')} {dimensionLines.length} {t('เส้น')}
-                                    </div>
-                                )}
-                                {showGrid && (
-                                    <div className="text-purple-300">
-                                        🔲 {t('ตาราง:')} {(gridSize / currentScale).toFixed(1)}{' '}
-                                        {t('ม.')}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="mt-3 space-y-2 border-t border-gray-600 pt-3">
-                                <h5 className="text-xs font-medium text-gray-300">
-                                    🔍 {t('การซูมและแพน:')}
-                                </h5>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => {
-                                            setZoom(Math.max(0.1, zoom - 0.1));
-                                        }}
-                                        className="flex h-8 w-8 items-center justify-center rounded bg-gray-600 text-white hover:bg-gray-500"
-                                    >
-                                        -
-                                    </button>
-                                    <span className="min-w-[60px] text-center text-sm text-white">
-                                        {Math.round(zoom * 100)}%
-                                    </span>
-                                    <button
-                                        onClick={() => {
-                                            setZoom(Math.min(5, zoom + 0.1));
-                                        }}
-                                        className="flex h-8 w-8 items-center justify-center rounded bg-gray-600 text-white hover:bg-gray-500"
-                                    >
-                                        +
-                                    </button>
-                                </div>
-                                <div className="grid grid-cols-4 gap-1">
-                                    {[0.5, 1, 1.5, 2].map((zoomLevel) => (
-                                        <button
-                                            key={zoomLevel}
-                                            onClick={() => {
-                                                setZoom(zoomLevel);
-                                                setPanOffset({ x: 0, y: 0 });
-                                                setLastPanOffset({ x: 0, y: 0 });
-                                            }}
-                                            className={`rounded px-2 py-1 text-xs transition-colors ${
-                                                Math.abs(zoom - zoomLevel) < 0.01
-                                                    ? 'bg-blue-600 text-white'
-                                                    : 'bg-gray-600 text-white hover:bg-gray-500'
-                                            }`}
-                                        >
-                                            {zoomLevel * 100}%
-                                        </button>
-                                    ))}
-                                </div>
-                                <div className="mt-2 text-xs text-gray-400">
-                                    💡 {t('ล้อเมาส์: ซูม | คลิกลาก: แพน | Grid ช่วยวาดโซน')}
-                                </div>
-                            </div>
-                        </div>
-
                         {!isScaleSet && (
                             <div className="rounded-lg border-l-4 border-amber-400 bg-amber-800 p-4">
                                 <div className="flex items-start gap-3">
@@ -1691,23 +1728,6 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                 </div>
                             </div>
                         )}
-
-                        <div className="border-t border-gray-600 pt-4">
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept="image/jpeg,image/png"
-                                onChange={handleFileChange}
-                                className="hidden"
-                                id="image-change"
-                            />
-                            <label
-                                htmlFor="image-change"
-                                className="block w-full cursor-pointer rounded-lg bg-purple-600 px-4 py-3 text-center font-medium text-white transition-colors hover:bg-purple-700"
-                            >
-                                🖼️ {t('เปลี่ยนรูปภาพ')}
-                            </label>
-                        </div>
                     </div>
 
                     <div className="relative flex h-full w-full flex-1 items-center justify-center overflow-hidden rounded-lg border border-gray-600 bg-gray-900">
@@ -1763,8 +1783,40 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                             onMouseDown={handleMouseDown}
                             onMouseMove={handleMouseMove}
                             onMouseUp={handleMouseUp}
-                            onWheel={handleWheel}
                             onContextMenu={handleRightClick}
+                            onTouchStart={(e) => {
+                                e.preventDefault();
+                                if (e.touches.length === 1) {
+                                    const touch = e.touches[0];
+                                    const syntheticEvent = {
+                                        clientX: touch.clientX,
+                                        clientY: touch.clientY,
+                                        button: 0,
+                                        preventDefault: () => {},
+                                    } as React.MouseEvent<HTMLDivElement>;
+                                    handleMouseDown(syntheticEvent);
+                                }
+                            }}
+                            onTouchMove={(e) => {
+                                e.preventDefault();
+                                if (e.touches.length === 1) {
+                                    const touch = e.touches[0];
+                                    const syntheticEvent = {
+                                        clientX: touch.clientX,
+                                        clientY: touch.clientY,
+                                        preventDefault: () => {},
+                                    } as React.MouseEvent<HTMLDivElement>;
+                                    handleMouseMove(syntheticEvent);
+                                }
+                            }}
+                            onTouchEnd={(e) => {
+                                e.preventDefault();
+                                handleMouseUp();
+                            }}
+                            onTouchCancel={(e) => {
+                                e.preventDefault();
+                                handleMouseUp();
+                            }}
                         >
                             <div
                                 className="absolute"
@@ -1773,567 +1825,650 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                     transformOrigin: '0 0',
                                 }}
                             >
-                                <img
-                                    src={imageData.url}
-                                    alt="House plan"
-                                    className="block"
-                                    style={{
-                                        width: imageData.width * zoom,
-                                        height: imageData.height * zoom,
-                                    }}
-                                    draggable={false}
-                                />
-
-                                <svg
-                                    className="absolute inset-0"
-                                    width={imageData.width * zoom}
-                                    height={imageData.height * zoom}
-                                    viewBox={`0 0 ${imageData.width} ${imageData.height}`}
-                                    style={{ pointerEvents: 'none' }}
-                                >
-                                    {measurementMode === 'line' && measurementLine.start && (
-                                        <g>
-                                            <circle
-                                                cx={measurementLine.start.x}
-                                                cy={measurementLine.start.y}
-                                                r="8"
-                                                fill="yellow"
-                                                stroke="red"
-                                                strokeWidth="3"
-                                            />
-                                            <text
-                                                x={measurementLine.start.x}
-                                                y={measurementLine.start.y - 15}
-                                                fill="white"
-                                                fontSize="12"
-                                                fontWeight="bold"
-                                                textAnchor="middle"
-                                                style={{
-                                                    filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))',
-                                                }}
-                                            >
-                                                {t('จุดที่ 1')}
-                                            </text>
-
-                                            {measurementLine.end && (
-                                                <>
-                                                    <line
-                                                        x1={measurementLine.start.x}
-                                                        y1={measurementLine.start.y}
-                                                        x2={measurementLine.end.x}
-                                                        y2={measurementLine.end.y}
-                                                        stroke="yellow"
-                                                        strokeWidth="4"
-                                                        strokeDasharray="10,5"
-                                                    />
-                                                    <circle
-                                                        cx={measurementLine.end.x}
-                                                        cy={measurementLine.end.y}
-                                                        r="8"
-                                                        fill="yellow"
-                                                        stroke="red"
-                                                        strokeWidth="3"
-                                                    />
-                                                    <text
-                                                        x={measurementLine.end.x}
-                                                        y={measurementLine.end.y - 15}
-                                                        fill="white"
-                                                        fontSize="12"
-                                                        fontWeight="bold"
-                                                        textAnchor="middle"
-                                                        style={{
-                                                            filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))',
-                                                        }}
-                                                    >
-                                                        {t('จุดที่ 2')}
-                                                    </text>
-                                                    <text
-                                                        x={
-                                                            (measurementLine.start.x +
-                                                                measurementLine.end.x) /
-                                                            2
-                                                        }
-                                                        y={
-                                                            (measurementLine.start.y +
-                                                                measurementLine.end.y) /
-                                                                2 -
-                                                            15
-                                                        }
-                                                        fill="yellow"
-                                                        fontSize="16"
-                                                        fontWeight="bold"
-                                                        textAnchor="middle"
-                                                        style={{
-                                                            filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))',
-                                                        }}
-                                                    >
-                                                        📏{' '}
-                                                        {measurementLine.pixelDistance?.toFixed(1)}{' '}
-                                                        {t('พิกเซล')}
-                                                    </text>
-                                                </>
-                                            )}
-                                        </g>
-                                    )}
-
-                                    {/* Dimension lines */}
-                                    {dimensionLines.map((dimension) => (
-                                        <g key={dimension.id}>
-                                            {/* Calculate dimension line position */}
-                                            {(() => {
-                                                const dx = dimension.end.x - dimension.start.x;
-                                                const dy = dimension.end.y - dimension.start.y;
-                                                const length = Math.sqrt(dx * dx + dy * dy);
-
-                                                if (length < 1) return null;
-
-                                                const unitX = dx / length;
-                                                const unitY = dy / length;
-                                                const offsetDistance = 30;
-
-                                                let offsetX = 0;
-                                                let offsetY = 0;
-
-                                                if (dimension.direction === 'auto') {
-                                                    offsetX = -unitY * offsetDistance;
-                                                    offsetY = unitX * offsetDistance;
-                                                } else if (dimension.direction === 'left') {
-                                                    offsetX = -offsetDistance;
-                                                    offsetY = 0;
-                                                } else if (dimension.direction === 'right') {
-                                                    offsetX = offsetDistance;
-                                                    offsetY = 0;
-                                                } else if (dimension.direction === 'top') {
-                                                    offsetX = 0;
-                                                    offsetY = -offsetDistance;
-                                                } else if (dimension.direction === 'bottom') {
-                                                    offsetX = 0;
-                                                    offsetY = offsetDistance;
-                                                }
-
-                                                const dimStart = {
-                                                    x: dimension.start.x + offsetX,
-                                                    y: dimension.start.y + offsetY,
-                                                };
-                                                const dimEnd = {
-                                                    x: dimension.end.x + offsetX,
-                                                    y: dimension.end.y + offsetY,
-                                                };
-
-                                                return (
-                                                    <>
-                                                        {/* Dimension line */}
-                                                        <line
-                                                            x1={dimStart.x}
-                                                            y1={dimStart.y}
-                                                            x2={dimEnd.x}
-                                                            y2={dimEnd.y}
-                                                            stroke="#FFD700"
-                                                            strokeWidth="2"
-                                                        />
-
-                                                        {/* Extension lines */}
-                                                        <line
-                                                            x1={dimension.start.x}
-                                                            y1={dimension.start.y}
-                                                            x2={dimStart.x}
-                                                            y2={dimStart.y}
-                                                            stroke="#FFD700"
-                                                            strokeWidth="1"
-                                                            strokeDasharray="3,3"
-                                                        />
-                                                        <line
-                                                            x1={dimension.end.x}
-                                                            y1={dimension.end.y}
-                                                            x2={dimEnd.x}
-                                                            y2={dimEnd.y}
-                                                            stroke="#FFD700"
-                                                            strokeWidth="1"
-                                                            strokeDasharray="3,3"
-                                                        />
-
-                                                        {/* Arrows */}
-                                                        {(() => {
-                                                            const arrowSize = 8;
-                                                            const angle1 = Math.atan2(
-                                                                dimEnd.y - dimStart.y,
-                                                                dimEnd.x - dimStart.x
-                                                            );
-                                                            const angle2 = angle1 + Math.PI;
-
-                                                            return (
-                                                                <>
-                                                                    <g
-                                                                        stroke="#FFD700"
-                                                                        strokeWidth="2"
-                                                                        fill="none"
-                                                                    >
-                                                                        <path
-                                                                            d={`M ${dimStart.x} ${dimStart.y} L ${dimStart.x + Math.cos(angle1 + 0.3) * arrowSize} ${dimStart.y + Math.sin(angle1 + 0.3) * arrowSize}`}
-                                                                        />
-                                                                        <path
-                                                                            d={`M ${dimStart.x} ${dimStart.y} L ${dimStart.x + Math.cos(angle1 - 0.3) * arrowSize} ${dimStart.y + Math.sin(angle1 - 0.3) * arrowSize}`}
-                                                                        />
-                                                                        <path
-                                                                            d={`M ${dimEnd.x} ${dimEnd.y} L ${dimEnd.x + Math.cos(angle2 + 0.3) * arrowSize} ${dimEnd.y + Math.sin(angle2 + 0.3) * arrowSize}`}
-                                                                        />
-                                                                        <path
-                                                                            d={`M ${dimEnd.x} ${dimEnd.y} L ${dimEnd.x + Math.cos(angle2 - 0.3) * arrowSize} ${dimEnd.y + Math.sin(angle2 - 0.3) * arrowSize}`}
-                                                                        />
-                                                                    </g>
-                                                                </>
-                                                            );
-                                                        })()}
-
-                                                        {/* Label with delete button */}
-                                                        <g>
-                                                            <rect
-                                                                x={(dimStart.x + dimEnd.x) / 2 - 25}
-                                                                y={(dimStart.y + dimEnd.y) / 2 - 8}
-                                                                width="50"
-                                                                height="16"
-                                                                fill="rgba(0,0,0,0.8)"
-                                                                rx="2"
-                                                            />
-                                                            <text
-                                                                x={(dimStart.x + dimEnd.x) / 2}
-                                                                y={(dimStart.y + dimEnd.y) / 2}
-                                                                fill="#FFD700"
-                                                                fontSize="12"
-                                                                fontWeight="bold"
-                                                                textAnchor="middle"
-                                                                dominantBaseline="middle"
-                                                            >
-                                                                {dimension.label}
-                                                            </text>
-                                                            <text
-                                                                x={(dimStart.x + dimEnd.x) / 2 + 20}
-                                                                y={(dimStart.y + dimEnd.y) / 2 - 2}
-                                                                fill="#FF4444"
-                                                                fontSize="10"
-                                                                fontWeight="bold"
-                                                                textAnchor="middle"
-                                                                dominantBaseline="middle"
-                                                                style={{ cursor: 'pointer' }}
-                                                            >
-                                                                ×
-                                                            </text>
-                                                        </g>
-                                                    </>
-                                                );
-                                            })()}
-                                        </g>
-                                    ))}
-
-                                    {/* Temp dimension points */}
-                                    {dimensionMode &&
-                                        tempDimensionPoints.map((point, index) => (
-                                            <g key={index}>
-                                                <circle
-                                                    cx={point.x}
-                                                    cy={point.y}
-                                                    r="6"
-                                                    fill="#FFD700"
-                                                    stroke="white"
-                                                    strokeWidth="2"
-                                                />
-                                                <text
-                                                    x={point.x}
-                                                    y={point.y - 15}
-                                                    fill="white"
-                                                    fontSize="12"
-                                                    fontWeight="bold"
-                                                    textAnchor="middle"
-                                                    style={{
-                                                        filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))',
-                                                    }}
-                                                >
-                                                    จุดที่ {index + 1}
-                                                </text>
-                                            </g>
-                                        ))}
-
-                                    {/* Temp dimension line */}
-                                    {tempDimensionPoints.length === 2 && (
-                                        <line
-                                            x1={tempDimensionPoints[0].x}
-                                            y1={tempDimensionPoints[0].y}
-                                            x2={tempDimensionPoints[1].x}
-                                            y2={tempDimensionPoints[1].y}
-                                            stroke="#FFD700"
-                                            strokeWidth="3"
-                                            strokeDasharray="5,5"
+                                {imageData && (
+                                    <>
+                                        <img
+                                            src={imageData.url}
+                                            alt="House plan"
+                                            className="block"
+                                            style={{
+                                                width: imageData.width * zoom,
+                                                height: imageData.height * zoom,
+                                                objectFit: 'contain',
+                                                aspectRatio: imageAspectRatio,
+                                            }}
+                                            draggable={false}
+                                            onMouseDown={handleImageDragStart}
+                                            onMouseMove={handleImageDragMove}
+                                            onMouseUp={handleImageDragEnd}
+                                            onMouseLeave={handleImageDragEnd}
                                         />
-                                    )}
 
-                                    {isScaleSet && (
-                                        <>
-                                            {/* Enhanced zone preview */}
-                                            {enhancedDrawing.previewShape &&
-                                                enhancedDrawing.previewShape.length > 2 && (
+                                        <svg
+                                            className="absolute inset-0"
+                                            width={imageData.width * zoom}
+                                            height={imageData.height * zoom}
+                                            viewBox={`0 0 ${imageData.width} ${imageData.height}`}
+                                            style={{ pointerEvents: 'none' }}
+                                        >
+                                            {measurementMode === 'line' &&
+                                                measurementLine.start && (
                                                     <g>
-                                                        <polygon
-                                                            points={enhancedDrawing.previewShape
-                                                                .map((p) => `${p.x},${p.y}`)
-                                                                .join(' ')}
-                                                            fill={
-                                                                ZONE_TYPES.find(
-                                                                    (z) => z.id === selectedZoneType
-                                                                )?.color + '26' || '#3B82F6' + '26'
-                                                            }
-                                                            stroke={
-                                                                ZONE_TYPES.find(
-                                                                    (z) => z.id === selectedZoneType
-                                                                )?.color || '#3B82F6'
-                                                            }
+                                                        <circle
+                                                            cx={measurementLine.start.x}
+                                                            cy={measurementLine.start.y}
+                                                            r="8"
+                                                            fill="yellow"
+                                                            stroke="red"
                                                             strokeWidth="3"
-                                                            strokeDasharray="8,6"
                                                         />
-                                                        {/* Show area preview */}
                                                         <text
-                                                            x={
-                                                                enhancedDrawing.previewShape.reduce(
-                                                                    (sum, p) => sum + p.x,
-                                                                    0
-                                                                ) /
-                                                                enhancedDrawing.previewShape.length
-                                                            }
-                                                            y={
-                                                                enhancedDrawing.previewShape.reduce(
-                                                                    (sum, p) => sum + p.y,
-                                                                    0
-                                                                ) /
-                                                                enhancedDrawing.previewShape.length
-                                                            }
+                                                            x={measurementLine.start.x}
+                                                            y={measurementLine.start.y - 15}
                                                             fill="white"
-                                                            fontSize="14"
+                                                            fontSize="12"
                                                             fontWeight="bold"
                                                             textAnchor="middle"
                                                             style={{
                                                                 filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))',
                                                             }}
                                                         >
-                                                            {formatEnhancedArea(
-                                                                calculatePolygonArea(
-                                                                    enhancedDrawing.previewShape,
-                                                                    currentScale
-                                                                )
-                                                            )}
+                                                            {t('จุดที่ 1')}
+                                                        </text>
+
+                                                        {measurementLine.end && (
+                                                            <>
+                                                                <line
+                                                                    x1={measurementLine.start.x}
+                                                                    y1={measurementLine.start.y}
+                                                                    x2={measurementLine.end.x}
+                                                                    y2={measurementLine.end.y}
+                                                                    stroke="yellow"
+                                                                    strokeWidth="4"
+                                                                    strokeDasharray="10,5"
+                                                                />
+                                                                <circle
+                                                                    cx={measurementLine.end.x}
+                                                                    cy={measurementLine.end.y}
+                                                                    r="8"
+                                                                    fill="yellow"
+                                                                    stroke="red"
+                                                                    strokeWidth="3"
+                                                                />
+                                                                <text
+                                                                    x={measurementLine.end.x}
+                                                                    y={measurementLine.end.y - 15}
+                                                                    fill="white"
+                                                                    fontSize="12"
+                                                                    fontWeight="bold"
+                                                                    textAnchor="middle"
+                                                                    style={{
+                                                                        filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))',
+                                                                    }}
+                                                                >
+                                                                    {t('จุดที่ 2')}
+                                                                </text>
+                                                                <text
+                                                                    x={
+                                                                        (measurementLine.start.x +
+                                                                            measurementLine.end.x) /
+                                                                        2
+                                                                    }
+                                                                    y={
+                                                                        (measurementLine.start.y +
+                                                                            measurementLine.end.y) /
+                                                                            2 -
+                                                                        15
+                                                                    }
+                                                                    fill="yellow"
+                                                                    fontSize="16"
+                                                                    fontWeight="bold"
+                                                                    textAnchor="middle"
+                                                                    style={{
+                                                                        filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))',
+                                                                    }}
+                                                                >
+                                                                    📏{' '}
+                                                                    {measurementLine.pixelDistance?.toFixed(
+                                                                        1
+                                                                    )}{' '}
+                                                                    {t('พิกเซล')}
+                                                                </text>
+                                                            </>
+                                                        )}
+                                                    </g>
+                                                )}
+
+                                            {/* Dimension lines */}
+                                            {dimensionLines.map((dimension) => (
+                                                <g key={dimension.id}>
+                                                    {/* Calculate dimension line position */}
+                                                    {(() => {
+                                                        const dx =
+                                                            dimension.end.x - dimension.start.x;
+                                                        const dy =
+                                                            dimension.end.y - dimension.start.y;
+                                                        const length = Math.sqrt(dx * dx + dy * dy);
+
+                                                        if (length < 1) return null;
+
+                                                        const unitX = dx / length;
+                                                        const unitY = dy / length;
+                                                        const offsetDistance = 30;
+
+                                                        let offsetX = 0;
+                                                        let offsetY = 0;
+
+                                                        if (dimension.direction === 'auto') {
+                                                            offsetX = -unitY * offsetDistance;
+                                                            offsetY = unitX * offsetDistance;
+                                                        } else if (dimension.direction === 'left') {
+                                                            offsetX = -offsetDistance;
+                                                            offsetY = 0;
+                                                        } else if (
+                                                            dimension.direction === 'right'
+                                                        ) {
+                                                            offsetX = offsetDistance;
+                                                            offsetY = 0;
+                                                        } else if (dimension.direction === 'top') {
+                                                            offsetX = 0;
+                                                            offsetY = -offsetDistance;
+                                                        } else if (
+                                                            dimension.direction === 'bottom'
+                                                        ) {
+                                                            offsetX = 0;
+                                                            offsetY = offsetDistance;
+                                                        }
+
+                                                        const dimStart = {
+                                                            x: dimension.start.x + offsetX,
+                                                            y: dimension.start.y + offsetY,
+                                                        };
+                                                        const dimEnd = {
+                                                            x: dimension.end.x + offsetX,
+                                                            y: dimension.end.y + offsetY,
+                                                        };
+
+                                                        return (
+                                                            <>
+                                                                {/* Dimension line */}
+                                                                <line
+                                                                    x1={dimStart.x}
+                                                                    y1={dimStart.y}
+                                                                    x2={dimEnd.x}
+                                                                    y2={dimEnd.y}
+                                                                    stroke="#FFD700"
+                                                                    strokeWidth="2"
+                                                                />
+
+                                                                {/* Extension lines */}
+                                                                <line
+                                                                    x1={dimension.start.x}
+                                                                    y1={dimension.start.y}
+                                                                    x2={dimStart.x}
+                                                                    y2={dimStart.y}
+                                                                    stroke="#FFD700"
+                                                                    strokeWidth="1"
+                                                                    strokeDasharray="3,3"
+                                                                />
+                                                                <line
+                                                                    x1={dimension.end.x}
+                                                                    y1={dimension.end.y}
+                                                                    x2={dimEnd.x}
+                                                                    y2={dimEnd.y}
+                                                                    stroke="#FFD700"
+                                                                    strokeWidth="1"
+                                                                    strokeDasharray="3,3"
+                                                                />
+
+                                                                {/* Arrows */}
+                                                                {(() => {
+                                                                    const arrowSize = 8;
+                                                                    const angle1 = Math.atan2(
+                                                                        dimEnd.y - dimStart.y,
+                                                                        dimEnd.x - dimStart.x
+                                                                    );
+                                                                    const angle2 = angle1 + Math.PI;
+
+                                                                    return (
+                                                                        <>
+                                                                            <g
+                                                                                stroke="#FFD700"
+                                                                                strokeWidth="2"
+                                                                                fill="none"
+                                                                            >
+                                                                                <path
+                                                                                    d={`M ${dimStart.x} ${dimStart.y} L ${dimStart.x + Math.cos(angle1 + 0.3) * arrowSize} ${dimStart.y + Math.sin(angle1 + 0.3) * arrowSize}`}
+                                                                                />
+                                                                                <path
+                                                                                    d={`M ${dimStart.x} ${dimStart.y} L ${dimStart.x + Math.cos(angle1 - 0.3) * arrowSize} ${dimStart.y + Math.sin(angle1 - 0.3) * arrowSize}`}
+                                                                                />
+                                                                                <path
+                                                                                    d={`M ${dimEnd.x} ${dimEnd.y} L ${dimEnd.x + Math.cos(angle2 + 0.3) * arrowSize} ${dimEnd.y + Math.sin(angle2 + 0.3) * arrowSize}`}
+                                                                                />
+                                                                                <path
+                                                                                    d={`M ${dimEnd.x} ${dimEnd.y} L ${dimEnd.x + Math.cos(angle2 - 0.3) * arrowSize} ${dimEnd.y + Math.sin(angle2 - 0.3) * arrowSize}`}
+                                                                                />
+                                                                            </g>
+                                                                        </>
+                                                                    );
+                                                                })()}
+
+                                                                {/* Label with delete button */}
+                                                                <g>
+                                                                    <rect
+                                                                        x={
+                                                                            (dimStart.x +
+                                                                                dimEnd.x) /
+                                                                                2 -
+                                                                            25
+                                                                        }
+                                                                        y={
+                                                                            (dimStart.y +
+                                                                                dimEnd.y) /
+                                                                                2 -
+                                                                            8
+                                                                        }
+                                                                        width="50"
+                                                                        height="16"
+                                                                        fill="rgba(0,0,0,0.8)"
+                                                                        rx="2"
+                                                                    />
+                                                                    <text
+                                                                        x={
+                                                                            (dimStart.x +
+                                                                                dimEnd.x) /
+                                                                            2
+                                                                        }
+                                                                        y={
+                                                                            (dimStart.y +
+                                                                                dimEnd.y) /
+                                                                            2
+                                                                        }
+                                                                        fill="#FFD700"
+                                                                        fontSize="12"
+                                                                        fontWeight="bold"
+                                                                        textAnchor="middle"
+                                                                        dominantBaseline="middle"
+                                                                    >
+                                                                        {dimension.label}
+                                                                    </text>
+                                                                    <text
+                                                                        x={
+                                                                            (dimStart.x +
+                                                                                dimEnd.x) /
+                                                                                2 +
+                                                                            20
+                                                                        }
+                                                                        y={
+                                                                            (dimStart.y +
+                                                                                dimEnd.y) /
+                                                                                2 -
+                                                                            2
+                                                                        }
+                                                                        fill="#FF4444"
+                                                                        fontSize="10"
+                                                                        fontWeight="bold"
+                                                                        textAnchor="middle"
+                                                                        dominantBaseline="middle"
+                                                                        style={{
+                                                                            cursor: 'pointer',
+                                                                        }}
+                                                                    >
+                                                                        ×
+                                                                    </text>
+                                                                </g>
+                                                            </>
+                                                        );
+                                                    })()}
+                                                </g>
+                                            ))}
+
+                                            {/* Temp dimension points */}
+                                            {dimensionMode &&
+                                                tempDimensionPoints.map((point, index) => (
+                                                    <g key={index}>
+                                                        <circle
+                                                            cx={point.x}
+                                                            cy={point.y}
+                                                            r="6"
+                                                            fill="#FFD700"
+                                                            stroke="white"
+                                                            strokeWidth="2"
+                                                        />
+                                                        <text
+                                                            x={point.x}
+                                                            y={point.y - 15}
+                                                            fill="white"
+                                                            fontSize="12"
+                                                            fontWeight="bold"
+                                                            textAnchor="middle"
+                                                            style={{
+                                                                filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))',
+                                                            }}
+                                                        >
+                                                            จุดที่ {index + 1}
                                                         </text>
                                                     </g>
-                                                )}
+                                                ))}
 
-                                            {/* Guide line for freehand drawing */}
-                                            {currentZoneTool === 'freehand' &&
-                                                enhancedDrawing.isDrawing &&
-                                                enhancedDrawing.currentPoints.length > 0 && (
-                                                    <g>
-                                                        <line
-                                                            x1={
-                                                                enhancedDrawing.currentPoints[
-                                                                    enhancedDrawing.currentPoints
-                                                                        .length - 1
-                                                                ].x
-                                                            }
-                                                            y1={
-                                                                enhancedDrawing.currentPoints[
-                                                                    enhancedDrawing.currentPoints
-                                                                        .length - 1
-                                                                ].y
-                                                            }
-                                                            x2={mousePos.x}
-                                                            y2={mousePos.y}
-                                                            stroke="#00FF00"
-                                                            strokeWidth="2"
-                                                            strokeDasharray="5,5"
-                                                        />
-                                                    </g>
-                                                )}
-
-                                            {/* Distance cursor for enhanced drawing */}
-                                            {distanceCursor.show && (
-                                                <g>
-                                                    <text
-                                                        x={mousePos.x + 10}
-                                                        y={mousePos.y}
-                                                        fill="white"
-                                                        fontSize="14"
-                                                        fontWeight="bold"
-                                                        style={{
-                                                            filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))',
-                                                        }}
-                                                    >
-                                                        {formatEnhancedDistance(
-                                                            distanceCursor.distance
-                                                        )}
-                                                    </text>
-                                                </g>
+                                            {/* Temp dimension line */}
+                                            {tempDimensionPoints.length === 2 && (
+                                                <line
+                                                    x1={tempDimensionPoints[0].x}
+                                                    y1={tempDimensionPoints[0].y}
+                                                    x2={tempDimensionPoints[1].x}
+                                                    y2={tempDimensionPoints[1].y}
+                                                    stroke="#FFD700"
+                                                    strokeWidth="3"
+                                                    strokeDasharray="5,5"
+                                                />
                                             )}
 
-                                            {gardenZones
-                                                .sort((a, b) => {
-                                                    if (a.parentZoneId && !b.parentZoneId) return 1;
-                                                    if (!a.parentZoneId && b.parentZoneId)
-                                                        return -1;
-                                                    return 0;
-                                                })
-                                                .map((zone) => {
-                                                    if (
-                                                        !zone.canvasCoordinates ||
-                                                        zone.canvasCoordinates.length < 3
-                                                    )
-                                                        return null;
+                                            {isScaleSet && (
+                                                <>
+                                                    {/* Enhanced zone preview */}
+                                                    {enhancedDrawing.previewShape &&
+                                                        enhancedDrawing.previewShape.length > 2 && (
+                                                            <g>
+                                                                <polygon
+                                                                    points={enhancedDrawing.previewShape
+                                                                        .map((p) => `${p.x},${p.y}`)
+                                                                        .join(' ')}
+                                                                    fill={
+                                                                        ZONE_TYPES.find(
+                                                                            (z) =>
+                                                                                z.id ===
+                                                                                selectedZoneType
+                                                                        )?.color + '26' ||
+                                                                        '#3B82F6' + '26'
+                                                                    }
+                                                                    stroke={
+                                                                        ZONE_TYPES.find(
+                                                                            (z) =>
+                                                                                z.id ===
+                                                                                selectedZoneType
+                                                                        )?.color || '#3B82F6'
+                                                                    }
+                                                                    strokeWidth="3"
+                                                                    strokeDasharray="8,6"
+                                                                />
+                                                                {/* Show area preview */}
+                                                                <text
+                                                                    x={
+                                                                        enhancedDrawing.previewShape.reduce(
+                                                                            (sum, p) => sum + p.x,
+                                                                            0
+                                                                        ) /
+                                                                        enhancedDrawing.previewShape
+                                                                            .length
+                                                                    }
+                                                                    y={
+                                                                        enhancedDrawing.previewShape.reduce(
+                                                                            (sum, p) => sum + p.y,
+                                                                            0
+                                                                        ) /
+                                                                        enhancedDrawing.previewShape
+                                                                            .length
+                                                                    }
+                                                                    fill="white"
+                                                                    fontSize="14"
+                                                                    fontWeight="bold"
+                                                                    textAnchor="middle"
+                                                                    style={{
+                                                                        filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))',
+                                                                    }}
+                                                                >
+                                                                    {formatEnhancedArea(
+                                                                        calculatePolygonArea(
+                                                                            enhancedDrawing.previewShape,
+                                                                            currentScale
+                                                                        )
+                                                                    )}
+                                                                </text>
+                                                            </g>
+                                                        )}
 
-                                                    const zoneType = ZONE_TYPES.find(
-                                                        (z) => z.id === zone.type
-                                                    );
-                                                    const points = zone.canvasCoordinates
-                                                        .map((c) => `${c.x},${c.y}`)
-                                                        .join(' ');
+                                                    {/* Guide line for freehand drawing */}
+                                                    {currentZoneTool === 'freehand' &&
+                                                        enhancedDrawing.isDrawing &&
+                                                        enhancedDrawing.currentPoints.length >
+                                                            0 && (
+                                                            <g>
+                                                                <line
+                                                                    x1={
+                                                                        enhancedDrawing
+                                                                            .currentPoints[
+                                                                            enhancedDrawing
+                                                                                .currentPoints
+                                                                                .length - 1
+                                                                        ].x
+                                                                    }
+                                                                    y1={
+                                                                        enhancedDrawing
+                                                                            .currentPoints[
+                                                                            enhancedDrawing
+                                                                                .currentPoints
+                                                                                .length - 1
+                                                                        ].y
+                                                                    }
+                                                                    x2={mousePos.x}
+                                                                    y2={mousePos.y}
+                                                                    stroke="#00FF00"
+                                                                    strokeWidth="2"
+                                                                    strokeDasharray="5,5"
+                                                                />
+                                                            </g>
+                                                        )}
 
-                                                    return (
-                                                        <g key={zone.id}>
-                                                            <polygon
-                                                                points={points}
-                                                                fill={zoneType?.color + '33'}
-                                                                stroke={zoneType?.color}
-                                                                strokeWidth={
-                                                                    zone.parentZoneId ? 3 : 2
-                                                                }
-                                                                strokeDasharray={
-                                                                    zone.type === 'forbidden' ||
-                                                                    zone.parentZoneId
-                                                                        ? '5,5'
-                                                                        : undefined
-                                                                }
-                                                            />
+                                                    {/* Distance cursor for enhanced drawing */}
+                                                    {distanceCursor.show && (
+                                                        <g>
                                                             <text
-                                                                x={
-                                                                    zone.canvasCoordinates.reduce(
-                                                                        (sum, c) => sum + c.x,
-                                                                        0
-                                                                    ) /
-                                                                    zone.canvasCoordinates.length
-                                                                }
-                                                                y={
-                                                                    zone.canvasCoordinates.reduce(
-                                                                        (sum, c) => sum + c.y,
-                                                                        0
-                                                                    ) /
-                                                                    zone.canvasCoordinates.length
-                                                                }
-                                                                textAnchor="middle"
+                                                                x={mousePos.x + 10}
+                                                                y={mousePos.y}
                                                                 fill="white"
-                                                                fontSize="12"
+                                                                fontSize="14"
                                                                 fontWeight="bold"
                                                                 style={{
                                                                     filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))',
                                                                 }}
                                                             >
-                                                                {t(zone.name)}
-                                                            </text>
-
-                                                            {/* Show area */}
-                                                            <text
-                                                                x={
-                                                                    zone.canvasCoordinates.reduce(
-                                                                        (sum, c) => sum + c.x,
-                                                                        0
-                                                                    ) /
-                                                                    zone.canvasCoordinates.length
-                                                                }
-                                                                y={
-                                                                    zone.canvasCoordinates.reduce(
-                                                                        (sum, c) => sum + c.y,
-                                                                        0
-                                                                    ) /
-                                                                        zone.canvasCoordinates
-                                                                            .length +
-                                                                    15
-                                                                }
-                                                                textAnchor="middle"
-                                                                fill="white"
-                                                                fontSize="10"
-                                                                style={{
-                                                                    filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.8))',
-                                                                }}
-                                                            >
-                                                                {formatArea(
-                                                                    calculatePolygonArea(
-                                                                        zone.canvasCoordinates,
-                                                                        currentScale
-                                                                    )
+                                                                {formatEnhancedDistance(
+                                                                    distanceCursor.distance
                                                                 )}
                                                             </text>
                                                         </g>
-                                                    );
-                                                })}
-
-                                            {currentPolygon.length > 0 && (
-                                                <g>
-                                                    <polyline
-                                                        points={currentPolygon
-                                                            .map((c) => `${c.x},${c.y}`)
-                                                            .join(' ')}
-                                                        fill="none"
-                                                        stroke={
-                                                            ZONE_TYPES.find(
-                                                                (z) => z.id === selectedZoneType
-                                                            )?.color
-                                                        }
-                                                        strokeWidth={3}
-                                                        strokeDasharray="8,4"
-                                                    />
-                                                    {currentPolygon.map((point, i) => (
-                                                        <circle
-                                                            key={i}
-                                                            cx={point.x}
-                                                            cy={point.y}
-                                                            r={6}
-                                                            fill={
-                                                                ZONE_TYPES.find(
-                                                                    (z) => z.id === selectedZoneType
-                                                                )?.color
-                                                            }
-                                                            stroke="white"
-                                                            strokeWidth="2"
-                                                        />
-                                                    ))}
-
-                                                    {/* Show area for current polygon */}
-                                                    {currentPolygon.length > 2 && (
-                                                        <text
-                                                            x={
-                                                                currentPolygon.reduce(
-                                                                    (sum, p) => sum + p.x,
-                                                                    0
-                                                                ) / currentPolygon.length
-                                                            }
-                                                            y={
-                                                                currentPolygon.reduce(
-                                                                    (sum, p) => sum + p.y,
-                                                                    0
-                                                                ) / currentPolygon.length
-                                                            }
-                                                            textAnchor="middle"
-                                                            fill="white"
-                                                            fontSize="14"
-                                                            fontWeight="bold"
-                                                            style={{
-                                                                filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))',
-                                                            }}
-                                                        >
-                                                            {formatArea(
-                                                                calculatePolygonArea(
-                                                                    currentPolygon,
-                                                                    currentScale
-                                                                )
-                                                            )}
-                                                        </text>
                                                     )}
-                                                </g>
-                                            )}
 
+                                                    {gardenZones
+                                                        .sort((a, b) => {
+                                                            if (a.parentZoneId && !b.parentZoneId)
+                                                                return 1;
+                                                            if (!a.parentZoneId && b.parentZoneId)
+                                                                return -1;
+                                                            return 0;
+                                                        })
+                                                        .map((zone) => {
+                                                            if (
+                                                                !zone.canvasCoordinates ||
+                                                                zone.canvasCoordinates.length < 3
+                                                            )
+                                                                return null;
+
+                                                            const zoneType = ZONE_TYPES.find(
+                                                                (z) => z.id === zone.type
+                                                            );
+                                                            // คำนวณตำแหน่งโซนที่ขยายหรือซูมตามรูปภาพ
+                                                            const scaledCoordinates =
+                                                                zone.canvasCoordinates.map(
+                                                                    (coord) => ({
+                                                                        x: coord.x,
+                                                                        y: coord.y,
+                                                                    })
+                                                                );
+                                                            const points = scaledCoordinates
+                                                                .map((c) => `${c.x},${c.y}`)
+                                                                .join(' ');
+
+                                                            return (
+                                                                <g key={zone.id}>
+                                                                    <polygon
+                                                                        points={points}
+                                                                        fill={
+                                                                            zoneType?.color + '33'
+                                                                        }
+                                                                        stroke={zoneType?.color}
+                                                                        strokeWidth={
+                                                                            zone.parentZoneId
+                                                                                ? 3
+                                                                                : 2
+                                                                        }
+                                                                        strokeDasharray={
+                                                                            zone.type ===
+                                                                                'forbidden' ||
+                                                                            zone.parentZoneId
+                                                                                ? '5,5'
+                                                                                : undefined
+                                                                        }
+                                                                    />
+                                                                    <text
+                                                                        x={
+                                                                            scaledCoordinates.reduce(
+                                                                                (sum, c) =>
+                                                                                    sum + c.x,
+                                                                                0
+                                                                            ) /
+                                                                            scaledCoordinates.length
+                                                                        }
+                                                                        y={
+                                                                            scaledCoordinates.reduce(
+                                                                                (sum, c) =>
+                                                                                    sum + c.y,
+                                                                                0
+                                                                            ) /
+                                                                            scaledCoordinates.length
+                                                                        }
+                                                                        textAnchor="middle"
+                                                                        fill="white"
+                                                                        fontSize="12"
+                                                                        fontWeight="bold"
+                                                                        style={{
+                                                                            filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))',
+                                                                        }}
+                                                                    >
+                                                                        {t(zone.name)}
+                                                                    </text>
+
+                                                                    {/* Show area */}
+                                                                    <text
+                                                                        x={
+                                                                            scaledCoordinates.reduce(
+                                                                                (sum, c) =>
+                                                                                    sum + c.x,
+                                                                                0
+                                                                            ) /
+                                                                            scaledCoordinates.length
+                                                                        }
+                                                                        y={
+                                                                            scaledCoordinates.reduce(
+                                                                                (sum, c) =>
+                                                                                    sum + c.y,
+                                                                                0
+                                                                            ) /
+                                                                                scaledCoordinates.length +
+                                                                            15
+                                                                        }
+                                                                        textAnchor="middle"
+                                                                        fill="white"
+                                                                        fontSize="10"
+                                                                        style={{
+                                                                            filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.8))',
+                                                                        }}
+                                                                    >
+                                                                        {formatArea(
+                                                                            calculatePolygonArea(
+                                                                                zone.canvasCoordinates,
+                                                                                currentScale
+                                                                            )
+                                                                        )}
+                                                                    </text>
+                                                                </g>
+                                                            );
+                                                        })}
+
+                                                    {currentPolygon.length > 0 && (
+                                                        <g>
+                                                            <polyline
+                                                                points={currentPolygon
+                                                                    .map((c) => `${c.x},${c.y}`)
+                                                                    .join(' ')}
+                                                                fill="none"
+                                                                stroke={
+                                                                    ZONE_TYPES.find(
+                                                                        (z) =>
+                                                                            z.id ===
+                                                                            selectedZoneType
+                                                                    )?.color
+                                                                }
+                                                                strokeWidth={3}
+                                                                strokeDasharray="8,4"
+                                                            />
+                                                            {currentPolygon.map((point, i) => (
+                                                                <circle
+                                                                    key={i}
+                                                                    cx={point.x}
+                                                                    cy={point.y}
+                                                                    r={6}
+                                                                    fill={
+                                                                        ZONE_TYPES.find(
+                                                                            (z) =>
+                                                                                z.id ===
+                                                                                selectedZoneType
+                                                                        )?.color
+                                                                    }
+                                                                    stroke="white"
+                                                                    strokeWidth="2"
+                                                                />
+                                                            ))}
+
+                                                            {/* Show area for current polygon */}
+                                                            {currentPolygon.length > 2 && (
+                                                                <text
+                                                                    x={
+                                                                        currentPolygon.reduce(
+                                                                            (sum, p) => sum + p.x,
+                                                                            0
+                                                                        ) / currentPolygon.length
+                                                                    }
+                                                                    y={
+                                                                        currentPolygon.reduce(
+                                                                            (sum, p) => sum + p.y,
+                                                                            0
+                                                                        ) / currentPolygon.length
+                                                                    }
+                                                                    textAnchor="middle"
+                                                                    fill="white"
+                                                                    fontSize="14"
+                                                                    fontWeight="bold"
+                                                                    style={{
+                                                                        filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.8))',
+                                                                    }}
+                                                                >
+                                                                    {formatArea(
+                                                                        calculatePolygonArea(
+                                                                            currentPolygon,
+                                                                            currentScale
+                                                                        )
+                                                                    )}
+                                                                </text>
+                                                            )}
+                                                        </g>
+                                                    )}
+
+                                                    {/* Disabled: Main pipe drawing - redundant with auto-generated pipes */}
+                                                    {/* This prevents overlapping lines that confuse users */}
+                                                    {/*
                                             {mainPipeDrawing.length >= 2 && (
                                                 <polyline
                                                     points={mainPipeDrawing
@@ -2344,33 +2479,81 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                     strokeWidth={8}
                                                 />
                                             )}
+                                            */}
 
-                                            {pipes.map((pipe) => {
-                                                if (!pipe.canvasStart || !pipe.canvasEnd)
-                                                    return null;
-                                                const isSelected = selectedPipes.has(pipe.id);
+                                                    {/* Sort pipes to render selected pipes last (on top) */}
+                                                    {[...pipes]
+                                                        .sort((a, b) => {
+                                                            const aSelected = selectedPipes.has(
+                                                                a.id
+                                                            );
+                                                            const bSelected = selectedPipes.has(
+                                                                b.id
+                                                            );
+                                                            if (aSelected && !bSelected) return 1; // Draw selected pipes last
+                                                            if (!aSelected && bSelected) return -1; // Draw non-selected pipes first
+                                                            return 0; // Keep original order for pipes with same selection state
+                                                        })
+                                                        .map((pipe) => {
+                                                            if (
+                                                                !pipe.canvasStart ||
+                                                                !pipe.canvasEnd
+                                                            )
+                                                                return null;
+                                                            const isSelected = selectedPipes.has(
+                                                                pipe.id
+                                                            );
 
-                                                return (
-                                                    <line
-                                                        key={pipe.id}
-                                                        x1={pipe.canvasStart.x}
-                                                        y1={pipe.canvasStart.y}
-                                                        x2={pipe.canvasEnd.x}
-                                                        y2={pipe.canvasEnd.y}
-                                                        stroke={isSelected ? '#FBBF24' : '#8B5CF6'}
-                                                        strokeWidth={isSelected ? 6 : 4}
-                                                        style={{ cursor: 'pointer' }}
-                                                    />
-                                                );
-                                            })}
+                                                            return (
+                                                                <g key={pipe.id}>
+                                                                    <line
+                                                                        x1={pipe.canvasStart.x}
+                                                                        y1={pipe.canvasStart.y}
+                                                                        x2={pipe.canvasEnd.x}
+                                                                        y2={pipe.canvasEnd.y}
+                                                                        stroke={
+                                                                            isSelected
+                                                                                ? '#FBBF24'
+                                                                                : '#8B5CF6'
+                                                                        }
+                                                                        strokeWidth={
+                                                                            isSelected ? 6 : 4
+                                                                        }
+                                                                        strokeLinecap="round"
+                                                                        style={{
+                                                                            cursor: 'pointer',
+                                                                        }}
+                                                                    />
+                                                                    {/* Add glow effect for selected pipes */}
+                                                                    {isSelected && (
+                                                                        <line
+                                                                            x1={pipe.canvasStart.x}
+                                                                            y1={pipe.canvasStart.y}
+                                                                            x2={pipe.canvasEnd.x}
+                                                                            y2={pipe.canvasEnd.y}
+                                                                            stroke="#FBBF24"
+                                                                            strokeWidth="10"
+                                                                            strokeLinecap="round"
+                                                                            strokeOpacity="0.3"
+                                                                            style={{
+                                                                                pointerEvents:
+                                                                                    'none',
+                                                                            }}
+                                                                        />
+                                                                    )}
+                                                                </g>
+                                                            );
+                                                        })}
 
-                                            {/* Render sprinkler radii */}
-                                            {sprinklers.map((sprinkler) =>
-                                                renderSprinklerRadius(sprinkler)
+                                                    {/* Render sprinkler radii */}
+                                                    {sprinklers.map((sprinkler) =>
+                                                        renderSprinklerRadius(sprinkler)
+                                                    )}
+                                                </>
                                             )}
-                                        </>
-                                    )}
-                                </svg>
+                                        </svg>
+                                    </>
+                                )}
 
                                 {isScaleSet && (
                                     <>
@@ -2422,15 +2605,17 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
 
                                         {waterSource?.canvasPosition && (
                                             <div
-                                                className="absolute flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-blue-600 shadow-lg"
+                                                className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-blue-600 shadow-lg"
                                                 style={{
                                                     left: waterSource.canvasPosition.x * zoom,
                                                     top: waterSource.canvasPosition.y * zoom,
+                                                    width: 24 * zoom,
+                                                    height: 24 * zoom,
                                                     cursor:
                                                         editMode === 'drag-sprinkler'
                                                             ? 'move'
                                                             : 'default',
-                                                    transform: `translate(-50%, -50%) scale(${zoom})`,
+                                                    transform: `translate(-50%, -50%)`,
                                                     filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.6))',
                                                     pointerEvents:
                                                         editMode === 'drag-sprinkler' ||
@@ -2438,11 +2623,17 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                         dimensionMode
                                                             ? 'auto'
                                                             : 'none',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
                                                 }}
                                             >
-                                                <span className="text-[14px] font-bold text-white">
-                                                    {waterSource.type === 'pump' ? '⚡' : '🚰'}
-                                                </span>
+                                                <img
+                                                    src="/images/water-pump.png"
+                                                    alt="Water Pump"
+                                                    className="object-contain"
+                                                    style={{ width: 20 * zoom, height: 20 * zoom }}
+                                                />
                                             </div>
                                         )}
                                     </>
@@ -2536,14 +2727,6 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                         {t('พิกเซล')}
                                     </span>
                                 </div>
-                                <div>
-                                    • {t('จุดเริ่มต้น:')} ({measurementLine.start?.x.toFixed(0)},{' '}
-                                    {measurementLine.start?.y.toFixed(0)})
-                                </div>
-                                <div>
-                                    • {t('จุดสิ้นสุด:')} ({measurementLine.end?.x.toFixed(0)},{' '}
-                                    {measurementLine.end?.y.toFixed(0)})
-                                </div>
                             </div>
                         </div>
 
@@ -2569,39 +2752,6 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                             </div>
                         </div>
 
-                        {realDistance &&
-                            !isNaN(parseFloat(realDistance)) &&
-                            parseFloat(realDistance) > 0 &&
-                            measurementLine.pixelDistance && (
-                                <div className="mb-4 rounded-lg bg-green-900/30 p-3">
-                                    <div className="mb-1 text-sm text-green-300">
-                                        🧮 {t('ผลการคำนวณ:')}
-                                    </div>
-                                    <div className="space-y-1 text-sm text-green-200">
-                                        <div>
-                                            • {t('มาตราส่วน:')}{' '}
-                                            <span className="font-bold">
-                                                {(
-                                                    measurementLine.pixelDistance /
-                                                    parseFloat(realDistance)
-                                                ).toFixed(2)}{' '}
-                                                {t('พิกเซล/เมตร')}
-                                            </span>
-                                        </div>
-                                        <div>
-                                            • {t('ความละเอียด:')}{' '}
-                                            <span className="font-bold">
-                                                {(
-                                                    (parseFloat(realDistance) * 100) /
-                                                    measurementLine.pixelDistance
-                                                ).toFixed(2)}{' '}
-                                                {t('ซม./พิกเซล')}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
                         <div className="flex gap-3">
                             <button
                                 onClick={handleScaleSubmit}
@@ -2626,6 +2776,72 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                 ❌ {t('ยกเลิก')}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* UI Instructions */}
+            {editMode === 'drag-sprinkler' && (
+                <div className="absolute bottom-4 left-4 rounded-lg border border-orange-500 bg-gray-800/90 p-4 text-sm text-white backdrop-blur">
+                    <div className="mb-2 flex items-center gap-2">
+                        <span className="text-orange-400">↔️</span>
+                        <span className="font-semibold">{t('โหมดย้ายหัวฉีด')}</span>
+                    </div>
+                    <div>🖱️ {t('ลากหัวฉีดเพื่อย้ายตำแหน่ง')}</div>
+                    <div>🖱️ {t('คลิกขวาเพื่อลบหัวฉีด')}</div>
+                    <div className="text-xs text-gray-300">
+                        🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนภาพ')}
+                    </div>
+                </div>
+            )}
+
+            {editMode === 'place' && (
+                <div className="absolute bottom-4 left-4 rounded-lg border border-green-500 bg-gray-800/90 p-4 text-sm text-white backdrop-blur">
+                    <div className="mb-2 flex items-center gap-2">
+                        <span className="text-green-400">💧</span>
+                        <span className="font-semibold">{t('โหมดวางหัวฉีด')}</span>
+                    </div>
+                    <div>🎯 {t('คลิกเพื่อวางหัวฉีด')}</div>
+                    <div className="mt-1 text-xs text-gray-300">
+                        {t('รัศมี:')} {manualSprinklerRadius}
+                        {t('ม.')} • 🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนภาพ')}
+                    </div>
+                </div>
+            )}
+
+            {editMode === 'edit' && (
+                <div className="absolute bottom-4 left-4 rounded-lg border border-yellow-500 bg-gray-800/90 p-4 text-sm text-white backdrop-blur">
+                    <div className="mb-2 flex items-center gap-2">
+                        <img
+                            src="/images/water-pump.png"
+                            alt="Water Pump"
+                            className="h-4 w-4 object-contain"
+                        />
+                        <span className="font-semibold">{t('โหมดจัดการแหล่งน้ำ')}</span>
+                    </div>
+                    <div>🎯 {t('คลิกเพื่อวางแหล่งน้ำ')}</div>
+                    <div>🖱️ {t('คลิกขวาบนแหล่งน้ำเพื่อลบ')}</div>
+                    <div className="text-xs text-gray-300">
+                        🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนภาพ')}
+                    </div>
+                </div>
+            )}
+
+            {(pipeEditMode === 'add' || pipeEditMode === 'remove') && (
+                <div className="absolute bottom-12 left-4 rounded-lg border border-purple-500 bg-gray-800/90 p-4 text-sm text-white backdrop-blur">
+                    <div className="mb-2 flex items-center gap-2">
+                        <span className="text-purple-400">🔧</span>
+                        <span className="font-semibold">
+                            {pipeEditMode === 'add' ? t('เพิ่มท่อ') : t('ลบท่อ')}
+                        </span>
+                    </div>
+                    <div>
+                        {pipeEditMode === 'add'
+                            ? `🎯 ${t('เลือกหัวฉีด 2 ตัวเพื่อเชื่อมต่อ')} (${selectedSprinklersForPipe.length}/2)`
+                            : `🎯 ${t('เลือกหัวฉีด 2 ตัวเพื่อลบท่อ')} (${selectedSprinklersForPipe.length}/2)`}
+                    </div>
+                    <div className="text-xs text-gray-300">
+                        🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนภาพ')}
                     </div>
                 </div>
             )}

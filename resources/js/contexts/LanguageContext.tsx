@@ -49,7 +49,6 @@ export const useLanguage = (): LanguageContextType => {
     return context;
 };
 
-
 // export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
 //     const [language, setLanguage] = useState<Language>('th');
 

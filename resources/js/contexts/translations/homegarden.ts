@@ -33,10 +33,6 @@ export const homeGardenTranslations = {
         เปลี่ยนวิธี: 'Change Method',
         ลบทั้งหมด: 'Delete All',
 
-        // Undo/Redo
-        Undo: 'Undo',
-        Redo: 'Redo',
-
         // Zone Management
         จัดการโซนพื้นที่: 'Manage Area Zones',
         'เลือกประเภทโซน:': 'Select zone type:',
@@ -137,6 +133,7 @@ export const homeGardenTranslations = {
         กรุณารอสักครู่: 'Please wait a moment',
         'กำลังเตรียม...': 'Preparing...',
         คำนวณอุปกรณ์: 'Calculate Equipment',
+        บันทึกร่าง: 'Save Draft',
         สรุปผลการออกแบบระบบน้ำ: 'Water System Design Summary',
         วันที่: 'Date',
         เวลา: 'Time',
@@ -340,6 +337,14 @@ export const homeGardenTranslations = {
         ใช้ปุ่มด้านล่างเพื่อเปลี่ยนโหมด: 'Use buttons below to change mode',
         'ระยะห่างตาราง:': 'Grid spacing:',
         ใกล้: 'Close',
+        หัวฉีดเพิ่มเติม: 'Additional Sprinklers',
+        ต้องตั้งค่าสเกลก่อน: 'Must set scale first',
+        'คลิกปุ่ม "ตั้งค่าสเกล" เพื่อวัดระยะทางจริง':
+            'Click "Set Scale" button to measure real distance',
+        จำเป็นสำหรับการคำนวณพื้นที่และระยะทางที่ถูกต้อง:
+            'Required for accurate area and distance calculations',
+        ใช้ปุ่มลบในรายการด้านขวา: 'Use delete buttons in right panel',
+        'วิธีการใช้งาน:': 'How to use:',
         ไกล: 'Far',
         ข้อมูลรูปภาพ: 'Image Information',
         'ขนาด:': 'Size:',
@@ -410,10 +415,6 @@ export const homeGardenTranslations = {
         ดูสรุปผล: 'ดูสรุปผล',
         เปลี่ยนวิธี: 'เปลี่ยนวิธี',
         ลบทั้งหมด: 'ลบทั้งหมด',
-
-        // Undo/Redo
-        Undo: 'Undo',
-        Redo: 'Redo',
 
         // Zone Management
         จัดการโซนพื้นที่: 'จัดการโซนพื้นที่',
@@ -705,6 +706,13 @@ export const homeGardenTranslations = {
         ใช้ปุ่มด้านล่างเพื่อเปลี่ยนโหมด: 'ใช้ปุ่มด้านล่างเพื่อเปลี่ยนโหมด',
         'ระยะห่างตาราง:': 'ระยะห่างตาราง:',
         ใกล้: 'ใกล้',
+        หัวฉีดเพิ่มเติม: 'หัวฉีดเพิ่มเติม',
+        ต้องตั้งค่าสเกลก่อน: 'ต้องตั้งค่าสเกลก่อน',
+        'คลิกปุ่ม "ตั้งค่าสเกล" เพื่อวัดระยะทางจริง': 'คลิกปุ่ม "ตั้งค่าสเกล" เพื่อวัดระยะทางจริง',
+        จำเป็นสำหรับการคำนวณพื้นที่และระยะทางที่ถูกต้อง:
+            'จำเป็นสำหรับการคำนวณพื้นที่และระยะทางที่ถูกต้อง',
+        ใช้ปุ่มลบในรายการด้านขวา: 'ใช้ปุ่มลบในรายการด้านขวา',
+        'วิธีการใช้งาน:': 'วิธีการใช้งาน:',
         ไกล: 'ไกล',
         ข้อมูลรูปภาพ: 'ข้อมูลรูปภาพ',
         'ขนาด:': 'ขนาด:',

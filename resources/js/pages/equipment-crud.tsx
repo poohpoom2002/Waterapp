@@ -1212,37 +1212,10 @@ const PumpAccessoryForm: React.FC<{
                                 <div className="grid grid-cols-12 items-center gap-4">
                                     {/* Control buttons */}
                                     <div className="col-span-1 flex flex-col items-center gap-2">
-                                        <span className="rounded bg-orange-600 px-2 py-1 text-xs text-white">
-                                            #{(currentPage - 1) * itemsPerPage + index + 1}
-                                        </span>
-                                        <div className="flex flex-col gap-1">
-                                            <div className="flex items-center gap-1">
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        index > 0 && moveAccessory(index, index - 1)
-                                                    }
-                                                    disabled={index === 0}
-                                                    className="rounded p-1 text-gray-400 transition-colors hover:text-white disabled:opacity-50"
-                                                    title={t('ย้ายขึ้น')}
-                                                >
-                                                    <ChevronDown className="h-6 w-6 rotate-180" />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        index < paginatedAccessories.length - 1 &&
-                                                        moveAccessory(index, index + 1)
-                                                    }
-                                                    disabled={
-                                                        index === paginatedAccessories.length - 1
-                                                    }
-                                                    className="rounded p-1 text-gray-400 transition-colors hover:text-white disabled:opacity-50"
-                                                    title={t('ย้ายลง')}
-                                                >
-                                                    <ChevronDown className="h-6 w-6" />
-                                                </button>
-                                            </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="rounded bg-orange-600 px-2 py-1 text-xs text-white">
+                                                #{(currentPage - 1) * itemsPerPage + index + 1}
+                                            </span>
                                             <button
                                                 type="button"
                                                 onClick={() => removeAccessory(index)}
@@ -1296,10 +1269,7 @@ const PumpAccessoryForm: React.FC<{
                                     </div>
 
                                     {/* Equipment selector */}
-                                    <div className="col-span-4">
-                                        <label className="mb-1 block text-sm font-medium text-gray-300">
-                                            {t('เลือกอุปกรณ์')} *
-                                        </label>
+                                    <div className="col-span-3">
                                         <SearchableDropdown
                                             options={availableEquipments}
                                             value={accessory.equipment_id || null}
@@ -1313,9 +1283,6 @@ const PumpAccessoryForm: React.FC<{
 
                                     {/* Equipment details - readonly display */}
                                     <div className="col-span-4">
-                                        <label className="mb-1 block text-sm font-medium text-gray-300">
-                                            {t('รายละเอียด')}
-                                        </label>
                                         <div className="rounded text-sm text-gray-300">
                                             {accessory.description && (
                                                 <div className="text-sm text-gray-400">
@@ -1326,24 +1293,24 @@ const PumpAccessoryForm: React.FC<{
                                     </div>
 
                                     {/* Quantity input */}
-                                    <div className="col-span-1">
-                                        <label className="mb-1 block text-sm font-medium text-gray-300">
-                                            {t('จำนวน')} *
-                                        </label>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            value={accessory.quantity || 1}
-                                            onChange={(e) =>
-                                                updateAccessory(
-                                                    index,
-                                                    'quantity',
-                                                    parseInt(e.target.value) || 1
-                                                )
-                                            }
-                                            className="w-full rounded border border-gray-600 bg-gray-600 p-2 text-white focus:ring-2 focus:ring-orange-500"
-                                            required
-                                        />
+                                    <div className="col-span-2">
+                                        <div className="flex-col-2 flex items-center">
+                                            <p className="mr-4 text-sm text-gray-400">จำนวน</p>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                value={accessory.quantity || 1}
+                                                onChange={(e) =>
+                                                    updateAccessory(
+                                                        index,
+                                                        'quantity',
+                                                        parseInt(e.target.value) || 1
+                                                    )
+                                                }
+                                                className="w-full rounded border border-gray-600 bg-gray-600 p-2 text-white focus:ring-2 focus:ring-orange-500"
+                                                required
+                                            />
+                                        </div>
                                     </div>
 
                                     {/* Include checkbox */}
@@ -1470,7 +1437,7 @@ const ImageUpload: React.FC<{
                     <img
                         src={currentImage}
                         alt="Product"
-                        className="h-20 w-20 cursor-pointer rounded-lg border border-gray-600 object-cover shadow-sm transition-all hover:border-blue-400 hover:opacity-80 hover:shadow-lg"
+                        className="h-[150px] w-[220px] cursor-pointer rounded-lg border border-gray-600 object-cover shadow-sm transition-all hover:border-blue-400 hover:opacity-80 hover:shadow-lg"
                         onClick={() => onImageClick && onImageClick(currentImage, t('สินค้า'))}
                         title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
                         onError={(e) => {
@@ -1500,44 +1467,46 @@ const ImageUpload: React.FC<{
             )}
 
             {/* Upload Area */}
-            <div
-                className={`relative rounded-lg border-2 border-dashed p-6 text-center transition-all ${
-                    dragActive
-                        ? 'border-blue-400 bg-blue-900/20'
-                        : 'border-gray-600 bg-gray-700 hover:border-gray-500 hover:bg-gray-600'
-                } ${loading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}`}
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-            >
-                <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                    disabled={loading}
-                />
+            {!currentImage && (
+                <div
+                    className={`relative h-[150px] w-full rounded-lg border-2 border-dashed p-4 text-center transition-all ${
+                        dragActive
+                            ? 'border-blue-400 bg-blue-900/20'
+                            : 'border-gray-600 bg-gray-700 hover:border-gray-500 hover:bg-gray-600'
+                    } ${loading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}`}
+                    onDragEnter={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDragOver={handleDrag}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                >
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                        disabled={loading}
+                    />
 
-                {loading ? (
-                    <div className="flex flex-col items-center">
-                        <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
-                        <p className="mt-2 text-sm text-blue-400">{t('กำลังอัปโหลด...')}</p>
-                    </div>
-                ) : (
-                    <div className="flex flex-col items-center">
-                        <Camera className="h-8 w-8 text-gray-400" />
-                        <p className="mt-2 text-sm text-gray-400">
-                            {t('คลิกหรือลากไฟล์รูปภาพมาที่นี่')}
-                        </p>
-                        <p className="mt-1 text-xs text-gray-500">
-                            {t('รองรับ JPG, PNG, GIF (ขนาดไม่เกิน 5MB)')}
-                        </p>
-                    </div>
-                )}
-            </div>
+                    {loading ? (
+                        <div className="flex flex-col items-center">
+                            <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
+                            <p className="mt-2 text-sm text-blue-400">{t('กำลังอัปโหลด...')}</p>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center">
+                            <Camera className="h-4 w-4 text-gray-400" />
+                            <p className="mt-2 text-sm text-gray-400">
+                                {t('คลิกหรือลากไฟล์รูปภาพมาที่นี่')}
+                            </p>
+                            <p className="mt-1 text-xs text-gray-500">
+                                {t('รองรับ JPG, PNG, GIF (ขนาดไม่เกิน 5MB)')}
+                            </p>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 };
@@ -1868,16 +1837,41 @@ const EquipmentForm: React.FC<{
 
         switch (attr.data_type) {
             case 'string':
-                input = (
-                    <input
-                        type="text"
-                        value={currentValue || ''}
-                        onChange={(e) => handleAttributeChange(attr.attribute_name, e.target.value)}
-                        className={baseInputClass}
-                        required={attr.is_required}
-                        placeholder={attr.display_name}
-                    />
-                );
+                input =
+                    selectedCategory?.name === 'pipe' && attr.attribute_name === 'pipeType' ? (
+                        <>
+                            <input
+                                type="text"
+                                list="pipe-type-options"
+                                value={currentValue || ''}
+                                onChange={(e) => {
+                                    const cleaned = e.target.value.replace(/[^A-Za-z]/g, '');
+                                    handleAttributeChange(attr.attribute_name, cleaned);
+                                }}
+                                className={baseInputClass}
+                                required={attr.is_required}
+                                pattern="[A-Za-z]+"
+                                title={t('กรอกเฉพาะตัวอักษรภาษาอังกฤษ (A-Z)')}
+                                placeholder={t('เช่น PE หรือ PVC')}
+                                autoComplete="off"
+                            />
+                            <datalist id="pipe-type-options">
+                                <option value="PE" />
+                                <option value="PVC" />
+                            </datalist>
+                        </>
+                    ) : (
+                        <input
+                            type="text"
+                            value={currentValue || ''}
+                            onChange={(e) =>
+                                handleAttributeChange(attr.attribute_name, e.target.value)
+                            }
+                            className={baseInputClass}
+                            required={attr.is_required}
+                            placeholder={attr.display_name}
+                        />
+                    );
                 break;
 
             case 'number':
@@ -2011,13 +2005,8 @@ const EquipmentForm: React.FC<{
                             }}
                             className={baseInputClass}
                             required={attr.is_required}
-                            placeholder={t(
-                                'Enter values separated by comma or dash (e.g., 10.5, 20.7 or 10.5-20.7)'
-                            )}
+                            placeholder={t('ใช้ , หรือ - เพื่อแยกค่า')}
                         />
-                        <div className="mt-1 text-xs text-gray-400">
-                            {t('ใช้เครื่องหมาย (,) หรือ dash (-) เพื่อแยกค่า ตัวอย่าง 5, 20')}
-                        </div>
                     </div>
                 );
                 break;
@@ -2062,7 +2051,11 @@ const EquipmentForm: React.FC<{
         return (
             <div key={attr.id}>
                 <label className="mb-2 block text-sm font-medium">
-                    {attr.display_name} {attr.unit && `(${attr.unit})`}
+                    {attr.display_name}
+                    {selectedCategory?.name === 'pipe' &&
+                        attr.attribute_name === 'pipeType' &&
+                        ' (ตัวพิมพ์อังกฤษ)'}
+                    {attr.unit && `(${attr.unit})`}
                     {attr.is_required && <span className="text-red-400"> *</span>}
                 </label>
                 {input}
@@ -2181,8 +2174,9 @@ const EquipmentForm: React.FC<{
                                     </div>
                                 )}
                             </div>
-
-                            <div>
+                        </div>
+                        <div className="grid grid-cols-1 gap-x-4 gap-y-4 md:grid-cols-4">
+                            <div className="flex flex-col md:col-span-1">
                                 <label className="mb-2 block text-sm font-medium">
                                     {t('แบรนด์')}
                                 </label>
@@ -2191,7 +2185,10 @@ const EquipmentForm: React.FC<{
                                     list="brand-options"
                                     value={formData.brand || ''}
                                     onChange={(e) =>
-                                        setFormData((prev) => ({ ...prev, brand: e.target.value }))
+                                        setFormData((prev) => ({
+                                            ...prev,
+                                            brand: e.target.value,
+                                        }))
                                     }
                                     className="w-full rounded-lg border border-gray-600 bg-gray-700 p-3 text-white focus:ring-2 focus:ring-blue-500"
                                     placeholder={t('แบรนด์สินค้า')}
@@ -2204,7 +2201,7 @@ const EquipmentForm: React.FC<{
                                 </datalist>
                             </div>
 
-                            <div>
+                            <div className="flex flex-col md:col-span-1">
                                 <label className="mb-2 block text-sm font-medium">
                                     {t('ราคา')} *
                                 </label>
@@ -2241,7 +2238,7 @@ const EquipmentForm: React.FC<{
                                 )}
                             </div>
 
-                            <div>
+                            <div className="flex flex-col md:col-span-1">
                                 <label className="mb-2 block text-sm font-medium">
                                     {t('Stock')}
                                 </label>
@@ -2260,32 +2257,36 @@ const EquipmentForm: React.FC<{
                                 />
                             </div>
 
-                            <div className="md:col-span-1">
-                                <ImageUpload
-                                    currentImage={formData.image}
-                                    onImageChange={handleImageChange}
-                                    onImageClick={onImageClick}
-                                    loading={imageUploading}
-                                />
-                                <div className="mt-4 flex items-center">
-                                    <label className="flex cursor-pointer items-center">
-                                        <input
-                                            type="checkbox"
-                                            checked={formData.is_active || false}
-                                            onChange={(e) =>
-                                                setFormData((prev) => ({
-                                                    ...prev,
-                                                    is_active: e.target.checked,
-                                                }))
-                                            }
-                                            className="mr-2 h-4 w-4"
-                                        />
-                                        <span className="text-sm">{t('เปิดใช้งานอุปกรณ์')}</span>
-                                    </label>
+                            <div className="flex h-full flex-col md:col-span-1 md:row-span-2">
+                                <div className="flex h-full flex-col justify-start">
+                                    <ImageUpload
+                                        currentImage={formData.image}
+                                        onImageChange={handleImageChange}
+                                        onImageClick={onImageClick}
+                                        loading={imageUploading}
+                                    />
+                                    <div className="mt-2 flex items-center">
+                                        <label className="flex cursor-pointer items-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.is_active || false}
+                                                onChange={(e) =>
+                                                    setFormData((prev) => ({
+                                                        ...prev,
+                                                        is_active: e.target.checked,
+                                                    }))
+                                                }
+                                                className="mr-2 h-4 w-4"
+                                            />
+                                            <span className="text-sm">
+                                                {t('เปิดใช้งานอุปกรณ์')}
+                                            </span>
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="md:col-span-2">
+                            <div className="flex flex-col md:col-span-3">
                                 <label className="mb-2 block text-sm font-medium">
                                     {t('คำอธิบาย')}
                                 </label>
@@ -2311,7 +2312,7 @@ const EquipmentForm: React.FC<{
                                     {t('คุณสมบัติเฉพาะ')}
                                 </h3>
 
-                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
                                     {attributes
                                         .sort((a, b) => a.sort_order - b.sort_order)
                                         .map(renderAttributeInput)}

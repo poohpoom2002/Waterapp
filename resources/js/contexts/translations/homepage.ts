@@ -1,5 +1,5 @@
 export const homepageTranslations = {
-    en: {   
+    en: {
         // Categories
         horticulture: 'Horticulture',
         horticulture_desc: 'Advanced irrigation system for fruit trees and orchards',
@@ -28,6 +28,7 @@ export const homepageTranslations = {
         environmental_monitoring: 'Environmental monitoring',
         large_scale_planning: 'Large-scale field planning',
         crop_rotation: 'Crop rotation support',
+        efficient_irrigation: 'Efficient irrigation systems',
         efficient_distribution: 'Efficient water distribution',
         weather_integration: 'Weather integration',
         yield_optimization: 'Yield optimization',
@@ -38,6 +39,7 @@ export const homepageTranslations = {
         residential_watering: 'Residential Watering System',
         equipment: 'Equipment',
         manage_equipment: 'Manage Equipment',
+        project_categories: 'Project Categories',
         product: 'Product',
         product_recommendations: 'Product Recommendations',
         create_dream_system: 'Create Your Dream Irrigation System',
@@ -292,15 +294,24 @@ export const homepageTranslations = {
         precision_planning: 'Precision Planning',
         precision_desc: 'Advanced algorithm for efficient water distribution',
         water_conservation: 'Water Conservation',
-        water_conservation_desc: 'Smart system that minimizes water loss while maintaining plant health',
+        water_conservation_desc:
+            'Smart system that minimizes water loss while maintaining plant health',
         water_management_system: 'Water Management System',
         data_driven: 'Data-Driven',
         data_driven_desc: 'Smart system that minimizes water loss while maintaining plant health',
-        comprehensive_stats_desc: 'Smart system that minimizes water loss while maintaining plant health',
-        automated_sprinkler_desc: 'Smart system that minimizes water loss while maintaining plant health',
+        comprehensive_stats_desc:
+            'Smart system that minimizes water loss while maintaining plant health',
+        automated_sprinkler_desc:
+            'Smart system that minimizes water loss while maintaining plant health',
         add_field: 'Add Field',
         create_folder: 'Create Folder',
         manage_irrigation_fields: 'Manage Irrigation Fields',
+
+        // Address translations
+        '15-23 ซ.พระยามนธาตุฯ แยก10 ถ.บางขุนเทียน แขวงคลองบางบอน เขตบางบอน กรุงเทพมหานคร 10150':
+            '15-23 Phraya Manthat Alley 10, Bang Khun Thian Road, Khlong Bang Bon Subdistrict, Bang Bon District, Bangkok 10150',
+        '71/6 หมู่ 1 ตำบลคอกกระบือ อำเภอเมืองสมุทรสาคร จ.สมุทรสาคร 74000':
+            '71/6 Moo 1, Khok Krabue Subdistrict, Mueang Samut Sakhon District, Samut Sakhon Province 74000',
     },
     th: {
         // Home page
@@ -308,6 +319,12 @@ export const homepageTranslations = {
         create_folder: 'สร้างโฟลเดอร์',
         manage_irrigation_fields: 'จัดการแปลงเกษตรและเครือข่ายท่อน้ำ',
         add_field: 'เพิ่มแปลง',
+
+        // Address translations
+        '15-23 ซ.พระยามนธาตุฯ แยก10 ถ.บางขุนเทียน แขวงคลองบางบอน เขตบางบอน กรุงเทพมหานคร 10150':
+            '15-23 ซ.พระยามนธาตุฯ แยก10 ถ.บางขุนเทียน แขวงคลองบางบอน เขตบางบอน กรุงเทพมหานคร 10150',
+        '71/6 หมู่ 1 ตำบลคอกกระบือ อำเภอเมืองสมุทรสาคร จ.สมุทรสาคร 74000':
+            '71/6 หมู่ 1 ตำบลคอกกระบือ อำเภอเมืองสมุทรสาคร จ.สมุทรสาคร 74000',
         no_fields_yet: 'ยังไม่มีแปลง',
         start_first_field: 'เริ่มต้นด้วยการสร้างแปลงชลประทานแรกของคุณ',
         create_first_field: 'สร้างแปลงแรกของคุณ',
@@ -366,6 +383,7 @@ export const homepageTranslations = {
         environmental_monitoring: 'การติดตามสิ่งแวดล้อม',
         large_scale_planning: 'การวางแผนแปลงขนาดใหญ่',
         crop_rotation: 'การหมุนเวียนพืช',
+        efficient_irrigation: 'ระบบชลประทานที่มีประสิทธิภาพ',
         efficient_distribution: 'การกระจายน้ำที่มีประสิทธิภาพ',
         weather_integration: 'การรวมสภาพอากาศ',
         yield_optimization: 'การปรับแต่งผลผลิต',
@@ -376,6 +394,7 @@ export const homepageTranslations = {
         residential_watering: 'ระบบรดน้ำในบ้าน',
         equipment: 'อุปกรณ์',
         manage_equipment: 'จัดการอุปกรณ์',
+        project_categories: 'หมวดหมู่โครงการ',
         product: 'ผลิตภัณฑ์',
         product_recommendations: 'คำแนะนำผลิตภัณฑ์',
         create_dream_system: 'สร้างระบบชลประทานในฝัน',

@@ -7,7 +7,15 @@ import UserAvatar from './UserAvatar';
 import FloatingAiChat from './FloatingAiChat';
 
 const Navbar: React.FC = () => {
-    const { t } = useLanguage();
+    // Add safety check for language context
+    let t: (key: string) => string;
+    try {
+        const languageContext = useLanguage();
+        t = languageContext.t;
+    } catch (error) {
+        // Fallback function if context is not available
+        t = (key: string) => key;
+    }
 
     // Defensive usePage call with error handling
     let page;
@@ -16,7 +24,7 @@ const Navbar: React.FC = () => {
         page = usePage();
         auth = (page.props as any).auth;
     } catch (error) {
-        console.warn('Inertia context not available in Navbar, using fallback values');
+        // Silently handle the error - this is expected during initial render
         page = { props: {} };
         auth = null;
     }
@@ -41,18 +49,22 @@ const Navbar: React.FC = () => {
                     <div className="flex items-center">
                         <Link
                             href="/"
-                            className="flex items-center space-x-3 text-white transition-colors hover:text-blue-300"
+                            className="flex items-center space-x-3 text-white transition-colors hover:text-green-300"
                         >
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-700">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white">
                                 <img
-                                    src="https://f.btwcdn.com/store-50036/store/e4c1b5ae-cf8e-5017-536b-66ecd994018d.jpg"
+                                    src="/images/chaiyo-logo.png"
                                     alt="logo"
                                     className="rounded-lg"
                                 />
                             </div>
                             <div>
-                                <h1 className="text-xl font-bold">{t('Chaiyo Irrigation System')}</h1>
-                                <p className="text-sm">{t('บจก.กนกโปรดักส์ จำกัด & บจก.ไชโยไปป์แอนด์ฟิตติ้ง จำกัด')}</p>
+                                <h1 className="text-xl font-bold">
+                                    {t('Chaiyo Irrigation System')}
+                                </h1>
+                                <p className="text-sm">
+                                    {t('บจก.กนกโปรดักส์ จำกัด & บจก.ไชโยไปป์แอนด์ฟิตติ้ง จำกัด')}
+                                </p>
                             </div>
                         </Link>
                     </div>
@@ -63,7 +75,7 @@ const Navbar: React.FC = () => {
                         {auth?.user?.is_super_user && (
                             <Link
                                 href="/super/dashboard"
-                                className="flex items-center gap-2 rounded-lg bg-yellow-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-yellow-700"
+                                className="flex items-center rounded-lg bg-yellow-600 px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-yellow-700"
                             >
                                 <span className="text-lg">👑</span>
                                 {t('Super Dashboard')}
@@ -79,19 +91,19 @@ const Navbar: React.FC = () => {
                             />
                             <button
                                 onClick={() => setShowFloatingAiChat(true)}
-                                className="rounded-lg bg-gradient-to-r from-green-500 to-blue-500 px-4 py-2 text-sm font-medium transition-all hover:from-green-600 hover:to-blue-600"
+                                className="rounded-lg bg-gradient-to-r from-green-500 to-blue-500 px-4 py-2 text-sm font-medium text-white transition-all hover:from-green-600 hover:to-blue-600"
                             >
                                 🤖 {t('AI ช่วยเหลือ')}
                             </button>
                             <button
                                 onClick={() => (window.location.href = '/equipment-crud')}
-                                className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium transition-colors hover:bg-gray-700"
+                                className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"
                             >
                                 ⚙️ {t('จัดการอุปกรณ์')}
                             </button>
                             <button
                                 onClick={scrollToFooter}
-                                className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium transition-colors hover:bg-gray-700"
+                                className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"
                             >
                                 {t('ติดต่อเรา')}
                             </button>

@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState } from 'react';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { router } from '@inertiajs/react';
@@ -27,7 +29,7 @@ interface ProfileProps {
 
 export default function Profile() {
     const { t } = useLanguage();
-    
+
     // Defensive usePage call with error handling
     let auth;
     try {
@@ -36,7 +38,7 @@ export default function Profile() {
         console.warn('Inertia context not available in Profile, using fallback values');
         auth = { user: null };
     }
-    
+
     const user = auth.user;
 
     const [isEditing, setIsEditing] = useState(false);

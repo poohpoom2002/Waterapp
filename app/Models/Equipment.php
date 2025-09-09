@@ -221,6 +221,7 @@ class Equipment extends Model
                 'is_included' => $accessory->is_included,
                 'sort_order' => $accessory->sort_order,
                 'description' => $accessory->description, // ⭐ เพิ่มบรรทัดนี้
+                'equipment_id' => $accessory->equipment_id,
             ];
         })->toArray();
 
@@ -280,6 +281,7 @@ class Equipment extends Model
                             'is_included' => $accessory->is_included,
                             'sort_order' => $accessory->sort_order,
                             'description' => $accessory->description,
+                            'equipment_id' => $accessory->equipment_id,
                         ];
                     })->sortBy('sort_order')->values()->toArray()
                     : [],

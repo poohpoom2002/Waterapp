@@ -1,6 +1,10 @@
 // resources/js/utils/cropData.ts
 
-import { cropTranslations, categoryTranslations, irrigationNeedsTranslations } from '../../contexts/translations/cropts';
+import {
+    cropTranslations,
+    categoryTranslations,
+    irrigationNeedsTranslations,
+} from '../../contexts/translations/cropts';
 
 export interface Crop {
     value: string;
@@ -17,7 +21,8 @@ export interface Crop {
     price: number; // Price (THB/kg)
 }
 
-export interface TranslatedCrop extends Omit<Crop, 'name' | 'description' | 'category' | 'irrigationNeeds'> {
+export interface TranslatedCrop
+    extends Omit<Crop, 'name' | 'description' | 'category' | 'irrigationNeeds'> {
     name: string;
     description: string;
     category: string;
@@ -167,6 +172,21 @@ export const cropTypes: Crop[] = [
         price: 1.2, // Price at the factory (THB/kg or 1,200 THB/ton)
     },
     {
+        value: 'pineapple',
+        name: 'Pineapple',
+        icon: '🍍',
+        description:
+            'A tropical fruit crop with high economic value, suitable for both fresh consumption and processing.',
+        category: 'industrial',
+        irrigationNeeds: 'medium',
+        growthPeriod: 540, // 18 months from planting to first harvest
+        waterRequirement: 2.8, // Moderate water requirement
+        rowSpacing: 120,
+        plantSpacing: 60,
+        yield: 4000, // Average yield per rai
+        price: 8.5, // Price at the farm (subject to fluctuation)
+    },
+    {
         value: 'rubber',
         name: 'Rubber',
         icon: '🌳',
@@ -220,7 +240,10 @@ export function getCropByValue(value: string): Crop | undefined {
 }
 
 // Find a crop by its value with translation
-export function getTranslatedCropByValue(value: string, language: 'en' | 'th' = 'en'): TranslatedCrop | undefined {
+export function getTranslatedCropByValue(
+    value: string,
+    language: 'en' | 'th' = 'en'
+): TranslatedCrop | undefined {
     const crop = getCropByValue(value);
     if (!crop) return undefined;
 
@@ -241,7 +264,7 @@ export function getTranslatedCropByValue(value: string, language: 'en' | 'th' = 
 
 // Get all crops with translation
 export function getTranslatedCrops(language: 'en' | 'th' = 'en'): TranslatedCrop[] {
-    return cropTypes.map(crop => {
+    return cropTypes.map((crop) => {
         const translation = cropTranslations[language][crop.value];
         const categoryTranslation = categoryTranslations[language][crop.category];
         const irrigationTranslation = irrigationNeedsTranslations[language][crop.irrigationNeeds];
@@ -265,7 +288,7 @@ export function searchCrops(term: string, language: 'en' | 'th' = 'en'): Crop[] 
         const translation = cropTranslations[language][crop.value];
         const translatedName = translation?.name || crop.name;
         const translatedDescription = translation?.description || crop.description;
-        
+
         return (
             translatedName.toLowerCase().includes(lower) ||
             translatedDescription.toLowerCase().includes(lower) ||
@@ -276,25 +299,33 @@ export function searchCrops(term: string, language: 'en' | 'th' = 'en'): Crop[] 
 }
 
 // Search translated crops
-export function searchTranslatedCrops(term: string, language: 'en' | 'th' = 'en'): TranslatedCrop[] {
+export function searchTranslatedCrops(
+    term: string,
+    language: 'en' | 'th' = 'en'
+): TranslatedCrop[] {
     const matchingCrops = searchCrops(term, language);
-    return matchingCrops.map(crop => {
+    return matchingCrops.map((crop) => {
         const translated = getTranslatedCropByValue(crop.value, language);
         return translated!;
     });
 }
 
 // Get crops by category with translation
-export function getCropsByCategory(category: 'cereal' | 'root' | 'legume' | 'industrial' | 'oilseed', language: 'en' | 'th' = 'en'): TranslatedCrop[] {
-    const categoryQrops = cropTypes.filter(crop => crop.category === category);
-    return categoryQrops.map(crop => getTranslatedCropByValue(crop.value, language)!);
+export function getCropsByCategory(
+    category: 'cereal' | 'root' | 'legume' | 'industrial' | 'oilseed',
+    language: 'en' | 'th' = 'en'
+): TranslatedCrop[] {
+    const categoryQrops = cropTypes.filter((crop) => crop.category === category);
+    return categoryQrops.map((crop) => getTranslatedCropByValue(crop.value, language)!);
 }
 
 // Get available categories with translation
-export function getAvailableCategories(language: 'en' | 'th' = 'en'): Array<{key: string, name: string}> {
-    const categories = Array.from(new Set(cropTypes.map(crop => crop.category)));
-    return categories.map(category => ({
+export function getAvailableCategories(
+    language: 'en' | 'th' = 'en'
+): Array<{ key: string; name: string }> {
+    const categories = Array.from(new Set(cropTypes.map((crop) => crop.category)));
+    return categories.map((category) => ({
         key: category,
-        name: categoryTranslations[language][category] || category
+        name: categoryTranslations[language][category] || category,
     }));
 }

@@ -2,7 +2,17 @@ import React from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 const LanguageSwitcher: React.FC = () => {
-    const { language, setLanguage } = useLanguage();
+    // Add safety check for language context
+    let language: 'en' | 'th' = 'th';
+    let setLanguage: (lang: 'en' | 'th') => void = () => {};
+    
+    try {
+        const languageContext = useLanguage();
+        language = languageContext.language;
+        setLanguage = languageContext.setLanguage;
+    } catch (error) {
+        // Silently handle the error - this is expected during initial render
+    }
 
     const toggleLanguage = () => {
         setLanguage(language === 'en' ? 'th' : 'en');

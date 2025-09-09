@@ -6,6 +6,7 @@ import { CalculationResults } from '../types/interfaces';
 import { Zone } from '../../utils/horticultureUtils';
 import { formatWaterFlow, formatRadius } from '../utils/calculations';
 import { useLanguage } from '@/contexts/LanguageContext';
+import SearchableDropdown from './SearchableDropdown';
 
 interface SprinklerSelectorProps {
     selectedSprinkler: any;
@@ -27,7 +28,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
     const [showImageModal, setShowImageModal] = useState(false);
     const [modalImage, setModalImage] = useState({ src: '', alt: '' });
     const { t } = useLanguage();
-    
+
     const openImageModal = (src: string, alt: string) => {
         setModalImage({ src, alt });
         setShowImageModal(true);
@@ -93,7 +94,8 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
     return (
         <div className="rounded-lg bg-gray-700 p-6">
             <h3 className="mb-4 text-2xl font-bold text-green-400">
-                {t('เลือก')} {projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}
+                {t('เลือก')}
+                {projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}
                 {activeZone && (
                     <span className="ml-2 text-sm font-normal text-gray-400">
                         - {activeZone.name}
@@ -107,7 +109,8 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 </h4>
                 <div className="text-xs text-gray-300">
                     <p>
-                        {t('อัตราการไหล')} {projectMode === 'garden' ? t('ต่อหัวฉีด') : t('ต่อหัว')}:{' '}
+                        {t('อัตราการไหล')} {projectMode === 'garden' ? t('ต่อหัวฉีด') : t('ต่อหัว')}
+                        :{' '}
                         <span className="font-bold text-blue-300">
                             {results.waterPerSprinklerLPM.toFixed(1)} {t('LPM')}
                         </span>
@@ -117,31 +120,51 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         <span className="font-bold text-yellow-300">
                             {results.totalSprinklers} {t('หัว')}
                         </span>
-                        {activeZone && <span className="ml-1 text-gray-400">({t('ในโซนนี้')})</span>}
+                        {activeZone && (
+                            <span className="ml-1 text-gray-400">({t('ในโซนนี้')})</span>
+                        )}
                     </p>
                 </div>
             </div>
 
-            <select
+            <SearchableDropdown
                 value={selectedSprinkler?.id || ''}
-                onChange={(e) => {
+                onChange={(value) => {
                     const selected = analyzedSprinklers.find(
-                        (s) => s.id === parseInt(e.target.value)
+                        (s) => s.id === parseInt(value.toString())
                     );
                     onSprinklerChange(selected);
                 }}
-                className="mb-4 w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
-            >
-                <option value="">
-                    -- {t('เลือก')} {projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}
-                    {activeZone ? ` ${t('สำหรับ')} ${activeZone.name}` : ''} --
-                </option>
-                {sortedSprinklers.map((sprinkler) => (
-                    <option key={sprinkler.id} value={sprinkler.id}>
-                        {sprinkler.name} - {sprinkler.price} {t('บาท')} | {sprinkler.brand || sprinkler.brand_name || '-'}
-                    </option>
-                ))}
-            </select>
+                options={[
+                    {
+                        value: '',
+                        label: `-- ${t('เลือก')} ${projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}${activeZone ? ` ${t('สำหรับ')} ${activeZone.name}` : ''} --`,
+                    },
+                    ...sortedSprinklers.map((sprinkler) => ({
+                        value: sprinkler.id,
+                        label: `${sprinkler.productCode || ''} - ${sprinkler.name} - ${sprinkler.price} ${t('บาท')} | ${sprinkler.brand || sprinkler.brand_name || '-'}`,
+                        searchableText: `${sprinkler.productCode || ''} ${sprinkler.name || ''} ${sprinkler.brand || sprinkler.brand_name || ''}`,
+                        image: sprinkler.image,
+                        productCode: sprinkler.productCode || (sprinkler as any).product_code,
+                        name: sprinkler.name,
+                        brand: sprinkler.brand || sprinkler.brand_name,
+                        price: sprinkler.price,
+                        unit: t('บาท'),
+                        score: sprinkler.score,
+                        isRecommended: sprinkler.isRecommended,
+                        isGoodChoice: sprinkler.isGoodChoice,
+                        isUsable: sprinkler.isUsable,
+                        isAutoSelected: false, // Sprinklers don't have auto-selection in this context
+                    })),
+                ]}
+                placeholder={`-- ${t('เลือก')} ${projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}${activeZone ? ` ${t('สำหรับ')} ${activeZone.name}` : ''} --`}
+                searchPlaceholder={
+                    t('พิมพ์เพื่อค้นหา') +
+                    (projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')) +
+                    ' (ชื่อ, รหัสสินค้า, แบรนด์)...'
+                }
+                className="mb-4 w-full"
+            />
 
             {selectedSprinkler && selectedAnalyzed && (
                 <div className="rounded bg-gray-600 p-3">
@@ -188,7 +211,8 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                             </p>
                             <p>
                                 <strong>{t('อัตราการไหล:')}</strong>{' '}
-                                {formatRangeValue(selectedSprinkler.waterVolumeLitersPerMinute)} {t('LPM')}
+                                {formatRangeValue(selectedSprinkler.waterVolumeLitersPerMinute)}{' '}
+                                {t('LPM')}
                             </p>
                             <p>
                                 <strong>{t('รัศมี:')}</strong>{' '}
@@ -202,15 +226,20 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
 
                         <div className="col-span-4">
                             <p>
-                                <strong>{t('แบรนด์:')}</strong> {selectedSprinkler.brand || selectedSprinkler.brand_name || '-'}
+                                <strong>{t('แบรนด์:')}</strong>{' '}
+                                {selectedSprinkler.brand || selectedSprinkler.brand_name || '-'}
                             </p>
                             <p>
-                                <strong>{t('ราคาต่อหัว:')}</strong> {selectedSprinkler.price?.toLocaleString()} {t('บาท')}
+                                <strong>{t('ราคาต่อหัว:')}</strong>{' '}
+                                {selectedSprinkler.price?.toLocaleString()} {t('บาท')}
                             </p>
                             <p>
-                                <strong>{t('จำนวนที่ต้องใช้:')}</strong> {results.totalSprinklers} {t('หัว')}
+                                <strong>{t('จำนวนที่ต้องใช้:')}</strong> {results.totalSprinklers}{' '}
+                                {t('หัว')}
                                 {activeZone && (
-                                    <span className="ml-1 text-xs text-gray-400">({t('โซนนี้')})</span>
+                                    <span className="ml-1 text-xs text-gray-400">
+                                        ({t('โซนนี้')})
+                                    </span>
                                 )}
                             </p>
                             <p>
@@ -239,19 +268,22 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         </h5>
                         <div className="grid grid-cols-3 gap-2 text-xs">
                             <p>
-                                {t('Flow เฉลี่ย:')} {' '}
+                                {t('Flow เฉลี่ย:')}{' '}
                                 <span className="font-bold text-blue-200">
-                                    {getAverageValue(selectedSprinkler.waterVolumeLitersPerMinute).toFixed(1)} LPM
+                                    {getAverageValue(
+                                        selectedSprinkler.waterVolumeLitersPerMinute
+                                    ).toFixed(1)}{' '}
+                                    LPM
                                 </span>
                             </p>
                             <p>
-                                {t('รัศมีเฉลี่ย:')} {' '}
+                                {t('รัศมีเฉลี่ย:')}{' '}
                                 <span className="font-bold text-blue-200">
                                     {getAverageValue(selectedSprinkler.radiusMeters).toFixed(1)} m
                                 </span>
                             </p>
                             <p>
-                                {t('แรงดันเฉลี่ย:')} {' '}
+                                {t('แรงดันเฉลี่ย:')}{' '}
                                 <span className="font-bold text-blue-200">
                                     {getAverageValue(selectedSprinkler.pressureBar).toFixed(1)} bar
                                 </span>
@@ -259,18 +291,25 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         </div>
                         <div className="mt-1 text-xs">
                             <p>
-                                {t('พื้นที่ครอบคลุม:')} {' '}
+                                {t('พื้นที่ครอบคลุม:')}{' '}
                                 <span className="font-bold text-yellow-300">
                                     {(
                                         Math.PI *
                                         Math.pow(getAverageValue(selectedSprinkler.radiusMeters), 2)
-                                    ).toFixed(1)} ตร.ม./หัว
+                                    ).toFixed(1)}{' '}
+                                    ตร.ม./หัว
                                 </span>
                             </p>
                             <p>
-                                {t('ราคาต่อ LPM:')} {' '}
+                                {t('ราคาต่อ LPM:')}{' '}
                                 <span className="font-bold text-green-300">
-                                    {(selectedSprinkler.price / getAverageValue(selectedSprinkler.waterVolumeLitersPerMinute)).toFixed(2)} บาท/LPM
+                                    {(
+                                        selectedSprinkler.price /
+                                        getAverageValue(
+                                            selectedSprinkler.waterVolumeLitersPerMinute
+                                        )
+                                    ).toFixed(2)}{' '}
+                                    บาท/LPM
                                 </span>
                             </p>
                         </div>
@@ -283,9 +322,11 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                             </h5>
                             <div className="grid grid-cols-2 gap-2 text-xs">
                                 <div>
-                                    <p>{t('ประเภทหัวฉีด:')} {selectedSprinkler.type || 'ไม่ระบุ'}</p>
                                     <p>
-                                        {t('พื้นที่ครอบคลุม:')} {' '}
+                                        {t('ประเภทหัวฉีด:')} {selectedSprinkler.type || 'ไม่ระบุ'}
+                                    </p>
+                                    <p>
+                                        {t('พื้นที่ครอบคลุม:')}{' '}
                                         {(
                                             Math.PI *
                                             Math.pow(
@@ -297,9 +338,12 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                                     </p>
                                 </div>
                                 <div>
-                                    <p>{t('เหมาะสำหรับ:')} {selectedSprinkler.suitable_for || 'ทั่วไป'}</p>
                                     <p>
-                                        {t('การติดตั้ง:')} {' '}
+                                        {t('เหมาะสำหรับ:')}{' '}
+                                        {selectedSprinkler.suitable_for || 'ทั่วไป'}
+                                    </p>
+                                    <p>
+                                        {t('การติดตั้ง:')}{' '}
                                         {selectedSprinkler.installation || 'ฝังดิน/ยกพื้น'}
                                     </p>
                                 </div>
@@ -309,20 +353,33 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
 
                     {activeZone && projectMode === 'horticulture' && (
                         <div className="mt-3 rounded bg-green-900 p-2">
-                            <h5 className="text-xs font-medium text-green-300">{t('ข้อมูลโซน:')}</h5>
+                            <h5 className="text-xs font-medium text-green-300">
+                                {t('ข้อมูลโซน:')}
+                            </h5>
                             <div className="grid grid-cols-2 gap-2 text-xs">
                                 <div>
                                     {activeZone.area >= 1600 ? (
-                                        <p>{t('พื้นที่โซน:')} {(activeZone.area / 1600).toFixed(1)} {t('ไร่')}</p>
+                                        <p>
+                                            {t('พื้นที่โซน:')} {(activeZone.area / 1600).toFixed(1)}{' '}
+                                            {t('ไร่')}
+                                        </p>
                                     ) : (
-                                        <p>{t('พื้นที่โซน:')} {activeZone.area.toFixed(2)} {t('ตร.ม.')}</p>
+                                        <p>
+                                            {t('พื้นที่โซน:')} {activeZone.area.toFixed(2)}{' '}
+                                            {t('ตร.ม.')}
+                                        </p>
                                     )}
-                                    <p>{t('จำนวนต้นไม้:')} {activeZone.plantCount} {t('ต้น')}</p>
+                                    <p>
+                                        {t('จำนวนต้นไม้:')} {activeZone.plantCount} {t('ต้น')}
+                                    </p>
                                 </div>
                                 <div>
-                                    <p>{t('พืชที่ปลูก:')} {activeZone.plantData?.name || 'ไม่ระบุ'}</p>
                                     <p>
-                                        {t('น้ำต่อต้น:')} {activeZone.plantData?.waterNeed || 0} {t('ลิตร/ครั้ง')}
+                                        {t('พืชที่ปลูก:')} {activeZone.plantData?.name || 'ไม่ระบุ'}
+                                    </p>
+                                    <p>
+                                        {t('น้ำต่อต้น:')} {activeZone.plantData?.waterNeed || 0}{' '}
+                                        {t('ลิตร/ครั้ง')}
                                     </p>
                                 </div>
                             </div>

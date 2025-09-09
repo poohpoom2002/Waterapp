@@ -2,11 +2,11 @@
 // @/pages/utils/greenHouseData.ts - Enhanced with comprehensive water calculation support
 
 import { getCropByValue } from '@/pages/utils/cropData';
-import { 
-    calculatePlotBasedWaterRequirements, 
+import {
+    calculatePlotBasedWaterRequirements,
     PlotBasedWaterSummary,
     PlotWaterCalculation,
-    PlantingDensity
+    PlantingDensity,
 } from '@/pages/components/Greenhouse/WaterCalculation';
 
 // --- Constants ---
@@ -67,10 +67,10 @@ export interface EnhancedProductionSummary {
     totalPlants: number;
     estimatedYield: number; // kg
     estimatedIncome: number; // baht
-    
+
     // Enhanced water calculation data
     waterCalculation: PlotWaterCalculation | null;
-    
+
     // Legacy support
     waterRequirementPerIrrigation: number; // Liters (for backward compatibility)
 }
@@ -84,7 +84,7 @@ export interface EnhancedPlotStats {
     cropType: string | null;
     area: number; // square meters
     effectivePlantingArea: number; // actual planting area excluding walkways
-    
+
     // Pipe infrastructure
     pipeStats: {
         main: PipeStats;
@@ -93,17 +93,17 @@ export interface EnhancedPlotStats {
         totalLength: number;
         longestPath: number; // ความยาวท่อเมน + ท่อย่อยที่ยาวที่สุดที่ไปถึงแปลงนี้
     };
-    
+
     // Equipment count
     equipmentCount: {
         sprinklers: number;
         pumps: number;
         valves: number;
     };
-    
+
     // Enhanced production with water calculation
     production: EnhancedProductionSummary;
-    
+
     // Additional metadata
     plantingDensity: PlantingDensity | null;
     cropIcon: string;
@@ -132,7 +132,7 @@ export interface WaterManagementSummary {
         optimal: number;
         unit: string;
     };
-    
+
     // Water intensity analysis
     waterIntensityStats: {
         averageIntensity: number; // L/m²/day
@@ -140,7 +140,7 @@ export interface WaterManagementSummary {
         maxIntensity: number;
         unit: string;
     };
-    
+
     // Storage recommendations
     storageRecommendations: {
         minimumSize: number; // m³
@@ -148,7 +148,7 @@ export interface WaterManagementSummary {
         optimalSize: number; // m³
         distributionStrategy: string;
     };
-    
+
     // Cost estimation
     estimatedCosts: {
         dailyCost: number; // baht
@@ -156,7 +156,7 @@ export interface WaterManagementSummary {
         yearlyCost: number; // baht
         costPerSquareMeter: number; // baht/m²/month
     };
-    
+
     // Efficiency metrics
     efficiency: {
         totalPlantsPerLiter: number; // plants per liter per day
@@ -177,22 +177,22 @@ export interface EnhancedGreenhousePlanningData {
         updatedAt: string;
         version: string; // เพิ่ม version tracking
     };
-    
+
     rawData: {
         shapes: Shape[];
         irrigationElements: IrrigationElement[];
         selectedCrops: string[];
     };
-    
+
     summary: {
         // Basic area information
         totalGreenhouseArea: number;
         totalPlotArea: number;
         totalEffectivePlantingArea: number;
-        
+
         // Enhanced plot statistics
         plotStats: EnhancedPlotStats[];
-        
+
         // Infrastructure summary
         overallPipeStats: {
             main: PipeStats;
@@ -200,7 +200,7 @@ export interface EnhancedGreenhousePlanningData {
             drip: PipeStats;
             totalLength: number;
         };
-        
+
         overallEquipmentCount: {
             pumps: number;
             solenoidValves: number;
@@ -208,13 +208,13 @@ export interface EnhancedGreenhousePlanningData {
             sprinklers: number;
             dripPoints: number;
         };
-        
+
         // Enhanced production with water management
         overallProduction: EnhancedProductionSummary;
-        
+
         // Comprehensive water management
         waterManagement: WaterManagementSummary;
-        
+
         // Plot-based water summary (from WaterCalculation.tsx)
         plotBasedWaterSummary: PlotBasedWaterSummary | null;
     };
@@ -287,20 +287,40 @@ const calculateWaterManagementSummary = (
             dailyRequirement: { min: 0, max: 0, optimal: 0, unit: 'L/day' },
             weeklyRequirement: { min: 0, max: 0, optimal: 0, unit: 'L/week' },
             monthlyRequirement: { min: 0, max: 0, optimal: 0, unit: 'L/month' },
-            waterIntensityStats: { averageIntensity: 0, minIntensity: 0, maxIntensity: 0, unit: 'L/m²/day' },
-            storageRecommendations: { minimumSize: 0, recommendedSize: 0, optimalSize: 0, distributionStrategy: '' },
+            waterIntensityStats: {
+                averageIntensity: 0,
+                minIntensity: 0,
+                maxIntensity: 0,
+                unit: 'L/m²/day',
+            },
+            storageRecommendations: {
+                minimumSize: 0,
+                recommendedSize: 0,
+                optimalSize: 0,
+                distributionStrategy: '',
+            },
             estimatedCosts: { dailyCost: 0, monthlyCost: 0, yearlyCost: 0, costPerSquareMeter: 0 },
-            efficiency: { totalPlantsPerLiter: 0, waterUtilizationRate: 0, mostEfficientCrop: '', leastEfficientCrop: '' }
+            efficiency: {
+                totalPlantsPerLiter: 0,
+                waterUtilizationRate: 0,
+                mostEfficientCrop: '',
+                leastEfficientCrop: '',
+            },
         };
     }
 
     // Calculate total requirements
-    const dailyTotal = plotWaterCalculations.reduce((sum, plot) => sum + plot.dailyWaterNeed.optimal, 0);
+    const dailyTotal = plotWaterCalculations.reduce(
+        (sum, plot) => sum + plot.dailyWaterNeed.optimal,
+        0
+    );
     const weeklyTotal = dailyTotal * 7;
     const monthlyTotal = dailyTotal * 30;
 
     // Water intensity statistics
-    const intensities = plotWaterCalculations.map(plot => plot.waterIntensity.litersPerSquareMeter);
+    const intensities = plotWaterCalculations.map(
+        (plot) => plot.waterIntensity.litersPerSquareMeter
+    );
     const averageIntensity = totalArea > 0 ? dailyTotal / totalArea : 0;
     const minIntensity = Math.min(...intensities);
     const maxIntensity = Math.max(...intensities);
@@ -322,40 +342,60 @@ const calculateWaterManagementSummary = (
     const waterUtilizationRate = 85; // Assume 85% utilization rate
 
     // Find most/least efficient crops
-    const efficiencies = plotWaterCalculations.map(plot => ({
+    const efficiencies = plotWaterCalculations.map((plot) => ({
         crop: plot.cropName,
-        efficiency: plot.totalPlants / plot.dailyWaterNeed.optimal
+        efficiency: plot.totalPlants / plot.dailyWaterNeed.optimal,
     }));
-    const mostEfficientCrop = efficiencies.reduce((prev, current) => 
-        current.efficiency > prev.efficiency ? current : prev, efficiencies[0]
+    const mostEfficientCrop = efficiencies.reduce(
+        (prev, current) => (current.efficiency > prev.efficiency ? current : prev),
+        efficiencies[0]
     ).crop;
-    const leastEfficientCrop = efficiencies.reduce((prev, current) => 
-        current.efficiency < prev.efficiency ? current : prev, efficiencies[0]
+    const leastEfficientCrop = efficiencies.reduce(
+        (prev, current) => (current.efficiency < prev.efficiency ? current : prev),
+        efficiencies[0]
     ).crop;
 
     return {
-        dailyRequirement: { min: dailyTotal * 0.8, max: dailyTotal * 1.2, optimal: dailyTotal, unit: 'L/day' },
-        weeklyRequirement: { min: weeklyTotal * 0.8, max: weeklyTotal * 1.2, optimal: weeklyTotal, unit: 'L/week' },
-        monthlyRequirement: { min: monthlyTotal * 0.8, max: monthlyTotal * 1.2, optimal: monthlyTotal, unit: 'L/month' },
+        dailyRequirement: {
+            min: dailyTotal * 0.8,
+            max: dailyTotal * 1.2,
+            optimal: dailyTotal,
+            unit: 'L/day',
+        },
+        weeklyRequirement: {
+            min: weeklyTotal * 0.8,
+            max: weeklyTotal * 1.2,
+            optimal: weeklyTotal,
+            unit: 'L/week',
+        },
+        monthlyRequirement: {
+            min: monthlyTotal * 0.8,
+            max: monthlyTotal * 1.2,
+            optimal: monthlyTotal,
+            unit: 'L/month',
+        },
         waterIntensityStats: { averageIntensity, minIntensity, maxIntensity, unit: 'L/m²/day' },
-        storageRecommendations: { 
-            minimumSize, 
-            recommendedSize, 
-            optimalSize, 
-            distributionStrategy: plotWaterCalculations.length <= 2 ? 'ถังเก็บน้ำรวม 1 ถัง' : 'ระบบถังเก็บน้ำแบบกระจาย' 
+        storageRecommendations: {
+            minimumSize,
+            recommendedSize,
+            optimalSize,
+            distributionStrategy:
+                plotWaterCalculations.length <= 2
+                    ? 'ถังเก็บน้ำรวม 1 ถัง'
+                    : 'ระบบถังเก็บน้ำแบบกระจาย',
         },
-        estimatedCosts: { 
-            dailyCost: Math.round(dailyCostBaht * 100) / 100, 
-            monthlyCost: Math.round(monthlyCostBaht * 100) / 100, 
-            yearlyCost: Math.round(yearlyCostBaht * 100) / 100, 
-            costPerSquareMeter: Math.round(costPerSquareMeter * 100) / 100 
+        estimatedCosts: {
+            dailyCost: Math.round(dailyCostBaht * 100) / 100,
+            monthlyCost: Math.round(monthlyCostBaht * 100) / 100,
+            yearlyCost: Math.round(yearlyCostBaht * 100) / 100,
+            costPerSquareMeter: Math.round(costPerSquareMeter * 100) / 100,
         },
-        efficiency: { 
-            totalPlantsPerLiter: Math.round(totalPlantsPerLiter * 100) / 100, 
-            waterUtilizationRate, 
-            mostEfficientCrop, 
-            leastEfficientCrop 
-        }
+        efficiency: {
+            totalPlantsPerLiter: Math.round(totalPlantsPerLiter * 100) / 100,
+            waterUtilizationRate,
+            mostEfficientCrop,
+            leastEfficientCrop,
+        },
     };
 };
 
@@ -372,7 +412,7 @@ export const calculateAllGreenhouseStats = (rawData: any): EnhancedGreenhousePla
         irrigationMethod = 'mini-sprinkler',
         planningMethod = 'draw',
         createdAt,
-        updatedAt
+        updatedAt,
     } = rawData;
 
     const plots = shapes.filter((s: Shape) => s.type === 'plot');
@@ -384,12 +424,12 @@ export const calculateAllGreenhouseStats = (rawData: any): EnhancedGreenhousePla
 
     try {
         // Convert shapes to format expected by water calculation
-        const plotsForWaterCalc = plots.map(plot => ({
+        const plotsForWaterCalc = plots.map((plot) => ({
             id: plot.id,
             type: plot.type,
             name: plot.name,
             points: plot.points,
-            cropType: plot.cropType || (selectedCrops && selectedCrops[0]) || 'tomato'
+            cropType: plot.cropType || (selectedCrops && selectedCrops[0]) || 'tomato',
         }));
 
         if (plotsForWaterCalc.length > 0) {
@@ -406,9 +446,10 @@ export const calculateAllGreenhouseStats = (rawData: any): EnhancedGreenhousePla
         const effectivePlantingArea = calculateEffectivePlantingArea(plotAreaM2);
 
         // Find corresponding water calculation for this plot
-        const plotWaterCalc = plotWaterCalculations.find(calc => 
-            calc.plotId === plot.id || calc.plotName === plot.name
-        ) || null;
+        const plotWaterCalc =
+            plotWaterCalculations.find(
+                (calc) => calc.plotId === plot.id || calc.plotName === plot.name
+            ) || null;
 
         // กรองหาอุปกรณ์และท่อที่อยู่ในแปลงนี้
         const elementsInPlot = irrigationElements.filter((el: IrrigationElement) =>
@@ -418,10 +459,12 @@ export const calculateAllGreenhouseStats = (rawData: any): EnhancedGreenhousePla
         const mainPipes = elementsInPlot.filter((el: IrrigationElement) => el.type === 'main-pipe');
         const subPipes = elementsInPlot.filter((el: IrrigationElement) => el.type === 'sub-pipe');
         const dripLines = elementsInPlot.filter((el: IrrigationElement) => el.type === 'drip-line');
-        const sprinklers = elementsInPlot.filter((el: IrrigationElement) => el.type === 'sprinkler');
+        const sprinklers = elementsInPlot.filter(
+            (el: IrrigationElement) => el.type === 'sprinkler'
+        );
         const pumps = elementsInPlot.filter((el: IrrigationElement) => el.type === 'pump');
-        const valves = elementsInPlot.filter((el: IrrigationElement) => 
-            el.type === 'solenoid-valve' || el.type === 'ball-valve'
+        const valves = elementsInPlot.filter(
+            (el: IrrigationElement) => el.type === 'solenoid-valve' || el.type === 'ball-valve'
         );
 
         const mainLengths = mainPipes.map((p: IrrigationElement) =>
@@ -444,7 +487,7 @@ export const calculateAllGreenhouseStats = (rawData: any): EnhancedGreenhousePla
             estimatedYield: 0, // Will be calculated based on crop data
             estimatedIncome: 0, // Will be calculated based on crop data
             waterCalculation: plotWaterCalc,
-            waterRequirementPerIrrigation: plotWaterCalc?.dailyWaterNeed.optimal || 0
+            waterRequirementPerIrrigation: plotWaterCalc?.dailyWaterNeed.optimal || 0,
         };
 
         // Calculate yield and income if crop data is available
@@ -478,17 +521,18 @@ export const calculateAllGreenhouseStats = (rawData: any): EnhancedGreenhousePla
                     count: dripLengths.length,
                 },
                 totalLength:
-                    mainLengths.reduce((s: number, l: number) => s + l, 0) + subLengths.reduce((s: number, l: number) => s + l, 0),
+                    mainLengths.reduce((s: number, l: number) => s + l, 0) +
+                    subLengths.reduce((s: number, l: number) => s + l, 0),
                 longestPath: Math.max(0, ...mainLengths) + Math.max(0, ...subLengths),
             },
-            equipmentCount: { 
+            equipmentCount: {
                 sprinklers: sprinklers.length,
                 pumps: pumps.length,
-                valves: valves.length
+                valves: valves.length,
             },
             production: enhancedProduction,
             plantingDensity: plotWaterCalc?.plantingDensity || null,
-            cropIcon
+            cropIcon,
         };
     });
 
@@ -504,9 +548,15 @@ export const calculateAllGreenhouseStats = (rawData: any): EnhancedGreenhousePla
     const totalEffectivePlantingArea = totalPlotArea * 0.85; // 85% utilization
 
     // Calculate overall pipe stats
-    const allMainPipes = irrigationElements.filter((el: IrrigationElement) => el.type === 'main-pipe');
-    const allSubPipes = irrigationElements.filter((el: IrrigationElement) => el.type === 'sub-pipe');
-    const allDripLines = irrigationElements.filter((el: IrrigationElement) => el.type === 'drip-line');
+    const allMainPipes = irrigationElements.filter(
+        (el: IrrigationElement) => el.type === 'main-pipe'
+    );
+    const allSubPipes = irrigationElements.filter(
+        (el: IrrigationElement) => el.type === 'sub-pipe'
+    );
+    const allDripLines = irrigationElements.filter(
+        (el: IrrigationElement) => el.type === 'drip-line'
+    );
 
     const allMainLengths = allMainPipes.map((p: IrrigationElement) =>
         pxToM(calculatePolylineLengthPx(p.points))
@@ -529,7 +579,10 @@ export const calculateAllGreenhouseStats = (rawData: any): EnhancedGreenhousePla
     const overallProduction: EnhancedProductionSummary = {
         totalPlants: enhancedPlotStats.reduce((sum, p) => sum + p.production.totalPlants, 0),
         estimatedYield: enhancedPlotStats.reduce((sum, p) => sum + p.production.estimatedYield, 0),
-        estimatedIncome: enhancedPlotStats.reduce((sum, p) => sum + p.production.estimatedIncome, 0),
+        estimatedIncome: enhancedPlotStats.reduce(
+            (sum, p) => sum + p.production.estimatedIncome,
+            0
+        ),
         waterCalculation: null, // Overall calculation not applicable to individual plots
         waterRequirementPerIrrigation: enhancedPlotStats.reduce(
             (sum, p) => sum + p.production.waterRequirementPerIrrigation,
@@ -538,10 +591,7 @@ export const calculateAllGreenhouseStats = (rawData: any): EnhancedGreenhousePla
     };
 
     // Calculate water management summary
-    const waterManagement = calculateWaterManagementSummary(
-        plotWaterCalculations,
-        totalPlotArea
-    );
+    const waterManagement = calculateWaterManagementSummary(plotWaterCalculations, totalPlotArea);
 
     return {
         projectInfo: {
@@ -549,7 +599,7 @@ export const calculateAllGreenhouseStats = (rawData: any): EnhancedGreenhousePla
             irrigationMethod: irrigationMethod,
             createdAt: createdAt || new Date().toISOString(),
             updatedAt: updatedAt || new Date().toISOString(),
-            version: '2.0.0' // Enhanced version
+            version: '2.0.0', // Enhanced version
         },
         rawData: { shapes, irrigationElements, selectedCrops },
         summary: {
@@ -578,7 +628,8 @@ export const calculateAllGreenhouseStats = (rawData: any): EnhancedGreenhousePla
                     allSubLengths.reduce((s: number, l: number) => s + l, 0),
             },
             overallEquipmentCount: {
-                pumps: irrigationElements.filter((el: IrrigationElement) => el.type === 'pump').length,
+                pumps: irrigationElements.filter((el: IrrigationElement) => el.type === 'pump')
+                    .length,
                 solenoidValves: irrigationElements.filter(
                     (el: IrrigationElement) => el.type === 'solenoid-valve'
                 ).length,
@@ -622,21 +673,21 @@ export const saveEnhancedGreenhouseData = (data: EnhancedGreenhousePlanningData)
 export const getEnhancedGreenhouseData = (): EnhancedGreenhousePlanningData | null => {
     // Try enhanced storage first
     let storedData = localStorage.getItem(ENHANCED_GREENHOUSE_STORAGE_KEY);
-    
+
     // Fallback to legacy storage
     if (!storedData) {
         storedData = localStorage.getItem(LEGACY_GREENHOUSE_STORAGE_KEY);
     }
-    
+
     if (storedData) {
         try {
             const parsedData = JSON.parse(storedData);
-            
+
             // Check if it's already enhanced version
             if (parsedData.projectInfo?.version === '2.0.0') {
                 return parsedData;
             }
-            
+
             // Migrate legacy data to enhanced version
             console.log('🔄 Migrating to enhanced greenhouse data...');
             const enhancedData = calculateAllGreenhouseStats(parsedData.rawData || parsedData);
@@ -695,21 +746,19 @@ export const formatWaterVolume = (liters: number): { value: number; unit: string
     if (liters >= 1000) {
         return {
             value: Math.round((liters / 1000) * 100) / 100,
-            unit: 'm³'
+            unit: 'm³',
         };
     }
     return {
         value: Math.round(liters * 100) / 100,
-        unit: 'L'
+        unit: 'L',
     };
 };
 
 /**
  * Generate water management recommendations
  */
-export const generateWaterRecommendations = (
-    data: EnhancedGreenhousePlanningData
-): string[] => {
+export const generateWaterRecommendations = (data: EnhancedGreenhousePlanningData): string[] => {
     const recommendations: string[] = [];
     const { waterManagement, plotStats } = data.summary;
 
@@ -729,14 +778,15 @@ export const generateWaterRecommendations = (
     }
 
     // Crop-specific recommendations
-    const highWaterCrops = plotStats.filter(plot => 
-        plot.production.waterCalculation && 
-        plot.production.waterCalculation.waterIntensity.category === 'high'
+    const highWaterCrops = plotStats.filter(
+        (plot) =>
+            plot.production.waterCalculation &&
+            plot.production.waterCalculation.waterIntensity.category === 'high'
     );
-    
+
     if (highWaterCrops.length > 0) {
         recommendations.push(
-            `พืชที่ใช้น้ำมาก (${highWaterCrops.map(p => p.plotName).join(', ')}) ควรใช้ระบบน้ำหยดแทนสปริงเกลอร์`
+            `พืชที่ใช้น้ำมาก (${highWaterCrops.map((p) => p.plotName).join(', ')}) ควรใช้ระบบน้ำหยดแทนสปริงเกลอร์`
         );
     }
 
@@ -750,5 +800,5 @@ export default {
     migrateLegacyGreenhouseData,
     formatWaterVolume,
     generateWaterRecommendations,
-    getWaterEfficiencyRating
+    getWaterEfficiencyRating,
 };

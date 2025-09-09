@@ -8,19 +8,27 @@ export const calculatePipeRolls = (totalLength: number, rollLength: number): num
 export const getAdjustedC = (pipeType: string, age: number): number => {
     const baseC =
         {
-            'HDPE PE 100': 150,
-            'HDPE PE 80': 145,
-            LDPE: 140,
-            PE: 140,
-            PVC: 150,
-            'PE-RT': 148,
-            'Flexible PE': 135,
+            'HDPE PE 100': 140,
+            'HDPE PE 80': 135,
+            LDPE: 130,
+            PE: 135,
+            PVC: 140, // Fix: More realistic C value for PVC pipes
+            'PE-RT': 138,
+            'Flexible PE': 125,
             Steel: 120,
             Galvanized: 110,
-        }[pipeType] || 140;
+        }[pipeType] || 135; // Fix: Increased default value
 
-    const degradationRate = pipeType.includes('PVC') ? 0.5 : 1.0;
-    return Math.max(120, baseC - age * degradationRate);
+    // Fix: More realistic degradation - PVC degrades slower than other materials
+    const degradationRate = pipeType.includes('PVC')
+        ? 0.3
+        : pipeType.includes('HDPE')
+          ? 0.4
+          : pipeType.includes('PE')
+            ? 0.5
+            : 1.0;
+
+    return Math.max(110, baseC - age * degradationRate);
 };
 
 export const getMinorLossCoefficient = (
@@ -30,29 +38,36 @@ export const getMinorLossCoefficient = (
 ): number => {
     let totalK = 0;
 
+    // Fix: More realistic base K values for different pipe sections
     const baseK = {
-        branch: 0.1,
-        secondary: 0.08,
-        main: 0.05,
+        branch: 0.2, // Fix: Increased for branch pipes with sprinklers
+        secondary: 0.15, // Fix: Slightly increased for secondary mains
+        main: 0.1, // Main pipes typically have fewer fittings
     };
 
-    totalK += baseK[sectionType as keyof typeof baseK] || 0.1;
+    totalK += baseK[sectionType as keyof typeof baseK] || 0.15;
 
-    totalK += (fittingCount.elbows || 0) * 0.2;
-    totalK += (fittingCount.tees || 0) * 0.4;
-    totalK += (fittingCount.valves || 0) * 0.05;
+    // Fix: More realistic fitting loss coefficients based on engineering standards
+    totalK += (fittingCount.elbows || 0) * 0.9; // Fix: Standard 90° elbow K ≈ 0.9
+    totalK += (fittingCount.tees || 0) * 1.8; // Fix: Tee junction K ≈ 1.8 (through flow)
+    totalK += (fittingCount.valves || 0) * 0.2; // Fix: Gate valve fully open K ≈ 0.2
 
+    // Fix: More realistic default fittings for different pipe types
     if (!Object.keys(fittingCount).length) {
         if (sectionType === 'branch') {
-            totalK += 0.2;
+            // Branch pipes typically have sprinkler connections and more fittings
+            totalK += 0.5; // Fix: Account for sprinkler connections and elbows
         } else if (sectionType === 'secondary') {
-            totalK += 0.15;
+            // Secondary mains have tees and some elbows
+            totalK += 0.3; // Fix: Account for branch takeoffs and direction changes
         } else if (sectionType === 'main') {
-            totalK += 0.1;
+            // Main pipes are typically straight with fewer fittings
+            totalK += 0.2; // Fix: Account for some direction changes
         }
     }
 
-    return Math.min(totalK, 1.0);
+    // Fix: More realistic maximum K value for complex systems
+    return Math.min(totalK, 3.0);
 };
 
 export const calculateImprovedHeadLoss = (
@@ -76,40 +91,56 @@ export const calculateImprovedHeadLoss = (
         };
     }
 
-    const validatedFlow = Math.min(Math.max(flow_lpm, 0.1), 10000);
-    const validatedDiameter = Math.min(Math.max(diameter_mm, 10), 500);
-    const validatedLength = Math.min(Math.max(length_m, 0.1), 1000);
+    const validatedFlow = Math.min(Math.max(flow_lpm, 0.1), 50000); // Fix: Increased upper limit
+    const validatedDiameter = Math.min(Math.max(diameter_mm, 10), 1000); // Fix: Increased upper limit
+    const validatedLength = Math.min(Math.max(length_m, 0.1), 5000); // Fix: Increased upper limit
 
-    const Q_m3s = validatedFlow / 60000;
-    const D_m = validatedDiameter / 1000;
+    // Convert units for Hazen-Williams equation
+    const Q_m3s = validatedFlow / 60000; // LPM to m³/s
+    const D_m = validatedDiameter / 1000; // mm to m
     const C = getAdjustedC(pipeType, pipeAgeYears);
 
+    // Calculate pipe cross-sectional area and velocity
     const A = Math.PI * Math.pow(D_m / 2, 2);
     const velocity = A > 0 ? Q_m3s / A : 0;
 
+    // Calculate major losses using Hazen-Williams equation
     let majorLoss = 0;
     if (Q_m3s > 0 && D_m > 0) {
+        // Standard Hazen-Williams equation: hL = 10.67 * L * Q^1.852 / (C^1.852 * D^4.87)
         majorLoss =
             (10.67 * validatedLength * Math.pow(Q_m3s, 1.852)) /
             (Math.pow(C, 1.852) * Math.pow(D_m, 4.87));
 
-        majorLoss = majorLoss * 0.7;
+        // Fix: Remove arbitrary 0.7 correction factor - no engineering justification
+        // majorLoss = majorLoss * 0.7; // REMOVED
 
-        majorLoss = Math.min(majorLoss, validatedLength * 5);
+        // Fix: Remove unrealistic head loss limit
+        // majorLoss = Math.min(majorLoss, validatedLength * 5); // REMOVED
     }
 
+    // Calculate velocity head for minor loss calculations
     const velocityHead = Math.pow(velocity, 2) / (2 * 9.81);
 
+    // Calculate minor losses
     const K = getMinorLossCoefficient(sectionType, velocity, fittingCount);
     let minorLoss = K * velocityHead;
 
+    // Fix: More realistic minor loss relationship to major loss
+    // Minor losses typically shouldn't exceed 150% of major losses for typical systems
     minorLoss = Math.min(minorLoss, majorLoss * 1.5);
 
-    if (validatedLength < 50) {
-        minorLoss = minorLoss * 0.7;
+    // Fix: Adjust minor loss for short pipe runs more realistically
+    if (validatedLength < 20) {
+        // For very short runs, minor losses dominate
+        minorLoss = minorLoss * 1.2;
+    } else if (validatedLength < 50) {
+        // For short runs, minor losses are still significant
+        minorLoss = minorLoss * 1.0; // No reduction
     }
 
     const totalLoss = majorLoss + minorLoss;
+
     return {
         major: formatNumber(majorLoss, 3),
         minor: formatNumber(minorLoss, 3),
@@ -122,54 +153,53 @@ export const calculateImprovedHeadLoss = (
 };
 
 export const checkVelocity = (velocity: number, section: string): string => {
-    if (velocity > 3.5)
-        return `🔴 ${section}: ความเร็วสูงเกินไป (${velocity.toFixed(3)} m/s) - เสี่ยง water hammer`;
+    // Fix: Updated velocity thresholds based on engineering standards for irrigation systems
+    if (velocity > 3.0)
+        return `🔴 ${section}: ความเร็วสูงเกินไป (${velocity.toFixed(3)} m/s) - เสี่ยง water hammer และการสึกหรอ`;
     if (velocity > 2.5)
         return `🟡 ${section}: ความเร็วสูง (${velocity.toFixed(3)} m/s) - ควรพิจารณาเพิ่มขนาดท่อ`;
     if (velocity < 0.3 && velocity > 0)
         return `🔵 ${section}: ความเร็วต่ำ (${velocity.toFixed(3)} m/s) - อาจมีการตกตะกอน`;
-    if (velocity >= 0.8 && velocity <= 2.0)
-        return `🟢 ${section}: ความเร็วเหมาะสม (${velocity.toFixed(3)} m/s)`;
-    if (velocity >= 0.5 && velocity <= 2.5)
-        return `🟡 ${section}: ความเร็วใช้ได้ (${velocity.toFixed(3)} m/s)`;
-    return `🟡 ${section}: ความเร็วอยู่นอกช่วงที่แนะนำ (${velocity.toFixed(3)} m/s)`;
+    if (velocity >= 0.6 && velocity <= 2.0)
+        return `🟢 ${section}: ความเร็วเหมาะสม (${velocity.toFixed(3)} m/s) - อยู่ในช่วงที่แนะนำ`;
+    if (velocity >= 0.4 && velocity <= 2.5)
+        return `🟡 ${section}: ความเร็วใช้ได้ (${velocity.toFixed(3)} m/s) - ยังอยู่ในเกณฑ์ยอมรับได้`;
+    return `🟡 ${section}: ความเร็วอยู่นอกช่วงที่แนะนำ (${velocity.toFixed(3)} m/s) - ควรตรวจสอบการออกแบบ`;
 };
 
 export const getVelocityScore = (velocity: number): number => {
-    if (velocity >= 0.8 && velocity <= 2.0) return 50;
-    if (velocity >= 0.6 && velocity <= 2.5) return 45;
-    if (velocity >= 0.5 && velocity <= 3.0) return 35;
-    if (velocity >= 0.3 && velocity <= 3.5) return 25;
-    return 10;
+    // Fix: Updated scoring based on irrigation system standards
+    if (velocity >= 0.6 && velocity <= 2.0) return 100; // Optimal range
+    if (velocity >= 0.4 && velocity <= 2.5) return 80; // Good range
+    if (velocity >= 0.3 && velocity <= 3.0) return 60; // Acceptable range
+    if (velocity > 3.0) return 20; // Too fast - water hammer risk
+    if (velocity < 0.3) return 30; // Too slow - sedimentation risk
+    return 40; // Outside normal operating range
 };
 
 export const calculateOptimalPipeSize = (
     flow_lpm: number,
-    targetVelocity: number = 1.2,
-    maxVelocity: number = 2.0
+    targetVelocity: number = 1.2, // Fix: Adjusted target velocity for irrigation systems
+    maxVelocity: number = 2.0 // Fix: Adjusted max velocity based on engineering standards
 ): { optimal: number; acceptable: number } => {
-    const Q = flow_lpm / 60000;
+    // Convert LPM to m³/s
+    const Q_m3s = flow_lpm / 60000;
 
-    const D_optimal = 2 * Math.sqrt(Q / (Math.PI * targetVelocity));
-    const optimalSizeMM = D_optimal * 1000;
+    // Calculate optimal diameter for target velocity
+    // A = Q/V, D = sqrt(4A/π) = sqrt(4Q/(πV))
+    const optimalArea = Q_m3s / targetVelocity;
+    const optimalDiameter = Math.sqrt((4 * optimalArea) / Math.PI) * 1000; // Convert to mm
 
-    const D_max = 2 * Math.sqrt(Q / (Math.PI * maxVelocity));
-    const acceptableSizeMM = D_max * 1000;
+    // Calculate acceptable diameter for max velocity
+    const acceptableArea = Q_m3s / maxVelocity;
+    const acceptableDiameter = Math.sqrt((4 * acceptableArea) / Math.PI) * 1000; // Convert to mm
 
-    const standardSizes = [
-        16, 20, 25, 32, 40, 50, 63, 75, 90, 110, 125, 140, 160, 200, 250, 315, 400, 500,
-    ];
-
-    const optimalStandard =
-        standardSizes.find((size) => size >= optimalSizeMM) ||
-        standardSizes[standardSizes.length - 1];
-    const acceptableStandard =
-        standardSizes.find((size) => size >= acceptableSizeMM) ||
-        standardSizes[standardSizes.length - 1];
+    // Fix: Ensure minimum practical pipe sizes for irrigation systems
+    const minPipeSize = 20; // 20mm minimum for irrigation
 
     return {
-        optimal: optimalStandard,
-        acceptable: acceptableStandard,
+        optimal: Math.max(optimalDiameter, minPipeSize),
+        acceptable: Math.max(acceptableDiameter, minPipeSize),
     };
 };
 
@@ -203,38 +233,47 @@ export const validateHeadLossRatio = (
     recommendation: string;
     severity: 'good' | 'warning' | 'critical';
 } => {
-    const ratio = totalHead > 0 ? (headLoss / totalHead) * 100 : 0;
-    const isValid = ratio <= 35;
-
-    let recommendation = '';
-    let severity: 'good' | 'warning' | 'critical' = 'good';
-
-    if (ratio > 60) {
-        recommendation = '🔴 Head Loss สูงมาก (>60%) ต้องเพิ่มขนาดท่อทันที';
-        severity = 'critical';
-    } else if (ratio > 45) {
-        recommendation = '🟡 Head Loss สูงเกินไป (>45%) ควรปรับปรุงระบบ';
-        severity = 'critical';
-    } else if (ratio > 35) {
-        recommendation = '⚠️ Head Loss เกินขีดจำกัด (>35%) ควรพิจารณาเพิ่มขนาดท่อ';
-        severity = 'warning';
-    } else if (ratio > 25) {
-        recommendation = '💡 Head Loss ค่อนข้างสูง (25-35%) ควรติดตาม';
-        severity = 'warning';
-    } else if (ratio > 15) {
-        recommendation = '✅ Head Loss ปกติ (15-25%) ระบบทำงานดี';
-        severity = 'good';
-    } else {
-        recommendation = '🟢 Head Loss ต่ำ (<15%) ระบบมีประสิทธิภาพสูง';
-        severity = 'good';
+    if (totalHead <= 0) {
+        return {
+            isValid: false,
+            ratio: 0,
+            recommendation: 'ไม่สามารถคำนวณอัตราส่วน Head Loss ได้ เนื่องจาก Total Head = 0',
+            severity: 'critical',
+        };
     }
 
-    return {
-        isValid,
-        ratio: formatNumber(ratio, 1),
-        recommendation,
-        severity,
-    };
+    const ratio = (headLoss / totalHead) * 100;
+
+    // Fix: Updated validation based on irrigation engineering standards (20% rule from images)
+    if (ratio <= 15) {
+        return {
+            isValid: true,
+            ratio,
+            recommendation: `✅ Head Loss อยู่ในเกณฑ์ดีเยี่ยม (${ratio.toFixed(1)}%) - ระบบมีประสิทธิภาพสูง`,
+            severity: 'good',
+        };
+    } else if (ratio <= 20) {
+        return {
+            isValid: true,
+            ratio,
+            recommendation: `⚠️ Head Loss อยู่ในเกณฑ์ยอมรับได้ (${ratio.toFixed(1)}%) - ยังอยู่ภายในขีดจำกัด 20%`,
+            severity: 'warning',
+        };
+    } else if (ratio <= 25) {
+        return {
+            isValid: false,
+            ratio,
+            recommendation: `🚨 Head Loss สูงเกินไป (${ratio.toFixed(1)}%) - ควรเพิ่มขนาดท่อหรือลดระยะทาง`,
+            severity: 'critical',
+        };
+    } else {
+        return {
+            isValid: false,
+            ratio,
+            recommendation: `🔴 Head Loss สูงมาก (${ratio.toFixed(1)}%) - ต้องปรับแก้การออกแบบทันที เพิ่มขนาดท่อ หรือลดการไหล`,
+            severity: 'critical',
+        };
+    }
 };
 
 export const calculateSafetyFactor = (systemComplexity: string, totalZones: number): number => {
@@ -333,36 +372,41 @@ export const getHeadLossScore = (headLoss: number, pipeType: string, length: num
 
 export const calculateZoneFlowRate = (
     sprinklerCount: number,
-    waterPerSprinkler: number = 360,
+    waterPerSprinklerLPM: number = 6.0, // Fixed: Changed name and default to clarify it's LPM
     irrigationTimeMinutes: number = 30
 ): {
     flowLPM: number;
-    totalDaily: number;
+    totalWaterPerIrrigation: number; // Fixed: Changed name to clarify it's total water, not daily
 } => {
-    const flowLPM = sprinklerCount * waterPerSprinkler;
+    // Flow rate in LPM
+    const flowLPM = sprinklerCount * waterPerSprinklerLPM;
 
-    const totalDaily = flowLPM * (irrigationTimeMinutes / 60);
+    // Total water per irrigation session in liters
+    const totalWaterPerIrrigation = flowLPM * (irrigationTimeMinutes / 60);
 
     return {
         flowLPM: flowLPM,
-        totalDaily: totalDaily,
+        totalWaterPerIrrigation: totalWaterPerIrrigation, // Fixed: Changed from totalDaily
     };
 };
 
 export const calculateFieldCropZoneFlowRate = (
     sprinklerCount: number,
-    waterPerSprinklerLPM: number = 6.0, 
+    waterPerSprinklerLPM: number = 6.0,
     irrigationTimeMinutes: number = 30
 ): {
     flowLPM: number;
-    totalWaterPerIrrigation: number;
+    totalWaterPerIrrigation: number; // Fixed: Changed name to clarify it's total water per irrigation
 } => {
+    // Flow rate in liters per minute
     const flowLPM = sprinklerCount * waterPerSprinklerLPM;
+
+    // Total water consumed per irrigation session in liters
     const totalWaterPerIrrigation = flowLPM * (irrigationTimeMinutes / 60);
 
     return {
         flowLPM: flowLPM,
-        totalWaterPerIrrigation: totalWaterPerIrrigation,
+        totalWaterPerIrrigation: totalWaterPerIrrigation, // Fixed: Changed from totalWaterPerIrrigation
     };
 };
 
@@ -837,7 +881,7 @@ export const convertAreaUnits = {
             return `${formatNumber(rai, 2)} ไร่`;
         }
         return `${formatNumber(sqm, 0)} ตร.ม.`;
-    }
+    },
 };
 
 export const calculatePlantingDensity = (
@@ -878,10 +922,5 @@ export const validateFieldCropInput = (input: any): boolean => {
 };
 
 export const validateGreenhouseInput = (input: any): boolean => {
-    return !!(
-        input &&
-        input.area > 0 &&
-        input.totalPlants > 0 &&
-        input.waterRequirement >= 0
-    );
+    return !!(input && input.area > 0 && input.totalPlants > 0 && input.waterRequirement >= 0);
 };

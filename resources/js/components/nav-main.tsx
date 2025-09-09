@@ -17,7 +17,7 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
         console.warn('Inertia context not available in NavMain, using fallback values');
         page = { url: '' };
     }
-    
+
     return (
         <SidebarGroup className="px-2 py-0">
             <SidebarGroupLabel>Platform</SidebarGroupLabel>

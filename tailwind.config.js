@@ -54,9 +54,6 @@ export default {
                 },
                 white: '#ffffff',
                 black: '#000000',
-                border: '#374151',
-                background: 'rgb(31,41,55)',
-                foreground: '#f3f4f6',
                 // Light mode colors - using hex values only
                 border: '#e5e7eb',
                 background: '#ffffff',
@@ -68,16 +65,6 @@ export default {
                 secondary: {
                     DEFAULT: '#facc15',
                     foreground: '#000000',
-                },
-                muted: {
-                    DEFAULT: '#9ca3af',
-                    foreground: '#374151',
-                },
-                accent: {
-                    DEFAULT: '#22c55e',
-                    foreground: '#ffffff',
-                    DEFAULT: '#6b7280',
-                    foreground: '#ffffff',
                 },
                 muted: {
                     DEFAULT: '#f9fafb',

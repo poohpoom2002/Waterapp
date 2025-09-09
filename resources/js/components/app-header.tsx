@@ -64,7 +64,7 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
         page = { props: { auth: null }, url: '' };
         auth = null;
     }
-    
+
     const getInitials = useInitials();
     return (
         <>

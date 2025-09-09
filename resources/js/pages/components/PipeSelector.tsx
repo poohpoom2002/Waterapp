@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { CalculationResults, PipeType, IrrigationInput, AnalyzedPipe } from '../types/interfaces';
 import { calculatePipeRolls } from '../utils/calculations';
 import { useLanguage } from '@/contexts/LanguageContext';
+import SearchableDropdown from './SearchableDropdown';
 
 interface PipeSelectorProps {
     pipeType: PipeType;
@@ -147,40 +148,49 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
     };
 
     return (
-        <div className={`rounded-lg p-6 ${config.title === t('ท่อย่อย') ? 'bg-yellow-500' : config.title === t('ท่อเมนรอง') ? 'bg-purple-500' : 'bg-blue-500'}`}>
-            <h3 className={`mb-4 text-2xl font-bold text-black`}>
-                {config.title}
-            </h3>
+        <div
+            className={`rounded-lg p-6 ${config.title === t('ท่อย่อย') ? 'bg-yellow-500' : config.title === t('ท่อเมนรอง') ? 'bg-purple-500' : 'bg-blue-500'}`}
+        >
+            <h3 className={`mb-4 text-2xl font-bold text-black`}>{config.title}</h3>
 
             <div className="mb-4">
-                
-                <select
+                <SearchableDropdown
                     value={currentPipe?.id || ''}
-                    onChange={(e) => {
+                    onChange={(value) => {
                         const selected = config.analyzedPipes.find(
-                            (p) => p.id === parseInt(e.target.value)
+                            (p) => p.id === parseInt(value.toString())
                         );
                         onPipeChange(selected || null);
                     }}
-                    className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
-                >
-                    <option value="">-- {t('ใช้การเลือกอัตโนมัติ')} --</option>
-                    {sortedPipes.map((pipe) => {
-                        const group = getPipeGrouping(pipe);
-                        const isAuto = pipe.id === config.autoSelectedPipe?.id;
-                        const rolls = calculateCurrentPipeRolls(pipe);
-                        const currentHeadLossPer100m = getHeadLossPer100m(pipe);
-                        return (
-                            <option key={pipe.id} value={pipe.id}>
-                                {isAuto ? '🤖 ' : ''}
-                                {pipe.name || pipe.productCode} - {pipe.sizeMM}mm -{' '}
-                                {pipe.price?.toLocaleString()} {t('บาท/ม้วน')} ({rolls} {t('ม้วน')}) | {group} |
-                                {t('คะแนน:')} {pipe.score} | {t('Loss:')} {currentHeadLossPer100m.toFixed(1)}
-                                m/100m
-                            </option>
-                        );
-                    })}
-                </select>
+                    options={[
+                        { value: '', label: `-- ${t('ใช้การเลือกอัตโนมัติ')} --` },
+                        ...sortedPipes.map((pipe) => {
+                            const group = getPipeGrouping(pipe);
+                            const isAuto = pipe.id === config.autoSelectedPipe?.id;
+                            const rolls = calculateCurrentPipeRolls(pipe);
+                            const currentHeadLossPer100m = getHeadLossPer100m(pipe);
+                            return {
+                                value: pipe.id,
+                                label: `${isAuto ? '🤖 ' : ''}${pipe.name || pipe.productCode || pipe.product_code} - ${pipe.sizeMM}mm - ${pipe.price?.toLocaleString()} ${t('บาท/ม้วน')}`,
+                                searchableText: `${pipe.productCode || pipe.product_code} ${pipe.name || ''} ${pipe.brand || ''} ${pipe.sizeMM}mm ${pipe.pipeType || ''} ${group}`,
+                                image: pipe.image,
+                                productCode: pipe.productCode || pipe.product_code,
+                                name: pipe.name,
+                                brand: pipe.brand,
+                                price: pipe.price,
+                                unit: t('บาท/ม้วน'),
+                                score: pipe.score,
+                                isRecommended: pipe.isRecommended,
+                                isGoodChoice: pipe.isGoodChoice,
+                                isUsable: pipe.isUsable,
+                                isAutoSelected: isAuto,
+                            };
+                        }),
+                    ]}
+                    placeholder={`-- ${t('ใช้การเลือกอัตโนมัติ')} --`}
+                    searchPlaceholder={t('พิมพ์เพื่อค้นหาท่อ (ชื่อ, รหัสสินค้า, ขนาด)...')}
+                    className="w-full"
+                />
             </div>
 
             {currentPipe ? (
@@ -227,7 +237,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
 
                         <div className="col-span-4">
                             <p>
-                                <strong>{t('รหัสสินค้า:')}</strong>{' '}
+                                <strong>{t('รหัส:')}</strong>{' '}
                                 {currentPipe?.productCode || currentPipe?.product_code}
                             </p>
                             <p>
@@ -306,17 +316,18 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                         </h5>
                         <div className="grid grid-cols-3 gap-2 text-xs">
                             <p>
-                                {t('คะแนนรวม:')} <span className="font-bold">{currentPipe?.score}</span>
+                                {t('คะแนนรวม:')}{' '}
+                                <span className="font-bold">{currentPipe?.score}</span>
                                 /100
                             </p>
                             <p>
-                                {t('Major Loss:')} {' '}
+                                {t('Major Loss:')}{' '}
                                 <span className="font-bold text-red-400">
                                     {config.headLoss.major.toFixed(2)} ม.
                                 </span>
                             </p>
                             <p>
-                                {t('Minor Loss:')} {' '}
+                                {t('Minor Loss:')}{' '}
                                 <span className="font-bold text-orange-400">
                                     {config.headLoss.minor.toFixed(2)} ม.
                                 </span>
@@ -324,13 +335,13 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                         </div>
                         <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                             <p>
-                                {t('Velocity Head:')} {' '}
+                                {t('Velocity Head:')}{' '}
                                 <span className="font-bold text-blue-300">
                                     {(Math.pow(config.velocity, 2) / (2 * 9.81)).toFixed(3)} ม.
                                 </span>
                             </p>
                             <p>
-                                {t('C-Factor:')} {' '}
+                                {t('C-Factor:')}{' '}
                                 <span className="font-bold text-purple-300">
                                     {results.coefficients ? results.coefficients[pipeType] : 140}
                                 </span>
@@ -344,7 +355,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                         </h5>
                         <div className="text-xs">
                             <p>
-                                {t('ความเร็วน้ำ:')} {' '}
+                                {t('ความเร็วน้ำ:')}{' '}
                                 <span
                                     className={`ml-1 font-bold ${
                                         config.velocity >= 0.8 && config.velocity <= 2.0
@@ -355,14 +366,14 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                     }`}
                                 >
                                     {config.velocity >= 0.8 && config.velocity <= 2.0
-                                            ? '✅ ' + t('เหมาะสมมาก (0.8-2.0 m/s)')
+                                        ? '✅ ' + t('เหมาะสมมาก (0.8-2.0 m/s)')
                                         : config.velocity >= 0.6 && config.velocity <= 2.5
                                           ? '⚠️ ' + t('ใช้ได้ (0.6-2.5 m/s)')
                                           : '❌ ' + t('อยู่นอกช่วงที่แนะนำ')}
                                 </span>
                             </p>
                             <p className="mt-1">
-                                {t('Head Loss:')} {' '}
+                                {t('Head Loss:')}{' '}
                                 <span
                                     className={`ml-1 font-bold ${
                                         getHeadLossPer100m(currentPipe) <= 3
@@ -381,13 +392,13 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                             </p>
                         </div>
                     </div>
-
-                    
                 </div>
             ) : (
                 <div className="rounded bg-gray-600 p-4 text-center">
                     <p className="text-gray-300">{t('ไม่สามารถหาท่อประเภทนี้ได้')}</p>
-                    <p className="mt-1 text-sm text-gray-400">{t('อาจไม่มีข้อมูลท่อที่เหมาะสมในระบบ')}</p>
+                    <p className="mt-1 text-sm text-gray-400">
+                        {t('อาจไม่มีข้อมูลท่อที่เหมาะสมในระบบ')}
+                    </p>
                 </div>
             )}
 

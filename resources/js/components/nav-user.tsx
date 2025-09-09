@@ -25,7 +25,7 @@ export function NavUser() {
         console.warn('Inertia context not available in NavUser, using fallback values');
         auth = { user: null };
     }
-    
+
     const { state } = useSidebar();
     const isMobile = useIsMobile();
 

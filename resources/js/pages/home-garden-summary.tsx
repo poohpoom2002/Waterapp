@@ -2,6 +2,7 @@
 // resources/js/pages/home-garden-summary.tsx
 import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import { router } from '@inertiajs/react';
+import axios from 'axios';
 import Navbar from '../components/Navbar';
 import GoogleMapSummary from '../components/homegarden/GoogleMapSummary';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -10,16 +11,61 @@ import {
     Coordinate,
     CanvasCoordinate,
     GardenPlannerData,
-    GardenStatistics,
     ZONE_TYPES,
     loadGardenData,
-    calculateStatistics,
     formatArea,
-    formatDistance,
     validateGardenData,
     clipCircleToPolygon,
     canvasToGPS,
 } from '../utils/homeGardenData';
+import { calculateGardenStatistics } from '../utils/gardenStatistics';
+
+// localStorage utility functions (matching HorticultureResultsPage.tsx pattern)
+const cleanupLocalStorage = () => {
+    const keysToRemove = [
+        'projectMapImage',
+        'horticultureIrrigationData',
+        'garden_planner_data',
+        'garden_statistics',
+        'gardenMapImage',
+        'gardenPlanImage',
+        'mapCaptureImage',
+        'projectMapMetadata',
+        'gardenMapMetadata',
+    ];
+    
+    keysToRemove.forEach(key => {
+        try {
+            localStorage.removeItem(key);
+        } catch (error) {
+            console.warn(`Failed to remove ${key} from localStorage:`, error);
+        }
+    });
+    
+    console.log('🧹 Cleaned up localStorage for garden project');
+};
+
+const safeLocalStorageSet = (key: string, value: string): boolean => {
+    try {
+        localStorage.setItem(key, value);
+        return true;
+    } catch (error) {
+        if (error instanceof DOMException && error.code === 22) {
+            console.warn('🚨 localStorage quota exceeded, cleaning up...');
+            cleanupLocalStorage();
+            try {
+                localStorage.setItem(key, value);
+                return true;
+            } catch (retryError) {
+                console.error('❌ Failed to save after cleanup:', retryError);
+                return false;
+            }
+        }
+        console.error('❌ Failed to save to localStorage:', error);
+        return false;
+    }
+};
+
 interface HomeGardenSummaryProps {
     data?: GardenPlannerData;
 }
@@ -113,6 +159,30 @@ const CanvasRenderer: React.FC<{
     }, []);
 
     const canvasBounds = useMemo(() => {
+        // For Image mode, base the bounds on the full image dimensions to show the entire plan
+        const isImageMode = gardenData.designMode === 'image';
+        const imgW = gardenData.imageData?.width;
+        const imgH = gardenData.imageData?.height;
+        if (
+            isImageMode &&
+            typeof imgW === 'number' &&
+            typeof imgH === 'number' &&
+            imgW > 0 &&
+            imgH > 0
+        ) {
+            return {
+                minX: 0,
+                maxX: imgW,
+                minY: 0,
+                maxY: imgH,
+                width: imgW,
+                height: imgH,
+                centerX: imgW / 2,
+                centerY: imgH / 2,
+            };
+        }
+
+        // Default (Canvas mode): use drawn zone extents
         const zonePoints: CanvasCoordinate[] = [];
 
         gardenData.gardenZones?.forEach((zone) => {
@@ -238,20 +308,6 @@ const CanvasRenderer: React.FC<{
         setIsDragging(false);
         setLastMousePos(null);
     }, []);
-
-    const handleWheel = useCallback(
-        (e: React.WheelEvent<HTMLCanvasElement>) => {
-            e.preventDefault();
-            const rect = activeCanvasRef.current?.getBoundingClientRect();
-            if (!rect) return;
-
-            const centerX = e.clientX - rect.left;
-            const centerY = e.clientY - rect.top;
-
-            handleZoom(-e.deltaY, centerX, centerY);
-        },
-        [handleZoom, activeCanvasRef]
-    );
 
     const resetView = useCallback(() => {
         setViewport({ zoom: 1, panX: 0, panY: 0 });
@@ -388,6 +444,8 @@ const CanvasRenderer: React.FC<{
         },
         [dimensionLines, transformPoint, transform, baseTransform]
     );
+    const imgPump = new Image();
+    imgPump.src = '/images/water-pump.png';
 
     const drawElements = useCallback(
         (ctx: CanvasRenderingContext2D, scale: number) => {
@@ -470,7 +528,7 @@ const CanvasRenderer: React.FC<{
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
                     ctx.strokeStyle = '#8B5CF6';
-                    ctx.lineWidth = 3 * Math.max(0.5, transform.scale / baseTransform.scale);
+                    ctx.lineWidth = 8 * Math.max(0.5, transform.scale / baseTransform.scale);
 
                     ctx.beginPath();
                     ctx.moveTo(startPoint.x, startPoint.y);
@@ -496,13 +554,11 @@ const CanvasRenderer: React.FC<{
                                 scale
                             );
 
-                            const radiusPixels =
-                                (sprinkler.type.radius * scale * transform.scale) /
-                                baseTransform.scale;
+                            const radiusPixels = sprinkler.type.radius * scale * transform.scale;
 
                             if (clipResult === 'FULL_CIRCLE') {
-                                ctx.fillStyle = sprinkler.type.color + '33';
-                                ctx.strokeStyle = sprinkler.type.color + '99';
+                                ctx.fillStyle = sprinkler.type.color + '1A';
+                                ctx.strokeStyle = sprinkler.type.color;
                                 ctx.lineWidth =
                                     2 * Math.max(0.5, transform.scale / baseTransform.scale);
                                 ctx.beginPath();
@@ -527,7 +583,10 @@ const CanvasRenderer: React.FC<{
                                 ctx.closePath();
                                 ctx.clip();
 
-                                ctx.fillStyle = sprinkler.type.color + '33';
+                                ctx.fillStyle = sprinkler.type.color + '1A';
+                                ctx.strokeStyle = sprinkler.type.color;
+                                ctx.lineWidth =
+                                    2 * Math.max(0.5, transform.scale / baseTransform.scale);
                                 ctx.beginPath();
                                 ctx.arc(
                                     sprinklerPoint.x,
@@ -537,29 +596,12 @@ const CanvasRenderer: React.FC<{
                                     Math.PI * 2
                                 );
                                 ctx.fill();
-                                ctx.restore();
-
-                                ctx.strokeStyle = sprinkler.type.color + '66';
-                                ctx.lineWidth =
-                                    1 * Math.max(0.5, transform.scale / baseTransform.scale);
-                                ctx.setLineDash([
-                                    3 * Math.max(0.5, transform.scale / baseTransform.scale),
-                                    3 * Math.max(0.5, transform.scale / baseTransform.scale),
-                                ]);
-                                ctx.beginPath();
-                                ctx.arc(
-                                    sprinklerPoint.x,
-                                    sprinklerPoint.y,
-                                    radiusPixels,
-                                    0,
-                                    Math.PI * 2
-                                );
                                 ctx.stroke();
-                                ctx.setLineDash([]);
+                                ctx.restore();
                             } else if (Array.isArray(clipResult) && clipResult.length >= 3) {
                                 const canvasResult = clipResult as CanvasCoordinate[];
-                                ctx.fillStyle = sprinkler.type.color + '33';
-                                ctx.strokeStyle = sprinkler.type.color + '99';
+                                ctx.fillStyle = sprinkler.type.color + '1A';
+                                ctx.strokeStyle = sprinkler.type.color;
                                 ctx.lineWidth =
                                     2 * Math.max(0.5, transform.scale / baseTransform.scale);
                                 ctx.beginPath();
@@ -573,34 +615,17 @@ const CanvasRenderer: React.FC<{
                                 ctx.fill();
                                 ctx.stroke();
                             }
+                            // If no coverage, don't show anything to ensure strict zone boundaries
                         } catch (error) {
                             console.error('Error drawing sprinkler radius:', error);
-
-                            const radiusPixels =
-                                (sprinkler.type.radius * scale * transform.scale) /
-                                baseTransform.scale;
-                            ctx.fillStyle = sprinkler.type.color + '26';
-                            ctx.strokeStyle = sprinkler.type.color + '80';
-                            ctx.lineWidth =
-                                1 * Math.max(0.5, transform.scale / baseTransform.scale);
-                            ctx.beginPath();
-                            ctx.arc(
-                                sprinklerPoint.x,
-                                sprinklerPoint.y,
-                                radiusPixels,
-                                0,
-                                Math.PI * 2
-                            );
-                            ctx.fill();
-                            ctx.stroke();
+                            // Don't show fallback circle to ensure strict zone boundaries
                         }
                     } else if (sprinkler.zoneId === 'virtual_zone') {
-                        const radiusPixels =
-                            (sprinkler.type.radius * scale * transform.scale) / baseTransform.scale;
+                        const radiusPixels = sprinkler.type.radius * scale * transform.scale;
 
-                        ctx.fillStyle = sprinkler.type.color + '26';
-                        ctx.strokeStyle = sprinkler.type.color + '80';
-                        ctx.lineWidth = 1 * Math.max(0.5, transform.scale / baseTransform.scale);
+                        ctx.fillStyle = sprinkler.type.color + '1A';
+                        ctx.strokeStyle = sprinkler.type.color;
+                        ctx.lineWidth = 2 * Math.max(0.5, transform.scale / baseTransform.scale);
                         ctx.setLineDash([
                             8 * Math.max(0.5, transform.scale / baseTransform.scale),
                             4 * Math.max(0.5, transform.scale / baseTransform.scale),
@@ -610,6 +635,17 @@ const CanvasRenderer: React.FC<{
                         ctx.fill();
                         ctx.stroke();
                         ctx.setLineDash([]);
+                    } else {
+                        // No zone or zone without coordinates - draw full circle
+                        const radiusPixels = sprinkler.type.radius * scale * transform.scale;
+
+                        ctx.fillStyle = sprinkler.type.color + '1A';
+                        ctx.strokeStyle = sprinkler.type.color;
+                        ctx.lineWidth = 2 * Math.max(0.5, transform.scale / baseTransform.scale);
+                        ctx.beginPath();
+                        ctx.arc(sprinklerPoint.x, sprinklerPoint.y, radiusPixels, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.stroke();
                     }
                 });
 
@@ -646,12 +682,6 @@ const CanvasRenderer: React.FC<{
 
                     ctx.save();
 
-                    ctx.shadowColor = 'rgba(0,0,0,0.6)';
-                    ctx.shadowBlur = 8 * Math.max(0.5, transform.scale / baseTransform.scale);
-                    ctx.shadowOffsetX = 2 * Math.max(0.5, transform.scale / baseTransform.scale);
-                    ctx.shadowOffsetY = 2 * Math.max(0.5, transform.scale / baseTransform.scale);
-
-                    ctx.fillStyle = gardenData.waterSource.type === 'pump' ? '#EF4444' : '#3B82F6';
                     ctx.beginPath();
                     ctx.arc(
                         waterSourcePoint.x,
@@ -664,14 +694,22 @@ const CanvasRenderer: React.FC<{
 
                     ctx.shadowColor = 'transparent';
                     ctx.fillStyle = '#fff';
-                    ctx.font = `bold ${10 * Math.max(0.8, transform.scale / baseTransform.scale)}px Arial`;
+                    ctx.font = `bold ${24 * Math.max(0.8, transform.scale / baseTransform.scale)}px Arial`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(
-                        gardenData.waterSource.type === 'pump' ? '⚡' : '🚰',
-                        waterSourcePoint.x,
-                        waterSourcePoint.y
-                    );
+                    if (gardenData.waterSource.type === 'pump') {
+                        ctx.fillText('⚡', waterSourcePoint.x, waterSourcePoint.y);
+                    } else {
+                        // วาดรูปภาพปั๊มน้ำ
+                        const pumpSize = 24 * Math.max(0.8, transform.scale / baseTransform.scale);
+                        ctx.drawImage(
+                            imgPump,
+                            waterSourcePoint.x - pumpSize / 2,
+                            waterSourcePoint.y - pumpSize / 2,
+                            pumpSize,
+                            pumpSize
+                        );
+                    }
 
                     ctx.restore();
                 }
@@ -798,6 +836,29 @@ const CanvasRenderer: React.FC<{
         };
     }, [isDragging, lastMousePos, setViewport, setLastMousePos]);
 
+    // Add wheel event listener with passive: false to allow preventDefault
+    useEffect(() => {
+        const canvas = activeCanvasRef.current;
+        if (!canvas) return;
+
+        const wheelHandler = (e: WheelEvent) => {
+            e.preventDefault();
+            const rect = activeCanvasRef.current?.getBoundingClientRect();
+            if (!rect) return;
+
+            const centerX = e.clientX - rect.left;
+            const centerY = e.clientY - rect.top;
+
+            handleZoom(-e.deltaY, centerX, centerY);
+        };
+
+        canvas.addEventListener('wheel', wheelHandler, { passive: false });
+
+        return () => {
+            canvas.removeEventListener('wheel', wheelHandler);
+        };
+    }, [handleZoom]);
+
     return (
         <div
             ref={containerRef}
@@ -830,7 +891,39 @@ const CanvasRenderer: React.FC<{
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
-                onWheel={handleWheel}
+                onTouchStart={(e) => {
+                    e.preventDefault();
+                    if (e.touches.length === 1) {
+                        const touch = e.touches[0];
+                        const syntheticEvent = {
+                            clientX: touch.clientX,
+                            clientY: touch.clientY,
+                            button: 0,
+                            preventDefault: () => {},
+                        } as React.MouseEvent<HTMLCanvasElement>;
+                        handleMouseDown(syntheticEvent);
+                    }
+                }}
+                onTouchMove={(e) => {
+                    e.preventDefault();
+                    if (e.touches.length === 1) {
+                        const touch = e.touches[0];
+                        const syntheticEvent = {
+                            clientX: touch.clientX,
+                            clientY: touch.clientY,
+                            preventDefault: () => {},
+                        } as React.MouseEvent<HTMLCanvasElement>;
+                        handleMouseMove(syntheticEvent);
+                    }
+                }}
+                onTouchEnd={(e) => {
+                    e.preventDefault();
+                    handleMouseUp();
+                }}
+                onTouchCancel={(e) => {
+                    e.preventDefault();
+                    handleMouseUp();
+                }}
             />
         </div>
     );
@@ -876,10 +969,10 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
         initializeData();
     }, [propsData]);
 
-    const statistics = useMemo<GardenStatistics | null>(() => {
+    const statistics = useMemo(() => {
         if (!gardenData) return null;
         try {
-            return calculateStatistics(gardenData);
+            return calculateGardenStatistics(gardenData);
         } catch (err) {
             console.error('Error calculating statistics:', err);
             return null;
@@ -1164,26 +1257,83 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
             `;
             document.body.appendChild(loadingDiv);
 
-            if (gardenData) {
-                localStorage.setItem('garden_planner_data', JSON.stringify(gardenData));
-            }
-
-            if (statistics) {
-                localStorage.setItem('garden_statistics', JSON.stringify(statistics));
-            }
-
             const imageUrl = await createMapImage();
 
-            if (imageUrl) {
-                localStorage.setItem('projectMapImage', imageUrl);
-                localStorage.setItem('projectType', 'home-garden');
-
-                document.body.removeChild(loadingDiv);
-
-                window.location.href = '/product?mode=garden';
+            if (imageUrl && imageUrl !== 'data:,' && imageUrl.length > 100) {
+                const currentFieldId = localStorage.getItem('currentFieldId');
+                if (currentFieldId && !currentFieldId.startsWith('mock-')) {
+                    try {
+                        console.log('🔄 Saving complete home garden project data to database...');
+                        const completeProjectData = {
+                            status: 'finished',
+                            is_completed: true,
+                            garden_data: gardenData, // Contains all garden project elements
+                            garden_stats: statistics, // Contains all calculated stats
+                            project_mode: 'home-garden',
+                            show_pump_option: true,
+                            last_saved: new Date().toISOString(),
+                            project_image: imageUrl,
+                            project_image_type: 'image/png',
+                        };
+                        const dataResponse = await axios.put(`/api/fields/${currentFieldId}/data`, completeProjectData);
+                        if (dataResponse.data.success) {
+                            console.log('✅ Complete home garden project data saved to database successfully');
+                            
+                            // Also save data to localStorage for immediate product page loading
+                            if (gardenData && !safeLocalStorageSet('garden_planner_data', JSON.stringify(gardenData))) {
+                                console.warn('⚠️ Failed to save garden_planner_data to localStorage, but data is saved to database');
+                            }
+                            
+                            if (statistics && !safeLocalStorageSet('garden_statistics', JSON.stringify(statistics))) {
+                                console.warn('⚠️ Failed to save garden_statistics to localStorage, but data is saved to database');
+                            }
+                            
+                            if (!safeLocalStorageSet('projectType', 'home-garden')) {
+                                console.warn('⚠️ Failed to save projectType to localStorage, but data is saved to database');
+                            }
+                            
+                            document.body.removeChild(loadingDiv);
+                            router.visit('/product?mode=garden');
+                        } else {
+                            throw new Error('Database save failed: ' + dataResponse.data.message);
+                        }
+                    } catch (error) {
+                        console.error('❌ Failed to save complete home garden project data to database:', error);
+                        // Fallback to localStorage if database fails
+                        if (gardenData && !safeLocalStorageSet('garden_planner_data', JSON.stringify(gardenData))) {
+                            throw new Error('ไม่สามารถบันทึกข้อมูลสวนบ้านได้ - ทั้ง database และ localStorage ล้มเหลว');
+                        }
+                        if (statistics && !safeLocalStorageSet('garden_statistics', JSON.stringify(statistics))) {
+                            throw new Error('ไม่สามารถบันทึกสถิติโครงการได้ - localStorage เต็ม');
+                        }
+                        if (!safeLocalStorageSet('projectMapImage', imageUrl)) {
+                            throw new Error('ไม่สามารถบันทึกภาพแผนที่ได้ - localStorage เต็ม');
+                        }
+                        if (!safeLocalStorageSet('projectType', 'home-garden')) {
+                            throw new Error('ไม่สามารถบันทึกประเภทโครงการได้ - localStorage เต็ม');
+                        }
+                        document.body.removeChild(loadingDiv);
+                        router.visit('/product?mode=garden');
+                    }
+                } else {
+                    // Fallback to localStorage for mock fields or when no field ID
+                    if (gardenData && !safeLocalStorageSet('garden_planner_data', JSON.stringify(gardenData))) {
+                        throw new Error('ไม่สามารถบันทึกข้อมูลสวนบ้านได้ - localStorage เต็ม');
+                    }
+                    if (statistics && !safeLocalStorageSet('garden_statistics', JSON.stringify(statistics))) {
+                        throw new Error('ไม่สามารถบันทึกสถิติโครงการได้ - localStorage เต็ม');
+                    }
+                    if (!safeLocalStorageSet('projectMapImage', imageUrl)) {
+                        throw new Error('ไม่สามารถบันทึกภาพแผนที่ได้ - localStorage เต็ม');
+                    }
+                    if (!safeLocalStorageSet('projectType', 'home-garden')) {
+                        throw new Error('ไม่สามารถบันทึกประเภทโครงการได้ - localStorage เต็ม');
+                    }
+                    document.body.removeChild(loadingDiv);
+                    router.visit('/product?mode=garden');
+                }
             } else {
-                document.body.removeChild(loadingDiv);
-                router.visit('/product?mode=garden');
+                throw new Error('ไม่สามารถสร้างภาพแผนที่ได้');
             }
         } catch (error) {
             console.error('🏡 Error navigating to equipment calculation:', error);
@@ -1196,7 +1346,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
         } finally {
             setIsCreatingImage(false);
         }
-    }, [gardenData, statistics]);
+    }, [gardenData, statistics, t]);
 
     useEffect(() => {
         if (error) {
@@ -1355,7 +1505,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                         {t('พื้นที่รวมทั้งหมด')}
                                     </div>
                                     <div className="text-xl font-bold text-white">
-                                        {formatArea(statistics.totalArea)}
+                                        {statistics.summary.totalAreaFormatted}
                                     </div>
                                 </div>
 
@@ -1364,7 +1514,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                         {t('จำนวนโซน (ไม่รวมพื้นที่ห้าม)')}
                                     </div>
                                     <div className="text-xl font-bold text-green-400">
-                                        {statistics.totalZones} {t('โซน')}
+                                        {statistics.summary.totalZones} {t('โซน')}
                                     </div>
                                 </div>
 
@@ -1373,7 +1523,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                         {t('จำนวนหัวฉีดทั้งหมด')}
                                     </div>
                                     <div className="text-xl font-bold text-blue-400">
-                                        {statistics.totalSprinklers} {t('ตัว')}
+                                        {statistics.summary.totalSprinklers} {t('ตัว')}
                                     </div>
                                 </div>
 
@@ -1385,7 +1535,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                                 {t('ท่อที่ยาวที่สุด')}
                                             </div>
                                             <div className="font-bold text-yellow-400">
-                                                {formatDistance(statistics.longestPipe)}
+                                                {statistics.summary.longestPipeFromSourceFormatted}
                                             </div>
                                         </div>
                                         <div>
@@ -1393,40 +1543,84 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                                 {t('ความยาวรวม')}
                                             </div>
                                             <div className="font-bold text-yellow-400">
-                                                {formatDistance(statistics.totalPipeLength)}
+                                                {statistics.summary.totalPipeLengthFormatted}
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+
+                                <div className="rounded-lg bg-gray-700 p-3">
+                                    <div className="mb-1 text-gray-400">{t('ข้อต่อทางแยก')}</div>
+                                    <div className="mt-1 grid grid-cols-2 gap-2">
+                                        <div>
+                                            <div className="text-xs text-gray-500">
+                                                {t('จำนวนรวม')}
+                                            </div>
+                                            <div className="font-bold text-purple-400">
+                                                {statistics.summary.totalJunctions} {t('จุด')}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-gray-500">
+                                                {t('แยกตามประเภท')}
+                                            </div>
+                                            <div className="text-xs">
+                                                <div className="text-purple-300">
+                                                    {t('ท่อ')}:{' '}
+                                                    {
+                                                        statistics.summary.junctionStatistics
+                                                            .pipeJunctions
+                                                    }
+                                                </div>
+                                                <div className="text-purple-300">
+                                                    {t('หัวฉีด')}:{' '}
+                                                    {
+                                                        statistics.summary.junctionStatistics
+                                                            .sprinklerJunctions
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {Object.keys(
+                                        statistics.summary.junctionStatistics.junctionsByWays
+                                    ).length > 0 && (
+                                        <div className="mt-2 border-t border-gray-600 pt-2">
+                                            <div className="mb-1 text-xs text-gray-500">
+                                                {t('จำนวนทางแยก:')}
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-1 text-xs">
+                                                {Object.entries(
+                                                    statistics.summary.junctionStatistics
+                                                        .junctionsByWays
+                                                ).map(([ways, count]) => (
+                                                    <div key={ways} className="text-purple-300">
+                                                        {ways}-{t('ทาง')}: {count}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {statistics.zoneStatistics.length > 0 && (
+                {statistics.zones.length > 0 && (
                     <div className="mt-6 rounded-xl bg-gray-800 p-6">
                         <h3 className="mb-4 text-lg font-semibold text-green-400">
                             📍 {t('ข้อมูลแยกตามโซน')}
                         </h3>
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                            {statistics.zoneStatistics.map((zone, index) => (
+                            {statistics.zones.map((zone, index) => (
                                 <div key={zone.zoneId} className="rounded-lg bg-gray-700 p-4">
                                     <div className="mb-3 flex items-center justify-between">
                                         <h4 className="font-semibold text-white">
                                             {index + 1}. {t(zone.zoneName)}
                                         </h4>
-                                        <span
-                                            className={`rounded bg-gray-600 px-2 py-1 text-xs ${
-                                                zone.zoneType === t('สนามหญ้า')
-                                                    ? 'bg-green-200 text-green-600'
-                                                    : zone.zoneType === t('แปลงดอกไม้')
-                                                      ? 'bg-pink-200 text-pink-600'
-                                                      : zone.zoneType === t('ต้นไม้')
-                                                        ? 'bg-green-300 text-green-800'
-                                                        : ''
-                                            }`}
-                                        >
-                                            {t(zone.zoneType)}
+                                        <span className="rounded bg-gray-600 px-2 py-1 text-xs text-gray-300">
+                                            {t('โซน')}
                                         </span>
                                     </div>
 
@@ -1434,7 +1628,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                         <div className="flex justify-between">
                                             <span className="text-gray-400">{t('พื้นที่:')}</span>
                                             <span className="font-medium text-white">
-                                                {formatArea(zone.area)}
+                                                {zone.areaFormatted}
                                             </span>
                                         </div>
 
@@ -1487,7 +1681,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                             </>
                                         )}
 
-                                        {zone.pipeLength > 0 && (
+                                        {zone.totalPipeLength > 0 && (
                                             <div className="border-t border-gray-600 pt-2">
                                                 <div className="mb-1 text-gray-400">
                                                     {t('ระบบท่อ:')}
@@ -1498,7 +1692,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                                             {t('ยาวที่สุด:')}{' '}
                                                         </span>
                                                         <span className="text-yellow-400">
-                                                            {formatDistance(zone.longestPipe)}
+                                                            {zone.longestPipeFromSourceFormatted}
                                                         </span>
                                                     </div>
                                                     <div>
@@ -1506,7 +1700,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                                             {t('รวม:')}{' '}
                                                         </span>
                                                         <span className="text-yellow-400">
-                                                            {formatDistance(zone.pipeLength)}
+                                                            {zone.totalPipeLengthFormatted}
                                                         </span>
                                                     </div>
                                                 </div>
