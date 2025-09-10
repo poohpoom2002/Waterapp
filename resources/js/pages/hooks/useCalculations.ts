@@ -536,9 +536,10 @@ const autoSelectBestPipe = (
         velocityMax = 3.0;
         minPressure = 6;
     } else if (projectMode === 'garden') {
+        // Garden mode now uses the same criteria as horticulture
         velocityMin = 0.3;
-        velocityMax = 3.2;
-        minPressure = 4;
+        velocityMax = 3.5;
+        minPressure = 6;
     }
 
     const suitablePipes = analyzedPipes.filter((pipe) => {
@@ -590,10 +591,12 @@ const autoSelectBestPump = (
 ): any => {
     if (!analyzedPumps || analyzedPumps.length === 0) return null;
 
+    // กรองเฉพาะปั๊มที่เพียงพอทั้ง Flow และ Head
     const adequatePumps = analyzedPumps.filter(
         (pump) => pump.isFlowAdequate && pump.isHeadAdequate
     );
 
+    // ถ้าไม่มีปั๊มที่เพียงพอ ให้เลือกปั๊มที่มี deficit น้อยที่สุด
     if (adequatePumps.length === 0) {
         return analyzedPumps.sort((a, b) => {
             const aDeficit =
@@ -606,30 +609,20 @@ const autoSelectBestPump = (
         })[0];
     }
 
+    // เลือกปั๊มที่มี Flow Max และ Head Max น้อยที่สุด (ไม่ oversized เกินไป)
     return adequatePumps.sort((a, b) => {
-        if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
-        if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
-
-        let flowWeight = 1;
-        let headWeight = 1;
-        
-        if (projectMode === 'field-crop') {
-            flowWeight = 1.2;
-            headWeight = 0.8;
-        } else if (projectMode === 'greenhouse') {
-            flowWeight = 0.8;
-            headWeight = 1.2;
+        // เปรียบเทียบ maxFlow ก่อน (น้อยกว่าดีกว่า)
+        if (Math.abs(a.maxFlow - b.maxFlow) > 10) { // ถ้าต่างกันมากกว่า 10 LPM
+            return a.maxFlow - b.maxFlow;
         }
-
-        const aOversize = (a.flowRatio - 1) * flowWeight + (a.headRatio - 1) * headWeight;
-        const bOversize = (b.flowRatio - 1) * flowWeight + (b.headRatio - 1) * headWeight;
-        if (Math.abs(aOversize - bOversize) > 0.3) return aOversize - bOversize;
-
-        const aEfficiency = a.flowPerBaht || 0;
-        const bEfficiency = b.flowPerBaht || 0;
-        if (Math.abs(aEfficiency - bEfficiency) > 0.01) return bEfficiency - aEfficiency;
-
-        return b.powerHP - a.powerHP; // Sort by power rating (higher power first for safety)
+        
+        // ถ้า maxFlow ใกล้เคียงกัน ให้เปรียบเทียบ maxHead (น้อยกว่าดีกว่า)
+        if (Math.abs(a.maxHead - b.maxHead) > 5) { // ถ้าต่างกันมากกว่า 5 เมตร
+            return a.maxHead - b.maxHead;
+        }
+        
+        // ถ้าใกล้เคียงกันทั้งคู่ ให้เลือกตามราคา (ถูกกว่าดีกว่า)
+        return a.price - b.price;
     })[0];
 };
 

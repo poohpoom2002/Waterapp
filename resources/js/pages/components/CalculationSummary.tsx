@@ -31,6 +31,7 @@ interface CalculationSummaryProps {
     getZoneName?: (zoneId: string) => string;
     fieldCropData?: any;
     greenhouseData?: any;
+    gardenStats?: any; // เพิ่มสำหรับ garden mode
 }
 
 const CalculationSummary: React.FC<CalculationSummaryProps> = ({
@@ -47,6 +48,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
     getZoneName = (id) => id,
     fieldCropData,
     greenhouseData,
+    gardenStats,
 }) => {
     const { t } = useLanguage();
     const actualPump = results.autoSelectedPump;
@@ -55,8 +57,69 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
     const actualMainPipe = results.autoSelectedMainPipe;
     const actualEmitterPipe = results.autoSelectedEmitterPipe;
 
-    const isMultiZone =
-        selectedZones.length > 1 || (results.allZoneResults && results.allZoneResults.length > 1);
+    // ฟังก์ชันสำหรับดึงค่า Head Loss จากท่อแต่ละชนิด
+    const getActualPipeHeadLoss = () => {
+        if (projectMode === 'garden') {
+            // สำหรับ garden mode ใช้ข้อมูลจาก PipeSelector calculations ที่เก็บใน localStorage
+            try {
+                const pipeCalculationsStr = localStorage.getItem('garden_pipe_calculations');
+                if (pipeCalculationsStr) {
+                    const pipeCalculations = JSON.parse(pipeCalculationsStr);
+                    
+                    const branchHeadLoss = pipeCalculations.branch?.headLoss || 0;
+                    const secondaryHeadLoss = pipeCalculations.secondary?.headLoss || 0;
+                    const mainHeadLoss = pipeCalculations.main?.headLoss || 0;
+                    const emitterHeadLoss = pipeCalculations.emitter?.headLoss || 0;
+
+                    const totalHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+
+                    return {
+                        branch: branchHeadLoss,
+                        secondary: secondaryHeadLoss,
+                        main: mainHeadLoss,
+                        emitter: emitterHeadLoss,
+                        total: totalHeadLoss,
+                    };
+                }
+            } catch (error) {
+                console.error('Error loading garden pipe calculations:', error);
+            }
+            
+            // Fallback: ใช้ข้อมูลจาก auto-selected pipes
+            const branchHeadLoss = actualBranchPipe?.headLoss || 0;
+            const secondaryHeadLoss = actualSecondaryPipe?.headLoss || 0;
+            const mainHeadLoss = actualMainPipe?.headLoss || 0;
+            const emitterHeadLoss = actualEmitterPipe?.headLoss || 0;
+
+            const totalHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+
+            return {
+                branch: branchHeadLoss,
+                secondary: secondaryHeadLoss,
+                main: mainHeadLoss,
+                emitter: emitterHeadLoss,
+                total: totalHeadLoss,
+            };
+        } else {
+            // สำหรับ mode อื่นๆ ใช้ค่าจาก results.headLoss
+            const branchHeadLoss = results.headLoss?.branch?.total || 0;
+            const secondaryHeadLoss = results.headLoss?.secondary?.total || 0;
+            const mainHeadLoss = results.headLoss?.main?.total || 0;
+            const emitterHeadLoss = results.headLoss?.emitter?.total || 0;
+
+            const totalHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+
+            return {
+                branch: branchHeadLoss,
+                secondary: secondaryHeadLoss,
+                main: mainHeadLoss,
+                emitter: emitterHeadLoss,
+                total: totalHeadLoss,
+            };
+        }
+    };
+
+    const actualHeadLoss = getActualPipeHeadLoss();
 
     const getEquipmentName = () => {
         switch (projectMode) {
@@ -107,6 +170,88 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
 
     const pressureInfo = getSprinklerPressureInfo();
 
+    // คำนวณ Head Loss หัวฉีด จาก แรงดัน(บาร์) * 10
+    const calculateSprinklerHeadLoss = () => {
+        let sprinklerPressureBar = 0;
+        
+        if (projectMode === 'horticulture') {
+            // สำหรับ horticulture mode ใช้ข้อมูลจาก horticultureSystemData
+            try {
+                const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
+                if (horticultureSystemDataStr) {
+                    const horticultureSystemData = JSON.parse(horticultureSystemDataStr);
+                    if (horticultureSystemData?.sprinklerConfig?.pressureBar) {
+                        sprinklerPressureBar = horticultureSystemData.sprinklerConfig.pressureBar;
+                    } else {
+                        // fallback ใช้ค่าจาก selectedSprinkler
+                        if (selectedSprinkler && selectedSprinkler.pressureBar) {
+                            if (Array.isArray(selectedSprinkler.pressureBar)) {
+                                sprinklerPressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                            } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                                const parts = selectedSprinkler.pressureBar.split('-');
+                                sprinklerPressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
+                            } else {
+                                sprinklerPressureBar = parseFloat(String(selectedSprinkler.pressureBar));
+                            }
+                        } else {
+                            sprinklerPressureBar = 2.5; // default
+                        }
+                    }
+                } else {
+                    // fallback ใช้ค่าจาก selectedSprinkler
+                    if (selectedSprinkler && selectedSprinkler.pressureBar) {
+                        if (Array.isArray(selectedSprinkler.pressureBar)) {
+                            sprinklerPressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                        } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                            const parts = selectedSprinkler.pressureBar.split('-');
+                            sprinklerPressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
+                        } else {
+                            sprinklerPressureBar = parseFloat(String(selectedSprinkler.pressureBar));
+                        }
+                    } else {
+                        sprinklerPressureBar = 2.5; // default
+                    }
+                }
+            } catch (error) {
+                console.error('Error parsing horticulture system data:', error);
+                sprinklerPressureBar = 2.5; // default
+            }
+        } else if (projectMode === 'garden') {
+            // สำหรับ garden mode ใช้ข้อมูลจาก zone
+            if (gardenStats && activeZone) {
+                const currentZone = gardenStats.zones.find((z: any) => z.zoneId === activeZone.id);
+                if (currentZone) {
+                    sprinklerPressureBar = currentZone.sprinklerPressure || 2.5;
+                } else {
+                    sprinklerPressureBar = 2.5; // default
+                }
+            } else {
+                sprinklerPressureBar = 2.5; // default
+            }
+        } else {
+            // สำหรับ mode อื่นๆ
+            if (selectedSprinkler && selectedSprinkler.pressureBar) {
+                sprinklerPressureBar = parseFloat(String(selectedSprinkler.pressureBar));
+            } else {
+                sprinklerPressureBar = 2.5; // default
+            }
+        }
+        
+        return sprinklerPressureBar * 10; // แรงดัน(บาร์) * 10
+    };
+
+    const sprinklerHeadLoss = calculateSprinklerHeadLoss();
+
+    // คำนวณ Pump Head จาก Head Loss ท่อ + Head Loss หัวฉีด
+    const calculatePumpHead = () => {
+        return actualHeadLoss.total + sprinklerHeadLoss;
+    };
+
+    const actualPumpHead = calculatePumpHead();
+
+    const isMultiZone =
+        selectedZones.length > 1 || (results.allZoneResults && results.allZoneResults.length > 1);
+
     const getItemName = () => {
         switch (projectMode) {
             case 'garden':
@@ -121,13 +266,11 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
     };
 
     const getAreaUnit = () => {
-        // Fix: All project modes now consistently use rai
         return t('ไร่');
     };
 
     const formatArea = (area: number) => {
         const safeArea = area || 0;
-        // Fix: Since farmSizeRai is now consistently in rai for all modes
         return `${safeArea.toFixed(1)} ไร่`;
     };
 
@@ -167,8 +310,8 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                     itemCount: zone.totalPlantingPoints,
                     waterNeed: zone.totalWaterRequirementPerDay || 0,
                     cropType: zone.cropType,
-                    estimatedYield: 0, // จะคำนวณจาก crop data
-                    estimatedIncome: 0, // จะคำนวณจาก crop data
+                    estimatedYield: 0,
+                    estimatedIncome: 0
                 };
             }
         }
@@ -224,8 +367,9 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
         else if (hasLowVelocity && !hasOptimalVelocity) performance.velocityStatus = 'warning';
 
         const headLossRatio = results.headLossValidation?.ratio || 0;
-        if (headLossRatio > 25) performance.headLossStatus = 'critical';
-        else if (headLossRatio > 20) performance.headLossStatus = 'warning';
+        const actualHeadLossRatio = actualHeadLoss.total > 0 ? (actualHeadLoss.total / (input.staticHeadM + pressureInfo.pressure)) * 100 : 0;
+        if (actualHeadLossRatio > 25) performance.headLossStatus = 'critical';
+        else if (actualHeadLossRatio > 20) performance.headLossStatus = 'warning';
 
         if (showPump && actualPump) {
             if (!actualPump.isFlowAdequate || !actualPump.isHeadAdequate) {
@@ -315,71 +459,6 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
 
     return (
         <div className="space-y-6">
-            {/* แสดงข้อมูลโซนปัจจุบัน */}
-            {currentZoneData && (
-                <div className="rounded-lg bg-purple-900 p-4">
-                    <h3 className="mb-2 text-lg font-bold text-purple-300">
-                        {getProjectIcon()} {t('ข้อมูลโซนปัจจุบัน:')} {currentZoneData.name}
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4 text-sm text-gray-300 md:grid-cols-4">
-                        <div>
-                            <p className="text-purple-200">{t('พื้นที่:')}</p>
-                            <p className="font-medium text-white">{formatArea(currentZoneData.area || 0)}</p>
-                        </div>
-                        <div>
-                            <p className="text-purple-200">
-                                {t('จำนวน')}{getItemName()}:
-                            </p>
-                            <p className="font-medium text-white">
-                                {(currentZoneData.itemCount || 0).toLocaleString()} {getItemName()}
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-purple-200">{t('ความต้องการน้ำ:')}</p>
-                            <p className="font-medium text-white">
-                                {(currentZoneData.waterNeed || 0).toFixed(0)} {t('ลิตร/ครั้ง')}
-                            </p>
-                        </div>
-                        {currentZoneData.cropType && (
-                            <div>
-                                <p className="text-purple-200">{t('พืชที่ปลูก:')}</p>
-                                <p className="font-medium text-white">{currentZoneData.cropType}</p>
-                            </div>
-                        )}
-                    </div>
-                    
-                    {/* แสดงข้อมูลการผลิตสำหรับ field-crop และ greenhouse */}
-                    {(projectMode === 'field-crop' || projectMode === 'greenhouse') && 
-                     ((currentZoneData.estimatedYield || 0) > 0 || (currentZoneData.estimatedIncome || 0) > 0) && (
-                        <div className="mt-3 grid grid-cols-2 gap-4 border-t border-purple-700 pt-3">
-                            {(currentZoneData.estimatedYield || 0) > 0 && (
-                                <div>
-                                    <p className="text-purple-200">{t('ผลผลิตประมาณ:')}</p>
-                                    <p className="font-medium text-green-300">
-                                        {(currentZoneData.estimatedYield || 0).toLocaleString()} {t('กก.')}
-                                    </p>
-                                </div>
-                            )}
-                            {(currentZoneData.estimatedIncome || 0) > 0 && (
-                                <div>
-                                    <p className="text-purple-200">{t('รายได้ประมาณ:')}</p>
-                                    <p className="font-medium text-green-300">
-                                        {(currentZoneData.estimatedIncome || 0).toLocaleString()} {t('บาท')}
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                    
-                    <div className="mt-2 rounded bg-purple-800 p-2">
-                        <p className="text-xs text-purple-200">
-                            💡 {t('ข้อมูลข้างต้นเป็นของโซน')} {currentZoneData.name} {t('ที่กำลังตั้งค่า')}
-                        </p>
-                    </div>
-                </div>
-            )}
-
-            {/* แสดงข้อมูลสรุปโครงการสำหรับ field-crop และ greenhouse */}
             {projectSummaryData && (
                 <div className="rounded-lg bg-blue-900 p-4">
                     <h3 className="mb-3 text-lg font-bold text-blue-300">
@@ -413,7 +492,6 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         </div>
                     </div>
 
-                    {/* แสดงข้อมูลการผลิตรวม */}
                     {((projectSummaryData.totalEstimatedYield || 0) > 0 || (projectSummaryData.totalEstimatedIncome || 0) > 0) && (
                         <div className="mt-3 grid grid-cols-2 gap-4 border-t border-blue-700 pt-3">
                             {(projectSummaryData.totalEstimatedYield || 0) > 0 && (
@@ -437,148 +515,6 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                 </div>
             )}
 
-            {/* แสดงสถานะการเลือกอุปกรณ์อัตโนมัติ */}
-            <div className="rounded-lg bg-gradient-to-r from-green-600 to-blue-600 p-4">
-                <h2 className="mb-2 text-lg font-bold text-white">
-                    🤖 {t('อุปกรณ์ที่เลือก')}
-                    {isMultiZone && currentZoneData && (
-                        <span className="ml-2 text-sm font-normal">
-                            ({t('โซนปัจจุบัน:')} {currentZoneData.name})
-                        </span>
-                    )}
-                </h2>
-                <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4"> 
-                    <div className="text-center">
-                        <p className="text-blue-200">{t('ท่อย่อย')}</p>
-                        <p
-                            className={`text-xl font-bold ${actualBranchPipe?.isRecommended
-                                    ? 'text-green-300'
-                                    : actualBranchPipe?.isGoodChoice
-                                        ? 'text-yellow-300'
-                                        : 'text-orange-300'
-                                }`}
-                        >
-                            {actualBranchPipe ? `${actualBranchPipe.sizeMM}mm` : t('ไม่มี')}
-                        </p>
-                        <p className="text-xs text-blue-100">
-                            {actualBranchPipe?.isRecommended
-                                ? t('🌟 แนะนำ')
-                                : actualBranchPipe?.isGoodChoice
-                                    ? t('✅ ดี')
-                                    : actualBranchPipe
-                                        ? t('⚡ ใช้ได้')
-                                        : t('❌ ไม่มี')}
-                        </p>
-
-                    </div>
-
-                    {results.hasValidSecondaryPipe && (
-                        <div className="text-center">
-                            <p className="text-orange-200">{t('ท่อรอง')}</p>
-                            <p
-                                className={`text-xl font-bold ${actualSecondaryPipe?.isRecommended
-                                        ? 'text-green-300'
-                                        : actualSecondaryPipe?.isGoodChoice
-                                            ? 'text-yellow-300'
-                                            : 'text-orange-300'
-                                    }`}
-                            >
-                                {actualSecondaryPipe ? `${actualSecondaryPipe.sizeMM}mm` : t('ไม่มี')}
-                            </p>
-                            <p className="text-xs text-orange-100">
-                                {actualSecondaryPipe?.isRecommended
-                                    ? t('🌟 แนะนำ')
-                                    : actualSecondaryPipe?.isGoodChoice
-                                        ? t('✅ ดี')
-                                        : actualSecondaryPipe
-                                            ? t('⚡ ใช้ได้')
-                                            : t('❌ ไม่มี')}
-                            </p>
-
-                        </div>
-                    )}
-
-                    {results.hasValidMainPipe && (
-                        <div className="text-center">
-                            <p className="text-cyan-200">{t('ท่อหลัก')}</p>
-                            <p
-                                className={`text-xl font-bold ${actualMainPipe?.isRecommended
-                                        ? 'text-green-300'
-                                        : actualMainPipe?.isGoodChoice
-                                            ? 'text-yellow-300'
-                                            : 'text-orange-300'
-                                    }`}
-                            >
-                                {actualMainPipe ? `${actualMainPipe.sizeMM}mm` : t('ไม่มี')}
-                            </p>
-                            <p className="text-xs text-cyan-100">
-                                {actualMainPipe?.isRecommended
-                                    ? t('🌟 แนะนำ')
-                                    : actualMainPipe?.isGoodChoice
-                                        ? t('✅ ดี')
-                                        : actualMainPipe
-                                            ? t('⚡ ใช้ได้')
-                                            : t('❌ ไม่มี')}
-                            </p>
-
-                        </div>
-                    )}
-
-                    {results.hasValidEmitterPipe && (
-                        <div className="text-center">
-                            <p className="text-green-200">{t('ท่อย่อยแยก')}</p>
-                            <p
-                                className={`text-xl font-bold ${actualEmitterPipe?.isRecommended
-                                        ? 'text-green-300'
-                                        : actualEmitterPipe?.isGoodChoice
-                                            ? 'text-yellow-300'
-                                            : 'text-orange-300'
-                                    }`}
-                            >
-                                {actualEmitterPipe ? `${actualEmitterPipe.sizeMM}mm` : t('ไม่มี')}
-                            </p>
-                            <p className="text-xs text-green-100">
-                                {actualEmitterPipe?.isRecommended
-                                    ? t('🌟 แนะนำ')
-                                    : actualEmitterPipe?.isGoodChoice
-                                        ? t('✅ ดี')
-                                        : actualEmitterPipe
-                                            ? t('⚡ ใช้ได้')
-                                            : t('❌ ไม่มี')}
-                            </p>
-
-                        </div>
-                    )}
-
-                    {showPump && (
-                        <div className="text-center">
-                            <p className="text-red-200">{t('ปั๊ม (ทั้งโปรเจค)')}</p>
-                            <p
-                                className={`text-xl font-bold ${actualPump?.isRecommended
-                                        ? 'text-green-300'
-                                        : actualPump?.isGoodChoice
-                                            ? 'text-yellow-300'
-                                            : 'text-orange-300'
-                                    }`}
-                            >
-                                {actualPump ? `${actualPump.powerHP}HP` : t('ไม่มี')}
-                            </p>
-                            <p className="text-xs text-red-100">
-                                {actualPump?.isRecommended
-                                    ? t('🌟 แนะนำ')
-                                    : actualPump?.isGoodChoice
-                                        ? t('✅ ดี')
-                                        : actualPump
-                                            ? t('⚡ ใช้ได้')
-                                            : t('❌ ไม่มี')}
-                            </p>
-
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* แสดงข้อมูลสำคัญของโซนปัจจุบัน */}
             <div className="rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 p-4">
                 <h2 className="mb-2 text-lg font-bold text-white">
                     🎯 {t('ข้อมูลสำคัญ')}
@@ -588,20 +524,27 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         </span>
                     )}
                 </h2>
-                <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
+                <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-5">
                     <div className="text-center">
                         <p className="text-blue-200">{t('ความต้องการน้ำ')}</p>
                         <p className="text-xl font-bold">
-                            {(results.totalWaterRequiredLPM || 0).toFixed(1)} {t('LPM')}
+                            {(() => {
+                                if (projectMode === 'garden') {
+                                    // สำหรับ garden mode ใช้ข้อมูลจาก input ต้องการน้ำ (คำนวณอัตโนมัติจาก garden statistics)
+                                    return input.waterPerTreeLiters.toFixed(1);
+                                } else {
+                                    return (results.totalWaterRequiredLPM || 0).toFixed(1);
+                                }
+                            })()} {t('LPM')}
                         </p>
                         {currentZoneData && <p className="text-xs text-blue-100">({currentZoneData.name})</p>}
                     </div>
                     <div className="text-center">
-                        <p className="text-green-200">{t('Head Loss รวม')}</p>
+                        <p className="text-green-200">{t('Head Loss ท่อ')}</p>
                         <p
                             className={`text-xl font-bold ${getStatusColor(systemPerformance.headLossStatus)}`}
                         >
-                            {(results.headLoss?.total || 0).toFixed(1)} m
+                            {actualHeadLoss.total.toFixed(1)} m
                         </p>
                         <p className="text-xs text-green-100">
                             {systemPerformance.headLossStatus === 'good'
@@ -611,11 +554,20 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                     : t('สูงเกินไป')}
                         </p>
                     </div>
+                    <div className="text-center">
+                        <p className="text-yellow-200">{t('Head Loss หัวฉีด')}</p>
+                        <p className="text-xl font-bold text-yellow-400">
+                            {sprinklerHeadLoss.toFixed(1)} m
+                        </p>
+                        <p className="text-xs text-yellow-100">
+                            {t('จากสูตร: แรงดัน(บาร์) × 10')}
+                        </p>
+                    </div>
                     {showPump && (
                         <div className="text-center">
                             <p className="text-purple-200">{t('Pump Head')}</p>
                             <p className="text-xl font-bold text-orange-300">
-                                {(results.pumpHeadRequired || 0).toFixed(1)} m
+                                {actualPumpHead.toFixed(1)} m
                             </p>
                             {isMultiZone && results.projectSummary && (
                                 <p className="text-xs text-purple-100">
@@ -623,9 +575,6 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                     {getOperationModeLabel(results.projectSummary.operationMode)})
                                 </p>
                             )}
-                            <p className="text-xs text-purple-100">
-                                {t('Safety Factor:')} {(results.safetyFactor || 0).toFixed(2)}x
-                            </p>
                         </div>
                     )}
                     <div className="text-center">
@@ -642,165 +591,11 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                 </div>
             </div>
 
-            {/* แสดงข้อมูลสรุปโปรเจคสำหรับหลายโซน */}
-            {isMultiZone && results.projectSummary && (
-                <div className="rounded-lg bg-blue-900 p-4">
-                    <h3 className="mb-3 text-lg font-bold text-blue-300">
-                        📊 {t('สรุปโปรเจคทั้งหมด')} ({results.allZoneResults?.length || 0} {t('โซน')})
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4 text-sm text-gray-300 md:grid-cols-4">
-                        <div>
-                            <p className="text-blue-200">{t('รูปแบบการเปิด:')}</p>
-                            <p className="font-bold text-white">
-                                {getOperationModeLabel(results.projectSummary.operationMode)}
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-blue-200">{t('อัตราการไหลรวม:')}</p>
-                            <p className="font-bold text-white">
-                                {(results.projectSummary?.totalFlowLPM || 0).toFixed(1)} LPM
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-blue-200">{t('Head สูงสุด:')}</p>
-                            <p className="font-bold text-white">
-                                {(results.projectSummary?.maxHeadM || 0).toFixed(1)} เมตร
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-blue-200">{t('โซนที่ต้องการ Head สูงสุด:')}</p>
-                            <p className="font-bold text-white">
-                                {getZoneName(results.projectSummary.criticalZone)}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="mt-3 rounded bg-blue-800 p-2">
-                        <h4 className="text-sm font-medium text-blue-300">💧 {t('การคำนวณปั๊ม:')}</h4>
-                        <div className="grid grid-cols-2 gap-2 text-xs text-blue-200">
-                            <p>
-                                {t('Flow ที่ต้องการ:')} {' '} {(results.projectSummary?.selectedGroupFlowLPM || 0).toFixed(1)} {t('LPM')}
-                            </p>
-                            <p>
-                                {t('Head ที่ต้องการ:')} {' '}
-                                {(results.projectSummary?.selectedGroupHeadM || 0).toFixed(1)} {t('เมตร')}
-                            </p>
-                        </div>
-                        {results.projectSummary.criticalGroup && (
-                            <p className="mt-1 text-xs text-blue-300">
-                                {t('จากกลุ่ม:')} {results.projectSummary.criticalGroup.label}
-                            </p>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* แสดงข้อมูลโซนย่อยสำหรับหลายโซน */}
-            {isMultiZone && results.allZoneResults && results.allZoneResults.length > 0 && (
-                <div className="rounded-lg bg-gray-800 p-4">
-                    <h3 className="mb-3 text-lg font-bold text-gray-300">🔍 {t('รายละเอียดแต่ละโซน')}</h3>
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        {results.allZoneResults.map((zoneResult, index) => (
-                            <div key={zoneResult.zoneId} className="rounded bg-gray-700 p-3">
-                                <div className="mb-2 flex items-center justify-between">
-                                    <h4 className="font-medium text-white">
-                                        {getZoneName(zoneResult.zoneId)}
-                                        {zoneResult.zoneId === currentZoneData?.name && (
-                                            <span className="ml-2 text-xs text-green-400">
-                                                ({t('กำลังดู')})
-                                            </span>
-                                        )}
-                                    </h4>
-                                    <div className="text-xs text-gray-400">
-                                        {zoneResult.sprinklerCount}{' '}
-                                        {t('หัว')}
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2 text-xs text-gray-300">
-                                    <div>
-                                        <p>{t('Flow:')} {zoneResult.totalFlowLPM.toFixed(1)} {t('LPM')}</p>
-                                        <p>{t('Static Head:')} {zoneResult.staticHead.toFixed(1)} {t('ม.')}</p>
-                                    </div>
-                                    <div>
-                                        <p>{t('Head Loss:')} {zoneResult.headLoss.total.toFixed(1)} {t('ม.')}</p>
-                                        <p>
-                                            {t('Total Head:')} {' '}
-                                            <span className="font-bold text-yellow-300">
-                                                {zoneResult.totalHead.toFixed(1)} {t('ม.')}
-                                            </span>
-                                        </p>
-                                    </div>
-                                </div>
-                                {zoneResult.zoneId === results.projectSummary?.criticalZone && (
-                                    <div className="mt-1 text-xs text-red-300">
-                                        ⭐ {t('โซนที่ต้องการ Head สูงสุด')}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-
-            <div className="rounded-lg bg-gradient-to-r from-gray-800 to-gray-700 p-4">
-                <h3 className="mb-3 text-lg font-bold text-white">
-                    📊 {t('ประสิทธิภาพระบบ')}
-                    <span className={`ml-2 ${getStatusColor(systemPerformance.overallStatus)}`}>
-                        {getStatusIcon(systemPerformance.overallStatus)}
-                    </span>
-                    {isMultiZone && currentZoneData && (
-                        <span className="ml-2 text-sm font-normal">({t('โซนปัจจุบัน:')} {currentZoneData.name})</span>
-                    )}
-                </h3>
-                <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                    <div className="text-center">
-                        <div
-                            className={`text-xl font-bold ${getStatusColor(systemPerformance.velocityStatus)}`}
-                        >
-                            {getStatusIcon(systemPerformance.velocityStatus)}
-                        </div>
-                        <p className="text-sm text-gray-300">{t('ความเร็วน้ำ')}</p>
-                        <p className="text-xs text-gray-400">0.3-2.5 {t('m/s')}</p>
-                    </div>
-                    <div className="text-center">
-                        <div
-                            className={`text-xl font-bold ${getStatusColor(systemPerformance.headLossStatus)}`}
-                        >
-                            {getStatusIcon(systemPerformance.headLossStatus)}
-                        </div>
-                        <p className="text-sm text-gray-300">{t('Head Loss')}</p>
-                        <p className="text-xs text-gray-400">
-                            {results.headLoss.total.toFixed(1)} {t('m')}
-                        </p>
-                    </div>
-                    {showPump && (
-                        <div className="text-center">
-                            <div
-                                className={`text-xl font-bold ${getStatusColor(systemPerformance.pumpStatus)}`}
-                            >
-                                {getStatusIcon(systemPerformance.pumpStatus)}
-                            </div>
-                            <p className="text-sm text-gray-300">{t('ปั๊มน้ำ')}</p>
-                            <p className="text-xs text-gray-400">
-                                {actualPump?.powerHP || t('N/A')} {t('HP')}
-                            </p>
-                        </div>
-                    )}
-                    <div className="text-center">
-                        <div className="text-xl font-bold text-blue-400">💰</div>
-                        <p className="text-sm text-gray-300">{t('ประมาณการ')}</p>
-                        <p className="text-xs text-gray-400">{t('ตามโซนปัจจุบัน')}</p>
-                    </div>
-                </div>
-            </div>
-
-            {/* แสดงข้อมูลรายละเอียดโซนปัจจุบัน */}
             <div className="rounded-lg bg-gray-700 p-6">
                 <h2 className="mb-4 text-xl font-semibold text-yellow-400">
                     📊 {t('สรุปการคำนวณรายละเอียด')}
                     {currentZoneData && (
-                        <span className="ml-2 text-sm font-normal text-gray-400">
+                        <span className="ml-2 text-lg font-normal text-red-400">
                             - {currentZoneData.name}
                         </span>
                     )}
@@ -813,64 +608,50 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
                     <div className="rounded bg-gray-600 p-4">
-                        <h3 className="mb-2 font-medium text-blue-300">💧 {t('ความต้องการน้ำรวม')}</h3>
+                        <h3 className="mb-2 font-medium text-blue-300">💧 {t('ความต้องการน้ำทั้งโซน')}</h3>
                         <p className="text-lg font-bold">
-                            {results.totalWaterRequiredLPM.toFixed(1)} {t('ลิตร/นาที')}
+                            {results.totalWaterRequiredLPM.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {t('ลิตร/นาที')}
                         </p>
                         <div className="mt-1 text-sm text-gray-300 space-y-1">
                             <p>
-                                {t('ความต้องการน้ำทั้งโซน:')} {input.waterPerTreeLiters.toFixed(1)} {t('ลิตร/นาที')} {t('(จาก input)')}
+                                {t('ความต้องการน้ำทั้งโซน:')} 
                             </p>
                             <p>
-                                {t('หัวฉีดละ')} {results.waterPerSprinklerLPM.toFixed(1)} {t('ลิตร/นาที')}
+                            {input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {t('ลิตร/นาที')} {t('(จาก input)')}
+                            </p>
+                            <p>
+                                {t('หัวฉีดละ')} {results.waterPerSprinklerLPM.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {t('ลิตร/นาที')}
                             </p>
                             <p className="text-xs text-blue-300">
-                                {t('ค่าจาก input โดยตรง:')} {input.waterPerTreeLiters.toFixed(1)} {t('ลิตร/นาที')}
+                                {t('ค่าจาก input โดยตรง:')} {input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {t('ลิตร/นาที')}
                             </p>
                         </div>
-                        <p className="mt-1 text-sm text-gray-300">
-                            + {t('Safety Factor')} {(results.safetyFactor * 100 - 100).toFixed(0)}%
-                        </p>
-                        <p className="text-sm font-bold text-green-300">
-                            {results.adjustedFlow.toFixed(1)} {t('ลิตร/นาที')} {t('(ปรับแล้ว)')}
-                        </p>
-                        {currentZoneData && (
-                            <p className="mt-1 text-xs text-blue-200">
-                                {t('สำหรับโซน')} {currentZoneData.name}
-                            </p>
-                        )}
                     </div>
 
                     <div className="rounded bg-gray-600 p-4">
                         <h3 className="mb-2 font-medium text-purple-300">
-                            <img 
-                                src="/images/water-pump.png" 
-                                alt="Water Pump" 
-                                className="inline w-4 h-4 object-contain mr-1"
-                            />
-                            {t('น้ำต่อหัว')}{getEquipmentName()}
+                            💦 {t('น้ำต่อหัว')}{getEquipmentName()}
                         </h3>
                         <p className="text-lg font-bold">
-                            {results.waterPerSprinklerLPM.toFixed(1)} {t('ลิตร/นาที')}
+                            {(() => {
+                                if (projectMode === 'garden' && gardenStats && activeZone) {
+                                    const currentZone = gardenStats.zones.find((z: any) => z.zoneId === activeZone.id);
+                                    if (currentZone) {
+                                        return `${currentZone.sprinklerFlowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
+                                    }
+                                }
+                                return `${results.waterPerSprinklerLPM.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
+                            })()}
                         </p>
                         <div className="text-sm text-gray-300 space-y-1 mt-2">
-                            <p>
-                                {t('ทั้งโซน:')} {' '}
-                                <span className="font-medium text-white">
-                                    {input.waterPerTreeLiters.toFixed(1)} {t('ลิตร/นาที')}
-                                </span>
-                                <span className="text-xs text-blue-300 ml-2">{t('(จาก input)')}</span>
-                            </p>
-                            {projectMode === 'horticulture' && (
-                                <p>
-                                    {t('จำนวนต้น:')} {' '}
-                                    <span className="font-medium text-white">
-                                        {input.totalTrees} {t('ต้น')}
-                                    </span>
-                                </p>
-                            )}
+                            
                             <p className="text-xs text-blue-300">
-                                {t('ค่าจาก input โดยตรง:')} {input.waterPerTreeLiters.toFixed(1)} {t('ลิตร/นาที')}
+                                {projectMode === 'garden' && gardenStats && activeZone ? (() => {
+                                    const currentZone = gardenStats.zones.find((z: any) => z.zoneId === activeZone.id);
+                                    return currentZone ? 
+                                        `${t('ค่าจาก garden zone:')} ${currentZone.sprinklerFlowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}` :
+                                        `${t('ค่าจาก input โดยตรง:')} ${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
+                                })() : `${t('ค่าจาก input โดยตรง:')} ${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`}
                             </p>
                         </div>
                         {selectedSprinkler && (
@@ -896,14 +677,14 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             <p>
                                 {t('ท่อย่อย:')} {' '}
                                 <span className="font-bold text-purple-300">
-                                    {results.flows.branch.toFixed(1)} {t('LPM')}
+                                    {results.flows.branch.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {t('LPM')}
                                 </span>
                             </p>
                             {results.hasValidSecondaryPipe && (
                                 <p>
                                     {t('ท่อรอง:')} {' '}
                                     <span className="font-bold text-orange-300">
-                                        {results.flows.secondary.toFixed(1)} {t('LPM')}
+                                        {results.flows.secondary.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {t('LPM')}
                                     </span>
                                 </p>
                             )}
@@ -911,7 +692,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                 <p>
                                     {t('ท่อหลัก:')} {' '}
                                     <span className="font-bold text-cyan-300">
-                                        {results.flows.main.toFixed(1)} {t('LPM')}
+                                        {results.flows.main.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {t('LPM')}
                                     </span>
                                 </p>
                             )}
@@ -922,60 +703,55 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                     <div className="rounded bg-gray-600 p-4">
                         <h3 className="mb-2 font-medium text-red-300">📉 {t('Head Loss รายละเอียด')}</h3>
                         <div className="text-sm space-y-1">
-                            <div className="flex justify-between">
-                                <span>{t('Major Loss:')}</span>
-                                <span className="font-bold text-red-400">
-                                    {results.headLoss.totalMajor.toFixed(2)} m
+                        <div className="flex justify-between">
+                                <span>{t('หัวฉีด:')}</span>
+                                <span className="font-bold text-gray-50">
+                                    {sprinklerHeadLoss.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 })} m
                                 </span>
                             </div>
                             <div className="flex justify-between">
-                                <span>{t('Minor Loss:')}</span>
-                                <span className="font-bold text-orange-400">
-                                    {results.headLoss.totalMinor.toFixed(2)} m
+                                <span>{t('ท่อย่อย:')}</span>
+                                <span className="font-bold text-gray-50">
+                                    {actualHeadLoss.branch.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 })} m
                                 </span>
                             </div>
+                            
+                            {results.hasValidSecondaryPipe && actualHeadLoss.secondary > 0 && (
+                                <div className="flex justify-between">
+                                    <span>{t('ท่อรอง:')}</span>
+                                    <span className="font-bold text-gray-50">
+                                        {actualHeadLoss.secondary.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 })} m
+                                    </span>
+                                </div>
+                            )}
+                            {results.hasValidMainPipe && actualHeadLoss.main > 0 && (
+                                <div className="flex justify-between">
+                                    <span>{t('ท่อหลัก:')}</span>
+                                    <span className="font-bold text-gray-50">
+                                        {actualHeadLoss.main.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 })} m
+                                    </span>
+                                </div>
+                            )}
+                            {results.hasValidEmitterPipe && actualHeadLoss.emitter > 0 && (
+                                <div className="flex justify-between">
+                                    <span>{t('ท่อย่อยแยก:')}</span>
+                                    <span className="font-bold text-gray-50">
+                                        {actualHeadLoss.emitter.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 })} m
+                                    </span>
+                                </div>
+                            )}
                             <div className="border-t border-gray-500 pt-1 mt-1">
                                 <div className="flex justify-between">
                                     <span className="font-medium">{t('รวม:')}</span>
                                     <span
                                         className={`font-bold ${getStatusColor(systemPerformance.headLossStatus)}`}
                                     >
-                                        {results.headLoss.total.toFixed(1)} m
+                                        {(actualHeadLoss.total + sprinklerHeadLoss).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} m
                                     </span>
                                 </div>
                             </div>
                         </div>
-                        <div className="mt-2 border-t border-gray-500 pt-2">
-                            <h4 className="text-xs font-medium text-gray-400 mb-1">{t('แยกตามประเภทท่อ:')}</h4>
-                            <div className="text-xs text-gray-300 space-y-0.5">
-                                <div className="flex justify-between">
-                                    <span>{t('ย่อย:')}</span>
-                                    <span>{results.headLoss.branch.total.toFixed(2)}m</span>
-                                </div>
-                                {results.hasValidSecondaryPipe && (
-                                    <div className="flex justify-between">
-                                        <span>{t('รอง:')}</span>
-                                        <span>{results.headLoss.secondary.total.toFixed(2)}m</span>
-                                    </div>
-                                )}
-                                {results.hasValidMainPipe && (
-                                    <div className="flex justify-between">
-                                        <span>{t('หลัก:')}</span>
-                                        <span>{results.headLoss.main.total.toFixed(2)}m</span>
-                                    </div>
-                                )}
-                                {results.hasValidEmitterPipe && (
-                                    <div className="flex justify-between">
-                                        <span>{t('ย่อยแยก:')}</span>
-                                        <span>
-                                            {results.headLoss.emitter && typeof results.headLoss.emitter === 'object' 
-                                                ? results.headLoss.emitter.total.toFixed(2) 
-                                                : '0.00'}m
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+                        <hr className="border-gray-500 mt-1" />
                     </div>
 
                     <div className="rounded bg-gray-600 p-4">
@@ -994,10 +770,10 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                                         : 'text-yellow-400'
                                             }`}
                                     >
-                                        {results.velocity.branch.toFixed(2)}
+                                        {results.velocity.branch.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                     </span>
                                     <span className="text-xs">
-                                        ({results.flows.branch.toFixed(0)} LPM)
+                                        ({results.flows.branch.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} LPM)
                                     </span>
                                 </div>
                             </div>
@@ -1015,10 +791,10 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                                             : 'text-yellow-400'
                                                 }`}
                                         >
-                                            {results.velocity.secondary.toFixed(2)}
+                                            {results.velocity.secondary.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                         </span>
                                         <span className="text-xs">
-                                            ({results.flows.secondary.toFixed(0)} LPM)
+                                                ({results.flows.secondary.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} LPM)
                                         </span>
                                     </div>
                                 </div>
@@ -1037,10 +813,10 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                                             : 'text-yellow-400'
                                                 }`}
                                         >
-                                            {results.velocity.main.toFixed(2)}
+                                            {results.velocity.main.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                         </span>
                                         <span className="text-xs">
-                                            ({results.flows.main.toFixed(0)} LPM)
+                                            ({results.flows.main.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} LPM)
                                         </span>
                                     </div>
                                 </div>
@@ -1059,10 +835,10 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                                             : 'text-yellow-400'
                                                 }`}
                                         >
-                                            {results.velocity.emitter?.toFixed(2) || '0.00'}
+                                            {results.velocity.emitter?.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 }) || '0.00'}
                                         </span>
                                         <span className="text-xs">
-                                            ({(results.flows.emitter || 0).toFixed(0)} LPM)
+                                            ({(results.flows.emitter || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} LPM)
                                         </span>
                                     </div>
                                 </div>

@@ -151,7 +151,12 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
         if (option.isRecommended) return { symbol: '⭐', text: t('แนะนำ'), color: 'text-yellow-300' };
         if (option.isGoodChoice) return { symbol: '✅', text: t('ดี'), color: 'text-green-300' };
         if (option.isUsable) return { symbol: '⚡', text: t('ใช้ได้'), color: 'text-orange-300' };
-        return { symbol: '⚠️', text: t('ไม่เหมาะสม'), color: 'text-red-300' };
+        // Check if any recommendation property is defined
+        if (option.isRecommended !== undefined || option.isGoodChoice !== undefined || option.isUsable !== undefined) {
+            return { symbol: '⚠️', text: t('ไม่เหมาะสม'), color: 'text-red-300' };
+        }
+        // Return null if no recommendation properties are defined
+        return null;
     };
 
     // Render option with enhanced display
@@ -221,15 +226,24 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                                 )}
                             </div>
                             
-                            {/* Head Loss calculation display */}
+                            
+                            
+                            <div className="flex items-center justify-between mt-1">
+                                <div className="flex items-center space-x-2 text-xs text-gray-300">
+                                    {option.brand && (
+                                        <span className="text-yellow-300">
+                                            {option.brand}
+                                        </span>
+                                    )}
+
+                                    {/* Head Loss calculation display */}
                             {option.headLoss !== undefined && (
-                                <div className="mt-1 bg-gray-800 rounded px-2 py-1">
-                                    <div className="flex items-center justify-between text-xs">
-                                        <span className="text-blue-300">📊 Head Loss:</span>
+                                <div className="mt-1 rounded px-2 py-1">
+                                    <div className="flex items-center justify-end text-xs">
                                         <span className={`font-bold ${
-                                            option.hasWarning ? 'text-red-400' : 'text-green-400'
+                                            option.hasWarning ? 'text-green-400' : 'text-green-400'
                                         }`}>
-                                            {option.headLoss.toFixed(3)} ม.
+                                            Head Loss: {option.headLoss.toFixed(3)} ม.
                                             {option.hasWarning && ' ⚠️'}
                                         </span>
                                     </div>
@@ -240,19 +254,13 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                                     )}
                                 </div>
                             )}
-                            
-                            <div className="flex items-center justify-between mt-1">
-                                <div className="flex items-center space-x-2 text-xs text-gray-300">
-                                    {option.brand && (
-                                        <span className="text-yellow-300">
-                                            {option.brand}
+                                    
+                                    {/* Recommendation text - only show if recommendation exists */}
+                                    {recommendation && (
+                                        <span className={`${recommendation.color}`}>
+                                            {recommendation.text}
                                         </span>
                                     )}
-                                    
-                                    {/* Recommendation text */}
-                                    <span className={`${recommendation.color}`}>
-                                        {recommendation.text}
-                                    </span>
                                 </div>
                                 
                                 {option.price && (

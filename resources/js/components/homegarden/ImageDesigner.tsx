@@ -45,7 +45,6 @@ interface ImageDesignerProps {
     pipes: Pipe[];
     selectedZoneType: string;
     editMode: string;
-    manualSprinklerType: string;
     manualSprinklerRadius: number;
     selectedSprinkler: string | null;
     selectedPipes: Set<string>;
@@ -73,7 +72,6 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
     pipes,
     selectedZoneType,
     editMode,
-    manualSprinklerType,
     manualSprinklerRadius,
     selectedSprinkler,
     selectedPipes,
@@ -2490,7 +2488,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                                 : 'none',
                                                     }}
                                                 >
-                                                    <span className="pointer-events-none text-[10px] font-bold">
+                                                    <span className="pointer-events-none text-[14px] font-bold">
                                                         {sprinkler.type.icon}
                                                     </span>
                                                 </div>

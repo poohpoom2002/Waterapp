@@ -34,21 +34,103 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
     zoneInputs = {},
     simultaneousZonesCount = 1,
     selectedZones = [],
+    allZoneResults,
+    projectSummary,
     zoneOperationMode = 'sequential',
     projectMode = 'horticulture',
 }) => {
     const [showImageModal, setShowImageModal] = useState(false);
+    const [showAccessoriesModal, setShowAccessoriesModal] = useState(false);
     const [modalImage, setModalImage] = useState({ src: '', alt: '' });
     const { t } = useLanguage();
     
-    // คำนวณความต้องการตามเงื่อนไขใหม่สำหรับ horticulture mode
+    // ประกาศตัวแปรที่จำเป็นก่อน
+    const requiredFlow = results.flows.main;
+    const requiredHead = results.pumpHeadRequired;
+    
+    // คำนวณความต้องการตามเงื่อนไขใหม่สำหรับ horticulture และ garden mode
     const getHorticultureRequirements = () => {
-        if (projectMode !== 'horticulture') {
+        if (projectMode !== 'horticulture' && projectMode !== 'garden') {
             return {
                 requiredFlowLPM: requiredFlow,
                 minRequiredHead: requiredHead,
                 qHeadSpray: 0
             };
+        }
+
+        // สำหรับ garden mode ใช้ข้อมูลจาก garden statistics
+        if (projectMode === 'garden') {
+            // ดึงข้อมูลจาก localStorage หรือ props
+            const gardenDataStr = localStorage.getItem('garden_planner_data');
+            if (!gardenDataStr) {
+                return {
+                    requiredFlowLPM: requiredFlow,
+                    minRequiredHead: requiredHead,
+                    qHeadSpray: 0
+                };
+            }
+
+            try {
+                const gardenData = JSON.parse(gardenDataStr);
+                const gardenStatsStr = localStorage.getItem('garden_statistics');
+                if (!gardenStatsStr) {
+                    return {
+                        requiredFlowLPM: requiredFlow,
+                        minRequiredHead: requiredHead,
+                        qHeadSpray: 0
+                    };
+                }
+
+                const gardenStats = JSON.parse(gardenStatsStr);
+                
+                // คำนวณความต้องการน้ำรวมจากทุกโซน
+                let totalWaterRequirement = 0;
+                if (gardenStats.zones && gardenStats.zones.length > 0) {
+                    // ดึงข้อมูลรูปแบบการเปิดโซนจาก garden_planner_data
+                    const gardenPlannerDataStr = localStorage.getItem('garden_planner_data');
+                    let simultaneousZones = gardenStats.zones.length; // default: เปิดทุกโซนพร้อมกัน
+                    
+                    if (gardenPlannerDataStr) {
+                        try {
+                            const gardenPlannerData = JSON.parse(gardenPlannerDataStr);
+                            if (gardenPlannerData.zoneOperationMode === 'sequential') {
+                                simultaneousZones = 1; // เปิดทีละโซน
+                            } else if (gardenPlannerData.zoneOperationMode === 'group') {
+                                simultaneousZones = gardenPlannerData.simultaneousZones || 1;
+                            }
+                        } catch (e) {
+                            console.error('Error parsing garden planner data:', e);
+                        }
+                    }
+                    
+                    // คำนวณความต้องการน้ำตามรูปแบบการเปิดโซน
+                    if (simultaneousZones >= gardenStats.zones.length) {
+                        // เปิดทุกโซนพร้อมกัน
+                        totalWaterRequirement = gardenStats.zones.reduce((total: number, zone: any) => {
+                            return total + (zone.sprinklerFlowRate * zone.sprinklerCount);
+                        }, 0);
+                    } else {
+                        // หาโซนที่ใช้น้ำมากที่สุด
+                        const maxZoneRequirement = Math.max(...gardenStats.zones.map((zone: any) => 
+                            zone.sprinklerFlowRate * zone.sprinklerCount
+                        ));
+                        totalWaterRequirement = maxZoneRequirement * simultaneousZones;
+                    }
+                }
+
+                return {
+                    requiredFlowLPM: totalWaterRequirement || requiredFlow,
+                    minRequiredHead: requiredHead,
+                    qHeadSpray: gardenStats.zones?.[0]?.sprinklerFlowRate || 0
+                };
+            } catch (error) {
+                console.error('Error parsing garden data:', error);
+                return {
+                    requiredFlowLPM: requiredFlow,
+                    minRequiredHead: requiredHead,
+                    qHeadSpray: 0
+                };
+            }
         }
 
         const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
@@ -109,6 +191,204 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
     const horticultureReq = getHorticultureRequirements();
     
+    // Garden mode: ดึงข้อมูล flow requirement และ pump head
+    // คำนวณ maxPumpHeadM แบบคงที่ (ไม่เปลี่ยนตามโซน)
+    const [cachedMaxPumpHead, setCachedMaxPumpHead] = React.useState<number | null>(null);
+    
+    // Reset cachedMaxPumpHead เมื่อโหลดหน้าใหม่
+    React.useEffect(() => {
+        // รีเซ็ตค่าเมื่อโหลดครั้งแรก
+        setCachedMaxPumpHead(null);
+    }, []); // รันครั้งเดียวเมื่อ component mount
+    
+    // คำนวณ pump head ใหม่เมื่อมีข้อมูลครบหรือเปลี่ยนแปลง
+    React.useEffect(() => {
+        if (projectMode !== 'garden') {
+            return;
+        }
+        
+        const calculateMaxPumpHead = () => {
+            try {
+                const gardenStatsStr = localStorage.getItem('garden_statistics');
+                const pipeCalculationsStr = localStorage.getItem('garden_pipe_calculations');
+                
+                if (!gardenStatsStr) {
+                    return;
+                }
+                
+                const gardenStats = JSON.parse(gardenStatsStr);
+                
+                if (!gardenStats.zones || gardenStats.zones.length === 0) {
+                    return;
+                }
+                
+                
+                const allZoneHeadLoss: number[] = [];
+                
+                if (pipeCalculationsStr) {
+                    try {
+                        const pipeCalculations = JSON.parse(pipeCalculationsStr);
+                        
+                        // คำนวณ Head Loss รวมของทุกโซน
+                        gardenStats.zones.forEach((zone: any, index: number) => {
+                            // Head Loss ท่อ (เดียวกันทุกโซน)
+                            const pipeHeadLoss = (pipeCalculations.branch?.headLoss || 0) +
+                                               (pipeCalculations.secondary?.headLoss || 0) +
+                                               (pipeCalculations.main?.headLoss || 0) +
+                                               (pipeCalculations.emitter?.headLoss || 0);
+                            
+                            // Head Loss หัวฉีดของโซนนี้
+                            const sprinklerHeadLoss = (zone.sprinklerPressure || 2.5) * 10;
+                            
+                            // Head Loss รวมของโซนนี้
+                            const totalZoneHeadLoss = pipeHeadLoss + sprinklerHeadLoss;
+                            allZoneHeadLoss.push(totalZoneHeadLoss);
+                            
+                        });
+                        
+                        // เลือกค่าสูงสุดมาเป็น Pump Head
+                        const maxHead = Math.max(...allZoneHeadLoss);
+                        
+                        // อัปเดตเฉพาะเมื่อค่าใหม่สูงกว่าค่าเดิม (keep max value)
+                        if (cachedMaxPumpHead === null || maxHead > cachedMaxPumpHead) {
+                            setCachedMaxPumpHead(maxHead);
+                        }
+                        
+                    } catch (error) {
+                        console.error('Error parsing garden pipe calculations:', error);
+                        setCachedMaxPumpHead(null);
+                    }
+                } else {
+                    // ถ้าไม่มี pipe calculations ให้ใช้ sprinkler pressure ของโซนที่สูงที่สุด
+                    const maxZonePressure = Math.max(...gardenStats.zones.map((zone: any) => 
+                        zone.sprinklerPressure || 2.5
+                    ));
+                    const fallbackHead = maxZonePressure * 10;
+                    
+                    // อัปเดตเฉพาะเมื่อค่าใหม่สูงกว่าค่าเดิม (keep max value)
+                    if (cachedMaxPumpHead === null || fallbackHead > cachedMaxPumpHead) {
+                        setCachedMaxPumpHead(fallbackHead);
+                    }
+                }
+            } catch (error) {
+                console.error('Error calculating cached pump head:', error);
+                setCachedMaxPumpHead(null);
+            }
+        };
+        
+        // คำนวณทันที
+        calculateMaxPumpHead();
+        
+        // ฟังการเปลี่ยนแปลงของ localStorage
+        const handleStorageChange = () => {
+            calculateMaxPumpHead();
+        };
+        
+        window.addEventListener('storage', handleStorageChange);
+        
+        // Polling เพื่อตรวจสอบการเปลี่ยนแปลงของ localStorage (สำหรับ same-tab updates)
+        let pollCount = 0;
+        const maxPollCount = 10; // ตรวจสอบสูงสุด 10 ครั้ง (20 วินาที)
+        
+        const pollInterval = setInterval(() => {
+            pollCount++;
+            const currentPipeCalc = localStorage.getItem('garden_pipe_calculations');
+            
+            if (currentPipeCalc) {
+                try {
+                    const pipeCalc = JSON.parse(currentPipeCalc);
+                    const hasPipeData = pipeCalc.branch || pipeCalc.secondary || pipeCalc.main || pipeCalc.emitter;
+                    
+                    if (hasPipeData) {
+                        calculateMaxPumpHead();
+                    }
+                } catch (error) {
+                    console.error('Error parsing pipe calculations during polling:', error);
+                }
+            }
+            
+            // หยุด polling หลังจาก 10 ครั้ง
+            if (pollCount >= maxPollCount) {
+                clearInterval(pollInterval);
+            }
+        }, 2000); // Check every 2 seconds
+        
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+            clearInterval(pollInterval);
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [projectMode]); // Note: cachedMaxPumpHead ใช้ใน comparison แต่ไม่ใส่ใน deps เพื่อหลีกเลี่ยง infinite loop
+    
+    const getGardenRequirements = () => {
+        // Calculate fallback pump head locally to avoid hoisting issues  
+        const fallbackPumpHead = (() => {
+            if (allZoneResults && allZoneResults.length > 1) {
+                // คำนวณ Pump Head สำหรับแต่ละโซน แล้วหาค่าสูงสุด
+                return Math.max(...allZoneResults.map((zone: any) => {
+                    const zoneHeadLoss = zone.headLoss?.total || 0;
+                    const zoneSprinklerFlow = zone.waterPerSprinklerLPM || 6.0;
+                    const zoneSprinklerHeadLoss = zoneSprinklerFlow * 10;
+                    return zoneHeadLoss + zoneSprinklerHeadLoss;
+                }));
+            } else {
+                // โซนเดียว ใช้การคำนวณปกติ
+                return (results.headLoss?.total || 0) + (results.pressureFromSprinkler || 0);
+            }
+        })();
+        
+        if (projectMode !== 'garden') {
+            return {
+                requiredFlowLPM: horticultureReq.requiredFlowLPM,
+                pumpHeadM: fallbackPumpHead
+            };
+        }
+        
+        try {
+            const gardenStatsStr = localStorage.getItem('garden_statistics');
+            
+            if (!gardenStatsStr) {
+                return {
+                    requiredFlowLPM: horticultureReq.requiredFlowLPM,
+                    pumpHeadM: cachedMaxPumpHead || fallbackPumpHead
+                };
+            }
+            
+            const gardenStats = JSON.parse(gardenStatsStr);
+            let requiredFlowLPM = 0;
+            
+            if (gardenStats.zones && gardenStats.zones.length > 0) {
+                // คำนวณ flow requirement
+                if (results.projectSummary?.operationMode === 'sequential' || results.projectSummary?.operationMode === 'single') {
+                    // เปิดทีละโซน - ใช้ค่าของโซนที่มากที่สุด
+                    requiredFlowLPM = Math.max(...gardenStats.zones.map((zone: any) => 
+                        zone.sprinklerFlowRate * zone.sprinklerCount
+                    ));
+                } else {
+                    // เปิดพร้อมกันทุกโซน - รวมทุกโซน
+                    requiredFlowLPM = gardenStats.zones.reduce((total: number, zone: any) => {
+                        return total + (zone.sprinklerFlowRate * zone.sprinklerCount);
+                    }, 0);
+                }
+            }
+            
+        const finalPumpHead = cachedMaxPumpHead || fallbackPumpHead;
+            
+            return {
+                requiredFlowLPM: requiredFlowLPM || horticultureReq.requiredFlowLPM,
+                pumpHeadM: finalPumpHead
+            };
+        } catch (error) {
+            console.error('Error loading garden requirements:', error);
+            return {
+                requiredFlowLPM: horticultureReq.requiredFlowLPM,
+                pumpHeadM: cachedMaxPumpHead || fallbackPumpHead
+            };
+        }
+    };
+    
+    const gardenReq = getGardenRequirements();
+    
     // ประเมินความเพียงพอของปั๊มตามเงื่อนไขใหม่
     const evaluatePumpAdequacy = (pump: any) => {
         if (!pump || projectMode !== 'horticulture') {
@@ -146,9 +426,6 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
         setShowImageModal(false);
         setModalImage({ src: '', alt: '' });
     };
-
-    const requiredFlow = results.flows.main;
-    const requiredHead = results.pumpHeadRequired;
 
     const calculateSimultaneousFlow = () => {
         if (results.projectSummary) {
@@ -211,13 +488,159 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
     const autoSelectedPump = results.autoSelectedPump;
     const analyzedPumps = useMemo(() => results.analyzedPumps || [], [results.analyzedPumps]);
 
+    // คำนวณ Pump Head เหมือนใน CalculationSummary.tsx
+    const calculatePumpHead = () => {
+        // ดึงท่อที่เลือกปัจจุบัน
+        const actualBranchPipe = results.autoSelectedBranchPipe;
+        const actualSecondaryPipe = results.autoSelectedSecondaryPipe;
+        const actualMainPipe = results.autoSelectedMainPipe;
+        const actualEmitterPipe = results.autoSelectedEmitterPipe;
+
+        // รวม Head Loss จากท่อทุกประเภท
+        const branchHeadLoss = actualBranchPipe?.headLoss || 0;
+        const secondaryHeadLoss = actualSecondaryPipe?.headLoss || 0;
+        const mainHeadLoss = actualMainPipe?.headLoss || 0;
+        const emitterHeadLoss = actualEmitterPipe?.headLoss || 0;
+        const totalPipeHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+
+        // คำนวณ Head Loss หัวฉีด (แรงดัน(บาร์) * 10)
+        let sprinklerPressureBar = 2.5; // default
+        
+        if (projectMode === 'horticulture') {
+            // สำหรับ horticulture mode ใช้ข้อมูลจาก horticultureSystemData
+            try {
+                const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
+                if (horticultureSystemDataStr) {
+                    const horticultureSystemData = JSON.parse(horticultureSystemDataStr);
+                    if (horticultureSystemData?.sprinklerConfig?.pressureBar) {
+                        sprinklerPressureBar = horticultureSystemData.sprinklerConfig.pressureBar;
+                    }
+                }
+            } catch (error) {
+                console.error('Error parsing horticulture system data:', error);
+            }
+        } else if (projectMode === 'garden') {
+            // สำหรับ garden mode ใช้ข้อมูลจาก gardenStats
+            try {
+                const gardenStatsStr = localStorage.getItem('garden_statistics');
+                if (gardenStatsStr) {
+                    const gardenStats = JSON.parse(gardenStatsStr);
+                    if (gardenStats.zones && gardenStats.zones.length > 0) {
+                        // ใช้แรงดันจากโซนแรก หรือค่าเฉลี่ย
+                        sprinklerPressureBar = gardenStats.zones[0].sprinklerPressure || 2.5;
+                    }
+                }
+            } catch (error) {
+                console.error('Error parsing garden stats:', error);
+            }
+        } else {
+            // สำหรับ mode อื่นๆ ใช้ข้อมูลจาก results
+            if (results.analyzedSprinklers && results.analyzedSprinklers.length > 0) {
+                const firstSprinkler = results.analyzedSprinklers[0];
+                if (firstSprinkler.pressureBar) {
+                    sprinklerPressureBar = Array.isArray(firstSprinkler.pressureBar) 
+                        ? (firstSprinkler.pressureBar[0] + firstSprinkler.pressureBar[1]) / 2
+                        : parseFloat(String(firstSprinkler.pressureBar));
+                }
+            }
+        }
+        
+        const sprinklerHeadLoss = sprinklerPressureBar * 10;
+
+        return totalPipeHeadLoss + sprinklerHeadLoss;
+    };
+
+    // สำหรับกรณีหลายโซน ให้หาค่าสูงสุด
+    const getMaxPumpHeadFromAllZones = () => {
+        if (allZoneResults && allZoneResults.length > 0) {
+            // คำนวณ Pump Head สำหรับแต่ละโซน แล้วหาค่าสูงสุด (ใช้ค่าสูงสุดเสมอ)
+            return Math.max(...allZoneResults.map((zone: any) => {
+                const zoneHeadLoss = zone.headLoss?.total || 0;
+                
+                // หา sprinkler pressure ที่ถูกต้องของโซนนี้
+                let zoneSprinklerPressure = 2.5; // default pressure (bar)
+                
+                if (projectMode === 'horticulture') {
+                    // ใช้ข้อมูลจาก horticultureSystemData
+                    try {
+                        const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
+                        if (horticultureSystemDataStr) {
+                            const horticultureSystemData = JSON.parse(horticultureSystemDataStr);
+                            if (horticultureSystemData?.sprinklerConfig?.pressureBar) {
+                                zoneSprinklerPressure = horticultureSystemData.sprinklerConfig.pressureBar;
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error parsing horticulture system data:', error);
+                    }
+                } else {
+                    // สำหรับ mode อื่นๆ ใช้ค่า default หรือจาก zone data
+                    if (zone.sprinklerPressure) {
+                        zoneSprinklerPressure = zone.sprinklerPressure;
+                    }
+                }
+                
+                const zoneSprinklerHeadLoss = zoneSprinklerPressure * 10; // pressure (bar) × 10 = head loss (m)
+                return zoneHeadLoss + zoneSprinklerHeadLoss;
+            }));
+        } else {
+            // ไม่มี allZoneResults ใช้การคำนวณปกติ
+            return calculatePumpHead();
+        }
+    };
+
+    const actualPumpHead = getMaxPumpHeadFromAllZones();
+
+
     // กรองปั๊มสำหรับ horticulture mode
     const getFilteredPumps = () => {
-        if (projectMode !== 'horticulture') {
+        if (projectMode !== 'horticulture' && projectMode !== 'garden') {
             return analyzedPumps.sort((a, b) => a.price - b.price);
         }
 
-        // สำหรับ horticulture mode - กรองตามเงื่อนไขเฉพาะ
+        // สำหรับ horticulture และ garden mode - กรองตามเงื่อนไขเฉพาะ
+        if (projectMode === 'garden') {
+            // สำหรับ garden mode ใช้ข้อมูลจาก garden statistics
+            const gardenStatsStr = localStorage.getItem('garden_statistics');
+            if (!gardenStatsStr) {
+                return analyzedPumps.sort((a, b) => a.price - b.price);
+            }
+
+            try {
+                const gardenStats = JSON.parse(gardenStatsStr);
+                
+                // คำนวณความต้องการน้ำรวมจากทุกโซน
+                let requiredFlowLPM = 0;
+                if (gardenStats.zones && gardenStats.zones.length > 0) {
+                    // สำหรับ garden mode ปกติจะเปิดทุกโซนพร้อมกัน
+                    requiredFlowLPM = gardenStats.zones.reduce((total: number, zone: any) => {
+                        return total + (zone.sprinklerFlowRate * zone.sprinklerCount);
+                    }, 0);
+                }
+
+                // ใช้ค่า actualPumpHead ที่คำนวณแล้ว
+                const maxPumpHeadFromZones = actualPumpHead;
+                
+                // กรองปั๊มที่เข้าเงื่อนไข
+                const compatiblePumps = analyzedPumps.filter((pump: any) => {
+                    const maxFlow = pump.max_flow_rate_lpm || pump.maxFlowLPM || 0;
+                    const flowCheck = maxFlow >= requiredFlowLPM;
+                    
+                    const maxHead = pump.max_head_m || pump.maxHead || 0;
+                    const headCheck = maxHead >= maxPumpHeadFromZones;
+                    
+                    return flowCheck && headCheck;
+                });
+
+                return compatiblePumps.length > 0 
+                    ? compatiblePumps.sort((a, b) => a.price - b.price)
+                    : analyzedPumps.sort((a, b) => a.price - b.price);
+            } catch (error) {
+                console.error('Error parsing garden stats:', error);
+                return analyzedPumps.sort((a, b) => a.price - b.price);
+            }
+        }
+
         const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
         if (!horticultureSystemDataStr) {
             return analyzedPumps.sort((a, b) => a.price - b.price);
@@ -255,20 +678,20 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 requiredFlowLPM = Math.max(...zones.map((zone: any) => zone.waterNeedPerMinute || 0));
             }
 
-            // เงื่อนไขการกรอง
-            const minRequiredHead = qHeadSpray * 10; // maxHead >= Q หัวฉีด * 10
+            // ใช้ค่า actualPumpHead ที่คำนวณแล้ว (ใช้ค่าสูงสุดจากทุกโซน)
+            const maxPumpHeadFromZones = actualPumpHead;
             
             // กรองปั๊มที่เข้าเงื่อนไข
             const compatiblePumps = analyzedPumps.filter((pump: any) => {
-                // ตรวจสอบ maxHead
-                const maxHead = pump.max_head_m || pump.maxHead || 0;
-                const headCheck = maxHead >= minRequiredHead;
-                
-                // ตรวจสอบ maxFlow
+                // ตรวจสอบ maxFlow - ต้องมากกว่าที่ต้องการ
                 const maxFlow = pump.max_flow_rate_lpm || pump.maxFlowLPM || 0;
                 const flowCheck = maxFlow >= requiredFlowLPM;
                 
-                return headCheck && flowCheck;
+                // ตรวจสอบ maxHead - ต้องมากกว่า Pump Head ของโซนที่สูงสุด
+                const maxHead = pump.max_head_m || pump.maxHead || 0;
+                const headCheck = maxHead >= maxPumpHeadFromZones;
+                
+                return flowCheck && headCheck;
             });
 
             // เรียงตามราคาถูกสุดก่อน
@@ -385,63 +808,35 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 {t('ปั๊มน้ำ')}
             </h3>
 
-            <div className="mb-4 rounded bg-gray-600 p-3">
-                <h4 className="mb-2 text-sm font-medium text-red-300">⚡ {t('ความต้องการ:')}</h4>
-                <div className="text-xs text-gray-300">
-                    <p>
-                        {t('อัตราการไหล:')} {' '}
+            <div className="mb-4 rounded bg-gray-600 p-3 flex flex-row items-center space-x-6">
+                <h4 className="text-lg font-medium text-red-300 mr-4 whitespace-nowrap">⚡ {t('ความต้องการ:')}</h4>
+                <div className="flex flex-row items-center space-x-4">
+                    <span>
+                        {t('อัตราการไหล:')}{' '}
                         <span className="font-bold text-blue-300">
-                            {horticultureReq.requiredFlowLPM.toFixed(1)}{' '}
-                            {t('LPM')}
+                            {Number((projectMode === 'garden' ? gardenReq.requiredFlowLPM : horticultureReq.requiredFlowLPM).toFixed(2)).toLocaleString()} {t('LPM')}
                         </span>
-                    </p>
-                    <p>
-                        {t('Head รวม:')} {' '}
-                        <span className="font-bold text-yellow-300">
-                            {horticultureReq.minRequiredHead.toFixed(1)}{' '}
-                            {t('เมตร')}
-                        </span>
-                        {projectMode === 'horticulture' && (
-                            <span className="ml-2 text-xs text-gray-400">
-                                (Q หัวฉีด {horticultureReq.qHeadSpray} × 10)
+                        {projectMode === 'garden' && (
+                            <span className="ml-2 text-xs text-green-400">
+                                (จาก garden input)
                             </span>
                         )}
-                    </p>
-                </div>
-                {results.projectSummary && (
-                    <div className="mt-2 text-xs text-purple-200">
-                        <p>
-                            🎯 {t('รูปแบบการเปิด:')} {' '}
-                            {results.projectSummary.operationMode === 'simultaneous'
-                                ? t('เปิดพร้อมกันทุกโซน')
-                                : results.projectSummary.operationMode === 'custom'
-                                  ? t('เปิดแบบกำหนดเอง')
-                                  : t('เปิดทีละโซน')}
-                        </p>
-                        <p>💧 {t('คำนวณจากโซน:')} {results.projectSummary.criticalZone}</p>
-                        {results.projectSummary.criticalGroup && (
-                            <p>🔗 {t('กลุ่มที่คำนวณ:')} {results.projectSummary.criticalGroup.label}</p>
+                    </span>
+                    <span>
+                        {t('Pump Head:')}{' '}
+                        <span className="font-bold text-orange-300">
+                            {(() => {
+                                const displayValue = projectMode === 'garden' ? gardenReq.pumpHeadM : actualPumpHead;
+                                return Number(displayValue.toFixed(2)).toLocaleString();
+                            })()} {t('เมตร')}
+                        </span>
+                        {projectMode === 'garden' && (
+                            <span className="ml-2 text-xs text-green-400">
+                                (จาก Head Loss รวม)
+                            </span>
                         )}
-                    </div>
-                )}
-                {projectMode === 'horticulture' && (
-                    <div className="mt-2 text-xs text-purple-200">
-                        <p>🎯 {t('รูปแบบการเปิด:')} {' '}
-                            {zoneOperationMode === 'simultaneous'
-                                ? t('เปิดพร้อมกันทุกโซน')
-                                : zoneOperationMode === 'custom'
-                                  ? t('เปิดแบบกำหนดเอง')
-                                  : t('เปิดทีละโซน')}
-                        </p>
-                        <p>💧 {t('คำนวณจาก:')} {' '}
-                            {zoneOperationMode === 'simultaneous'
-                                ? t('น้ำรวมทุกโซน')
-                                : zoneOperationMode === 'custom'
-                                  ? t('กลุ่มโซนที่ต้องการมากสุด')
-                                  : t('โซนที่ต้องการมากสุด')}
-                        </p>
-                    </div>
-                )}
+                    </span>
+                </div>
             </div>
 
             <div className="mb-4">
@@ -590,99 +985,34 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                         </div>
                     )}
 
-
-                    
-
                     {currentPump.pumpAccessories && currentPump.pumpAccessories.length > 0 && (
-                        <div className="mt-3 rounded bg-purple-900 p-2">
-                            <h5 className="mb-2 text-xs font-medium text-purple-300">
-                                🔧 {t('อุปกรณ์ประกอบ')} ({currentPump.pumpAccessories.length} {t('รายการ')}):
-                            </h5>
-                            <div className="space-y-2">
-                                {currentPump.pumpAccessories
-                                    .sort(
-                                        (a: any, b: any) =>
-                                            (a.sort_order || 0) - (b.sort_order || 0)
-                                    )
-                                    .map((accessory: any, index: number) => (
-                                        <div
-                                            key={accessory.id || index}
-                                            className="flex items-center justify-between rounded bg-purple-800 p-2"
-                                        >
-                                            <div className="flex items-center space-x-3">
-                                                {renderAccessoryImage(accessory)}
-                                                <div className="text-xs">
-                                                    <p className="font-medium text-white">
-                                                        {accessory.name}
-                                                    </p>
-                                                    <p className="capitalize text-purple-200">
-                                                        {accessory.accessory_type?.replace(
-                                                            '_',
-                                                            ' '
-                                                        )}
-                                                        {accessory.size && ` • ${accessory.size}`}
-                                                    </p>
-                                                    {accessory.specifications &&
-                                                        Object.keys(accessory.specifications)
-                                                            .length > 0 && (
-                                                            <p className="text-purple-300">
-                                                                {Object.entries(
-                                                                    accessory.specifications
-                                                                )
-                                                                    .slice(0, 1)
-                                                                    .map(
-                                                                        ([key, value]) =>
-                                                                            `${key}: ${value}`
-                                                                    )
-                                                                    .join(', ')}
-                                                                {Object.keys(
-                                                                    accessory.specifications
-                                                                ).length > 1 && '...'}
-                                                            </p>
-                                                        )}
-                                                </div>
-                                            </div>
-                                            <div className="text-right text-xs">
-                                                <div
-                                                    className={`font-medium ${accessory.is_included ? 'text-green-300' : 'text-yellow-300'}`}
-                                                >
-                                                    {accessory.is_included ? (
-                                                        <span>✅ {t('รวมในชุด')}</span>
-                                                    ) : (
-                                                        <span>
-                                                            💰 +
-                                                            {Number(
-                                                                accessory.price || 0
-                                                            ).toLocaleString()}{' '}
-                                                            {t('บาท')}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                {!accessory.is_included && (
-                                                    <div className="text-purple-200">({t('แยกขาย')})</div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
+                        <div className="mt-3 rounded bg-purple-900 p-3">
+                            <div className="flex items-center justify-between">
+                                <h5 className="text-sm font-medium text-purple-300">
+                                    🔧 {t('อุปกรณ์ประกอบ')} ({currentPump.pumpAccessories.length} {t('รายการ')})
+                                </h5>
+                                <button
+                                    onClick={() => setShowAccessoriesModal(true)}
+                                    className="rounded bg-purple-600 px-3 py-1 text-xs text-white hover:bg-purple-500 transition-colors"
+                                >
+                                    {t('ดูอุปกรณ์')}
+                                </button>
                             </div>
-
                             {currentPump.pumpAccessories.some((acc: any) => !acc.is_included) && (
-                                <div className="mt-2 rounded bg-purple-800 p-2 text-xs">
-                                    <div className="flex justify-between text-purple-200">
-                                        <span>{t('ราคาอุปกรณ์เสริม:')}</span>
-                                        <span className="font-medium text-yellow-300">
-                                            +
-                                            {currentPump.pumpAccessories
-                                                .filter((acc: any) => !acc.is_included)
-                                                .reduce(
-                                                    (sum: number, acc: any) =>
-                                                        sum + (Number(acc.price) || 0),
-                                                    0
-                                                )
-                                                .toLocaleString()}{' '}
-                                            {t('บาท')}
-                                        </span>
-                                    </div>
+                                <div className="mt-2 text-xs text-purple-200">
+                                    <span>{t('ราคาอุปกรณ์เสริม:')}</span>{' '}
+                                    <span className="font-medium text-yellow-300">
+                                        +
+                                        {currentPump.pumpAccessories
+                                            .filter((acc: any) => !acc.is_included)
+                                            .reduce(
+                                                (sum: number, acc: any) =>
+                                                    sum + (Number(acc.price) || 0),
+                                                0
+                                            )
+                                            .toLocaleString()}{' '}
+                                        {t('บาท')}
+                                    </span>
                                 </div>
                             )}
                         </div>
@@ -738,6 +1068,131 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                             <p className="inline-block rounded bg-black bg-opacity-50 px-2 py-1 text-sm text-white">
                                 {modalImage.alt}
                             </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showAccessoriesModal && currentPump && currentPump.pumpAccessories && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
+                    onClick={() => setShowAccessoriesModal(false)}
+                >
+                    <div
+                        className="relative max-h-[90vh] max-w-[800px] w-full mx-4 bg-gray-800 rounded-lg shadow-2xl overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between bg-purple-900 px-4 py-3">
+                            <h3 className="text-lg font-medium text-white">
+                                🔧 {t('อุปกรณ์ประกอบ')} - {currentPump.name}
+                            </h3>
+                            <button
+                                onClick={() => setShowAccessoriesModal(false)}
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700"
+                                title={t('ปิด')}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="p-4">
+                            {currentPump.pumpAccessories.length > 5 && (
+                                <div className="mb-3 text-center text-xs text-gray-400">
+                                    📜 {t('มีอุปกรณ์')} {currentPump.pumpAccessories.length} {t('รายการ - เลื่อนเพื่อดูเพิ่มเติม')}
+                                </div>
+                            )}
+                            <div className="max-h-[400px] overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+                                {currentPump.pumpAccessories
+                                    .sort(
+                                        (a: any, b: any) =>
+                                            (a.sort_order || 0) - (b.sort_order || 0)
+                                    )
+                                    .map((accessory: any, index: number) => (
+                                        <div
+                                            key={accessory.id || index}
+                                            className="flex items-center justify-between rounded bg-gray-700 p-3"
+                                        >
+                                            <div className="flex items-center space-x-4">
+                                                {renderAccessoryImage(accessory)}
+                                                <div className="text-sm">
+                                                    <p className="font-medium text-white">
+                                                        {accessory.name}
+                                                    </p>
+                                                    <p className="capitalize text-gray-300">
+                                                        {accessory.accessory_type?.replace(
+                                                            '_',
+                                                            ' '
+                                                        )}
+                                                        {accessory.size && ` • ${accessory.size}`}
+                                                    </p>
+                                                    {accessory.specifications &&
+                                                        Object.keys(accessory.specifications)
+                                                            .length > 0 && (
+                                                            <div className="mt-1 text-xs text-gray-400">
+                                                                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                                                                    {Object.entries(
+                                                                        accessory.specifications
+                                                                    ).map(([key, value]) => (
+                                                                        <div key={key}>
+                                                                            <span className="font-medium">{key}:</span>{' '}
+                                                                            <span>{String(value)}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    {accessory.description && (
+                                                        <p className="mt-1 text-xs text-gray-400">
+                                                            {accessory.description}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div
+                                                    className={`text-sm font-medium ${accessory.is_included ? 'text-green-300' : 'text-yellow-300'}`}
+                                                >
+                                                    {accessory.is_included ? (
+                                                        <span>✅ {t('รวมในชุด')}</span>
+                                                    ) : (
+                                                        <span>
+                                                            💰 +
+                                                            {Number(
+                                                                accessory.price || 0
+                                                            ).toLocaleString()}{' '}
+                                                            {t('บาท')}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {!accessory.is_included && (
+                                                    <div className="text-xs text-gray-400 mt-1">
+                                                        ({t('แยกขาย')})
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                            </div>
+
+                            {currentPump.pumpAccessories.some((acc: any) => !acc.is_included) && (
+                                <div className="mt-4 rounded bg-purple-800 p-3">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-purple-200">{t('รวมราคาอุปกรณ์เสริม:')}</span>
+                                        <span className="font-medium text-yellow-300">
+                                            +
+                                            {currentPump.pumpAccessories
+                                                .filter((acc: any) => !acc.is_included)
+                                                .reduce(
+                                                    (sum: number, acc: any) =>
+                                                        sum + (Number(acc.price) || 0),
+                                                    0
+                                                )
+                                                .toLocaleString()}{' '}
+                                            {t('บาท')}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

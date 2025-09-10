@@ -110,13 +110,11 @@ const getStoredProjectImage = (projectMode: ProjectMode): string | null => {
     for (const key of imageKeys) {
         const image = localStorage.getItem(key);
         if (image && image.startsWith('data:image/')) {
-            console.log(`✅ Found project image with key: ${key}`);
 
             try {
                 const metadata = localStorage.getItem('projectMapMetadata');
                 if (metadata) {
                     const parsedMetadata = JSON.parse(metadata);
-                    console.log(`📊 Image metadata:`, parsedMetadata);
                 }
             } catch (error) {
                 console.warn('⚠️ Could not parse image metadata:', error);
@@ -164,9 +162,6 @@ const cleanupOldImages = (): void => {
         }
     });
 
-    if (cleanedCount > 0) {
-        console.log(`🧹 Cleaned up ${cleanedCount} old image references`);
-    }
 };
 
 export default function Product() {
@@ -184,6 +179,7 @@ export default function Product() {
     const [zoneInputs, setZoneInputs] = useState<{ [zoneId: string]: IrrigationInput }>({});
     const [zoneSprinklers, setZoneSprinklers] = useState<{ [zoneId: string]: any }>({});
     const [horticultureSystemData, setHorticultureSystemData] = useState<any>(null);
+    const [gardenSystemData, setGardenSystemData] = useState<any>(null);
 
     const [zoneOperationMode, setZoneOperationMode] = useState<
         'sequential' | 'simultaneous' | 'custom'
@@ -234,7 +230,6 @@ export default function Product() {
                         }
                     });
 
-                    console.log('✅ User uploaded image saved successfully');
                 } else {
                     setImageLoadError('Invalid image format');
                 }
@@ -268,7 +263,6 @@ export default function Product() {
 
         setProjectImage(null);
         setImageLoadError(null);
-        console.log('🗑️ Project image deleted');
     };
 
     useEffect(() => {
@@ -298,9 +292,7 @@ export default function Product() {
 
         if (image && validateImageData(image)) {
             setProjectImage(image);
-            console.log(`✅ Successfully loaded project image for ${projectMode} mode`);
         } else {
-            console.log(`ℹ️ No valid project image found for ${projectMode} mode`);
             setProjectImage(null);
             const modeNames = {
                 'field-crop': 'Field Crop Summary',
@@ -643,7 +635,9 @@ export default function Product() {
         
 
 
-        const waterPerSprinkler = 50;
+        // ใช้ข้อมูลจาก zone: sprinklerFlowRate * sprinklerCount
+        const totalWaterRequirement = zoneStats.sprinklerFlowRate * zoneStats.sprinklerCount;
+        const waterPerSprinkler = sprinklerCount > 0 ? totalWaterRequirement / sprinklerCount : zoneStats.sprinklerFlowRate;
 
         return {
             farmSizeRai: formatNumber(areaInRai, 3),
@@ -708,6 +702,93 @@ export default function Product() {
             totalSecondaryPipeM: 0,
             longestMainPipeM: 0,
             totalMainPipeM: 0,
+        };
+    };
+
+    // สร้าง gardenSystemData เหมือน horticultureSystemData สำหรับ garden mode
+    const createGardenSystemData = (gardenData: GardenPlannerData, gardenStats: GardenStatistics) => {
+        if (!gardenData || !gardenStats) return null;
+
+        const summary = gardenStats.summary;
+        const zones = gardenStats.zones;
+
+        // สร้าง sprinkler config จากข้อมูล garden
+        const sprinklerConfig = {
+            flowRatePerPlant: 6.0, // L/min ต่อหัวฉีด (default)
+            pressureBar: 2.5, // บาร์ (default)
+            radiusMeters: 8.0, // เมตร (default)
+        };
+
+        // สร้างข้อมูลโซนแบบ horticulture
+        const systemZones = zones.length > 0 ? zones.map((zone) => {
+            const sprinklerCount = zone.sprinklerCount || Math.max(1, Math.ceil(zone.area / 1600 * 12));
+            
+            return {
+                id: zone.zoneId,
+                name: zone.zoneName,
+                sprinklerCount: sprinklerCount,
+                waterNeedPerMinute: sprinklerCount * sprinklerConfig.flowRatePerPlant,
+                bestPipes: {
+                    // สร้าง BestPipeInfo สำหรับแต่ละประเภทท่อ
+                    branch: {
+                        id: `branch-${zone.zoneId}`,
+                        length: zone.longestPipeFromSource || 20,
+                        count: sprinklerCount, // จำนวนทางออก = จำนวนหัวฉีด
+                        waterFlowRate: sprinklerCount * sprinklerConfig.flowRatePerPlant,
+                        details: { type: 'branch', zoneId: zone.zoneId },
+                    },
+                    subMain: {
+                        id: `submain-${zone.zoneId}`,
+                        length: Math.max(zone.longestPipeFromSource * 0.7, 15),
+                        count: Math.max(1, Math.ceil(sprinklerCount / 5)), // จำนวนท่อย่อยที่เชื่อมต่อ
+                        waterFlowRate: sprinklerCount * sprinklerConfig.flowRatePerPlant,
+                        details: { type: 'subMain', zoneId: zone.zoneId },
+                    },
+                    main: {
+                        id: `main-${zone.zoneId}`,
+                        length: Math.max(zone.longestPipeFromSource * 0.5, 10),
+                        count: 1, // จำนวนท่อเมนรองที่เชื่อมต่อ
+                        waterFlowRate: sprinklerCount * sprinklerConfig.flowRatePerPlant,
+                        details: { type: 'main', zoneId: zone.zoneId },
+                    },
+                },
+            };
+        }) : [{
+            // Single zone สำหรับกรณีที่ไม่มีโซนแยก
+            id: 'main-garden',
+            name: 'สวนหลัก',
+            sprinklerCount: summary.totalSprinklers || Math.max(5, Math.ceil(summary.totalArea / 1600 * 12)),
+            waterNeedPerMinute: (summary.totalSprinklers || Math.max(5, Math.ceil(summary.totalArea / 1600 * 12))) * sprinklerConfig.flowRatePerPlant,
+            bestPipes: {
+                branch: {
+                    id: 'branch-main-garden',
+                    length: summary.longestPipeFromSource || 20,
+                    count: summary.totalSprinklers || Math.max(5, Math.ceil(summary.totalArea / 1600 * 12)),
+                    waterFlowRate: (summary.totalSprinklers || Math.max(5, Math.ceil(summary.totalArea / 1600 * 12))) * sprinklerConfig.flowRatePerPlant,
+                    details: { type: 'branch', zoneId: 'main-garden' },
+                },
+                subMain: {
+                    id: 'submain-main-garden',
+                    length: Math.max((summary.longestPipeFromSource || 20) * 0.7, 15),
+                    count: Math.max(1, Math.ceil((summary.totalSprinklers || 5) / 5)),
+                    waterFlowRate: (summary.totalSprinklers || Math.max(5, Math.ceil(summary.totalArea / 1600 * 12))) * sprinklerConfig.flowRatePerPlant,
+                    details: { type: 'subMain', zoneId: 'main-garden' },
+                },
+                main: {
+                    id: 'main-main-garden',
+                    length: Math.max((summary.longestPipeFromSource || 20) * 0.5, 10),
+                    count: 1,
+                    waterFlowRate: (summary.totalSprinklers || Math.max(5, Math.ceil(summary.totalArea / 1600 * 12))) * sprinklerConfig.flowRatePerPlant,
+                    details: { type: 'main', zoneId: 'main-garden' },
+                },
+            },
+        }];
+
+        return {
+            sprinklerConfig,
+            zones: systemZones,
+            isMultipleZones: zones.length > 1,
+            projectMode: 'garden',
         };
     };
 
@@ -840,6 +921,9 @@ export default function Product() {
 
         if (mode === 'greenhouse') {
             setProjectMode('greenhouse');
+            // Clear global default sprinkler เมื่อเปลี่ยน mode
+            localStorage.removeItem('horticulture_defaultSprinkler');
+            localStorage.removeItem('garden_defaultSprinkler');
 
             let data = getGreenhouseData();
 
@@ -895,6 +979,9 @@ export default function Product() {
             }
         } else if (mode === 'field-crop') {
             setProjectMode('field-crop');
+            // Clear global default sprinkler เมื่อเปลี่ยน mode
+            localStorage.removeItem('horticulture_defaultSprinkler');
+            localStorage.removeItem('garden_defaultSprinkler');
 
             let fieldData = getEnhancedFieldCropData();
 
@@ -950,15 +1037,21 @@ export default function Product() {
             }
         } else if (mode === 'garden') {
             setProjectMode('garden');
+            // Clear global default sprinkler เมื่อเปลี่ยน mode (ยกเว้น garden_defaultSprinkler)
+            localStorage.removeItem('horticulture_defaultSprinkler');
             const gardenPlannerData = loadGardenData();
             if (gardenPlannerData) {
                 setGardenData(gardenPlannerData);
                 const stats = calculateGardenStatistics(gardenPlannerData);
                 setGardenStats(stats);
 
+                // สร้าง gardenSystemData เหมือน horticultureSystemData
+                const systemData = createGardenSystemData(gardenPlannerData, stats);
+                setGardenSystemData(systemData);
+
                 const initialZoneInputs: { [zoneId: string]: IrrigationInput } = {};
                 const initialSelectedPipes: {
-                    [zoneId: string]: { branch?: any; secondary?: any; main?: any };
+                    [zoneId: string]: { branch?: any; secondary?: any; main?: any; emitter?: any };
                 } = {};
 
                 if (stats.zones.length > 1) {
@@ -972,6 +1065,7 @@ export default function Product() {
                             branch: undefined,
                             secondary: undefined,
                             main: undefined,
+                            emitter: undefined,
                         };
                     });
 
@@ -983,13 +1077,15 @@ export default function Product() {
                     const singleInput = createSingleGardenInput(stats);
                     setZoneInputs({ 'main-area': singleInput });
                     setSelectedPipes({
-                        'main-area': { branch: undefined, secondary: undefined, main: undefined },
+                        'main-area': { branch: undefined, secondary: undefined, main: undefined, emitter: undefined },
                     });
                     setActiveZoneId('main-area');
                 }
             }
         } else {
             setProjectMode('horticulture');
+            // Clear global default sprinkler เมื่อเปลี่ยน mode (ยกเว้น horticulture_defaultSprinkler)
+            localStorage.removeItem('garden_defaultSprinkler');
             
             // โหลดข้อมูลระบบหัวฉีดและโซนจาก HorticultureResultsPage
             const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
@@ -997,7 +1093,6 @@ export default function Product() {
             if (horticultureSystemDataStr) {
                 try {
                     horticultureSystemData = JSON.parse(horticultureSystemDataStr);
-                    console.log('Loaded horticultureSystemData:', horticultureSystemData);
                     setHorticultureSystemData(horticultureSystemData);
                 } catch (error) {
                     console.warn('Failed to parse horticulture system data:', error);
@@ -1034,7 +1129,6 @@ export default function Product() {
 
             // ถ้าไม่มีข้อมูลโปรเจกต์ ให้สร้างข้อมูล default
             if (!data && horticultureSystemData) {
-                console.log('Creating default project data from horticultureSystemData');
                 data = {
                     projectName: 'Default Project',
                     totalArea: horticultureSystemData.zones[0]?.area || 1600,
@@ -1210,7 +1304,6 @@ export default function Product() {
                 }
             } else {
                 // ถ้าไม่มีข้อมูลเลย ให้สร้าง default
-                console.log('No data found, creating minimal default');
                 const defaultInput: IrrigationInput = {
                     farmSizeRai: 1,
                     totalTrees: 100,
@@ -1286,6 +1379,10 @@ export default function Product() {
 
     const hasValidMainPipeData = results?.hasValidMainPipe ?? false;
     const hasValidSubmainPipeData = results?.hasValidSecondaryPipe ?? false;
+    
+    // สำหรับ garden mode ให้แสดงเฉพาะท่อย่อย (branch) เท่านั้น
+    const shouldShowSecondaryPipe = projectMode === 'garden' ? false : hasValidSubmainPipeData;
+    const shouldShowMainPipe = projectMode === 'garden' ? false : hasValidMainPipeData;
 
     const [showQuotationModal, setShowQuotationModal] = useState(false);
     const [showQuotation, setShowQuotation] = useState(false);
@@ -1459,6 +1556,67 @@ export default function Product() {
             }
         }
         return projectData?.zones.find((z) => z.id === activeZoneId);
+    };
+
+    // ฟังก์ชันดึงข้อมูลพื้นที่โซนจาก horticultureSystemData หรือข้อมูลโซนที่มีอยู่
+    const getZoneAreaData = (): {
+        zoneId: string;
+        zoneName: string;
+        areaInRai: number;
+        coordinates?: { lat: number; lng: number }[];
+    } | undefined => {
+        if (!activeZoneId) return undefined;
+
+        // ลองดึงจาก horticultureSystemData ก่อน (จาก HorticultureResultsPage.tsx)
+        if (horticultureSystemData && horticultureSystemData.zones) {
+            const zoneFromHorticultureData = horticultureSystemData.zones.find(
+                (zone: any) => zone.id === activeZoneId
+            );
+            
+            if (zoneFromHorticultureData) {
+                // ถ้ามี area ใน horticultureSystemData ให้ใช้เลย (เพราะคำนวณจาก coordinates แล้ว)
+                if (zoneFromHorticultureData.area && zoneFromHorticultureData.area > 0) {
+                    return {
+                        zoneId: zoneFromHorticultureData.id as string,
+                        zoneName: zoneFromHorticultureData.name as string,
+                        areaInRai: zoneFromHorticultureData.area / 1600, // แปลงจากตร.ม. เป็นไร่
+                        coordinates: undefined,
+                    };
+                }
+                
+                // ถ้าไม่มี area ให้ลองหาจากข้อมูลโซนต้นฉบับที่มี coordinates
+                const originalZone = projectData?.zones?.find((z: any) => z.id === activeZoneId) as any;
+                if (originalZone?.coordinates && originalZone.coordinates.length > 0) {
+                    return {
+                        zoneId: zoneFromHorticultureData.id as string,
+                        zoneName: zoneFromHorticultureData.name as string,
+                        areaInRai: 0, // จะคำนวณใน InputForm.tsx
+                        coordinates: originalZone.coordinates,
+                    };
+                }
+                
+                // fallback
+                return {
+                    zoneId: zoneFromHorticultureData.id as string,
+                    zoneName: zoneFromHorticultureData.name as string,
+                    areaInRai: 0,
+                    coordinates: undefined,
+                };
+            }
+        }
+
+        // ถ้าไม่เจอใน horticultureSystemData ให้ลองดึงจากข้อมูลโซนปกติ
+        const activeZone = getActiveZone();
+        if (activeZone && activeZone.area) {
+            return {
+                zoneId: activeZone.id as string,
+                zoneName: (activeZone.name || `โซน ${activeZone.id}`) as string,
+                areaInRai: activeZone.area / 1600, // แปลงจากตร.ม. เป็นไร่
+                coordinates: undefined,
+            };
+        }
+
+        return undefined;
     };
 
     const hasEssentialData =
@@ -1687,21 +1845,36 @@ export default function Product() {
                                     {zones.map((zone) => {
                                         const isActive = activeZoneId === zone.id;
                                         const hasSprinkler = !!zoneSprinklers[zone.id];
+                                        
+                                        // หาสีของโซนจาก horticultureSystemData
+                                        let zoneColor = null;
+                                        if (horticultureSystemData && horticultureSystemData.zones) {
+                                            const systemZone = horticultureSystemData.zones.find((hz: any) => hz.id === zone.id);
+                                            zoneColor = systemZone?.color;
+                                        }
+
+                                        const buttonStyle = zoneColor
+                                            ? {
+                                                backgroundColor: zoneColor,
+                                                color: 'black',
+                                            }
+                                            : {};
 
                                         return (
                                             <button
                                                 key={zone.id}
                                                 onClick={() => setActiveZoneId(zone.id)}
-                                                className={`relative rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                                                className={`relative rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
                                                     isActive
-                                                        ? 'bg-blue-600 text-white'
-                                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                        ? 'border-2 border-blue-600 text-blue-400 ring-2 ring-blue-400'
+                                                        : 'opacity-80'
                                                 }`}
+                                                style={buttonStyle}
                                             >
                                                 <div className="flex items-center gap-2">
                                                     <span>{zone.name}</span>
                                                     {hasSprinkler && (
-                                                        <span className="text-xs text-green-400">
+                                                        <span className="text-xs text-green-700">
                                                             ✓
                                                         </span>
                                                     )}
@@ -1917,6 +2090,7 @@ export default function Product() {
                             selectedSprinkler={currentSprinkler}
                             activeZone={activeZone}
                             projectMode={projectMode}
+                            zoneAreaData={getZoneAreaData()}
                         />
 
                         <SprinklerSelector
@@ -1926,6 +2100,7 @@ export default function Product() {
                             activeZone={activeZone}
                             allZoneSprinklers={zoneSprinklers}
                             projectMode={projectMode}
+                            gardenStats={gardenStats}
                         />
 
                         {currentSprinkler && (
@@ -1938,12 +2113,13 @@ export default function Product() {
                                         selectedPipe={effectiveEquipment.branchPipe}
                                         onPipeChange={(pipe) => handlePipeChange('branch', pipe)}
                                         horticultureSystemData={horticultureSystemData}
+                                        gardenSystemData={gardenSystemData}
                                         activeZoneId={activeZoneId}
                                         selectedSprinkler={currentSprinkler}
                                         projectMode={projectMode}
                                     />
 
-                                    {hasValidSubmainPipeData ? (
+                                    {shouldShowSecondaryPipe ? (
                                         <PipeSelector
                                             pipeType="secondary"
                                             results={results}
@@ -1953,6 +2129,7 @@ export default function Product() {
                                                 handlePipeChange('secondary', pipe)
                                             }
                                             horticultureSystemData={horticultureSystemData}
+                                            gardenSystemData={gardenSystemData}
                                             activeZoneId={activeZoneId}
                                             selectedSprinkler={currentSprinkler}
                                             projectMode={projectMode}
@@ -1966,7 +2143,7 @@ export default function Product() {
                                         </div>
                                     )}
 
-                                    {hasValidMainPipeData && (
+                                    {shouldShowMainPipe && (
                                         <PipeSelector
                                             pipeType="main"
                                             results={results}
@@ -1974,6 +2151,7 @@ export default function Product() {
                                             selectedPipe={effectiveEquipment.mainPipe}
                                             onPipeChange={(pipe) => handlePipeChange('main', pipe)}
                                             horticultureSystemData={horticultureSystemData}
+                                            gardenSystemData={gardenSystemData}
                                             activeZoneId={activeZoneId}
                                             selectedSprinkler={currentSprinkler}
                                             projectMode={projectMode}
@@ -1988,6 +2166,7 @@ export default function Product() {
                                             selectedPipe={effectiveEquipment.emitterPipe}
                                             onPipeChange={(pipe) => handlePipeChange('emitter', pipe)}
                                             horticultureSystemData={horticultureSystemData}
+                                            gardenSystemData={gardenSystemData}
                                             activeZoneId={activeZoneId}
                                             selectedSprinkler={currentSprinkler}
                                             projectMode={projectMode}
@@ -2007,6 +2186,7 @@ export default function Product() {
                                 {/* สรุปการคำนวณระบบท่อทั้งหมด */}
                                 <PipeSystemSummary
                                     horticultureSystemData={horticultureSystemData}
+                                    gardenSystemData={gardenSystemData}
                                     activeZoneId={activeZoneId}
                                     selectedPipes={{
                                         branch: effectiveEquipment.branchPipe,
@@ -2015,7 +2195,13 @@ export default function Product() {
                                         emitter: effectiveEquipment.emitterPipe
                                     }}
                                     sprinklerPressure={
-                                        horticultureSystemData?.sprinklerConfig?.pressureBar
+                                        projectMode === 'garden' && gardenSystemData?.sprinklerConfig?.pressureBar
+                                            ? {
+                                                pressureBar: gardenSystemData.sprinklerConfig.pressureBar,
+                                                headM: gardenSystemData.sprinklerConfig.pressureBar * 10,
+                                                head20PercentM: (gardenSystemData.sprinklerConfig.pressureBar * 10) * 0.2
+                                            }
+                                            : horticultureSystemData?.sprinklerConfig?.pressureBar
                                             ? {
                                                 pressureBar: horticultureSystemData.sprinklerConfig.pressureBar,
                                                 headM: horticultureSystemData.sprinklerConfig.pressureBar * 10,
@@ -2026,31 +2212,7 @@ export default function Product() {
                                     projectMode={projectMode}
                                 />
 
-                                {(projectMode === 'horticulture' || showPumpOption) && (
-                                        <PumpSelector
-                                            results={results}
-                                            selectedPump={effectiveEquipment.pump}
-                                            onPumpChange={handlePumpChange}
-                                            zoneOperationGroups={zoneOperationGroups}
-                                            zoneInputs={zoneInputs}
-                                            zoneOperationMode={zoneOperationMode}
-                                            simultaneousZonesCount={
-                                                zoneOperationMode === 'simultaneous'
-                                                    ? zones.length
-                                                    : zoneOperationMode === 'custom'
-                                                      ? Math.max(
-                                                            ...zoneOperationGroups.map(
-                                                                (g) => g.zones.length
-                                                            )
-                                                        )
-                                                      : 1
-                                            }
-                                            selectedZones={zones.map((z) => z.id)}
-                                            projectMode={projectMode}
-                                        />
-                                    )}
-                                
-                                <CalculationSummary
+<CalculationSummary
                                     results={results}
                                     input={currentInput}
                                     selectedSprinkler={currentSprinkler}
@@ -2078,7 +2240,36 @@ export default function Product() {
                                     getZoneName={getZoneNameForSummary}
                                     fieldCropData={fieldCropData}
                                     greenhouseData={greenhouseData}
+                                    gardenStats={gardenStats}
                                 />
+
+                                {(projectMode === 'horticulture' || showPumpOption) && (
+                                        <PumpSelector
+                                            results={results}
+                                            selectedPump={effectiveEquipment.pump}
+                                            onPumpChange={handlePumpChange}
+                                            zoneOperationGroups={zoneOperationGroups}
+                                            zoneInputs={zoneInputs}
+                                            zoneOperationMode={zoneOperationMode}
+                                            simultaneousZonesCount={
+                                                zoneOperationMode === 'simultaneous'
+                                                    ? zones.length
+                                                    : zoneOperationMode === 'custom'
+                                                      ? Math.max(
+                                                            ...zoneOperationGroups.map(
+                                                                (g) => g.zones.length
+                                                            )
+                                                        )
+                                                      : 1
+                                            }
+                                            selectedZones={zones.map((z) => z.id)}
+                                            allZoneResults={results?.allZoneResults}
+                                            projectSummary={results?.projectSummary}
+                                            projectMode={projectMode}
+                                        />
+                                    )}
+                                
+                                
 
                                 
 

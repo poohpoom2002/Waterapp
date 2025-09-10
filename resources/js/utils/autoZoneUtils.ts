@@ -25,6 +25,7 @@ class SeededRandom {
 export interface AutoZoneConfig {
     numberOfZones: number;
     balanceWaterNeed: boolean;
+    balancePlantCount: boolean; // 🌱 เพิ่มตัวเลือกสมดุลจำนวนต้นไม้
     debugMode: boolean;
     paddingMeters: number;
     useVoronoi: boolean;
@@ -68,10 +69,13 @@ export interface AutoZoneDebugInfo {
 
 // Generate unique colors for zones
 export const generateZoneColors = (count: number, randomSeed?: number): string[] => {
+    // 🎨 ใช้สีชุดเดียวกับ ZONE_COLORS ใน horticultureUtils.ts
+    // 🌈 5 โซนแรกใช้สีที่แตกต่างกันมากที่สุด
     const colors = [
-        '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+        '#FF6B6B', '#9B59B6', '#F39C12', '#1ABC9C', '#3498DB',
         '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
-        '#F8C471', '#82E0AA', '#F1948A', '#85C1E9', '#D2B4DE'
+        '#F8C471', '#82E0AA', '#F1948A', '#AED6F1', '#D2B4DE',
+        '#F9E79F', '#A9DFBF', '#FAD7A0', '#D5A6BD', '#B2DFDB'
     ];
     
     // Shuffle colors if randomSeed is provided for more visual variety
@@ -272,6 +276,180 @@ export const waterNeedAwareCluster = (plants: PlantLocation[], k: number, maxIte
     
     // Use improved perfect water balance algorithm
     return perfectWaterBalanceCluster(plants, k, targetWaterNeedPerZone, maxIterations, randomSeed);
+};
+
+// 🌱 Plant count balanced clustering - สมดุลจำนวนต้นไม้ในแต่ละโซน
+export const plantCountBalancedCluster = (plants: PlantLocation[], k: number, maxIterations: number = 100, randomSeed?: number): PlantLocation[][] => {
+    if (plants.length === 0 || k <= 0) return [];
+    if (k >= plants.length) return plants.map(plant => [plant]);
+
+    const seededRandom = randomSeed !== undefined ? new SeededRandom(randomSeed) : null;
+    const targetPlantsPerZone = Math.floor(plants.length / k);
+    const extraPlants = plants.length % k; // จำนวนต้นไม้ที่เหลือ
+    
+    // สร้าง target sizes สำหรับแต่ละโซน
+    const targetSizes: number[] = [];
+    for (let i = 0; i < k; i++) {
+        // โซนแรกๆ จะได้ต้นไม้เพิ่ม 1 ต้น หากมีต้นไม้เหลือ
+        targetSizes.push(targetPlantsPerZone + (i < extraPlants ? 1 : 0));
+    }
+
+    // 🎯 สร้าง initial centroids ที่กระจายตัวดีขึ้น (k-means++ style)
+    const initialCentroids: Coordinate[] = [];
+    const usedPlants = new Set<number>();
+
+    // เลือกจุดแรกแบบสุ่ม
+    const firstIndex = seededRandom ? 
+        Math.floor(seededRandom.next() * plants.length) : 
+        Math.floor(Math.random() * plants.length);
+    initialCentroids.push(plants[firstIndex].position);
+    usedPlants.add(firstIndex);
+
+    // เลือกจุดถัดไปโดยให้ห่างจากจุดที่มีอยู่
+    for (let i = 1; i < k; i++) {
+        let maxDistance = -1;
+        let bestIndex = -1;
+
+        for (let j = 0; j < plants.length; j++) {
+            if (usedPlants.has(j)) continue;
+
+            // หาระยะห่างขั้นต่ำจาก centroids ที่มีอยู่
+            let minDistanceToExisting = Infinity;
+            for (const centroid of initialCentroids) {
+                const distance = calculateDistance(plants[j].position, centroid);
+                minDistanceToExisting = Math.min(minDistanceToExisting, distance);
+            }
+
+            // เลือกจุดที่มีระยะห่างขั้นต่ำมากที่สุด
+            if (minDistanceToExisting > maxDistance) {
+                maxDistance = minDistanceToExisting;
+                bestIndex = j;
+            }
+        }
+
+        if (bestIndex !== -1) {
+            initialCentroids.push(plants[bestIndex].position);
+            usedPlants.add(bestIndex);
+        }
+    }
+
+    // Initialize clusters
+    const clusters: PlantLocation[][] = Array(k).fill(null).map(() => []);
+    
+    // Phase 1: แบ่งต้นไม้ตาม initial centroids ที่ใกล้ที่สุด
+    plants.forEach(plant => {
+        let closestCentroidIndex = 0;
+        let minDistance = calculateDistance(plant.position, initialCentroids[0]);
+
+        for (let i = 1; i < initialCentroids.length; i++) {
+            const distance = calculateDistance(plant.position, initialCentroids[i]);
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestCentroidIndex = i;
+            }
+        }
+
+        clusters[closestCentroidIndex].push(plant);
+    });
+
+    // Phase 2: ปรับแต่งด้วย k-means เพื่อให้ต้นไม้ในแต่ละโซนอยู่ใกล้กัน
+    // แต่ยังคงรักษาจำนวนต้นไม้ให้สมดุล
+    for (let iteration = 0; iteration < maxIterations; iteration++) {
+        // คำนวณ centroids
+        const centroids: Coordinate[] = clusters.map(cluster => {
+            if (cluster.length === 0) return { lat: 0, lng: 0 };
+            return {
+                lat: cluster.reduce((sum, plant) => sum + plant.position.lat, 0) / cluster.length,
+                lng: cluster.reduce((sum, plant) => sum + plant.position.lng, 0) / cluster.length
+            };
+        });
+
+        let hasChanged = false;
+
+        // สำหรับแต่ละต้นไม้ ลองย้ายไปโซนที่ใกล้กว่า (หากจำนวนต้นไม้ยังสมดุล)
+        for (let clusterIndex = 0; clusterIndex < clusters.length; clusterIndex++) {
+            const cluster = clusters[clusterIndex];
+            
+            for (let plantIndex = cluster.length - 1; plantIndex >= 0; plantIndex--) {
+                const plant = cluster[plantIndex];
+                
+                // หาโซนที่ใกล้ที่สุด
+                let bestClusterIndex = clusterIndex;
+                let minDistance = calculateDistance(plant.position, centroids[clusterIndex]);
+                
+                for (let otherIndex = 0; otherIndex < clusters.length; otherIndex++) {
+                    if (otherIndex === clusterIndex) continue;
+                    
+                    const distance = calculateDistance(plant.position, centroids[otherIndex]);
+                    
+                    // ย้ายได้เฉพาะเมื่อ:
+                    // 1. โซนปลายทางใกล้กว่า
+                    // 2. โซนต้นทางมีต้นไม้เกินเป้าหมาย หรือ โซนปลายทางมีต้นไม้น้อยกว่าเป้าหมาย
+                    if (distance < minDistance) {
+                        const canMoveFrom = clusters[clusterIndex].length > targetSizes[clusterIndex];
+                        const canMoveTo = clusters[otherIndex].length < targetSizes[otherIndex];
+                        
+                        if (canMoveFrom || canMoveTo) {
+                            minDistance = distance;
+                            bestClusterIndex = otherIndex;
+                        }
+                    }
+                }
+                
+                // ย้ายต้นไม้หากพบโซนที่ดีกว่า
+                if (bestClusterIndex !== clusterIndex) {
+                    const movedPlant = cluster.splice(plantIndex, 1)[0];
+                    clusters[bestClusterIndex].push(movedPlant);
+                    hasChanged = true;
+                }
+            }
+        }
+
+        if (!hasChanged) break;
+    }
+
+    // Phase 3: Fine-tuning เพื่อให้จำนวนต้นไม้ตรงเป้าหมายมากที่สุด
+    for (let iteration = 0; iteration < 10; iteration++) {
+        let hasAdjusted = false;
+
+        // หาโซนที่มีต้นไม้เกินและโซนที่มีต้นไม้น้อย
+        for (let i = 0; i < clusters.length; i++) {
+            if (clusters[i].length > targetSizes[i]) {
+                // โซนนี้มีต้นไม้เกิน หาโซนที่มีต้นไม้น้อยกว่า
+                for (let j = 0; j < clusters.length; j++) {
+                    if (i !== j && clusters[j].length < targetSizes[j]) {
+                        // ย้ายต้นไม้ที่อยู่ไกลจาก centroid ของโซน i ไปโซน j
+                        const centroidI = {
+                            lat: clusters[i].reduce((sum, plant) => sum + plant.position.lat, 0) / clusters[i].length,
+                            lng: clusters[i].reduce((sum, plant) => sum + plant.position.lng, 0) / clusters[i].length
+                        };
+
+                        let farthestIndex = 0;
+                        let maxDistance = 0;
+                        
+                        clusters[i].forEach((plant, index) => {
+                            const distance = calculateDistance(plant.position, centroidI);
+                            if (distance > maxDistance) {
+                                maxDistance = distance;
+                                farthestIndex = index;
+                            }
+                        });
+
+                        // ย้ายต้นไม้ที่ไกลที่สุด
+                        const movedPlant = clusters[i].splice(farthestIndex, 1)[0];
+                        clusters[j].push(movedPlant);
+                        hasAdjusted = true;
+                        break;
+                    }
+                }
+            }
+            if (hasAdjusted) break;
+        }
+
+        if (!hasAdjusted) break;
+    }
+
+    return clusters.filter(cluster => cluster.length > 0);
 };
 
 // Perfect water balance clustering using greedy algorithm
@@ -731,12 +909,107 @@ export const findPlantsInPolygon = (plants: PlantLocation[], polygon: Coordinate
 export const createVoronoiZones = (
     clusters: PlantLocation[][],
     mainArea: Coordinate[],
-    colors: string[]
+    colors: string[],
+    preserveClusterPlants: boolean = false // 🌱 เพิ่มพารามิเตอร์ใหม่
 ): IrrigationZone[] => {
     const zones: IrrigationZone[] = [];
     
     if (clusters.length === 0) return zones;
 
+    // 🌱 สำหรับ plant count balanced clustering ให้ใช้ Voronoi แต่รักษา cluster plants
+    // เพื่อให้ได้ทั้งการแยกพื้นที่และจำนวนต้นไม้ที่ถูกต้อง
+    if (preserveClusterPlants) {
+        // คำนวณ centroid จาก cluster ที่แบ่งแล้ว และปรับตำแหน่งเพื่อหลีกเลี่ยงโซนตรงกลางเล็ก
+        const centroids = clusters.map((cluster) => {
+            if (cluster.length === 0) return null;
+            
+            const basicCentroid = {
+                lat: cluster.reduce((sum, plant) => sum + plant.position.lat, 0) / cluster.length,
+                lng: cluster.reduce((sum, plant) => sum + plant.position.lng, 0) / cluster.length
+            };
+
+            // 🎯 ปรับตำแหน่ง centroid เพื่อให้โซนกระจายตัวดีขึ้น
+            // หาจุดกึ่งกลางของ main area
+            const mainAreaCenter = {
+                lat: mainArea.reduce((sum, coord) => sum + coord.lat, 0) / mainArea.length,
+                lng: mainArea.reduce((sum, coord) => sum + coord.lng, 0) / mainArea.length
+            };
+
+            // คำนวณทิศทางจากจุดกึ่งกลางไปยัง centroid
+            const direction = {
+                lat: basicCentroid.lat - mainAreaCenter.lat,
+                lng: basicCentroid.lng - mainAreaCenter.lng
+            };
+
+            // ถ้า centroid อยู่ใกล้จุดกึ่งกลางมาก ให้เลื่อนออกไปเล็กน้อย
+            const distanceFromCenter = Math.sqrt(direction.lat * direction.lat + direction.lng * direction.lng);
+            const minDistanceFromCenter = 0.0001; // ~10 เมตร
+
+            if (distanceFromCenter < minDistanceFromCenter && distanceFromCenter > 0) {
+                // เลื่อน centroid ออกจากจุดกึ่งกลาง
+                const scale = minDistanceFromCenter / distanceFromCenter;
+                return {
+                    lat: mainAreaCenter.lat + direction.lat * scale,
+                    lng: mainAreaCenter.lng + direction.lng * scale
+                };
+            }
+            
+            return basicCentroid;
+        }).filter(centroid => centroid !== null) as Coordinate[];
+
+        // สร้าง Voronoi zones จาก centroid ที่ปรับแล้ว
+        const voronoiZones = createTrueVoronoiZones(centroids, mainArea);
+        
+        // แต่ใช้ plants จาก cluster ที่แบ่งไว้แล้ว (ไม่ใช้ findPlantsInPolygon)
+        clusters.forEach((cluster, index) => {
+            if (cluster.length === 0 || index >= voronoiZones.length) return;
+
+            const zoneCoordinates = voronoiZones[index];
+            
+            // ตรวจสอบว่าโซนยังใช้ได้
+            if (zoneCoordinates.length < 3) {
+                console.warn(`⚠️ Zone ${index + 1} has insufficient points, using fallback...`);
+                
+                // Fallback: ใช้ convex hull ของ cluster
+                const plantPositions = cluster.map(plant => plant.position);
+                const fallbackZone = convexHull(plantPositions);
+                
+                if (fallbackZone.length >= 3) {
+                    const totalWaterNeed = cluster.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
+                    
+                    const zone: IrrigationZone = {
+                        id: `auto-zone-${index + 1}`,
+                        name: `โซน ${index + 1}`,
+                        coordinates: fallbackZone,
+                        plants: cluster, // 🌱 ใช้ cluster ที่แบ่งไว้แล้ว
+                        totalWaterNeed,
+                        color: colors[index] || '#888888',
+                        layoutIndex: index
+                    };
+                    zones.push(zone);
+                }
+                return;
+            }
+
+            const totalWaterNeed = cluster.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
+
+            const zone: IrrigationZone = {
+                id: `auto-zone-${index + 1}`,
+                name: `โซน ${index + 1}`,
+                coordinates: zoneCoordinates,
+                plants: cluster, // 🌱 ใช้ cluster ที่แบ่งไว้แล้ว (ไม่ใช้ findPlantsInPolygon)
+                totalWaterNeed,
+                color: colors[index] || '#888888',
+                layoutIndex: index
+            };
+
+            zones.push(zone);
+        });
+
+        return zones;
+    }
+
+    // สำหรับกรณีอื่นๆ ใช้ Voronoi เหมือนเดิม
     // Calculate weighted centroids for each cluster (considering plant water needs)
     const centroids = clusters.map(cluster => {
         if (cluster.length === 0) return null;
@@ -761,8 +1034,8 @@ export const createVoronoiZones = (
     // Create true Voronoi diagram using mathematical approach
     const voronoiZones = createTrueVoronoiZones(centroids, mainArea);
     
-    // Collect all plants from all clusters for accurate assignment
-    const allPlants = clusters.flat();
+    // 🌱 สำหรับ plant count balanced clustering ให้ใช้ cluster ที่แบ่งไว้แล้ว
+    // ไม่ต้องใช้ findPlantsInPolygon ที่จะทำให้จำนวนต้นไม้เปลี่ยนไป
     
     // Assign clusters to their corresponding Voronoi zones
     clusters.forEach((cluster, index) => {
@@ -779,17 +1052,26 @@ export const createVoronoiZones = (
             const fallbackZone = createFallbackZone(plantPositions, mainArea, 10); // 10m buffer
             
             if (fallbackZone.length >= 3) {
-                // Find plants that are actually in the fallback polygon
-                const plantsInPolygon = findPlantsInPolygon(allPlants, fallbackZone);
-                const totalWaterNeed = plantsInPolygon.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
-                
+                let fallbackPlants: PlantLocation[];
+                let fallbackWaterNeed: number;
+
+                if (preserveClusterPlants) {
+                    // 🌱 ใช้ cluster ที่แบ่งไว้แล้ว
+                    fallbackPlants = cluster;
+                    fallbackWaterNeed = cluster.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
+                } else {
+                    // ใช้ findPlantsInPolygon
+                    const allPlants = clusters.flat();
+                    fallbackPlants = findPlantsInPolygon(allPlants, fallbackZone);
+                    fallbackWaterNeed = fallbackPlants.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
+                }
                 
                 const zone: IrrigationZone = {
                     id: `auto-zone-${index + 1}`,
-                    name: `โซนอัตโนมัติ ${index + 1}`,
+                    name: `โซน ${index + 1}`,
                     coordinates: fallbackZone,
-                    plants: plantsInPolygon, // Use actual plants in polygon
-                    totalWaterNeed,
+                    plants: fallbackPlants,
+                    totalWaterNeed: fallbackWaterNeed,
                     color: colors[index] || '#888888',
                     layoutIndex: index
                 };
@@ -798,16 +1080,25 @@ export const createVoronoiZones = (
             return;
         }
 
-        // Find plants that are actually inside this polygon (not just assigned cluster)
-        const plantsInPolygon = findPlantsInPolygon(allPlants, zoneCoordinates);
-        const totalWaterNeed = plantsInPolygon.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
+        let finalPlants: PlantLocation[];
+        let totalWaterNeed: number;
 
+        if (preserveClusterPlants) {
+            // 🌱 สำหรับ plant count balanced clustering ให้ใช้ cluster ที่แบ่งไว้แล้ว
+            finalPlants = cluster;
+            totalWaterNeed = cluster.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
+        } else {
+            // สำหรับกรณีอื่นๆ ให้ใช้ findPlantsInPolygon เพื่อความแม่นยำทางพื้นที่
+            const allPlants = clusters.flat();
+            finalPlants = findPlantsInPolygon(allPlants, zoneCoordinates);
+            totalWaterNeed = finalPlants.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
+        }
 
         const zone: IrrigationZone = {
             id: `auto-zone-${index + 1}`,
-            name: `โซนอัตโนมัติ ${index + 1}`,
+            name: `โซน ${index + 1}`,
             coordinates: zoneCoordinates,
-            plants: plantsInPolygon, // Use actual plants in polygon instead of original cluster
+            plants: finalPlants,
             totalWaterNeed,
             color: colors[index] || '#888888',
             layoutIndex: index
@@ -1008,11 +1299,12 @@ export const createZonesFromClusters = (
     mainArea: Coordinate[],
     colors: string[],
     paddingMeters: number = 2,
-    useVoronoi: boolean = true
+    useVoronoi: boolean = true,
+    preserveClusterPlants: boolean = false // 🌱 เพิ่มพารามิเตอร์ใหม่
 ): IrrigationZone[] => {
     // Use Voronoi-based zones for better area coverage
     if (useVoronoi) {
-        return createVoronoiZones(clusters, mainArea, colors);
+        return createVoronoiZones(clusters, mainArea, colors, preserveClusterPlants);
     }
 
     // Original method with padding
@@ -1037,16 +1329,24 @@ export const createZonesFromClusters = (
             return;
         }
 
-        // Find plants that are actually inside this polygon (not just assigned cluster)
-        const plantsInPolygon = findPlantsInPolygon(allPlants, zoneCoordinates);
-        const totalWaterNeed = plantsInPolygon.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
+        let finalPlants: PlantLocation[];
+        let totalWaterNeed: number;
 
+        if (preserveClusterPlants) {
+            // 🌱 สำหรับ plant count balanced clustering ให้ใช้ cluster ที่แบ่งไว้แล้ว
+            finalPlants = cluster;
+            totalWaterNeed = cluster.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
+        } else {
+            // สำหรับกรณีอื่นๆ ให้ใช้ findPlantsInPolygon เพื่อความแม่นยำทางพื้นที่
+            finalPlants = findPlantsInPolygon(allPlants, zoneCoordinates);
+            totalWaterNeed = finalPlants.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
+        }
 
         const zone: IrrigationZone = {
             id: `auto-zone-${index + 1}`,
-            name: `โซนอัตโนมัติ ${index + 1}`,
+            name: `โซน ${index + 1}`,
             coordinates: zoneCoordinates,
-            plants: plantsInPolygon, // Use actual plants in polygon instead of original cluster
+            plants: finalPlants,
             totalWaterNeed,
             color: colors[index] || '#888888',
             layoutIndex: index
@@ -1399,14 +1699,19 @@ export const createAutomaticZones = (
         debugInfo.totalWaterNeed = plants.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
         debugInfo.averageWaterNeedPerZone = debugInfo.totalWaterNeed / config.numberOfZones;
 
-        // Perform clustering with water need awareness
+        // Perform clustering based on user preference
         let clusters: PlantLocation[][];
-        if (config.balanceWaterNeed) {
+        if (config.balancePlantCount) {
+            // 🌱 ใช้อัลกอริทึมสมดุลจำนวนต้นไม้
+            clusters = plantCountBalancedCluster(plants, config.numberOfZones, 100, config.randomSeed);
+        } else if (config.balanceWaterNeed) {
+            // 💧 ใช้อัลกอริทึมสมดุลความต้องการน้ำ
             clusters = kMeansCluster(plants, config.numberOfZones, 100, true, config.randomSeed);
             
             // Additional refinement for perfect water balance
             clusters = enhancedBalanceWaterNeeds(clusters, debugInfo.averageWaterNeedPerZone);
         } else {
+            // 📍 ใช้อัลกอริทึมแบ่งโซนตามตำแหน่งเท่านั้น
             clusters = kMeansCluster(plants, config.numberOfZones, 100, false, config.randomSeed);
         }
 
@@ -1414,7 +1719,30 @@ export const createAutomaticZones = (
         const colors = generateZoneColors(config.numberOfZones);
 
         // Create zones from clusters with configurable options
-        let zones = createZonesFromClusters(clusters, mainArea, colors, config.paddingMeters, config.useVoronoi);
+        // 🌱 ถ้าใช้ plant count balanced clustering ให้ preserve cluster plants
+        const preserveClusterPlants = config.balancePlantCount;
+        let zones = createZonesFromClusters(clusters, mainArea, colors, config.paddingMeters, config.useVoronoi, preserveClusterPlants);
+
+        // 🌱 Debug: แสดงจำนวนต้นไม้ในแต่ละโซนและตำแหน่ง centroid
+        if (config.balancePlantCount && config.debugMode) {
+            console.log('🌱 Plant Count Balance Debug:');
+            clusters.forEach((cluster, index) => {
+                const centroid = cluster.length > 0 ? {
+                    lat: cluster.reduce((sum, plant) => sum + plant.position.lat, 0) / cluster.length,
+                    lng: cluster.reduce((sum, plant) => sum + plant.position.lng, 0) / cluster.length
+                } : null;
+                console.log(`Cluster ${index + 1}: ${cluster.length} plants, centroid:`, centroid);
+            });
+            zones.forEach((zone, index) => {
+                console.log(`Zone ${index + 1}: ${zone.plants.length} plants`);
+            });
+            
+            // แสดงความแตกต่างจำนวนต้นไม้
+            const plantCounts = zones.map(zone => zone.plants.length);
+            const minCount = Math.min(...plantCounts);
+            const maxCount = Math.max(...plantCounts);
+            console.log(`🎯 Plant count range: ${minCount} - ${maxCount} (diff: ${maxCount - minCount})`);
+        }
 
         // Filter out invalid zones (zones with no coordinates or insufficient points)
         const validZones = zones.filter(zone => zone.coordinates && zone.coordinates.length >= 3);

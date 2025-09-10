@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Pipe Friction Loss Data (Pressure drop in kgf/cm²/km)
 // Data extracted from pipe friction tables
 
@@ -500,6 +501,36 @@ export interface PipeFlowData {
   // PE PN 6.3 Data
   export function getPE_PN63_Data(): PipeSizeData {
     return {
+      "16mm": [ // 0.375 นิ้ว (เพิ่มเพื่อทดสอบ Smart Size Selection)
+        { flow: 1, pressureLoss: 0.03 },
+        { flow: 2, pressureLoss: 0.08 },
+        { flow: 3, pressureLoss: 0.16 },
+        { flow: 4, pressureLoss: 0.28 },
+        { flow: 5, pressureLoss: 0.42 },
+        { flow: 10, pressureLoss: 1.52 },
+        { flow: 15, pressureLoss: 3.25 },
+        { flow: 20, pressureLoss: 5.63 },
+        { flow: 25, pressureLoss: 8.67 },
+        { flow: 30, pressureLoss: 12.38 }
+      ],
+      "20mm": [ // 0.5 นิ้ว (เพิ่มเพื่อรองรับ PN16 → PN6.3)
+        { flow: 1, pressureLoss: 0.02 },
+        { flow: 2, pressureLoss: 0.05 },
+        { flow: 3, pressureLoss: 0.10 },
+        { flow: 4, pressureLoss: 0.16 },
+        { flow: 5, pressureLoss: 0.23 },
+        { flow: 10, pressureLoss: 0.85 },
+        { flow: 15, pressureLoss: 1.82 },
+        { flow: 20, pressureLoss: 3.15 },
+        { flow: 25, pressureLoss: 4.85 },
+        { flow: 30, pressureLoss: 6.94 },
+        { flow: 35, pressureLoss: 9.40 },
+        { flow: 40, pressureLoss: 12.25 },
+        { flow: 45, pressureLoss: 15.47 },
+        { flow: 50, pressureLoss: 19.06 },
+        { flow: 55, pressureLoss: 23.02 },
+        { flow: 60, pressureLoss: 27.34 }
+      ],
       "25mm": [ // 0.75 นิ้ว 
         { flow: 2, pressureLoss: 0.01 },
         { flow: 3, pressureLoss: 0.02 },
@@ -1824,8 +1855,88 @@ export interface PipeFlowData {
   
 
   
+  // Smart pipe data selection with conservative approach
+  function getSmartPipeData(pipeType: string, pressureClass: string): PipeSizeData | null {
+    const type = pipeType.toUpperCase();
+    
+    // Extract numeric value from pressure class
+    const numericValue = extractNumericValue(pressureClass);
+    if (numericValue === null) return null;
+    
+    if (type === 'PE') {
+      return selectPEData(numericValue);
+    } else if (type === 'PVC') {
+      return selectPVCData(numericValue);
+    }
+    
+    return null;
+  }
+  
+  // Extract numeric value from pressure class string
+  function extractNumericValue(pressureClass: string): number | null {
+    const cleanString = pressureClass.toUpperCase().replace(/[^0-9.]/g, '');
+    const value = parseFloat(cleanString);
+    return isNaN(value) ? null : value;
+  }
+  
+  // Select appropriate PE data based on PN value
+  function selectPEData(pnValue: number): PipeSizeData | null {
+    const availablePNs = [2.5, 4, 6.3];
+    
+    // If exact match exists
+    if (availablePNs.includes(pnValue)) {
+      switch (pnValue) {
+        case 2.5: return getPE_PN25_Data();
+        case 4: return getPE_PN4_Data();
+        case 6.3: return getPE_PN63_Data();
+      }
+    }
+    
+    // Conservative approach: use higher value if between ranges
+    if (pnValue < 2.5) {
+      return getPE_PN25_Data(); // Use lowest available
+    } else if (pnValue > 2.5 && pnValue < 4) {
+      return getPE_PN4_Data(); // Use PN4 (higher than PN2.5)
+    } else if (pnValue > 4 && pnValue < 6.3) {
+      return getPE_PN63_Data(); // Use PN6.3 (higher than PN4)
+    } else if (pnValue > 6.3) {
+      return getPE_PN63_Data(); // Use highest available PN6.3
+    }
+    
+    return getPE_PN25_Data(); // Fallback
+  }
+  
+  // Select appropriate PVC data based on Class value
+  function selectPVCData(classValue: number): PipeSizeData | null {
+    const availableClasses = [5, 8.5];
+    
+    // If exact match exists
+    if (availableClasses.includes(classValue)) {
+      switch (classValue) {
+        case 5: return getPVC_Class5_Data();
+        case 8.5: return getPVC_Class85_Data();
+      }
+    }
+    
+    // Conservative approach: use higher value if between ranges
+    if (classValue < 5) {
+      return getPVC_Class5_Data(); // Use lowest available
+    } else if (classValue > 5 && classValue < 8.5) {
+      return getPVC_Class85_Data(); // Use Class 8.5 (higher than Class 5)
+    } else if (classValue > 8.5) {
+      return getPVC_Class85_Data(); // Use highest available Class 8.5
+    }
+    
+    return getPVC_Class5_Data(); // Fallback
+  }
+
   // Utility functions to get pipe data by type and class/PN
-  export function getPipeData(pipeType: string, pressureClass: string): PipeSizeData | null {
+  export function getPipeData(pipeType: string, pressureClass: string): PipeSizeData | null {    
+    // First try smart selection
+    const smartData = getSmartPipeData(pipeType, pressureClass);
+    if (smartData) return smartData;
+    
+    // Fallback to exact matching (backward compatibility)
     const key = `${pipeType.toUpperCase()}_${pressureClass.toUpperCase()}`;
     
     switch (key) {
@@ -1916,5 +2027,193 @@ export interface PipeFlowData {
     return {
       min: Math.min(...flows),
       max: Math.max(...flows)
+    };
+  }
+
+  // Function to get comprehensive information about pipe data selection
+  export function getSelectedPipeDataInfo(
+    pipeType: string, 
+    pressureClass: string,
+    pipeSize?: string
+  ): { 
+    originalValue: string; 
+    selectedValue: string; 
+    reason: string;
+    isExactMatch: boolean;
+    sizeInfo?: {
+      originalSize: string;
+      selectedSize: string;
+      sizeReason: string;
+      isExactSizeMatch: boolean;
+    };
+  } | null {
+    const type = pipeType.toUpperCase();
+    const numericValue = extractNumericValue(pressureClass);
+    
+    if (numericValue === null) return null;
+    
+    let selectedValue = '';
+    let reason = '';
+    let isExactMatch = false;
+    
+    if (type === 'PE') {
+      const availablePNs = [2.5, 4, 6.3];
+      
+      if (availablePNs.includes(numericValue)) {
+        selectedValue = `PN${numericValue}`;
+        reason = 'ค่าตรงกับข้อมูลในตาราง';
+        isExactMatch = true;
+      } else if (numericValue < 2.5) {
+        selectedValue = 'PN2.5';
+        reason = 'ใช้ค่าต่ำสุดที่มี (Conservative approach)';
+      } else if (numericValue > 2.5 && numericValue < 4) {
+        selectedValue = 'PN4';
+        reason = `PN${numericValue} อยู่ระหว่าง PN2.5 และ PN4 จึงใช้ค่าที่สูงกว่า (PN4)`;
+      } else if (numericValue > 4 && numericValue < 6.3) {
+        selectedValue = 'PN6.3';
+        reason = `PN${numericValue} อยู่ระหว่าง PN4 และ PN6.3 จึงใช้ค่าที่สูงกว่า (PN6.3)`;
+      } else if (numericValue > 6.3) {
+        selectedValue = 'PN6.3';
+        reason = `PN${numericValue} สูงกว่าค่าสูงสุดในตาราง จึงใช้ค่าสูงสุดที่มี (PN6.3)`;
+      }
+    } else if (type === 'PVC') {
+      const availableClasses = [5, 8.5];
+      
+      if (availableClasses.includes(numericValue)) {
+        selectedValue = `Class${numericValue}`;
+        reason = 'ค่าตรงกับข้อมูลในตาราง';
+        isExactMatch = true;
+      } else if (numericValue < 5) {
+        selectedValue = 'Class5';
+        reason = 'ใช้ค่าต่ำสุดที่มี (Conservative approach)';
+      } else if (numericValue > 5 && numericValue < 8.5) {
+        selectedValue = 'Class8.5';
+        reason = `Class${numericValue} อยู่ระหว่าง Class5 และ Class8.5 จึงใช้ค่าที่สูงกว่า (Class8.5)`;
+      } else if (numericValue > 8.5) {
+        selectedValue = 'Class8.5';
+        reason = `Class${numericValue} สูงกว่าค่าสูงสุดในตาราง จึงใช้ค่าสูงสุดที่มี (Class8.5)`;
+      }
+    }
+    
+    const result: any = {
+      originalValue: pressureClass,
+      selectedValue: selectedValue,
+      reason: reason,
+      isExactMatch: isExactMatch
+    };
+
+    // Add size information if pipe size is provided
+    if (pipeSize) {
+      const smartPipeResult = getPipeDataWithSmartSize(pipeType, selectedValue, pipeSize);
+      if (smartPipeResult) {
+        result.sizeInfo = {
+          originalSize: pipeSize,
+          selectedSize: smartPipeResult.selectedSize,
+          sizeReason: smartPipeResult.sizeInfo.reason,
+          isExactSizeMatch: smartPipeResult.sizeInfo.isExactMatch
+        };
+      }
+    }
+    
+    return result;
+  }
+
+  // Function to find the nearest available pipe size (conservative approach)
+  function findNearestPipeSize(requestedSize: string, availableSizes: string[]): {
+    selectedSize: string;
+    isExactMatch: boolean;
+    reason: string;
+  } {
+    // Extract numeric value from size string
+    const requestedValue = parseFloat(requestedSize.replace(/[^0-9.]/g, ''));
+    
+    if (isNaN(requestedValue)) {
+      return {
+        selectedSize: availableSizes[0],
+        isExactMatch: false,
+        reason: 'ไม่สามารถระบุขนาดท่อได้ ใช้ขนาดเล็กสุดที่มี'
+      };
+    }
+
+    // Check for exact match first
+    const exactMatch = availableSizes.find(size => {
+      const sizeValue = parseFloat(size.replace(/[^0-9.]/g, ''));
+      return Math.abs(sizeValue - requestedValue) < 0.1; // Allow small tolerance
+    });
+
+    if (exactMatch) {
+      return {
+        selectedSize: exactMatch,
+        isExactMatch: true,
+        reason: 'ขนาดตรงกับข้อมูลในตาราง'
+      };
+    }
+
+    // Convert sizes to numbers for comparison
+    const sizePairs = availableSizes.map(size => ({
+      size,
+      value: parseFloat(size.replace(/[^0-9.]/g, ''))
+    })).sort((a, b) => a.value - b.value);
+
+    // Find the smallest size that is larger than requested
+    const largerSize = sizePairs.find(pair => pair.value > requestedValue);
+    
+    if (largerSize) {
+      return {
+        selectedSize: largerSize.size,
+        isExactMatch: false,
+        reason: `${requestedSize} ไม่มีในตาราง ใช้ขนาดที่ใกล้ที่สุดที่ใหญ่กว่า (${largerSize.size})`
+      };
+    }
+
+    // If no larger size found, use the largest available
+    const largestSize = sizePairs[sizePairs.length - 1];
+    return {
+      selectedSize: largestSize.size,
+      isExactMatch: false,
+      reason: `${requestedSize} ใหญ่กว่าขนาดสูงสุดในตาราง ใช้ขนาดสูงสุดที่มี (${largestSize.size})`
+    };
+  }
+
+  // Enhanced function to get pipe data with smart size selection
+  export function getPipeDataWithSmartSize(
+    pipeType: string, 
+    pressureClass: string, 
+    requestedSize: string
+  ): {
+    data: PipeSizeData | null;
+    selectedSize: string;
+    sizeInfo: {
+      isExactMatch: boolean;
+      reason: string;
+    };
+  } | null {
+    // First get pipe data for the pressure class
+    const pipeData = getPipeData(pipeType, pressureClass);
+    if (!pipeData) {
+      return null;
+    }
+
+    const availableSizes = Object.keys(pipeData);
+    const sizeSelection = findNearestPipeSize(requestedSize, availableSizes);
+
+    return {
+      data: pipeData,
+      selectedSize: sizeSelection.selectedSize,
+      sizeInfo: {
+        isExactMatch: sizeSelection.isExactMatch,
+        reason: sizeSelection.reason
+      }
+    };
+  }
+
+  // Function to get all available pipe types and classes
+  export function getAvailablePipeTypes(): {
+    PE: number[];
+    PVC: number[];
+  } {
+    return {
+      PE: [2.5, 4, 6.3],
+      PVC: [5, 8.5]
     };
   }

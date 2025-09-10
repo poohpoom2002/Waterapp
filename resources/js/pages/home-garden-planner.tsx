@@ -170,8 +170,22 @@ export default function HomeGardenPlanner() {
     const [pipeEditMode, setPipeEditMode] = useState<'add' | 'remove' | 'view'>('view');
     const [selectedSprinklersForPipe, setSelectedSprinklersForPipe] = useState<string[]>([]);
 
-    const [manualSprinklerType, setManualSprinklerType] = useState<string>('pop-up-sprinkler');
     const [manualSprinklerRadius, setManualSprinklerRadius] = useState<number>(4);
+    const [manualSprinklerPressure, setManualSprinklerPressure] = useState<number>(2.5);
+    const [manualSprinklerFlowRate, setManualSprinklerFlowRate] = useState<number>(15);
+
+    // อัปเดตหัวฉีดที่มีอยู่แล้วแบบเรียลไทม์เมื่อค่าเปลี่ยน
+    useEffect(() => {
+        setSprinklers(prev => prev.map(sprinkler => ({
+            ...sprinkler,
+            type: {
+                ...sprinkler.type,
+                radius: manualSprinklerRadius,
+                pressure: manualSprinklerPressure,
+                flowRate: manualSprinklerFlowRate,
+            }
+        })));
+    }, [manualSprinklerRadius, manualSprinklerPressure, manualSprinklerFlowRate]);
 
     const [showValidationErrors, setShowValidationErrors] = useState<boolean>(false);
     const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -344,10 +358,6 @@ export default function HomeGardenPlanner() {
                     ? `${zoneTypeInfo?.name} (${t('ใน')} ${gardenZones.find((z) => z.id === parentZoneId)?.name}) ${baseNameCount}`
                     : `${zoneTypeInfo?.name} ${baseNameCount}`,
                 parentZoneId,
-                sprinklerConfig:
-                    selectedZoneType !== 'forbidden' && defaultSprinkler
-                        ? { type: defaultSprinkler.id, radius: defaultSprinkler.radius }
-                        : undefined,
             };
 
             setGardenZones((prev) => [...prev, newZone]);
@@ -399,10 +409,6 @@ export default function HomeGardenPlanner() {
                     ? `${zoneTypeInfo?.name} (${t('ใน')} ${gardenZones.find((z) => z.id === parentZoneId)?.name}) ${baseNameCount}`
                     : `${zoneTypeInfo?.name} ${baseNameCount}`,
                 parentZoneId,
-                sprinklerConfig:
-                    selectedZoneType !== 'forbidden' && defaultSprinkler
-                        ? { type: defaultSprinkler.id, radius: defaultSprinkler.radius }
-                        : undefined,
             };
 
             setGardenZones((prev) => [...prev, newZone]);
@@ -458,10 +464,18 @@ export default function HomeGardenPlanner() {
 
     const handleCanvasSprinklerPlaced = useCallback(
         (position: CanvasCoordinate) => {
-            const selectedSprinklerType = SPRINKLER_TYPES.find((s) => s.id === manualSprinklerType);
-            if (!selectedSprinklerType) return;
-
-            const sprinklerType = { ...selectedSprinklerType, radius: manualSprinklerRadius };
+            // สร้างหัวฉีดจากค่าที่ผู้ใช้กรอก
+            const sprinklerType: SprinklerType = {
+                id: 'sprinkler',
+                nameEN: 'Sprinkler',
+                nameTH: 'Sprinkler',
+                icon: '💧',
+                radius: manualSprinklerRadius,
+                pressure: manualSprinklerPressure,
+                flowRate: manualSprinklerFlowRate,
+                suitableFor: ['grass', 'flowers', 'trees'],
+                color: '#33CCFF',
+            };
 
             const targetZone = gardenZones.find((zone) => {
                 if (zone.type === 'forbidden') return false;
@@ -500,8 +514,9 @@ export default function HomeGardenPlanner() {
         },
         [
             gardenZones,
-            manualSprinklerType,
             manualSprinklerRadius,
+            manualSprinklerPressure,
+            manualSprinklerFlowRate,
             canvasData,
             isPointInAvoidanceZone,
             t,
@@ -610,14 +625,20 @@ export default function HomeGardenPlanner() {
     const autoPlaceSprinklersInZone = useCallback(
         (zoneId: string) => {
             const zone = gardenZones.find((z) => z.id === zoneId);
-            if (!zone || zone.type === 'forbidden' || !zone.sprinklerConfig) return;
+            if (!zone || zone.type === 'forbidden') return;
 
-            const sprinklerTypeData = SPRINKLER_TYPES.find(
-                (s) => s.id === zone.sprinklerConfig!.type
-            );
-            if (!sprinklerTypeData) return;
-
-            const sprinklerType = { ...sprinklerTypeData, radius: zone.sprinklerConfig.radius };
+            // ใช้ค่าจากการตั้งค่าหัวฉีดปัจจุบัน
+            const sprinklerType: SprinklerType = {
+                id: 'sprinkler',
+                nameEN: 'Sprinkler',
+                nameTH: 'Sprinkler',
+                icon: '🔵',
+                radius: manualSprinklerRadius,
+                pressure: manualSprinklerPressure,
+                flowRate: manualSprinklerFlowRate,
+                suitableFor: ['grass', 'flowers', 'trees'],
+                color: '#33CCFF',
+            };
             const coordinates = zone.canvasCoordinates || zone.coordinates;
             const isCanvas = !!zone.canvasCoordinates;
             const scale = isCanvas ? currentScale : 1;
@@ -785,6 +806,9 @@ export default function HomeGardenPlanner() {
             canvasData,
             imageData,
             currentScale,
+            manualSprinklerRadius,
+            manualSprinklerPressure,
+            manualSprinklerFlowRate,
         ]
     );
 
@@ -792,7 +816,7 @@ export default function HomeGardenPlanner() {
         setSelectedSprinkler(null);
         setSprinklers([]);
         gardenZones.forEach((zone) => {
-            if (zone.type !== 'forbidden' && zone.sprinklerConfig) {
+            if (zone.type !== 'forbidden') {
                 autoPlaceSprinklersInZone(zone.id);
             }
         });
@@ -1019,19 +1043,7 @@ export default function HomeGardenPlanner() {
         }
     }, []);
 
-    const updateZoneConfig = useCallback(
-        (zoneId: string, sprinklerType: string, radius: number) => {
-            setGardenZones((prev) =>
-                prev.map((zone) =>
-                    zone.id === zoneId
-                        ? { ...zone, sprinklerConfig: { type: sprinklerType, radius } }
-                        : zone
-                )
-            );
-            setSprinklers((prev) => prev.filter((s) => s.zoneId !== zoneId));
-        },
-        []
-    );
+    // ลบฟังก์ชัน updateZoneConfig เนื่องจากไม่ใช้ sprinklerConfig อีกต่อไป
 
     const deleteZone = useCallback(
         (zoneId: string) => {
@@ -1065,12 +1077,18 @@ export default function HomeGardenPlanner() {
             const { lat, lng } = e.latlng;
 
             if (editMode === 'place') {
-                const selectedSprinklerType = SPRINKLER_TYPES.find(
-                    (s) => s.id === manualSprinklerType
-                );
-                if (!selectedSprinklerType) return;
-
-                const sprinklerType = { ...selectedSprinklerType, radius: manualSprinklerRadius };
+                // สร้างหัวฉีดจากค่าที่ผู้ใช้กรอก
+                const sprinklerType: SprinklerType = {
+                    id: 'custom',
+                    nameEN: 'Custom Sprinkler',
+                    nameTH: 'หัวฉีดกำหนดเอง',
+                    icon: '💧',
+                    radius: manualSprinklerRadius,
+                    pressure: manualSprinklerPressure,
+                    flowRate: manualSprinklerFlowRate,
+                    suitableFor: ['grass', 'flowers', 'trees'],
+                    color: '#33CCFF',
+                };
 
                 const targetZone = gardenZones.find((zone) => {
                     if (zone.type === 'forbidden') return false;
@@ -1116,8 +1134,9 @@ export default function HomeGardenPlanner() {
             gardenZones,
             findLongestEdgeAngle,
             isPointInAvoidanceZone,
-            manualSprinklerType,
             manualSprinklerRadius,
+            manualSprinklerPressure,
+            manualSprinklerFlowRate,
         ]
     );
 
@@ -1494,25 +1513,6 @@ export default function HomeGardenPlanner() {
                                                                         {t('หัวฉีด')} •{' '}
                                                                         {formatArea(zoneArea)}
                                                                     </div>
-                                                                    {zone.sprinklerConfig && (
-                                                                        <div className="text-xs text-blue-300">
-                                                                            {
-                                                                                SPRINKLER_TYPES.find(
-                                                                                    (s) =>
-                                                                                        s.id ===
-                                                                                        zone
-                                                                                            .sprinklerConfig!
-                                                                                            .type
-                                                                                )?.nameEN
-                                                                            }
-                                                                            • {t('รัศมี')}
-                                                                            {
-                                                                                zone.sprinklerConfig
-                                                                                    .radius
-                                                                            }
-                                                                            {t('ม.')}
-                                                                        </div>
-                                                                    )}
                                                                 </div>
                                                             </div>
                                                             <div className="flex space-x-1">
@@ -1539,9 +1539,7 @@ export default function HomeGardenPlanner() {
                                                                                     zone.id
                                                                                 )
                                                                             }
-                                                                            disabled={
-                                                                                !zone.sprinklerConfig
-                                                                            }
+                                                                            disabled={false}
                                                                             className="text-green-400 hover:text-green-300 disabled:cursor-not-allowed disabled:text-gray-500"
                                                                             title={t(
                                                                                 'วางหัวฉีดในโซนนี้'
@@ -1583,95 +1581,28 @@ export default function HomeGardenPlanner() {
                                                         {isConfigOpen &&
                                                             zone.type !== 'forbidden' && (
                                                                 <div className="mt-3 space-y-3 border-t border-gray-600 pt-3">
-                                                                    <div>
-                                                                        <label className="mb-2 block text-xs font-medium text-gray-300">
-                                                                            {t(
-                                                                                'เลือกประเภทหัวฉีด:'
-                                                                            )}
-                                                                        </label>
-                                                                        <div className="grid grid-cols-1 gap-1">
-                                                                            {SPRINKLER_TYPES.filter(
-                                                                                (s) =>
-                                                                                    s.suitableFor.includes(
-                                                                                        zone.type
-                                                                                    )
-                                                                            ).map((sprinkler) => (
-                                                                                <button
-                                                                                    key={
-                                                                                        sprinkler.id
-                                                                                    }
-                                                                                    onClick={() => {
-                                                                                        const currentRadius =
-                                                                                            zone
-                                                                                                .sprinklerConfig
-                                                                                                ?.radius ||
-                                                                                            sprinkler.radius;
-                                                                                        updateZoneConfig(
-                                                                                            zone.id,
-                                                                                            sprinkler.id,
-                                                                                            currentRadius
-                                                                                        );
-                                                                                    }}
-                                                                                    className={`rounded p-2 text-left text-xs transition-all ${
-                                                                                        zone
-                                                                                            .sprinklerConfig
-                                                                                            ?.type ===
-                                                                                        sprinkler.id
-                                                                                            ? 'bg-blue-900/30 ring-1 ring-blue-400'
-                                                                                            : 'hover:bg-gray-600'
-                                                                                    }`}
-                                                                                >
-                                                                                    <div className="flex items-center space-x-2">
-                                                                                        <span>
-                                                                                            {
-                                                                                                sprinkler.icon
-                                                                                            }
-                                                                                        </span>
-                                                                                        <span className="font-medium text-gray-100">
-                                                                                            {
-                                                                                                sprinkler.nameEN
-                                                                                            }
-                                                                                        </span>
-                                                                                    </div>
-                                                                                </button>
-                                                                            ))}
-                                                                        </div>
+                                                                    <div className="text-center text-sm text-gray-400 mb-3">
+                                                                        💧 {t('หัวฉีดจะใช้คุณสมบัติที่กำหนดในการวางหัวฉีดเอง')}
                                                                     </div>
 
-                                                                    {zone.sprinklerConfig && (
-                                                                        <div>
-                                                                            <label className="mb-2 block text-xs font-medium text-gray-300">
-                                                                                {t(
-                                                                                    'รัศมีการฉีดน้ำ (เมตร):'
-                                                                                )}
-                                                                            </label>
+                                                                    <div className="space-y-3">
+                                                                    <div>
+                                                                        <label className="mb-2 block text-xs font-medium text-gray-300">
+                                                                                {t('รัศมีการฉีดน้ำ (เมตร):')}
+                                                                        </label>
                                                                             <div className="flex items-center space-x-3">
                                                                                 <button
                                                                                     onClick={() =>
-                                                                                        updateZoneConfig(
-                                                                                            zone.id,
-                                                                                            zone
-                                                                                                .sprinklerConfig!
-                                                                                                .type,
+                                                                                        setManualSprinklerRadius(
                                                                                             Math.max(
                                                                                                 1,
-                                                                                                zone
-                                                                                                    .sprinklerConfig!
-                                                                                                    .radius -
-                                                                                                    0.5
+                                                                                                manualSprinklerRadius - 0.5
                                                                                             )
                                                                                         )
                                                                                     }
                                                                                     className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-600 text-white transition-all hover:bg-gray-500 disabled:cursor-not-allowed disabled:bg-gray-700"
-                                                                                    disabled={
-                                                                                        zone
-                                                                                            .sprinklerConfig!
-                                                                                            .radius <=
-                                                                                        1
-                                                                                    }
-                                                                                    title={t(
-                                                                                        'ลดรัศมี 0.5 เมตร'
-                                                                                    )}
+                                                                                    disabled={manualSprinklerRadius <= 1}
+                                                                                    title={t('ลดรัศมี 0.5 เมตร')}
                                                                                 >
                                                                                     -
                                                                                 </button>
@@ -1680,66 +1611,140 @@ export default function HomeGardenPlanner() {
                                                                                     min="1"
                                                                                     max="15"
                                                                                     step="0.5"
-                                                                                    value={
-                                                                                        zone
-                                                                                            .sprinklerConfig
-                                                                                            .radius
-                                                                                    }
+                                                                                    value={manualSprinklerRadius}
                                                                                     onChange={(e) =>
-                                                                                        updateZoneConfig(
-                                                                                            zone.id,
-                                                                                            zone
-                                                                                                .sprinklerConfig!
-                                                                                                .type,
-                                                                                            Number(
-                                                                                                e
-                                                                                                    .target
-                                                                                                    .value
-                                                                                            )
+                                                                                        setManualSprinklerRadius(
+                                                                                            Number(e.target.value)
                                                                                         )
                                                                                     }
                                                                                     className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-gray-600"
                                                                                 />
                                                                                 <button
                                                                                     onClick={() =>
-                                                                                        updateZoneConfig(
-                                                                                            zone.id,
-                                                                                            zone
-                                                                                                .sprinklerConfig!
-                                                                                                .type,
+                                                                                        setManualSprinklerRadius(
                                                                                             Math.min(
                                                                                                 15,
-                                                                                                zone
-                                                                                                    .sprinklerConfig!
-                                                                                                    .radius +
-                                                                                                    0.5
+                                                                                                manualSprinklerRadius + 0.5
                                                                                             )
                                                                                         )
                                                                                     }
                                                                                     className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-600 text-white transition-all hover:bg-gray-500 disabled:cursor-not-allowed disabled:bg-gray-700"
-                                                                                    disabled={
-                                                                                        zone
-                                                                                            .sprinklerConfig!
-                                                                                            .radius >=
-                                                                                        15
-                                                                                    }
-                                                                                    title={t(
-                                                                                        'เพิ่มรัศมี 0.5 เมตร'
-                                                                                    )}
+                                                                                    disabled={manualSprinklerRadius >= 15}
+                                                                                    title={t('เพิ่มรัศมี 0.5 เมตร')}
                                                                                 >
                                                                                     +
                                                                                 </button>
                                                                                 <span className="min-w-[3rem] text-sm font-bold text-blue-400">
-                                                                                    {
-                                                                                        zone
-                                                                                            .sprinklerConfig
-                                                                                            .radius
+                                                                                    {manualSprinklerRadius} {t('ม.')}
+                                                                                        </span>
+                                                                                    </div>
+                                                                        </div>
+
+                                                                        <div>
+                                                                            <label className="mb-2 block text-xs font-medium text-gray-300">
+                                                                                {t('แรงดัน (บาร์):')}
+                                                                            </label>
+                                                                            <div className="flex items-center space-x-3">
+                                                                                <button
+                                                                                    onClick={() =>
+                                                                                        setManualSprinklerPressure(
+                                                                                            Math.max(
+                                                                                                0.5,
+                                                                                                manualSprinklerPressure - 0.1
+                                                                                            )
+                                                                                        )
                                                                                     }
-                                                                                    {t('ม.')}
+                                                                                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-600 text-white transition-all hover:bg-gray-500 disabled:cursor-not-allowed disabled:bg-gray-700"
+                                                                                    disabled={manualSprinklerPressure <= 0.5}
+                                                                                >
+                                                                                    -
+                                                                                </button>
+                                                                                <input
+                                                                                    type="range"
+                                                                                    min="0.5"
+                                                                                    max="5"
+                                                                                    step="0.1"
+                                                                                    value={manualSprinklerPressure}
+                                                                                    onChange={(e) =>
+                                                                                        setManualSprinklerPressure(
+                                                                                            Number(e.target.value)
+                                                                                        )
+                                                                                    }
+                                                                                    className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-gray-600"
+                                                                                />
+                                                                                <button
+                                                                                    onClick={() =>
+                                                                                        setManualSprinklerPressure(
+                                                                                            Math.min(
+                                                                                                5,
+                                                                                                manualSprinklerPressure + 0.1
+                                                                                            )
+                                                                                        )
+                                                                                    }
+                                                                                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-600 text-white transition-all hover:bg-gray-500 disabled:cursor-not-allowed disabled:bg-gray-700"
+                                                                                    disabled={manualSprinklerPressure >= 5}
+                                                                                >
+                                                                                    +
+                                                                                </button>
+                                                                                <span className="min-w-[3rem] text-sm font-bold text-blue-400">
+                                                                                    {manualSprinklerPressure.toFixed(1)} {t('บาร์')}
+                                                                                </span>
+                                                                        </div>
+                                                                    </div>
+
+                                                                        <div>
+                                                                            <label className="mb-2 block text-xs font-medium text-gray-300">
+                                                                                {t('อัตราการไหล (ลิตร/นาที):')}
+                                                                            </label>
+                                                                            <div className="flex items-center space-x-3">
+                                                                                <button
+                                                                                    onClick={() =>
+                                                                                        setManualSprinklerFlowRate(
+                                                                                            Math.max(
+                                                                                                1,
+                                                                                                manualSprinklerFlowRate - 1
+                                                                                            )
+                                                                                        )
+                                                                                    }
+                                                                                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-600 text-white transition-all hover:bg-gray-500 disabled:cursor-not-allowed disabled:bg-gray-700"
+                                                                                    disabled={manualSprinklerFlowRate <= 1}
+                                                                                >
+                                                                                    -
+                                                                                </button>
+                                                                                <input
+                                                                                    type="range"
+                                                                                    min="1"
+                                                                                    max="50"
+                                                                                    step="1"
+                                                                                    value={manualSprinklerFlowRate}
+                                                                                    onChange={(e) =>
+                                                                                        setManualSprinklerFlowRate(
+                                                                                            Number(e.target.value)
+                                                                                        )
+                                                                                    }
+                                                                                    className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-gray-600"
+                                                                                />
+                                                                                <button
+                                                                                    onClick={() =>
+                                                                                        setManualSprinklerFlowRate(
+                                                                                            Math.min(
+                                                                                                50,
+                                                                                                manualSprinklerFlowRate + 1
+                                                                                            )
+                                                                                        )
+                                                                                    }
+                                                                                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-600 text-white transition-all hover:bg-gray-500 disabled:cursor-not-allowed disabled:bg-gray-700"
+                                                                                    disabled={manualSprinklerFlowRate >= 50}
+                                                                                >
+                                                                                    +
+                                                                                </button>
+                                                                                <span className="min-w-[4rem] text-sm font-bold text-blue-400">
+                                                                                    {manualSprinklerFlowRate} {t('L/Min')}
                                                                                 </span>
                                                                             </div>
                                                                         </div>
-                                                                    )}
+                                                                    </div>
+
                                                                 </div>
                                                             )}
                                                     </div>
@@ -1763,13 +1768,12 @@ export default function HomeGardenPlanner() {
                                             onClick={autoPlaceAllSprinklers}
                                             disabled={
                                                 gardenZones.filter(
-                                                    (z) =>
-                                                        z.type !== 'forbidden' && z.sprinklerConfig
+                                                    (z) => z.type !== 'forbidden'
                                                 ).length === 0
                                             }
                                             className="w-full rounded-lg bg-purple-600 py-3 font-medium text-white transition-all hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-600"
                                         >
-                                            🤖 {t('วางหัวฉีดอัตโนมัติ (ทุกโซน)')}
+                                            🤖 {t('วางหัวฉีดอัตโนมัติ')}
                                         </button>
 
                                         <button
@@ -1780,47 +1784,19 @@ export default function HomeGardenPlanner() {
                                             }
                                             className={`w-full rounded-lg py-3 font-medium transition-all ${
                                                 editMode === 'place'
-                                                    ? 'bg-green-600 text-white shadow-lg'
-                                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                    ? 'bg-red-300 text-red-900 shadow-lg'
+                                                    : 'bg-green-700 text-white hover:bg-green-600'
                                             }`}
                                         >
-                                            📍{' '}
                                             {editMode === 'place'
-                                                ? t('ยกเลิกการวางหัวฉีด')
-                                                : t('วางหัวฉีดเอง')}
+                                                ? '❌ ' + t('ยกเลิกการวางหัวฉีด')
+                                                : '📍 ' + t('วางหัวฉีดเอง')}
                                         </button>
 
-                                        {editMode === 'place' && (
+                                        {/* {editMode === 'place' && (
                                             <div className="mt-3 space-y-3 border-t border-gray-600 pt-3">
-                                                <div>
-                                                    <label className="mb-2 block text-xs font-medium text-gray-300">
-                                                        {t('เลือกประเภทหัวฉีด:')}
-                                                    </label>
-                                                    <div className="grid grid-cols-1 gap-1">
-                                                        {SPRINKLER_TYPES.map((sprinkler) => (
-                                                            <button
-                                                                key={sprinkler.id}
-                                                                onClick={() =>
-                                                                    setManualSprinklerType(
-                                                                        sprinkler.id
-                                                                    )
-                                                                }
-                                                                className={`rounded p-2 text-left text-xs transition-all ${
-                                                                    manualSprinklerType ===
-                                                                    sprinkler.id
-                                                                        ? 'bg-blue-900/30 ring-1 ring-blue-400'
-                                                                        : 'hover:bg-gray-600'
-                                                                }`}
-                                                            >
-                                                                <div className="flex items-center space-x-2">
-                                                                    <span>{sprinkler.icon}</span>
-                                                                    <span className="font-medium text-gray-100">
-                                                                        {sprinkler.nameEN}
-                                                                    </span>
-                                                                </div>
-                                                            </button>
-                                                        ))}
-                                                    </div>
+                                                <div className="text-center text-sm text-gray-400 mb-3">
+                                                    💧 {t('กำหนดคุณสมบัติหัวฉีด')}
                                                 </div>
 
                                                 <div>
@@ -1876,8 +1852,112 @@ export default function HomeGardenPlanner() {
                                                         </span>
                                                     </div>
                                                 </div>
+
+                                                <div>
+                                                    <label className="mb-2 block text-xs font-medium text-gray-300">
+                                                        {t('แรงดัน (บาร์):')}
+                                                    </label>
+                                                    <div className="flex items-center space-x-3">
+                                                        <button
+                                                            onClick={() =>
+                                                                setManualSprinklerPressure(
+                                                                    Math.max(
+                                                                        0.5,
+                                                                        manualSprinklerPressure - 0.1
+                                                                    )
+                                                                )
+                                                            }
+                                                            className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-600 text-white transition-all hover:bg-gray-500 disabled:cursor-not-allowed disabled:bg-gray-700"
+                                                            disabled={manualSprinklerPressure <= 0.5}
+                                                        >
+                                                            -
+                                                        </button>
+                                                        <input
+                                                            type="range"
+                                                            min="0.5"
+                                                            max="5"
+                                                            step="0.1"
+                                                            value={manualSprinklerPressure}
+                                                            onChange={(e) =>
+                                                                setManualSprinklerPressure(
+                                                                    Number(e.target.value)
+                                                                )
+                                                            }
+                                                            className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-gray-600"
+                                                        />
+                                                        <button
+                                                            onClick={() =>
+                                                                setManualSprinklerPressure(
+                                                                    Math.min(
+                                                                        5,
+                                                                        manualSprinklerPressure + 0.1
+                                                                    )
+                                                                )
+                                                            }
+                                                            className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-600 text-white transition-all hover:bg-gray-500 disabled:cursor-not-allowed disabled:bg-gray-700"
+                                                            disabled={manualSprinklerPressure >= 5}
+                                                        >
+                                                            +
+                                                        </button>
+                                                        <span className="min-w-[3rem] text-sm font-bold text-blue-400">
+                                                            {manualSprinklerPressure.toFixed(1)} {t('บาร์')}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <label className="mb-2 block text-xs font-medium text-gray-300">
+                                                        {t('อัตราการไหล (ลิตร/นาที):')}
+                                                    </label>
+                                                    <div className="flex items-center space-x-3">
+                                                        <button
+                                                            onClick={() =>
+                                                                setManualSprinklerFlowRate(
+                                                                    Math.max(
+                                                                        1,
+                                                                        manualSprinklerFlowRate - 1
+                                                                    )
+                                                                )
+                                                            }
+                                                            className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-600 text-white transition-all hover:bg-gray-500 disabled:cursor-not-allowed disabled:bg-gray-700"
+                                                            disabled={manualSprinklerFlowRate <= 1}
+                                                        >
+                                                            -
+                                                        </button>
+                                                        <input
+                                                            type="range"
+                                                            min="1"
+                                                            max="50"
+                                                            step="1"
+                                                            value={manualSprinklerFlowRate}
+                                                            onChange={(e) =>
+                                                                setManualSprinklerFlowRate(
+                                                                    Number(e.target.value)
+                                                                )
+                                                            }
+                                                            className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-gray-600"
+                                                        />
+                                                        <button
+                                                            onClick={() =>
+                                                                setManualSprinklerFlowRate(
+                                                                    Math.min(
+                                                                        50,
+                                                                        manualSprinklerFlowRate + 1
+                                                                    )
+                                                                )
+                                                            }
+                                                            className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-600 text-white transition-all hover:bg-gray-500 disabled:cursor-not-allowed disabled:bg-gray-700"
+                                                            disabled={manualSprinklerFlowRate >= 50}
+                                                        >
+                                                            +
+                                                        </button>
+                                                        <span className="min-w-[4rem] text-sm font-bold text-blue-400">
+                                                            {manualSprinklerFlowRate} {t('ล./นาที')}
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        )}
+                                        )} */}
 
                                         <button
                                             onClick={() =>
@@ -1887,60 +1967,58 @@ export default function HomeGardenPlanner() {
                                             }
                                             className={`w-full rounded-lg py-3 font-medium transition-all flex items-center justify-center gap-2 ${
                                                 editMode === 'edit'
-                                                    ? 'bg-yellow-600 text-white shadow-lg'
-                                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                    ? 'bg-red-300 text-red-900 shadow-lg'
+                                                    : 'bg-green-700 text-white hover:bg-green-600'
                                             }`}
                                         >
-                                            <img src="/images/water-pump.png" alt="water pump" className="w-6 h-6" />
-                                            <span>
+                                            <span className="flex items-center gap-2">
                                                 {editMode === 'edit'
-                                                    ? t('ยกเลิกการวางแหล่งน้ำ')
-                                                    : t('วางแหล่งน้ำ')}
+                                                    ? '❌ ' + t('ยกเลิกการวางแหล่งน้ำ')
+                                                    : <><img src="/images/water-pump.png" alt="water pump" className="w-6 h-6" /> {t('วางแหล่งน้ำ')}</>
+                                                }
                                             </span>
                                         </button>
-
-                                        <button
-                                            onClick={() =>
-                                                setEditMode(
-                                                    editMode === 'drag-sprinkler'
-                                                        ? ''
-                                                        : 'drag-sprinkler'
-                                                )
-                                            }
-                                            className={`w-full rounded-lg py-3 font-medium transition-all ${
-                                                editMode === 'drag-sprinkler'
-                                                    ? 'bg-orange-600 text-white shadow-lg'
-                                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                            }`}
-                                        >
-                                            ↔️{' '}
-                                            {editMode === 'drag-sprinkler'
-                                                ? t('ยกเลิกการปรับตำแหน่ง')
-                                                : t('ปรับตำแหน่งหัวฉีด')}
-                                        </button>
-                                        {editMode === 'drag-sprinkler' && (
-                                            <div className="mt-2 rounded-lg bg-orange-900/30 p-3 text-xs text-orange-200">
-                                                <div className="mb-1 font-medium">
-                                                    💡 {t('วิธีการใช้งาน:')}
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <div>• {t('ลากหัวฉีดเพื่อย้ายตำแหน่ง')}</div>
-                                                    <div>• {t('คลิกขวาเพื่อลบหัวฉีด')}</div>
-                                                    <div>• {t('ใช้ปุ่มลบในรายการด้านขวา')}</div>
-                                                </div>
-                                            </div>
-                                        )}
+                                        
 
                                         {sprinklers.length > 0 && (
+                                            <>
+                                            <hr className="my-4 border-gray-600" />
+                                            <button
+                                                onClick={() =>
+                                                    setEditMode(
+                                                        editMode === 'drag-sprinkler'
+                                                            ? ''
+                                                            : 'drag-sprinkler'
+                                                    )
+                                                }
+                                                className={`w-full rounded-lg py-3 font-medium transition-all ${
+                                                    editMode === 'drag-sprinkler'
+                                                        ? 'bg-red-600 text-white shadow-lg'
+                                                        : 'bg-red-700 text-white hover:bg-red-600'
+                                                }`}
+                                            >
+                                                <span className="flex items-center justify-center gap-2">
+                                                    {editMode === 'drag-sprinkler'
+                                                        ? '❌ ' + t('ยกเลิกการลบหัวฉีดที่เลือก')
+                                                        : '🗑️' + t('ลบหัวฉีดที่เลือก')
+                                                    }
+                                                </span>
+                                            </button>
+                                            {editMode === 'drag-sprinkler' && (
+                                                <div className="mt-2 rounded-lg bg-orange-900/30 p-3 text-xs text-orange-200">
+                                                    <div className="mb-1 font-medium">💡 {t('วิธีการใช้งาน:')} <span>{t('คลิกขวาเพื่อลบหัวฉีดที่ต้องการลบ')}</span></div>
+                                                </div>
+                                            )}
                                             <button
                                                 onClick={() => {
                                                     setSelectedSprinkler(null);
                                                     setSprinklers([]);
                                                 }}
-                                                className="w-full rounded-lg bg-red-600 py-3 font-medium text-white transition-all hover:bg-red-700"
+                                                className="w-full rounded-lg bg-red-700 py-3 font-medium text-white transition-all hover:bg-red-600"
                                             >
                                                 🗑️ {t('ลบหัวฉีดทั้งหมด')}
                                             </button>
+                                            </>
                                         )}
                                     </div>
 
@@ -1993,17 +2071,9 @@ export default function HomeGardenPlanner() {
                                                                                 {zoneSprinklers.length}{' '}
                                                                                 {t('หัว')}
                                                                             </div>
-                                                                            {zone.sprinklerConfig && (
+                                                                            {zoneSprinklers.length > 0 && (
                                                                                 <div className="text-gray-400">
-                                                                                    {
-                                                                                        SPRINKLER_TYPES.find(
-                                                                                            (s) =>
-                                                                                                s.id ===
-                                                                                                zone
-                                                                                                    .sprinklerConfig!
-                                                                                                    .type
-                                                                                        )?.nameEN
-                                                                                    }
+                                                                                    Sprinkler
                                                                                 </div>
                                                                             )}
                                                                         </div>
@@ -2324,7 +2394,6 @@ export default function HomeGardenPlanner() {
                                         pipes={pipes}
                                         selectedZoneType={selectedZoneType}
                                         editMode={editMode}
-                                        manualSprinklerType={manualSprinklerType}
                                         manualSprinklerRadius={manualSprinklerRadius}
                                         selectedSprinkler={selectedSprinkler}
                                         selectedPipes={selectedPipes}
@@ -2366,7 +2435,6 @@ export default function HomeGardenPlanner() {
                                         pipes={pipes}
                                         selectedZoneType={selectedZoneType}
                                         editMode={editMode}
-                                        manualSprinklerType={manualSprinklerType}
                                         manualSprinklerRadius={manualSprinklerRadius}
                                         selectedSprinkler={selectedSprinkler}
                                         selectedPipes={selectedPipes}

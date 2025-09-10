@@ -55,6 +55,8 @@ export interface ZoneStatistics {
     sprinklerCount: number; // จำนวนหัวฉีดในโซน
     sprinklerTypes: string[]; // ประเภทหัวฉีดที่ใช้ในโซน (เช่น ["Pop-up Sprinkler", "Spray Sprinkler"])
     sprinklerRadius: number; // รัศมีของหัวฉีดในโซน (ม.)
+    sprinklerPressure: number; // แรงดันของหัวฉีดในโซน (บาร์)
+    sprinklerFlowRate: number; // อัตราการไหลรวมของหัวฉีดในโซน (ลิตร/นาที)
     longestPipeFromSource: number; // ท่อที่ยาวที่สุดจากปั๊มไปหาหัวฉีดในโซนนี้ (ม.)
     longestPipeFromSourceFormatted: string; // ท่อที่ยาวที่สุดจากปั๊มไปหาหัวฉีดในโซนนี้ (รูปแบบที่อ่านง่าย)
     totalPipeLength: number; // ความยาวท่อรวมในโซน (ม.)
@@ -165,13 +167,26 @@ function calculateZoneStatistics(
             // หาหัวฉีดในโซนนี้
             const zoneSprinklers = sprinklers.filter((s) => s.zoneId === zone.id);
 
-            // หาประเภทหัวฉีดที่ใช้ในโซน
-            const sprinklerTypes = [...new Set(zoneSprinklers.map((s) => s.type.nameEN))];
+            // หาประเภทหัวฉีดที่ใช้ในโซน - แสดงเป็น Sprinkler ทั้งหมด
+            const sprinklerTypes = zoneSprinklers.length > 0 ? ['Sprinkler'] : [];
 
             const sprinklerRadius =
                 zoneSprinklers.length > 0
                     ? zoneSprinklers.reduce((sum, s) => sum + s.type.radius, 0) /
                       zoneSprinklers.length
+                    : 0;
+
+            // คำนวณแรงดันเฉลี่ย
+            const sprinklerPressure =
+                zoneSprinklers.length > 0
+                    ? zoneSprinklers.reduce((sum, s) => sum + s.type.pressure, 0) /
+                      zoneSprinklers.length
+                    : 0;
+
+            // คำนวณอัตราการไหลเฉลี่ย (Q หัวฉีด)
+            const sprinklerFlowRate =
+                zoneSprinklers.length > 0
+                    ? zoneSprinklers.reduce((sum, s) => sum + s.type.flowRate, 0) / zoneSprinklers.length
                     : 0;
 
             // หาท่อในโซนนี้และคำนวณความยาวรวม
@@ -205,6 +220,8 @@ function calculateZoneStatistics(
                 sprinklerCount: zoneSprinklers.length,
                 sprinklerTypes,
                 sprinklerRadius: sprinklerRadius,
+                sprinklerPressure: sprinklerPressure,
+                sprinklerFlowRate: sprinklerFlowRate,
                 longestPipeFromSource,
                 longestPipeFromSourceFormatted: formatDistance(longestPipeFromSource),
                 totalPipeLength,
@@ -288,8 +305,6 @@ export function calculateJunctionStatistics(
     scale: number,
     tolerance: number = 1.0 // ระยะความผิดพลาดที่ยอมรับได้ (เมตร)
 ): JunctionStatistics {
-    console.log('🔧 Junction calculation started');
-    console.log('Pipes:', pipes.length, 'Sprinklers:', sprinklers.length);
     
     const junctionPoints: JunctionPoint[] = [];
     const processedPositions = new Set<string>();
@@ -342,7 +357,6 @@ export function calculateJunctionStatistics(
 
     // หาจุดตัดของท่อโดยตรงด้วยคณิตศาสตร์ (สำหรับท่อที่ตัดกันกลางเส้น)
     const directIntersections = findDirectPipeIntersections(pipes, tolerance, scale);
-    console.log('📍 Direct intersections:', directIntersections.length);
     
     // เพิ่มจุดตัดที่หาได้เข้าไปในกลุ่มจุด
     directIntersections.forEach(intersection => {
@@ -361,7 +375,6 @@ export function calculateJunctionStatistics(
 
     // เพิ่มการตรวจสอบจุดกลางของท่อแต่ละเส้นเพื่อหาท่อที่ผ่านจุดเดียวกัน
     const additionalIntersections = findPipePassThroughPoints(pipes, tolerance, scale);
-    console.log('📍 Pass-through points:', additionalIntersections.length);
     
     additionalIntersections.forEach(intersection => {
         const positionKey = getPositionKey(intersection.position);
@@ -379,11 +392,9 @@ export function calculateJunctionStatistics(
 
     // เพิ่มวิธีการใหม่: หา T-junctions (ปลายท่อเชื่อมกับกลางท่ออีกเส้น)
     const tJunctions = findTJunctions(pipes, tolerance, scale);
-    console.log('📍 T-junctions:', tJunctions.length);
     
     // เพิ่มวิธีการใหม่: หาจุดที่ท่อหลายเส้นมาเจอกันโดยใช้ความใกล้เคียงที่เหมาะสม
     const enhancedJunctions = findEnhancedPipeJunctions(pipes, tolerance * 3, scale);
-    console.log('📍 Enhanced junctions:', enhancedJunctions.length);
     
     tJunctions.forEach(intersection => {
         const positionKey = getPositionKey(intersection.position);
@@ -414,9 +425,8 @@ export function calculateJunctionStatistics(
     });
 
     // วิเคราะห์แต่ละกลุ่มจุด
-    console.log(`🔍 Analyzing ${pointGroups.length} point groups...`);
     
-    pointGroups.forEach((group, index) => {
+    pointGroups.forEach((group) => {
         const positionKey = getPositionKey(group.position);
         if (processedPositions.has(positionKey)) return;
         
@@ -428,16 +438,12 @@ export function calculateJunctionStatistics(
         // ตรวจสอบว่ามีหัวฉีดอยู่ที่จุดนี้หรือไม่
         const sprinklerAtPoint = findSprinklerAtPosition(group.position, sprinklers, tolerance, scale);
         
-        console.log(`📍 Group ${index + 1} at ${positionKey}:`);
-        console.log(`  - Connected pipes: ${connectedPipeIds.length} (${connectedPipeIds.join(', ')})`);
-        console.log(`  - Has sprinkler: ${sprinklerAtPoint ? sprinklerAtPoint.id : 'No'}`);
         
         if (sprinklerAtPoint) {
             // หัวฉีดที่อยู่ปลายท่อ (เชื่อมต่อกับท่อเพียงท่อเดียว) ใช้ 2 ทาง
             // หัวฉีดที่อยู่กลางเส้นทาง (เชื่อมต่อกับท่อมากกว่า 1 ท่อ) บวก 1 ทางเสมอ
             const ways = connectedPipeIds.length === 1 ? 2 : connectedPipeIds.length + 1;
             
-            console.log(`  ✅ Creating SPRINKLER junction (${ways} ways)`);
             junctionPoints.push({
                 position: group.position,
                 ways,
@@ -448,7 +454,6 @@ export function calculateJunctionStatistics(
             
             // ถ้ามีท่อมากกว่า 2 เส้น ให้สร้าง pipe junction เพิ่มเติมด้วย (จุดแยกที่มีหัวฉีดแต่ก็เป็นข้อต่อท่อด้วย)
             if (connectedPipeIds.length >= 3) {
-                console.log(`  ✅ Creating additional PIPE junction (${connectedPipeIds.length} ways) - complex intersection with sprinkler`);
                 junctionPoints.push({
                     position: group.position,
                     ways: connectedPipeIds.length,
@@ -461,8 +466,6 @@ export function calculateJunctionStatistics(
             // จำกัดจำนวนท่อเพื่อป้องกันข้อต่อ "ปลอม" ที่มีท่อมากเกินไป
             const ways = connectedPipeIds.length;
             
-            console.log(`  ✅ Creating PIPE junction (${ways} ways)`);
-            console.log('  Connected pipes:', connectedPipeIds);
             
             junctionPoints.push({
                 position: group.position,
@@ -471,9 +474,9 @@ export function calculateJunctionStatistics(
                 connectedPipes: connectedPipeIds
             });
         } else if (connectedPipeIds.length > 6) {
-            console.log(`  ⚠️ Suspicious junction with ${connectedPipeIds.length} pipes - IGNORED`);
+            // Suspicious junction with too many pipes - IGNORED
         } else {
-            console.log(`  ❌ Not enough pipes (${connectedPipeIds.length}) - IGNORED`);
+            // Not enough pipes - IGNORED
         }
     });
 
@@ -528,11 +531,6 @@ export function calculateJunctionStatistics(
         junctionsByWays[junction.ways] = (junctionsByWays[junction.ways] || 0) + 1;
     });
 
-    console.log('🎯 FINAL RESULTS:');
-    console.log('Total junctions:', totalJunctions);
-    console.log('Pipe junctions:', pipeJunctions);
-    console.log('Sprinkler junctions:', sprinklerJunctions);
-    console.log('Junctions by ways:', junctionsByWays);
 
 
 
@@ -603,7 +601,6 @@ function findDirectPipeIntersections(
 ): Array<{ position: Coordinate | CanvasCoordinate; pipes: string[] }> {
     const intersections: Array<{ position: Coordinate | CanvasCoordinate; pipes: string[] }> = [];
     
-    console.log(`🔍 Checking ${pipes.length} pipes for direct intersections...`);
     
     // ตรวจสอบการตัดกันของท่อทุกคู่
     for (let i = 0; i < pipes.length; i++) {
@@ -622,7 +619,6 @@ function findDirectPipeIntersections(
             const intersection = findMathematicalLineIntersection(start1, end1, start2, end2);
             
             if (intersection) {
-                console.log(`✅ Found intersection between ${pipe1.id} and ${pipe2.id}:`, intersection);
                 // ตรวจสอบว่ามีจุดตัดนี้อยู่แล้วหรือไม่
                 const existingIntersection = intersections.find(existing => {
                     const dist = calculateDistance(
@@ -875,7 +871,6 @@ function findTJunctions(
 ): Array<{ position: Coordinate | CanvasCoordinate; pipes: string[] }> {
     const tJunctions: Array<{ position: Coordinate | CanvasCoordinate; pipes: string[] }> = [];
     
-    console.log(`🔍 Looking for T-junctions in ${pipes.length} pipes...`);
     
     // ตรวจสอบทุกปลายท่อกับท่ออื่นๆ
     pipes.forEach((pipe, i) => {
@@ -896,7 +891,6 @@ function findTJunctions(
                 
                 // ตรวจสอบว่าปลายท่อนี้อยู่บนท่ออีกเส้นหรือไม่
                 if (isPointOnLineSegment(endpoint, otherStart, otherEnd, tolerance, scale)) {
-                    console.log(`✅ Found T-junction: ${pipe.id} endpoint connects to ${otherPipe.id} middle`);
                     
                     // ตรวจสอบว่ามี T-junction นี้อยู่แล้วหรือไม่
                     const existingTJunction = tJunctions.find(existing => {
@@ -928,7 +922,6 @@ function findTJunctions(
         });
     });
     
-    console.log(`Found ${tJunctions.length} T-junctions`);
     return tJunctions;
 }
 

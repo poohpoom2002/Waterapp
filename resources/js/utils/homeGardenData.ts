@@ -17,10 +17,6 @@ export interface GardenZone {
     coordinates: Coordinate[];
     canvasCoordinates?: CanvasCoordinate[];
     name: string;
-    sprinklerConfig?: {
-        type: string;
-        radius: number;
-    };
     parentZoneId?: string;
 }
 
@@ -30,6 +26,8 @@ export interface SprinklerType {
     nameTH: string;
     icon: string;
     radius: number;
+    pressure: number; // แรงดัน (บาร์)
+    flowRate: number; // อัตราการไหล (ลิตร/นาที)
     suitableFor: string[];
     color: string;
 }
@@ -111,6 +109,8 @@ export const SPRINKLER_TYPES: SprinklerType[] = [
         nameTH: 'หัว Pop‑Up ยก–หดได้',
         icon: '🟤',
         radius: 5,
+        pressure: 2.5,
+        flowRate: 18,
         suitableFor: ['grass', 'flowers'],
         color: '#33CCFF',
     },
@@ -120,6 +120,8 @@ export const SPRINKLER_TYPES: SprinklerType[] = [
         nameTH: 'มินิสปริงเกอร์',
         icon: '🟤',
         radius: 2,
+        pressure: 2.0,
+        flowRate: 8,
         suitableFor: ['flowers', 'trees'],
         color: '#33CCFF',
     },
@@ -129,6 +131,8 @@ export const SPRINKLER_TYPES: SprinklerType[] = [
         nameTH: 'สปริงเกอร์แบบหมุน/ยิงไกล',
         icon: '🟤',
         radius: 12,
+        pressure: 3.5,
+        flowRate: 35,
         suitableFor: ['trees', 'grass'],
         color: '#33CCFF',
     },
@@ -138,6 +142,8 @@ export const SPRINKLER_TYPES: SprinklerType[] = [
         nameTH: 'หัวฉีดด้านเดียวปรับมุม',
         icon: '🟤',
         radius: 4,
+        pressure: 2.2,
+        flowRate: 12,
         suitableFor: ['grass', 'flowers'],
         color: '#33CCFF',
     },
@@ -147,6 +153,8 @@ export const SPRINKLER_TYPES: SprinklerType[] = [
         nameTH: 'หัวฉีดผีเสื้อ',
         icon: '🟤',
         radius: 1,
+        pressure: 1.5,
+        flowRate: 4,
         suitableFor: ['flowers'],
         color: '#33CCFF',
     },
@@ -156,6 +164,8 @@ export const SPRINKLER_TYPES: SprinklerType[] = [
         nameTH: 'หัวพ่นหมอก – แบบเสียบท่อ PE',
         icon: '🟤',
         radius: 1,
+        pressure: 1.8,
+        flowRate: 6,
         suitableFor: ['flowers'],
         color: '#33CCFF',
     },
@@ -165,6 +175,8 @@ export const SPRINKLER_TYPES: SprinklerType[] = [
         nameTH: 'สปริงเกอร์ชนิดกระแทก',
         icon: '🟤',
         radius: 15,
+        pressure: 4.0,
+        flowRate: 45,
         suitableFor: ['trees', 'grass'],
         color: '#33CCFF',
     },
@@ -174,6 +186,8 @@ export const SPRINKLER_TYPES: SprinklerType[] = [
         nameTH: 'หัวฉีดเกียร์ไดร์ฟ ปรับแรงและมุม',
         icon: '🟤',
         radius: 10,
+        pressure: 3.0,
+        flowRate: 28,
         suitableFor: ['grass', 'trees'],
         color: '#33CCFF',
     },
@@ -183,6 +197,8 @@ export const SPRINKLER_TYPES: SprinklerType[] = [
         nameTH: 'เทปน้ำหยดหรือสเปรย์ แบบม้วน',
         icon: '🟤',
         radius: 0.3,
+        pressure: 1.2,
+        flowRate: 2,
         suitableFor: ['flowers', 'trees'],
         color: '#33CCFF',
     },
