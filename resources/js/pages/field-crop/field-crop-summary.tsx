@@ -3092,6 +3092,17 @@ export default function FieldCropSummary() {
 
                                 {/* Save Project Button (removed by UI simplification request) */}
 
+                                {/* Product Button */}
+                                <Link
+                                    href="/product?mode=field-crop"
+                                    className="inline-flex transform items-center rounded-lg bg-gradient-to-r from-green-500 to-emerald-500 px-6 py-3 font-semibold text-white transition-all duration-200 hover:scale-105 hover:from-green-600 hover:to-emerald-600 hover:shadow-lg"
+                                >
+                                    <svg className="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                                    </svg>
+                                    🛒 {t('คำนวณอุปกรณ์')}
+                                </Link>
+
                                 {/* New Project Button */}
                                 <Link
                                     href="/step4-pipe-system?currentStep=4&completedSteps=4"
