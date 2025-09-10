@@ -685,6 +685,46 @@ const usePipeManager = () => {
     return connectedSprinklers;
   }, []);
 
+  // ฟังก์ชันสำหรับหาจุดเชื่อมต่อทั้งหมด (สปริงเกลอร์, เทปน้ำหยด, เทปน้ำพุ่ง, pivot)
+  const findNearbyConnectedIrrigationPoints = useCallback((coordinates: Coordinate[], irrigationPositions: IrrigationPositions, snapRadius: number = 2) => {
+    if (coordinates.length < 2) return { sprinklers: [], dripTapes: [], waterJets: [], pivots: [] };
+
+    const connectedSprinklers = findNearbyConnectedSprinklers(coordinates, irrigationPositions.sprinklers, snapRadius);
+    const connectedDripTapes = findNearbyConnectedSprinklers(coordinates, irrigationPositions.dripTapes, snapRadius);
+    const connectedWaterJets = findNearbyConnectedSprinklers(coordinates, irrigationPositions.waterJets, snapRadius);
+    const connectedPivots = findNearbyConnectedSprinklers(coordinates, irrigationPositions.pivots, snapRadius);
+
+    return {
+      sprinklers: connectedSprinklers,
+      dripTapes: connectedDripTapes,
+      waterJets: connectedWaterJets,
+      pivots: connectedPivots
+    };
+  }, [findNearbyConnectedSprinklers]);
+
+  // ฟังก์ชันคำนวณอัตราการไหลรวมสำหรับทุกประเภท
+  const calculateTotalFlowRate = useCallback((connectedPoints: { sprinklers: Coordinate[], dripTapes: Coordinate[], waterJets: Coordinate[], pivots: Coordinate[] }, irrigationSettings: IrrigationSettings) => {
+    let totalFlow = 0;
+    
+    // สปริงเกลอร์
+    const sprinklerFlow = Number(irrigationSettings.sprinkler_system?.flow) || 10;
+    totalFlow += connectedPoints.sprinklers.length * sprinklerFlow;
+    
+    // เทปน้ำหยด (0.24 L/min per emitter)
+    const dripFlow = 0.24;
+    totalFlow += connectedPoints.dripTapes.length * dripFlow;
+    
+    // เทปน้ำพุ่ง
+    const waterJetFlow = Number(irrigationSettings.water_jet_tape?.flow) || 1.5;
+    totalFlow += connectedPoints.waterJets.length * waterJetFlow;
+    
+    // Pivot
+    const pivotFlow = Number(irrigationSettings.pivot?.flow) || 50;
+    totalFlow += connectedPoints.pivots.length * pivotFlow;
+    
+    return totalFlow;
+  }, []);
+
   // ปรับปรุงฟังก์ชัน updateCurrentDistance สำหรับ lateral เพื่อติดตามสปริงเกลอร์ที่เชื่อมต่อ
   const updateCurrentDistanceWithSprinklers = useCallback((coordinates: Coordinate[], pipeType: PipeType, sprinklers: Coordinate[], perSprinklerLpm?: number, snapRadius: number = 2) => {
     if (coordinates.length < 2) {
@@ -737,7 +777,9 @@ const usePipeManager = () => {
     updateCurrentDistance,
     // expose helpers for synchronous preview updates
     findNearbyConnectedSprinklers,
+    findNearbyConnectedIrrigationPoints,
     calculateFlowRate,
+    calculateTotalFlowRate,
     updateCurrentDistanceWithSprinklers, // เพิ่มฟังก์ชันใหม่
     addPipe,
     updatePipe,
@@ -841,9 +883,12 @@ const useSnapSystem = () => {
       return closestPoint;
     }
 
-    // For submain and lateral: only lateral snaps to sprinklers
+    // For submain and lateral: only lateral snaps to sprinklers, drip tapes, water jets, and pivots
     const allIrrigationPoints = pipeType === 'lateral' ? [
-      ...irrigationPositions.sprinklers
+      ...irrigationPositions.sprinklers,
+      ...irrigationPositions.dripTapes,
+      ...irrigationPositions.waterJets,
+      ...irrigationPositions.pivots
     ] : [];
     
     for (const irrigationPoint of allIrrigationPoints) {
@@ -1093,12 +1138,14 @@ const useMapManager = () => {
       // สำหรับ lateral แสดงจำนวนหัว + อัตราการไหลเป็นบรรทัดเดียว (ไม่ขึ้นบรรทัดใหม่)
       let labelText = `${distance.toFixed(1)}m`;
       if (pipeType === 'lateral') {
-        const sprinklerCount = (connectedSprinklers && connectedSprinklers.length) ? connectedSprinklers.length : 0;
+        const totalPoints = (connectedSprinklers && connectedSprinklers.length) ? connectedSprinklers.length : 0;
         const roundedFlow = typeof flowRate === 'number' ? Math.round(flowRate) : undefined;
         const parts: string[] = [];
-        parts.push(`🚿 ${sprinklerCount}`);
+        if (totalPoints > 0) {
+          parts.push(`🔗 ${totalPoints}`);
+        }
         if (typeof roundedFlow === 'number') parts.push(`💧 ${roundedFlow} L/min`);
-        const headerText = (sprinklerCount > 0 || typeof roundedFlow === 'number') ? parts.join(' • ') : '';
+        const headerText = (totalPoints > 0 || typeof roundedFlow === 'number') ? parts.join(' • ') : '';
         if (headerText) {
           // แสดงเฉพาะหัวข้อแบบบรรทัดเดียว ไม่แสดงระยะทางในป้ายนี้
           labelText = `${headerText}`;
@@ -1206,9 +1253,9 @@ const useMapManager = () => {
       let midLabelText = `${midDistance.toFixed(1)}m`;
       if (pipeType === 'lateral' && connectedSprinklers && connectedSprinklers.length >= 0) {
         if (typeof flowRate === 'number') {
-          midLabelText = `🚿 ${connectedSprinklers.length} • 💧 ${Math.round(flowRate)} L/min`;
+          midLabelText = `🔗 ${connectedSprinklers.length} • 💧 ${Math.round(flowRate)} L/min`;
         } else {
-          midLabelText = `🚿 ${connectedSprinklers.length}`;
+          midLabelText = `🔗 ${connectedSprinklers.length}`;
         }
       }
 
@@ -1395,6 +1442,7 @@ const useMapManager = () => {
       overlaysRef.current.irrigation = new Map();
       overlaysRef.current.circles = new Map();
 
+      // Create sprinkler markers
       positions.sprinklers.forEach((pos, index) => {
         const id = `sprinkler-${index}`;
         const marker = new google.maps.Marker({
@@ -1433,7 +1481,74 @@ const useMapManager = () => {
           overlaysRef.current.circles.set(id, circle);
         }
       });
-      // ... (ทำเช่นเดียวกันกับ pivots, dripTapes, waterJets)
+
+      // Create pivot markers
+      positions.pivots.forEach((pos, index) => {
+        const id = `pivot-${index}`;
+        const marker = new google.maps.Marker({
+          position: pos,
+          map: map,
+          icon: {
+            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+              <svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="6" cy="6" r="5" fill="#f97316" stroke="#ea580c" stroke-width="1"/>
+                <circle cx="6" cy="6" r="2" fill="#ffffff"/>
+              </svg>
+            `),
+            scaledSize: new google.maps.Size(12, 12),
+            anchor: new google.maps.Point(6, 6)
+          },
+          title: `Pivot ${index + 1}`,
+          optimized: true,
+          clickable: false,
+          zIndex: 650
+        });
+        overlaysRef.current.irrigation.set(id, marker);
+
+        if (settings?.pivot?.coverageRadius) {
+          const circle = new google.maps.Circle({
+            center: pos,
+            radius: settings.pivot.coverageRadius,
+            fillColor: '#f97316',
+            fillOpacity: 0.2,
+            strokeColor: '#ea580c',
+            strokeOpacity: 1.0,
+            strokeWeight: 1,
+            map: map,
+            clickable: false,
+            zIndex: 700
+          });
+          overlaysRef.current.circles.set(id, circle);
+        }
+      });
+
+      // Create drip tape and water jet markers
+      [
+        { points: positions.dripTapes, name: 'Drip Tape', color: '#3b82f6' },
+        { points: positions.waterJets, name: 'Water Jet', color: '#f97316' }
+      ].forEach(({ points, name, color }) => {
+        points.forEach((pos, index) => {
+          const id = `${name.toLowerCase().replace(' ', '')}-${index}`;
+          const marker = new google.maps.Marker({
+            position: pos,
+            map: map,
+            icon: {
+              url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                <svg width="8" height="8" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="4" cy="4" r="3" fill="${color}" stroke="${color}" stroke-width="1"/>
+                </svg>
+              `),
+              scaledSize: new google.maps.Size(8, 8),
+              anchor: new google.maps.Point(4, 4)
+            },
+            title: `${name} ${index + 1}`,
+            optimized: true,
+            clickable: false,
+            zIndex: 650
+          });
+          overlaysRef.current.irrigation.set(id, marker);
+        });
+      });
     }
   }, []);
 
@@ -2762,11 +2877,23 @@ export default function PipeGenerate(props: PipeGenerateProps) {
           });
         }
         if (type === 'lateral') {
-          const perHead = Number((fieldData.irrigationSettings?.sprinkler_system as { flow?: number } | undefined)?.flow) || 10;
-          const connected = pipeManager.findNearbyConnectedSprinklers(outputCoordinates, fieldData.irrigationPositions.sprinklers);
-          const totalFlow = pipeManager.calculateFlowRate(connected, perHead);
+          const connectedPoints = pipeManager.findNearbyConnectedIrrigationPoints(outputCoordinates, fieldData.irrigationPositions);
+          const totalFlow = pipeManager.calculateTotalFlowRate(connectedPoints, fieldData.irrigationSettings);
           const endCoord = outputCoordinates[outputCoordinates.length - 1];
-          const pill = new PillLabel(endCoord, `🚿 ${connected.length} • 💧 ${Math.round(totalFlow)} L/min`, { backgroundColor: 'rgba(17, 24, 39, 0.85)', textColor: '#fff', fontSize: '13px', fontWeight: '700', padding: '4px 8px', borderRadius: '999px', boxShadow: '0 2px 6px rgba(0,0,0,0.35)', zIndex: 1003 });
+          
+          // สร้างข้อความแสดงจำนวนจุดเชื่อมแต่ละประเภท
+          const totalPoints = connectedPoints.sprinklers.length + connectedPoints.dripTapes.length + connectedPoints.waterJets.length + connectedPoints.pivots.length;
+          let labelText = `💧 ${Math.round(totalFlow)} L/min`;
+          if (totalPoints > 0) {
+            const parts: string[] = [];
+            if (connectedPoints.sprinklers.length > 0) parts.push(`🚿${connectedPoints.sprinklers.length}`);
+            if (connectedPoints.dripTapes.length > 0) parts.push(`💧${connectedPoints.dripTapes.length}`);
+            if (connectedPoints.waterJets.length > 0) parts.push(`🌊${connectedPoints.waterJets.length}`);
+            if (connectedPoints.pivots.length > 0) parts.push(`🔄${connectedPoints.pivots.length}`);
+            labelText = `${parts.join(' ')} • ${labelText}`;
+          }
+          
+          const pill = new PillLabel(endCoord, labelText, { backgroundColor: 'rgba(17, 24, 39, 0.85)', textColor: '#fff', fontSize: '13px', fontWeight: '700', padding: '4px 8px', borderRadius: '999px', boxShadow: '0 2px 6px rgba(0,0,0,0.35)', zIndex: 1003 });
           pill.setMap(mapManager.mapRef.current!);
           const labelsMap = mapManager.overlaysRef.current.pipeLabelPills;
           const existing = labelsMap.get(newPipe.id) || [];
@@ -2846,10 +2973,10 @@ export default function PipeGenerate(props: PipeGenerateProps) {
       const coordinates = currentPath.map(latLng => ({ lat: latLng.lat(), lng: latLng.lng() }));
       pipeManager.updateDrawingState({ isDrawing: true, currentPoint: { lat: e.latLng.lat(), lng: e.latLng.lng() }, currentCoordinates: coordinates });
       if (type === 'lateral') {
-        const perHead = Number((fieldData.irrigationSettings?.sprinkler_system as { flow?: number } | undefined)?.flow) || 10;
-        const connected = pipeManager.findNearbyConnectedSprinklers(coordinates, fieldData.irrigationPositions.sprinklers);
-        const flow = pipeManager.calculateFlowRate(connected, perHead);
-        mapManager.updateDrawingPreview(coordinates, type, calculateDistance(coordinates), curveType, connected, flow);
+        const connectedPoints = pipeManager.findNearbyConnectedIrrigationPoints(coordinates, fieldData.irrigationPositions);
+        const totalFlow = pipeManager.calculateTotalFlowRate(connectedPoints, fieldData.irrigationSettings);
+        const allConnected = [...connectedPoints.sprinklers, ...connectedPoints.dripTapes, ...connectedPoints.waterJets, ...connectedPoints.pivots];
+        mapManager.updateDrawingPreview(coordinates, type, calculateDistance(coordinates), curveType, allConnected, totalFlow);
       } else {
         mapManager.updateDrawingPreview(coordinates, type, calculateDistance(coordinates), curveType);
       }
@@ -2902,11 +3029,11 @@ export default function PipeGenerate(props: PipeGenerateProps) {
       const coordinates = [...fixed, { lat: hover.lat(), lng: hover.lng() }];
       pipeManager.updateDrawingState({ currentPoint: { lat: hover.lat(), lng: hover.lng() }, currentCoordinates: coordinates });
       if (type === 'lateral') {
-        const perHead = Number((fieldData.irrigationSettings?.sprinkler_system as { flow?: number } | undefined)?.flow) || 10;
-        pipeManager.updateCurrentDistanceWithSprinklers(coordinates, type, fieldData.irrigationPositions.sprinklers, perHead, 2);
-        const connected = pipeManager.findNearbyConnectedSprinklers(coordinates, fieldData.irrigationPositions.sprinklers, 2);
-        const flow = pipeManager.calculateFlowRate(connected, perHead);
-        mapManager.updateDrawingPreview(coordinates, type, calculateDistance(coordinates), curveType, connected, flow);
+        const connectedPoints = pipeManager.findNearbyConnectedIrrigationPoints(coordinates, fieldData.irrigationPositions, 2);
+        const totalFlow = pipeManager.calculateTotalFlowRate(connectedPoints, fieldData.irrigationSettings);
+        const allConnected = [...connectedPoints.sprinklers, ...connectedPoints.dripTapes, ...connectedPoints.waterJets, ...connectedPoints.pivots];
+        pipeManager.updateCurrentDistanceWithSprinklers(coordinates, type, allConnected, totalFlow, 2);
+        mapManager.updateDrawingPreview(coordinates, type, calculateDistance(coordinates), curveType, allConnected, totalFlow);
       } else {
         pipeManager.updateCurrentDistance(coordinates);
         mapManager.updateDrawingPreview(coordinates, type, pipeManager.drawingState.currentDistance, curveType);
@@ -2972,7 +3099,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     void generateLateralPipes;
   }, [generateLateralPipes]);
 
-  // สร้างท่อย่อยตาม "แถวของสปริงเกลอร์" โดยใช้มุมการหมุนของแปลง
+  // สร้างท่อย่อยตาม "แถวของจุดให้น้ำ" โดยใช้มุมการหมุนของแปลง
   function generateGuidedLateralsFromTemplate(template: Pipe): Pipe[] {
     if (!template.coordinates || template.coordinates.length < 2) return [];
 
@@ -2982,12 +3109,18 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     const zone = findZoneForPoint(guideStart);
     if (!zone) return [];
 
-    // ดึงสปริงเกลอร์ในโซนนั้น
-    const sprinklers = fieldData.irrigationPositions.sprinklers.filter(s => isPointInPolygonEnhanced([s.lat, s.lng], zone.coordinates));
-    if (sprinklers.length < 2) return [];
+    // ดึงจุดให้น้ำทั้งหมดในโซนนั้น
+    const allIrrigationPoints = [
+      ...fieldData.irrigationPositions.sprinklers,
+      ...fieldData.irrigationPositions.dripTapes,
+      ...fieldData.irrigationPositions.waterJets,
+      ...fieldData.irrigationPositions.pivots
+    ].filter(point => isPointInPolygonEnhanced([point.lat, point.lng], zone.coordinates));
+    
+    if (allIrrigationPoints.length < 2) return [];
 
     // เตรียม helper สำหรับ หมุน/แปลงพิกัด (หน่วยเมตรแบบ local)
-    const origin = sprinklers[0];
+    const origin = allIrrigationPoints[0];
     const toXYm = (c: Coordinate) => ({ x: (c.lng - origin.lng) * METERS_PER_DEGREE, y: (c.lat - origin.lat) * METERS_PER_DEGREE });
     const fromXYm = (p: { x: number; y: number }): Coordinate => ({ lat: origin.lat + p.y / METERS_PER_DEGREE, lng: origin.lng + p.x / METERS_PER_DEGREE });
     // หาองศาของท่อต้นแบบ แล้วหมุนระบบพิกัดให้ท่อต้นแบบขนานแกน X
@@ -3002,8 +3135,8 @@ export default function PipeGenerate(props: PipeGenerateProps) {
       return { x: p.x * cosB - p.y * sinB, y: p.x * sinB + p.y * cosB };
     };
 
-    // หมุนจุดสปริงเกลอร์ให้แถวขนานแกน X "ตามแนวท่อต้นแบบ"
-    const rotated = sprinklers.map(s => ({ s, xy: rotateXY(toXYm(s)) }));
+    // หมุนจุดให้น้ำทั้งหมดให้แถวขนานแกน X "ตามแนวท่อต้นแบบ"
+    const rotated = allIrrigationPoints.map(point => ({ point, xy: rotateXY(toXYm(point)) }));
 
     // หา submain ที่ใกล้จุดเริ่มท่อต้นแบบที่สุด และแปลงเป็นพิกัดที่หมุนแล้ว
     const submains = pipeManager.pipes.filter(p => p.type === 'submain' && p.coordinates && p.coordinates.length >= 2);
@@ -3050,7 +3183,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     const tol = Math.max(0.3, spacingEst * 0.3); // tolerance สำหรับจับกลุ่มเป็นแถว
 
     // จัดกลุ่มเป็นแถวด้วยการจับคู่ตาม y ใกล้เคียง (หลังหมุนด้วยแนวท่อต้นแบบ)
-    type Row = { y: number; points: { s: Coordinate; xy: { x: number; y: number } }[] };
+    type Row = { y: number; points: { point: Coordinate; xy: { x: number; y: number } }[] };
     const rows: Row[] = [];
     for (const r of rotated) {
       let assigned: Row | null = null;
@@ -3061,7 +3194,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
         assigned = { y: r.xy.y, points: [] };
         rows.push(assigned);
       }
-      assigned.points.push({ s: r.s, xy: r.xy });
+      assigned.points.push({ point: r.point, xy: r.xy });
       // อัปเดตค่า y เฉลี่ยของแถวเพื่อเพิ่มความเสถียร
       const sumY = assigned.points.reduce((acc, p) => acc + p.xy.y, 0);
       assigned.y = sumY / assigned.points.length;
@@ -3093,47 +3226,90 @@ export default function PipeGenerate(props: PipeGenerateProps) {
         const dx = Math.abs(xs[i] - medianX);
         if (dx < bestDx) { bestDx = dx; anchorX = xs[i]; }
       }
-      // กำหนดปลายทางด้านนอกให้ไปทาง +X ตามแนวท่อต้นแบบ (หลังหมุน)
+      // สร้างท่อย่อยทั้งสองฝั่งจากจุดเชื่อมต่อกับท่อเมนย่อย
       const outward = pts.filter(p => p.xy.x > anchorX);
       const inward = pts.filter(p => p.xy.x < anchorX);
-      let endX: number | null = null;
+      
+      // สร้างท่อฝั่งขวา (outward)
       if (outward.length > 0) {
-        endX = outward[outward.length - 1].xy.x; // ค่าสูงสุดด้านนอก
-      } else if (inward.length > 0) {
-        // ถ้าไม่มีด้านนอก ให้ใช้ด้านในแทน (กรณีผู้ใช้วาดท่อต้นแบบจากนอกเข้าหาเมน)
-        endX = inward[0].xy.x; // ค่าต่ำสุดด้านใน
-      }
-      if (endX === null || Math.abs(endX - anchorX) < 0.5) continue; // สั้นเกินไป
-      const startXY = unrotateXY({ x: anchorX, y: row.y });
-      const endXY = unrotateXY({ x: endX, y: row.y });
-      const start = fromXYm(startXY);
-      const end = fromXYm(endXY);
-      // ความยาวต้องพอสมควรและอยู่ในโซน
-      if (!isPointInPolygonEnhanced([start.lat, start.lng], zone.coordinates)) continue;
-      if (!isPointInPolygonEnhanced([end.lat, end.lng], zone.coordinates)) continue;
-      const mid = { lat: (start.lat + end.lat) / 2, lng: (start.lng + end.lng) / 2 };
-      // กันซ้อนกับท่อเดิม/ที่สร้างระหว่างรอบนี้ และห้ามทับท่อต้นแบบ
-      const minGapM = 0.8;
-      const templateGapM = Math.max(1.0, spacingEst * 0.6);
-      const distToTemplate = pointToPolylineDistance(mid, template.coordinates || []);
-      if (distToTemplate < templateGapM) {
-        continue; // ใกล้ท่อต้นแบบเกินไป ไม่สร้างซ้ำแนวเดียวกัน
-      }
-      const overlapsGenerated = generated.some(g => pointToPolylineDistance(mid, g.coordinates || []) < minGapM);
-      let overlapsExisting = false;
-      if (!overlapsGenerated) {
-        for (const p of already) {
-          if (!p.coordinates || p.coordinates.length < 2) continue;
-          for (let i = 0; i < p.coordinates.length - 1; i++) {
-            const { distance } = getClosestPointOnSegment(mid, p.coordinates[i], p.coordinates[i + 1]);
-            if (distance < minGapM) { overlapsExisting = true; break; }
+        const endX = outward[outward.length - 1].xy.x; // ค่าสูงสุดด้านนอก
+        if (Math.abs(endX - anchorX) >= 0.5) { // สั้นเกินไป
+          const startXY = unrotateXY({ x: anchorX, y: row.y });
+          const endXY = unrotateXY({ x: endX, y: row.y });
+          const start = fromXYm(startXY);
+          const end = fromXYm(endXY);
+          
+          // ความยาวต้องพอสมควรและอยู่ในโซน
+          if (isPointInPolygonEnhanced([start.lat, start.lng], zone.coordinates) && 
+              isPointInPolygonEnhanced([end.lat, end.lng], zone.coordinates)) {
+            const mid = { lat: (start.lat + end.lat) / 2, lng: (start.lng + end.lng) / 2 };
+            
+            // กันซ้อนกับท่อเดิม/ที่สร้างระหว่างรอบนี้ และห้ามทับท่อต้นแบบ
+            const minGapM = 0.8;
+            const templateGapM = Math.max(1.0, spacingEst * 0.6);
+            const distToTemplate = pointToPolylineDistance(mid, template.coordinates || []);
+            
+            if (distToTemplate >= templateGapM) { // ใกล้ท่อต้นแบบเกินไป ไม่สร้างซ้ำแนวเดียวกัน
+              const overlapsGenerated = generated.some(g => pointToPolylineDistance(mid, g.coordinates || []) < minGapM);
+              let overlapsExisting = false;
+              if (!overlapsGenerated) {
+                for (const p of already) {
+                  if (!p.coordinates || p.coordinates.length < 2) continue;
+                  for (let i = 0; i < p.coordinates.length - 1; i++) {
+                    const { distance } = getClosestPointOnSegment(mid, p.coordinates[i], p.coordinates[i + 1]);
+                    if (distance < minGapM) { overlapsExisting = true; break; }
+                  }
+                  if (overlapsExisting) break;
+                }
+              }
+              const lengthM = calculateDistance([start, end]);
+              if (lengthM >= 2 && !overlapsGenerated && !overlapsExisting) {
+                generated.push({ id: `lateral-row-${Date.now()}-${generated.length}-right`, type: 'lateral', coordinates: [start, end], length: lengthM });
+              }
+            }
           }
-          if (overlapsExisting) break;
         }
       }
-      const lengthM = calculateDistance([start, end]);
-      if (lengthM >= 2 && !overlapsGenerated && !overlapsExisting) {
-        generated.push({ id: `lateral-row-${Date.now()}-${generated.length}`, type: 'lateral', coordinates: [start, end], length: lengthM });
+      
+      // สร้างท่อฝั่งซ้าย (inward)
+      if (inward.length > 0) {
+        const endX = inward[0].xy.x; // ค่าต่ำสุดด้านใน
+        if (Math.abs(endX - anchorX) >= 0.5) { // สั้นเกินไป
+          const startXY = unrotateXY({ x: anchorX, y: row.y });
+          const endXY = unrotateXY({ x: endX, y: row.y });
+          const start = fromXYm(startXY);
+          const end = fromXYm(endXY);
+          
+          // ความยาวต้องพอสมควรและอยู่ในโซน
+          if (isPointInPolygonEnhanced([start.lat, start.lng], zone.coordinates) && 
+              isPointInPolygonEnhanced([end.lat, end.lng], zone.coordinates)) {
+            const mid = { lat: (start.lat + end.lat) / 2, lng: (start.lng + end.lng) / 2 };
+            
+            // กันซ้อนกับท่อเดิม/ที่สร้างระหว่างรอบนี้ และห้ามทับท่อต้นแบบ
+            const minGapM = 0.8;
+            const templateGapM = Math.max(1.0, spacingEst * 0.6);
+            const distToTemplate = pointToPolylineDistance(mid, template.coordinates || []);
+            
+            if (distToTemplate >= templateGapM) { // ใกล้ท่อต้นแบบเกินไป ไม่สร้างซ้ำแนวเดียวกัน
+              const overlapsGenerated = generated.some(g => pointToPolylineDistance(mid, g.coordinates || []) < minGapM);
+              let overlapsExisting = false;
+              if (!overlapsGenerated) {
+                for (const p of already) {
+                  if (!p.coordinates || p.coordinates.length < 2) continue;
+                  for (let i = 0; i < p.coordinates.length - 1; i++) {
+                    const { distance } = getClosestPointOnSegment(mid, p.coordinates[i], p.coordinates[i + 1]);
+                    if (distance < minGapM) { overlapsExisting = true; break; }
+                  }
+                  if (overlapsExisting) break;
+                }
+              }
+              const lengthM = calculateDistance([start, end]);
+              if (lengthM >= 2 && !overlapsGenerated && !overlapsExisting) {
+                generated.push({ id: `lateral-row-${Date.now()}-${generated.length}-left`, type: 'lateral', coordinates: [start, end], length: lengthM });
+              }
+            }
+          }
+        }
       }
     }
 
@@ -3160,9 +3336,8 @@ export default function PipeGenerate(props: PipeGenerateProps) {
   const handleAcceptAsReference = useCallback((pipeId: string) => {
     const p = pipeManager.pipes.find(pp => pp.id === pipeId);
     if (!p || !p.coordinates) return;
-    const perHead = Number((fieldData.irrigationSettings?.sprinkler_system as { flow?: number } | undefined)?.flow) || 10;
-    const connected = pipeManager.findNearbyConnectedSprinklers(p.coordinates, fieldData.irrigationPositions.sprinklers);
-    const totalFlow = pipeManager.calculateFlowRate(connected, perHead);
+    const connectedPoints = pipeManager.findNearbyConnectedIrrigationPoints(p.coordinates, fieldData.irrigationPositions);
+    const totalFlow = pipeManager.calculateTotalFlowRate(connectedPoints, fieldData.irrigationSettings);
     const newThreshold = p.length || calculateDistance(p.coordinates);
     if (confirm(t('Use this lateral as new reference?'))) {
       setLateralReference({ pipeId, length: newThreshold, flowLpm: totalFlow });
@@ -3185,7 +3360,8 @@ export default function PipeGenerate(props: PipeGenerateProps) {
             const distBefore = qSegLens.slice(0, Math.max(0, best.segIndex)).reduce((s, v) => s + v, 0);
             return { chain: distBefore + best.along, segIndex: best.segIndex, proj: best.proj as Coordinate };
           };
-          const qConnected = pipeManager.findNearbyConnectedSprinklers(qCoords, fieldData.irrigationPositions.sprinklers, 2);
+          const qConnectedPoints = pipeManager.findNearbyConnectedIrrigationPoints(qCoords, fieldData.irrigationPositions, 2);
+          const qConnected = [...qConnectedPoints.sprinklers, ...qConnectedPoints.dripTapes, ...qConnectedPoints.waterJets, ...qConnectedPoints.pivots];
           let qBest: { chain: number; segIndex: number; proj: Coordinate } | null = null;
           for (const s of qConnected) {
             const ch = getChainageQ(s);
@@ -3650,7 +3826,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
                             {t('Current Pipe Length')}
                           </div>
                           
-                          {/* แสดงข้อมูลสปริงเกลอร์และอัตราการไหลสำหรับ lateral */}
+                          {/* แสดงข้อมูลอุปกรณ์ให้น้ำและอัตราการไหลสำหรับ lateral */}
                           {pipeManager.selectedType === 'lateral' && (
                             <div className="mt-2 space-y-1">
                               <div className="text-sm font-bold text-purple-400">
@@ -3660,7 +3836,10 @@ export default function PipeGenerate(props: PipeGenerateProps) {
                                 {t('Current Flow Rate')}
                               </div>
                               <div className="text-xs text-purple-200">
-                                🚿 {pipeManager.drawingState.connectedSprinklers?.length || 0} {t('Sprinklers Connected')}
+                                🔗 {pipeManager.drawingState.connectedSprinklers?.length || 0} {t('Equipment Connected')}
+                              </div>
+                              <div className="text-xs text-gray-400">
+                                {t('Includes sprinklers, pivots, drip tapes, and water jets')}
                               </div>
                             </div>
                           )}
