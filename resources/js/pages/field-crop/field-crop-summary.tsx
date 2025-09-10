@@ -1871,7 +1871,6 @@ const calculateZoneIrrigationCounts = (
         const zonePolygon = turf.polygon([zoneCoords]);
 
         let sprinklerCount = 0;
-        // removed miniSprinklerCount and microSprayCount
         let dripTapeCount = 0;
         let pivotCount = 0;
         let waterJetTapeCount = 0;
@@ -2021,9 +2020,48 @@ export default function FieldCropSummary() {
                     Array.isArray(normalized.irrigationPoints) && normalized.irrigationPoints.length > 0
                 )
                     ? normalized.irrigationPoints
-                    : (Array.isArray((normalized as Partial<FieldCropSummaryProps> & { irrigationPositions?: { sprinklers?: { lat: number; lng: number }[] } }).irrigationPositions?.sprinklers)
-                        ? ((normalized as Partial<FieldCropSummaryProps> & { irrigationPositions?: { sprinklers?: { lat: number; lng: number }[] } }).irrigationPositions!.sprinklers!).map((s, i) => ({ id: `sprinkler-${i}`, lat: s.lat, lng: s.lng, type: 'sprinkler' }))
-                        : []);
+                    : (() => {
+                        const irrigationPositions = (normalized as Partial<FieldCropSummaryProps> & { 
+                            irrigationPositions?: { 
+                                sprinklers?: { lat: number; lng: number }[];
+                                pivots?: { lat: number; lng: number }[];
+                                dripTapes?: { lat: number; lng: number }[];
+                                waterJets?: { lat: number; lng: number }[];
+                            } 
+                        }).irrigationPositions;
+                        
+                        const points: IrrigationPoint[] = [];
+                        
+                        // Add sprinklers
+                        if (Array.isArray(irrigationPositions?.sprinklers)) {
+                            irrigationPositions.sprinklers.forEach((s, i) => {
+                                points.push({ id: `sprinkler-${i}`, lat: s.lat, lng: s.lng, type: 'sprinkler' });
+                            });
+                        }
+                        
+                        // Add pivots
+                        if (Array.isArray(irrigationPositions?.pivots)) {
+                            irrigationPositions.pivots.forEach((p, i) => {
+                                points.push({ id: `pivot-${i}`, lat: p.lat, lng: p.lng, type: 'pivot' });
+                            });
+                        }
+                        
+                        // Add drip tapes
+                        if (Array.isArray(irrigationPositions?.dripTapes)) {
+                            irrigationPositions.dripTapes.forEach((d, i) => {
+                                points.push({ id: `dripTape-${i}`, lat: d.lat, lng: d.lng, type: 'drip_tape' });
+                            });
+                        }
+                        
+                        // Add water jets
+                        if (Array.isArray(irrigationPositions?.waterJets)) {
+                            irrigationPositions.waterJets.forEach((w, i) => {
+                                points.push({ id: `waterJet-${i}`, lat: w.lat, lng: w.lng, type: 'water_jet_tape' });
+                            });
+                        }
+                        
+                        return points;
+                    })();
 
                 const finalData: FieldCropSummaryProps = {
                     ...normalized,
@@ -2070,9 +2108,48 @@ export default function FieldCropSummary() {
                         Array.isArray(parsedData.irrigationPoints) && parsedData.irrigationPoints.length > 0
                     )
                         ? parsedData.irrigationPoints
-                        : (Array.isArray((parsedData as Partial<FieldCropSummaryProps> & { irrigationPositions?: { sprinklers?: { lat: number; lng: number }[] } }).irrigationPositions?.sprinklers)
-                            ? ((parsedData as Partial<FieldCropSummaryProps> & { irrigationPositions?: { sprinklers?: { lat: number; lng: number }[] } }).irrigationPositions!.sprinklers!).map((s: { lat: number; lng: number }, i: number) => ({ id: `sprinkler-${i}`, lat: s.lat, lng: s.lng, type: 'sprinkler' }))
-                            : []);
+                        : (() => {
+                            const irrigationPositions = (parsedData as Partial<FieldCropSummaryProps> & { 
+                                irrigationPositions?: { 
+                                    sprinklers?: { lat: number; lng: number }[];
+                                    pivots?: { lat: number; lng: number }[];
+                                    dripTapes?: { lat: number; lng: number }[];
+                                    waterJets?: { lat: number; lng: number }[];
+                                } 
+                            }).irrigationPositions;
+                            
+                            const points: IrrigationPoint[] = [];
+                            
+                            // Add sprinklers
+                            if (Array.isArray(irrigationPositions?.sprinklers)) {
+                                irrigationPositions.sprinklers.forEach((s, i) => {
+                                    points.push({ id: `sprinkler-${i}`, lat: s.lat, lng: s.lng, type: 'sprinkler' });
+                                });
+                            }
+                            
+                            // Add pivots
+                            if (Array.isArray(irrigationPositions?.pivots)) {
+                                irrigationPositions.pivots.forEach((p, i) => {
+                                    points.push({ id: `pivot-${i}`, lat: p.lat, lng: p.lng, type: 'pivot' });
+                                });
+                            }
+                            
+                            // Add drip tapes
+                            if (Array.isArray(irrigationPositions?.dripTapes)) {
+                                irrigationPositions.dripTapes.forEach((d, i) => {
+                                    points.push({ id: `dripTape-${i}`, lat: d.lat, lng: d.lng, type: 'drip_tape' });
+                                });
+                            }
+                            
+                            // Add water jets
+                            if (Array.isArray(irrigationPositions?.waterJets)) {
+                                irrigationPositions.waterJets.forEach((w, i) => {
+                                    points.push({ id: `waterJet-${i}`, lat: w.lat, lng: w.lng, type: 'water_jet_tape' });
+                                });
+                            }
+                            
+                            return points;
+                        })();
 
                     const coerced: FieldCropSummaryProps = {
                         ...parsedData,
@@ -2199,7 +2276,7 @@ export default function FieldCropSummary() {
         mapZoom = 18,
     } = summaryData || {};
 
-    const actualZones = Array.isArray(zones) ? zones : [];
+    const actualZones = useMemo(() => (Array.isArray(zones) ? zones : []), [zones]);
     const actualPipes = useMemo(() => (Array.isArray(pipes) ? pipes : []), [pipes]);
     const zonePipeStatsMap = useMemo(() => {
         try {
@@ -3434,10 +3511,10 @@ export default function FieldCropSummary() {
                                             </div>
                                             <div className="rounded bg-gray-700 p-1 text-center print:border">
                                                 <div className="text-sm font-bold text-cyan-400">
-                                                    {dripPoints + dripLines}
+                                                    {dripPoints}
                                                 </div>
                                                 <div className="text-xs text-gray-400">
-                                                    {t('Drip Points')}
+                                                    {t('Drip Tape')}
                                                 </div>
                                             </div>
                                         </div>

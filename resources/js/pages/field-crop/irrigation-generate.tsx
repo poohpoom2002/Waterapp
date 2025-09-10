@@ -123,8 +123,8 @@ export default function IrrigationGenerate({
 						irrigationSettings: {
 							sprinkler_system: { coverageRadius: 8, overlap: 0, flow: 10, pressure: 2.5 },
 							pivot: { coverageRadius: 165, overlap: 0, flow: 50, pressure: 3.0 },
-							drip_tape: { emitterSpacing: 20, placement: 'along_rows', side: 'left' },
-							water_jet_tape: { emitterSpacing: 20, placement: 'along_rows', side: 'left' }
+							drip_tape: { emitterSpacing: 20, placement: 'along_rows', side: 'left', flow: 0.24, pressure: 1.0 },
+							water_jet_tape: { emitterSpacing: 20, placement: 'along_rows', side: 'left', flow: 1.5, pressure: 1.5 }
 						},
 						irrigationPositions: { sprinklers: [], pivots: [], dripTapes: [], waterJets: [] }
 					};
@@ -246,7 +246,7 @@ export default function IrrigationGenerate({
 				console.error('Error loading field data from localStorage:', e);
 			}
 		}
-	}, []);
+	}, [areaRai, completedSteps, crops, mainAreaData, obstaclesData, perimeterMeters, plantPointsData, plantSpacing, rotationAngle, rowSpacing, selectedCrops]);
 
 	// Use parsed data or fallback to props
 	const finalMainArea = parsedMainArea.length > 0 ? parsedMainArea : mainArea;
@@ -254,6 +254,18 @@ export default function IrrigationGenerate({
 	const finalPlantPoints = useMemo(() => (
 		parsedPlantPoints.length > 0 ? parsedPlantPoints : []
 	), [parsedPlantPoints]);
+
+	// Debug: Log final data for rendering
+	console.log('Final data for rendering:', {
+		finalMainArea: finalMainArea.length,
+		finalObstacles: finalObstacles.length,
+		finalPlantPoints: finalPlantPoints.length,
+		parsedMainArea: parsedMainArea.length,
+		parsedObstacles: parsedObstacles.length,
+		parsedPlantPoints: parsedPlantPoints.length,
+		propsMainArea: mainArea.length,
+		propsObstacles: obstacles.length
+	});
 	
 	// Debug: Log final obstacles data
 	console.log('Final obstacles for rendering:', {
@@ -339,11 +351,15 @@ export default function IrrigationGenerate({
 			emitterSpacing: 20, // 10,15,20,30cm
 			placement: 'along_rows', // 'along_rows' | 'staggered'
 			side: 'left', // 'left' | 'right'
+			flow: 0.24, // L/min per emitter (fixed in UI)
+			pressure: 1.0, // bar (display only)
 		},
 		water_jet_tape: {
 			emitterSpacing: 20, // 10,20,30cm
 			placement: 'along_rows', // 'along_rows' | 'staggered'
 			side: 'left', // 'left' | 'right'
+			flow: 1.5, // L/min (adjustable)
+			pressure: 1.5, // bar (adjustable)
 		},
 	});
 
@@ -452,8 +468,8 @@ export default function IrrigationGenerate({
 				selectedIrrigationType: '',
 				irrigationCounts: { sprinkler_system: 0, pivot: 0, drip_tape: 0, water_jet_tape: 0 },
 				totalWaterRequirement: 0,
-				irrigationSettings: irrigationSettings,
-				irrigationPositions: irrigationPositions,
+				irrigationSettings,
+				irrigationPositions,
 				mapCenter: calculatedMapCenter,
 				mapZoom: finalMapZoom,
 			};
@@ -555,8 +571,8 @@ export default function IrrigationGenerate({
 				selectedIrrigationType: '',
 				irrigationCounts: { sprinkler_system: 0, pivot: 0, drip_tape: 0, water_jet_tape: 0 },
 				totalWaterRequirement: 0,
-				irrigationSettings: irrigationSettings,
-				irrigationPositions: irrigationPositions,
+				irrigationSettings,
+				irrigationPositions,
 				mapCenter: calculatedMapCenter,
 				mapZoom: finalMapZoom,
 			};
@@ -610,14 +626,16 @@ export default function IrrigationGenerate({
 		mapRef.current = map;
 		setIsMapLoaded(true);
 		console.log('Map loaded successfully, map ref:', !!mapRef.current);
-		
-		// Fit map to main area if available
-		if (finalMainArea.length >= 3) {
+	}, []);
+
+	// Fit map to main area when main area changes
+	useEffect(() => {
+		if (mapRef.current && finalMainArea.length >= 3) {
 			const bounds = new google.maps.LatLngBounds();
 			finalMainArea.forEach(coord => {
 				bounds.extend(new google.maps.LatLng(coord.lat, coord.lng));
 			});
-			map.fitBounds(bounds);
+			mapRef.current.fitBounds(bounds);
 			console.log('Map fitted to main area bounds');
 		}
 	}, [finalMainArea]);
@@ -1327,7 +1345,7 @@ export default function IrrigationGenerate({
 		} finally {
 			setIsGeneratingIrrigation(false);
 		}
-	}, [finalPlantPoints, finalMainArea, irrigationSettings.drip_tape.emitterSpacing, irrigationSettings.drip_tape.placement, irrigationSettings.drip_tape.side, isPointInPolygon, isPointInObstacle]);
+	}, [finalPlantPoints, finalMainArea, irrigationSettings.drip_tape.emitterSpacing, irrigationSettings.drip_tape.placement, irrigationSettings.drip_tape.side, isPointInObstacle, isPointInPolygon]);
 	
 	// Updated generateWaterJetTape function to use center-first row placement like plant points
 	const generateWaterJetTape = useCallback(async () => {
@@ -1461,7 +1479,7 @@ export default function IrrigationGenerate({
 		} finally {
 			setIsGeneratingIrrigation(false);
 		}
-	}, [finalPlantPoints, finalMainArea, irrigationSettings.water_jet_tape.emitterSpacing, irrigationSettings.water_jet_tape.placement, irrigationSettings.water_jet_tape.side, isPointInPolygon, isPointInObstacle]);
+	}, [finalPlantPoints, finalMainArea, irrigationSettings.water_jet_tape.emitterSpacing, irrigationSettings.water_jet_tape.placement, irrigationSettings.water_jet_tape.side, isPointInObstacle, isPointInPolygon]);
 	
 	// Function to render irrigation settings based on selected type
 	const renderIrrigationSettings = () => {
@@ -1473,6 +1491,37 @@ export default function IrrigationGenerate({
 					<div className="rounded p-3 border border-white" style={{ backgroundColor: '#000005' }}>
 						<h4 className="font-medium text-white mb-3 text-sm">{t('Sprinkler System Settings')}</h4>
 						<div className="space-y-4">
+						<div className="grid grid-cols-2 gap-3">
+							<div>
+								<label className="block text-xs text-gray-400 mb-2">
+									{t('Flow')} (L/min)
+								</label>
+								<input
+									type="number"
+									min={0.24}
+									max={0.24}
+									step={0.01}
+									value={0.24}
+									readOnly
+									className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+								/>
+							</div>
+							<div>
+								<label className="block text-xs text-gray-400 mb-2">
+									{t('Pressure')} (bar)
+								</label>
+								<input
+									type="number"
+									min={0.5}
+									max={2.0}
+									step={0.1}
+									value={irrigationSettings.drip_tape.pressure}
+									onChange={(e) => handleSettingsChange('drip_tape', 'pressure', parseFloat(e.target.value) || 1.0)}
+									className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-blue-500"
+									placeholder="1.0"
+								/>
+							</div>
+						</div>
 							<div>
 								<label className="block text-xs text-gray-400 mb-2">
 									{t('Coverage Radius')}: {irrigationSettings.sprinkler_system.coverageRadius}m
@@ -1572,6 +1621,38 @@ export default function IrrigationGenerate({
 					<div className="rounded p-3 border border-white" style={{ backgroundColor: '#000005' }}>
 						<h4 className="font-medium text-white mb-3 text-sm">{t('System Pivot Settings')}</h4>
 						<div className="space-y-4">
+						<div className="grid grid-cols-2 gap-3">
+							<div>
+								<label className="block text-xs text-gray-400 mb-2">
+									{t('Flow')} (L/min)
+								</label>
+								<input
+									type="number"
+									min={0.5}
+									max={10}
+									step={0.1}
+									value={irrigationSettings.water_jet_tape.flow}
+									onChange={(e) => handleSettingsChange('water_jet_tape', 'flow', parseFloat(e.target.value) || 1.5)}
+									className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-orange-500"
+									placeholder="1.5"
+								/>
+							</div>
+							<div>
+								<label className="block text-xs text-gray-400 mb-2">
+									{t('Pressure')} (bar)
+								</label>
+								<input
+									type="number"
+									min={0.5}
+									max={3.0}
+									step={0.1}
+									value={irrigationSettings.water_jet_tape.pressure}
+									onChange={(e) => handleSettingsChange('water_jet_tape', 'pressure', parseFloat(e.target.value) || 1.5)}
+									className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-orange-500"
+									placeholder="1.5"
+								/>
+							</div>
+						</div>
 							<div>
 								<label className="block text-xs text-gray-400 mb-2">
 									{t('Coverage Radius')}: {irrigationSettings.pivot.coverageRadius}m
@@ -1749,6 +1830,38 @@ export default function IrrigationGenerate({
 								</div>
 							</div>
 							
+							<div className="grid grid-cols-2 gap-3">
+								<div>
+									<label className="block text-xs text-gray-400 mb-2">
+										{t('Flow')} (L/min)
+									</label>
+									<input
+										type="number"
+										min={0.24}
+										max={0.24}
+										step={0.01}
+										value={0.24}
+										readOnly
+										className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+									/>
+								</div>
+								<div>
+									<label className="block text-xs text-gray-400 mb-2">
+										{t('Pressure')} (bar)
+									</label>
+									<input
+										type="number"
+										min={0.5}
+										max={2.0}
+										step={0.1}
+										value={irrigationSettings.drip_tape.pressure}
+										onChange={(e) => handleSettingsChange('drip_tape', 'pressure', parseFloat(e.target.value) || 1.0)}
+										className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-blue-500"
+										placeholder="1.0"
+									/>
+								</div>
+							</div>
+							
 							<button
 								onClick={() => generateDripTape()}
 								disabled={isGeneratingIrrigation}
@@ -1849,6 +1962,39 @@ export default function IrrigationGenerate({
 								</div>
 							</div>
 							
+							<div className="grid grid-cols-2 gap-3">
+								<div>
+									<label className="block text-xs text-gray-400 mb-2">
+										{t('Flow')} (L/min)
+									</label>
+									<input
+										type="number"
+										min={0.5}
+										max={10}
+										step={0.1}
+										value={irrigationSettings.water_jet_tape.flow}
+										onChange={(e) => handleSettingsChange('water_jet_tape', 'flow', parseFloat(e.target.value) || 1.5)}
+										className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-orange-500"
+										placeholder="1.5"
+									/>
+								</div>
+								<div>
+									<label className="block text-xs text-gray-400 mb-2">
+										{t('Pressure')} (bar)
+									</label>
+									<input
+										type="number"
+										min={0.5}
+										max={3.0}
+										step={0.1}
+										value={irrigationSettings.water_jet_tape.pressure}
+										onChange={(e) => handleSettingsChange('water_jet_tape', 'pressure', parseFloat(e.target.value) || 1.5)}
+										className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-orange-500"
+										placeholder="1.5"
+									/>
+								</div>
+							</div>
+							
 							<button
 								onClick={() => generateWaterJetTape()}
 								disabled={isGeneratingIrrigation}
@@ -1873,14 +2019,21 @@ export default function IrrigationGenerate({
 
 	// Render main area polygon
 	useEffect(() => {
-		dbg('Main area rendering effect:', {
+		console.log('Main area rendering effect:', {
 			mapLoaded: !!mapRef.current,
 			mainAreaLength: finalMainArea.length,
 			isMapLoaded,
 			finalMainArea: finalMainArea.slice(0, 3) // Show first 3 points
 		});
 		
-		if (!mapRef.current || !finalMainArea.length || !isMapLoaded) return;
+		if (!mapRef.current || !finalMainArea.length || !isMapLoaded) {
+			console.log('Main area rendering skipped:', {
+				noMap: !mapRef.current,
+				noMainArea: !finalMainArea.length,
+				notMapLoaded: !isMapLoaded
+			});
+			return;
+		}
 
 		if (mainAreaPolygonRef.current) {
 			mainAreaPolygonRef.current.setMap(null);
@@ -1929,8 +2082,8 @@ export default function IrrigationGenerate({
 
 	// [FIX] Simplified distance overlay creation
 	const createSimpleDistanceOverlays = useCallback((obstacle: Obstacle) => {
-		if (!mapRef.current || finalMainArea.length < 3) {
-			dbg('Cannot create distance overlays: map or main area not ready');
+		if (!mapRef.current) {
+			dbg('Cannot create distance overlays: map not ready');
 			return;
 		}
 
@@ -1944,18 +2097,24 @@ export default function IrrigationGenerate({
 
 		distanceOverlaysRef.current[obstacle.id] = overlays;
 		dbg('Successfully created distance overlays for obstacle:', obstacle.id);
-	}, [finalMainArea]);
+	}, []);
 
 	// [FIX] Improved obstacles rendering effect
 	useEffect(() => {
-		dbg('Obstacles rendering effect:', {
+		console.log('Obstacles rendering effect:', {
 			mapLoaded: !!mapRef.current,
 			obstaclesLength: finalObstacles.length,
 			isMapLoaded,
 			obstacles: finalObstacles.map(o => ({ type: o.type, points: o.coordinates.length }))
 		});
 		
-		if (!mapRef.current || !isMapLoaded) return;
+		if (!mapRef.current || !isMapLoaded) {
+			console.log('Obstacles rendering skipped:', {
+				noMap: !mapRef.current,
+				notMapLoaded: !isMapLoaded
+			});
+			return;
+		}
 
 		// Clear existing obstacle polygons
 		obstaclePolygonsRef.current.forEach(poly => poly.setMap(null));
@@ -2036,17 +2195,24 @@ export default function IrrigationGenerate({
 			
 			dbg(`Successfully created ${obstaclePolygonsRef.current.length} obstacle polygons out of ${finalObstacles.length} obstacles`);
 		}
-	}, [finalObstacles, finalMainArea, isMapLoaded, createSimpleDistanceOverlays]);
+	}, [finalObstacles, isMapLoaded, createSimpleDistanceOverlays, finalMainArea.length]);
 
 	// Render plant points
 	useEffect(() => {
-		dbg('Plant points rendering effect:', {
+		console.log('Plant points rendering effect:', {
 			mapLoaded: !!mapRef.current,
 			plantPointsLength: finalPlantPoints.length,
 			isMapLoaded
 		});
 		
-		if (!mapRef.current || !isMapLoaded || finalPlantPoints.length === 0) return;
+		if (!mapRef.current || !isMapLoaded || finalPlantPoints.length === 0) {
+			console.log('Plant points rendering skipped:', {
+				noMap: !mapRef.current,
+				notMapLoaded: !isMapLoaded,
+				noPlantPoints: finalPlantPoints.length === 0
+			});
+			return;
+		}
 
 		// Clear existing markers
 		plantPointMarkersRef.current.forEach(marker => marker.setMap(null));
@@ -2241,12 +2407,12 @@ export default function IrrigationGenerate({
 	}, [
 		isMapLoaded,
 		selectedIrrigationType,
-		irrigationPositions.sprinklers,
-		irrigationPositions.pivots,
-		irrigationPositions.dripTapes,
-		irrigationPositions.waterJets,
 		irrigationSettings.sprinkler_system.coverageRadius,
-		irrigationSettings.pivot.coverageRadius
+		irrigationSettings.pivot.coverageRadius,
+		irrigationPositions.dripTapes,
+		irrigationPositions.pivots,
+		irrigationPositions.sprinklers,
+		irrigationPositions.waterJets
 	]);
 
 	// Additional effect to ensure irrigation overlays are recreated when data is loaded from localStorage
@@ -2406,12 +2572,12 @@ export default function IrrigationGenerate({
 		}
 	}, [
 		isMapLoaded,
-		irrigationPositions.sprinklers,
-		irrigationPositions.pivots,
-		irrigationPositions.dripTapes,
-		irrigationPositions.waterJets,
 		irrigationSettings.sprinkler_system?.coverageRadius,
-		irrigationSettings.pivot?.coverageRadius
+		irrigationSettings.pivot?.coverageRadius,
+		irrigationPositions.dripTapes,
+		irrigationPositions.pivots,
+		irrigationPositions.sprinklers,
+		irrigationPositions.waterJets
 	]);
 
 	return (
@@ -2681,9 +2847,14 @@ export default function IrrigationGenerate({
 												}`} 
 												style={{ backgroundColor: selectedIrrigationType === 'sprinkler_system' ? '#3b82f6' : '#000005' }}
 											>
-												<div className="text-lg mb-1">💧</div>
+												<div className="text-lg mb-1">🚿</div>
 												<h4 className="text-xs font-medium text-white">{t('Sprinkler')}</h4>
 												<p className="text-xs text-gray-400">{t('Wide area coverage')}</p>
+												{irrigationCounts.sprinkler_system > 0 && (
+													<div className="text-xs text-blue-300 mt-1">
+														{irrigationCounts.sprinkler_system} {t('generated')}
+													</div>
+												)}
 											</div>
 											
 											<div 
@@ -2698,6 +2869,11 @@ export default function IrrigationGenerate({
 												<div className="text-lg mb-1">🔄</div>
 												<h4 className="text-xs font-medium text-white">{t('System Pivot')}</h4>
 												<p className="text-xs text-gray-400">{t('Rotating irrigation')}</p>
+												{irrigationCounts.pivot > 0 && (
+													<div className="text-xs text-orange-300 mt-1">
+														{irrigationCounts.pivot} {t('generated')}
+													</div>
+												)}
 											</div>
 											
 											<div 
@@ -2712,6 +2888,11 @@ export default function IrrigationGenerate({
 												<div className="text-lg mb-1">🌊</div>
 												<h4 className="text-xs font-medium text-white">{t('Water Jet Tape')}</h4>
 												<p className="text-xs text-gray-400">{t('Precise water jets')}</p>
+												{irrigationCounts.water_jet_tape > 0 && (
+													<div className="text-xs text-orange-300 mt-1">
+														{irrigationCounts.water_jet_tape} {t('generated')}
+													</div>
+												)}
 											</div>
 											
 											<div 
@@ -2726,9 +2907,71 @@ export default function IrrigationGenerate({
 												<div className="text-lg mb-1">💧</div>
 												<h4 className="text-xs font-medium text-white">{t('Drip Tape')}</h4>
 												<p className="text-xs text-gray-400">{t('Water efficient dripping')}</p>
+												{irrigationCounts.drip_tape > 0 && (
+													<div className="text-xs text-blue-300 mt-1">
+														{irrigationCounts.drip_tape} {t('generated')}
+													</div>
+												)}
 											</div>
 										</div>
 									</div>
+
+									{/* Irrigation Equipment Summary */}
+									{(irrigationPositions.sprinklers.length > 0 ||
+										irrigationPositions.pivots.length > 0 ||
+										irrigationPositions.dripTapes.length > 0 ||
+										irrigationPositions.waterJets.length > 0) && (
+										<div className="rounded-lg p-4 border border-blue-500" style={{ backgroundColor: '#000005' }}>
+											<h3 className="text-sm font-semibold text-blue-400 mb-3">
+												💧 {t('Irrigation Equipment Summary')}
+											</h3>
+											<div className="space-y-2 text-xs">
+												{irrigationPositions.sprinklers.length > 0 && (
+													<div className="flex justify-between text-gray-400">
+														<span>🚿 {t('Sprinklers')}:</span>
+														<span className="text-blue-400">
+															{irrigationPositions.sprinklers.length} {t('units')}
+														</span>
+													</div>
+												)}
+												{irrigationPositions.pivots.length > 0 && (
+													<div className="flex justify-between text-gray-400">
+														<span>🔄 {t('Pivots')}:</span>
+														<span className="text-orange-400">
+															{irrigationPositions.pivots.length} {t('units')}
+														</span>
+													</div>
+												)}
+												{irrigationPositions.dripTapes.length > 0 && (
+													<div className="flex justify-between text-gray-400">
+														<span>💧 {t('Drip Tapes')}:</span>
+														<span className="text-blue-400">
+															{irrigationPositions.dripTapes.length} {t('units')}
+														</span>
+													</div>
+												)}
+												{irrigationPositions.waterJets.length > 0 && (
+													<div className="flex justify-between text-gray-400">
+														<span>🌊 {t('Water Jets')}:</span>
+														<span className="text-orange-400">
+															{irrigationPositions.waterJets.length} {t('units')}
+														</span>
+													</div>
+												)}
+												<div className="border-t border-gray-600 pt-2 mt-2">
+													<div className="flex justify-between text-gray-300">
+														<span>{t('Total Equipment')}:</span>
+														<span className="text-green-400 font-semibold">
+															{irrigationPositions.sprinklers.length + 
+															 irrigationPositions.pivots.length + 
+															 irrigationPositions.dripTapes.length + 
+															 irrigationPositions.waterJets.length} {t('units')}
+														</span>
+													</div>
+												</div>
+											</div>
+										</div>
+									)}
 
 									{/* Step Completion Status */}
 									{(irrigationPositions.sprinklers.length > 0 ||
@@ -2745,10 +2988,10 @@ export default function IrrigationGenerate({
 												</h3>
 											</div>
 											<div className="text-xs text-green-300 mt-2">
-												{irrigationPositions.sprinklers.length > 0 && `${irrigationPositions.sprinklers.length} ${t('sprinklers')} `}
-												{irrigationPositions.pivots.length > 0 && `${irrigationPositions.pivots.length} ${t('pivots')} `}
-												{irrigationPositions.dripTapes.length > 0 && `${irrigationPositions.dripTapes.length} ${t('drip points')} `}
-												{irrigationPositions.waterJets.length > 0 && `${irrigationPositions.waterJets.length} ${t('water jets')} `}
+												{irrigationPositions.sprinklers.length > 0 && `🚿 ${irrigationPositions.sprinklers.length} ${t('sprinklers')} `}
+												{irrigationPositions.pivots.length > 0 && `🔄 ${irrigationPositions.pivots.length} ${t('pivots')} `}
+												{irrigationPositions.dripTapes.length > 0 && `💧 ${irrigationPositions.dripTapes.length} ${t('drip points')} `}
+												{irrigationPositions.waterJets.length > 0 && `🌊 ${irrigationPositions.waterJets.length} ${t('water jets')} `}
 												{t('generated successfully')}
 											</div>
 										</div>
@@ -2784,8 +3027,8 @@ export default function IrrigationGenerate({
 											setIrrigationSettings({
 												sprinkler_system: { coverageRadius: 8, overlap: 0, flow: 10, pressure: 2.5 },
 												pivot: { coverageRadius: 165, overlap: 0, flow: 50, pressure: 3.0 },
-												drip_tape: { emitterSpacing: 20, placement: 'along_rows', side: 'left' },
-												water_jet_tape: { emitterSpacing: 20, placement: 'along_rows', side: 'left' },
+												drip_tape: { emitterSpacing: 20, placement: 'along_rows', side: 'left', flow: 0.24, pressure: 1.0 },
+												water_jet_tape: { emitterSpacing: 20, placement: 'along_rows', side: 'left', flow: 1.5, pressure: 1.5 },
 											});
 											
 											// Clear irrigation counts
