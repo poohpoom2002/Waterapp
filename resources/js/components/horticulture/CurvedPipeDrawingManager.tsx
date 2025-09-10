@@ -233,7 +233,7 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
     onPipeComplete,
     onCancel,
     strokeColor = '#ff4444',
-    strokeWeight = 4,
+    strokeWeight = 3,
     showGuides = true,
     onAnchorPointsChange
 }) => {
