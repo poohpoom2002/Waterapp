@@ -40,6 +40,10 @@ interface LateralPipeInfoPanelProps {
     currentPoint: Coordinate | null;
     snappedStartPoint?: Coordinate | null; // เพิ่มสำหรับคำนวณความยาวท่อสีเขียว
     alignedCurrentPoint?: Coordinate | null; // เพิ่มสำหรับคำนวณความยาวท่อสีเขียว
+    // 🚀 เพิ่มสำหรับ multi-segment
+    waypoints?: Coordinate[];
+    isMultiSegmentMode?: boolean;
+    segmentCount?: number;
     onCancel: () => void;
     onConfirm: () => void;
     t: (key: string) => string;
@@ -55,6 +59,10 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
     currentPoint,
     snappedStartPoint,
     alignedCurrentPoint,
+    // 🚀 เพิ่มสำหรับ multi-segment
+    waypoints = [],
+    isMultiSegmentMode = false,
+    segmentCount = 1,
     onCancel,
     onConfirm,
     t
@@ -62,21 +70,49 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
     if (!isVisible) return null;
 
     const calculateLength = (): number => {
-        // ใช้เส้นสีเขียว (snap/aligned) สำหรับคำนวณความยาว
-        const effectiveStartPoint = snappedStartPoint || startPoint;
-        const effectiveEndPoint = alignedCurrentPoint || currentPoint;
-        
-        if (!effectiveStartPoint || !effectiveEndPoint) return 0;
-        
-        const R = 6371000; // Earth's radius in meters
-        const dLat = (effectiveEndPoint.lat - effectiveStartPoint.lat) * Math.PI / 180;
-        const dLng = (effectiveEndPoint.lng - effectiveStartPoint.lng) * Math.PI / 180;
-        const a = 
-            Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(effectiveStartPoint.lat * Math.PI / 180) * Math.cos(effectiveEndPoint.lat * Math.PI / 180) * 
-            Math.sin(dLng/2) * Math.sin(dLng/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        return R * c;
+        // 🚀 รองรับ multi-segment calculation
+        if (isMultiSegmentMode && waypoints.length > 0) {
+            // Multi-segment: คำนวณความยาวรวมทุกส่วน
+            const effectiveStartPoint = snappedStartPoint || startPoint;
+            const effectiveEndPoint = alignedCurrentPoint || currentPoint;
+            
+            if (!effectiveStartPoint || !effectiveEndPoint) return 0;
+            
+            const allPoints = [effectiveStartPoint, ...waypoints, effectiveEndPoint];
+            let totalLength = 0;
+            
+            for (let i = 0; i < allPoints.length - 1; i++) {
+                const segmentStart = allPoints[i];
+                const segmentEnd = allPoints[i + 1];
+                
+                const R = 6371000; // รัศมีโลกเป็นเมตร
+                const dLat = (segmentEnd.lat - segmentStart.lat) * Math.PI / 180;
+                const dLng = (segmentEnd.lng - segmentStart.lng) * Math.PI / 180;
+                const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                        Math.cos(segmentStart.lat * Math.PI / 180) * Math.cos(segmentEnd.lat * Math.PI / 180) * 
+                        Math.sin(dLng/2) * Math.sin(dLng/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                totalLength += R * c;
+            }
+            
+            return totalLength;
+        } else {
+            // Single-segment (เดิม)
+            const effectiveStartPoint = snappedStartPoint || startPoint;
+            const effectiveEndPoint = alignedCurrentPoint || currentPoint;
+            
+            if (!effectiveStartPoint || !effectiveEndPoint) return 0;
+            
+            const R = 6371000; // Earth's radius in meters
+            const dLat = (effectiveEndPoint.lat - effectiveStartPoint.lat) * Math.PI / 180;
+            const dLng = (effectiveEndPoint.lng - effectiveStartPoint.lng) * Math.PI / 180;
+            const a = 
+                Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(effectiveStartPoint.lat * Math.PI / 180) * Math.cos(effectiveEndPoint.lat * Math.PI / 180) * 
+                Math.sin(dLng/2) * Math.sin(dLng/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
     };
 
     const length = calculateLength();
@@ -123,6 +159,25 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
                     )}
                 </div>
             </div>
+
+            {/* 🚀 Multi-segment Info */}
+            {isMultiSegmentMode && waypoints.length > 0 && (
+                <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-md">
+                    <div className="flex items-center gap-2 text-orange-700 mb-2">
+                        <span className="text-lg">🔄</span>
+                        <span className="text-sm font-medium">
+                            {t('ท่อแบบหักเลี้ยว') || 'ท่อแบบหักเลี้ยว'}
+                        </span>
+                    </div>
+                    <div className="text-sm text-orange-600 space-y-1">
+                        <div>📍 {t('จุดหักเลี้ยว') || 'จุดหักเลี้ยว'}: {waypoints.length} {t('จุด') || 'จุด'}</div>
+                        <div>📏 {t('ส่วนท่อ') || 'ส่วนท่อ'}: {waypoints.length + 1} {t('ส่วน') || 'ส่วน'}</div>
+                        <div className="text-xs text-orange-500 mt-2 p-2 bg-orange-100 rounded">
+                            💡 {t('คลิกขวาเพื่อเพิ่มจุดหักเลี้ยว, คลิกซ้ายเพื่อจบการวาด') || 'คลิกขวาเพื่อเพิ่มจุดหักเลี้ยว, คลิกซ้ายเพื่อจบการวาด'}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Real-time Statistics */}
             <div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-lg p-4 border border-gray-200 mb-4">
