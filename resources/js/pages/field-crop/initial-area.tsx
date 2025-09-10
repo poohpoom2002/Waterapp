@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { Head } from '@inertiajs/react';
-import { router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Navbar from '../../components/Navbar';
 import HorticultureMapComponent from '../../components/horticulture/HorticultureMapComponent';
@@ -25,6 +24,9 @@ const hasSetMap = (obj: unknown): obj is { setMap: (map: google.maps.Map | null)
 };
 const detachOverlay = (overlay: unknown) => { if (hasSetMap(overlay)) overlay.setMap(null); };
 
+// Types and Interfaces
+type Coordinate = { lat: number; lng: number };
+
 interface InitialAreaProps {
     crops?: string;
     currentStep?: number;
@@ -47,7 +49,6 @@ interface StepData {
     route: string;
 }
 
- 
 interface PlantPoint {
     id: string;
     lat: number;
@@ -56,11 +57,10 @@ interface PlantPoint {
     isValid: boolean;
 }
 
-// Obstacle interface
 interface Obstacle {
     id: string;
     type: 'water_source' | 'other';
-    coordinates: { lat: number; lng: number }[];
+    coordinates: Coordinate[];
     name?: string;
 }
 
@@ -82,7 +82,35 @@ export default function InitialArea({
     const [completed, setCompleted] = useState<number[]>([]);
     const activeStep = currentStep;
 
-    // Spacing states
+    // Map and Area States
+    const [map, setMap] = useState<google.maps.Map | null>(null);
+    const [mapCenter, setMapCenter] = useState<[number, number]>([13.7563, 100.5018]);
+    const [mapZoom, setMapZoom] = useState<number>(16);
+    const [mainArea, setMainArea] = useState<Coordinate[]>([]);
+    const [areaRai, setAreaRai] = useState<number | null>(null);
+    const [perimeterMeters, setPerimeterMeters] = useState<number | null>(null);
+    const [isMainAreaSet, setIsMainAreaSet] = useState<boolean>(false);
+    const [isEditingMainArea, setIsEditingMainArea] = useState<boolean>(false);
+
+    // Drawing States
+    const [isDrawing, setIsDrawing] = useState<boolean>(false);
+    const [drawingManagerRef, setDrawingManagerRef] = useState<google.maps.drawing.DrawingManager | null>(null);
+    const [selectedShape, setSelectedShape] = useState<string>('polygon');
+    const [drawnPolygon, setDrawnPolygon] = useState<google.maps.Polygon | null>(null);
+
+    // Plant and Obstacle States
+    const [plantPoints, setPlantPoints] = useState<PlantPoint[]>([]);
+    const [isGeneratingPlants, setIsGeneratingPlants] = useState<boolean>(false);
+    const [obstacles, setObstacles] = useState<Obstacle[]>([]);
+    const [isDrawingObstacle, setIsDrawingObstacle] = useState<boolean>(false);
+    const [selectedObstacleType, setSelectedObstacleType] = useState<'water_source' | 'other'>('water_source');
+    const [obstacleOverlays, setObstacleOverlays] = useState<google.maps.Polygon[]>([]);
+    const [distanceOverlaysByObstacle, setDistanceOverlaysByObstacle] = useState<Record<string, { lines: google.maps.Polyline[]; labels: google.maps.Marker[] }>>({});
+
+    // Rotation State
+    const [rotationAngle, setRotationAngle] = useState<number>(0);
+
+    // Spacing States
     const [rowSpacing, setRowSpacing] = useState<Record<string, number>>({});
     const [plantSpacing, setPlantSpacing] = useState<Record<string, number>>({});
     const [tempRowSpacing, setTempRowSpacing] = useState<Record<string, string>>({});
@@ -90,46 +118,22 @@ export default function InitialArea({
     const [editingRowSpacingForCrop, setEditingRowSpacingForCrop] = useState<string | null>(null);
     const [editingPlantSpacingForCrop, setEditingPlantSpacingForCrop] = useState<string | null>(null);
 
-    type Coordinate = { lat: number; lng: number };
-    const [map, setMap] = useState<google.maps.Map | null>(null);
-    const [mapCenter, setMapCenter] = useState<[number, number]>([13.7563, 100.5018]);
-    const [mapZoom, setMapZoom] = useState<number>(16);
-    const [mainArea, setMainArea] = useState<Coordinate[]>([]);
-    const [areaRai, setAreaRai] = useState<number | null>(null);
-    const [perimeterMeters, setPerimeterMeters] = useState<number | null>(null);
-    const [isDrawing, setIsDrawing] = useState<boolean>(false);
-    const [drawingManagerRef, setDrawingManagerRef] = useState<google.maps.drawing.DrawingManager | null>(null);
-    const [selectedShape, setSelectedShape] = useState<string>('polygon');
-    const [drawnPolygon, setDrawnPolygon] = useState<google.maps.Polygon | null>(null);
-    const [isMainAreaSet, setIsMainAreaSet] = useState<boolean>(false);
-
-    // Plant points and obstacles states
-    const [plantPoints, setPlantPoints] = useState<PlantPoint[]>([]);
-    const [rotationAngle, setRotationAngle] = useState<number>(0);
-    const [obstacles, setObstacles] = useState<Obstacle[]>([]);
-    const [isGeneratingPlants, setIsGeneratingPlants] = useState<boolean>(false);
-	    const [isDrawingObstacle, setIsDrawingObstacle] = useState<boolean>(false);
-	const [selectedObstacleType, setSelectedObstacleType] = useState<'water_source' | 'other'>('water_source');
-    const [obstacleOverlays, setObstacleOverlays] = useState<google.maps.Polygon[]>([]);
-    const [distanceOverlaysByObstacle, setDistanceOverlaysByObstacle] = useState<Record<string, { lines: google.maps.Polyline[]; labels: google.maps.Marker[] }>>({});
-    const [isEditingMainArea, setIsEditingMainArea] = useState<boolean>(false);
-
-    // Refs to avoid stale state inside Google Maps listeners
+    // Refs for state synchronization
     const mainAreaRef = useRef<Coordinate[]>(mainArea);
     const obstaclesRef = useRef<Obstacle[]>(obstacles);
     const drawnPolygonRef = useRef<google.maps.Polygon | null>(drawnPolygon);
     const selectedObstacleTypeRef = useRef<'water_source' | 'other'>(selectedObstacleType);
-    
-    // [FIX] Enhanced refs for race condition prevention
-    const currentGenerationIdRef = useRef<number>(0);
-    const plantPointMarkersRef = useRef<google.maps.Marker[]>([]);
-    const listenersRef = useRef<google.maps.MapsEventListener[]>([]);
-    const rotationTimerRef = useRef<NodeJS.Timeout | null>(null);
-    // Refs mirroring state used in unmount cleanup to satisfy exhaustive-deps without re-running effect
     const obstacleOverlaysRef = useRef<google.maps.Polygon[]>([]);
     const distanceOverlaysByObstacleRef = useRef<Record<string, { lines: google.maps.Polyline[]; labels: google.maps.Marker[] }>>({});
     const drawingManagerObjRef = useRef<google.maps.drawing.DrawingManager | null>(null);
 
+    // Refs for race condition prevention and cleanup
+    const currentGenerationIdRef = useRef<number>(0);
+    const plantPointMarkersRef = useRef<google.maps.Marker[]>([]);
+    const listenersRef = useRef<google.maps.MapsEventListener[]>([]);
+    const rotationTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+    // State synchronization effects
     useEffect(() => { mainAreaRef.current = mainArea; }, [mainArea]);
     useEffect(() => { obstaclesRef.current = obstacles; }, [obstacles]);
     useEffect(() => { drawnPolygonRef.current = drawnPolygon; }, [drawnPolygon]);
@@ -138,7 +142,7 @@ export default function InitialArea({
     useEffect(() => { distanceOverlaysByObstacleRef.current = distanceOverlaysByObstacle; }, [distanceOverlaysByObstacle]);
     useEffect(() => { drawingManagerObjRef.current = drawingManagerRef; }, [drawingManagerRef]);
     
-    // [FIX] Master cleanup function for component unmount
+    // Component cleanup effect
     useEffect(() => {
         const startingGenerationId = currentGenerationIdRef.current;
         return () => {
@@ -178,6 +182,8 @@ export default function InitialArea({
         };
     }, []);
 
+    // ===== UTILITY FUNCTIONS =====
+    
     // Compute area and perimeter for a set of coordinates with optional holes
     const computeAreaAndPerimeter = useCallback((coordinates: Coordinate[], holes: Coordinate[][] = []) => {
         try {
@@ -208,7 +214,7 @@ export default function InitialArea({
         }
     }, []);
 
-    // Helper functions to extract coordinates from Google Maps shapes
+    // Coordinate extraction functions
     const extractCoordinatesFromPolygon = useCallback((polygon: google.maps.Polygon): Coordinate[] => {
         const coordinates: Coordinate[] = [];
         const path = polygon.getPath();
@@ -303,6 +309,8 @@ export default function InitialArea({
         return d * 111000; // rough conversion to meters
     }, [distanceToPolygonEdgeGeneric]);
 
+    // ===== CROP AND SPACING FUNCTIONS =====
+    
 	const getCropSpacingInfo = useCallback((cropValue: string) => {
 		const crop = getCropByValue(cropValue);
 		const defaultRowSpacing = crop?.rowSpacing ?? 50;
@@ -320,7 +328,9 @@ export default function InitialArea({
 		};
 	}, [rowSpacing, plantSpacing, language]);
 
-    // [FIX] Enhanced function to clear all existing plant markers immediately
+    // ===== PLANT POINT FUNCTIONS =====
+    
+    // Enhanced function to clear all existing plant markers immediately
     const clearAllPlantMarkers = useCallback(() => {
         log('Clearing all existing plant markers...');
         
@@ -707,7 +717,7 @@ export default function InitialArea({
         setDistanceOverlaysByObstacle(prev => ({ ...prev, [obstacle.id]: overlays }));
     }, [map, mainArea, computeCentroid, toLocalXY, toLatLngFromXY]);
 
-    // Recreate map overlays when data is loaded from localStorage
+    // Main area polygon rendering effect
     useEffect(() => {
         if (!map || !isMainAreaSet || mainArea.length < 3 || isEditingMainArea) return;
 
@@ -764,7 +774,7 @@ export default function InitialArea({
         log('Recreated main area polygon from localStorage data');
     }, [map, isMainAreaSet, mainArea, computeAreaAndPerimeter, isEditingMainArea]);
 
-    // Recreate obstacle overlays when obstacles are loaded from localStorage
+    // Obstacle overlays rendering effect
     useEffect(() => {
         if (!map || obstacles.length === 0) return;
 
@@ -807,7 +817,7 @@ export default function InitialArea({
         log('Recreated obstacle overlays from localStorage data:', obstacles.length, 'obstacles');
     }, [map, obstacles, createDistanceOverlaysForWaterObstacle]);
 
-    // [FIX] Enhanced plant point recreation with proper cleanup
+    // Plant points markers rendering effect
     useEffect(() => {
         if (!map) return;
         
@@ -980,6 +990,8 @@ export default function InitialArea({
         return { perPlant, total };
     }, [selectedCrops, plantPoints.length]);
 
+    // ===== OBSTACLE FUNCTIONS =====
+    
     // Clear obstacles function
     const clearObstacles = useCallback(() => {
         setObstacles([]);
@@ -1090,7 +1102,7 @@ export default function InitialArea({
         }
     ];
 
-    // Initialize data from URL parameters, props, or localStorage with enhanced validation
+    // Data initialization effect
 	useEffect(() => {
 		// If this is a browser reload, mirror the Reset behavior on this page
 		const navEntries = (typeof performance !== 'undefined' && typeof performance.getEntriesByType === 'function')
@@ -1167,10 +1179,10 @@ export default function InitialArea({
 					drawnPolygonRef.current.setMap(null);
 					drawnPolygonRef.current = null;
 				}
-				obstacleOverlays.forEach(overlay => overlay.setMap(null));
+				obstacleOverlaysRef.current.forEach(overlay => overlay.setMap(null));
 				setObstacleOverlays([]);
 				clearAllPlantMarkers();
-				Object.values(distanceOverlaysByObstacle).forEach(({ lines, labels }) => {
+				Object.values(distanceOverlaysByObstacleRef.current).forEach(({ lines, labels }) => {
 					lines.forEach(l => l.setMap(null));
 					labels.forEach(lb => lb.setMap(null));
 				});
@@ -1700,6 +1712,8 @@ export default function InitialArea({
         }));
     };
 
+    // ===== EVENT HANDLERS =====
+    
     const handleSearch = useCallback((lat: number, lng: number) => {
         setMapCenter([lat, lng]);
         if (map) {
