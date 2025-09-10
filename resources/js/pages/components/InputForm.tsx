@@ -62,6 +62,7 @@ const InputForm: React.FC<InputFormProps> = ({
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [validationMessages, setValidationMessages] = useState<string[]>([]);
     const [pipeData, setPipeData] = useState<any[]>([]);
+    const [gardenWaterRequirement, setGardenWaterRequirement] = useState<number>(0);
     const { t } = useLanguage();
 
     // ฟังก์ชันคำนวณพื้นที่โซนจาก coordinates (นำมาจาก HorticultureResultsPage.tsx)
@@ -138,6 +139,41 @@ const InputForm: React.FC<InputFormProps> = ({
         };
         fetchPipeData();
     }, []);
+
+    // Garden mode: ดึงข้อมูล water requirement จาก garden statistics (แยกแต่ละโซน)
+    useEffect(() => {
+        if (projectMode === 'garden' && activeZone) {
+            try {
+                const gardenStatsStr = localStorage.getItem('garden_statistics');
+                if (gardenStatsStr) {
+                    const gardenStats = JSON.parse(gardenStatsStr);
+                    if (gardenStats.zones && gardenStats.zones.length > 0) {
+                        // หาข้อมูลของโซนปัจจุบัน
+                        const currentZoneStats = gardenStats.zones.find((zone: any) => 
+                            zone.zoneId === activeZone.id
+                        );
+                        
+                        if (currentZoneStats && currentZoneStats.sprinklerFlowRate && currentZoneStats.sprinklerCount) {
+                            const zoneWaterRequirement = currentZoneStats.sprinklerFlowRate * currentZoneStats.sprinklerCount;
+                            
+                            setGardenWaterRequirement(zoneWaterRequirement);
+                            
+                            // Update input.waterPerTreeLiters with zone-specific value (only if significantly different)
+                            if (zoneWaterRequirement > 0 && Math.abs(zoneWaterRequirement - input.waterPerTreeLiters) > 0.01) {
+                                onInputChange({
+                                    ...input,
+                                    waterPerTreeLiters: zoneWaterRequirement
+                                });
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading garden zone statistics:', error);
+            }
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [projectMode, activeZone?.id]);
 
     const isMultiZone = input.numberOfZones > 1;
 
@@ -531,11 +567,17 @@ const InputForm: React.FC<InputFormProps> = ({
                             </label>
                             <input
                                 type="number"
-                                defaultValue={input.waterPerTreeLiters}
+                                value={input.waterPerTreeLiters}
                                 onChange={(e) => {
-                                    const value = parseFloat(e.target.value);
-                                    if (!isNaN(value)) {
-                                        updateInput('waterPerTreeLiters', value);
+                                    const value = e.target.value;
+                                    // Allow empty string for controlled input
+                                    if (value === '') {
+                                        updateInput('waterPerTreeLiters', 0);
+                                    } else {
+                                        const num = parseFloat(value);
+                                        if (!isNaN(num)) {
+                                            updateInput('waterPerTreeLiters', num);
+                                        }
                                     }
                                 }}
                                 onBlur={(e) => updateInputOnBlur('waterPerTreeLiters', e.target.value)}

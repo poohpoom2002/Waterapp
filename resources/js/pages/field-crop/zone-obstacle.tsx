@@ -10,12 +10,13 @@ import { parseCompletedSteps, toCompletedStepsCsv } from '../../utils/stepUtils'
 import { getTranslatedCropByValue } from './choose-crop';
 
 // ==================== CONSTANTS ====================
+// 🎨 ใช้สีชุดเดียวกับ ZONE_COLORS ใน horticultureUtils.ts
+// 🌈 5 โซนแรกใช้สีที่แตกต่างกันมากที่สุด
 const ZONE_COLORS = [
-	'#FF6B6B', '#82E0AA', '#45B7D1', '#BB8FCE',
-	'#98D8C8', '#F7DC6F', '#4ECDC4', '#85C1E9',
-	'#F8C471', '#A3E4D7', '#AED6F1', '#D7BDE2',
-	'#F9E79F', '#A9DFBF', '#FAD7A0', '#D5A6BD',
-	'#82E0AA', '#F7DC6F', '#D2B4DE', '#AED6F1'
+	'#FF6B6B', '#9B59B6', '#F39C12', '#1ABC9C', '#3498DB',
+	'#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
+	'#F8C471', '#82E0AA', '#F1948A', '#AED6F1', '#D2B4DE',
+	'#F9E79F', '#A9DFBF', '#FAD7A0', '#D5A6BD', '#B2DFDB'
 ];
 
 const DEFAULT_IRRIGATION_COUNTS = {

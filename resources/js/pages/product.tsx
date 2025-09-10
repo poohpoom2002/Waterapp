@@ -2212,31 +2212,7 @@ export default function Product() {
                                     projectMode={projectMode}
                                 />
 
-                                {(projectMode === 'horticulture' || showPumpOption) && (
-                                        <PumpSelector
-                                            results={results}
-                                            selectedPump={effectiveEquipment.pump}
-                                            onPumpChange={handlePumpChange}
-                                            zoneOperationGroups={zoneOperationGroups}
-                                            zoneInputs={zoneInputs}
-                                            zoneOperationMode={zoneOperationMode}
-                                            simultaneousZonesCount={
-                                                zoneOperationMode === 'simultaneous'
-                                                    ? zones.length
-                                                    : zoneOperationMode === 'custom'
-                                                      ? Math.max(
-                                                            ...zoneOperationGroups.map(
-                                                                (g) => g.zones.length
-                                                            )
-                                                        )
-                                                      : 1
-                                            }
-                                            selectedZones={zones.map((z) => z.id)}
-                                            projectMode={projectMode}
-                                        />
-                                    )}
-                                
-                                <CalculationSummary
+<CalculationSummary
                                     results={results}
                                     input={currentInput}
                                     selectedSprinkler={currentSprinkler}
@@ -2266,6 +2242,34 @@ export default function Product() {
                                     greenhouseData={greenhouseData}
                                     gardenStats={gardenStats}
                                 />
+
+                                {(projectMode === 'horticulture' || showPumpOption) && (
+                                        <PumpSelector
+                                            results={results}
+                                            selectedPump={effectiveEquipment.pump}
+                                            onPumpChange={handlePumpChange}
+                                            zoneOperationGroups={zoneOperationGroups}
+                                            zoneInputs={zoneInputs}
+                                            zoneOperationMode={zoneOperationMode}
+                                            simultaneousZonesCount={
+                                                zoneOperationMode === 'simultaneous'
+                                                    ? zones.length
+                                                    : zoneOperationMode === 'custom'
+                                                      ? Math.max(
+                                                            ...zoneOperationGroups.map(
+                                                                (g) => g.zones.length
+                                                            )
+                                                        )
+                                                      : 1
+                                            }
+                                            selectedZones={zones.map((z) => z.id)}
+                                            allZoneResults={results?.allZoneResults}
+                                            projectSummary={results?.projectSummary}
+                                            projectMode={projectMode}
+                                        />
+                                    )}
+                                
+                                
 
                                 
 

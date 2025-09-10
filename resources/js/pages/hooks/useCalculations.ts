@@ -536,9 +536,10 @@ const autoSelectBestPipe = (
         velocityMax = 3.0;
         minPressure = 6;
     } else if (projectMode === 'garden') {
+        // Garden mode now uses the same criteria as horticulture
         velocityMin = 0.3;
-        velocityMax = 3.2;
-        minPressure = 4;
+        velocityMax = 3.5;
+        minPressure = 6;
     }
 
     const suitablePipes = analyzedPipes.filter((pipe) => {

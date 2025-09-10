@@ -60,7 +60,32 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
     // ฟังก์ชันสำหรับดึงค่า Head Loss จากท่อแต่ละชนิด
     const getActualPipeHeadLoss = () => {
         if (projectMode === 'garden') {
-            // สำหรับ garden mode ใช้ข้อมูลจาก auto-selected pipes
+            // สำหรับ garden mode ใช้ข้อมูลจาก PipeSelector calculations ที่เก็บใน localStorage
+            try {
+                const pipeCalculationsStr = localStorage.getItem('garden_pipe_calculations');
+                if (pipeCalculationsStr) {
+                    const pipeCalculations = JSON.parse(pipeCalculationsStr);
+                    
+                    const branchHeadLoss = pipeCalculations.branch?.headLoss || 0;
+                    const secondaryHeadLoss = pipeCalculations.secondary?.headLoss || 0;
+                    const mainHeadLoss = pipeCalculations.main?.headLoss || 0;
+                    const emitterHeadLoss = pipeCalculations.emitter?.headLoss || 0;
+
+                    const totalHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+
+                    return {
+                        branch: branchHeadLoss,
+                        secondary: secondaryHeadLoss,
+                        main: mainHeadLoss,
+                        emitter: emitterHeadLoss,
+                        total: totalHeadLoss,
+                    };
+                }
+            } catch (error) {
+                console.error('Error loading garden pipe calculations:', error);
+            }
+            
+            // Fallback: ใช้ข้อมูลจาก auto-selected pipes
             const branchHeadLoss = actualBranchPipe?.headLoss || 0;
             const secondaryHeadLoss = actualSecondaryPipe?.headLoss || 0;
             const mainHeadLoss = actualMainPipe?.headLoss || 0;
@@ -505,9 +530,8 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         <p className="text-xl font-bold">
                             {(() => {
                                 if (projectMode === 'garden') {
-                                    // สำหรับ garden mode ใช้ข้อมูลจาก input
-                                    const totalFlow = input.waterPerTreeLiters * input.totalTrees;
-                                    return totalFlow.toFixed(1);
+                                    // สำหรับ garden mode ใช้ข้อมูลจาก input ต้องการน้ำ (คำนวณอัตโนมัติจาก garden statistics)
+                                    return input.waterPerTreeLiters.toFixed(1);
                                 } else {
                                     return (results.totalWaterRequiredLPM || 0).toFixed(1);
                                 }
