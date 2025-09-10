@@ -432,17 +432,23 @@ export const findSubMainToLateralStartConnections = (
                 continue; // ข้าม - ต่างโซนกัน
             }
 
-            // ตรวจสอบว่าจุดเริ่มต้นของ lateral pipe อยู่บน submain pipe หรือไม่
-            if (isPointOnSubMainPipe(lateralStart, subMainPipe, snapThreshold)) {
-                // หาจุดที่ใกล้ที่สุดบน submain pipe
-                const closestPoint = findClosestConnectionPoint(lateralStart, subMainPipe);
-                
-                if (closestPoint) {
+            // 🔧 ปรับปรุงการตรวจสอบและคำนวณจุดเชื่อมต่อ
+            const closestPoint = findClosestConnectionPoint(lateralStart, subMainPipe);
+            
+            if (closestPoint) {
+                const distance = calculateDistanceBetweenPoints(lateralStart, closestPoint);
+
+                if (distance <= snapThreshold) {
                     connections.push({
                         subMainPipeId: subMainPipe.id,
                         lateralPipeId: lateralPipe.id,
-                        connectionPoint: closestPoint
+                        connectionPoint: {
+                            lat: parseFloat(closestPoint.lat.toFixed(8)),
+                            lng: parseFloat(closestPoint.lng.toFixed(8))
+                        }
                     });
+                } else {
+                    console.log(`❌ Rejected lateral-submain connection: distance ${distance.toFixed(2)}m > threshold ${snapThreshold}m`);
                 }
             }
         }
@@ -765,7 +771,7 @@ export const isPointOnSubMainPipe = (
     return false;
 };
 
-// ฟังก์ชันหาจุดเชื่อมต่อที่ใกล้ที่สุดบนท่อเมนรอง (รวมถึง endpoints)
+// ฟังก์ชันหาจุดเชื่อมต่อที่ใกล้ที่สุดบนท่อเมนรอง (ปรับปรุงให้แม่นยำขึ้น)
 export const findClosestConnectionPoint = (
     point: Coordinate,
     subMainPipe: SubMainPipe
@@ -776,37 +782,54 @@ export const findClosestConnectionPoint = (
 
     let closestPoint: Coordinate | null = null;
     let minDistance = Infinity;
+    let bestSegmentIndex = -1;
 
-    // 🔥 ตรวจสอบ endpoints ของท่อเมนรองก่อน
+    // 🔧 ปรับปรุงการหาจุดใกล้ที่สุด - ให้ความสำคัญกับ perpendicular projection
+    for (let i = 0; i < subMainPipe.coordinates.length - 1; i++) {
+        const segmentStart = subMainPipe.coordinates[i];
+        const segmentEnd = subMainPipe.coordinates[i + 1];
+        
+        // คำนวณจุดที่ฉายลงบน line segment (perpendicular projection)
+        const pointOnSegment = findClosestPointOnLineSegment(point, segmentStart, segmentEnd);
+        const distance = calculateDistanceBetweenPoints(point, pointOnSegment);
+        
+        // ตรวจสอบว่าการฉายลงนั้นอยู่บน segment จริงๆ หรือเป็น endpoint
+        const segmentLength = calculateDistanceBetweenPoints(segmentStart, segmentEnd);
+        const distanceFromStart = calculateDistanceBetweenPoints(segmentStart, pointOnSegment);
+        const distanceFromEnd = calculateDistanceBetweenPoints(segmentEnd, pointOnSegment);
+        
+        // ถ้าจุดที่ฉายลงอยู่ภายใน segment (ไม่ใช่ endpoint) ให้ความสำคัญมากขึ้น
+        const isWithinSegment = distanceFromStart < segmentLength - 0.001 && distanceFromEnd < segmentLength - 0.001;
+        const adjustedDistance = isWithinSegment ? distance * 0.8 : distance; // ลดน้ำหนัก 20% ถ้าอยู่ใน segment
+        
+        if (adjustedDistance < minDistance) {
+            minDistance = adjustedDistance;
+            closestPoint = {
+                lat: parseFloat(pointOnSegment.lat.toFixed(8)), // ปัดเศษให้แม่นยำ
+                lng: parseFloat(pointOnSegment.lng.toFixed(8))
+            };
+            bestSegmentIndex = i;
+        }
+    }
+    
+    // 🔧 ตรวจสอบ endpoints แยกต่างหาก เพื่อให้แน่ใจว่าไม่พลาด
     const startPoint = subMainPipe.coordinates[0];
     const endPoint = subMainPipe.coordinates[subMainPipe.coordinates.length - 1];
     
-    // ตรวจสอบระยะห่างจากจุดเริ่มต้น
     const distanceToStart = calculateDistanceBetweenPoints(point, startPoint);
-    if (distanceToStart < minDistance) {
+    const distanceToEnd = calculateDistanceBetweenPoints(point, endPoint);
+    
+    // ถ้า endpoint ใกล้กว่า 2 เมตร ให้ใช้ endpoint
+    if (distanceToStart <= 2.0 && distanceToStart < minDistance) {
+        closestPoint = { lat: startPoint.lat, lng: startPoint.lng };
         minDistance = distanceToStart;
-        closestPoint = startPoint;
+        bestSegmentIndex = 0;
     }
     
-    // ตรวจสอบระยะห่างจากจุดสิ้นสุด
-    const distanceToEnd = calculateDistanceBetweenPoints(point, endPoint);
-    if (distanceToEnd < minDistance) {
+    if (distanceToEnd <= 2.0 && distanceToEnd < minDistance) {
+        closestPoint = { lat: endPoint.lat, lng: endPoint.lng };
         minDistance = distanceToEnd;
-        closestPoint = endPoint;
-    }
-
-    // ตรวจสอบ line segments ตามเดิม
-    for (let i = 0; i < subMainPipe.coordinates.length - 1; i++) {
-        const start = subMainPipe.coordinates[i];
-        const end = subMainPipe.coordinates[i + 1];
-        
-        const pointOnSegment = findClosestPointOnLineSegment(point, start, end);
-        const distance = calculateDistanceBetweenPoints(point, pointOnSegment);
-        
-        if (distance < minDistance) {
-            minDistance = distance;
-            closestPoint = pointOnSegment;
-        }
+        bestSegmentIndex = subMainPipe.coordinates.length - 2;
     }
     
     return closestPoint;
@@ -1384,6 +1407,7 @@ export const computeBetweenPlantsMode = (
     snapThreshold: number,
     direction: 'rows' | 'columns'
 ): { alignedEnd: Coordinate; selectedPlants: PlantLocation[]; snappedStart: Coordinate } => {
+
     const rows = groupPlantsByRows(plants);
     const cols = groupPlantsByColumns(plants);
     
@@ -1425,6 +1449,16 @@ export const computeBetweenPlantsMode = (
         
         if (group1.length < 2 || group2.length < 2) continue;
         
+        // 🔧 เพิ่มการตรวจสอบระยะห่างระหว่างแถว/คอลัมน์ (ไม่ควรเกิน 15 เมตร)
+        const group1CenterCheck = getPlantGroupCenter(group1);
+        const group2CenterCheck = getPlantGroupCenter(group2);
+        const distanceBetweenGroupsCheck = calculateDistanceBetweenPoints(group1CenterCheck, group2CenterCheck);
+        
+        // ถ้าแถว/คอลัมน์อยู่ไกลกันเกิน 15 เมตร ให้ข้ามไป
+        if (distanceBetweenGroupsCheck > 15.0) {
+            continue;
+        }
+        
         const closestToStart = findClosestPlantToStartInPair(group1, group2);
         if (!closestToStart) continue;
         
@@ -1432,15 +1466,15 @@ export const computeBetweenPlantsMode = (
         const adjustedSnapThreshold = snapThreshold * 3; // เพิ่มเป็น 3 เท่าเพื่อให้หาคู่แถว/คอลัมน์ได้ง่ายขึ้น
         
         // เพิ่มการตรวจสอบระยะห่างระหว่างคู่แถว/คอลัมน์เพื่อให้แน่ใจว่าเลือกคู่ที่เหมาะสม
-        const group1Center = {
+        const group1CenterCalc = {
             lat: group1.reduce((sum, p) => sum + p.position.lat, 0) / group1.length,
             lng: group1.reduce((sum, p) => sum + p.position.lng, 0) / group1.length
         };
-        const group2Center = {
+        const group2CenterCalc = {
             lat: group2.reduce((sum, p) => sum + p.position.lat, 0) / group2.length,
             lng: group2.reduce((sum, p) => sum + p.position.lng, 0) / group2.length
         };
-        const distanceBetweenGroups = calculateDistanceBetweenPoints(group1Center, group2Center);
+        const distanceBetweenGroupsCalc = calculateDistanceBetweenPoints(group1CenterCalc, group2CenterCalc);
         
         // เลือกคู่แถว/คอลัมน์ที่มี "ต้นไม้ต้นแรก" ใกล้ initialStartPoint ที่สุด และอยู่ในระยะ snapThreshold
         
@@ -1450,8 +1484,8 @@ export const computeBetweenPlantsMode = (
         
         // เพิ่มการตรวจสอบความเหมาะสมของคู่แถว/คอลัมน์
         const isSuitablePair = closestToStart.distance <= adjustedSnapThreshold && 
-            distanceBetweenGroups >= minGroupDistance && 
-            distanceBetweenGroups <= maxGroupDistance;
+            distanceBetweenGroupsCalc >= minGroupDistance && 
+            distanceBetweenGroupsCalc <= maxGroupDistance;
         
         // เพิ่มการตรวจสอบระยะห่างจากจุดเริ่มต้นไปยังเส้นกึ่งกลางของคู่แถว/คอลัมน์
         const centerLineStart = {
@@ -1466,7 +1500,7 @@ export const computeBetweenPlantsMode = (
         const distanceToCenterLine = calculateDistanceBetweenPoints(initialStartPoint, closestPointOnCenterLine);
         
         // เพิ่มการตรวจสอบความเหมาะสมเพิ่มเติม
-        const isOptimalDistance = distanceBetweenGroups >= 2.0 && distanceBetweenGroups <= 15.0; // ปรับระยะห่างที่เหมาะสมที่สุดให้หลวมขึ้น
+        const isOptimalDistance = distanceBetweenGroupsCalc >= 2.0 && distanceBetweenGroupsCalc <= 15.0; // ปรับระยะห่างที่เหมาะสมที่สุดให้หลวมขึ้น
         
         // ปรับปรุงการเลือกคู่แถว/คอลัมน์ให้แม่นยำขึ้น
         const isBetterChoice = !bestAlignment || 
@@ -1480,6 +1514,7 @@ export const computeBetweenPlantsMode = (
         const isGoodPair = isSuitablePair && isBetterChoice && isCloseToCenterLine;
         
         if (isGoodPair) {
+          
             // สร้างเส้นกึ่งกลางระหว่างคู่แถว/คอลัมน์ - ปรับให้ยาวเต็มเพื่อให้ระบบสามารถ snap ได้
             let fullCenterLine: { start: Coordinate; end: Coordinate };
             
@@ -1538,7 +1573,16 @@ export const computeBetweenPlantsMode = (
     }
 
     if (!bestAlignment) {
-        return { alignedEnd: rawEndPoint, selectedPlants: [], snappedStart: initialStartPoint };
+        
+        // 🚀 Fallback: หาต้นไม้ทั้งหมดที่อยู่ใกล้เส้นท่อตรงจาก initialStartPoint ไป rawEndPoint
+        const allPlants = [...plants];
+        const directPlants = allPlants.filter(plant => {
+            const closestPoint = findClosestPointOnLineSegment(plant.position, initialStartPoint, rawEndPoint);
+            const distance = calculateDistanceBetweenPoints(plant.position, closestPoint);
+            
+            return distance <= 15.0; // ระยะทน 15 เมตร
+        });
+        return { alignedEnd: rawEndPoint, selectedPlants: directPlants, snappedStart: initialStartPoint };
     }
 
     // คำนวณ snappedStart: จุดที่ projection ของ initialStartPoint ลงบนเส้นกึ่งกลาง
@@ -1564,27 +1608,96 @@ export const computeBetweenPlantsMode = (
         // หาตำแหน่งของต้นไม้บนเส้นกึ่งกลาง
         const plantProjected = findClosestPointOnLineSegment(plant.position, bestAlignment.centerLine.start, bestAlignment.centerLine.end);
         
-        // ตรวจสอบว่าต้นไม้อยู่ระหว่าง snappedStart และ alignedEnd หรือไม่
+        // 🔧 เพิ่มการตรวจสอบว่าต้นไม้อยู่ภายในช่วงของท่อย่อยจริงๆ ไม่เกินปลาย
+        const distanceToStart = calculateDistanceBetweenPoints(plantProjected, snappedStart);
+        const distanceToEnd = calculateDistanceBetweenPoints(plantProjected, alignedEnd);
+        const lateralLength = calculateDistanceBetweenPoints(snappedStart, alignedEnd);
+        
+        // 🔧 คำนวณ tolerance ตามระยะห่างเฉลี่ยของต้นไม้ในคู่แถว/คอลัมน์
+        const calculatePlantSpacing = (plants: PlantLocation[]): number => {
+            if (plants.length < 2) return 5.0; // ค่าเริ่มต้น
+            let totalDistance = 0;
+            let count = 0;
+            for (let i = 0; i < plants.length - 1; i++) {
+                const distance = calculateDistanceBetweenPoints(plants[i].position, plants[i + 1].position);
+                totalDistance += distance;
+                count++;
+            }
+            return totalDistance / count;
+        };
+        
+        const row1Spacing = calculatePlantSpacing(bestAlignment.row1);
+        const row2Spacing = calculatePlantSpacing(bestAlignment.row2);
+        const avgPlantSpacing = (row1Spacing + row2Spacing) / 2;
+        const pipeLengthTolerance = Math.max(2.0, avgPlantSpacing * 0.4); // อย่างน้อย 2 เมตร หรือ 40% ของระยะห่างต้นไม้
+        
+        // ตรวจสอบว่า projected point อยู่ภายในช่วงของท่อย่อย (ปรับ tolerance ตามระยะห่างต้นไม้)
+        const isWithinPipeLength = (distanceToStart + distanceToEnd) <= (lateralLength + pipeLengthTolerance);
+        
+        // ตรวจสอบว่าต้นไม้อยู่ระหว่าง snappedStart และ alignedEnd หรือไม่ (เข้มงวดขึ้น)
         let isInRange = false;
         
         if (bestAlignment.type === 'between_rows') {
-            // สำหรับระหว่างแถว: ตรวจสอบตาม lng
+            // สำหรับระหว่างแถว: ตรวจสอบตาม lng - เข้มงวดขึ้น
             const minLng = Math.min(snappedStart.lng, alignedEnd.lng);
             const maxLng = Math.max(snappedStart.lng, alignedEnd.lng);
-            isInRange = plantProjected.lng >= minLng - 0.000001 && plantProjected.lng <= maxLng + 0.000001;
+            // ปรับ tolerance ตามระยะห่างต้นไม้ - สำหรับพืชที่ปลูกห่างกันมากจะมี tolerance มากขึ้น
+            const lngTolerance = Math.max(0.000005, avgPlantSpacing * 0.00001); // ขั้นต่ำ 0.5 เมตร
+            isInRange = plantProjected.lng >= minLng + lngTolerance && plantProjected.lng <= maxLng - lngTolerance;
+            
         } else {
-            // สำหรับระหว่างคอลัมน์: ตรวจสอบตาม lat
+            // สำหรับระหว่างคอลัมน์: ตรวจสอบตาม lat - เข้มงวดขึ้น
             const minLat = Math.min(snappedStart.lat, alignedEnd.lat);
             const maxLat = Math.max(snappedStart.lat, alignedEnd.lat);
-            isInRange = plantProjected.lat >= minLat - 0.000001 && plantProjected.lat <= maxLat + 0.000001;
+            // ปรับ tolerance ตามระยะห่างต้นไม้ - สำหรับพืชที่ปลูกห่างกันมากจะมี tolerance มากขึ้น
+            const latTolerance = Math.max(0.000005, avgPlantSpacing * 0.00001); // ขั้นต่ำ 0.5 เมตร
+            isInRange = plantProjected.lat >= minLat + latTolerance && plantProjected.lat <= maxLat - latTolerance;
         }
         
-        // ตรวจสอบว่าต้นไม้อยู่ใกล้เส้นกึ่งกลางเพียงพอ (tolerance 8 เมตร - เพิ่มขึ้นเพื่อให้ครอบคลุมมากขึ้น)
+        // 🔧 เพิ่มการตรวจสอบว่าต้นไม้อยู่ระหว่างแถว/คอลัมน์จริงๆ
+        let isBetweenPlantPairs = false;
+        if (bestAlignment.type === 'between_rows') {
+            // สำหรับ between_rows: ตรวจสอบว่าต้นไม้อยู่ระหว่าง lat ของแถวที่ 1 และแถวที่ 2
+            const row1LatAvg = bestAlignment.row1.reduce((sum, p) => sum + p.position.lat, 0) / bestAlignment.row1.length;
+            const row2LatAvg = bestAlignment.row2.reduce((sum, p) => sum + p.position.lat, 0) / bestAlignment.row2.length;
+            const minRowLat = Math.min(row1LatAvg, row2LatAvg);
+            const maxRowLat = Math.max(row1LatAvg, row2LatAvg);
+            isBetweenPlantPairs = plant.position.lat >= minRowLat && plant.position.lat <= maxRowLat;
+        } else {
+            // สำหรับ between_cols: ตรวจสอบว่าต้นไม้อยู่ระหว่าง lng ของคอลัมน์ที่ 1 และคอลัมน์ที่ 2
+            const col1LngAvg = bestAlignment.row1.reduce((sum, p) => sum + p.position.lng, 0) / bestAlignment.row1.length;
+            const col2LngAvg = bestAlignment.row2.reduce((sum, p) => sum + p.position.lng, 0) / bestAlignment.row2.length;
+            const minColLng = Math.min(col1LngAvg, col2LngAvg);
+            const maxColLng = Math.max(col1LngAvg, col2LngAvg);
+            isBetweenPlantPairs = plant.position.lng >= minColLng && plant.position.lng <= maxColLng;
+        }
+        
+        // ตรวจสอบว่าต้นไม้อยู่ใกล้เส้นกึ่งกลางเพียงพอ (ปรับ tolerance ตามระยะห่างต้นไม้)
         const distanceToLine = calculateDistanceBetweenPoints(plant.position, plantProjected);
-        const result = isInRange && distanceToLine <= 8.0;
+        const distanceTolerance = Math.max(1.5, avgPlantSpacing * 0.3); // อย่างน้อย 1.5 เมตร หรือ 30% ของระยะห่างต้นไม้
+        const result = isInRange && isWithinPipeLength && distanceToLine <= distanceTolerance && isBetweenPlantPairs;
         
         return result;
     });
+
+    // 🚀 Fallback mechanism: ถ้าไม่มีต้นไม้ถูกเลือกจากการกรอง ให้หาต้นไม้ที่ใกล้เส้นท่อย่อยที่สุด
+    if (selectedPlants.length === 0 && allPlantsInPair.length > 0) {
+        
+        // หาต้นไม้ทั้งหมดที่อยู่ในระยะใกล้เส้นท่อย่อย (ลดจาก 15 เป็น 8 เมตร)
+        const fallbackPlants = allPlantsInPair.filter(plant => {
+            const lateralStart = snappedStart;
+            const lateralEnd = alignedEnd;
+            const closestPoint = findClosestPointOnLineSegment(plant.position, lateralStart, lateralEnd);
+            const distance = calculateDistanceBetweenPoints(plant.position, closestPoint);
+            
+            // ปรับ fallback tolerance ให้เหมาะสมกับการปลูกที่มีระยะห่างต่างกัน
+            return distance <= 5.0; // เพิ่มเป็น 5 เมตร เพื่อรองรับพืชที่ปลูกห่างกันมาก
+        });
+        
+        if (fallbackPlants.length > 0) {
+            return { alignedEnd, selectedPlants: fallbackPlants, snappedStart };
+        }
+    }
 
     return { alignedEnd, selectedPlants, snappedStart };
 };
@@ -1629,8 +1742,8 @@ export const generateEmitterLines = (
         // สร้างท่อแยกย่อยขนาดเล็กจาก lateral pipe ไปยังต้นไม้
         const distance = calculateDistanceBetweenPoints(closestPointOnLateral, plant.position);
 
-        // สร้างเฉพาะกับต้นไม้ที่อยู่ใกล้ท่อย่อย (ไม่เกิน 10 เมตร)
-        if (distance <= 10) {
+        // สร้างเฉพาะกับต้นไม้ที่อยู่ใกล้ท่อย่อย (ไม่เกิน 20 เมตร)
+        if (distance <= 20) {
             const emitterLine = {
                 id: `emitter_${lateralPipeId}_${index}`,
                 lateralPipeId: lateralPipeId,
@@ -1657,12 +1770,17 @@ export const generateEmitterLinesForBetweenPlantsMode = (
     selectedPlants: PlantLocation[], // เปลี่ยนจาก plants เป็น selectedPlants
     emitterDiameter: number = 4
 ): any[] => {
-
+    
+    
+    // 🔧 ตรวจสอบการวางแนวท่อเพื่อปรับ threshold ตามนั้น
+    const latDiff = Math.abs(lateralEnd.lat - lateralStart.lat);
+    const lngDiff = Math.abs(lateralEnd.lng - lateralStart.lng);
+    const isVerticalPipe = latDiff > lngDiff; // ท่อในแนวตั้งถ้า lat เปลี่ยนมากกว่า lng
     
     const emitterLines: any[] = [];
 
     selectedPlants.forEach(plant => {
-        // หาจุดที่ใกล้ที่สุดบนท่อย่อยสำหรับแต่ละต้นไม้ที่เลือก
+        // 🔧 ปรับปรุงการคำนวณจุดเชื่อมต่อให้แม่นยำขึ้น
         const closestPointOnLateral = findClosestPointOnLineSegment(
             plant.position,
             lateralStart,
@@ -1670,26 +1788,105 @@ export const generateEmitterLinesForBetweenPlantsMode = (
         );
 
         const distance = calculateDistanceBetweenPoints(closestPointOnLateral, plant.position);
+        
+        // 🔧 คำนวณระยะห่างเฉลี่ยของต้นไม้เพื่อปรับ threshold
+        const calculatePlantSpacing = (): number => {
+            if (selectedPlants.length < 2) return 5.0;
+            let totalDistance = 0;
+            let count = 0;
+            for (let i = 0; i < selectedPlants.length - 1; i++) {
+                const dist = calculateDistanceBetweenPoints(selectedPlants[i].position, selectedPlants[i + 1].position);
+                totalDistance += dist;
+                count++;
+            }
+            return totalDistance / count;
+        };
+        
+        const avgSpacing = calculatePlantSpacing();
+        const adaptiveMaxDistance = Math.max(8.0, avgSpacing * 0.8); // เพิ่ม threshold ให้ครอบคลุมมากขึ้น
 
-        // สร้างท่อแยกย่อยเฉพาะต้นไม้ที่อยู่ในระยะที่เหมาะสม (ไม่เกิน 10 เมตร)
-        if (distance <= 10.0) {
+        // สร้างท่อแยกย่อยด้วย threshold ที่ปรับตามระยะห่างต้นไม้
+        if (distance <= adaptiveMaxDistance) {
+            // 🔧 ปรับปรุงการสร้าง coordinates ให้แม่นยำขึ้น
+            // สร้างเส้นตรงจาก closest point ไปยังต้นไม้โดยตรง
             const emitterLine = {
                 id: `emitter_${lateralPipeId}_${plant.id}`,
                 lateralPipeId: lateralPipeId,
                 plantId: plant.id,
-                coordinates: [closestPointOnLateral, plant.position],
+                coordinates: [
+                    { lat: closestPointOnLateral.lat, lng: closestPointOnLateral.lng }, // จุดบนท่อย่อย
+                    { lat: plant.position.lat, lng: plant.position.lng } // ตำแหน่งต้นไม้
+                ],
                 length: distance,
                 diameter: emitterDiameter,
                 emitterType: 'drip',
                 isVisible: true,
                 isActive: true,
-                connectionPoint: closestPointOnLateral
+                connectionPoint: { lat: closestPointOnLateral.lat, lng: closestPointOnLateral.lng }
+            };
+
+            emitterLines.push(emitterLine);
+            
+
+        } else {
+            console.log(`❌ Skipped plant ${plant.id}: distance ${distance.toFixed(2)}m > max ${adaptiveMaxDistance.toFixed(1)}m`);
+        }
+    });
+
+    return emitterLines;
+};
+
+// 🚀 ฟังก์ชันสร้าง emitter lines สำหรับ multi-segment lateral pipes
+export const generateEmitterLinesForMultiSegment = (
+    lateralPipeId: string,
+    lateralCoordinates: Coordinate[], // เส้นทางท่อย่อยที่สมบูรณ์ (รวม waypoints)
+    selectedPlants: PlantLocation[],
+    emitterDiameter: number = 4
+): any[] => {
+    const emitterLines: any[] = [];
+
+    selectedPlants.forEach(plant => {
+        // หาจุดที่ใกล้ที่สุดบนเส้นทางท่อย่อยทั้งหมด (multi-segment)
+        let closestPoint: Coordinate | null = null;
+        let minDistance = Infinity;
+
+        // ตรวจสอบทุกส่วนของท่อย่อย
+        for (let i = 0; i < lateralCoordinates.length - 1; i++) {
+            const segmentStart = lateralCoordinates[i];
+            const segmentEnd = lateralCoordinates[i + 1];
+            
+            const closestOnSegment = findClosestPointOnLineSegment(
+                plant.position,
+                segmentStart,
+                segmentEnd
+            );
+            
+            const distance = calculateDistanceBetweenPoints(closestOnSegment, plant.position);
+            
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestPoint = closestOnSegment;
+            }
+        }
+
+        // สร้างท่อแยกย่อยถ้าระยะห่างเหมาะสม
+        if (closestPoint && minDistance <= 10.0) {
+            const emitterLine = {
+                id: `emitter_${lateralPipeId}_${plant.id}`,
+                lateralPipeId: lateralPipeId,
+                plantId: plant.id,
+                coordinates: [closestPoint, plant.position],
+                length: minDistance,
+                diameter: emitterDiameter,
+                emitterType: 'drip',
+                isVisible: true,
+                isActive: true,
+                connectionPoint: closestPoint
             };
 
             emitterLines.push(emitterLine);
         }
     });
-
 
     return emitterLines;
 };
