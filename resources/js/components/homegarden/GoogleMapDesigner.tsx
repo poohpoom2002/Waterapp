@@ -70,7 +70,6 @@ interface GoogleMapDesignerProps {
     pipes: Pipe[];
     selectedZoneType: string;
     editMode: string;
-    manualSprinklerType: string;
     manualSprinklerRadius: number;
     selectedSprinkler: string | null;
     selectedPipes: Set<string>;
@@ -933,7 +932,7 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                 fillOpacity: 0.9,
                 strokeColor: '#FFFFFF',
                 strokeWeight: isSelected ? 3 : 2,
-                scale: isSelected ? 6 : 4,
+                scale: isSelected ? 8 : 6,
                 rotation: orientation || 0,
             };
         },
@@ -1085,7 +1084,7 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                                     isSelected,
                                     sprinkler.orientation
                                 ),
-                                title: `หัวฉีด: ${sprinkler.type.nameTH} (รัศมี ${sprinkler.type.radius}ม.)`,
+                                title: `หัวฉีด: ${sprinkler.type.nameTH} | รัศมี: ${sprinkler.type.radius}ม. | แรงดัน: ${sprinkler.type.pressure}บาร์ | อัตราการไหล: ${sprinkler.type.flowRate}ล./นาที`,
                                 draggable: props.editMode === 'drag-sprinkler',
                                 map: props.map,
                             });

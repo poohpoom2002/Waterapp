@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// components/horticulture/HorticultureMapComponent.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Wrapper, Status } from '@googlemaps/react-wrapper';
 import { GOOGLE_MAPS_CONFIG } from '../../utils/googleMapsConfig';
@@ -86,6 +85,18 @@ const MapComponent: React.FC<{
     children?: React.ReactNode;
     mapOptions?: Partial<google.maps.MapOptions>;
 }> = ({ center, zoom, onLoad, children, mapOptions }) => {
+    // Validate center coordinates
+    const validCenter = (center && 
+        typeof center.lat === 'number' && 
+        typeof center.lng === 'number' &&
+        !isNaN(center.lat) && 
+        !isNaN(center.lng) &&
+        isFinite(center.lat) && 
+        isFinite(center.lng)) 
+        ? center 
+        : { lat: 13.7563, lng: 100.5018 }; // Default to Bangkok
+    
+    const validZoom = (typeof zoom === 'number' && !isNaN(zoom) && isFinite(zoom)) ? zoom : 16;
     const ref = useRef<HTMLDivElement>(null);
     const [map, setMap] = useState<google.maps.Map>();
     const [isMapInitialized, setIsMapInitialized] = useState(false);
@@ -100,8 +111,8 @@ const MapComponent: React.FC<{
                     ...mapOptions,
                 };
                 const newMap = new window.google.maps.Map(ref.current, {
-                    center,
-                    zoom,
+                    center: validCenter,
+                    zoom: validZoom,
                     ...mergedOptions,
                 });
 
@@ -171,9 +182,9 @@ const MapComponent: React.FC<{
 
     useEffect(() => {
         if (map && !isMapInitialized) {
-            map.setCenter(center);
+            map.setCenter(validCenter);
         }
-    }, [map, center, isMapInitialized]);
+    }, [map, validCenter, isMapInitialized]);
 
     return (
         <>
@@ -214,6 +225,21 @@ const HorticultureMapComponent: React.FC<HorticultureMapComponentProps> = ({
         return <MapErrorComponent onRetry={() => window.location.reload()} />;
     }
 
+    // Validate center coordinates
+    const validCenter = (center && 
+        Array.isArray(center) && 
+        center.length === 2 &&
+        typeof center[0] === 'number' && 
+        typeof center[1] === 'number' &&
+        !isNaN(center[0]) && 
+        !isNaN(center[1]) &&
+        isFinite(center[0]) && 
+        isFinite(center[1])) 
+        ? { lat: center[0], lng: center[1] }
+        : { lat: 13.7563, lng: 100.5018 }; // Default to Bangkok
+    
+    const validZoom = (typeof zoom === 'number' && !isNaN(zoom) && isFinite(zoom)) ? zoom : 16;
+
     return (
         <Wrapper
             apiKey={config.apiKey}
@@ -222,8 +248,8 @@ const HorticultureMapComponent: React.FC<HorticultureMapComponentProps> = ({
             version="weekly"
         >
             <MapComponent
-                center={{ lat: center[0], lng: center[1] }}
-                zoom={zoom}
+                center={validCenter}
+                zoom={validZoom}
                 onLoad={onMapLoad}
                 mapOptions={mapOptions}
             >

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { router } from '@inertiajs/react';
 
 export interface Coordinate {
@@ -13,6 +14,10 @@ export interface PlantData {
     waterNeed: number;
 }
 
+/**
+ * @deprecated ใช้ IrrigationZone แทน - interface นี้จะถูกลบในอนาคต
+ * ปัจจุบันใช้เฉพาะการแบ่งโซนให้น้ำ (💧 แบ่งโซนให้น้ำ) และการแบ่งโซนน้ำเอง (💧 แบ่งโซนน้ำเอง)
+ */
 export interface Zone {
     id: string;
     name: string;
@@ -115,68 +120,341 @@ export interface HorticultureProjectData {
     zones: Zone[];
     mainPipes: MainPipe[];
     subMainPipes: SubMainPipe[];
+    lateralPipes?: {
+        id: string;
+        coordinates: Coordinate[];
+        length: number;
+        plants: PlantLocation[];
+        placementMode: 'over_plants' | 'between_plants';
+        totalFlowRate: number;
+        connectionPoint: Coordinate;
+        emitterLines?: {
+            id: string;
+            lateralPipeId: string;
+            plantId: string;
+            coordinates: Coordinate[];
+            length: number;
+            diameter: number;
+            emitterType?: string;
+        }[];
+    }[]; // เพิ่มสำหรับท่อย่อย
     exclusionAreas: ExclusionArea[];
     plants: PlantLocation[];
     useZones: boolean;
-    selectedPlantType?: PlantData; // [FIX] เพิ่ม property นี้
+    selectedPlantType?: PlantData;
     branchPipeSettings?: BranchPipeSettings;
+    irrigationZones?: {
+        id: string;
+        name: string;
+        coordinates: Coordinate[];
+        plants: PlantLocation[];
+        totalWaterNeed: number;
+        color: string;
+        layoutIndex: number;
+    }[]; // เพิ่มสำหรับระบบโซนใหม่
     createdAt: string;
     updatedAt: string;
 }
 
-// ข้อมูลโครงการที่ต้องการสำหรับรายงาน
 export interface ProjectSummaryData {
-    // ข้อมูลโดยรวม
-    totalAreaInRai: number; // พื้นที่รวมเป็นไร่
-    totalZones: number; // จำนวนโซน
-    totalPlants: number; // จำนวนต้นไม้ทั้งหมด
-    totalWaterNeedPerSession: number; // ปริมาณน้ำต่อครั้ง (ลิตร)
-    waterPerPlant: number; // ปริมาณน้ำต่อต้น (ลิตร)
+    totalAreaInRai: number;
+    totalZones: number;
+    totalPlants: number;
+    totalWaterNeedPerSession: number;
+    waterPerPlant: number;
 
-    // ข้อมูลท่อ
     mainPipes: {
-        longest: number; // ท่อเมนที่ยาวที่สุด (เมตร)
-        totalLength: number; // ความยาวรวมท่อเมน (เมตร)
+        count: number;
+        longest: number;
+        totalLength: number;
     };
     subMainPipes: {
-        longest: number; // ท่อเมนรองที่ยาวที่สุด (เมตร)
-        totalLength: number; // ความยาวรวมท่อเมนรอง (เมตร)
+        count: number;
+        longest: number;
+        totalLength: number;
     };
     branchPipes: {
-        longest: number; // ท่อย่อยที่ยาวที่สุด (เมตร)
-        totalLength: number; // ความยาวรวมท่อย่อย (เมตร)
+        count: number;
+        longest: number;
+        totalLength: number;
     };
-    longestPipesCombined: number; // ท่อที่ยาวที่สุดรวมกัน (เมตร)
+    emitterPipes: {
+        count: number;
+        longest: number;
+        totalLength: number;
+    };
+    longestPipesCombined: number;
 
-    // ข้อมูลแยกโซน (ถ้ามี)
     zoneDetails: ZoneSummaryData[];
 }
 
 export interface ZoneSummaryData {
     zoneId: string;
     zoneName: string;
-    areaInRai: number; // พื้นที่โซนเป็นไร่
-    plantCount: number; // จำนวนต้นไม้ในโซน
-    waterNeedPerSession: number; // ปริมาณน้ำโซนต่อครั้ง (ลิตร)
-    waterPerPlant: number; // ปริมาณน้ำต่อต้น (ลิตร)
-    plantData?: PlantData; // เพิ่มข้อมูลพืช
+    areaInRai: number;
+    plantCount: number;
+    waterNeedPerSession: number;
+    waterPerPlant: number;
+    plantData?: PlantData;
 
-    // ข้อมูลท่อในโซน
     mainPipesInZone: {
+        count: number;
         longest: number;
         totalLength: number;
     };
     subMainPipesInZone: {
+        count: number;
         longest: number;
         totalLength: number;
     };
     branchPipesInZone: {
+        count: number;
+        longest: number;
+        totalLength: number;
+    };
+    emitterPipesInZone: {
+        count: number;
         longest: number;
         totalLength: number;
     };
 }
 
-// Utility Functions
+// Enhanced project data interface with additional features
+export interface EnhancedProjectData extends HorticultureProjectData {
+    irrigationZones?: IrrigationZoneExtended[];
+    lateralPipes?: LateralPipe[];
+    headLossResults?: HeadLossResult[];
+    sprinklerConfig?: SprinklerConfig;
+    plantRotation?: number;
+    autoZoneConfig?: {
+        numberOfZones: number;
+        balanceWaterNeed: boolean;
+        paddingMeters: number;
+        useVoronoi: boolean;
+    };
+}
+
+// Extended irrigation zone interface
+export interface IrrigationZoneExtended {
+    id: string;
+    name: string;
+    coordinates: Coordinate[];
+    plants: PlantLocation[];
+    totalWaterNeed: number;
+    color: string;
+    layoutIndex: number;
+    area?: number;
+    plantSpacing?: number;
+    rowSpacing?: number;
+}
+
+// Lateral pipe interface
+export interface LateralPipe {
+    id: string;
+    coordinates: Coordinate[];
+    length: number;
+    plants: PlantLocation[];
+    placementMode: 'over_plants' | 'between_plants';
+    totalFlowRate: number;
+    connectionPoint: Coordinate;
+    intersectionData?: {
+        subMainPipeId: string;
+        point: Coordinate;
+        segmentIndex: number;
+    };
+    emitterLines?: {
+        id: string;
+        lateralPipeId: string;
+        plantId: string;
+        coordinates: Coordinate[];
+        length: number;
+        diameter: number;
+        emitterType?: string;
+    }[];
+}
+
+// Best pipe information interface for analysis
+export interface BestPipeInfo {
+    id: string;
+    length: number;
+    count: number; // จำนวนต้นไม้ หรือท่อที่เชื่อม
+    waterFlowRate: number; // ลิตร/นาที
+    details?: any; // ข้อมูลเพิ่มเติม
+}
+
+// Head loss result interface
+export interface HeadLossResult {
+    pipeId: string;
+    pipeType: 'mainPipe' | 'subMainPipe' | 'branchPipe';
+    zoneName: string;
+    zoneId: string;
+    pipeName?: string;
+    lossCoefficient: number;
+    pipeLength: number;
+    correctionFactor: number;
+    headLoss: number;
+    calculatedAt: string;
+}
+
+// Sprinkler configuration interface
+export interface SprinklerConfig {
+    flowRatePerMinute: number;
+    pressureBar: number;
+    radiusMeters: number;
+    createdAt: string;
+    updatedAt: string;
+}
+// Zone color constants for display
+export const ZONE_COLORS = [
+    '#FF69B4',
+    '#00CED1',
+    '#32CD32',
+    '#FFD700',
+    '#FF6347',
+    '#9370DB',
+    '#20B2AA',
+    '#FF1493',
+    '#00FA9A',
+    '#FFA500',
+];
+
+// Exclusion area color constants
+export const EXCLUSION_COLORS = {
+    building: '#F59E0B',
+    powerplant: '#EF4444',
+    river: '#3B82F6',
+    road: '#6B7280',
+    other: '#8B5CF6',
+};
+
+/**
+ * Get zone color by index
+ */
+export const getZoneColor = (index: number): string => {
+    return ZONE_COLORS[index % ZONE_COLORS.length];
+};
+
+/**
+ * Get exclusion type name in Thai
+ */
+export const getExclusionTypeName = (type: string, t: (key: string) => string): string => {
+    switch (type) {
+        case 'building':
+            return t('สิ่งก่อสร้าง');
+        case 'powerplant':
+            return t('ห้องควบคุม');
+        case 'river':
+            return t('แหล่งน้ำ');
+        case 'road':
+            return t('ถนน');
+        case 'other':
+            return t('อื่นๆ');
+        default:
+            return t('พื้นที่หลีกเลี่ยง');
+    }
+};
+
+/**
+ * Get polygon center coordinate
+ */
+export const getPolygonCenter = (coordinates: Coordinate[]): Coordinate => {
+    if (coordinates.length === 0) return { lat: 0, lng: 0 };
+
+    const totalLat = coordinates.reduce((sum, coord) => sum + coord.lat, 0);
+    const totalLng = coordinates.reduce((sum, coord) => sum + coord.lng, 0);
+
+    return {
+        lat: totalLat / coordinates.length,
+        lng: totalLng / coordinates.length,
+    };
+};
+
+/**
+ * Check if two points are close within threshold
+ */
+export const isPointsClose = (point1: Coordinate, point2: Coordinate, threshold: number = 5): boolean => {
+    const distance = calculateDistanceBetweenPoints(point1, point2);
+    return distance <= threshold;
+};
+
+/**
+ * Find closest point on line segment
+ */
+export const findClosestPointOnLineSegmentExtended = (
+    point: Coordinate,
+    lineStart: Coordinate,
+    lineEnd: Coordinate
+): Coordinate => {
+    const A = point.lat - lineStart.lat;
+    const B = point.lng - lineStart.lng;
+    const C = lineEnd.lat - lineStart.lat;
+    const D = lineEnd.lng - lineStart.lng;
+
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+
+    if (lenSq === 0) return lineStart;
+
+    const param = dot / lenSq;
+
+    if (param < 0) {
+        return lineStart;
+    } else if (param > 1) {
+        return lineEnd;
+    } else {
+        return {
+            lat: lineStart.lat + param * C,
+            lng: lineStart.lng + param * D,
+        };
+    }
+};
+
+/**
+ * Check if coordinate is in zone/polygon
+ */
+export const isCoordinateInZone = (coordinate: Coordinate, zone: any): boolean => {
+    if (!zone || !zone.coordinates || zone.coordinates.length < 3) return false;
+    return isPointInPolygon(coordinate, zone.coordinates);
+};
+
+/**
+ * Calculate water flow rate for plants
+ */
+export const calculateWaterFlowRate = (plantCount: number, sprinklerConfig: any): number => {
+    if (!sprinklerConfig || !sprinklerConfig.flowRatePerMinute) return plantCount * 2.5; // default
+    return plantCount * sprinklerConfig.flowRatePerMinute;
+};
+
+/**
+ * Distance from point to line segment
+ */
+export const distanceFromPointToLineSegment = (
+    point: Coordinate,
+    lineStart: Coordinate,
+    lineEnd: Coordinate
+): number => {
+    const A = point.lat - lineStart.lat;
+    const B = point.lng - lineStart.lng;
+    const C = lineEnd.lat - lineStart.lat;
+    const D = lineEnd.lng - lineStart.lng;
+
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+    
+    if (lenSq === 0) {
+        return calculateDistanceBetweenPoints(point, lineStart);
+    }
+    
+    const t = Math.max(0, Math.min(1, dot / lenSq));
+    
+    const projection = {
+        lat: lineStart.lat + t * C,
+        lng: lineStart.lng + t * D
+    };
+    
+    return calculateDistanceBetweenPoints(point, projection);
+};
+
 export const calculateAreaFromCoordinates = (coordinates: Coordinate[]): number => {
     if (!coordinates || coordinates.length < 3) return 0;
 
@@ -260,124 +538,270 @@ export const isPointInPolygon = (point: Coordinate, polygon: Coordinate[]): bool
     }
 };
 
-// Main function to calculate project summary
 export const calculateProjectSummary = (
     projectData: HorticultureProjectData
 ): ProjectSummaryData => {
-    console.log('📊 Calculating project summary...');
-
-    // คำนวณข้อมูลโดยรวม
-    const totalAreaInRai = projectData.totalArea / 1600; // แปลงจากตร.ม. เป็นไร่
-    const totalZones = projectData.useZones ? projectData.zones.length : 1;
+    const totalAreaInRai = projectData.totalArea / 1600;
+    const totalZones = (projectData.irrigationZones?.length ?? 0) > 0 ? projectData.irrigationZones?.length ?? 1 : 1;
     const totalPlants = projectData.plants?.length || 0;
     const totalWaterNeedPerSession =
         projectData.plants?.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0) || 0;
     const waterPerPlant = totalPlants > 0 ? totalWaterNeedPerSession / totalPlants : 0;
 
-    // คำนวณข้อมูลท่อเมน
     const mainPipeLengths = projectData.mainPipes?.map((pipe) => pipe.length) || [];
     const mainPipesData = {
+        count: projectData.mainPipes?.length || 0,
         longest: mainPipeLengths.length > 0 ? Math.max(...mainPipeLengths) : 0,
         totalLength: mainPipeLengths.reduce((sum, length) => sum + length, 0),
     };
 
-    // คำนวณข้อมูลท่อเมนรอง
     const subMainPipeLengths = projectData.subMainPipes?.map((pipe) => pipe.length) || [];
     const subMainPipesData = {
+        count: projectData.subMainPipes?.length || 0,
         longest: subMainPipeLengths.length > 0 ? Math.max(...subMainPipeLengths) : 0,
         totalLength: subMainPipeLengths.reduce((sum, length) => sum + length, 0),
     };
 
-    // คำนวณข้อมูลท่อย่อย
+    // รวม branchPipes และ lateralPipes เข้าด้วยกัน
     const allBranchPipes =
         projectData.subMainPipes?.flatMap((subMain) => subMain.branchPipes || []) || [];
+    const allLateralPipes = projectData.lateralPipes || [];
+    
     const branchPipeLengths = allBranchPipes.map((pipe) => pipe.length);
+    const lateralPipeLengths = allLateralPipes.map((pipe) => pipe.length);
+    const combinedPipeLengths = [...branchPipeLengths, ...lateralPipeLengths];
+    
     const branchPipesData = {
-        longest: branchPipeLengths.length > 0 ? Math.max(...branchPipeLengths) : 0,
-        totalLength: branchPipeLengths.reduce((sum, length) => sum + length, 0),
+        count: allBranchPipes.length + allLateralPipes.length,
+        longest: combinedPipeLengths.length > 0 ? Math.max(...combinedPipeLengths) : 0,
+        totalLength: combinedPipeLengths.reduce((sum, length) => sum + length, 0),
     };
+    
 
-    // คำนวณท่อที่ยาวที่สุดรวมกัน
+
+    // คำนวณ emitter pipes (ท่อย่อยแยก) จาก lateralPipes.emitterLines
+    const allEmitterPipes = allLateralPipes.flatMap((lateral) => lateral.emitterLines || []);
+    const emitterPipeLengths = allEmitterPipes.map((emitter) => emitter.length);
+    const emitterPipesData = {
+        count: allEmitterPipes.length,
+        longest: emitterPipeLengths.length > 0 ? Math.max(...emitterPipeLengths) : 0,
+        totalLength: emitterPipeLengths.reduce((sum, length) => sum + length, 0),
+    };
+    
+
+
     const longestPipesCombined =
-        mainPipesData.longest + subMainPipesData.longest + branchPipesData.longest;
+        mainPipesData.longest + subMainPipesData.longest + branchPipesData.longest + emitterPipesData.longest;
 
-    // คำนวณข้อมูลแยกโซน
     const zoneDetails: ZoneSummaryData[] = [];
 
-    if (projectData.useZones && projectData.zones && projectData.zones.length > 0) {
-        // โหมดหลายโซน
-        projectData.zones.forEach((zone) => {
-            // หาต้นไม้ในโซนนี้
-            const plantsInZone =
-                projectData.plants?.filter(
-                    (plant) =>
-                        (plant.zoneId && plant.zoneId === zone.id) ||
-                        (!plant.zoneId && isPointInPolygon(plant.position, zone.coordinates))
-                ) || [];
+    // ตรวจสอบว่ามี zones แบบปกติ (ที่สร้างเอง) หรือ irrigationZones (อัตโนมัติ) หรือไม่
+    if (projectData.zones && projectData.zones.length > 0 && projectData.useZones) {
+        // กรณีมีการแบ่งโซนแบบปกติ - แยกท่อตามโซนจริงๆ
+        for (const zone of projectData.zones) {
+            const plantsInZone = projectData.plants?.filter(plant => plant.zoneId === zone.id) || [];
+            const waterNeedInZone = plantsInZone.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
+            const waterPerPlantInZone = plantsInZone.length > 0 ? waterNeedInZone / plantsInZone.length : 0;
 
-            // หาท่อในโซนนี้
-            const zoneSubMainPipes =
-                projectData.subMainPipes?.filter((pipe) => pipe.zoneId === zone.id) || [];
-            const zoneBranchPipes = zoneSubMainPipes.flatMap(
-                (subMain) => subMain.branchPipes || []
-            );
+            // แยกท่อตามโซน
+            const mainPipesInZone = projectData.mainPipes?.filter(pipe => pipe.toZone === zone.id) || [];
+            const subMainPipesInZone = projectData.subMainPipes?.filter(pipe => pipe.zoneId === zone.id) || [];
+            const branchPipesInZone = subMainPipesInZone.flatMap(subMain => subMain.branchPipes || []);
+            
+            // lateral pipes: เอาท่อที่ plants ส่วนใหญ่อยู่ในโซนนี้
+            const lateralPipesInZone = projectData.lateralPipes?.filter(lateral => {
+                const plantsInThisZone = lateral.plants.filter(plant => {
+                    const fullPlant = projectData.plants?.find(p => p.id === plant.id);
+                    return fullPlant?.zoneId === zone.id;
+                });
+                return plantsInThisZone.length > lateral.plants.length / 2; // majority voting
+            }) || [];
 
-            // หาท่อเมนที่ไปยังโซนนี้
-            const zoneMainPipes =
-                projectData.mainPipes?.filter((pipe) => pipe.toZone === zone.id) || [];
+            // emitter pipes: จาก lateral pipes ในโซนนี้ - เฉพาะโหมด 'between_plants' เท่านั้น
+            const emitterPipesInZone = lateralPipesInZone
+                .filter(lateral => lateral.placementMode === 'between_plants') // กรองเฉพาะ between_plants
+                .flatMap(lateral => lateral.emitterLines || []);
 
-            // คำนวณความยาวท่อแต่ละประเภทในโซน
-            const mainPipeLengthsInZone = zoneMainPipes.map((pipe) => pipe.length);
-            const subMainPipeLengthsInZone = zoneSubMainPipes.map((pipe) => pipe.length);
-            const branchPipeLengthsInZone = zoneBranchPipes.map((pipe) => pipe.length);
-            const waterNeedInZone = plantsInZone.reduce(
-                (sum, plant) => sum + plant.plantData.waterNeed,
-                0
-            );
+            const mainPipeLengthsInZone = mainPipesInZone.map(pipe => pipe.length);
+            const mainPipesDataInZone = {
+                count: mainPipesInZone.length,
+                longest: mainPipeLengthsInZone.length > 0 ? Math.max(...mainPipeLengthsInZone) : 0,
+                totalLength: mainPipeLengthsInZone.reduce((sum, length) => sum + length, 0),
+            };
+
+            const subMainPipeLengthsInZone = subMainPipesInZone.map(pipe => pipe.length);
+            const subMainPipesDataInZone = {
+                count: subMainPipesInZone.length,
+                longest: subMainPipeLengthsInZone.length > 0 ? Math.max(...subMainPipeLengthsInZone) : 0,
+                totalLength: subMainPipeLengthsInZone.reduce((sum, length) => sum + length, 0),
+            };
+
+            const branchPipeLengthsInZone = branchPipesInZone.map(pipe => pipe.length);
+            const lateralPipeLengthsInZone = lateralPipesInZone.map(pipe => pipe.length);
+            const combinedBranchLengthsInZone = [...branchPipeLengthsInZone, ...lateralPipeLengthsInZone];
+            const branchPipesDataInZone = {
+                count: branchPipesInZone.length + lateralPipesInZone.length,
+                longest: combinedBranchLengthsInZone.length > 0 ? Math.max(...combinedBranchLengthsInZone) : 0,
+                totalLength: combinedBranchLengthsInZone.reduce((sum, length) => sum + length, 0),
+            };
+
+            const emitterPipeLengthsInZone = emitterPipesInZone.map(pipe => pipe.length);
+            const emitterPipesDataInZone = {
+                count: emitterPipesInZone.length,
+                longest: emitterPipeLengthsInZone.length > 0 ? Math.max(...emitterPipeLengthsInZone) : 0,
+                totalLength: emitterPipeLengthsInZone.reduce((sum, length) => sum + length, 0),
+            };
 
             const zoneData: ZoneSummaryData = {
                 zoneId: zone.id,
                 zoneName: zone.name,
-                areaInRai: zone.area / 1600, // แปลงเป็นไร่
+                areaInRai: zone.area / 1600, // แปลง ตร.ม. เป็น ไร่
                 plantCount: plantsInZone.length,
                 waterNeedPerSession: waterNeedInZone,
-                waterPerPlant: plantsInZone.length > 0 ? waterNeedInZone / plantsInZone.length : 0,
-                plantData: zone.plantData, // เพิ่มข้อมูลพืช
-                mainPipesInZone: {
-                    longest:
-                        mainPipeLengthsInZone.length > 0 ? Math.max(...mainPipeLengthsInZone) : 0,
-                    totalLength: mainPipeLengthsInZone.reduce((sum, length) => sum + length, 0),
-                },
-                subMainPipesInZone: {
-                    longest:
-                        subMainPipeLengthsInZone.length > 0
-                            ? Math.max(...subMainPipeLengthsInZone)
-                            : 0,
-                    totalLength: subMainPipeLengthsInZone.reduce((sum, length) => sum + length, 0),
-                },
-                branchPipesInZone: {
-                    longest:
-                        branchPipeLengthsInZone.length > 0
-                            ? Math.max(...branchPipeLengthsInZone)
-                            : 0,
-                    totalLength: branchPipeLengthsInZone.reduce((sum, length) => sum + length, 0),
-                },
+                waterPerPlant: waterPerPlantInZone,
+                plantData: zone.plantData,
+                mainPipesInZone: mainPipesDataInZone,
+                subMainPipesInZone: subMainPipesDataInZone,
+                branchPipesInZone: branchPipesDataInZone,
+                emitterPipesInZone: emitterPipesDataInZone,
             };
 
             zoneDetails.push(zoneData);
-        });
+        }
+        
+
+    } else if (projectData.irrigationZones && projectData.irrigationZones.length > 0) {
+        // กรณีมี irrigationZones (โซนอัตโนมัติ) - แยกท่อตามโซนจริงๆ
+
+        
+        for (const irrZone of projectData.irrigationZones) {
+
+            
+            const plantsInZone = projectData.plants?.filter(plant => plant.zoneId === irrZone.id) || [];
+
+            
+            const waterNeedInZone = plantsInZone.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
+            const waterPerPlantInZone = plantsInZone.length > 0 ? waterNeedInZone / plantsInZone.length : 0;
+
+            // แยกท่อตามโซน irrigationZones - ใช้การหาท่อจริงๆ ในโซน
+            
+            // Import findPipeEndZone function (assume it's available or create a simplified version)
+            const findPipeEndZoneLocal = (pipe: any, zones: any[], irrigationZones: any[]) => {
+                if (!pipe.coordinates || pipe.coordinates.length === 0) return null;
+                
+                const endPoint = pipe.coordinates[pipe.coordinates.length - 1];
+                
+                // Check irrigationZones first
+                for (const zone of irrigationZones) {
+                    if (zone.coordinates && zone.coordinates.length > 0) {
+                        const isInside = isPointInPolygon(endPoint, zone.coordinates);
+                        if (isInside) return zone.id;
+                    }
+                }
+                
+                return null;
+            };
+            
+            // ท่อเมน: หาท่อจริงๆ ที่อยู่ในโซนนี้
+            const allMainPipes = projectData.mainPipes || [];
+            const zoneMainPipes = allMainPipes.filter(mainPipe => {
+                const mainZoneId = findPipeEndZoneLocal(mainPipe, projectData.zones || [], projectData.irrigationZones || []);
+                return mainZoneId === irrZone.id;
+            });
+            const mainPipeLengthInZone = zoneMainPipes.reduce((sum, pipe) => sum + pipe.length, 0);
+            
+            // ท่อเมนรอง: หาท่อจริงๆ ที่อยู่ในโซนนี้
+            const allSubMainPipes = projectData.subMainPipes || [];
+            const zoneSubMainPipes = allSubMainPipes.filter(subMainPipe => {
+                const subMainZoneId = findPipeEndZoneLocal(subMainPipe, projectData.zones || [], projectData.irrigationZones || []);
+                return subMainZoneId === irrZone.id;
+            });
+            const subMainPipeLengthInZone = zoneSubMainPipes.reduce((sum, pipe) => sum + pipe.length, 0);
+            
+            // Branch pipes: ดึงจาก subMainPipes ที่อยู่ในโซนนี้
+            const branchPipesInZone = zoneSubMainPipes.flatMap(subMain => subMain.branchPipes || []);
+            const branchPipeLengthInZone = branchPipesInZone.reduce((sum, pipe) => sum + pipe.length, 0);
+            
+
+
+            
+            // lateral pipes: เอาท่อที่ plants ส่วนใหญ่อยู่ในโซนนี้
+            const lateralPipesInZone = projectData.lateralPipes?.filter(lateral => {
+                const plantsInThisZone = lateral.plants.filter(plant => {
+                    const fullPlant = projectData.plants?.find(p => p.id === plant.id);
+                    return fullPlant?.zoneId === irrZone.id;
+                });
+                const majorityVote = plantsInThisZone.length > lateral.plants.length / 2;
+
+                return majorityVote;
+            }) || [];
+            
+
+
+            // emitter pipes: จาก lateral pipes ในโซนนี้ - เฉพาะโหมด 'between_plants' เท่านั้น
+            const emitterPipesInZone = lateralPipesInZone
+                .filter(lateral => lateral.placementMode === 'between_plants') // กรองเฉพาะ between_plants
+                .flatMap(lateral => lateral.emitterLines || []);
+
+            // ใช้ข้อมูลจริงจากท่อที่อยู่ในโซนนี้
+            const mainPipesDataInZone = {
+                count: zoneMainPipes.length,
+                longest: zoneMainPipes.length > 0 ? Math.max(...zoneMainPipes.map(p => p.length)) : 0,
+                totalLength: mainPipeLengthInZone,
+            };
+
+            const subMainPipesDataInZone = {
+                count: zoneSubMainPipes.length,
+                longest: zoneSubMainPipes.length > 0 ? Math.max(...zoneSubMainPipes.map(p => p.length)) : 0,
+                totalLength: subMainPipeLengthInZone,
+            };
+
+            // สำหรับ branch pipes: รวม branch pipes จากท่อเมนรองในโซน + lateral pipes ที่อยู่ในโซนนี้
+            const lateralPipeLengthsInZone = lateralPipesInZone.map(pipe => pipe.length);
+            const totalLateralLengthInZone = lateralPipeLengthsInZone.reduce((sum, length) => sum + length, 0);
+            
+            const branchPipesDataInZone = {
+                count: branchPipesInZone.length + lateralPipesInZone.length,
+                longest: Math.max(
+                    branchPipesInZone.length > 0 ? Math.max(...branchPipesInZone.map(p => p.length)) : 0,
+                    lateralPipeLengthsInZone.length > 0 ? Math.max(...lateralPipeLengthsInZone) : 0
+                ),
+                totalLength: branchPipeLengthInZone + totalLateralLengthInZone,
+            };
+
+            const emitterPipeLengthsInZone = emitterPipesInZone.map(pipe => pipe.length);
+            const emitterPipesDataInZone = {
+                count: emitterPipesInZone.length,
+                longest: emitterPipeLengthsInZone.length > 0 ? Math.max(...emitterPipeLengthsInZone) : 0,
+                totalLength: emitterPipeLengthsInZone.reduce((sum, length) => sum + length, 0),
+            };
+
+            // คำนวณพื้นที่จากจำนวนต้นไม้ (ประมาณการ)
+            const estimatedAreaInRai = plantsInZone.length * 0.01; // ประมาณ 100 ต้นต่อไร่
+
+            const zoneData: ZoneSummaryData = {
+                zoneId: irrZone.id,
+                zoneName: irrZone.name || `โซน ${irrZone.id}`,
+                areaInRai: estimatedAreaInRai,
+                plantCount: plantsInZone.length,
+                waterNeedPerSession: waterNeedInZone,
+                waterPerPlant: waterPerPlantInZone,
+                plantData: projectData.selectedPlantType || plantsInZone[0]?.plantData,
+                mainPipesInZone: mainPipesDataInZone,
+                subMainPipesInZone: subMainPipesDataInZone,
+                branchPipesInZone: branchPipesDataInZone,
+                emitterPipesInZone: emitterPipesDataInZone,
+            };
+
+            zoneDetails.push(zoneData);
+        }
+        
+
     } else {
-        // โหมดโซนเดียว
+    // กรณีไม่มีการแบ่งโซนหรือใช้พื้นที่เดียว
         const plantDataForSingleZone =
             projectData.selectedPlantType || projectData.plants?.[0]?.plantData;
         const waterPerPlantSingleZone = plantDataForSingleZone?.waterNeed || 0;
-
-        console.log('🔍 Debug single zone plant data:', {
-            selectedPlantType: projectData.selectedPlantType,
-            firstPlantData: projectData.plants?.[0]?.plantData,
-            plantDataForSingleZone,
-            waterPerPlantSingleZone,
-        });
 
         const singleZoneData: ZoneSummaryData = {
             zoneId: 'main-area',
@@ -387,13 +811,15 @@ export const calculateProjectSummary = (
             waterNeedPerSession: totalWaterNeedPerSession,
             waterPerPlant:
                 totalPlants > 0 ? totalWaterNeedPerSession / totalPlants : waterPerPlantSingleZone,
-            plantData: plantDataForSingleZone, // เพิ่มข้อมูลพืช
+            plantData: plantDataForSingleZone,
             mainPipesInZone: mainPipesData,
             subMainPipesInZone: subMainPipesData,
             branchPipesInZone: branchPipesData,
+            emitterPipesInZone: emitterPipesData,
         };
 
         zoneDetails.push(singleZoneData);
+
     }
 
     const summary: ProjectSummaryData = {
@@ -405,15 +831,14 @@ export const calculateProjectSummary = (
         mainPipes: mainPipesData,
         subMainPipes: subMainPipesData,
         branchPipes: branchPipesData,
+        emitterPipes: emitterPipesData,
         longestPipesCombined,
         zoneDetails,
     };
 
-    console.log('✅ Project summary calculated:', summary);
     return summary;
 };
 
-// Formatting functions
 export const formatArea = (area: number): string => {
     if (typeof area !== 'number' || isNaN(area) || area < 0) return '0 ตร.ม.';
     if (area >= 1600) {
@@ -448,7 +873,6 @@ export const formatWaterVolume = (volume: number): string => {
     }
 };
 
-// Storage functions
 export const STORAGE_KEY = 'horticultureIrrigationData';
 
 export const saveProjectData = (data: HorticultureProjectData): boolean => {
@@ -456,7 +880,6 @@ export const saveProjectData = (data: HorticultureProjectData): boolean => {
         data.updatedAt = new Date().toISOString();
         data.version = '3.2.0';
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        console.log('✅ Project data saved successfully');
         return true;
     } catch (error) {
         console.error('❌ Error saving project data:', error);
@@ -469,7 +892,6 @@ export const loadProjectData = (): HorticultureProjectData | null => {
         const storedData = localStorage.getItem(STORAGE_KEY);
         if (storedData) {
             const data = JSON.parse(storedData);
-            console.log('✅ Project data loaded successfully');
             return data;
         }
         return null;
@@ -482,13 +904,239 @@ export const loadProjectData = (): HorticultureProjectData | null => {
 export const clearProjectData = (): void => {
     try {
         localStorage.removeItem(STORAGE_KEY);
-        console.log('✅ Project data cleared');
     } catch (error) {
         console.error('❌ Error clearing project data:', error);
     }
 };
 
-// Navigation functions
+// ฟังก์ชันใหม่สำหรับสร้างเส้นวัดระยะทางตั้งฉาก
+export const generatePerpendicularDimensionLines = (
+    exclusionArea: ExclusionArea,
+    mainArea: Coordinate[],
+    angleOffset: number = 0 // มุมในการปรับเอียง (องศา)
+): { id: string; start: Coordinate; end: Coordinate; distance: number; angle: number }[] => {
+    const lines: { id: string; start: Coordinate; end: Coordinate; distance: number; angle: number }[] = [];
+    
+    // ตรวจสอบข้อมูลพื้นฐาน
+    if (!exclusionArea || !exclusionArea.coordinates || exclusionArea.coordinates.length < 3) {
+        return lines;
+    }
+    
+    if (!mainArea || mainArea.length < 3) {
+        return lines;
+    }
+    
+    // คำนวณขอบเขตของพื้นที่หลีกเลี่ยง
+    const bounds = {
+        minLat: Math.min(...exclusionArea.coordinates.map(c => c.lat)),
+        maxLat: Math.max(...exclusionArea.coordinates.map(c => c.lat)),
+        minLng: Math.min(...exclusionArea.coordinates.map(c => c.lng)),
+        maxLng: Math.max(...exclusionArea.coordinates.map(c => c.lng))
+    };
+
+    // จุดกลางของพื้นที่หลีกเลี่ยง
+    const center = {
+        lat: (bounds.minLat + bounds.maxLat) / 2,
+        lng: (bounds.minLng + bounds.maxLng) / 2
+    };
+
+    // สร้างเส้นตั้งฉาก 4 ทิศทาง (เหนือ, ใต้, ตะวันออก, ตะวันตก)
+    const directions = [
+        { name: 'north', angle: 0 + angleOffset },    // ขึ้นเหนือ
+        { name: 'east', angle: 90 + angleOffset },    // ไปตะวันออก
+        { name: 'south', angle: 180 + angleOffset },  // ลงใต้
+        { name: 'west', angle: 270 + angleOffset }    // ไปตะวันตก
+    ];
+
+    directions.forEach((direction) => {
+        // คำนวณจุดเริ่มต้นบนขอบของพื้นที่หลีกเลี่ยง
+        const startPoint = calculatePointOnExclusionBoundary(
+            exclusionArea.coordinates,
+            center,
+            direction.angle
+        );
+
+        if (startPoint) {
+            // คำนวณจุดสิ้นสุดบนขอบของพื้นที่หลัก
+            const endPoint = calculateIntersectionWithMainArea(
+                startPoint,
+                direction.angle,
+                mainArea
+            );
+
+            if (endPoint) {
+                const distance = calculateDistanceBetweenPoints(startPoint, endPoint);
+                const line = {
+                    id: generateUniqueId('dimension'),
+                    start: startPoint,
+                    end: endPoint,
+                    distance: distance,
+                    angle: direction.angle
+                };
+                
+                lines.push(line);
+            }
+        }
+    });
+
+    return lines;
+};
+
+// ฟังก์ชันช่วยคำนวณจุดบนขอบของพื้นที่หลีกเลี่ยง
+const calculatePointOnExclusionBoundary = (
+    exclusionCoordinates: Coordinate[],
+    center: Coordinate,
+    angle: number
+): Coordinate | null => {
+    if (exclusionCoordinates.length < 3) return null;
+
+    try {
+        // แปลงมุมเป็นเรเดียน
+        const angleRad = (angle * Math.PI) / 180;
+        
+        // คำนวณเวกเตอร์ทิศทาง
+        const directionVector = {
+            lat: Math.cos(angleRad),
+            lng: Math.sin(angleRad)
+        };
+
+        // หาจุดตัดระหว่างเส้นจากจุดกลางไปในทิศทางที่กำหนดกับขอบของพื้นที่หลีกเลี่ยง
+        let intersectionPoint: Coordinate | null = null;
+        let minDistance = Infinity;
+
+        for (let i = 0; i < exclusionCoordinates.length; i++) {
+            const j = (i + 1) % exclusionCoordinates.length;
+            const segmentStart = exclusionCoordinates[i];
+            const segmentEnd = exclusionCoordinates[j];
+
+            const intersection = findLineSegmentIntersection(
+                center,
+                {
+                    lat: center.lat + directionVector.lat * 0.01, // ขยายเส้นออกไปเล็กน้อย
+                    lng: center.lng + directionVector.lng * 0.01
+                },
+                segmentStart,
+                segmentEnd
+            );
+
+            if (intersection) {
+                const distance = calculateDistanceBetweenPoints(center, intersection);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    intersectionPoint = intersection;
+                }
+            }
+        }
+
+        return intersectionPoint;
+    } catch (error) {
+        console.error('Error calculating point on exclusion boundary:', error);
+        return null;
+    }
+};
+
+// ฟังก์ชันช่วยหาจุดตัดระหว่างเส้นสองเส้น
+const findLineSegmentIntersection = (
+    line1Start: Coordinate,
+    line1End: Coordinate,
+    line2Start: Coordinate,
+    line2End: Coordinate
+): Coordinate | null => {
+    try {
+        const x1 = line1Start.lat;
+        const y1 = line1Start.lng;
+        const x2 = line1End.lat;
+        const y2 = line1End.lng;
+        const x3 = line2Start.lat;
+        const y3 = line2Start.lng;
+        const x4 = line2End.lat;
+        const y4 = line2End.lng;
+
+        const denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+        
+        if (Math.abs(denominator) < 1e-10) {
+            return null; // เส้นขนานกัน
+        }
+
+        const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denominator;
+        const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denominator;
+
+        // ตรวจสอบว่าจุดตัดอยู่ในช่วงของทั้งสองเส้น
+        if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+            return {
+                lat: x1 + t * (x2 - x1),
+                lng: y1 + t * (y2 - y1)
+            };
+        }
+
+        return null;
+    } catch (error) {
+        console.error('Error finding line segment intersection:', error);
+        return null;
+    }
+};
+
+// ฟังก์ชันช่วยคำนวณจุดตัดกับพื้นที่หลัก
+const calculateIntersectionWithMainArea = (
+    startPoint: Coordinate,
+    angle: number,
+    mainArea: Coordinate[]
+): Coordinate | null => {
+    if (mainArea.length < 3) return null;
+
+    try {
+        // แปลงมุมเป็นเรเดียน
+        const angleRad = (angle * Math.PI) / 180;
+        
+        // คำนวณเวกเตอร์ทิศทาง
+        const directionVector = {
+            lat: Math.cos(angleRad),
+            lng: Math.sin(angleRad)
+        };
+
+        // สร้างจุดปลายของเส้น (ขยายออกไปไกล)
+        const endPoint = {
+            lat: startPoint.lat + directionVector.lat * 0.1, // ขยายเส้นออกไป 0.1 องศา
+            lng: startPoint.lng + directionVector.lng * 0.1
+        };
+
+        // หาจุดตัดกับขอบของพื้นที่หลัก
+        let intersectionPoint: Coordinate | null = null;
+        let minDistance = Infinity;
+
+        for (let i = 0; i < mainArea.length; i++) {
+            const j = (i + 1) % mainArea.length;
+            const segmentStart = mainArea[i];
+            const segmentEnd = mainArea[j];
+
+            const intersection = findLineSegmentIntersection(
+                startPoint,
+                endPoint,
+                segmentStart,
+                segmentEnd
+            );
+
+            if (intersection) {
+                const distance = calculateDistanceBetweenPoints(startPoint, intersection);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    intersectionPoint = intersection;
+                }
+            }
+        }
+
+        return intersectionPoint;
+    } catch (error) {
+        console.error('Error calculating intersection with main area:', error);
+        return null;
+    }
+};
+
+// ฟังก์ชันช่วยสร้าง ID ที่ไม่ซ้ำกัน
+const generateUniqueId = (prefix: string): string => {
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+};
+
 export const navigateToPlanner = (): void => {
     router.visit('/horticulture/planner');
 };
@@ -496,3 +1144,132 @@ export const navigateToPlanner = (): void => {
 export const navigateToResults = (): void => {
     router.visit('/horticulture/results');
 };
+
+/**
+ * ฟังก์ชันหาจุดที่ใกล้ที่สุดบนเส้นตรง (ใช้ร่วมกัน)
+ */
+export const findClosestPointOnLineSegment = (
+    point: Coordinate,
+    lineStart: Coordinate,
+    lineEnd: Coordinate
+): Coordinate => {
+    const A = point.lat - lineStart.lat;
+    const B = point.lng - lineStart.lng;
+    const C = lineEnd.lat - lineStart.lat;
+    const D = lineEnd.lng - lineStart.lng;
+
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+
+    if (lenSq === 0) {
+        return lineStart;
+    }
+
+    const param = dot / lenSq;
+
+    if (param < 0) {
+        return lineStart;
+    } else if (param > 1) {
+        return lineEnd;
+    }
+
+    return {
+        lat: lineStart.lat + param * C,
+        lng: lineStart.lng + param * D
+    };
+};
+
+/**
+ * ฟังก์ชัน snap ปลายท่อ main ไปหาท่อ sub main ตามกฎใหม่
+ * กฎ: 
+ * 1. ท่อ sub main ห้ามขยับทุกกรณี
+ * 2. ใช้เฉพาะปลายท่อ main ในการ snap
+ * 3. ถ้าปลายท่อ sub main อยู่ในระยะ ≤ 1 เมตร ให้ snap ไปหาปลายท่อ sub main
+ * 4. ถ้าไม่ ให้ snap ไปหาจุดที่ใกล้ที่สุดบนท่อ sub main
+ */
+export const snapMainPipeEndToSubMainPipe = (
+    mainPipes: MainPipe[],
+    subMainPipeCoordinates: Coordinate[]
+): { mainPipes: MainPipe[], snapped: boolean } => {
+    if (!mainPipes || mainPipes.length === 0 || !subMainPipeCoordinates || subMainPipeCoordinates.length === 0) {
+        return { mainPipes, snapped: false };
+    }
+
+    const SNAP_THRESHOLD = 5.0; // เปลี่ยนเป็น 5 เมตร ตามที่ผู้ใช้ต้องการ
+    let hasSnapped = false;
+    
+    const updatedMainPipes = mainPipes.map(mainPipe => {
+        if (!mainPipe.coordinates || mainPipe.coordinates.length === 0) {
+            return mainPipe;
+        }
+
+        const mainPipeEnd = mainPipe.coordinates[mainPipe.coordinates.length - 1];
+        let closestPoint = mainPipeEnd;
+        let minDistance = Infinity;
+        let snapType = 'none'; // 'endpoint' หรือ 'midpoint'
+
+        // ขั้นตอน 1: หาจุดที่ใกล้ที่สุดบนท่อ sub main ทั้งหมด (endpoints และ midpoints)
+        
+        // ตรวจสอบปลายท่อ sub main (จุดเริ่มต้นและจุดปลาย)
+        const subMainStart = subMainPipeCoordinates[0];
+        const subMainEnd = subMainPipeCoordinates[subMainPipeCoordinates.length - 1];
+        
+        const distanceToStart = calculateDistanceBetweenPoints(mainPipeEnd, subMainStart);
+        const distanceToEnd = calculateDistanceBetweenPoints(mainPipeEnd, subMainEnd);
+        
+        // เช็คระยะห่างไปยังปลายท่อ sub main
+        if (distanceToStart < minDistance) {
+            minDistance = distanceToStart;
+            closestPoint = subMainStart;
+            snapType = 'endpoint';
+        }
+        
+        if (distanceToEnd < minDistance) {
+            minDistance = distanceToEnd;
+            closestPoint = subMainEnd;
+            snapType = 'endpoint';
+        }
+
+        // ขั้นตอน 2: ตรวจสอบจุดที่ใกล้ที่สุดบนท่อ sub main (midpoints)
+        for (let i = 0; i < subMainPipeCoordinates.length - 1; i++) {
+            const lineStart = subMainPipeCoordinates[i];
+            const lineEnd = subMainPipeCoordinates[i + 1];
+            
+            const closestPointOnLine = findClosestPointOnLineSegment(mainPipeEnd, lineStart, lineEnd);
+            const distanceToLine = calculateDistanceBetweenPoints(mainPipeEnd, closestPointOnLine);
+            
+            if (distanceToLine < minDistance) {
+                minDistance = distanceToLine;
+                closestPoint = closestPointOnLine;
+                snapType = 'midpoint';
+            }
+        }
+
+        // ขั้นตอน 3: ทำการ snap ถ้าพบจุดที่เหมาะสม
+        if (minDistance <= SNAP_THRESHOLD && snapType !== 'none') {
+            const updatedCoordinates = [...mainPipe.coordinates];
+            updatedCoordinates[updatedCoordinates.length - 1] = closestPoint;
+            
+            hasSnapped = true;
+            
+            // แสดงข้อความแจ้งเตือน
+            if (typeof window !== 'undefined' && (window as any).showSnapNotification) {
+                const snapMessage = snapType === 'endpoint' 
+                    ? 'ปลายท่อเมนเชื่อมต่อกับปลายท่อเมนรองสำเร็จ' 
+                    : 'ปลายท่อเมนเชื่อมต่อกับท่อเมนรองสำเร็จ';
+                (window as any).showSnapNotification(snapMessage);
+            }
+            
+            return {
+                ...mainPipe,
+                coordinates: updatedCoordinates,
+                length: calculatePipeLength(updatedCoordinates)
+            };
+        }
+
+        return mainPipe;
+    });
+
+    return { mainPipes: updatedMainPipes, snapped: hasSnapped };
+};
+

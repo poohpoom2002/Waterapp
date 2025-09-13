@@ -22,8 +22,8 @@ import {
     type PipeType,
     type EquipmentType,
 } from '@/pages/utils/fieldMapConstants';
-import Navbar from '../components/Navbar';
-import { useLanguage } from '../contexts/LanguageContext';
+import Navbar from '../../components/Navbar';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 // Proper TypeScript interfaces
 interface Coordinate {

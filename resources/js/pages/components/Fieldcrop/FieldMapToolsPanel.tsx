@@ -1472,25 +1472,15 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                     </div>
                                                     {recommendations.length > 0 && (
                                                         <div className="mt-1 text-xs text-gray-400">
-                                                            💡 {t('Recommended')}:{' '}
-                                                            {recommendations
-                                                                .map((r) => {
-                                                                    switch (r) {
-                                                                        case 'sprinkler':
-                                                                            return t('Sprinkler');
-                                                                        case 'mini_sprinkler':
-                                                                            return t(
-                                                                                'Mini Sprinkler'
-                                                                            );
-                                                                        case 'micro_spray':
-                                                                            return t('Micro Spray');
-                                                                        case 'drip-tape':
-                                                                            return t('Drip System');
-                                                                        default:
-                                                                            return r;
-                                                                    }
-                                                                })
-                                                                .join(', ')}
+                                                            💡 {t('Recommended')}: {recommendations.map(r => {
+                                                                switch(r) {
+                                                                    case 'sprinkler': return t('Sprinkler');
+                                                                    case 'mini_sprinkler': return t('Sprinkler');
+                                                                    case 'micro_spray': return t('Sprinkler');
+                                                                    case 'drip-tape': return t('Drip System');
+                                                                    default: return r;
+                                                                }
+                                                            }).join(', ')}
                                                         </div>
                                                     )}
                                                 </div>
@@ -1539,44 +1529,9 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                         ? '⭐'
                                                         : ''}
                                                 </option>
-                                                <option
-                                                    value="mini_sprinkler"
-                                                    className={
-                                                        recommendations.includes('mini_sprinkler')
-                                                            ? 'bg-green-700'
-                                                            : ''
-                                                    }
-                                                >
-                                                    🌱 {t('Mini Sprinkler')}{' '}
-                                                    {recommendations.includes('mini_sprinkler')
-                                                        ? '⭐'
-                                                        : ''}
-                                                </option>
-                                                <option
-                                                    value="micro_spray"
-                                                    className={
-                                                        recommendations.includes('micro_spray')
-                                                            ? 'bg-green-700'
-                                                            : ''
-                                                    }
-                                                >
-                                                    💦 {t('Micro Spray')}{' '}
-                                                    {recommendations.includes('micro_spray')
-                                                        ? '⭐'
-                                                        : ''}
-                                                </option>
-                                                <option
-                                                    value="drip-tape"
-                                                    className={
-                                                        recommendations.includes('drip-tape')
-                                                            ? 'bg-green-700'
-                                                            : ''
-                                                    }
-                                                >
-                                                    💧 {t('Drip System')}{' '}
-                                                    {recommendations.includes('drip-tape')
-                                                        ? '⭐'
-                                                        : ''}
+                                                {/* Removed mini_sprinkler and micro_spray options */}
+                                                <option value="drip-tape" className={recommendations.includes('drip-tape') ? 'bg-green-700' : ''}>
+                                                    💧 {t('Drip System')} {recommendations.includes('drip-tape') ? '⭐' : ''}
                                                 </option>
                                             </select>
 

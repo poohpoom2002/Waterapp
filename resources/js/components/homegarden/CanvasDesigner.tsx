@@ -59,7 +59,6 @@ interface CanvasDesignerProps {
     pipes: Pipe[];
     selectedZoneType: string;
     editMode: string;
-    manualSprinklerType: string;
     manualSprinklerRadius: number;
     selectedSprinkler: string | null;
     selectedPipes: Set<string>;
@@ -86,7 +85,6 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
     pipes,
     selectedZoneType,
     editMode,
-    manualSprinklerType,
     manualSprinklerRadius,
     selectedSprinkler,
     selectedPipes,
@@ -1073,7 +1071,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             }
 
             ctx.fillStyle = isSelected ? '#FFD700' : sprinkler.type.color;
-            ctx.font = `bold ${10 / viewport.zoom}px Arial`;
+            ctx.font = `bold ${20 / viewport.zoom}px Arial`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.shadowColor = 'rgba(0,0,0,0.8)';

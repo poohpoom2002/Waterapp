@@ -2563,7 +2563,7 @@ const EquipmentDetailModal: React.FC<{
             .replace(/Width/gi, t('ความกว้าง'))
             .replace(/Length/gi, t('ความยาว'))
             .replace(/Water Volume/gi, t('อัตราการไหล'))
-            .replace(/Liters Per Minute/gi, t('ลิตรต่อนาที'))
+            .replace(/Liters Per Minute/gi, t('ลิตรต่อนาที')) // L/min
             .replace(/Meters/gi, t('เมตร'))
             .replace(/Bar/gi, t('บาร์'));
 

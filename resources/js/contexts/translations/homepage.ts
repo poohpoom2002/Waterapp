@@ -356,13 +356,13 @@ export const homepageTranslations = {
         data_driven_desc: 'การวิเคราะห์และรายงานที่ครอบคลุมสำหรับการตัดสินใจที่ชาญฉลาด',
 
         // Categories
-        horticulture: 'พืชสวน',
+        horticulture: 'พืชสวน (ไม้ยืนต้น)',
         horticulture_desc: 'ระบบชลประทานขั้นสูงสำหรับไม้ผลและสวนผลไม้',
-        home_garden: 'สวนบ้าน',
+        home_garden: 'สวนบ้าน (Home Garden)',
         home_garden_desc: 'ระบบสปริงเกอร์อัตโนมัติสำหรับสวนในบ้าน',
-        greenhouse: 'โรงเรือน',
+        greenhouse: 'โรงเรือน (Greenhouse)',
         greenhouse_desc: 'ชลประทานเฉพาะสำหรับการเกษตรในสภาพแวดล้อมควบคุม',
-        field_crop: 'พืชไร่',
+        field_crop: 'พืชไร่ (Field Crop)',
         field_crop_desc: 'ชลประทานขนาดใหญ่สำหรับแปลงเกษตร',
 
         // Category features

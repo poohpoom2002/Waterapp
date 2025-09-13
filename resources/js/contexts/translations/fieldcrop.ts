@@ -21,7 +21,8 @@ export const fieldCropTranslations = {
         'm.': 'm.',
         lines: 'lines',
         units: 'units',
-
+        bar: 'bar',
+        
         // Basic units and measurements
         meters: 'meters',
         liters: 'liters',
@@ -98,6 +99,8 @@ export const fieldCropTranslations = {
         // Error messages and confirmations
         '⚠️ Reset all data? All drawn elements will be lost.':
             '⚠️ Reset all data? All drawn elements will be lost.',
+        '⚠️ Reset all pipes? All drawn pipes will be lost.':
+            '⚠️ Reset all pipes? All drawn pipes will be lost.',
         'Remove all equipment?': 'Remove all equipment?',
         'Remove {equipmentName}?': 'Remove {equipmentName}?',
         'Failed to load saved project data': 'Failed to load saved project data',
@@ -159,7 +162,6 @@ export const fieldCropTranslations = {
         'Main Pipe': 'Main Pipe',
         'Sub Main Pipe': 'Sub Main Pipe',
         'Lateral Pipe': 'Lateral Pipe',
-        'Generate Lateral Pipes': 'Generate Lateral Pipes',
         'Clear Lateral Pipes': 'Clear Lateral Pipes',
         'Manual Drawing': 'Manual Drawing',
         'Auto Generate': 'Auto Generate',
@@ -288,7 +290,11 @@ export const fieldCropTranslations = {
         'Planting Points': 'Planting Points',
         'Crop Information (from cropData)': 'Crop Information (from cropData)',
         'Infrastructure Summary': 'Infrastructure Summary',
+        'Sprinkler Specs': 'Sprinkler Specs',
         'Pipe System (finished drawing only)': 'Pipe System (finished drawing only)',
+        'Flow:': 'Flow:',
+        'Radius:': 'Radius:',
+        'Pressure:': 'Pressure:',
         'Main Pipes': 'Main Pipes',
         'Submain Pipes': 'Submain Pipes',
         'Lateral Pipes': 'Lateral Pipes',
@@ -387,7 +393,32 @@ export const fieldCropTranslations = {
         'Project data for calculations': 'Project data for calculations',
         'No project to calculate': 'No project to calculate',
         'Irrigation Planning Summary': 'Irrigation Planning Summary',
-
+        // field-crop-summary additions
+        'Irrigation Points': 'Irrigation Points',
+        'Water Summary': 'Water Summary',
+        'Water by zone': 'Water by zone',
+        'per irrigation': 'per irrigation',
+        'Actual Plants & Daily Water (from Initial Area):': 'Actual Plants & Daily Water (from Initial Area):',
+        'Per-plant water (day)': 'Per-plant water (day)',
+        'Total water (day)': 'Total water (day)',
+        'Hide details': 'Hide details',
+        'Show details': 'Show details',
+        'Rate': 'Rate',
+        'L/plant': 'L/plant',
+        'L/min': 'L/min',
+        'No flow data': 'No flow data',
+        'Total flowrate': 'Total flowrate',
+        'Lateral outlets': 'Lateral outlets',
+        'Hide': 'Hide',
+        'View all': 'View all',
+        'Most outlets': 'Most outlets',
+        'No laterals': 'No laterals',
+        'Water need': 'Water Need',
+        'Water Jet Tape': 'Water Jet Tape',
+        'System Pivot': 'System Pivot',
+        'Water Requirements (liters per irrigation)': 'Water Requirements (liters per irrigation)',
+        'L/irrigation': 'L/irrigation',
+        
         // New spacing update messages
         'Updated row spacing for {cropName}: {value}cm':
             'Updated row spacing for {cropName}: {value}cm',
@@ -396,11 +427,7 @@ export const fieldCropTranslations = {
         'Reset spacing to defaults for {count} crops':
             'Reset spacing to defaults for {count} crops',
 
-        // Fittings section
-        'Fittings (2-way / 3-way / 4-way)': 'Fittings (2-way / 3-way / 4-way)',
-        '2-way': '2-way',
-        '3-way': '3-way',
-        '4-way': '4-way',
+        // Fittings section (trimmed to only keys used by 5 pages)
         Main: 'Main',
         Submain: 'Submain',
         Lateral: 'Lateral',
@@ -445,7 +472,8 @@ export const fieldCropTranslations = {
         'm.': 'ม.',
         lines: 'เส้น',
         units: 'หน่วย',
-
+        bar: 'บาร์',
+        
         // Basic units and measurements
         meters: 'เมตร',
         liters: 'ลิตร',
@@ -521,6 +549,8 @@ export const fieldCropTranslations = {
         // Error messages and confirmations
         '⚠️ Reset all data? All drawn elements will be lost.':
             '⚠️ รีเซ็ตข้อมูลทั้งหมดหรือไม่? ข้อมูลที่วาดไว้ทั้งหมดจะหายไป',
+        '⚠️ Reset all pipes? All drawn pipes will be lost.':
+            '⚠️ รีเซ็ตท่อทั้งหมดหรือไม่? ท่อที่วาดไว้ทั้งหมดจะหายไป',
         'Remove all equipment?': 'ลบอุปกรณ์ทั้งหมดหรือไม่?',
         'Remove {equipmentName}?': 'ลบ {equipmentName} หรือไม่?',
         'Failed to load saved project data': 'ไม่สามารถโหลดข้อมูลโปรเจกต์ที่บันทึกไว้ได้',
@@ -582,7 +612,6 @@ export const fieldCropTranslations = {
         'Main Pipe': 'ท่อเมน',
         'Sub Main Pipe': 'ท่อเมนรอง',
         'Lateral Pipe': 'ท่อย่อย',
-        'Generate Lateral Pipes': 'สร้างท่อย่อย',
         'Clear Lateral Pipes': 'ลบท่อย่อย',
         'Manual Drawing': 'การวาดด้วยตนเอง',
         'Auto Generate': 'สร้างอัตโนมัติ',
@@ -709,7 +738,11 @@ export const fieldCropTranslations = {
         'Planting Points': 'จุดปลูก',
         'Crop Information (from cropData)': 'ข้อมูลพืช (จาก cropData)',
         'Infrastructure Summary': 'สรุปโครงสร้างพื้นฐาน',
+        'Sprinkler Specs': 'สเปคสปริงเกลอร์',
         'Pipe System (finished drawing only)': 'ระบบท่อ (เฉพาะที่วาดเสร็จ)',
+        'Flow:': 'อัตราการไหล:',
+        'Radius:': 'รัศมี:',
+        'Pressure:': 'แรงดัน:',
         'Main Pipes': 'ท่อเมน',
         'Submain Pipes': 'ท่อรอง',
         'Lateral Pipes': 'ท่อย่อย',
@@ -807,7 +840,32 @@ export const fieldCropTranslations = {
         'Project data for calculations': 'ข้อมูลโปรเจกต์สำหรับการคำนวณ',
         'No project to calculate': 'ไม่มีโปรเจกต์ให้คำนวณ',
         'Irrigation Planning Summary': 'สรุปการวางแผนระบบน้ำ',
-
+        // field-crop-summary additions
+        'Irrigation Points': 'จุดชลประทาน',
+        'Water Summary': 'สรุปน้ำ',
+        'Water by zone': 'ปริมาณน้ำตามโซน',
+        'per irrigation': 'ต่อการให้น้ำ',
+        'Actual Plants & Daily Water (from Initial Area):': 'จำนวนต้นจริงและปริมาณน้ำต่อวัน (จากพื้นที่เริ่มต้น):',
+        'Per-plant water (day)': 'ปริมาณน้ำต่อหนึ่งต้น (ต่อวัน)',
+        'Total water (day)': 'ปริมาณน้ำรวม (ต่อวัน)',
+        'Hide details': 'ซ่อนรายละเอียด',
+        'Show details': 'แสดงรายละเอียด',
+        'Rate': 'อัตรา',
+        'L/plant': 'ลิตร/ต้น',
+        'L/min': 'ลิตร/นาที',
+        'No flow data': 'ไม่มีข้อมูลอัตราการไหล',
+        'Total flowrate': 'อัตราการไหลรวม',
+        'Lateral outlets': 'จุดจ่ายน้ำบนท่อย่อย',
+        'Hide': 'ซ่อน',
+        'View all': 'ดูทั้งหมด',
+        'Most outlets': 'จำนวนจุดจ่ายมากที่สุด',
+        'No laterals': 'ไม่มีท่อย่อย',
+        'Water need': 'ความต้องการน้ำ',
+        'Water Jet Tape': 'สายน้ำพ่น',
+        'System Pivot': 'ระบบพีวอท',
+        'Water Requirements (liters per irrigation)': 'ความต้องการน้ำ (ลิตรต่อการให้น้ำ)',
+        'L/irrigation': 'ลิตร/ครั้ง',
+        
         // New spacing update messages
         'Updated row spacing for {cropName}: {value}cm':
             'อัปเดตระยะห่างแถวสำหรับ {cropName}: {value} ซม.',
@@ -816,11 +874,7 @@ export const fieldCropTranslations = {
         'Reset spacing to defaults for {count} crops':
             'รีเซ็ตระยะห่างเป็นค่าเริ่มต้นสำหรับ {count} พืช',
 
-        // Fittings section
-        'Fittings (2-way / 3-way / 4-way)': 'ข้อต่อ (2 ทาง / 3 ทาง / 4 ทาง)',
-        '2-way': '2 ทาง',
-        '3-way': '3 ทาง',
-        '4-way': '4 ทาง',
+        // Fittings section (trimmed to only keys used by 5 pages)
         Main: 'ท่อเมน',
         Submain: 'ท่อเมนย่อย',
         Lateral: 'ท่อย่อย',

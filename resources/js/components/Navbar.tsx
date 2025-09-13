@@ -33,13 +33,16 @@ const Navbar: React.FC = () => {
     const [showFloatingAiChat, setShowFloatingAiChat] = useState(false);
     const [isAiChatMinimized, setIsAiChatMinimized] = useState(false);
 
-    // Scroll to footer function
-    const scrollToFooter = () => {
-        const footer = document.querySelector('footer');
-        if (footer) {
-            footer.scrollIntoView({ behavior: 'smooth' });
-        }
-    };
+    // ฟังก์ชันสำหรับเลื่อนไปยัง Footer
+    // const scrollToFooter = () => {
+    //     const footerElement = document.getElementById('contact-footer');
+    //     if (footerElement) {
+    //         footerElement.scrollIntoView({ 
+    //             behavior: 'smooth', 
+    //             block: 'start' 
+    //         });
+    //     }
+    // };
 
     return (
         <nav className="border-b border-gray-700 bg-gray-800 shadow-lg">
@@ -59,12 +62,8 @@ const Navbar: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <h1 className="text-xl font-bold">
-                                    {t('Chaiyo Irrigation System')}
-                                </h1>
-                                <p className="text-sm">
-                                    {t('บจก.กนกโปรดักส์ จำกัด & บจก.ไชโยไปป์แอนด์ฟิตติ้ง จำกัด')}
-                                </p>
+                                <h1 className="text-xl font-bold">{t('Chaiyo Irrigation Planning System')}</h1>
+                                <p className="text-sm">{t('บจก.กนกโปรดักส์ จำกัด & บจก.ไชโยไปป์แอนด์ฟิตติ้ง จำกัด')}</p>
                             </div>
                         </Link>
                     </div>
@@ -100,12 +99,6 @@ const Navbar: React.FC = () => {
                                 className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"
                             >
                                 ⚙️ {t('จัดการอุปกรณ์')}
-                            </button>
-                            <button
-                                onClick={scrollToFooter}
-                                className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"
-                            >
-                                {t('ติดต่อเรา')}
                             </button>
                         </div>
                         <LanguageSwitcher />

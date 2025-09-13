@@ -500,7 +500,7 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
                 fillOpacity: 0.9,
                 strokeColor: '#FFFFFF',
                 strokeWeight: 2,
-                scale: 4,
+                scale: 6,
                 rotation: orientation || 0,
             };
         },
@@ -587,7 +587,7 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
                     const marker = new google.maps.Marker({
                         position: { lat: sprinkler.position.lat, lng: sprinkler.position.lng },
                         icon: createSprinklerIcon(sprinkler.type, sprinkler.orientation),
-                        title: `หัวฉีด: ${sprinkler.type.nameEN} (รัศมี ${sprinkler.type.radius}ม.)`,
+                        title: `หัวฉีด: ${sprinkler.type.nameEN} | รัศมี: ${sprinkler.type.radius}ม. | แรงดัน: ${sprinkler.type.pressure}บาร์ | อัตราการไหล: ${sprinkler.type.flowRate}ล./นาที`,
                         map: map,
                     });
                     overlaysRef.current.set(`sprinkler-${sprinkler.id}`, marker);

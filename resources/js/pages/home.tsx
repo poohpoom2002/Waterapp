@@ -173,7 +173,7 @@ const getPlantCategories = (t: (key: string) => string): PlantCategory[] => [
         description: t('field_crop_desc'),
         icon: '🌾',
         color: 'from-yellow-600 to-yellow-800',
-        route: '/field-crop',
+	        route: '/choose-crop',
         features: [
             t('large_scale_planning'),
             t('efficient_irrigation'),
@@ -461,7 +461,7 @@ const FieldCard = ({
                                     ? field.total_water_need.toFixed(2)
                                     : (parseFloat(field.total_water_need) || 0).toFixed(2)
                                 : 'N/A'}{' '}
-                            ลิตร/วัน
+                            ลิตร/ครั้ง
                         </span>
                     </div>
                         </>

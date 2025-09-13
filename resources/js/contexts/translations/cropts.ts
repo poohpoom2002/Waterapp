@@ -1,4 +1,4 @@
-// resources/js/utils/cropDataTranslations.ts
+// resources/js/contexts/translations/cropts.ts
 
 export interface CropTranslations {
     [key: string]: {
@@ -10,19 +10,9 @@ export interface CropTranslations {
 export const cropTranslations = {
     en: {
         // Cereals
-        rice: {
-            name: 'Rice',
-            description:
-                "Thailand's main crop, grown in paddy fields. Requires a lot of water, especially during tillering and booting stages.",
-        },
         corn: {
-            name: 'Field Corn',
-            description: 'An important economic field crop used in the animal feed industry.',
-        },
-        sorghum: {
-            name: 'Sorghum',
-            description:
-                'A drought-tolerant cereal crop suitable for arid areas, used for animal and human consumption.',
+            name: 'Corn',
+            description: 'An important economic field crop used in the animal feed industry.'
         },
 
         // Root crops
@@ -35,6 +25,10 @@ export const cropTranslations = {
             name: 'Sweet Potato',
             description:
                 'A highly nutritious root crop with both domestic and international market demand.',
+        },
+        taro: {
+            name: 'Taro',
+            description: 'A nutritious root vegetable that grows well in wet conditions and is popular in Thai cuisine.'
         },
 
         // Legumes
@@ -69,6 +63,14 @@ export const cropTranslations = {
             description:
                 'A long-term economic crop. Tapping can begin about 7 years after planting.',
         },
+        asparagus: {
+            name: 'Asparagus',
+            description: 'A high-value perennial vegetable crop popular in export markets and fine dining.'
+        },
+        chili: {
+            name: 'Chili Pepper',
+            description: 'A spicy vegetable crop essential in Thai cuisine with high market demand both fresh and dried.'
+        },
 
         // Oilseed crops
         oil_palm: {
@@ -84,17 +86,9 @@ export const cropTranslations = {
     },
     th: {
         // พืชธัญพืช
-        rice: {
-            name: 'ข้าว',
-            description: 'พืชหลักของประเทศไทย ปลูกในไร่นา ต้องการน้ำมาก โดยเฉพาะช่วงแตกกอและออกรวง',
-        },
         corn: {
-            name: 'ข้าวโพดไร่',
-            description: 'พืชเศรษฐกิจสำคัญที่ใช้ในอุตสาหกรรมอาหารสัตว์',
-        },
-        sorghum: {
-            name: 'ข้าวฟ่าง',
-            description: 'พืชธัญพืชทนแล้งที่เหมาะสำหรับพื้นที่แห้งแล้ง ใช้เป็นอาหารสัตว์และอาหารคน',
+            name: 'ข้าวโพด',
+            description: 'พืชเศรษฐกิจสำคัญที่ใช้ในอุตสาหกรรมอาหารสัตว์'
         },
 
         // พืชหัว
@@ -105,6 +99,10 @@ export const cropTranslations = {
         sweet_potato: {
             name: 'มันเทศ',
             description: 'พืชหัวที่มีคุณค่าทางโภชนาการสูง มีตลาดทั้งในและต่างประเทศ',
+        },
+        taro: {
+            name: 'เผือก',
+            description: 'พืชหัวที่มีคุณค่าทางโภชนาการ เจริญเติบโตได้ดีในที่ชื้น เป็นส่วนผสมสำคัญในอาหารไทย'
         },
 
         // พืชตระกูลถั่ว
@@ -133,6 +131,14 @@ export const cropTranslations = {
         rubber: {
             name: 'ยางพารา',
             description: 'พืชเศรษฐกิจระยะยาว เริ่มกรีดได้ประมาณ 7 ปีหลังปลูก',
+        },
+        asparagus: {
+            name: 'หน่อไม้ฝรั่ง',
+            description: 'พืชผักยืนต้นมูลค่าสูง เป็นที่นิยมในตลาดส่งออกและร้านอาหารหรู'
+        },
+        chili: {
+            name: 'พริก',
+            description: 'พืชผักเผ็ดที่จำเป็นในอาหารไทย มีความต้องการในตลาดสูงทั้งสดและแห้ง'
         },
 
         // พืชน้ำมัน
@@ -175,6 +181,6 @@ export const irrigationNeedsTranslations = {
     th: {
         low: 'น้อย',
         medium: 'ปานกลาง',
-        high: 'มาก',
-    },
+        high: 'มาก'
+    }
 } as const;
