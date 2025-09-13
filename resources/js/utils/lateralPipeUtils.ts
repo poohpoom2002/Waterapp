@@ -217,6 +217,55 @@ export const findMainToSubMainConnections = (
         return null;
     };
 
+    // Helper function สำหรับตรวจสอบว่าท่อเมนผ่านหลายโซนหรือไม่
+    const checkMainPipePassesThroughMultipleZones = (mainPipe: any): boolean => {
+        if (!mainPipe.coordinates || mainPipe.coordinates.length < 2) return false;
+        
+        const startPoint = mainPipe.coordinates[0];
+        const endPoint = mainPipe.coordinates[mainPipe.coordinates.length - 1];
+        
+        let startZone: string | null = null;
+        let endZone: string | null = null;
+        
+        // หาโซนของจุดเริ่มต้น
+        if (irrigationZones) {
+            for (const zone of irrigationZones) {
+                if (isPointInPolygon(startPoint, zone.coordinates)) {
+                    startZone = zone.id;
+                    break;
+                }
+            }
+        }
+        if (!startZone && zones) {
+            for (const zone of zones) {
+                if (isPointInPolygon(startPoint, zone.coordinates)) {
+                    startZone = zone.id;
+                    break;
+                }
+            }
+        }
+        
+        // หาโซนของจุดสิ้นสุด
+        if (irrigationZones) {
+            for (const zone of irrigationZones) {
+                if (isPointInPolygon(endPoint, zone.coordinates)) {
+                    endZone = zone.id;
+                    break;
+                }
+            }
+        }
+        if (!endZone && zones) {
+            for (const zone of zones) {
+                if (isPointInPolygon(endPoint, zone.coordinates)) {
+                    endZone = zone.id;
+                    break;
+                }
+            }
+        }
+        
+        return startZone !== null && endZone !== null && startZone !== endZone;
+    };
+
     for (const mainPipe of mainPipes) {
         if (!mainPipe.coordinates || mainPipe.coordinates.length < 2) {
             continue;
@@ -237,8 +286,14 @@ export const findMainToSubMainConnections = (
             
             const distance = calculateDistanceBetweenPoints(mainEnd, subMainStart);
             
+            // 🔧 ปรับปรุงเงื่อนไขการตรวจสอบโซนให้เข้มงวดขึ้น
             if (mainZone && subMainZone && mainZone !== subMainZone) {
-                continue; // ข้าม - ท่อคนละโซนไม่ควรเชื่อมกัน
+                // 🚨 เข้มงวดขึ้น: อนุญาตเฉพาะท่อเมนที่ผ่านหลายโซนเท่านั้น
+                const isMultiZoneMainPipe = checkMainPipePassesThroughMultipleZones(mainPipe);
+                
+                if (!isMultiZoneMainPipe) {
+                    continue; // ข้าม - ต่างโซนกันและไม่ใช่ท่อข้ามโซน
+                }
             }
             
             if (distance <= snapThreshold) {
@@ -290,7 +345,6 @@ export const findMainToSubMainConnections = (
             }
         }
     }
-
 
     return connections;
 };
@@ -384,6 +438,9 @@ export const findSubMainToLateralStartConnections = (
         lateralPipeId: string;
         connectionPoint: Coordinate;
     }[] = [];
+    
+    // 🔥 เพิ่ม Set เพื่อป้องกันการสร้างจุดเชื่อมต่อซ้ำ
+    const connectionKeys = new Set<string>();
 
     // Helper function สำหรับหาโซนของท่อ (ตามจุดปลาย)
     const findPipeZone = (pipe: any): string | null => {
@@ -439,14 +496,20 @@ export const findSubMainToLateralStartConnections = (
                 const distance = calculateDistanceBetweenPoints(lateralStart, closestPoint);
 
                 if (distance <= snapThreshold) {
-                    connections.push({
-                        subMainPipeId: subMainPipe.id,
-                        lateralPipeId: lateralPipe.id,
-                        connectionPoint: {
-                            lat: parseFloat(closestPoint.lat.toFixed(8)),
-                            lng: parseFloat(closestPoint.lng.toFixed(8))
-                        }
-                    });
+                    // 🔥 สร้าง unique key เพื่อป้องกันการซ้ำซ้อน
+                    const connectionKey = `${subMainPipe.id}-${lateralPipe.id}`;
+                    
+                    if (!connectionKeys.has(connectionKey)) {
+                        connectionKeys.add(connectionKey);
+                        connections.push({
+                            subMainPipeId: subMainPipe.id,
+                            lateralPipeId: lateralPipe.id,
+                            connectionPoint: {
+                                lat: parseFloat(closestPoint.lat.toFixed(8)),
+                                lng: parseFloat(closestPoint.lng.toFixed(8))
+                            }
+                        });
+                    }
                 } else {
                     console.log(`❌ Rejected lateral-submain connection: distance ${distance.toFixed(2)}m > threshold ${snapThreshold}m`);
                 }
@@ -478,6 +541,9 @@ export const findSubMainToMainIntersections = (
         subMainSegmentIndex: number;
         mainSegmentIndex: number;
     }[] = [];
+    
+    // 🔥 เพิ่ม Set เพื่อป้องกันการสร้างจุดตัดซ้ำ
+    const intersectionKeys = new Set<string>();
 
     // Helper function สำหรับหาโซนของท่อ (ตามจุดปลาย)
     const findPipeZone = (pipe: any): string | null => {
@@ -542,13 +608,19 @@ export const findSubMainToMainIntersections = (
                     );
 
                     if (intersection) {
-                        intersections.push({
-                            subMainPipeId: subMainPipe.id,
-                            mainPipeId: mainPipe.id,
-                            intersectionPoint: intersection,
-                            subMainSegmentIndex: i,
-                            mainSegmentIndex: j
-                        });
+                        // 🔥 สร้าง unique key เพื่อป้องกันการซ้ำซ้อน
+                        const intersectionKey = `${subMainPipe.id}-${mainPipe.id}-${i}-${j}`;
+                        
+                        if (!intersectionKeys.has(intersectionKey)) {
+                            intersectionKeys.add(intersectionKey);
+                            intersections.push({
+                                subMainPipeId: subMainPipe.id,
+                                mainPipeId: mainPipe.id,
+                                intersectionPoint: intersection,
+                                subMainSegmentIndex: i,
+                                mainSegmentIndex: j
+                            });
+                        }
                     }
                 }
             }
@@ -580,6 +652,9 @@ export const findMidConnections = (
         sourceEndIndex: number;
         targetSegmentIndex: number;
     }[] = [];
+    
+    // 🔥 เพิ่ม Set เพื่อป้องกันการสร้างจุดเชื่อมต่อซ้ำ
+    const connectionKeys = new Set<string>();
 
     // Helper function สำหรับหาโซนของท่อ (ตามจุดปลาย)
     const findPipeZone = (pipe: any): string | null => {
@@ -649,13 +724,19 @@ export const findMidConnections = (
                             (calculateDistanceBetweenPoints(endpoint.point, segmentEnd) <= snapThreshold);
 
                         if (!isEndToEndConnection) {
-                            connections.push({
-                                sourcePipeId: sourcePipe.id,
-                                targetPipeId: targetPipe.id,
-                                connectionPoint: closestPoint,
-                                sourceEndIndex: endpoint.index,
-                                targetSegmentIndex: i
-                            });
+                            // 🔥 สร้าง unique key เพื่อป้องกันการซ้ำซ้อน
+                            const connectionKey = `${sourcePipe.id}-${targetPipe.id}-${endpoint.index}-${i}`;
+                            
+                            if (!connectionKeys.has(connectionKey)) {
+                                connectionKeys.add(connectionKey);
+                                connections.push({
+                                    sourcePipeId: sourcePipe.id,
+                                    targetPipeId: targetPipe.id,
+                                    connectionPoint: closestPoint,
+                                    sourceEndIndex: endpoint.index,
+                                    targetSegmentIndex: i
+                                });
+                            }
                         }
                     }
                 }
