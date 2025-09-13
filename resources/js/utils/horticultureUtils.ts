@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { router } from '@inertiajs/react';
+import { findPipeZoneImproved } from './horticultureProjectStats';
 
 export interface Coordinate {
     lat: number;
@@ -698,27 +699,28 @@ export const calculateProjectSummary = (
 
             // แยกท่อตามโซน irrigationZones - ใช้การหาท่อจริงๆ ในโซน
             
-            // Import findPipeEndZone function (assume it's available or create a simplified version)
-            const findPipeEndZoneLocal = (pipe: any, zones: any[], irrigationZones: any[]) => {
-                if (!pipe.coordinates || pipe.coordinates.length === 0) return null;
-                
-                const endPoint = pipe.coordinates[pipe.coordinates.length - 1];
-                
-                // Check irrigationZones first
-                for (const zone of irrigationZones) {
-                    if (zone.coordinates && zone.coordinates.length > 0) {
-                        const isInside = isPointInPolygon(endPoint, zone.coordinates);
-                        if (isInside) return zone.id;
-                    }
-                }
-                
-                return null;
-            };
+            // Import findPipeEndZone function (assume it's available or create a simplified version) - ไม่ใช้แล้ว
+            // const findPipeEndZoneLocal = (pipe: any, zones: any[], irrigationZones: any[]) => {
+            //     if (!pipe.coordinates || pipe.coordinates.length === 0) return null;
+            //     
+            //     const endPoint = pipe.coordinates[pipe.coordinates.length - 1];
+            //     
+            //     // Check irrigationZones first
+            //     for (const zone of irrigationZones) {
+            //         if (zone.coordinates && zone.coordinates.length > 0) {
+            //             const isInside = isPointInPolygon(endPoint, zone.coordinates);
+            //             if (isInside) return zone.id;
+            //         }
+            //     }
+            //     
+            //     return null;
+            // };
             
             // ท่อเมน: หาท่อจริงๆ ที่อยู่ในโซนนี้
             const allMainPipes = projectData.mainPipes || [];
             const zoneMainPipes = allMainPipes.filter(mainPipe => {
-                const mainZoneId = findPipeEndZoneLocal(mainPipe, projectData.zones || [], projectData.irrigationZones || []);
+                // 🔧 ใช้ findPipeZoneImproved แทน findPipeEndZoneLocal เพื่อความแม่นยำ
+                const mainZoneId = findPipeZoneImproved(mainPipe, projectData.zones || [], projectData.irrigationZones || []);
                 return mainZoneId === irrZone.id;
             });
             const mainPipeLengthInZone = zoneMainPipes.reduce((sum, pipe) => sum + pipe.length, 0);
@@ -726,7 +728,8 @@ export const calculateProjectSummary = (
             // ท่อเมนรอง: หาท่อจริงๆ ที่อยู่ในโซนนี้
             const allSubMainPipes = projectData.subMainPipes || [];
             const zoneSubMainPipes = allSubMainPipes.filter(subMainPipe => {
-                const subMainZoneId = findPipeEndZoneLocal(subMainPipe, projectData.zones || [], projectData.irrigationZones || []);
+                // 🔧 ใช้ findPipeZoneImproved แทน findPipeEndZoneLocal เพื่อความแม่นยำ
+                const subMainZoneId = findPipeZoneImproved(subMainPipe, projectData.zones || [], projectData.irrigationZones || []);
                 return subMainZoneId === irrZone.id;
             });
             const subMainPipeLengthInZone = zoneSubMainPipes.reduce((sum, pipe) => sum + pipe.length, 0);
